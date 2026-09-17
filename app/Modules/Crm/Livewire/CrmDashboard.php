@@ -186,7 +186,10 @@ class CrmDashboard extends Component
 
     public function render()
     {
-        return view('modules.crm.livewire.crm-dashboard')
-            ->layout('layouts.backoffice', ['header' => 'CRM & Membership']);
+        return view('modules.crm.livewire.crm-dashboard', [
+            'tiers' => $this->tiers,
+            'customers' => $this->customers,
+            'selectedCustomer' => $this->selectedCustomer,
+        ])->layout('layouts.backoffice', ['header' => 'CRM & Membership']);
     }
 }

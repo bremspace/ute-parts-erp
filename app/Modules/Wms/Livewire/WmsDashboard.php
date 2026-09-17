@@ -19,12 +19,30 @@ class WmsDashboard extends Component
 {
     use WithPagination;
 
-    public string $activeTab = 'stok'; // stok, transfer, opname
+    public string $activeTab = 'stok'; // stok, produk, transfer, opname
 
     // Stok Tab filters
     public string $search = '';
     public string $kategori = '';
     public ?int $filterGudangId = null;
+
+    // Produk tab filters
+    public string $produkSearch = '';
+
+    // New Produk Modal (Tambah Produk — sinkron Akunting)
+    public bool $showProdukModal = false;
+    public array $produkForm = [
+        'nama' => '', 'kategori' => '', 'brand_kompatibel' => '', 'model_kompatibel' => '',
+        'kondisi' => 'baru', 'harga_beli' => 0, 'harga_jual_retail' => 0,
+        'sku' => '', 'gudang_id' => null, 'stok_awal' => 0, 'stok_minimum' => 0,
+    ];
+
+    // Tambah Stok Modal (pembelian — sinkron Akunting)
+    public bool $showTambahStokModal = false;
+    public ?int $stokProdukId = null;
+    public array $tambahStokForm = [
+        'gudang_id' => null, 'qty' => 1, 'harga_beli' => 0, 'keterangan' => 'Pembelian dari supplier',
+    ];
 
     // New Transfer Modal state
     public bool $showTransferModal = false;
@@ -326,6 +344,96 @@ class WmsDashboard extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Stock opname disetujui & stok sistem berhasil diselaraskan']);
     }
 
+    // ===== PRODUK (master + pembelian, sinkron Akunting) =====
+
+    public function openProdukModal()
+    {
+        $this->produkForm = [
+            'nama' => '', 'kategori' => '', 'brand_kompatibel' => '', 'model_kompatibel' => '',
+            'kondisi' => 'baru', 'harga_beli' => 0, 'harga_jual_retail' => 0,
+            'sku' => '', 'gudang_id' => null, 'stok_awal' => 0, 'stok_minimum' => 0,
+        ];
+        $this->showProdukModal = true;
+    }
+
+    public function simpanProduk()
+    {
+        $this->validate([
+            'produkForm.nama' => 'required|string|max:255',
+            'produkForm.kategori' => 'required|string|max:255',
+            'produkForm.harga_beli' => 'required|numeric|min:0',
+            'produkForm.harga_jual_retail' => 'required|numeric|min:0',
+        ]);
+
+        try {
+            app(\App\Modules\Wms\Services\ProdukService::class)->buatProduk(
+                nama: $this->produkForm['nama'],
+                kategori: $this->produkForm['kategori'],
+                brand: $this->produkForm['brand_kompatibel'] ?: null,
+                model: $this->produkForm['model_kompatibel'] ?: null,
+                kondisi: $this->produkForm['kondisi'],
+                hargaBeli: (float) $this->produkForm['harga_beli'],
+                hargaJual: (float) $this->produkForm['harga_jual_retail'],
+                sku: $this->produkForm['sku'] ?: null,
+                gudangId: $this->produkForm['gudang_id'] ?: null,
+                stokAwal: (int) $this->produkForm['stok_awal'],
+                stokMinimum: (int) $this->produkForm['stok_minimum'],
+                userId: auth()->id()
+            );
+
+            $this->showProdukModal = false;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => 'Produk tersimpan' . ((int) $this->produkForm['stok_awal'] > 0 ? ' + jurnal pembelian dibuat' : ''),
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function openTambahStokModal(int $produkId)
+    {
+        $produk = Produk::with('skuVariants')->findOrFail($produkId);
+        $this->stokProdukId = $produkId;
+        $variant = $produk->skuVariants->first();
+        $this->tambahStokForm = [
+            'gudang_id' => $this->filterGudangId,
+            'qty' => 1,
+            'harga_beli' => $variant?->harga_beli ?? $produk->harga_beli ?? 0,
+            'keterangan' => 'Pembelian stok ' . $produk->nama,
+        ];
+        $this->showTambahStokModal = true;
+    }
+
+    public function simpanTambahStok()
+    {
+        $this->validate([
+            'tambahStokForm.gudang_id' => 'required|exists:gudang,id',
+            'tambahStokForm.qty' => 'required|integer|min:1',
+            'tambahStokForm.harga_beli' => 'required|numeric|min:0',
+        ]);
+
+        try {
+            $produk = Produk::with('skuVariants')->findOrFail($this->stokProdukId);
+            $variant = $produk->skuVariants->first();
+
+            app(\App\Modules\Wms\Services\ProdukService::class)->tambahStokPembelian(
+                produkId: $produk->id,
+                variantId: $variant?->id,
+                gudangId: (int) $this->tambahStokForm['gudang_id'],
+                qty: (int) $this->tambahStokForm['qty'],
+                hargaBeli: (float) $this->tambahStokForm['harga_beli'],
+                keterangan: $this->tambahStokForm['keterangan'] ?: 'Pembelian dari supplier',
+                userId: auth()->id()
+            );
+
+            $this->showTambahStokModal = false;
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Stok ditambahkan + jurnal pembelian dibuat']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
     public function render()
     {
         $gudangs = Gudang::where('is_active', true)->get();
@@ -364,6 +472,14 @@ class WmsDashboard extends Component
             'stokItems' => $stokItems,
             'transfers' => $transfers,
             'opnames' => $opnames,
+            'produks' => Produk::with(['skuVariants', 'stokItems.gudang'])
+                ->when($this->produkSearch, fn ($q) => $q->where(function ($q2) {
+                    $q2->where('nama', 'like', "%{$this->produkSearch}%")
+                        ->orWhere('kategori', 'like', "%{$this->produkSearch}%")
+                        ->orWhere('brand_kompatibel', 'like', "%{$this->produkSearch}%");
+                }))
+                ->orderBy('nama')
+                ->paginate(12),
         ])->layout('layouts.backoffice', ['header' => 'Gudang & Manajemen Stok (WMS)']);
     }
 }

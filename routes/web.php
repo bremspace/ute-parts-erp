@@ -94,6 +94,11 @@ Route::post('/logout-pelanggan', function () {
 Route::get('/cart', CartCheckout::class)->name('cart');
 Route::get('/checkout', CartCheckout::class)->name('checkout');
 
+// Dashboard akun pelanggan (ACCOUNT-01..05)
+Route::get('/account', App\Modules\Marketplace\Livewire\CustomerAccount::class)
+    ->middleware('auth:customer')
+    ->name('customer.account');
+
 // ===== Zona Backoffice (internal staff, dark mode) =====
 Route::get('/app/login', function () {
     return view('auth.login');
@@ -118,8 +123,10 @@ Route::post('/app/login', function (\Illuminate\Http\Request $request) {
 })->middleware('throttle:10,1')->name('login.post');
 
 Route::prefix('app')->middleware('auth')->group(function () {
-    Route::get('/', fn() => redirect('/app/pos'));
-    Route::get('/dashboard', fn() => redirect('/app/pos'));
+    Route::get('/', fn() => redirect('/app/dashboard'));
+
+    // Dashboard (DASH-01 widget per role)
+    Route::get('/dashboard', App\Modules\Dashboard\Livewire\DashboardIndex::class)->name('dashboard');
 
     // POS Kasir Screen
     Route::get('/pos', PosKasir::class)->name('pos');
@@ -138,4 +145,10 @@ Route::prefix('app')->middleware('auth')->group(function () {
 
     // Akunting & Keuangan Screen
     Route::get('/akunting', AkuntingDashboard::class)->name('akunting');
+
+    // Omnichannel Command Center Screen
+    Route::get('/omnichannel', App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter::class)->name('omnichannel');
+
+    // Pengaturan & RBAC Screen
+    Route::get('/pengaturan', App\Modules\Rbac\Livewire\SettingsRbac::class)->name('pengaturan');
 });

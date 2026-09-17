@@ -321,7 +321,13 @@ class AkuntingDashboard extends Component
     public function render()
     {
         return view('modules.akunting.livewire.akunting-dashboard', [
-            'akunCoaList' => $this->akun_coa_list,
+            'akunCoaList' => $this->coaList,
+            'labaRugi' => $this->labaRugi,
+            'neraca' => $this->neraca,
+            'arusKas' => $this->arusKas,
+            'jurnals' => $this->jurnals,
+            'piutangs' => $this->piutangs,
+            'utangs' => $this->utangs,
         ])->layout('layouts.backoffice', ['header' => 'Akunting & Keuangan']);
     }
 }

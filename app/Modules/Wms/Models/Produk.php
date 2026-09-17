@@ -28,6 +28,11 @@ class Produk extends \Illuminate\Database\Eloquent\Model
         return $this->hasMany(SkuVariant::class);
     }
 
+    public function channelMappings(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Omnichannel\Models\ChannelProductMapping::class);
+    }
+
     public function stokItems(): HasMany
     {
         return $this->hasMany(StokItem::class);

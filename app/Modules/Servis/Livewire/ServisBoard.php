@@ -268,6 +268,10 @@ class ServisBoard extends Component
             'teknisiList'     => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(),
             'gudangList'      => Gudang::where('is_active', true)->get(),
             'produkList'      => Produk::where('is_active', true)->orderBy('nama')->limit(50)->get(),
+            'stateMachineColumns' => $this->stateMachineColumns,
+            'groupedTikets'   => $this->groupedTikets,
+            'selectedTiket'   => $this->selectedTiket,
+            'fotoCount'       => $this->fotoCount,
         ])->layout('layouts.backoffice', ['header' => 'Servis HP — Papan Kanban']);
     }
 }

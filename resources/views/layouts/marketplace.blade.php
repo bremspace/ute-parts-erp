@@ -49,7 +49,7 @@
 
                 <!-- Customer / Login -->
                 @auth('customer')
-                    <a href="{{ route('checkout') }}" class="px-3.5 py-2 rounded-xl text-sm font-semibold text-ink-500 hover:bg-ink-50 hover:text-ink-900 transition-colors flex items-center gap-2">
+                    <a href="{{ route('customer.account') }}" class="px-3.5 py-2 rounded-xl text-sm font-semibold text-ink-500 hover:bg-ink-50 hover:text-ink-900 transition-colors flex items-center gap-2">
                         <span class="w-7 h-7 rounded-full bg-up-mint/20 text-up-mint flex items-center justify-center text-xs font-bold">
                             {{ substr(auth('customer')->user()->nama, 0, 1) }}
                         </span>

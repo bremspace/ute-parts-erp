@@ -110,7 +110,10 @@ class ResellerDashboard extends Component
 
     public function render()
     {
-        return view('modules.reseller.livewire.reseller-dashboard')
-            ->layout('layouts.backoffice', ['header' => 'Reseller & Komisi']);
+        return view('modules.reseller.livewire.reseller-dashboard', [
+            'resellers' => $this->resellers,
+            'komisiList' => $this->komisiList,
+            'skemaList' => $this->skemaList,
+        ])->layout('layouts.backoffice', ['header' => 'Reseller & Komisi']);
     }
 }
