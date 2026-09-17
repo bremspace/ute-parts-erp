@@ -33,3 +33,6 @@ Thumbs.db
 !storage/framework/views/.gitignore
 !storage/framework/cache/.gitignore
 !/storage/logs/.gitignore
+
+/.omo/
+
