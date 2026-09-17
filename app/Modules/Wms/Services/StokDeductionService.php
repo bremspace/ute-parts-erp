@@ -60,6 +60,18 @@ class StokDeductionService
             'catatan'        => $catatan,
         ]);
 
+        // [T-26] SOT mutation log
+        \App\Modules\Wms\Models\StockMutationLog::create([
+            'produk_id'      => $produkId,
+            'sku_variant_id' => $skuVariantId,
+            'gudang_id'      => $gudangId,
+            'delta'          => -$qty,
+            'sumber'         => $jenis,
+            'referensi_tipe' => $referensiTipe,
+            'referensi_id'   => $referensiId,
+            'terjadi_at'     => now(),
+        ]);
+
         return $stok;
     }
 

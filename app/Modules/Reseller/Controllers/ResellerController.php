@@ -18,6 +18,51 @@ class ResellerController extends Controller
         protected KomisiService $komisiService
     ) {}
 
+    // [API: RESELLER-05][T-21] Daftarkan reseller baru + skema komisi custom per kategori
+    public function daftarReseller(Request $request)
+    {
+        $request->validate([
+            'nama' => 'required|string|max:255',
+            'telepon' => 'required|string|max:20|unique:pelanggan,telepon',
+            'email' => 'nullable|email',
+            'skema' => 'required|array|min:1',
+            'skema.*.kategori' => 'nullable|string|max:100',
+            'skema.*.tipe' => 'required|in:persen,nominal',
+            'skema.*.nilai' => 'required|numeric|min:0',
+        ]);
+
+        $tier = \App\Modules\Crm\Models\TierMembership::where('is_active', true)->first();
+
+        $pelanggan = \App\Modules\Crm\Models\Pelanggan::create([
+            'nama' => $request->nama,
+            'telepon' => $request->telepon,
+            'email' => $request->email,
+            'tier_membership_id' => $tier?->id,
+            'is_reseller' => true,
+        ]);
+
+        foreach ($request->skema as $s) {
+            \App\Modules\Reseller\Models\SkemaKomisiReseller::create([
+                'pelanggan_id' => $pelanggan->id,
+                'kategori' => $s['kategori'] ?: null,
+                'tipe' => $s['tipe'],
+                'nilai' => $s['nilai'],
+                'is_active' => true,
+            ]);
+        }
+
+        return $this->success($pelanggan->load('komisi'), 'Reseller terdaftar dengan skema custom', 201);
+    }
+
+    // [API: RESELLER-06][T-21] List skema custom per reseller
+    public function skemaReseller(Request $request, $id)
+    {
+        return $this->success(
+            \App\Modules\Reseller\Models\SkemaKomisiReseller::where('pelanggan_id', $id)->get(),
+            'Skema custom reseller berhasil dimuat'
+        );
+    }
+
     // [API: RESELLER-01] Daftar reseller + omzet + komisi terhutang/terbayar
     public function index(Request $request)
     {

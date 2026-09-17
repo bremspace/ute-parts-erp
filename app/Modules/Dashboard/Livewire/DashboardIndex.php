@@ -3,6 +3,7 @@
 namespace App\Modules\Dashboard\Livewire;
 
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Akunting\Models\Piutang;
@@ -100,6 +101,105 @@ class DashboardIndex extends Component
             ->get();
     }
 
+    // ===== [T-27] Data siap-chart (server-computed, ringan untuk RAM 1GB) =====
+
+    /** Tren omzet 30 hari (line chart): [tanggal, total] utk cabang aktif */
+    public function getChartOmzet30HariProperty(): array
+    {
+        $cabangId = session('cabang_id');
+
+        $rows = Transaksi::where('status', 'selesai')
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('created_at', '>=', now()->subDays(29)->startOfDay())
+            ->selectRaw('DATE(created_at) as tgl, SUM(total_akhir) as total')
+            ->groupBy('tgl')
+            ->get()
+            ->keyBy('tgl');
+
+        $labels = [];
+        $values = [];
+        for ($i = 29; $i >= 0; $i--) {
+            $d = now()->subDays($i)->toDateString();
+            $labels[] = now()->subDays($i)->format('d/m');
+            $values[] = round((float) ($rows[$d]->total ?? 0), 0);
+        }
+
+        return ['labels' => $labels, 'values' => $values];
+    }
+
+    /** Komposisi omzet per kategori produk (donut): [label, nilai] */
+    public function getChartKategoriProperty(): array
+    {
+        $cabangId = session('cabang_id');
+
+        $query = TransaksiItem::query()
+            ->join('produk', 'produk.id', '=', 'transaksi_item.produk_id')
+            ->join('transaksi', 'transaksi.id', '=', 'transaksi_item.transaksi_id')
+            ->where('transaksi.status', 'selesai')
+            ->when($cabangId, fn ($q) => $q->where('transaksi.cabang_id', $cabangId))
+            ->where('transaksi.created_at', '>=', now()->startOfMonth())
+            ->selectRaw('COALESCE(produk.kategori, \'Umum\') as kate, SUM(transaksi_item.subtotal) as total')
+            ->groupBy('kate')
+            ->orderByDesc('total')
+            ->limit(6)
+            ->get();
+
+        return [
+            'labels' => $query->pluck('kate')->values()->all(),
+            'values' => $query->pluck('total')->map(fn ($v) => round((float) $v, 0))->values()->all(),
+        ];
+    }
+
+    /** Status servis aktif per tahap kanban (bar chart) */
+    public function getChartServisStatusProperty(): array
+    {
+        $statuses = ['diterima', 'diagnosa', 'menunggu_approval', 'disetujui', 'dikerjakan', 'qc', 'selesai'];
+
+        $labels = collect($statuses)->map(fn ($s) => str_replace('_', ' ', $s))->values()->all();
+        $values = collect($statuses)->map(function ($s) {
+            $q = TiketServis::where('status', $s);
+            if (session('cabang_id')) {
+                $q->where('cabang_id', session('cabang_id'));
+            }
+            return $q->count();
+        })->values()->all();
+
+        return ['labels' => $labels, 'values' => $values];
+    }
+
+    /** Piutang aging (0-30, 31-60, 61-90, >90 hari) */
+    public function getChartPiutangAgingProperty(): array
+    {
+        $semua = Piutang::where('status', '!=', 'lunas')->get();
+        $now = now()->startOfDay();
+
+        $buckets = ['0-30 hari' => 0, '31-60 hari' => 0, '61-90 hari' => 0, '>90 hari' => 0];
+        foreach ($semua as $p) {
+            $umur = $now->diffInDays($p->jatuh_tempo ?? $now);
+            if ($umur <= 30) $buckets['0-30 hari'] += (float) $p->sisa;
+            elseif ($umur <= 60) $buckets['31-60 hari'] += (float) $p->sisa;
+            elseif ($umur <= 90) $buckets['61-90 hari'] += (float) $p->sisa;
+            else $buckets['>90 hari'] += (float) $p->sisa;
+        }
+
+        return ['labels' => array_keys($buckets), 'values' => array_values($buckets)];
+    }
+
+    /** Stok kritis top-N (bar chart) */
+    public function getChartStokKritisProperty(): array
+    {
+        $items = $this->stokKritis['items']->take(10);
+        return [
+            'labels' => $items->map(fn ($s) => $s->produk?->nama)->values()->all(),
+            'values' => $items->map(fn ($s) => $s->jumlah)->values()->all(),
+        ];
+    }
+
+    public function getRoleProperty(): string
+    {
+        return auth()->user()?->getRoleNames()->first() ?? 'super-admin';
+    }
+
     public function render()
     {
         return view('modules.dashboard.livewire.dashboard-index', [
@@ -114,6 +214,12 @@ class DashboardIndex extends Component
             'piutangJatuhTempo' => $this->piutangJatuhTempo,
             'komisiPending' => $this->komisiPending,
             'transaksiTerbaru' => $this->transaksiTerbaru,
+            'chartOmzet30' => $this->chartOmzet30Hari,
+            'chartKategori' => $this->chartKategori,
+            'chartServisStatus' => $this->chartServisStatus,
+            'chartPiutangAging' => $this->chartPiutangAging,
+            'chartStokKritis' => $this->chartStokKritis,
+            'currentRole' => $this->role,
         ])->layout('layouts.backoffice', ['header' => 'Dashboard']);
     }
 }

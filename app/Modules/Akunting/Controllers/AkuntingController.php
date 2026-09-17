@@ -287,6 +287,47 @@ class AkuntingController extends Controller
         ], 'Buku besar berhasil diambil');
     }
 
+    // [API: ACC-11][T-24] Export laporan → queue (async, RAM-heap friendly)
+    public function export(Request $request)
+    {
+        $request->validate([
+            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,stok,pelanggan,servis,piutang,utang',
+            'periode_dari' => 'nullable|date',
+            'periode_sampai' => 'nullable|date',
+            'akun_id' => 'nullable|exists:akun_coa,id',
+        ]);
+
+        dispatch(new \App\Modules\Akunting\Jobs\ExportLaporanJob(
+            jenis: $request->jenis,
+            periodeDari: $request->periode_dari,
+            periodeSampai: $request->periode_sampai,
+            cabangId: session('cabang_id'),
+            akunId: $request->akun_id,
+            userId: auth()->id()
+        ));
+
+        return $this->success(
+            ['status' => 'queued', 'pesan' => 'Export diproses via antrian — link muncul setelah selesai'],
+            'Export laporan dijadwalkan (async)'
+        );
+    }
+
+    // [ACC-11b] Download hasil export yg sudah siap (path base64 dari session flash)
+    public function exportDownload(Request $request)
+    {
+        $path = base64_decode((string) $request->query('path', ''));
+        if (str_contains($path, '..') || !str_starts_with($path, 'exports/')) {
+            return $this->error('Path tidak valid', 400);
+        }
+
+        $full = storage_path('app/' . $path);
+        if (!file_exists($full)) {
+            return $this->error('File export tidak ditemukan atau belum siap', 404);
+        }
+
+        return response()->download($full);
+    }
+
     // [API: ACC-08] Piutang (AR) list + reminder jatuh tempo
     public function indexPiutang(Request $request)
     {

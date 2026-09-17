@@ -1,4 +1,10 @@
 <div class="space-y-6">
+    @php
+        // helper warna chart (HSL) — palet Prism
+        function colorHsl(int $hue, int $saturation = 70): string {
+            return "hsl({$hue} {$saturation}% 55%)";
+        }
+    @endphp
     <!-- Greeting -->
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
@@ -70,6 +76,70 @@
                 </div>
             </div>
             <a href="/app/reseller" class="inline-block text-[11px] text-up-primary hover:text-indigo-400 mt-2 font-semibold">Approval Komisi →</a>
+        </x-prism.glass-card>
+    </div>
+
+    <!-- [T-27] Chart (SVG ringan, server-computed — aman RAM 1GB) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Omzet 30 hari -->
+        <x-prism.glass-card title="Tren Omzet 30 Hari" :subtitle="'Role: ' . $currentRole">
+            <div class="flex items-end gap-[3px] h-32">
+                @php($max = max(1, ...array_pad($chartOmzet30['values'], 1, 0)))
+                @foreach($chartOmzet30['values'] as $i => $v)
+                    <div class="flex-1 flex flex-col items-center gap-1 group" title="{{ $chartOmzet30['labels'][$i] }}: Rp {{ number_format($v,0,',','.') }}">
+                        <div class="w-full rounded-t bg-gradient-to-t from-up-primary/40 to-up-primary transition-all group-hover:from-up-accent/60 group-hover:to-up-accent"
+                             style="height: {{ max(2, round(($v/$max)*100)) }}%"></div>
+                    </div>
+                @endforeach
+            </div>
+            <div class="flex justify-between mt-2 text-[9px] text-ink-500">
+                <span>{{ $chartOmzet30['labels'][0] ?? '' }}</span>
+                <span>{{ $chartOmzet30['labels'][array_key_last($chartOmzet30['labels']) ?? 0] ?? '' }}</span>
+            </div>
+        </x-prism.glass-card>
+
+        <!-- Kategori omzet -->
+        <x-prism.glass-card title="Komposisi Omzet per Kategori" subtitle="Bulan ini">
+            @php($maxK = max(1, ...array_pad($chartKategori['values'], 1, 0)))
+            <div class="space-y-2">
+                @foreach($chartKategori['labels'] as $i => $label)
+                    <div class="flex items-center gap-2 text-[11px]">
+                        <span class="w-24 truncate text-ink-300">{{ $label }}</span>
+                        <div class="flex-1 h-3 rounded bg-white/5 overflow-hidden">
+                            <div class="h-full" style="width: {{ max(2, round((($chartKategori['values'][$i] ?? 0)/$maxK)*100)) }}%; background: {{ colorHsl(($i) * 50 + 250, 70) }}"></div>
+                        </div>
+                        <span class="tabular-nums text-white font-semibold">Rp {{ number_format($chartKategori['values'][$i] ?? 0, 0, ',', '.') }}</span>
+                    </div>
+                @endforeach
+            </div>
+        </x-prism.glass-card>
+
+        <!-- Servis status (bar) -->
+        <x-prism.glass-card title="Status Servis Aktif" subtitle="Per tahap kanban">
+            <div class="flex items-end gap-2 h-28">
+                @php($maxS = max(1, ...array_pad($chartServisStatus['values'], 1, 0)))
+                @foreach($chartServisStatus['labels'] as $i => $label)
+                    <div class="flex-1 flex flex-col items-center justify-end gap-1" title="{{ $label }}: {{ $chartServisStatus['values'][$i] ?? 0 }}">
+                        <div class="w-full rounded-t bg-up-amber/70" style="height: {{ max(2, round((($chartServisStatus['values'][$i] ?? 0)/$maxS)*100)) }}%"></div>
+                        <span class="text-[8px] text-ink-500 truncate w-full text-center">{{ Str::limit($label, 8) }}</span>
+                    </div>
+                @endforeach
+            </div>
+        </x-prism.glass-card>
+
+        <!-- Stok kritis (bar) -->
+        <x-prism.glass-card title="Top Stok Kritis" subtitle="Perlu restok segera">
+            <div class="space-y-1.5">
+                @foreach($chartStokKritis['labels'] as $i => $label)
+                    <div class="flex items-center gap-2 text-[11px]">
+                        <span class="w-28 truncate text-ink-300">{{ $label }}</span>
+                        <div class="flex-1 h-3 rounded bg-white/5 overflow-hidden">
+                            <div class="h-full bg-up-red/80" style="width: {{ min(100, (($chartStokKritis['values'][$i] ?? 0) / 10) * 100) }}%"></div>
+                        </div>
+                        <span class="tabular-nums text-up-red font-bold">{{ $chartStokKritis['values'][$i] ?? 0 }}</span>
+                    </div>
+                @endforeach
+            </div>
         </x-prism.glass-card>
     </div>
 

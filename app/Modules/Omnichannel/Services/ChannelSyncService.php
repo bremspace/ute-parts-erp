@@ -116,6 +116,8 @@ class ChannelSyncService
                     'payload' => $order,
                     'channel_status' => $order['order_status'] ?? null,
                     'status' => 'menunggu_proses',
+                    // [T-26] Estimasi biaya admin marketplace (configurable per channel — fallback 5%)
+                    'estimasi_biaya_platform' => round(((float) ($order['total_amount'] ?? 0)) * ($channel->kredensial['biaya_persen'] ?? 5) / 100, 2),
                 ]);
 
                 // Buat Transaksi lokal (validasi produk mapping di phase 2 — MVP catat saja)

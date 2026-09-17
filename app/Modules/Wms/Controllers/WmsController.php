@@ -131,6 +131,14 @@ class WmsController extends Controller
                 $setelah = $sebelum - $item->jumlah;
                 $stokAsal->update(['jumlah' => $setelah]);
 
+                // [T-26] SOT
+                \App\Modules\Wms\Models\StockMutationLog::create([
+                    'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
+                    'gudang_id' => $transfer->gudang_asal_id, 'delta' => -$item->jumlah,
+                    'sumber' => 'transfer', 'referensi_tipe' => StokTransfer::class,
+                    'referensi_id' => $transfer->id, 'terjadi_at' => now(),
+                ]);
+
                 StokLog::create([
                     'gudang_id' => $transfer->gudang_asal_id,
                     'produk_id' => $item->produk_id,
@@ -179,6 +187,14 @@ class WmsController extends Controller
                 $sebelum = $stokTujuan->jumlah;
                 $setelah = $sebelum + $item->jumlah;
                 $stokTujuan->update(['jumlah' => $setelah]);
+
+                // [T-26] SOT
+                \App\Modules\Wms\Models\StockMutationLog::create([
+                    'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
+                    'gudang_id' => $transfer->gudang_tujuan_id, 'delta' => $item->jumlah,
+                    'sumber' => 'transfer', 'referensi_tipe' => StokTransfer::class,
+                    'referensi_id' => $transfer->id, 'terjadi_at' => now(),
+                ]);
 
                 StokLog::create([
                     'gudang_id' => $transfer->gudang_tujuan_id,
@@ -315,6 +331,14 @@ class WmsController extends Controller
                 $stok->update(['jumlah' => $item->stok_fisik]);
 
                 if ($item->selisih !== 0) {
+                    // [T-26] SOT
+                    \App\Modules\Wms\Models\StockMutationLog::create([
+                        'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
+                        'gudang_id' => $opname->gudang_id, 'delta' => $item->selisih,
+                        'sumber' => 'opname', 'referensi_tipe' => StokOpname::class,
+                        'referensi_id' => $opname->id, 'terjadi_at' => now(),
+                    ]);
+
                     StokLog::create([
                         'gudang_id' => $opname->gudang_id,
                         'produk_id' => $item->produk_id,

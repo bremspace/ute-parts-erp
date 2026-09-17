@@ -1,13 +1,15 @@
 <div class="space-y-6">
     <!-- Tabs -->
     <div class="flex items-center gap-2 border-b border-white/5 pb-4 flex-wrap">
-        @foreach(['users' => '👥 Manajemen User', 'cabang' => '🏬 Cabang & Gudang', 'master' => '📋 Master Data'] as $kode => $label)
+        @foreach(['users' => '👥 Manajemen User', 'role' => '🔐 Role & Permission', 'cabang' => '🏬 Cabang & Gudang', 'master' => '📋 Master Data'] as $kode => $label)
             <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">{{ $label }}</button>
         @endforeach
 
         <div class="ml-auto">
             @if($activeTab === 'users')
                 <button wire:click="openUserModal()" class="px-4 py-2 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer">+ User Baru</button>
+            @elseif($activeTab === 'role')
+                <button wire:click="openRoleModal" class="px-4 py-2 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer">+ Role Baru</button>
             @elseif($activeTab === 'cabang')
                 <button wire:click="openCabangModal()" class="px-4 py-2 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer mr-2">+ Cabang</button>
                 <button wire:click="openGudangModal()" class="px-4 py-2 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">+ Gudang</button>
@@ -47,7 +49,7 @@
             <x-slot:pagination>{{ $users->links() }}</x-slot:pagination>
         </x-prism.data-table>
 
-        <!-- Role matrix viewer -->
+        <!-- Role matrix viewer (read-only summary) -->
         <div class="glass-panel rounded-2xl p-5 mt-4">
             <p class="text-sm font-bold text-white mb-3">Matriks Role & Permission (rekomendasi default PRD §3)</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -59,7 +61,86 @@
                     </div>
                 @endforeach
             </div>
+            <p class="text-[10px] text-ink-500 mt-3">💡 Ubah akses per role di tab "<strong class="text-up-primary">Role & Permission</strong>".</p>
         </div>
+    @endif
+
+    <!-- TAB: ROLE & PERMISSION [T-25] -->
+    @if($activeTab === 'role')
+        <div class="space-y-4">
+            @if($editRoleId)
+                @php $roleEdit = $rolesFull->firstWhere('id', $editRoleId); @endphp
+                <div class="glass-panel rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-sm font-bold text-white">Edit Permission — <span class="text-up-primary">{{ $roleEdit?->name }}</span></h4>
+                        <button wire:click="$set('editRoleId', null)" class="text-ink-400 hover:text-white text-xs cursor-pointer">✕ tutup</button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-96 overflow-y-auto pr-1">
+                        @foreach($permissionsList as $perm)
+                            <label class="flex items-center gap-2 text-[11px] text-ink-200 cursor-pointer p-1.5 rounded-lg hover:bg-white/5">
+                                <input type="checkbox" wire:model="editRolePermissions" value="{{ $perm->name }}" class="accent-up-mint w-3.5 h-3.5" />
+                                <span class="font-mono">{{ $perm->name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <div class="mt-4 flex gap-2">
+                        <button wire:click="$set('editRoleId', null)" class="px-4 py-2 rounded-xl bg-white/5 text-ink-300 text-xs font-semibold cursor-pointer">Batal</button>
+                        <button wire:click="saveEditRolePermissions" class="px-4 py-2 rounded-xl bg-up-mint text-ink-950 text-xs font-bold cursor-pointer">Simpan Permission</button>
+                    </div>
+                    @if($roleEdit?->name === 'super-admin')
+                        <p class="text-[10px] text-up-amber mt-2">⚠️ super-admin wajib minimal 1 permission (anti lockout).</p>
+                    @endif
+                </div>
+            @endif
+
+            <x-prism.data-table :headers="['Role', 'Permission', 'Edit']">
+                @forelse($rolesFull as $r)
+                    <tr class="hover:bg-white/[0.02] transition-colors text-xs">
+                        <td class="py-3.5 px-4 font-bold text-white">
+                            {{ $r->name }}
+                            @if($r->name === 'super-admin')
+                                <span class="ml-1 text-[9px] text-up-amber bg-up-amber/10 px-1.5 py-0.5 rounded-full">guardrail</span>
+                            @endif
+                        </td>
+                        <td class="py-3.5 px-4 text-ink-300">{{ $r->permissions->count() }} permission</td>
+                        <td class="py-3.5 px-4">
+                            <button wire:click="openEditRole({{ $r->id }})" class="px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/35 text-up-primary font-bold text-[11px] cursor-pointer">Edit</button>
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="3" class="py-12 text-center text-ink-400">Belum ada role.</td></tr>
+                @endforelse
+            </x-prism.data-table>
+        </div>
+
+        <!-- MODAL: ROLE BARU -->
+        @if($showRoleModal)
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                <div class="w-full max-w-lg glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                        <h3 class="text-lg font-bold text-white">Role Baru</h3>
+                        <button wire:click="$set('showRoleModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    </div>
+                    <div class="mb-3">
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Role *</label>
+                        <input type="text" wire:model="roleBaruNama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="opsi-gudang-regional" />
+                    </div>
+                    <p class="text-xs font-bold text-ink-300 mb-2">Pilih Permission</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                        @foreach($permissionsList as $perm)
+                            <label class="flex items-center gap-2 text-[11px] text-ink-200 cursor-pointer p-1.5 rounded-lg hover:bg-white/5">
+                                <input type="checkbox" wire:model="roleBaruPermissions" value="{{ $perm->name }}" class="accent-up-mint w-3.5 h-3.5" />
+                                <span class="font-mono">{{ $perm->name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <div class="flex gap-3 pt-4 border-t border-white/5 mt-4">
+                        <button wire:click="$set('showRoleModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
+                        <button wire:click="saveRoleBaru" class="flex-1 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan Role</button>
+                    </div>
+                </div>
+            </div>
+        @endif
     @endif
 
     <!-- TAB: CABANG & GUDANG -->

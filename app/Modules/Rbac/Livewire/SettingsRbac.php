@@ -46,6 +46,70 @@ class SettingsRbac extends Component
         'is_part_original' => false, 'is_active' => true,
     ];
 
+    // [T-25] RBAC fleksibel: role baru + permission matrix per role
+    public bool $showRoleModal = false;
+    public string $roleBaruNama = '';
+    public array $roleBaruPermissions = [];
+    public ?int $editRoleId = null;
+    public array $editRolePermissions = [];
+
+    public function getPermissionsListProperty()
+    {
+        return \Spatie\Permission\Models\Permission::orderBy('name')->get();
+    }
+
+    // Role: semua role + permission (recompute)
+    public function getRolesFullProperty()
+    {
+        return \Spatie\Permission\Models\Role::with('permissions')->orderBy('name')->get();
+    }
+
+    public function openRoleModal()
+    {
+        $this->roleBaruNama = '';
+        $this->roleBaruPermissions = [];
+        $this->showRoleModal = true;
+    }
+
+    public function saveRoleBaru()
+    {
+        $this->validate(['roleBaruNama' => 'required|string|max:255|unique:roles,name']);
+
+        $role = \Spatie\Permission\Models\Role::create(['name' => $this->roleBaruNama]);
+        if (!empty($this->roleBaruPermissions)) {
+            $role->syncPermissions($this->roleBaruPermissions);
+        }
+
+        app(AuditService::class)->catat('Role', 'create', $role->id, "Role {$role->name} dibuat");
+
+        $this->showRoleModal = false;
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Role baru dibuat']);
+    }
+
+    public function openEditRole(int $roleId)
+    {
+        $role = \Spatie\Permission\Models\Role::with('permissions')->findOrFail($roleId);
+        $this->editRoleId = $roleId;
+        $this->editRolePermissions = $role->permissions->pluck('name')->toArray();
+    }
+
+    public function saveEditRolePermissions()
+    {
+        $role = \Spatie\Permission\Models\Role::findOrFail($this->editRoleId);
+
+        // Guardrail: super-admin tidak boleh dikosongkan (anti lockout)
+        if ($role->name === 'super-admin' && empty($this->editRolePermissions)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'super-admin wajib punya minimal 1 permission']);
+            return;
+        }
+
+        $role->syncPermissions($this->editRolePermissions);
+        app(AuditService::class)->catat('Role', 'update', $role->id, "Permission role {$role->name} diperbarui");
+
+        $this->editRoleId = null;
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Permission role diperbarui']);
+    }
+
     public function getRolesProperty()
     {
         return Role::all();
@@ -242,6 +306,8 @@ class SettingsRbac extends Component
     {
         return view('modules.rbac.livewire.settings-rbac', [
             'roles' => $this->roles,
+            'rolesFull' => $this->rolesFull,
+            'permissionsList' => $this->permissionsList,
             'cabangs' => $this->cabangs,
             'gudangs' => $this->gudangs,
             'users' => $this->users,

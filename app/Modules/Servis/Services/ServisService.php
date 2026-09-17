@@ -326,6 +326,18 @@ class ServisService
         $sebelum = $stok->jumlah;
         $stok->update(['jumlah' => $sebelum - $qty]);
 
+        // [T-26] SOT mutation log
+        \App\Modules\Wms\Models\StockMutationLog::create([
+            'produk_id' => $produkId,
+            'sku_variant_id' => $variantId,
+            'gudang_id' => $gudangId,
+            'delta' => -$qty,
+            'sumber' => 'servis',
+            'referensi_tipe' => TiketServis::class,
+            'referensi_id' => $tiket->id,
+            'terjadi_at' => now(),
+        ]);
+
         StokLog::create([
             'gudang_id'      => $gudangId,
             'produk_id'      => $produkId,

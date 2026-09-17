@@ -35,4 +35,9 @@ class Pelanggan extends Model implements Authenticatable
     {
         return $this->hasMany(\App\Modules\Reseller\Models\Komisi::class);
     }
+
+    public function transaksi(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Pos\Models\Transaksi::class);
+    }
 }

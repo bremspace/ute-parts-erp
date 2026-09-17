@@ -126,6 +126,18 @@ class ProdukService
                 'catatan' => $keterangan,
             ]);
 
+            // [T-26] SOT mutation log
+            \App\Modules\Wms\Models\StockMutationLog::create([
+                'produk_id' => $produkId,
+                'sku_variant_id' => $variantId,
+                'gudang_id' => $gudangId,
+                'delta' => $qty,
+                'sumber' => 'po',
+                'referensi_tipe' => Produk::class,
+                'referensi_id' => $produkId,
+                'terjadi_at' => now(),
+            ]);
+
             // Jurnal pembelian (PRD §4.6): Persediaan debit / Utang Usaha kredit
             $total = round($hargaBeli * $qty, 2);
             if ($total > 0) {

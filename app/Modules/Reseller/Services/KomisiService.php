@@ -37,11 +37,22 @@ class KomisiService
 
         foreach ($itemsAgregat as $agregat) {
             $kategori = $agregat['kategori'] ?? 'umum';
-            $skema = SkemaKomisi::where('is_active', true)
+
+            // [T-21] Cek override skema PER RESELLER terlebih dahulu; fallback ke skema default
+            $skema = \App\Modules\Reseller\Models\SkemaKomisiReseller::where('pelanggan_id', $pelanggan->id)
+                ->where('is_active', true)
                 ->where(function ($q) use ($kategori) {
                     $q->whereNull('kategori')->orWhere('kategori', $kategori);
                 })
                 ->first();
+
+            if (!$skema) {
+                $skema = SkemaKomisi::where('is_active', true)
+                    ->where(function ($q) use ($kategori) {
+                        $q->whereNull('kategori')->orWhere('kategori', $kategori);
+                    })
+                    ->first();
+            }
 
             if ($skema) {
                 $totalKomisi += $skema->tipe === 'persen'

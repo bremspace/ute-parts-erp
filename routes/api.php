@@ -13,6 +13,7 @@ use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Pos\Controllers\PosController;
 use App\Modules\Rbac\Controllers\AuthController;
 use App\Modules\Rbac\Controllers\RbacController;
+use App\Modules\Rbac\Controllers\RbacFlexController;
 use App\Modules\Reseller\Controllers\ResellerController;
 use App\Modules\Servis\Controllers\ServisController;
 use App\Modules\Wms\Controllers\WmsController;
@@ -42,6 +43,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users', [RbacController::class, 'index'])->middleware('permission:user.view');
     Route::post('/users', [RbacController::class, 'store'])->middleware('permission:user.create');
     Route::put('/users/{user}', [RbacController::class, 'update'])->middleware('permission:user.edit');
+
+    // [API: RBAC-05..07][T-25] Role custom + permission matrix editable
+    Route::prefix('rbac')->group(function () {
+        Route::get('/roles', [RbacFlexController::class, 'indexRoles'])->middleware('permission:user.view');
+        Route::post('/roles', [RbacFlexController::class, 'storeRole'])->middleware('permission:user.create');
+        Route::put('/roles/{id}/permissions', [RbacFlexController::class, 'updateRolePermissions'])->middleware('permission:user.edit');
+        Route::delete('/roles/{id}', [RbacFlexController::class, 'destroyRole'])->middleware('permission:user.delete');
+    });
 
     // [API: POS-01, POS-02, PRICING-01] Modul POS
     Route::prefix('pos')->group(function () {
@@ -101,16 +110,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/tiers', [CrmController::class, 'storeTier'])->middleware('permission:tier.manage');
         Route::put('/tiers/{id}', [CrmController::class, 'updateTier'])->middleware('permission:tier.manage');
         Route::post('/recalc-tier', [CrmController::class, 'recalcTiers'])->middleware('permission:tier.manage');
+        Route::match(['get','post'], '/config', [CrmController::class, 'config'])->middleware('permission:tier.manage'); // [T-22] CRM-07
+        Route::post('/broadcast/kampanye', [CrmController::class, 'broadcastKampanye'])->middleware('permission:crm.broadcast'); // [T-23] CRM-08
+        Route::get('/broadcast/{id}/log', [CrmController::class, 'broadcastLog'])->middleware('permission:crm.broadcast'); // [T-23] CRM-09
         Route::post('/broadcast', [CrmController::class, 'broadcast'])->middleware('permission:crm.broadcast');
     });
 
-    // [API: RESELLER-01..04] Modul Reseller & Komisi
+    // [API: RESELLER-01..06][T-21] Modul Reseller & Komisi
     Route::prefix('reseller')->group(function () {
         Route::get('/', [ResellerController::class, 'index'])->middleware('permission:reseller.view');
+        Route::post('/daftar', [ResellerController::class, 'daftarReseller'])->middleware('permission:reseller.manage');
         Route::get('/komisi', [ResellerController::class, 'indexKomisi'])->middleware('permission:komisi.view');
         Route::post('/komisi/approve', [ResellerController::class, 'approveKomisi'])->middleware('permission:komisi.approve');
         Route::get('/skema-komisi', [ResellerController::class, 'indexSkemaKomisi'])->middleware('permission:reseller.view');
         Route::post('/skema-komisi', [ResellerController::class, 'storeSkemaKomisi'])->middleware('permission:reseller.manage');
+        Route::get('/skema/{id}', [ResellerController::class, 'skemaReseller'])->middleware('permission:reseller.view');
     });
 
     // [API: ACC-01..10] Modul Akunting
@@ -123,6 +137,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/laporan/laba-rugi', [AkuntingController::class, 'labaRugi'])->middleware('permission:laporan.cabang');
         Route::get('/laporan/neraca', [AkuntingController::class, 'neraca'])->middleware('permission:laporan.cabang');
         Route::get('/laporan/arus-kas', [AkuntingController::class, 'arusKas'])->middleware('permission:laporan.cabang');
+        Route::post('/export', [AkuntingController::class, 'export'])->middleware('permission:laporan.cabang'); // [T-24] ACC-11
+        Route::get('/export/download', [AkuntingController::class, 'exportDownload'])->middleware('permission:laporan.cabang'); // ACC-11b
         Route::get('/buku-besar/{akunId}', [AkuntingController::class, 'bukuBesar'])->middleware('permission:akunting.view');
         Route::get('/piutang', [AkuntingController::class, 'indexPiutang'])->middleware('permission:piutang.view');
         Route::post('/piutang/{id}/bayar', [AkuntingController::class, 'bayarPiutang'])->middleware('permission:piutang.manage');

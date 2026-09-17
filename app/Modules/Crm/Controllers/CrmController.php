@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Controllers;
 
+use App\Modules\Crm\Models\KampanyeBroadcast;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\TierService;
@@ -84,6 +85,72 @@ class CrmController extends Controller
         ]);
 
         return $this->success($pelanggan->load('tierMembership'), 'Pelanggan berhasil dibuat', 201);
+    }
+
+    // [API: CRM-07][T-22] Konfigurasi strategi loyalitas (editable tanpa deploy)
+    public function config(Request $request)
+    {
+        $config = app(\App\Modules\Crm\Services\KonfigurasiService::class);
+
+        if ($request->isMethod('get')) {
+            return $this->success($config->defaults(), 'Konfigurasi loyalitas berhasil dimuat');
+        }
+
+        $request->validate([
+            'poin_earn_persen' => 'required|numeric|min:0|max:100',
+            'poin_redeem_rupiah' => 'required|numeric|min:0',
+            'diskon_silver' => 'required|numeric|min:0|max:100',
+            'diskon_gold' => 'required|numeric|min:0|max:100',
+            'diskon_platinum' => 'required|numeric|min:0|max:100',
+        ]);
+
+        foreach ($request->only(['poin_earn_persen', 'poin_redeem_rupiah', 'diskon_silver', 'diskon_gold', 'diskon_platinum']) as $k => $v) {
+            $config->set($k, (float) $v, 'Strategi loyalitas');
+        }
+
+        // Terapkan diskon tier
+        \App\Modules\Crm\Models\TierMembership::where('kode', 'silver')->update(['diskon_persen' => $request->diskon_silver]);
+        \App\Modules\Crm\Models\TierMembership::where('kode', 'gold')->update(['diskon_persen' => $request->diskon_gold]);
+        \App\Modules\Crm\Models\TierMembership::where('kode', 'platinum')->update(['diskon_persen' => $request->diskon_platinum]);
+
+        return $this->success(null, 'Konfigurasi loyalitas tersimpan');
+    }
+
+    // [API: CRM-08][T-23] Buat & kirim broadcast kampanye
+    public function broadcastKampanye(Request $request)
+    {
+        $request->validate([
+            'judul' => 'required|string|max:255',
+            'pesan' => 'required|string',
+            'channel' => 'required|in:wa,email,inapp',
+            'segment' => 'nullable|array',
+            'jadiwalkan_at' => 'nullable|date',
+        ]);
+
+        $kampanye = KampanyeBroadcast::create([
+            'judul' => $request->judul,
+            'pesan' => $request->pesan,
+            'channel' => $request->channel,
+            'segment' => $request->segment ?? [],
+            'status' => $request->jadiwalkan_at ? 'terjadwal' : 'draft',
+            'dijadwalkan_at' => $request->jadiwalkan_at,
+            'user_id' => auth()->id(),
+        ]);
+
+        if (!$request->jadiwalkan_at) {
+            app(\App\Modules\Crm\Services\BroadcastService::class)->kirimSekarang($kampanye);
+        }
+
+        return $this->success($kampanye, 'Broadcast kampanye dibuat', 201);
+    }
+
+    // [API: CRM-09][T-23] Log pengiriman kampanye
+    public function broadcastLog(Request $request, $id)
+    {
+        return $this->success(
+            app(\App\Modules\Crm\Services\BroadcastService::class)->logPengiriman($id),
+            'Log pengiriman kampanye berhasil dimuat'
+        );
     }
 
     // [API: CRM-02] Daftar pelanggan
