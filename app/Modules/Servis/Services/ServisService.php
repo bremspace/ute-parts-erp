@@ -7,6 +7,7 @@ use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\ServisSparepart;
 use App\Modules\Servis\Models\ServisStatusLog;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,9 @@ class ServisService
             'telepon_pelanggan'  => $data['telepon_pelanggan'] ?? null,
             'jenis_hp'           => $data['jenis_hp'],
             'seri_hp'            => $data['seri_hp'] ?? null,
+            // [T-19] kunci gadget: terenkripsi at-rest (cast encrypted)
+            'tipe_kunci'         => $data['tipe_kunci'] ?? null,
+            'kunci_terenkripsi'  => $data['kunci_terenkripsi'] ?? null,
             'keluhan'            => $data['keluhan'],
             'kondisi_fisik'      => $data['kondisi_fisik'] ?? null,
             'foto_unit'          => $data['foto_unit'] ?? null,
@@ -253,6 +257,91 @@ class ServisService
     }
 
     /**
+     * [T-17] Input pekerjaan teknisi — split part & jasa via TiketServisItem.
+     * Baris tipe=jasa: tidak menyentuh stok. Baris tipe=part: kurangi StokItem 1x + StokLog.
+     *
+     * @param array $items [['tipe'=>'part|jasa','produk_id'=>?,'sku_variant_id'=>?,'nama_item'=>string,'qty'=>int,'harga'=>float,'gudang_id'=>(wajib utk part)], ...]
+     */
+    public function inputPekerjaan(TiketServis $tiket, array $items, User $user): array
+    {
+        if (!in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
+            throw new \Exception('Input pekerjaan hanya saat status disetujui / dikerjakan / qc');
+        }
+
+        $created = [];
+
+        DB::transaction(function () use ($tiket, $items, $user, &$created) {
+            foreach ($items as $item) {
+                $tipe = $item['tipe'] ?? 'jasa';
+                $namaItem = $item['nama_item'];
+                $qty = (int) ($item['qty'] ?? 1);
+                $harga = (float) ($item['harga'] ?? 0);
+
+                if ($tipe === 'part') {
+                    $produkId = $item['produk_id'] ?? null;
+                    if (!$produkId) {
+                        throw new \Exception("Item part '{$namaItem}' wajib pilih produk");
+                    }
+                    $produk = \App\Modules\Wms\Models\Produk::findOrFail($produkId);
+                    $gudangId = $item['gudang_id'] ?? null;
+                    if (!$gudangId) {
+                        throw new \Exception("Part '{$namaItem}' wajib pilih gudang");
+                    }
+
+                    // Deduct stok 1x (fee guard: lockForUpdate di StokDeductionService reklarasi)
+                    $this->kurangiStokServis($produk->id, $item['sku_variant_id'] ?? null, $gudangId, $qty, $tiket, $user);
+                }
+
+                $created[] = TiketServisItem::create([
+                    'tiket_servis_id' => $tiket->id,
+                    'tipe' => $tipe,
+                    'produk_id' => $tipe === 'part' ? ($item['produk_id'] ?? null) : null,
+                    'sku_variant_id' => $tipe === 'part' ? ($item['sku_variant_id'] ?? null) : null,
+                    'nama_item' => $namaItem,
+                    'qty' => $qty,
+                    'harga' => $harga,
+                    'hpp' => $tipe === 'part' && ($item['produk_id'] ?? null)
+                        ? (float) (\App\Modules\Wms\Models\Produk::find($item['produk_id'])?->harga_beli ?? 0)
+                        : 0,
+                ]);
+            }
+        });
+
+        return $created;
+    }
+
+    private function kurangiStokServis(int $produkId, ?int $variantId, int $gudangId, int $qty, TiketServis $tiket, User $user): void
+    {
+        $stok = StokItem::where('produk_id', $produkId)
+            ->where('sku_variant_id', $variantId)
+            ->where('gudang_id', $gudangId)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$stok || $stok->jumlah < $qty) {
+            $tersedia = $stok ? $stok->jumlah : 0;
+            throw new \Exception("Stok sparepart tidak mencukupi di gudang terpilih (tersedia: {$tersedia})");
+        }
+
+        $sebelum = $stok->jumlah;
+        $stok->update(['jumlah' => $sebelum - $qty]);
+
+        StokLog::create([
+            'gudang_id'      => $gudangId,
+            'produk_id'      => $produkId,
+            'sku_variant_id' => $variantId,
+            'user_id'        => $user->id,
+            'jenis'          => 'servis',
+            'referensi_tipe' => TiketServis::class,
+            'referensi_id'   => $tiket->id,
+            'jumlah_sebelum' => $sebelum,
+            'perubahan'      => -$qty,
+            'jumlah_setelah' => $sebelum - $qty,
+            'catatan'        => "Servis {$tiket->no_tiket} — item part",
+        ]);
+    }
+
+    /**
      * Get tiket by token_approval (public tracking).
      */
     public function getByToken(string $token): TiketServis
@@ -307,14 +396,32 @@ class ServisService
             $jurnalService = app(\App\Modules\Akunting\Services\JurnalService::class);
 
             $jasaServis = (float) ($tiket->estimasi_biaya ?? 0);
-            // HPP sparepart (biaya perolehan)
-            $totalHpp = (float) $tiket->spareparts()
-                ->get()
-                ->sum(fn ($sp) => (float) $sp->hpp * (int) $sp->jumlah);
-            // Nilai jual sparepart (pendapatan penjualan sparepart)
-            $totalJualSparepart = (float) $tiket->spareparts()
-                ->get()
-                ->sum(fn ($sp) => (float) $sp->harga_satuan * (int) $sp->jumlah);
+
+            // [T-17] Dasar perhitungan dari TiketServisItem (part/jasa) bila ada;
+            // fallback ke spareparts legacy utk kompatibilitas.
+            $itemsServis = $tiket->items()->get();
+            if ($itemsServis->isNotEmpty()) {
+                $pendapatanJasa = (float) $itemsServis->where('tipe', 'jasa')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
+                $pendapatanPart = (float) $itemsServis->where('tipe', 'part')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
+                $hppPart = (float) $itemsServis->where('tipe', 'part')->sum(fn ($i) => (float) $i->hpp * (int) $i->qty);
+
+                $totalHpp = $hppPart;
+                $totalJualSparepart = $pendapatanPart;
+                // jasa dari items lebih akurat dari estimasi jika diisi
+                if ($pendapatanJasa > 0) {
+                    $jasaServis = $pendapatanJasa;
+                }
+            } else {
+                // HPP sparepart (biaya perolehan)
+                $totalHpp = (float) $tiket->spareparts()
+                    ->get()
+                    ->sum(fn ($sp) => (float) $sp->hpp * (int) $sp->jumlah);
+                // Nilai jual sparepart (pendapatan penjualan sparepart)
+                $totalJualSparepart = (float) $tiket->spareparts()
+                    ->get()
+                    ->sum(fn ($sp) => (float) $sp->harga_satuan * (int) $sp->jumlah);
+            }
+
             $totalTagihan = $jasaServis + $totalJualSparepart;
 
             if ($totalTagihan > 0) {

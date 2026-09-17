@@ -13,8 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'no_tiket', 'cabang_id', 'jenis_servis_id', 'pelanggan_id', 'teknisi_id',
-    'nama_pelanggan', 'telepon_pelanggan', 'jenis_hp', 'seri_hp', 'keluhan',
-    'kondisi_fisik', 'foto_unit', 'status', 'sumber', 'estimasi_biaya',
+    'nama_pelanggan', 'telepon_pelanggan', 'jenis_hp', 'seri_hp', 'tipe_kunci', 'kunci_terenkripsi',
+    'keluhan', 'kondisi_fisik', 'foto_unit', 'status', 'sumber', 'estimasi_biaya',
     'alasan_estimasi', 'token_approval', 'tanggal_terima', 'tanggal_selesai',
     'tanggal_diambil', 'catatan_admin'
 ])]
@@ -29,6 +29,7 @@ class TiketServis extends Model
         'tanggal_terima' => 'datetime',
         'tanggal_selesai' => 'datetime',
         'tanggal_diambil' => 'datetime',
+        'kunci_terenkripsi' => 'encrypted', // [T-19] terenkripsi at-rest
     ];
 
     public function cabang(): BelongsTo
@@ -64,5 +65,10 @@ class TiketServis extends Model
     public function spareparts(): HasMany
     {
         return $this->hasMany(ServisSparepart::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(TiketServisItem::class); // [T-17] split part & jasa
     }
 }

@@ -265,4 +265,80 @@ class IntegrasiModulTest extends TestCase
         $kreditTotal = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->sum('kredit');
         $this->assertEqualsWithDelta($debitTotal, $kreditTotal, 0.01, 'Total debit harus = total kredit (double-entry)');
     }
+
+    // [T-17] Pekerjaan servis split part & jasa: jasa tak sentuh stok, part kurangi stok 1x, jurnal akurat
+    public function test_pekerjaan_servis_split_part_jasa(): void
+    {
+        [$gudang, $gudang2] = $this->setUpFixtures();
+        $this->actingAs($this->kasir, 'web');
+
+        $produk = Produk::create([
+            'nama' => 'LCD Test', 'slug' => 'lcd-test', 'kategori' => 'LCD',
+            'kondisi' => 'baru', 'harga_beli' => 100000, 'harga_jual_retail' => 150000,
+        ]);
+        $variant = \App\Modules\Wms\Models\SkuVariant::create([
+            'produk_id' => $produk->id, 'sku' => 'LCD-1', 'nama_varian' => 'Standar',
+            'harga_beli' => 100000, 'harga_jual_retail' => 150000,
+        ]);
+        StokItem::create(['produk_id' => $produk->id, 'sku_variant_id' => $variant->id, 'gudang_id' => $gudang->id, 'jumlah' => 10]);
+
+        $gudangTarget = $gudang;
+        $sebelum = 10;
+
+        $servis = $this->postJson('/api/servis', [
+            'nama_pelanggan' => 'Owner',
+            'telepon_pelanggan' => '081111',
+            'jenis_hp' => 'Samsung A52',
+            'keluhan' => 'Ganti LCD + jasa',
+            'foto_unit' => ['data:image/png;base64,foto1', 'data:image/png;base64,foto2'],
+        ])->assertSuccessful();
+        $tiket = TiketServis::where('no_tiket', $servis->json('data.no_tiket'))->firstOrFail();
+
+        $this->putJson("/api/servis/{$tiket->id}/status", ['status' => 'diagnosa'])->assertSuccessful();
+        $this->postJson("/api/servis/{$tiket->id}/estimasi", ['estimasi_biaya' => 200000, 'alasan' => 'LCD + ongkos'])->assertSuccessful();
+        $tiket->refresh();
+        $this->postJson("/api/servis/public/approve/{$tiket->token_approval}", ['action' => 'approve'])->assertSuccessful();
+        $this->putJson("/api/servis/{$tiket->id}/status", ['status' => 'dikerjakan'])->assertSuccessful();
+
+        // Input 1 part (LCD) + 1 jasa
+        $this->postJson("/api/servis/{$tiket->id}/pekerjaan", [
+            'items' => [
+                ['tipe' => 'jasa', 'nama_item' => 'Ongkos pasang', 'qty' => 1, 'harga' => 50000],
+                ['tipe' => 'part', 'nama_item' => 'LCD', 'produk_id' => $produk->id, 'sku_variant_id' => $produk->skuVariants()->first()?->id, 'gudang_id' => $gudangTarget->id, 'qty' => 1, 'harga' => 150000],
+            ],
+        ])->assertSuccessful();
+
+        // 2 rows items tersimpan
+        $this->assertDatabaseHas('tiket_servis_item', ['tiket_servis_id' => $tiket->id, 'tipe' => 'jasa']);
+        $this->assertDatabaseHas('tiket_servis_item', ['tiket_servis_id' => $tiket->id, 'tipe' => 'part']);
+
+        // Part kurangi stok 1x
+        $this->assertDatabaseHas('stok_items', ['produk_id' => $produk->id, 'gudang_id' => $gudangTarget->id, 'jumlah' => $sebelum - 1]);
+        $this->assertDatabaseHas('stok_log', ['produk_id' => $produk->id, 'jenis' => 'servis', 'perubahan' => -1]);
+
+        foreach (['qc', 'selesai'] as $st) {
+            $this->putJson("/api/servis/{$tiket->id}/status", ['status' => $st])->assertSuccessful();
+        }
+
+        // Jurnal servis: Pendapatan Jasa (420-01) 50.000 + Pendapatan Penjualan (410-01) 150.000 + HPP
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'sumber' => 'servis',
+            'referensi_id' => $tiket->id,
+            'akun_coa_id' => AkunCOA::where('kode', '420-01')->first()->id,
+            'kredit' => 50000,
+        ]);
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'sumber' => 'servis',
+            'referensi_id' => $tiket->id,
+            'akun_coa_id' => AkunCOA::where('kode', '410-01')->first()->id,
+            'kredit' => 150000,
+        ]);
+
+        // Balance
+        $no = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')
+            ->where('sumber', 'servis')->where('referensi_id', $tiket->id)->value('no_jurnal');
+        $d = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->where('no_jurnal', $no)->sum('debit');
+        $k = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->where('no_jurnal', $no)->sum('kredit');
+        $this->assertEqualsWithDelta($d, $k, 0.01);
+    }
 }

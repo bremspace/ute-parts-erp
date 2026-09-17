@@ -38,6 +38,14 @@ class SettingsRbac extends Component
     public bool $showGudangModal = false;
     public array $gudangForm = ['id' => null, 'cabang_id' => null, 'nama' => '', 'kode' => '', 'is_active' => true];
 
+    // [T-16] JenisServis CRUD editable
+    public bool $showJenisServisModal = false;
+    public array $jenisServisForm = [
+        'id' => null, 'nama' => '', 'kode' => '', 'kategori' => 'hardware',
+        'estimasi_durasi' => 120, 'durasi_garansi_hari' => 30, 'butuh_part' => true,
+        'is_part_original' => false, 'is_active' => true,
+    ];
+
     public function getRolesProperty()
     {
         return Role::all();
@@ -61,6 +69,39 @@ class SettingsRbac extends Component
     public function getJenisServisProperty()
     {
         return JenisServis::all();
+    }
+
+    /** [T-16] open modal edit/tambah jenis servis */
+    public function openJenisServisModal(?int $id = null)
+    {
+        if ($id) {
+            $j = JenisServis::findOrFail($id);
+            $this->jenisServisForm = $j->toArray();
+        } else {
+            $this->jenisServisForm = [
+                'id' => null, 'nama' => '', 'kode' => '', 'kategori' => 'hardware',
+                'estimasi_durasi' => 120, 'durasi_garansi_hari' => 30, 'butuh_part' => true,
+                'is_part_original' => false, 'is_active' => true,
+            ];
+        }
+        $this->showJenisServisModal = true;
+    }
+
+    public function simpanJenisServis()
+    {
+        $this->validate([
+            'jenisServisForm.nama' => 'required|string|max:255',
+            'jenisServisForm.kode' => 'required|string|max:20|unique:jenis_servis,kode,' . ($this->jenisServisForm['id'] ?? 'NULL'),
+        ]);
+
+        if ($this->jenisServisForm['id']) {
+            JenisServis::findOrFail($this->jenisServisForm['id'])->update($this->jenisServisForm);
+        } else {
+            JenisServis::create($this->jenisServisForm);
+        }
+
+        $this->showJenisServisModal = false;
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Jenis servis disimpan']);
     }
 
     public function getCoaListProperty()

@@ -24,6 +24,10 @@ class ServisBoard extends Component
 
     // Terima Unit Modal
     public bool $showTerimaModal = false;
+
+    // [T-18] customer picker reusable (sama seperti POS)
+    public string $pelangganSearch = '';
+
     public array $terimaForm = [
         'pelanggan_id'    => null,
         'nama_pelanggan'  => '',
@@ -31,6 +35,9 @@ class ServisBoard extends Component
         'jenis_servis_id' => null,
         'jenis_hp'        => '',
         'seri_hp'         => '',
+        // [T-19] kunci gadget
+        'tipe_kunci'      => null,
+        'kunci_terenkripsi' => '',
         'keluhan'         => '',
         'kondisi_fisik'   => [],
         'foto_unit'       => [], // BASE64 data URLs (min 2)
@@ -137,12 +144,49 @@ class ServisBoard extends Component
             'jenis_servis_id' => JenisServis::where('is_active', true)->first()?->id,
             'jenis_hp'        => '',
             'seri_hp'         => '',
+            'tipe_kunci'      => null,
+            'kunci_terenkripsi' => '',
             'keluhan'         => '',
             'kondisi_fisik'   => [],
             'foto_unit'       => [],
         ];
+        $this->pelangganSearch = '';
         $this->photoInputs = [null, null, null];
         $this->showTerimaModal = true;
+    }
+
+    /** [T-18] hasil pencarian pelanggan utk customer-picker */
+    public function getPelangganCariServisProperty()
+    {
+        if (strlen($this->pelangganSearch) < 2) {
+            return collect();
+        }
+
+        return Pelanggan::with('tierMembership')
+            ->where(function ($q) {
+                $q->where('nama', 'like', "%{$this->pelangganSearch}%")
+                  ->orWhere('telepon', 'like', "%{$this->pelangganSearch}%");
+            })
+            ->limit(8)
+            ->get();
+    }
+
+    /** pilih pelanggan dari picker (terima unit) */
+    public function setPelangganServis(?int $id)
+    {
+        $this->terimaForm['pelanggan_id'] = $id;
+        if ($id) {
+            $p = Pelanggan::find($id);
+            $this->terimaForm['nama_pelanggan'] = $p?->nama ?? '';
+            $this->terimaForm['telepon_pelanggan'] = $p?->telepon ?? '';
+        }
+        $this->pelangganSearch = '';
+    }
+
+    /** [T-18] quick-add pelanggan baru dari terima unit — satu sumber (CRM-06 path) */
+    public function openPelangganBaruServis()
+    {
+        $this->dispatch('alert', ['type' => 'info', 'message' => 'Buat pelanggan via CRM lalu kaitkan; POS & Servis pakai data yang sama']);
     }
 
     public function simpanTerima()
@@ -163,6 +207,11 @@ class ServisBoard extends Component
 
         $data = $this->terimaForm;
         $data['foto_unit'] = $foto;
+
+        // [T-19] pola kunci → simpan urutan angka, bukan objek
+        if (is_array($data['kunci_terenkripsi'])) {
+            $data['kunci_terenkripsi'] = implode('-', $data['kunci_terenkripsi']);
+        }
 
         try {
             $tiket = app(ServisService::class)->terimaUnit($data, auth()->user());
@@ -272,6 +321,7 @@ class ServisBoard extends Component
             'groupedTikets'   => $this->groupedTikets,
             'selectedTiket'   => $this->selectedTiket,
             'fotoCount'       => $this->fotoCount,
+            'pelangganCariServis' => $this->pelangganCariServis,
         ])->layout('layouts.backoffice', ['header' => 'Servis HP — Papan Kanban']);
     }
 }

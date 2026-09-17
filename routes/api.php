@@ -89,6 +89,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}/status', [ServisController::class, 'updateStatus'])->middleware('permission:servis.update-status');
         Route::post('/{id}/estimasi', [ServisController::class, 'setEstimasi'])->middleware('permission:servis.update-status');
         Route::post('/{id}/sparepart', [ServisController::class, 'inputSparepart'])->middleware('permission:servis.input-sparepart');
+        Route::post('/{id}/pekerjaan', [ServisController::class, 'inputPekerjaan'])->middleware('permission:servis.input-sparepart'); // [T-17]
     });
 
     // [API: CRM-01..05] Modul CRM & Tier

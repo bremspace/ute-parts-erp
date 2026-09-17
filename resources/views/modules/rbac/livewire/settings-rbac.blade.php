@@ -100,19 +100,30 @@
     <!-- TAB: MASTER DATA -->
     @if($activeTab === 'master')
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <x-prism.glass-card title="Jenis Servis & Garansi" subtitle="Durasi garansi configurable (PRD §4.3)">
+            <x-prism.glass-card title="Jenis Servis & Garansi" subtitle="Kategori & durasi garansi editable (T-16)">
                 <div class="space-y-2">
                     @foreach($jenisServis as $j)
                         <div class="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
                             <div>
                                 <p class="text-xs font-bold text-white">{{ $j->nama }}</p>
-                                <p class="text-[10px] text-ink-400 font-mono">{{ $j->kode }}</p>
+                                <p class="text-[10px] text-ink-400 font-mono">
+                                    {{ $j->kode }} · {{ $j->kategori }} · est. {{ $j->estimasi_durasi }} mnt
+                                </p>
                             </div>
-                            <span class="text-xs font-semibold {{ $j->is_part_original ? 'text-up-accent' : 'text-up-mint' }} tabular-nums">
-                                {{ $j->durasi_garansi_hari }} hari
-                            </span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold {{ $j->is_part_original ? 'text-up-accent' : 'text-up-mint' }} tabular-nums">
+                                    {{ $j->durasi_garansi_hari }} hari
+                                </span>
+                                @if($j->butuh_part)
+                                    <span class="text-[9px] text-up-primary bg-up-primary/10 px-1.5 py-0.5 rounded">part</span>
+                                @endif
+                                <button wire:click="openJenisServisModal({{ $j->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
+                            </div>
                         </div>
                     @endforeach
+                </div>
+                <div class="mt-3">
+                    <button wire:click="openJenisServisModal()" class="px-3 py-2 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-[11px] cursor-pointer">+ Jenis Servis Baru</button>
                 </div>
             </x-prism.glass-card>
 
@@ -254,6 +265,61 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
                     <button wire:click="$set('showGudangModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
                     <button wire:click="saveGudang" class="flex-1 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- [T-16] MODAL: JENIS SERVIS -->
+    @if($showJenisServisModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-lg font-bold text-white">{{ $jenisServisForm['id'] ? 'Edit Jenis Servis' : 'Jenis Servis Baru' }}</h3>
+                    <button wire:click="$set('showJenisServisModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama *</label>
+                        <input type="text" wire:model="jenisServisForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode *</label>
+                            <input type="text" wire:model="jenisServisForm.kode" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kategori</label>
+                            <select wire:model="jenisServisForm.kategori" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                                <option value="hardware" class="bg-ink-900">Hardware</option>
+                                <option value="software" class="bg-ink-900">Software</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Estimasi Durasi (menit)</label>
+                            <input type="number" wire:model="jenisServisForm.estimasi_durasi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Durasi Garansi (hari)</label>
+                            <input type="number" wire:model="jenisServisForm.durasi_garansi_hari" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
+                            <input type="checkbox" wire:model="jenisServisForm.butuh_part" class="accent-up-mint w-4 h-4" /> Butuh part
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
+                            <input type="checkbox" wire:model="jenisServisForm.is_part_original" class="accent-up-accent w-4 h-4" /> Part original
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                    <button wire:click="$set('showJenisServisModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="simpanJenisServis" class="flex-1 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan</button>
                 </div>
             </div>
         </div>

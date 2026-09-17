@@ -27,6 +27,9 @@ class ServisController extends Controller
             'telepon_pelanggan'   => 'required_without:pelanggan_id|nullable|string|max:20',
             'jenis_hp'            => 'required|string|max:255',
             'seri_hp'             => 'nullable|string|max:255',
+            // [T-19] kunci gadget
+            'tipe_kunci'          => 'nullable|in:pola,pin,password,tidak_ada',
+            'kunci_terenkripsi'   => 'required_with:tipe_kunci|nullable|string',
             'keluhan'             => 'required|string',
             'kondisi_fisik'       => 'nullable|array',
             'foto_unit'           => 'required|array|min:2', // wajib minimal 2 foto
@@ -81,7 +84,19 @@ class ServisController extends Controller
         $tiket = TiketServis::with([
             'jenisServis', 'pelanggan.tierMembership', 'teknisi', 'garansi',
             'statusLogs.user', 'spareparts.produk', 'spareparts.skuVariant', 'cabang',
+            'items', // [T-17]
         ])->findOrFail($id);
+
+        // [T-19] Kunci gadget hanya utk teknisi yang ditugaskan / admin-toko / super-admin
+        $user = $request->user();
+        $bolehLihatKunci = $user
+            && ($user->hasRole(['super-admin', 'admin-toko'])
+                || ($user->hasRole('teknisi') && $tiket->teknisi_id === $user->id));
+
+        if (!$bolehLihatKunci) {
+            $tiket->makeHidden(['kunci_terenkripsi']);
+            $tiket->setAttribute('kunci_terenkripsi', null);
+        }
 
         return $this->success($tiket, 'Detail tiket servis berhasil diambil');
     }
@@ -154,6 +169,29 @@ class ServisController extends Controller
                 $request->user()
             );
             return $this->success($parts, 'Sparepart dicatat & stok berkurang');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 400);
+        }
+    }
+
+    // [API: SERVICE-06c][T-17] Input pekerjaan teknisi (split part & jasa via TiketServisItem)
+    public function inputPekerjaan(Request $request, $id)
+    {
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.tipe' => 'required|in:part,jasa',
+            'items.*.nama_item' => 'required|string|max:255',
+            'items.*.qty' => 'required|integer|min:1',
+            'items.*.harga' => 'required|numeric|min:0',
+            'items.*.produk_id' => 'required_if:items.*.tipe,part|exists:produk,id',
+            'items.*.gudang_id' => 'required_if:items.*.tipe,part|exists:gudang,id',
+        ]);
+
+        $tiket = TiketServis::findOrFail($id);
+
+        try {
+            $rows = $this->servisService->inputPekerjaan($tiket, $request->items, $request->user());
+            return $this->success($rows, 'Pekerjaan servis dicatat (part & jasa terpisah)');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
         }

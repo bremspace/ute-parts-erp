@@ -176,15 +176,18 @@
                 </div>
 
                 <div class="overflow-y-auto pr-1 space-y-4 flex-1">
-                    <!-- Pelanggan Terdaftar -->
+                    <!-- Pelanggan Terdaftar [T-18: reusable picker, sama seperti POS] -->
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Pelanggan Terdaftar <span class="text-ink-500 font-normal">(opsional)</span></label>
-                        <select wire:model="terimaForm.pelanggan_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                            <option value="" class="bg-ink-900">— Pilih atau isi data guest —</option>
-                            @foreach($pelangganList as $p)
-                                <option value="{{ $p->id }}" class="bg-ink-900">{{ $p->nama }} — {{ $p->telepon ?? '-' }}</option>
-                            @endforeach
-                        </select>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Pelanggan <span class="text-ink-500 font-normal">(cari / isi data guest)</span></label>
+                        <x-customer-picker
+                            wireModel="pelangganSearch"
+                            selectAction="setPelangganServis"
+                            addAction="openPelangganBaruServis"
+                            :results="$pelangganCariServis"
+                        />
+                        @if($terimaForm['pelanggan_id'])
+                            <button wire:click="setPelangganServis(null)" class="mt-1 text-[10px] text-up-red hover:underline cursor-pointer">✕ lepaskan pelanggan terpilih</button>
+                        @endif
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -216,6 +219,44 @@
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Seri / IMEI</label>
                         <input type="text" wire:model="terimaForm.seri_hp" placeholder="Nomor seri / IMEI (opsional)" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+
+                    <!-- [T-19] Kunci Gadget (terenkripsi) -->
+                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kunci Gadget <span class="text-ink-500 font-normal">(opsional, terenkripsi — hanya teknisi/admin)</span></label>
+                        <select wire:model="terimaForm.tipe_kunci" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="" class="bg-ink-900">— Tidak ada / default —</option>
+                            <option value="pola" class="bg-ink-900">Pola</option>
+                            <option value="pin" class="bg-ink-900">PIN (4-6 digit)</option>
+                            <option value="password" class="bg-ink-900">Password</option>
+                            <option value="tidak_ada" class="bg-ink-900">Tidak ada</option>
+                        </select>
+
+                        @if(($terimaForm['tipe_kunci'] ?? '') === 'pola')
+                            <div class="mt-2">
+                                <p class="text-[10px] text-ink-400 mb-1.5">Klik urutan titik pola (1-9):</p>
+                                <div class="grid grid-cols-3 gap-2 w-40" x-data="{}">
+                                    @for($i = 1; $i <= 9; $i++)
+                                        <button
+                                            type="button"
+                                            class="aspect-square rounded-full border border-white/15 bg-white/5 text-xs font-bold text-ink-300 hover:bg-up-primary/30 hover:border-up-primary cursor-pointer"
+                                            wire:click="$set('terimaForm.kunci_terenkripsi.{{ $loop->index }}', {{ $i }})"
+                                            @click="$el.classList.toggle('bg-up-primary')"
+                                        >{{ $i }}</button>
+                                    @endfor
+                                </div>
+                                <p class="text-[10px] text-up-primary mt-1 font-mono tabular-nums">
+                                    {{ is_array($terimaForm['kunci_terenkripsi'] ?? null) ? implode('-', $terimaForm['kunci_terenkripsi']) : ($terimaForm['kunci_terenkripsi'] ?? '') }}
+                                </p>
+                            </div>
+                        @else
+                            <input
+                                type="password"
+                                wire:model="terimaForm.kunci_terenkripsi"
+                                placeholder="Masukkan PIN / password / pola (angka) — aman terenkripsi"
+                                class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium mt-2"
+                            />
+                        @endif
                     </div>
 
                     <div>
@@ -266,6 +307,7 @@
                                         <input
                                             type="file"
                                             accept="image/*"
+                                            capture="environment"
                                             class="absolute inset-0 opacity-0 cursor-pointer"
                                             x-ref="fotoInput{{ $idx }}"
                                             @change="
