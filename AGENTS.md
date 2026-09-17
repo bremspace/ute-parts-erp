@@ -55,6 +55,10 @@ Boost replaces these bootstrap instructions with guidelines tailored to the appl
 
 Follow the 7-day roadmap in `PRD-Backend-UteParts.md` §9. Do not skip modules — each day builds on the previous.
 
+Untuk pekerjaan update/optimasi pasca-MVP, baca juga `implement-plan.md`.
+Kerjakan per Fase secara berurutan (§1 implement-plan.md), jangan lompat fase.
+Setelah tiap Fase selesai, update `CHANGELOG.md` dengan ringkasan task yang selesai.
+
 ## Stack
 
 - **Laravel 13** (PHP 8.3+), TALL stack (Tailwind 4, Alpine.js, Livewire/Volt, Laravel)

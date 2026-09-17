@@ -12,6 +12,7 @@
         "laravel/tinker": "^3.0",
         "livewire/livewire": "*",
         "maatwebsite/excel": "*",
+        "picqer/php-barcode-generator": "*",
         "spatie/laravel-permission": "*"
     },
     "require-dev": {

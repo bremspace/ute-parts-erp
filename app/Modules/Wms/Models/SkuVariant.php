@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'produk_id', 'sku', 'nama_varian', 'atribut', 'harga_beli',
+    'produk_id', 'sku', 'barcode', 'nama_varian', 'satuan_kode', 'atribut', 'harga_beli',
     'harga_jual_retail', 'is_active'
 ])]
 class SkuVariant extends \Illuminate\Database\Eloquent\Model

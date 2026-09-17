@@ -19,7 +19,18 @@ class WmsDashboard extends Component
 {
     use WithPagination;
 
-    public string $activeTab = 'stok'; // stok, produk, transfer, opname
+    public string $activeTab = 'stok'; // stok, produk, transfer, opname, po
+
+    // [T-10] PO dan Supplier
+    public bool $showPoModal = false;
+    public array $poForm = [
+        'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'jatuh_tempo' => '',
+        'items' => [],
+    ];
+    public bool $showSupplierModal = false;
+    public array $supplierForm = ['nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30];
+    public ?int $bayarPoId = null;
+    public float $bayarPoJumlah = 0;
 
     // Stok Tab filters
     public string $search = '';
@@ -41,8 +52,12 @@ class WmsDashboard extends Component
     public bool $showTambahStokModal = false;
     public ?int $stokProdukId = null;
     public array $tambahStokForm = [
-        'gudang_id' => null, 'qty' => 1, 'harga_beli' => 0, 'keterangan' => 'Pembelian dari supplier',
+        'gudang_id' => null, 'rak_id' => null, 'qty' => 1, 'harga_beli' => 0, 'keterangan' => 'Pembelian dari supplier',
     ];
+
+    // [T-12] Rak management
+    public bool $showRakModal = false;
+    public array $rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
 
     // New Transfer Modal state
     public bool $showTransferModal = false;
@@ -434,6 +449,164 @@ class WmsDashboard extends Component
         }
     }
 
+    public function openPoModal()
+    {
+        $this->poForm = [
+            'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'jatuh_tempo' => '',
+            'items' => [['produk_id' => null, 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1]],
+        ];
+        $this->showPoModal = true;
+    }
+
+    public function addPoItem()
+    {
+        $this->poForm['items'][] = ['produk_id' => null, 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1];
+    }
+
+    public function removePoItem(int $idx)
+    {
+        unset($this->poForm['items'][$idx]);
+        $this->poForm['items'] = array_values($this->poForm['items']);
+    }
+
+    public function poProdukDipilih(int $idx)
+    {
+        $produk = Produk::find($this->poForm['items'][$idx]['produk_id']);
+        if ($produk) {
+            $this->poForm['items'][$idx]['harga_beli'] = (float) $produk->harga_beli;
+            $this->poForm['items'][$idx]['sku_variant_id'] = $produk->skuVariants()->first()?->id;
+        }
+    }
+
+    public function simpanPo()
+    {
+        $this->validate([
+            'poForm.supplier_id' => 'required|exists:supplier,id',
+            'poForm.gudang_tujuan_id' => 'required|exists:gudang,id',
+            'poForm.metode_bayar' => 'required|in:tunai,kredit',
+            'poForm.items' => 'required|array|min:1',
+        ]);
+
+        $today = now()->format('Ymd');
+        $count = \App\Modules\Wms\Models\PurchaseOrder::whereDate('created_at', now()->toDateString())->count() + 1;
+        $noPo = sprintf('PO-%s-%03d', $today, $count);
+
+        $total = 0;
+        foreach ($this->poForm['items'] as $i) {
+            $total += (float) ($i['harga_beli'] ?? 0) * (int) ($i['jumlah'] ?? 1);
+        }
+
+        $po = \App\Modules\Wms\Models\PurchaseOrder::create([
+            'no_po' => $noPo,
+            'supplier_id' => $this->poForm['supplier_id'],
+            'gudang_tujuan_id' => $this->poForm['gudang_tujuan_id'],
+            'status' => 'draft',
+            'metode_bayar' => $this->poForm['metode_bayar'],
+            'jatuh_tempo' => $this->poForm['jatuh_tempo'] ?: now()->addDays((int) \App\Modules\Wms\Models\Supplier::find($this->poForm['supplier_id'])?->termin_hari ?? 30)->toDateString(),
+            'total' => $total,
+            'total_dibayar' => 0,
+        ]);
+
+        foreach ($this->poForm['items'] as $i) {
+            \App\Modules\Wms\Models\PurchaseOrderItem::create([
+                'purchase_order_id' => $po->id,
+                'produk_id' => $i['produk_id'],
+                'sku_variant_id' => $i['sku_variant_id'] ?? null,
+                'harga_beli' => (float) ($i['harga_beli'] ?? 0),
+                'jumlah' => (int) ($i['jumlah'] ?? 1),
+                'subtotal' => (float) ($i['harga_beli'] ?? 0) * (int) ($i['jumlah'] ?? 1),
+            ]);
+        }
+
+        $this->showPoModal = false;
+        $this->dispatch('alert', ['type' => 'success', 'message' => "PO {$noPo} dibuat (draft)"]);
+    }
+
+    public function kirimPo(int $id)
+    {
+        \App\Modules\Wms\Models\PurchaseOrder::findOrFail($id)->update(['status' => 'dikirim']);
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'PO dikirim ke supplier']);
+    }
+
+    public function terimaPo(int $id)
+    {
+        try {
+            app(\App\Modules\Wms\Services\PurchaseOrderService::class)->terimaBarang(
+                \App\Modules\Wms\Models\PurchaseOrder::findOrFail($id),
+                auth()->id()
+            );
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'PO diterima — stok & jurnal akunting dibuat']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function bukaBayarPo(int $id)
+    {
+        $this->bayarPoId = $id;
+        $this->bayarPoJumlah = (float) \App\Modules\Wms\Models\PurchaseOrder::find($id)?->sisa ?? 0;
+        $this->dispatch('alert-open-bayar-po', ['id' => $id]);
+    }
+
+    public function bayarPo()
+    {
+        try {
+            app(\App\Modules\Wms\Services\PurchaseOrderService::class)->bayarPO(
+                \App\Modules\Wms\Models\PurchaseOrder::findOrFail($this->bayarPoId),
+                (float) $this->bayarPoJumlah,
+                auth()->id()
+            );
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Pembayaran PO tercatat — sisa utang updated']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function simpanSupplier()
+    {
+        $this->validate([
+            'supplierForm.nama' => 'required|string|max:255',
+        ]);
+
+        \App\Modules\Wms\Models\Supplier::create($this->supplierForm);
+        $this->showSupplierModal = false;
+        $this->supplierForm = ['nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30];
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier disimpan']);
+    }
+
+    // [T-15] Generate barcode utk produk (api paralel ke WMS-14)
+    public function generateBarcodeProduk(int $id)
+    {
+        $produk = Produk::findOrFail($id);
+
+        if (empty($produk->barcode)) {
+            $checksum = substr(hash('crc32b', (string) $produk->id), 0, 4);
+            $produk->update(['barcode' => sprintf('UTP-%05d-%s', $produk->id, strtoupper($checksum))]);
+        }
+
+        $variant = $produk->skuVariants()->first();
+        if ($variant && empty($variant->barcode)) {
+            $variant->update(['barcode' => $produk->barcode . '-' . $variant->id]);
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Barcode: ' . $produk->fresh()->barcode]);
+    }
+
+    // [T-12] Rak
+    public function simpanRak()
+    {
+        $this->validate([
+            'rakForm.gudang_id' => 'required|exists:gudang,id',
+            'rakForm.nama' => 'required|string|max:255',
+            'rakForm.kode' => 'required|string|max:20|unique:rak,kode',
+        ]);
+
+        \App\Modules\Wms\Models\Rak::create($this->rakForm);
+        $this->showRakModal = false;
+        $this->rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Rak ditambahkan']);
+    }
+
     public function render()
     {
         $gudangs = Gudang::where('is_active', true)->get();
@@ -472,6 +645,9 @@ class WmsDashboard extends Component
             'stokItems' => $stokItems,
             'transfers' => $transfers,
             'opnames' => $opnames,
+            'suppliers' => \App\Modules\Wms\Models\Supplier::orderBy('nama')->get(),
+            'raks' => \App\Modules\Wms\Models\Rak::with('gudang')->get(),
+            'poList' => \App\Modules\Wms\Models\PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk'])->latest()->paginate(15, pageName: 'po'),
             'produks' => Produk::with(['skuVariants', 'stokItems.gudang'])
                 ->when($this->produkSearch, fn ($q) => $q->where(function ($q2) {
                     $q2->where('nama', 'like', "%{$this->produkSearch}%")

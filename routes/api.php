@@ -68,6 +68,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/opname/{id}/items', [WmsController::class, 'inputOpnameItems'])->middleware('permission:wms.opname');
         Route::put('/opname/{id}/approve', [WmsController::class, 'approveOpname'])->middleware('permission:wms.approve-opname');
         Route::get('/kartu-stok/{produk_id}', [WmsController::class, 'kartuStok'])->middleware('permission:wms.view');
+
+        // [T-10] WMS-09..12: Supplier & PO
+        Route::get('/supplier', [WmsController::class, 'supplier'])->middleware('permission:wms.view');
+        Route::post('/supplier', [WmsController::class, 'storeSupplier'])->middleware('permission:wms.create');
+        Route::get('/po', [WmsController::class, 'indexPo'])->middleware('permission:wms.view');
+        Route::post('/po', [WmsController::class, 'storePo'])->middleware('permission:wms.create');
+        Route::put('/po/{id}/status', [WmsController::class, 'updatePoStatus'])->middleware('permission:wms.create');
+        Route::post('/po/{id}/bayar', [WmsController::class, 'bayarPo'])->middleware('permission:wms.create');
+
+        // [T-15] WMS-14: generate barcode
+        Route::post('/produk/{id}/generate-barcode', [WmsController::class, 'generateBarcode'])->middleware('permission:wms.create');
     });
 
     // [API: SERVICE-01..06] Modul Servis HP

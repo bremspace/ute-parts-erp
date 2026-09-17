@@ -4,6 +4,8 @@ namespace App\Modules\Wms\Controllers;
 
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
@@ -11,6 +13,7 @@ use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\StokOpnameItem;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
+use App\Modules\Wms\Models\Supplier;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -112,11 +115,12 @@ class WmsController extends Controller
         }
 
         return DB::transaction(function () use ($transfer) {
-            // Kurangi stok dari gudang asal & catat log
+            // Kurangi stok dari gudang asal & catat log — lockForUpdate anti race (T-13)
             foreach ($transfer->items as $item) {
                 $stokAsal = StokItem::where('gudang_id', $transfer->gudang_asal_id)
                     ->where('produk_id', $item->produk_id)
                     ->where('sku_variant_id', $item->sku_variant_id)
+                    ->lockForUpdate()
                     ->first();
 
                 $sebelum = $stokAsal ? $stokAsal->jumlah : 0;
@@ -163,7 +167,7 @@ class WmsController extends Controller
         return DB::transaction(function () use ($transfer) {
             // Tambah stok ke gudang tujuan & catat log
             foreach ($transfer->items as $item) {
-                $stokTujuan = StokItem::firstOrCreate(
+                $stokTujuan = StokItem::lockForUpdate()->firstOrCreate(
                     [
                         'gudang_id' => $transfer->gudang_tujuan_id,
                         'produk_id' => $item->produk_id,
@@ -361,5 +365,149 @@ class WmsController extends Controller
         $logs = $query->paginate(30);
 
         return $this->success($logs, 'Riwayat kartu stok berhasil diambil');
+    }
+
+    // ==================== [T-10] SUPPLIER & PO ====================
+
+    // [API: WMS-09] CRUD supplier
+    public function supplier(Request $request)
+    {
+        return $this->success(Supplier::orderBy('nama')->get(), 'Daftar supplier berhasil dimuat');
+    }
+
+    public function storeSupplier(Request $request)
+    {
+        $request->validate([
+            'nama' => 'required|string|max:255',
+            'telepon' => 'nullable|string|max:20',
+            'termin_hari' => 'nullable|integer|min:0',
+        ]);
+
+        $supplier = Supplier::create($request->all());
+
+        return $this->success($supplier, 'Supplier berhasil dibuat', 201);
+    }
+
+    // [API: WMS-10] CRUD PO + ubah status
+    public function indexPo(Request $request)
+    {
+        return $this->success(
+            PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk'])
+                ->latest()->paginate(20),
+            'Daftar PO berhasil dimuat'
+        );
+    }
+
+    public function storePo(Request $request)
+    {
+        $request->validate([
+            'supplier_id' => 'required|exists:supplier,id',
+            'gudang_tujuan_id' => 'required|exists:gudang,id',
+            'metode_bayar' => 'required|in:tunai,kredit',
+            'jatuh_tempo' => 'nullable|date',
+            'items' => 'required|array|min:1',
+            'items.*.produk_id' => 'required|exists:produk,id',
+            'items.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
+            'items.*.harga_beli' => 'required|numeric|min:0',
+            'items.*.jumlah' => 'required|integer|min:1',
+        ]);
+
+        $today = now()->format('Ymd');
+        $count = PurchaseOrder::whereDate('created_at', now()->toDateString())->count() + 1;
+        $noPo = sprintf('PO-%s-%03d', $today, $count);
+
+        return DB::transaction(function () use ($request, $noPo) {
+            $total = 0;
+            foreach ($request->items as $i) {
+                $total += (float) $i['harga_beli'] * (int) $i['jumlah'];
+            }
+
+            $po = PurchaseOrder::create([
+                'no_po' => $noPo,
+                'supplier_id' => $request->supplier_id,
+                'gudang_tujuan_id' => $request->gudang_tujuan_id,
+                'status' => 'draft',
+                'metode_bayar' => $request->metode_bayar,
+                'jatuh_tempo' => $request->jatuh_tempo ?? now()->addDays((int) (Supplier::find($request->supplier_id)?->termin_hari ?? 30))->toDateString(),
+                'total' => $total,
+                'total_dibayar' => 0,
+                'catatan' => $request->catatan,
+            ]);
+
+            foreach ($request->items as $i) {
+                PurchaseOrderItem::create([
+                    'purchase_order_id' => $po->id,
+                    'produk_id' => $i['produk_id'],
+                    'sku_variant_id' => $i['sku_variant_id'] ?? null,
+                    'harga_beli' => (float) $i['harga_beli'],
+                    'jumlah' => (int) $i['jumlah'],
+                    'subtotal' => (float) $i['harga_beli'] * (int) $i['jumlah'],
+                ]);
+            }
+
+            return $this->success($po->load('items', 'supplier'), 'PO berhasil dibuat', 201);
+        });
+    }
+
+    public function updatePoStatus(Request $request, $id)
+    {
+        $po = PurchaseOrder::findOrFail($id);
+        $action = $request->input('action', 'diterima'); // dikirim | diterima | dibatalkan
+
+        $allowed = ['draft' => ['dikirim'], 'dikirim' => ['diterima', 'dibatalkan'], 'draft' => ['dibatalkan']];
+        $valid = $allowed[$po->status] ?? [];
+
+        if ($action === 'dibatalkan' && in_array($po->status, ['draft', 'dikirim'], true)) {
+            $po->update(['status' => 'dibatalkan']);
+            return $this->success($po, 'PO dibatalkan');
+        }
+
+        if ($action === 'dikirim' && $po->status === 'draft') {
+            $po->update(['status' => 'dikirim']);
+            return $this->success($po, 'PO dikirim');
+        }
+
+        if ($action === 'diterima' && $po->status === 'dikirim') {
+            $po = app(\App\Modules\Wms\Services\PurchaseOrderService::class)->terimaBarang($po, auth()->id());
+            return $this->success($po->load('items', 'supplier'), 'PO diterima — stok & jurnal akunting dibuat');
+        }
+
+        return $this->error('Transisi status tidak valid', 422);
+    }
+
+    // [API: WMS-14] Generate barcode utk produk tanpa barcode (format UTP-{id}-{checksum})
+    public function generateBarcode(Request $request, $id)
+    {
+        $produk = Produk::findOrFail($id);
+
+        if (empty($produk->barcode)) {
+            $checksum = substr(hash('crc32b', (string) $produk->id), 0, 4);
+            $produk->update(['barcode' => sprintf('UTP-%05d-%s', $produk->id, strtoupper($checksum))]);
+        }
+
+        // Varian juga (jika belum)
+        $variant = $produk->skuVariants()->first();
+        if ($variant && empty($variant->barcode)) {
+            $variant->update(['barcode' => $produk->barcode . '-' . $variant->id]);
+        }
+
+        return $this->success($produk->fresh(), 'Barcode berhasil digenerate');
+    }
+
+    // [API: WMS-12] Bayar PO
+    public function bayarPo(Request $request, $id)
+    {
+        $request->validate(['jumlah' => 'required|numeric|min:1']);
+
+        try {
+            $po = app(\App\Modules\Wms\Services\PurchaseOrderService::class)->bayarPO(
+                PurchaseOrder::findOrFail($id),
+                (float) $request->jumlah,
+                auth()->id()
+            );
+            return $this->success($po, 'Pembayaran PO tercatat — sisa utang terupdate');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
     }
 }

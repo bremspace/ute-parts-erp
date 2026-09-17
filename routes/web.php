@@ -99,6 +99,19 @@ Route::get('/account', App\Modules\Marketplace\Livewire\CustomerAccount::class)
     ->middleware('auth:customer')
     ->name('customer.account');
 
+// [T-15] Cetak label barcode (multi-produk via ?ids=1,2,3)
+Route::get('/print-barcode', function (Illuminate\Http\Request $request) {
+    $ids = collect(explode(',', (string) $request->query('ids', '')))
+        ->filter(fn ($v) => is_numeric($v))
+        ->map(fn ($v) => (int) $v);
+
+    $produks = $ids->isEmpty()
+        ? \App\Modules\Wms\Models\Produk::where('is_active', true)->limit(20)->get()
+        : \App\Modules\Wms\Models\Produk::whereIn('id', $ids)->get();
+
+    return view('wms.barcode-label', ['produks' => $produks]);
+})->middleware('auth')->name('barcode.print');
+
 // ===== Zona Backoffice (internal staff, dark mode) =====
 Route::get('/app/login', function () {
     return view('auth.login');

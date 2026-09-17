@@ -156,6 +156,72 @@ class SemuaHalamanTest extends TestCase
         $this->assertNotNull($no);
     }
 
+    // [T-10] PO kredit: dibuat → dikirim → diterima (stok + jurnal) → bayar → sisa utang updated
+    public function test_po_kredit_diterima_dan_dibayar(): void
+    {
+        $this->authed();
+        $gudang = \App\Modules\Wms\Models\Gudang::where('kode', 'GDG-01')->firstOrFail();
+        $produk = Produk::firstOrFail();
+        $stokAwal = \App\Modules\Wms\Models\StokItem::where('produk_id', $produk->id)->where('gudang_id', $gudang->id)->value('jumlah') ?? 0;
+
+        // Supplier
+        $supplier = \App\Modules\Wms\Models\Supplier::create(['nama' => 'Supplier Test', 'telepon' => '021000', 'termin_hari' => 30]);
+
+        // Buat PO kredit 2 item @ 100000 = 200000
+        $poResp = $this->postJson('/api/wms/po', [
+            'supplier_id' => $supplier->id,
+            'gudang_tujuan_id' => $gudang->id,
+            'metode_bayar' => 'kredit',
+            'items' => [
+                ['produk_id' => $produk->id, 'sku_variant_id' => $produk->skuVariants()->first()?->id, 'harga_beli' => 100000, 'jumlah' => 2],
+            ],
+        ])->assertSuccessful();
+        $poId = $poResp->json('data.id');
+
+        // Kirim → terima
+        $this->putJson("/api/wms/po/{$poId}/status", ['action' => 'dikirim'])->assertSuccessful();
+        $this->putJson("/api/wms/po/{$poId}/status", ['action' => 'diterima'])->assertSuccessful();
+
+        // Stok gudang bertambah 2
+        $this->assertDatabaseHas('stok_items', ['produk_id' => $produk->id, 'gudang_id' => $gudang->id, 'jumlah' => $stokAwal + 2]);
+
+        // Jurnal pembelian: Persediaan 130-01 debit 200000, Utang 210-01 kredit 200000
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'sumber' => 'pembelian',
+            'akun_coa_id' => \App\Modules\Akunting\Models\AkunCOA::where('kode', '130-01')->first()->id,
+            'debit' => 200000,
+        ]);
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'sumber' => 'pembelian',
+            'akun_coa_id' => \App\Modules\Akunting\Models\AkunCOA::where('kode', '210-01')->first()->id,
+            'kredit' => 200000,
+        ]);
+
+        // Bayar parsial 50000
+        $this->postJson("/api/wms/po/{$poId}/bayar", ['jumlah' => 50000])->assertSuccessful();
+        $this->assertDatabaseHas('purchase_order', ['id' => $poId, 'total_dibayar' => 50000]);
+
+        // Jurnal bayar: Utang debit 50000, Kas kredit 50000
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'akun_coa_id' => \App\Modules\Akunting\Models\AkunCOA::where('kode', '210-01')->first()->id,
+            'debit' => 50000,
+        ]);
+    }
+
+    // [T-11] Tambah produk dengan slug+d
+    public function test_konfigurasi_casting_barcode_foto(): void
+    {
+        $this->authed();
+        $produk = Produk::firstOrFail();
+
+        $produk->update([
+            'barcode' => 'XYZ-123-BARCODE',
+            'kompatibilitas_hp' => [['merk' => 'Apple', 'model' => 'iPhone 13']],
+        ]);
+
+        $this->assertDatabaseHas('produk', ['id' => $produk->id, 'barcode' => 'XYZ-123-BARCODE']);
+    }
+
     public function test_tambah_produk_dengan_stok_awal_membuat_jurnal_pembelian(): void
     {
         $this->authed();
