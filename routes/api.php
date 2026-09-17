@@ -46,7 +46,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // [API: POS-01, POS-02, PRICING-01] Modul POS
     Route::prefix('pos')->group(function () {
         Route::get('/produk', [PosController::class, 'products'])->middleware('permission:pos.view');
+        Route::get('/pelanggan', [PosController::class, 'pelanggan'])->middleware('permission:pos.view'); // [T-08] POS-06
+        Route::get('/transaksi', [PosController::class, 'index'])->middleware('permission:pos.view'); // [T-03] POS-05
         Route::post('/transaksi', [PosController::class, 'store'])->middleware('permission:pos.create');
+        Route::post('/transaksi/{id}/tahan', [PosController::class, 'tahan'])->middleware('permission:pos.create'); // [T-03] POS-04
+        Route::post('/transaksi/{id}/resume', [PosController::class, 'resume'])->middleware('permission:pos.create'); // [T-03]
+        // [T-09] Kas sesi
+        Route::post('/kas/buka', [PosController::class, 'bukaKas'])->middleware('permission:pos.create'); // POS-07
+        Route::post('/kas/tutup', [PosController::class, 'tutupKas'])->middleware('permission:pos.create'); // POS-08
+        Route::get('/kas/riwayat', [PosController::class, 'riwayatKas'])->middleware('permission:pos.view'); // POS-09
     });
     Route::get('/pricing/{produk_id}', [PosController::class, 'resolvePrice'])->middleware('permission:pos.view');
 
@@ -75,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // [API: CRM-01..05] Modul CRM & Tier
     Route::prefix('crm')->group(function () {
         Route::get('/pelanggan', [CrmController::class, 'index'])->middleware('permission:crm.view');
+        Route::post('/pelanggan', [CrmController::class, 'store'])->middleware('permission:crm.create'); // [T-04] CRM-06
         Route::get('/pelanggan/{id}', [CrmController::class, 'show'])->middleware('permission:crm.view');
         Route::get('/tiers', [CrmController::class, 'indexTiers'])->middleware('permission:crm.view');
         Route::post('/tiers', [CrmController::class, 'storeTier'])->middleware('permission:tier.manage');

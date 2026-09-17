@@ -145,7 +145,6 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-[11px] text-ink-400">{{ $produks->total() }} produk</span>
-                    <button wire:click="openProdukModal" class="px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer">+ Tambah Produk</button>
                 </div>
             </div>
 

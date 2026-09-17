@@ -43,7 +43,10 @@ class AuthController extends Controller
 
         // If user has exactly 1 cabang, auto-set in session
         if ($cabangs->count() === 1) {
-            session(['cabang_id' => $cabangs->first()->id]);
+            session([
+                'cabang_id' => $cabangs->first()->id,
+                'cabang_nama' => $cabangs->first()->nama,
+            ]);
             $data['cabang_id'] = $cabangs->first()->id;
         }
 
@@ -67,7 +70,10 @@ class AuthController extends Controller
             return $this->error('Anda tidak memiliki akses ke cabang ini', 403);
         }
 
-        session(['cabang_id' => $request->cabang_id]);
+        session([
+            'cabang_id' => $request->cabang_id,
+            'cabang_nama' => $cabang->nama,
+        ]);
 
         return $this->success([
             'cabang' => $cabang,

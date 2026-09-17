@@ -22,10 +22,12 @@ class DatabaseSeeder extends Seeder
             CabangSeeder::class,
             TierMembershipSeeder::class,
             AdminUserSeeder::class,
+            RoleUserSeeder::class,
             ProdukDanStokSeeder::class,
             JenisServisSeeder::class,
             AkunCoaSeeder::class,
             KomisiSkemaSeeder::class,
+            TransaksiDemoSeeder::class,
         ]);
     }
 }

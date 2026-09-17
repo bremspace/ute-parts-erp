@@ -142,6 +142,14 @@ class PosController extends Controller
             'split_detail' => 'nullable|array',
         ]);
 
+        // [T-09] Validasi sesi kas utk pembayaran tunai (blokir bila belum buka kas)
+        if ($request->metode_bayar === 'tunai') {
+            $kasSesi = app(\App\Modules\Pos\Services\KasSesiState::class);
+            if (!$kasSesi->isActiveSesi()) {
+                return $this->error('Kas belum dibuka — buka sesi kas terlebih dahulu sebelum transaksi tunai', 422);
+            }
+        }
+
         $cabangId = session('cabang_id') ?? auth()->user()->cabangs()->first()?->id;
         if (!$cabangId) {
             return $this->error('Cabang aktif belum dipilih', 400);
@@ -346,5 +354,118 @@ class PosController extends Controller
                 201
             );
         });
+    }
+
+    // [API: POS-05] Daftar transaksi (filter status, di-scope cabang; default cabang aktif)
+    public function index(Request $request)
+    {
+        $status = $request->query('status');
+        $cabangId = $request->query('cabang_id') ?? session('cabang_id');
+
+        $query = Transaksi::with(['items', 'pelanggan', 'kasir', 'cabang'])
+            ->latest();
+
+        if ($cabangId) {
+            $query->where('cabang_id', $cabangId);
+        }
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        return $this->success($query->paginate($request->query('per_page', 20)), 'Daftar transaksi berhasil dimuat');
+    }
+
+    // [API: POS-04] Tahan transaksi (park) — simpan cart ke split_detail, status ditahan (belum kurangi stok)
+    public function tahan(Request $request, $id)
+    {
+        $transaksi = Transaksi::where('id', $id)
+            ->where('cabang_id', session('cabang_id') ?? $request->user()->cabangs()->first()?->id)
+            ->where('status', 'draft')
+            ->firstOrFail();
+
+        $transaksi->update(['status' => 'ditahan']); // split_detail sudah berisi cart
+
+        return $this->success($transaksi, 'Transaksi ditahan — bisa dilanjutkan kasir lain');
+    }
+
+    // [API: POS-04b] Lanjutkan transaksi ditahan (resume) — status kembali draft utk dilanjutkan
+    public function resume(Request $request, $id)
+    {
+        $transaksi = Transaksi::where('id', $id)
+            ->where('cabang_id', session('cabang_id') ?? $request->user()->cabangs()->first()?->id)
+            ->where('status', 'ditahan')
+            ->firstOrFail();
+
+        $transaksi->update([
+            'status' => 'draft',
+            'kasir_id' => auth()->id(),
+        ]);
+
+        return $this->success($transaksi->load('items'), 'Transaksi dilanjutkan');
+    }
+
+    // [API: POS-06] Cari pelanggan utk POS (satu sumber: pelanggan CRM)
+    public function pelanggan(Request $request)
+    {
+        $search = $request->query('search', '');
+
+        $query = Pelanggan::with('tierMembership')
+            ->where('is_active', true)
+            ->latest();
+
+        if (strlen($search) >= 2) {
+            $query->where(function ($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                  ->orWhere('telepon', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        return $this->success($query->limit(10)->get(), 'Daftar pelanggan berhasil dimuat');
+    }
+
+    // [API: POS-07] Buka kas sesi
+    public function bukaKas(Request $request)
+    {
+        $request->validate([
+            'saldo_awal' => 'required|numeric|min:0',
+            'cabang_id' => 'nullable|exists:cabang,id',
+        ]);
+
+        try {
+            $sesi = app(\App\Modules\Pos\Services\KasSesiState::class)->bukaKas(
+                (float) $request->saldo_awal,
+                $request->cabang_id ?? session('cabang_id'),
+                auth()->id()
+            );
+            return $this->success($sesi, 'Kas berhasil dibuka');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+    }
+
+    // [API: POS-08] Tutup kas sesi
+    public function tutupKas(Request $request)
+    {
+        $request->validate([
+            'saldo_fisik' => 'required|numeric|min:0',
+        ]);
+
+        try {
+            $hasil = app(\App\Modules\Pos\Services\KasSesiState::class)->tutupKas((float) $request->saldo_fisik);
+            return $this->success($hasil, 'Kas berhasil ditutup');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+    }
+
+    // [API: POS-09] Riwayat sesi kas per cabang
+    public function riwayatKas(Request $request)
+    {
+        return $this->success(
+            app(\App\Modules\Pos\Services\KasSesiState::class)->riwayat($request->cabang_id ?? session('cabang_id')),
+            'Riwayat sesi kas berhasil dimuat'
+        );
     }
 }

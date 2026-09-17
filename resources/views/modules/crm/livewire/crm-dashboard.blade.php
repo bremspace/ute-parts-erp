@@ -19,6 +19,9 @@
             </div>
         </div>
         <div class="flex items-center gap-2">
+            <x-prism.prism-button variant="mint" size="sm" wire:click="$set('showPelangganBaruModal', true)">
+                + Tambah Pelanggan
+            </x-prism.prism-button>
             <x-prism.prism-button variant="primary" size="sm" wire:click="openTierModal()">
                 + Tambah Tier
             </x-prism.prism-button>
@@ -299,6 +302,45 @@
                             </div>
                         </div>
                     @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- [T-04] MODAL: TAMBAH PELANGGAN (CRM-06) -->
+    @if($showPelangganBaruModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-lg font-bold text-white">Tambah Pelanggan Baru</h3>
+                    <button wire:click="$set('showPelangganBaruModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama *</label>
+                        <input type="text" wire:model="pelangganBaruForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">No. HP *</label>
+                        <input type="text" wire:model="pelangganBaruForm.telepon" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="08xx-xxxx-xxxx" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email</label>
+                        <input type="email" wire:model="pelangganBaruForm.email" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
+                        <textarea wire:model="pelangganBaruForm.alamat" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
+                    </div>
+                    <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
+                        <input type="checkbox" wire:model="pelangganBaruForm.is_reseller" class="accent-up-accent w-4 h-4" />
+                        Jadikan Reseller
+                    </label>
+                    <p class="text-[10px] text-ink-500">Satu data pelanggan — langsung bisa dipakai di POS & Servis.</p>
+                </div>
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                    <button wire:click="$set('showPelangganBaruModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="simpanPelangganBaruCrm" class="flex-1 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan</button>
                 </div>
             </div>
         </div>

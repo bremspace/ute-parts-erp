@@ -17,6 +17,9 @@ use Livewire\Component;
 
 class PosKasir extends Component
 {
+    // [T-09] state sesi kas
+    public $kasAktif = null;
+
     // Search & Filter state
     public string $search = '';
     public ?int $selectedCustomerId = null;
@@ -46,13 +49,41 @@ class PosKasir extends Component
     public ?int $completedTransactionId = null;
     public ?array $receiptData = null;
 
+    // [T-03] Transaksi ditahan (park)
+    public bool $showDitahanPanel = false;
+
+    // [T-08] Pencarian & tambah pelanggan quick
+    public string $pelangganSearch = '';
+    public bool $showPelangganBaruModal = false;
+    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => ''];
+
+    // [T-09] Kas sesi modal
+    public bool $showKasModal = false;
+    public bool $kasModeBuka = true;
+    public float $kasSaldoAwal = 0;
+    public float $kasSaldoFisik = 0;
+    public ?array $kasHasil = null;
+
     public function mount()
     {
-        // Set default gudang from active session cabang
+        // Set default gudang dari active session cabang
         $cabangId = session('cabang_id');
         if ($cabangId) {
             $this->selectedGudangId = Gudang::where('cabang_id', $cabangId)->value('id');
         }
+
+        // [T-09] Deteksi sesi kas terbuka utk user/cabang
+        $this->checkKasSesi();
+    }
+
+    public function checkKasSesi(): void
+    {
+        $this->kasAktif = app(\App\Modules\Pos\Services\KasSesiState::class)->sesiKasAktif();
+    }
+
+    public function getKasAktifProperty()
+    {
+        return app(\App\Modules\Pos\Services\KasSesiState::class)->sesiKasAktif();
     }
 
     public function getCustomerProperty()
@@ -87,6 +118,28 @@ class PosKasir extends Component
             return max(0.0, $totalBayar - $this->totalAkhir);
         }
         return 0.0;
+    }
+
+    /** [T-07] Enter = scan barcode/SKU exact-match → auto add ke keranjang. */
+    public function scanEnter()
+    {
+        $q = trim($this->search);
+        if ($q === '') {
+            return;
+        }
+
+        $variant = SkuVariant::where('sku', $q)->where('is_active', true)->first();
+        if ($variant) {
+            $this->addToCart($variant->produk_id, $variant->id);
+            $this->search = '';
+            return;
+        }
+
+        $produk = Produk::where('id', $q)->orWhere('nama', $q)->first();
+        if ($produk) {
+            $this->addToCart($produk->id);
+            $this->search = '';
+        }
     }
 
     public function addToCart(int $produkId, ?int $variantId = null)
@@ -381,8 +434,182 @@ class PosKasir extends Component
             $this->showPaymentModal = false;
             $this->showReceiptModal = true;
             $this->clearCart();
+            $this->checkKasSesi();
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memproses transaksi: ' . $e->getMessage()]);
+        }
+    }
+
+    // ==================== [T-03] PARK / TAHAN ====================
+
+    /** Simpan keranjang sebagai transaksi status 'ditahan' (F6) — belum kurangi stok. */
+    public function tahanTransaksi()
+    {
+        if (empty($this->cart)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Keranjang kosong, tidak ada yang ditahan']);
+            return;
+        }
+
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
+
+        try {
+            DB::transaction(function () use ($cabangId) {
+                $today = now()->format('Ymd');
+                $count = Transaksi::whereDate('created_at', now()->toDateString())
+                    ->where('cabang_id', $cabangId)->count() + 1;
+                $no = sprintf('TRX-C%02d-%s-T%04d', $cabangId, $today, $count);
+
+                $transaksi = Transaksi::create([
+                    'no_transaksi' => $no,
+                    'cabang_id' => $cabangId,
+                    'kasir_id' => auth()->id() ?? 1,
+                    'pelanggan_id' => $this->selectedCustomerId,
+                    'gudang_id' => $this->selectedGudangId,
+                    'sumber' => 'pos',
+                    'subtotal' => $this->subtotal,
+                    'total_akhir' => $this->totalAkhir,
+                    'metode_bayar' => 'ditahan',
+                    'jumlah_bayar' => 0,
+                    'kembalian' => 0,
+                    'split_detail' => [
+                        'cart' => array_values($this->cart),
+                        'diskon_persen' => $this->diskonPersen,
+                        'diskon_nominal' => $this->diskonNominal,
+                        'catatan' => 'Ditahan (park) oleh ' . (auth()->user()?->name ?? 'kasir'),
+                    ],
+                    'status' => 'ditahan',
+                    'catatan' => 'Transaksi ditahan (park)',
+                ]);
+            });
+
+            $this->clearCart();
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Transaksi ditahan — dapat dilanjutkan kasir lain di cabang ini']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    /** Daftar transaksi ditahan (scope cabang aktif — POS-05). */
+    public function getDitahanListProperty()
+    {
+        return Transaksi::with('kasir')
+            ->where('cabang_id', session('cabang_id'))
+            ->where('status', 'ditahan')
+            ->latest()
+            ->get();
+    }
+
+    /** Lanjutkan transaksi yang ditahan → isi ulang keranjang, status duplikat jadi draft biasa. */
+    public function resumeDitahan(int $id)
+    {
+        $transaksi = Transaksi::where('id', $id)
+            ->where('cabang_id', session('cabang_id'))
+            ->where('status', 'ditahan')
+            ->firstOrFail();
+
+        $detail = $transaksi->split_detail ?? [];
+        $cartItems = $detail['cart'] ?? [];
+
+        if (empty($cartItems)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Data keranjang ditahan tidak ditemukan']);
+            return;
+        }
+
+        // Muat ulang keranjang ke state (tanpa duplikat — reset dulu)
+        $this->clearCart();
+        foreach ($cartItems as $item) {
+            $key = isset($item['sku_variant_id']) && $item['sku_variant_id']
+                ? $item['produk_id'] . '-' . $item['sku_variant_id']
+                : $item['produk_id'] . '-0';
+            $this->cart[$key] = $item;
+        }
+        $this->diskonPersen = (float) ($detail['diskon_persen'] ?? 0);
+        $this->diskonNominal = (float) ($detail['diskon_nominal'] ?? 0);
+        $this->selectedCustomerId = $transaksi->pelanggan_id;
+
+        // Tandai transaksi asli dipindahkan → status 'batal' (tidak dipakai lagi), tanpa jurnal
+        $transaksi->update(['status' => 'dibatalkan', 'catatan' => 'Dilanjutkan (resume) oleh ' . (auth()->user()?->name ?? 'kasir')]);
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Transaksi ditahan dilanjutkan — silakan lanjut bayar']);
+    }
+
+    // ==================== [T-08] PELANGGAN QUICK-ADD ====================
+
+    public function getPelangganCariProperty()
+    {
+        if (strlen($this->pelangganSearch) < 2) {
+            return collect();
+        }
+
+        return Pelanggan::with('tierMembership')
+            ->where(function ($q) {
+                $q->where('nama', 'like', "%{$this->pelangganSearch}%")
+                  ->orWhere('telepon', 'like', "%{$this->pelangganSearch}%")
+                  ->orWhere('email', 'like', "%{$this->pelangganSearch}%");
+            })
+            ->limit(8)
+            ->get();
+    }
+
+    public function simpanPelangganBaru()
+    {
+        $this->validate([
+            'pelangganBaruForm.nama' => 'required|string|max:255',
+            'pelangganBaruForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon',
+            'pelangganBaruForm.email' => 'nullable|email|unique:pelanggan,email',
+        ]);
+
+        $tier = \App\Modules\Crm\Models\TierMembership::where('is_active', true)
+            ->orderBy('min_belanja_12bulan')->first();
+
+        $pelanggan = Pelanggan::create([
+            'nama' => $this->pelangganBaruForm['nama'],
+            'telepon' => $this->pelangganBaruForm['telepon'],
+            'email' => $this->pelangganBaruForm['email'] ?: null,
+            'alamat' => $this->pelangganBaruForm['alamat'] ?: null,
+            'tier_membership_id' => $tier?->id,
+            'is_reseller' => false,
+        ]);
+
+        $this->setPelanggan($pelanggan->id);
+        $this->showPelangganBaruModal = false;
+        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => ''];
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan & dipilih (sinkron ke CRM)']);
+    }
+
+    // ==================== [T-09] KAS SESI ====================
+
+    public function bukaKasModal()
+    {
+        $this->kasModeBuka = true;
+        $this->kasSaldoAwal = 0;
+        $this->kasHasil = null;
+        $this->showKasModal = true;
+    }
+
+    public function tutupKasModal()
+    {
+        $this->kasModeBuka = false;
+        $sesi = $this->kasAktif;
+        $this->kasSaldoFisik = (float) ($sesi->saldo_akhir_sistem ?? $sesi->saldo_awal ?? 0);
+        $this->kasHasil = null;
+        $this->showKasModal = true;
+    }
+
+    public function prosesKas()
+    {
+        try {
+            $svc = app(\App\Modules\Pos\Services\KasSesiState::class);
+            if ($this->kasModeBuka) {
+                $this->kasHasil = $svc->bukaKas((float) $this->kasSaldoAwal, session('cabang_id'), auth()->id());
+            } else {
+                $this->kasHasil = $svc->tutupKas((float) $this->kasSaldoFisik);
+            }
+            $this->checkKasSesi();
+            $this->dispatch('alert', ['type' => 'success', 'message' => $this->kasModeBuka ? 'Kas dibuka' : 'Kas ditutup' . ($this->kasHasil['selisih'] != 0 ? ' — selisih tercatat' : '')]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
     }
 
@@ -408,6 +635,9 @@ class PosKasir extends Component
         return view('modules.pos.livewire.pos-kasir', [
             'products' => $products,
             'customers' => $customers,
+            'pelangganCari' => $this->pelangganCari,
+            'ditahanList' => $this->ditahanList,
+            'kasAktif' => $this->kasAktif,
         ])->layout('layouts.backoffice', ['header' => 'Kasir Point of Sale (POS)']);
     }
 }

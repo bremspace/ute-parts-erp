@@ -9,10 +9,16 @@
         <!-- Top Toolbar: Search & Gudang Selector -->
         <div class="flex items-center gap-4 mb-4 flex-shrink-0">
             <div class="flex-1">
-                <x-prism.barcode-scan-input
-                    placeholder="Scan Barcode atau ketik nama/tipe HP (Tekan F2)..."
-                    model="search"
-                />
+                <div class="relative">
+                    <x-prism.barcode-scan-input
+                        placeholder="Scan Barcode atau ketik nama/tipe HP (Tekan F2, Enter=add)..."
+                        model="search"
+                        wire:keydown.enter="scanEnter"
+                    />
+                    <button wire:click="scanEnter"
+                            class="absolute right-14 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/40 text-up-primary text-[10px] font-bold cursor-pointer"
+                            title="Tambah dari barcode/SKU (Enter)">ADD</button>
+                </div>
             </div>
 
             <div class="w-48">
@@ -106,18 +112,42 @@
             </div>
 
             <div class="flex gap-2">
-                <select
-                    wire:model.live="selectedCustomerId"
-                    wire:change="setPelanggan($event.target.value)"
-                    class="flex-1 px-3 py-2 rounded-xl glass-input text-xs font-medium"
-                >
-                    <option value="" class="bg-ink-900">Pelanggan Umum (Tanpa Member)</option>
-                    @foreach($customers as $c)
-                        <option value="{{ $c->id }}" class="bg-ink-900">
-                            {{ $c->nama }} — {{ $c->telepon ?? '-' }} ({{ $c->tierMembership?->nama ?? 'Retail' }})
-                        </option>
-                    @endforeach
-                </select>
+                <div class="flex-1 relative">
+                    <select
+                        wire:model.live="selectedCustomerId"
+                        wire:change="setPelanggan($event.target.value)"
+                        class="flex-1 w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
+                    >
+                        @if(!$pelangganCari->isEmpty())<option value="" class="bg-ink-900">— Pilih dari daftar / cari di bawah —</option>@endif
+                        <option value="" class="bg-ink-900">Pelanggan Umum (Tanpa Member)</option>
+                        @foreach($customers as $c)
+                            <option value="{{ $c->id }}" class="bg-ink-900">
+                                {{ $c->nama }} — {{ $c->telepon ?? '-' }} ({{ $c->tierMembership?->nama ?? 'Retail' }})
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <!-- [T-08] pencarian pelanggan live + tambah baru -->
+                    <input
+                        type="text"
+                        wire:model.live.debounce.250ms="pelangganSearch"
+                        placeholder="Cari pelanggan: nama / no HP..."
+                        class="mt-2 w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
+                    />
+                    @if($pelangganCari->isNotEmpty())
+                        <div class="absolute z-20 mt-1 w-full glass-panel rounded-xl overflow-hidden text-xs">
+                            @foreach($pelangganCari as $pc)
+                                <button
+                                    wire:click="setPelanggan({{ $pc->id }}); $set('pelangganSearch', '')"
+                                    class="w-full text-left px-3 py-2 hover:bg-white/5 text-ink-200 cursor-pointer"
+                                >
+                                    <span class="font-semibold">{{ $pc->nama }}</span>
+                                    <span class="text-ink-400 font-mono ml-1">{{ $pc->telepon }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
 
                 @if($selectedCustomerId)
                     <button
@@ -128,6 +158,13 @@
                         ✕
                     </button>
                 @endif
+                <button
+                    wire:click="$set('showPelangganBaruModal', true)"
+                    class="px-3 py-2 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 text-[11px] font-bold whitespace-nowrap"
+                    title="Tambah Pelanggan Baru (sinkron ke CRM)"
+                >
+                    + Baru
+                </button>
             </div>
 
             @if($this->customer && $this->customer->tierMembership)
@@ -228,6 +265,7 @@
 
                 <button
                     type="button"
+                    wire:click="tahanTransaksi"
                     class="py-3 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white font-semibold text-xs transition-all border border-white/5 flex flex-col items-center justify-center gap-1 cursor-pointer"
                 >
                     <span>Tahan (F6)</span>
@@ -241,6 +279,44 @@
                     <span>BAYAR</span>
                     <span class="text-[10px] font-mono text-white/70">F4</span>
                 </button>
+            </div>
+
+            <!-- [T-09] Status Kas Sesi -->
+            <div class="flex items-center justify-between pt-2">
+                @if($kasAktif)
+                    <div class="flex items-center gap-2 text-[11px] text-up-mint">
+                        <span class="w-1.5 h-1.5 rounded-full bg-up-mint animate-pulse"></span>
+                        <span>Kas terbuka · saldo awal <span class="tabular-nums">Rp {{ number_format($kasAktif->saldo_awal, 0, ',', '.') }}</span></span>
+                    </div>
+                    <button wire:click="tutupKasModal" class="text-[11px] font-bold text-up-amber hover:text-up-red cursor-pointer">Tutup Kas</button>
+                @else
+                    <div class="flex items-center gap-2 text-[11px] text-up-amber">
+                        <span class="w-1.5 h-1.5 rounded-full bg-up-amber"></span>
+                        <span>Kas belum dibuka — transaksi tunai diblokir</span>
+                    </div>
+                    <button wire:click="bukaKasModal" class="text-[11px] font-bold text-up-primary hover:text-indigo-400 cursor-pointer">Buka Kas</button>
+                @endif
+            </div>
+
+            <!-- [T-03] Panel transaksi ditahan -->
+            <div class="pt-1">
+                <button wire:click="$toggle('showDitahanPanel')" class="text-[11px] font-semibold text-ink-400 hover:text-white flex items-center gap-1 cursor-pointer">
+                    <span>{{ $showDitahanPanel ? '▼' : '▶' }}</span>
+                    Transaksi Ditahan ({{ $ditahanList->count() }})
+                </button>
+                @if($showDitahanPanel && $ditahanList->isNotEmpty())
+                    <div class="mt-2 space-y-1.5 max-h-44 overflow-y-auto">
+                        @foreach($ditahanList as $dt)
+                            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white/[0.03] border border-white/5 text-[11px]">
+                                <div class="min-w-0">
+                                    <span class="font-mono text-white truncate block">{{ $dt->no_transaksi }}</span>
+                                    <span class="text-ink-400">Rp <span class="tabular-nums">{{ number_format($dt->total_akhir, 0, ',', '.') }}</span> · {{ $dt->kasir?->name }}</span>
+                                </div>
+                                <button wire:click="resumeDitahan({{ $dt->id }})" class="px-2.5 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold cursor-pointer whitespace-nowrap">Lanjutkan</button>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -434,6 +510,102 @@
                     >
                         Tutup
                     </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- [T-08] MODAL: PELANGGAN BARU -->
+    @if($showPelangganBaruModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-lg font-bold text-white">Tambah Pelanggan Baru</h3>
+                    <button wire:click="$set('showPelangganBaruModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama *</label>
+                        <input type="text" wire:model="pelangganBaruForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">No. HP *</label>
+                        <input type="text" wire:model="pelangganBaruForm.telepon" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="08xx-xxxx-xxxx" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email</label>
+                        <input type="email" wire:model="pelangganBaruForm.email" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
+                        <textarea wire:model="pelangganBaruForm.alamat" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
+                    </div>
+                    <p class="text-[10px] text-ink-500">Pelanggan baru langsung tersedia di POS, CRM, dan Servis (satu data).</p>
+                </div>
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                    <button wire:click="$set('showPelangganBaruModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="simpanPelangganBaru" class="flex-1 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- [T-09] MODAL: KAS SESI -->
+    @if($showKasModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-lg font-bold text-white">{{ $kasModeBuka ? 'Buka Kas (Shift Baru)' : 'Tutup Kas (Rekap Shift)' }}</h3>
+                    <button wire:click="$set('showKasModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                @if(!$kasHasil)
+                    <div class="space-y-4">
+                        @if($kasModeBuka)
+                            <div>
+                                <label class="block text-xs font-semibold text-ink-300 mb-1.5">Saldo Awal (Rp)</label>
+                                <input type="number" wire:model.live="kasSaldoAwal" min="0" class="w-full px-3 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" placeholder="0" />
+                            </div>
+                        @else
+                            <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs space-y-1.5">
+                                <div class="flex justify-between">
+                                    <span class="text-ink-400">Saldo awal</span>
+                                    <span class="tabular-nums text-white">{{ number_format($kasAktif?->saldo_awal ?? 0, 0, ',', '.') }}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-ink-300 mb-1.5">Saldo Fisik Akhir (Rp) *</label>
+                                <input type="number" wire:model.live="kasSaldoFisik" min="0" step="500" class="w-full px-3 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                            </div>
+                            <p class="text-[10px] text-ink-500">Sistem menghitung saldo sistem & selisih otomatis; selisih ≠ 0 membuat jurnal penyesuaian.</p>
+                        @endif
+                    </div>
+                @else
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between p-2.5 rounded-lg bg-white/[0.03]">
+                            <span class="text-ink-400">{{ $kasModeBuka ? 'Saldo awal' : 'Saldo sistem' }}</span>
+                            <span class="font-bold text-white tabular-nums">Rp {{ number_format($kasHasil['saldo_awal'] ?? $kasHasil['saldo_sistem'], 0, ',', '.') }}</span>
+                        </div>
+                        @if(!$kasModeBuka)
+                            <div class="flex justify-between p-2.5 rounded-lg bg-white/[0.03]">
+                                <span class="text-ink-400">Saldo fisik</span>
+                                <span class="font-bold text-white tabular-nums">Rp {{ number_format($kasHasil['saldo_fisik'], 0, ',', '.') }}</span>
+                            </div>
+                            <div class="flex justify-between p-2.5 rounded-lg {{ $kasHasil['selisih'] == 0 ? 'bg-up-mint/10' : 'bg-up-amber/10' }}">
+                                <span class="text-ink-400">Selisih</span>
+                                <span class="font-bold {{ $kasHasil['selisih'] == 0 ? 'text-up-mint' : 'text-up-amber' }} tabular-nums">Rp {{ number_format($kasHasil['selisih'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                    <button wire:click="$set('showKasModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Tutup</button>
+                    @if(!$kasHasil)
+                        <button wire:click="prosesKas" class="flex-1 py-2.5 rounded-xl {{ $kasModeBuka ? 'bg-up-mint' : 'bg-up-accent' }} text-ink-950 font-bold text-xs cursor-pointer">
+                            {{ $kasModeBuka ? 'Buka Kas' : 'Tutup & Rekap' }}
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>

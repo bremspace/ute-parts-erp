@@ -125,6 +125,25 @@ Route::post('/app/login', function (\Illuminate\Http\Request $request) {
 Route::prefix('app')->middleware('auth')->group(function () {
     Route::get('/', fn() => redirect('/app/dashboard'));
 
+    // [T-02] Ganti cabang aktif — perbarui session + kembali ke halaman asal (full reload supaya semua modul re-query)
+    Route::post('/pilih-cabang', function (Illuminate\Http\Request $request) {
+        $request->validate(['cabang_id' => 'required|exists:cabang,id']);
+
+        $cabang = App\Modules\Rbac\Models\Cabang::findOrFail($request->cabang_id);
+        $user = auth()->user();
+
+        if (!$user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke cabang ini');
+        }
+
+        session([
+            'cabang_id' => $cabang->id,
+            'cabang_nama' => $cabang->nama,
+        ]);
+
+        return redirect()->to($request->input('back', url()->previous() ?: '/app/dashboard'));
+    })->name('pilih-cabang');
+
     // Dashboard (DASH-01 widget per role)
     Route::get('/dashboard', App\Modules\Dashboard\Livewire\DashboardIndex::class)->name('dashboard');
 
@@ -134,8 +153,8 @@ Route::prefix('app')->middleware('auth')->group(function () {
     // WMS Gudang & Stok Screen
     Route::get('/wms', WmsDashboard::class)->name('wms');
 
-    // Servis HP Kanban Screen
-    Route::get('/servis', ServisBoard::class)->name('servis');
+    // Servis HP Kanban Screen — [T-06] wajib role dgn permission servis.view (staf)
+    Route::get('/servis', ServisBoard::class)->name('servis')->middleware('permission:servis.view');
 
     // CRM & Membership Screen
     Route::get('/crm', CrmDashboard::class)->name('crm');

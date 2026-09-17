@@ -14,7 +14,9 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="bg-ink-950 text-ink-100 font-sans antialiased min-h-screen flex flex-col selection:bg-up-primary selection:text-white">
+<body class="bg-ink-950 text-ink-100 font-sans antialiased min-h-screen flex flex-col selection:bg-up-primary selection:text-white"
+      x-data="{ branchModal: false }"
+      @open-branch-modal.window="branchModal = true">
     <div class="flex-1 flex overflow-hidden">
         <!-- Sidebar -->
         <aside class="w-64 bg-ink-900 border-r border-white/5 flex flex-col flex-shrink-0 z-30">
@@ -191,5 +193,44 @@
     </div>
 
     @livewireScripts
+
+    <!-- [T-02] Modal Ganti Cabang — full reload agar semua modul re-query cabang baru -->
+    <div x-cloak x-show="branchModal" x-transition.opacity
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+         @keydown.escape.window="branchModal = false">
+        <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative" @click.outside="branchModal = false">
+            <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                <h3 class="text-lg font-bold text-white">Pilih Cabang Aktif</h3>
+                <button @click="branchModal = false" class="text-ink-400 hover:text-white">✕</button>
+            </div>
+
+            <p class="text-xs text-ink-400 mb-3">Cabang aktif akan dipakai Dashboard, POS, WMS, dan modul lain.</p>
+
+            <div class="space-y-2">
+                @foreach(auth()->user()->cabangs as $cb)
+                    <form method="POST" action="{{ route('pilih-cabang') }}">
+                        @csrf
+                        <input type="hidden" name="cabang_id" value="{{ $cb->id }}" />
+                        <button type="submit"
+                                class="w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer
+                                    {{ session('cabang_id') == $cb->id
+                                        ? 'bg-up-primary/15 border-up-primary/50 text-white'
+                                        : 'bg-white/[0.03] border-white/10 text-ink-200 hover:bg-white/[0.07]' }}">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-bold">{{ $cb->nama }}</span>
+                                <span class="text-[10px] font-mono text-ink-400">{{ $cb->kode }}</span>
+                            </div>
+                            @if($cb->alamat)
+                                <span class="text-[11px] text-ink-400 block mt-0.5 truncate">{{ $cb->alamat }}</span>
+                            @endif
+                            @if(session('cabang_id') == $cb->id)
+                                <span class="text-[10px] text-up-mint font-bold mt-1 block">● Aktif</span>
+                            @endif
+                        </button>
+                    </form>
+                @endforeach
+            </div>
+        </div>
+    </div>
 </body>
 </html>

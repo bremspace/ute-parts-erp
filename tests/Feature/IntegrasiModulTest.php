@@ -81,6 +81,13 @@ class IntegrasiModulTest extends TestCase
         $this->kasir->cabangs()->attach($this->cabang->id, ['is_default' => true]);
         session(['cabang_id' => $this->cabang->id]);
 
+        // [T-09] Buka kas sesi agar POS tunai tidak diblokir di test integrasi
+        try {
+            app(\App\Modules\Pos\Services\KasSesiState::class)->bukaKas(0, $this->cabang->id, $this->kasir->id);
+        } catch (\Throwable) {
+            // sudah ada sesi terbuka — abaikan
+        }
+
         return [$gudang, $gudang2];
     }
 
