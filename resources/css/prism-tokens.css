@@ -1,0 +1,90 @@
+:root {
+    --up-primary: #5B4FE9;
+    --up-primary-dark: #3B2FC9;
+    --up-accent: #E8873B;
+    --up-mint: #1FBF8F;
+    --up-amber: #F5A623;
+    --up-red: #EF4444;
+
+    --up-ink-950: #070A14;
+    --up-ink-900: #0B1020;
+    --up-ink-850: #0E152B;
+    --up-ink-800: #141D3A;
+    --up-ink-700: #1E2B54;
+    --up-ink-600: #334375;
+    --up-ink-500: #64748B;
+    --up-ink-400: #94A3B8;
+    --up-ink-100: #E2E8F0;
+    --up-ink-50: #F6F7FB;
+
+    --up-gradient-signature: linear-gradient(135deg, #5B4FE9 0%, #8B7CF6 45%, #E8873B 100%);
+    --up-gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%);
+
+    --up-glass-bg: rgba(14, 21, 43, 0.75);
+    --up-glass-border: rgba(255, 255, 255, 0.08);
+    --up-glass-border-hover: rgba(91, 79, 233, 0.4);
+    --up-glass-shadow: 0 12px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Glass surface classes */
+.glass-panel {
+    background: var(--up-glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--up-glass-border);
+    box-shadow: var(--up-glass-shadow);
+}
+
+.glass-panel-hover:hover {
+    border-color: var(--up-glass-border-hover);
+    box-shadow: 0 16px 36px 0 rgba(91, 79, 233, 0.15);
+}
+
+.glass-input {
+    background: rgba(11, 16, 32, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #F8FAFC;
+    transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+    outline: none;
+    border-color: var(--up-primary);
+    box-shadow: 0 0 0 2px rgba(91, 79, 233, 0.25);
+    background: rgba(14, 21, 43, 0.95);
+}
+
+/* Circuit lines decorative motif */
+.circuit-line {
+    position: relative;
+}
+
+.circuit-line::after {
+    content: '';
+    position: absolute;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(91, 79, 233, 0.3), rgba(232, 135, 59, 0.3), transparent);
+    width: 100%;
+    bottom: 0;
+    left: 0;
+}
+
+.tabular-nums {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(11, 16, 32, 0.5);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(91, 79, 233, 0.3);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(91, 79, 233, 0.6);
+}
