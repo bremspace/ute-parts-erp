@@ -6,7 +6,7 @@
 #
 # Env yang dibutuhkan (dipass oleh workflow):
 #   DEPLOY_PATH  = docroot project (mis. /home/ute/ute-parts)
-#   PHP_BIN      = path PHP CLI (mis. /usr/local/lsws/lsphp83/bin/php)
+#   PHP_BIN      = path PHP CLI (mis. /usr/local/lsws/lsphp85/bin/php)
 #   QUEUE_NAME   = nama supervisor program queue (ute-parts-queue)
 # ============================================================
 set -euo pipefail

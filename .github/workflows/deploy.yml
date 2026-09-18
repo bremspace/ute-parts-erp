@@ -33,7 +33,7 @@ jobs:
 
             # Path project & PHP CLI — samakan dengan konfigurasi VPS mu
             DEPLOY_PATH="${VPS_PATH:-/home/ute/ute-parts}"
-            PHP_BIN="${PHP_BIN:-/usr/local/lsws/lsphp83/bin/php}"
+            PHP_BIN="${PHP_BIN:-/usr/local/lsws/lsphp85/bin/php}"
             QUEUE_NAME="${QUEUE_NAME:-ute-parts-queue}"
 
             # Cek folder project ada

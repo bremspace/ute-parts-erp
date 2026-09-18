@@ -11,7 +11,7 @@ Urut eksekusi — jangan loncat. Kalau suatu langkah error, berhenti dan cek Tro
 |---|---|---|
 | OS | Ubuntu 22.04 LTS / AlmaLinux | `cat /etc/os-release` |
 | RAM | ≥ 1GB + **swap 2GB** | `free -h` |
-| PHP via CyberPanel | **lsphp83+** (Laravel 13 butuh PHP 8.3+) | Websites → PHP Version |
+| PHP via CyberPanel | **lsphp85+** (Laravel 13 butuh PHP 8.5+) | Websites → PHP Version |
 | Ekstensi PHP wajib | `pdo_mysql, gd, zip, fileinfo, mbstring, openssl, intl, sqlite3` | pakai tombol "PHP Extensions" di CyberPanel |
 | MySQL/MariaDB | 10.6+ (bawaan CyberPanel) | `mysql --version` |
 | Node 20+ (untuk build asset) | sekali saja di server | `node -v` |
@@ -25,7 +25,7 @@ Urut eksekusi — jangan loncat. Kalau suatu langkah error, berhenti dan cek Tro
 
 1. **CyberPanel → Websites → Create Website**
    - Domain: `domain.com` (subdomain/dedicated)
-   - PHP: **8.3**
+   - PHP: **8.5**
    - Package: Home (RAM 1GB)
    - Centang **Create Database** → catat nama DB, user, password yang ditampilkan.
 
@@ -165,7 +165,7 @@ index  = index.php
 enableLSCache = 1 (Web Cache → Dynamic)
 ```
 
-- **PHP Handler**: set ke `lsphp83` (Websites → PHP → PHP 8.3), LSAPI mode.
+- **PHP Handler**: set ke `lsphp85` (Websites → PHP → PHP 8.5), LSAPI mode.
 - **Symlink di luar docroot**: aktifkan "Follow SymLink" di vhost (utk `public/storage` yang menunjuk ke `storage/app/public`).
 - **HTTP → HTTPS redirect**: Website → SSL → "Force HTTPS" / Rewrite ke https.
 
@@ -177,9 +177,9 @@ enableLSCache = 1 (Web Cache → Dynamic)
 sudo apt install -y supervisor
 ```
 
-> ⚠️ **Pakai PHP CLI yang SAMA dengan lsphp83.** CyberPanel menyediakan `lsphp83` di `PATH`; jika `which php` menunjuk versi lain (mis. 8.1 default OS), artisan/queue bisa error versi. Pastikan:
+> ⚠️ **Pakai PHP CLI yang SAMA dengan lsphp85.** CyberPanel menyediakan `lsphp85` di `PATH`; jika `which php` menunjuk versi lain (mis. 8.1 default OS), artisan/queue bisa error versi. Pastikan:
 > ```bash
-> /usr/local/lsws/lsphp83/bin/php -v   # harus PHP 8.3.x
+> /usr/local/lsws/lsphp85/bin/php -v   # harus PHP 8.5.x
 > # lalu gunakan path itu di semua perintah artisan & supervisor
 > ```
 
@@ -188,7 +188,7 @@ File `/etc/supervisor/conf.d/ute-parts.conf`:
 ```ini
 [program:ute-parts-queue]
 process_name=%(program_name)s_%(process_num)02d
-command=/usr/local/lsws/lsphp83/bin/php /home/<USER>/<website_dir>/artisan queue:work database --sleep=3 --tries=3 --max-time=3600
+command=/usr/local/lsws/lsphp85/bin/php /home/<USER>/<website_dir>/artisan queue:work database --sleep=3 --tries=3 --max-time=3600
 autostart=true
 autorestart=true
 stopasgroup=true
@@ -211,8 +211,8 @@ sudo supervisorctl status
 
 ```bash
 crontab -e
-# tambah (gunakan path PHP CLI lsphp83 yang sama):
-* * * * * /usr/local/lsws/lsphp83/bin/php /home/<USER>/<website_dir>/artisan schedule:run >> /dev/null 2>&1
+# tambah (gunakan path PHP CLI lsphp85 yang sama):
+* * * * * /usr/local/lsws/lsphp85/bin/php /home/<USER>/<website_dir>/artisan schedule:run >> /dev/null 2>&1
 ```
 
 ---
@@ -248,7 +248,7 @@ cat ~/.ssh/ute_deploy
 | `VPS_SSH_PRIVATE_KEY` | isi private key dari `cat ~/.ssh/ute_deploy` |
 | `VPS_PORT` | opsional, default 22 |
 | `VPS_PATH` | path project di VPS (mis. `/home/ute/ute-parts`) |
-| `PHP_BIN` | opsional; default `/usr/local/lsws/lsphp83/bin/php` |
+| `PHP_BIN` | opsional; default `/usr/local/lsws/lsphp85/bin/php` |
 | `QUEUE_NAME` | opsional; default `ute-parts-queue` |
 
 ### Cara kerja
@@ -304,7 +304,7 @@ php artisan tinker --execute="echo App\\Modules\\Rbac\\Models\\Cabang::count().'
 | Migrate: table exists | seeder/upgrade | pastikan `.env` benar; jangan drop tabel tak sengaja |
 | `SQLSTATE[HY000] [2000]` (mysqlnd old auth) | MariaDB lama pakai password hash lawas | `ALTER USER '<user>'@'localhost' IDENTIFIED WITH mysql_native_password BY '<pass>';` |
 | `SQLSTATE[42000] 1115 Unknown character set utf8mb4` | MySQL/MariaDB lawas tanpa utf8mb4 | tambah di `.env`: `DB_CHARSET=utf8` + `DB_COLLATION=utf8_unicode_ci` |
-| Artisan/queue error `PHP version ... does not satisfy` | CLI `php` beda dari lsphp83 | gunakan `/usr/local/lsws/lsphp83/bin/php` untuk semua perintah |
+| Artisan/queue error `PHP version ... does not satisfy` | CLI `php` beda dari lsphp85 | gunakan `/usr/local/lsws/lsphp85/bin/php` untuk semua perintah |
 | Queue tidak jalan | Supervisor gagal/OOM | `supervisorctl status`; tambah `memory_limit=-1` utk CLI; periksa swap |
 | Webhook Duitku 419 | CSRF tidak dikecualikan (seharusnya sudah default) | cek `routes/web.php` `withoutMiddleware(ValidateCsrfToken)` |
 | Export Excel error | ekstensi `gd`/`zip` off | aktivkan PHP Extensions di CyberPanel |
@@ -314,7 +314,7 @@ php artisan tinker --execute="echo App\\Modules\\Rbac\\Models\\Cabang::count().'
 
 ## 13 Optimasi RAM 1GB (PRD §7)
 
-### OPcache (CyberPanel → PHP 8.3 → PHP.ini)
+### OPcache (CyberPanel → PHP 8.5 → PHP.ini)
 
 ```ini
 opcache.enable=1
