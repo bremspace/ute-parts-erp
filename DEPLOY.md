@@ -217,7 +217,50 @@ crontab -e
 
 ---
 
-## 9. Smoke Test Setelah Go-Live
+## 10 Auto-Deploy Otomatis (GitHub → VPS) — DIREKOMENDASIKAN
+
+Setiap push ke `main` → VPS otomatis pull + update + restart queue. **Wajib aman**: script `deploy.sh` melakukan **auto-rollback** ke versi sebelumnya jika ada langkah gagal — site tidak pernah mati lama di VPS.
+
+### Fitur
+- Trigger: push/main + tombol manual di GitHub Actions.
+- Langkah: pull → composer → migrate → npm build → cache → chown lsadm → restart queue.
+- **Rollback otomatis**: bila composer/migrate/build/cache gagal → `git reset --hard` ke commit lama + restore build lama + cache clear → site live lagi.
+- Log di `/tmp/ute-deploy.log`, status tampil di tab Actions.
+
+### Setup sekali (VPS — SSH)
+```bash
+# 1. Pastikan project sudah ada & environment production OK (bagian 2-8 di bawah)
+# 2. Siapkan SSH key khusus deploy di VPS
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+ssh-keygen -t ed25519 -f ~/.ssh/ute_deploy -N "" -C "github-actions"
+cat ~/.ssh/ute_deploy.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+
+# 3. Tampilkan private key (salin ke GitHub secret nanti):
+cat ~/.ssh/ute_deploy
+```
+
+### Setup GitHub (sekali — tab Settings → Secrets and variables → Actions)
+| Secret | Isi |
+|---|---|
+| `VPS_HOST` | IP/domain VPS (mis. `203.0.113.10`) |
+| `VPS_USER` | user SSH (mis. `root`) |
+| `VPS_SSH_PRIVATE_KEY` | isi private key dari `cat ~/.ssh/ute_deploy` |
+| `VPS_PORT` | opsional, default 22 |
+| `VPS_PATH` | path project di VPS (mis. `/home/ute/ute-parts`) |
+| `PHP_BIN` | opsional; default `/usr/local/lsws/lsphp83/bin/php` |
+| `QUEUE_NAME` | opsional; default `ute-parts-queue` |
+
+### Cara kerja
+1. Unduh `deploy.sh` dari repo ini ke `/tmp/ute-deploy.sh`, lalu eksekusi di VPS.
+2. Script menyimpan hash commit lama & **backup `public/build`** sebelum bekerja.
+3. Bila ada kegagalan → fungsi `rollback()` mengembalikan semuanya ke commit lama.
+
+> 🔒 **Keamanan**: private key hanya di GitHub secrets, tidak pernah masuk repo. `deploy.sh` hanya update kode — `.env` (ada di VPS) **tidak pernah tersentuh** karena di-`.gitignore`.
+
+---
+
+## 11 Smoke Test Setelah Go-Live
 
 ```bash
 BASE=https://domain.com
@@ -248,7 +291,7 @@ php artisan tinker --execute="echo App\\Modules\\Rbac\\Models\\Cabang::count().'
 
 ---
 
-## 10. Troubleshooting Produksi
+## 12 Troubleshooting Produksi
 
 | Gejala | Penyebab | Solusi |
 |---|---|---|
@@ -269,7 +312,7 @@ php artisan tinker --execute="echo App\\Modules\\Rbac\\Models\\Cabang::count().'
 
 ---
 
-## 11. Optimasi RAM 1GB (PRD §7)
+## 13 Optimasi RAM 1GB (PRD §7)
 
 ### OPcache (CyberPanel → PHP 8.3 → PHP.ini)
 
@@ -292,7 +335,7 @@ max_connections=50
 
 ---
 
-## 12. Backup Harian (wajib sebelum go-live, §6)
+## 14 Backup Harian (wajib sebelum go-live, §6)
 
 CyberPanel → **Backup** > Website Backup (engine bawaan). Tambah dump DB khusus (bukan root):
 
@@ -307,7 +350,7 @@ chmod +x /etc/cron.daily/ute-parts-backup
 
 ---
 
-## 13. Checklist Go-Live (PRD §11 DoD)
+## 15 Checklist Go-Live (PRD §11 DoD)
 
 - [ ] HTTPS Let's Encrypt aktif, HTTP di-redirect
 - [ ] `APP_DEBUG=false`, `APP_URL=https://...`

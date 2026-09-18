@@ -1,0 +1,63 @@
+name: Auto-Deploy ke VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # izinkan trigger manual dari tab Actions
+
+jobs:
+  deploy:
+    name: Deploy ke VPS (CyberPanel)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Tampilkan info deploy
+        run: |
+          echo "Trigger: ${{ github.event.head_commit.message || 'manual' }}"
+          echo "Commit: ${{ github.sha }}"
+
+      # Aplikasi: enkripsi secret disimpan di repo.
+      - name: Jalankan script deploy di VPS via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          timeout: 60s
+          command_timeout: 15m
+          script_stop: true   # berhenti & laporkan gagal bila salah satu command error
+          script: |
+            set -euo pipefail
+
+            # Path project & PHP CLI — samakan dengan konfigurasi VPS mu
+            DEPLOY_PATH="${VPS_PATH:-/home/ute/ute-parts}"
+            PHP_BIN="${PHP_BIN:-/usr/local/lsws/lsphp83/bin/php}"
+            QUEUE_NAME="${QUEUE_NAME:-ute-parts-queue}"
+
+            # Cek folder project ada
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              echo "❌ Folder deploy tidak ditemukan: $DEPLOY_PATH"
+              exit 1
+            fi
+
+            # Sinkronkan script deploy terbaru ke VPS
+            curl -fsSL \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.raw" \
+              "https://api.github.com/repos/${{ github.repository }}/contents/deploy.sh" \
+              -o /tmp/ute-deploy.sh
+            chmod +x /tmp/ute-deploy.sh
+            cp /tmp/ute-deploy.sh "$DEPLOY_PATH/deploy.sh"
+            chown lsadm:lsadm "$DEPLOY_PATH/deploy.sh" || true
+
+            # Eksekusi deploy (script ini aman: auto-rollback bila gagal)
+            echo "🚀 Menjalankan deploy ..."
+            DEPLOY_PATH="$DEPLOY_PATH" PHP_BIN="$PHP_BIN" QUEUE_NAME="$QUEUE_NAME" \
+              bash "$DEPLOY_PATH/deploy.sh"
+            echo "✅ Deploy selesai"
+
+      - name: Laporkan status ke GitHub
+        if: failure()
+        run: echo "::error::Deploy gagal — VPS otomatis rollback ke versi sebelumnya. Cek /tmp/ute-deploy.log di server."
