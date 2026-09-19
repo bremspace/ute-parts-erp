@@ -90,20 +90,45 @@ else
   echo "⚠️ Node/npm tidak ada — lewati build. Asset harus di-upload dulu (public/build)."
 fi
 
-# ---------- 3. Database ----------
-DBNAME="ute_$(echo "$DOMAIN" | tr '.-' '__' | cut -c1-24)"
-DBUSER="$DBNAME"
-DBPASS="$(openssl rand -hex 12)"
+# ---------- 3. Database (interaktif — user buat dulu di CyberPanel) ----------
+DBNAME="${DBNAME:-}"
+DBUSER="${DBUSER:-}"
+DBPASS="${DBPASS:-}"
 
-echo "⟳ Buat database ${DBNAME} ..."
-mysql -uroot <<SQL
-CREATE DATABASE IF NOT EXISTS \`${DBNAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-ALTER USER '${DBUSER}'@'localhost' IDENTIFIED BY '${DBPASS}';
-CREATE USER IF NOT EXISTS '${DBUSER}'@'localhost' IDENTIFIED BY '${DBPASS}';
-GRANT ALL PRIVILEGES ON \`${DBNAME}\`.* TO '${DBUSER}'@'localhost';
-FLUSH PRIVILEGES;
-SQL
-echo "✔ Database siap."
+# Jika belum diisi lewat env, minta input manual
+if [ -z "$DBNAME" ] || [ -z "$DBUSER" ] || [ -z "$DBPASS" ]; then
+  echo ""
+  echo "============================================================"
+  echo "  DATABASE — buat manual di CyberPanel:"
+  echo "  Websites → ${DOMAIN} → Manage Database → Create Database"
+  echo "============================================================"
+  echo ""
+  read -rp "  Nama Database (mis. test_uteparts_id): " DBNAME
+  read -rp "  Username Database    : " DBUSER
+  read -rsp "  Password Database    : " DBPASS && echo ""
+fi
+
+[ -n "$DBNAME" ] && [ -n "$DBUSER" ] && [ -n "$DBPASS" ] || { echo "❌ Database wajib diisi."; exit 1; }
+
+# Verifikasi koneksi — pastikan user benar sebelum migrate
+echo "⟳ Verifikasi koneksi database..."
+DB_OK=$("$PHP_BIN" -r "
+try {
+    \$p = new PDO('mysql:host=127.0.0.1;port=3306;dbname=${DBNAME}', '${DBUSER}', '${DBPASS}', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    echo 'OK';
+} catch (Exception \$e) { echo 'FAIL'; }
+" 2>/dev/null)
+
+if echo "$DB_OK" | grep -q "OK"; then
+  echo "✔ Database '${DBNAME}' terkoneksi dengan user '${DBUSER}'."
+else
+  echo "❌ Gagal koneksi database!"
+  echo "   Pastikan:"
+  echo "   1. Database '${DBNAME}' sudah dibuat di CyberPanel"
+  echo "   2. User '${DBUSER}' sudah dibuat dengan akses ALL PRIVILEGES ke '${DBNAME}'"
+  echo "   3. Password sudah benar"
+  exit 1
+fi
 
 # ---------- 4. .env ----------
 cd "$WEBROOT"
