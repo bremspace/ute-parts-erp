@@ -67,7 +67,7 @@ Buka **http://127.0.0.1:8000** — akan redirect ke login backoffice.
 
 | Role | Email/Telepon | Password |
 |---|---|---|
-| Super Admin (semua modul backoffice) | `admin@uteparts.com` | `password` |
+| Super Admin (semua modul backoffice) | `admin@test.uteparts.id` | `password` |
 | Pelanggan marketplace (member Gold) | telepon `08123344556` | (buat via daftar, atau daftar baru) |
 | Reseller (ujian komisi) | telepon `08119876543` | (buat via daftar, atau daftar baru) |
 

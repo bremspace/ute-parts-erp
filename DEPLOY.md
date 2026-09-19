@@ -274,7 +274,7 @@ curl -s $BASE/app/login -o /dev/null -w "login-page=%{http_code}\n"# 200
 
 # 3. Login post (harus 302 → /app/pos); 419 = CSRF/cookie https bermasalah
 curl -s -c c.txt -b c.txt -X POST $BASE/app/login \
-  -d "email=admin@uteparts.com&password=password" \
+  -d "email=admin@test.uteparts.id&password=password" \
   -o /dev/null -w "login-post=%{http_code}\n" -L
 
 # 4. Beta user yang tidak diblock:

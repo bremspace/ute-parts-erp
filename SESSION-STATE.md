@@ -29,7 +29,7 @@ Dokumen ini berisi semua keputusan, status, dan issue yang perlu diketahui saat 
 
 ### Di VPS (Linux, satu perintah):
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/bremspace/ute-parts-erp/main/setup-vps.sh) uteparts.com
+bash <(curl -fsSL https://raw.githubusercontent.com/bremspace/ute-parts-erp/main/setup-vps.sh) test.uteparts.id
 ```
 
 ### Update dari GitHub:
@@ -98,12 +98,12 @@ tests/Feature/
 
 ```bash
 # Jalankan setup (dari VPS langsung):
-bash <(curl -fsSL https://raw.githubusercontent.com/bremspace/ute-parts-erp/main/setup-vps.sh) uteparts.com
+bash <(curl -fsSL https://raw.githubusercontent.com/bremspace/ute-parts-erp/main/setup-vps.sh) test.uteparts.id
 
 # Setelah deploy:
-curl -s -o /dev/null -w "%{http_code}" https://uteparts.com/up       # → 200
-curl -s -o /dev/null -w "%{http_code}" https://uteparts.com/shop     # → 200
-curl -s -o /dev/null -w "%{http_code}" https://uteparts.com/app/login # → 200
+curl -s -o /dev/null -w "%{http_code}" https://test.uteparts.id/up       # → 200
+curl -s -o /dev/null -w "%{http_code}" https://test.uteparts.id/shop     # → 200
+curl -s -o /dev/null -w "%{http_code}" https://test.uteparts.id/app/login # → 200
 ```
 
 PHP binary di VPS: cari dengan `find /usr -name "php" -path "*/bin/*" 2>/dev/null | head -1`

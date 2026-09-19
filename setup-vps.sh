@@ -194,5 +194,6 @@ echo ""
 echo "============================================================"
 echo "  DEPLOY SELESAI"
 echo "  URL: https://${DOMAIN}"
-echo "  Login: /app/login → admin@uteparts.com / password"
+echo "  Login: /app/login → admin@test.uteparts.id / password"
 echo "============================================================"
+
