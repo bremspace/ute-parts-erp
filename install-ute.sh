@@ -60,12 +60,20 @@ command -v mysql >/dev/null || { echo "❌ mysql client tidak ada."; exit 1; }
 if [ -d "$WEBROOT/.git" ]; then
   echo "✔ Project sudah ada — git pull..."
   cd "$WEBROOT"
-  git pull origin main || git fetch origin && git reset --hard origin/main
+  git pull origin main || { git fetch origin && git reset --hard origin/main; }
 else
-  mkdir -p "$WEBROOT"
-  cd "$WEBROOT/"
+  echo "⟳ Siapkan folder project di $WEBROOT ..."
+  # CyberPanel membuat file default (index.html dll) — pindahkan ke backup
+  if [ -n "$(ls -A "$WEBROOT" 2>/dev/null)" ]; then
+    mkdir -p "${HOME_DIR}/public_html_default_bak"
+    cp -a "$WEBROOT"/* "${HOME_DIR}/public_html_default_bak/" 2>/dev/null || true
+    cp -a "$WEBROOT"/.[!.]* "${HOME_DIR}/public_html_default_bak/" 2>/dev/null || true
+    find "$WEBROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+    echo "  ✔ File bawaan CyberPanel di-backup ke public_html_default_bak"
+  fi
+
   echo "⟳ Clone $REPO_GIT ..."
-  git clone "$REPO_GIT" .
+  git clone "$REPO_GIT" "$WEBROOT"
 fi
 
 # ---------- 2. Dependency + build ----------
