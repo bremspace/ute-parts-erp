@@ -90,90 +90,36 @@ else
   echo "⚠️ Node/npm tidak ada — lewati build. Asset harus di-upload dulu (public/build)."
 fi
 
-# ---------- 3. Database (interaktif — user buat dulu di CyberPanel) ----------
-DBNAME="${DBNAME:-}"
-DBUSER="${DBUSER:-}"
-DBPASS="${DBPASS:-}"
+# ---------- 3. Database -- isi manual dari CyberPanel ------
 
-# Jika belum diisi lewat env, minta input manual
-if [ -z "$DBNAME" ] || [ -z "$DBUSER" ] || [ -z "$DBPASS" ]; then
-  echo ""
-  echo "============================================================"
-  echo "  DATABASE — buat manual di CyberPanel:"
-  echo "  Websites → ${DOMAIN} → Manage Database → Create Database"
-  echo "============================================================"
-  echo ""
-  read -rp "  Nama Database (mis. test_uteparts_id): " DBNAME
-  read -rp "  Username Database    : " DBUSER
-  read -rsp "  Password Database    : " DBPASS && echo ""
-fi
+echo ""
+echo "============================================================"
+echo "  LANGKAH 3: DATABASE"
+echo "============================================================"
+echo ""
+echo "  1. CyberPanel: Websites > Manage Database > Create Database"
+echo "  2. CATAT: nama database, username, DAN password"
+echo "  3. Edit .env: nano WEBROOT/.env"
+echo "  4. Isi: DB_CONNECTION=mysql, DB_HOST=127.0.0.1, DB_PORT=3306"
+echo "     DB_DATABASE=<nama>, DB_USERNAME=<user>, DB_PASSWORD=<pass>"
+echo "  5. Simpan .env"
+echo ""
+echo "============================================================"
+echo ""
+read -rp "  Tekan ENTER setelah .env sudah diisi: "
+echo ""
 
-[ -n "$DBNAME" ] && [ -n "$DBUSER" ] && [ -n "$DBPASS" ] || { echo "❌ Database wajib diisi."; exit 1; }
-
-# Verifikasi koneksi — pastikan user benar sebelum migrate
-echo "⟳ Verifikasi koneksi database..."
-DB_OK=$("$PHP_BIN" -r "
-try {
-    \$p = new PDO('mysql:host=127.0.0.1;port=3306;dbname=${DBNAME}', '${DBUSER}', '${DBPASS}', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-    echo 'OK';
-} catch (Exception \$e) { echo 'FAIL'; }
-" 2>/dev/null)
-
-if echo "$DB_OK" | grep -q "OK"; then
-  echo "✔ Database '${DBNAME}' terkoneksi dengan user '${DBUSER}'."
-else
-  echo "❌ Gagal koneksi database!"
-  echo "   Pastikan:"
-  echo "   1. Database '${DBNAME}' sudah dibuat di CyberPanel"
-  echo "   2. User '${DBUSER}' sudah dibuat dengan akses ALL PRIVILEGES ke '${DBNAME}'"
-  echo "   3. Password sudah benar"
+# ---------- 4. Key generate ----------
+# .env sudah di-edit manual oleh user (step 3), jangan di-overwrite di sini
+# Cek .env wajib ada:
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo "??  .env belum ada, salin dari .env.example � edit dulu sebelum migrate!"
   exit 1
 fi
-
-# ---------- 4. .env ----------
-cd "$WEBROOT"
-[ -f .env ] || cp .env.example .env
-cat > .env <<EOFENV
-APP_NAME="Ute Parts"
-APP_ENV=production
-APP_KEY=
-APP_DEBUG=false
-APP_URL=https://${DOMAIN}
-APP_LOCALE=id
-APP_FALLBACK_LOCALE=en
-APP_FAKER_LOCALE=en_US
-BCRYPT_ROUNDS=10
-LOG_CHANNEL=stack
-LOG_STACK=single
-LOG_LEVEL=error
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=${DBNAME}
-DB_USERNAME=${DBUSER}
-DB_PASSWORD=${DBPASS}
-BROADCAST_CONNECTION=log
-FILESYSTEM_DISK=local
-QUEUE_CONNECTION=database
-CACHE_STORE=database
-CACHE_PREFIX=ute
-SESSION_DRIVER=database
-SESSION_LIFETIME=120
-SESSION_SECURE_COOKIE=true
-SESSION_DOMAIN=${DOMAIN}
-SANCTUM_STATEFUL_DOMAINS=${DOMAIN}
-MAIL_MAILER=log
-MAIL_FROM_ADDRESS=no-reply@${DOMAIN}
-MAIL_FROM_NAME="Ute Parts"
-DUITKU_SANDBOX=true
-DUITKU_MERCHANT_CODE=
-DUITKU_API_KEY=
-DUITKU_MERCHANT_KEY=
-BITESHIP_API_KEY=
-VITE_APP_NAME="Ute Parts"
-EOFENV
-
-"$PHP_BIN" artisan key:generate --force
+echo "? .env ditemukan. Pastikan DB_* sudah diisi dengan benar."
+echo "   CATATAN: APP_KEY akan di-generate otomatis jika kosong."
+"$PHP_BIN" artisan key:generate --force 2>/dev/null || true
 
 # ---------- 5. Migrate + seed + cache ----------
 "$PHP_BIN" artisan migrate --force
