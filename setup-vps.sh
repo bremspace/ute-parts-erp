@@ -100,12 +100,14 @@ echo "  Clone selesai"
 # ── 4. Dependencies + Build ────────────────────────────
 echo ""
 echo "[4/9] Build assets..."
-echo "  composer install..."
-timeout 600 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
-echo "  composer install selesai"
-echo "  npm build..."
-timeout 180 npm install --ignore-scripts --no-audit --no-fund >/dev/null 2>&1 && timeout 180 npm run build
-echo "  Build selesai"
+echo "  composer install (perlu waktu 1-3 menit pertama kali)..."
+COMPOSER_ALLOW_SUPERUSER=1 timeout 600 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+echo "  ✓ composer selesai"
+
+echo "  npm install + build..."
+timeout 300 npm install --ignore-scripts --no-audit --no-fund 2>&1 | tail -1
+timeout 300 npm run build 2>&1 | tail -3
+echo "  ✓ npm selesai"
 
 # ── 5. .env ────────────────────────────────────────────
 echo ""
@@ -144,13 +146,15 @@ echo "  Key + env siap"
 # ── 6. Migrate + Seed + Cache ──────────────────────────
 echo ""
 echo "[6/9] Migrate & seed..."
-php8.5 artisan migrate --force
-php8.5 artisan db:seed --force || true
-php8.5 artisan storage:link
-php8.5 artisan config:cache
-php8.5 artisan route:cache
-php8.5 artisan view:cache
-echo "  Database + cache siap"
+php8.5 artisan migrate --force 2>&1 | tail -5
+echo "  migrate selesai"
+php8.5 artisan db:seed --force 2>&1 | tail -3 || true
+echo "  seed selesai"
+php8.5 artisan storage:link 2>&1 | tail -1
+php8.5 artisan config:cache 2>&1 | tail -1
+php8.5 artisan route:cache 2>&1 | tail -1
+php8.5 artisan view:cache 2>&1 | tail -1
+echo "  ✓ Database + cache siap"
 
 # ── 7. Permission + Nginx ──────────────────────────────
 echo ""
