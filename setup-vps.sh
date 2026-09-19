@@ -47,8 +47,17 @@ php8.5 -v >/dev/null 2>&1 || { echo "PHP 8.5 gagal install."; exit 1; }
 echo "  PHP $(php8.5 -r 'echo PHP_VERSION;')"
 
 # Nginx + MySQL + utilities
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  nginx mysql-server curl unzip >/dev/null 2>&1
+echo "  [1a] Installing nginx + utilities..."
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx curl unzip >/dev/null 2>&1
+echo "  [1b] Installing MySQL..."
+# Preseed MySQL agar tidak promt password
+echo "mysql-server mysql-server/root_password password root" | debconf-set-selections
+echo "mysql-server mysql-server/root_password_again password root" | debconf-set-selections
+echo "mysql-server mysql-server/root_password_selected boolean true" | debconf-set-selections
+yes | DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mysql-server >/dev/null 2>&1
+echo "  [1c] Verifikasi MySQL..."
+mysql -u root -e "SELECT 'MySQL OK'" >/dev/null 2>&1 || service mysql restart 2>/dev/null || systemctl restart mysql 2>/dev/null
+mysql -u root -e "SELECT 'MySQL OK'" >/dev/null 2>&1 && echo "  Nginx + MySQL siap" || echo "  ⚠️ MySQL mungkin perlu konfigurasi manual"
 
 # Composer 2.x (bukan apt Composer — lama & deprecated di PHP 8.5)
 if ! composer --version 2>/dev/null | grep -q "Composer 2"; then
