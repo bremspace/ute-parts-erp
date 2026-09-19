@@ -77,6 +77,8 @@ else
 fi
 
 # ---------- 2. Dependency + build ----------
+cd "$WEBROOT"
+export COMPOSER_ALLOW_SUPERUSER=1
 echo "⟳ composer install (--no-dev)..."
 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
 
