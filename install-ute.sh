@@ -98,6 +98,7 @@ DBPASS="$(openssl rand -hex 12)"
 echo "⟳ Buat database ${DBNAME} ..."
 mysql -uroot <<SQL
 CREATE DATABASE IF NOT EXISTS \`${DBNAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER USER '${DBUSER}'@'localhost' IDENTIFIED BY '${DBPASS}';
 CREATE USER IF NOT EXISTS '${DBUSER}'@'localhost' IDENTIFIED BY '${DBPASS}';
 GRANT ALL PRIVILEGES ON \`${DBNAME}\`.* TO '${DBUSER}'@'localhost';
 FLUSH PRIVILEGES;
