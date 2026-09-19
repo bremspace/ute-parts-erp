@@ -49,15 +49,21 @@ echo "  PHP $(php8.5 -r 'echo PHP_VERSION;')"
 # Nginx + MySQL + utilities
 echo "  [1a] Installing nginx + utilities..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx curl unzip >/dev/null 2>&1
-echo "  [1b] Installing MySQL..."
-# Preseed MySQL agar tidak promt password
+echo "  [1b] Installing MySQL/MariaDB..."
+
+# Preseed agar tidak minta password interaktif
 echo "mysql-server mysql-server/root_password password root" | debconf-set-selections
 echo "mysql-server mysql-server/root_password_again password root" | debconf-set-selections
-echo "mysql-server mysql-server/root_password_selected boolean true" | debconf-set-selections
-yes | DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mysql-server >/dev/null 2>&1
-echo "  [1c] Verifikasi MySQL..."
-mysql -u root -e "SELECT 'MySQL OK'" >/dev/null 2>&1 || service mysql restart 2>/dev/null || systemctl restart mysql 2>/dev/null
-mysql -u root -e "SELECT 'MySQL OK'" >/dev/null 2>&1 && echo "  Nginx + MySQL siap" || echo "  ⚠️ MySQL mungkin perlu konfigurasi manual"
+
+# Install (MySQL atau MariaDB — tergantung distro)
+if ! command -v mysql >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mysql-server 2>/dev/null || \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mariadb-server 2>/dev/null
+fi
+
+echo "  [1c] Verifying MySQL..."
+mysql -u root -e "SELECT 1" >/dev/null 2>&1 && echo "  MySQL/MariaDB siap" || \
+  (echo "  ⚠️ MySQL tidak terdeteksi — cek manual: mysql -u root -e 'SELECT 1'")
 
 # Composer 2.x (bukan apt Composer — lama & deprecated di PHP 8.5)
 if ! composer --version 2>/dev/null | grep -q "Composer 2"; then
