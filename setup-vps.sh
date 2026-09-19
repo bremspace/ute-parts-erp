@@ -66,18 +66,19 @@ mysql -u root -e "SELECT 1" >/dev/null 2>&1 && echo "  MySQL/MariaDB siap" || \
   (echo "  ⚠️ MySQL tidak terdeteksi — cek manual: mysql -u root -e 'SELECT 1'")
 
 # Composer 2.x (bukan apt Composer — lama & deprecated di PHP 8.5)
-if ! composer --version 2>/dev/null | grep -q "Composer 2"; then
-  echo "  Install Composer 2.x terbaru..."
-  curl -sS https://getcomposer.org/installer | php8.5 -- --install-dir=/usr/local/bin --filename=composer >/dev/null 2>&1
+echo "  [1d] Install Composer 2.x..."
+if ! command -v composer >/dev/null 2>&1 || ! composer --version 2>/dev/null | grep -q "Composer 2"; then
+  timeout 60 curl -sS https://getcomposer.org/installer | php8.5 -- --install-dir=/usr/local/bin --filename=composer 2>&1
+  echo "  Composer terinstall: $(composer --version 2>/dev/null | head -c 25)"
+else
+  echo "  Composer 2.x sudah ada: $(composer --version 2>/dev/null | head -c 25)"
 fi
-echo "  Compose $(composer --version 2>/dev/null | head -c 20)"
 
 # ── 2. MySQL DB + User ─────────────────────────────────
 echo ""
 echo "[2/9] Database..."
 DBUSER="${DBNAME}"
 DBPASS="$(openssl rand -hex 12)"
-
 mysql -u root -e "
   CREATE DATABASE IF NOT EXISTS \`${DBNAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   CREATE USER IF NOT EXISTS '${DBUSER}'@'localhost' IDENTIFIED BY '${DBPASS}';
@@ -93,17 +94,22 @@ echo "  DB: ${DBNAME} / ${DBUSER}"
 
 # ── 3. Clone project ───────────────────────────────────
 echo ""
-echo "[3/9] Clone project ke ${PROJECT}..."
+echo "[3/9] Clone project..."
 mkdir -p "$PROJECT"
 cd "$PROJECT"
-git clone --depth 1 "$REPO" . 2>/dev/null || git pull origin main
+echo "  git clone --depth 1..."
+timeout 120 git clone --depth 1 "$REPO" . 2>/dev/null || timeout 120 git pull origin main
+echo "  Clone selesai"
 
 # ── 4. Dependencies + Build ────────────────────────────
 echo ""
-echo "[4/9] Build..."
-COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
-npm install --ignore-scripts --no-audit --no-fund >/dev/null 2>&1 && npm run build
-echo "  Assets siap"
+echo "[4/9] Build assets..."
+echo "  composer install..."
+timeout 600 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+echo "  composer install selesai"
+echo "  npm build..."
+timeout 180 npm install --ignore-scripts --no-audit --no-fund >/dev/null 2>&1 && timeout 180 npm run build
+echo "  Build selesai"
 
 # ── 5. .env ────────────────────────────────────────────
 echo ""
