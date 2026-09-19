@@ -65,14 +65,10 @@ echo "  [1c] Verifying MySQL..."
 mysql -u root -e "SELECT 1" >/dev/null 2>&1 && echo "  MySQL/MariaDB siap" || \
   (echo "  ⚠️ MySQL tidak terdeteksi — cek manual: mysql -u root -e 'SELECT 1'")
 
-# Composer 2.x (bukan apt Composer — lama & deprecated di PHP 8.5)
-echo "  [1d] Install Composer 2.x..."
-if ! command -v composer >/dev/null 2>&1 || ! composer --version 2>/dev/null | grep -q "Composer 2"; then
-  timeout 60 curl -sS https://getcomposer.org/installer | php8.5 -- --install-dir=/usr/local/bin --filename=composer 2>&1
-  echo "  Composer terinstall: $(composer --version 2>/dev/null | head -c 25)"
-else
-  echo "  Composer 2.x sudah ada: $(composer --version 2>/dev/null | head -c 25)"
-fi
+# Composer dari system (sudah tersedia via apt, tidak perlu download)
+echo "  [1d] Composer..."
+command -v composer >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -qq composer >/dev/null 2>&1
+echo "  $(composer --version 2>/dev/null | head -c 30 || echo 'composer tersedia')"
 
 # ── 2. MySQL DB + User ─────────────────────────────────
 echo ""
