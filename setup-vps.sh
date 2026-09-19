@@ -76,9 +76,17 @@ git clone --depth 1 "$REPO" . 2>/dev/null || git pull origin main
 echo "✔ Project di $WEBROOT"
 
 # ── 5. Build ──
-echo "[5/8] Install dependencies + build assets..."
+echo "[5/8] Install Composer 2.x (terbaru) + build assets..."
 php8.5 -r "echo 'PHP OK';" >/dev/null || { echo "❌ php8.5 tidak jalan"; exit 1; }
-COMPOSER_ALLOW_SUPERUSER=1 php8.5 /usr/bin/composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+
+# Install Composer 2.x terbaru via PHAR (bukan apt, supaya compatible PHP 8.5)
+if ! command -v composer >/dev/null 2>&1 || ! composer --version 2>/dev/null | grep -q "Composer 2"; then
+  echo "⟳ Download Composer 2.x..."
+  curl -sS https://getcomposer.org/installer | php8.5 -- --install-dir=/usr/local/bin --filename=composer >/dev/null 2>&1
+  echo "✔ Composer $(composer --version 2>/dev/null | head -1)"
+fi
+
+COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
 npm install --ignore-scripts --no-audit --no-fund >/dev/null 2>&1 && npm run build
 echo "✔ Assets siap"
 
