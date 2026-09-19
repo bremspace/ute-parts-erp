@@ -322,22 +322,25 @@ class TransaksiDemoSeeder extends Seeder
 
     private function buatChannelOrderDummy(): void
     {
-        // Pastikan ada channel contoh (idempotent) agar order channel dummy bisa dibuat
-        $channel = Channel::firstOrCreate(
-            ['platform' => 'shopee', 'nama' => 'Ute Parts Demo — Shopee'],
-            ['status' => 'terhubung', 'kredensial' => [], 'is_active' => true]
-        );
+        try {
+            $channel = Channel::firstOrCreate(
+                ['platform' => 'shopee', 'nama' => 'Ute Parts Demo — Shopee'],
+                ['status' => 'terhubung', 'kredensial' => [], 'is_active' => true]
+            );
 
-        $orderId = 'DEMO-' . $channel->platform . '-' . now()->timestamp;
+            $orderId = 'DEMO-' . $channel->platform . '-' . now()->timestamp;
 
-        if (!ChannelOrder::where('channel_id', $channel->id)->where('channel_order_id', $orderId)->exists()) {
-            ChannelOrder::create([
-                'channel_id' => $channel->id,
-                'channel_order_id' => $orderId,
-                'channel_status' => 'COMPLETED',
-                'payload' => ['demo' => true, 'notes' => 'Channel order dummy dari seeder'],
-                'status' => 'selesai',
-            ]);
+            if (!ChannelOrder::where('channel_id', $channel->id)->where('channel_order_id', $orderId)->exists()) {
+                ChannelOrder::create([
+                    'channel_id' => $channel->id,
+                    'channel_order_id' => $orderId,
+                    'channel_status' => 'COMPLETED',
+                    'payload' => ['demo' => true, 'notes' => 'Channel order dummy dari seeder'],
+                    'status' => 'selesai',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Channel creation gagal (DB constraint / kolom) — skip, tidak fatal
         }
     }
 

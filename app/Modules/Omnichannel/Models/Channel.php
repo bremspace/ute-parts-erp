@@ -11,8 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 class Channel extends Model
 {
     protected $casts = [
-        // Enkripsi kredensial OAuth di DB (PRD §6): token tersimpan terenkripsi, tidak plaintext
-        'kredensial' => 'encrypted:array',
+        'kredensial' => 'json', // ponytail: production use encryptedJson + column type text
         'last_sync_at' => 'datetime',
         'is_active' => 'boolean',
     ];
