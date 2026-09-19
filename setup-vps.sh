@@ -34,7 +34,7 @@ if ! dpkg -l php8.5-fpm 2>/dev/null | grep -q "^ii"; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     php8.5-fpm php8.5-mysql php8.5-gd php8.5-xml \
     php8.5-mbstring php8.5-zip php8.5-bcmath \
-    php8.5-intl php8.5-curl php8.5-opcache >/dev/null
+    php8.5-intl php8.5-curl php8.5-sqlite3 >/dev/null
 
   # Pastikan php8.5 jalan
   php8.5 -v >/dev/null 2>&1 || { echo "❌ PHP 8.5 gagal diinstall."; exit 1; }
@@ -196,3 +196,4 @@ echo "  URL   : https://${DOMAIN}"
 echo "  Login : /app/login → admin@uteparts.com / password"
 echo "  PHP   : $(php8.5 -r 'echo PHP_VERSION;')"
 echo "============================================================"
+
