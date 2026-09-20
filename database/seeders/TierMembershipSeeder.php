@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Modules\Crm\Models\TierMembership;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Modules\Crm\Models\TierMembership;
 
 class TierMembershipSeeder extends Seeder
 {

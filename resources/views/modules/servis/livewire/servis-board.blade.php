@@ -304,28 +304,52 @@
                                             Foto {{ $idx + 1 }}
                                         </span>
                                     @else
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            capture="environment"
-                                            class="absolute inset-0 opacity-0 cursor-pointer"
-                                            x-ref="fotoInput{{ $idx }}"
-                                            @change="
-                                                const file = $event.target.files[0];
-                                                if (file) {
-                                                    const reader = new FileReader();
-                                                    reader.onload = (e) => {
-                                                        $wire.handleFotoUpload({{ $idx }}, e.target.result);
-                                                    };
-                                                    reader.readAsDataURL(file);
-                                                }
-                                            "
-                                        />
-                                        <svg class="w-8 h-8 text-ink-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                        <span class="absolute bottom-1.5 text-[9px] text-ink-500">Foto {{ $idx + 1 }}</span>
+                                        <div class="absolute inset-0 flex flex-col">
+                                            <!-- Kamera (capture) -->
+                                            <label class="flex-1 flex flex-col items-center justify-center gap-1 cursor-pointer">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    capture="environment"
+                                                    class="absolute inset-0 opacity-0 cursor-pointer"
+                                                    @change="
+                                                        const file = $event.target.files[0];
+                                                        if (file) {
+                                                            const reader = new FileReader();
+                                                            reader.onload = (e) => {
+                                                                $wire.handleFotoUpload({{ $idx }}, e.target.result);
+                                                            };
+                                                            reader.readAsDataURL(file);
+                                                        }
+                                                    "
+                                                />
+                                                <svg class="w-8 h-8 text-ink-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                                <span class="text-[9px] text-ink-500">Kamera</span>
+                                            </label>
+                                            <!-- Galeri (fallback) -->
+                                            <label class="w-full py-1.5 text-center bg-white/5 hover:bg-white/10 border-t border-white/5 text-[9px] font-semibold text-ink-300 cursor-pointer">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    class="absolute inset-0 opacity-0 cursor-pointer"
+                                                    @change="
+                                                        const file = $event.target.files[0];
+                                                        if (file) {
+                                                            const reader = new FileReader();
+                                                            reader.onload = (e) => {
+                                                                $wire.handleFotoUpload({{ $idx }}, e.target.result);
+                                                            };
+                                                            reader.readAsDataURL(file);
+                                                        }
+                                                    "
+                                                />
+                                                &#128444; Pilih dari galeri
+                                            </label>
+                                        </div>
+                                        <span class="absolute top-1.5 left-1.5 text-[9px] text-ink-500">Foto {{ $idx + 1 }}</span>
                                     @endif
                                 </div>
                             @endforeach
@@ -339,6 +363,39 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-4 flex-shrink-0">
                     <button wire:click="$set('showTerimaModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
                     <button wire:click="simpanTerima" class="flex-1 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer">Simpan & Terima Unit</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- ===== MODAL: QUICK-ADD PELANGGAN BARU [T-18] ===== -->
+    @if($showPelangganBaruModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-lg font-bold text-white">+ Pelanggan Baru</h3>
+                    <button wire:click="$set('showPelangganBaruModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama <span class="text-up-red">*</span></label>
+                        <input type="text" wire:model="pelangganBaruForm.nama" placeholder="Nama pelanggan" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon <span class="text-up-red">*</span></label>
+                        <input type="text" wire:model="pelangganBaruForm.telepon" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
+                        <textarea wire:model="pelangganBaruForm.alamat" rows="2" placeholder="Alamat (opsional)" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"></textarea>
+                    </div>
+                    <p class="text-[10px] text-ink-500">Disimpan via <strong class="text-up-primary">PelangganService</strong> (satu sumber dgn CRM-06 & POS) — langsung terpilih di tiket.</p>
+                </div>
+
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                    <button wire:click="$set('showPelangganBaruModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="simpanPelangganBaruServis" class="flex-1 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer">Simpan Pelanggan</button>
                 </div>
             </div>
         </div>
@@ -495,6 +552,56 @@
                                     </div>
                                 @endforeach
                             </div>
+                        </div>
+                    @endif
+
+                    <!-- [T-17] Item Pekerjaan Teknisi (part/jasa) -->
+                    @if($selectedTiket->items->count() > 0)
+                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                            <p class="text-[10px] text-ink-400 uppercase mb-2">Item Pekerjaan ({{ $selectedTiket->items->count() }})</p>
+                            <div class="space-y-1.5">
+                                @foreach($selectedTiket->items as $it)
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-ink-100">
+                                            <span class="text-[9px] font-bold {{ $it->tipe === 'part' ? 'text-up-amber bg-up-amber/10 border border-up-amber/30' : 'text-up-mint bg-up-mint/10 border border-up-mint/30' }} px-1.5 py-0.5 rounded-full mr-1.5">
+                                                {{ strtoupper($it->tipe) }}
+                                            </span>
+                                            {{ $it->nama_item }} × {{ $it->qty }}
+                                        </span>
+                                        <span class="font-bold text-white tabular-nums">Rp {{ number_format($it->harga * $it->qty, 0, ',', '.') }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- [T-17] Form input pekerjaan teknisi (part → potong stok, jasa → tagihan) -->
+                    @if(in_array($selectedTiket->status, ['disetujui', 'dikerjakan', 'qc'], true))
+                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                            <p class="text-[10px] text-ink-400 uppercase mb-2">Input Pekerjaan Teknisi</p>
+                            @foreach($pekerjaanItems as $idx => $row)
+                                <div class="grid grid-cols-12 gap-1.5 mb-2 items-center">
+                                    <select wire:model="pekerjaanItems.{{ $idx }}.tipe" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium">
+                                        <option value="jasa" class="bg-ink-900">Jasa</option>
+                                        <option value="part" class="bg-ink-900">Part</option>
+                                    </select>
+                                    <select wire:model="pekerjaanItems.{{ $idx }}.produk_id" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium">
+                                        <option value="" class="bg-ink-900">— Produk (part) —</option>
+                                        @foreach($produkList as $p)
+                                            <option value="{{ $p->id }}" class="bg-ink-900">{{ $p->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input type="text" wire:model="pekerjaanItems.{{ $idx }}.nama_item" placeholder="Nama item" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
+                                    <input type="number" wire:model="pekerjaanItems.{{ $idx }}.qty" min="1" placeholder="Qty" class="col-span-1 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
+                                    <input type="number" wire:model="pekerjaanItems.{{ $idx }}.harga" min="0" step="500" placeholder="Harga" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
+                                    <button wire:click="removePekerjaanRow({{ $idx }})" class="col-span-1 text-up-red hover:text-white text-sm cursor-pointer" title="Hapus baris">✕</button>
+                                </div>
+                            @endforeach
+                            <div class="flex flex-wrap gap-2">
+                                <button wire:click="addPekerjaanRow" class="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 text-[11px] font-semibold border border-white/10 cursor-pointer">+ Baris</button>
+                                <button wire:click="simpanPekerjaan" class="px-4 py-2 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">Simpan Item Pekerjaan</button>
+                            </div>
+                            <p class="text-[10px] text-ink-500 mt-2">Part: stok dikurangi 1x + log. Jasa: hanya tagihan/jurnal. Item part menonaktifkan form sparepart legacy (anti dobel stok).</p>
                         </div>
                     @endif
 

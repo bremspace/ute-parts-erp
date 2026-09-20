@@ -3,10 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Services\ProdukService;
+use Database\Seeders\AkunCoaSeeder;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -20,11 +30,11 @@ class SemuaHalamanTest extends TestCase
     private function authed(): void
     {
         // Seed roles & permissions lengkap (dipakai role() scope di ServisBoard)
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
-        $this->seed(\Database\Seeders\AkunCoaSeeder::class); // untuk jurnal pembelian
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $this->seed(AkunCoaSeeder::class); // untuk jurnal pembelian
 
         $cabang = Cabang::create(['nama' => 'Pusat', 'kode' => 'CBG-01', 'is_active' => true]);
-        $gudang = \App\Modules\Wms\Models\Gudang::create(['cabang_id' => $cabang->id, 'nama' => 'Gudang 1', 'kode' => 'GDG-01', 'is_active' => true]);
+        $gudang = Gudang::create(['cabang_id' => $cabang->id, 'nama' => 'Gudang 1', 'kode' => 'GDG-01', 'is_active' => true]);
 
         $user = User::create([
             'name' => 'Admin', 'email' => 'admin@test.com',
@@ -34,11 +44,11 @@ class SemuaHalamanTest extends TestCase
         $user->cabangs()->attach($cabang->id);
         session(['cabang_id' => $cabang->id]);
 
-        $produk = \App\Modules\Wms\Models\Produk::create([
+        $produk = Produk::create([
             'nama' => 'LCD iPhone', 'slug' => 'lcd-iphone', 'kategori' => 'LCD',
             'kondisi' => 'baru', 'harga_beli' => 750000, 'harga_jual_retail' => 1100000,
         ]);
-        \App\Modules\Wms\Models\StokItem::create(['produk_id' => $produk->id, 'gudang_id' => $gudang->id, 'jumlah' => 5, 'jumlah_minimum' => 2]);
+        StokItem::create(['produk_id' => $produk->id, 'gudang_id' => $gudang->id, 'jumlah' => 5, 'jumlah_minimum' => 2]);
 
         $this->actingAs($user, 'web');
     }
@@ -70,9 +80,9 @@ class SemuaHalamanTest extends TestCase
     // [T-06] Kanban internal wajib permission servis.view — user tanpa akses dapat 403
     public function test_kanban_servis_diblokir_tanpa_permission_servis_view(): void
     {
-        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(VerifyCsrfToken::class);
 
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         $cabang = Cabang::create(['nama' => 'Pusat', 'kode' => 'CBG-01', 'is_active' => true]);
 
@@ -82,7 +92,7 @@ class SemuaHalamanTest extends TestCase
             'password' => Hash::make('password'),
             'is_active' => true,
         ]);
-        $role = \Spatie\Permission\Models\Role::findByName('kasir'); // role kasir: tanpa servis.view
+        $role = Role::findByName('kasir'); // role kasir: tanpa servis.view
         $kasir->assignRole($role);
         $kasir->cabangs()->attach($cabang->id);
         session(['cabang_id' => $cabang->id]);
@@ -160,12 +170,12 @@ class SemuaHalamanTest extends TestCase
     public function test_po_kredit_diterima_dan_dibayar(): void
     {
         $this->authed();
-        $gudang = \App\Modules\Wms\Models\Gudang::where('kode', 'GDG-01')->firstOrFail();
+        $gudang = Gudang::where('kode', 'GDG-01')->firstOrFail();
         $produk = Produk::firstOrFail();
-        $stokAwal = \App\Modules\Wms\Models\StokItem::where('produk_id', $produk->id)->where('gudang_id', $gudang->id)->value('jumlah') ?? 0;
+        $stokAwal = StokItem::where('produk_id', $produk->id)->where('gudang_id', $gudang->id)->value('jumlah') ?? 0;
 
         // Supplier
-        $supplier = \App\Modules\Wms\Models\Supplier::create(['nama' => 'Supplier Test', 'telepon' => '021000', 'termin_hari' => 30]);
+        $supplier = Supplier::create(['nama' => 'Supplier Test', 'telepon' => '021000', 'termin_hari' => 30]);
 
         // Buat PO kredit 2 item @ 100000 = 200000
         $poResp = $this->postJson('/api/wms/po', [
@@ -188,12 +198,12 @@ class SemuaHalamanTest extends TestCase
         // Jurnal pembelian: Persediaan 130-01 debit 200000, Utang 210-01 kredit 200000
         $this->assertDatabaseHas('jurnal_akuntansi', [
             'sumber' => 'pembelian',
-            'akun_coa_id' => \App\Modules\Akunting\Models\AkunCOA::where('kode', '130-01')->first()->id,
+            'akun_coa_id' => AkunCOA::where('kode', '130-01')->first()->id,
             'debit' => 200000,
         ]);
         $this->assertDatabaseHas('jurnal_akuntansi', [
             'sumber' => 'pembelian',
-            'akun_coa_id' => \App\Modules\Akunting\Models\AkunCOA::where('kode', '210-01')->first()->id,
+            'akun_coa_id' => AkunCOA::where('kode', '210-01')->first()->id,
             'kredit' => 200000,
         ]);
 
@@ -203,7 +213,7 @@ class SemuaHalamanTest extends TestCase
 
         // Jurnal bayar: Utang debit 50000, Kas kredit 50000
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'akun_coa_id' => \App\Modules\Akunting\Models\AkunCOA::where('kode', '210-01')->first()->id,
+            'akun_coa_id' => AkunCOA::where('kode', '210-01')->first()->id,
             'debit' => 50000,
         ]);
     }
@@ -225,9 +235,9 @@ class SemuaHalamanTest extends TestCase
     public function test_tambah_produk_dengan_stok_awal_membuat_jurnal_pembelian(): void
     {
         $this->authed();
-        $gudang = \App\Modules\Wms\Models\Gudang::where('kode', 'GDG-01')->firstOrFail();
+        $gudang = Gudang::where('kode', 'GDG-01')->firstOrFail();
 
-        $produk = app(\App\Modules\Wms\Services\ProdukService::class)->buatProduk(
+        $produk = app(ProdukService::class)->buatProduk(
             nama: 'Baterai Samsung Baru',
             kategori: 'Baterai',
             brand: 'Samsung',
@@ -252,15 +262,15 @@ class SemuaHalamanTest extends TestCase
         // Jurnal pembelian: Debit Persediaan (130-01) = 800.000, utk Kredit Utang (210-01)
         $this->assertDatabaseHas('jurnal_akuntansi', [
             'sumber' => 'pembelian',
-            'akun_coa_id' => \App\Modules\Akunting\Models\AkunCOA::where('kode', '130-01')->first()->id,
+            'akun_coa_id' => AkunCOA::where('kode', '130-01')->first()->id,
             'debit' => 800000,
         ]);
 
         // Double-entry balance untuk jurnal pembelian
-        $noJurnal = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')
+        $noJurnal = DB::table('jurnal_akuntansi')
             ->where('sumber', 'pembelian')->value('no_jurnal');
-        $debit = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->where('no_jurnal', $noJurnal)->sum('debit');
-        $kredit = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->where('no_jurnal', $noJurnal)->sum('kredit');
+        $debit = DB::table('jurnal_akuntansi')->where('no_jurnal', $noJurnal)->sum('debit');
+        $kredit = DB::table('jurnal_akuntansi')->where('no_jurnal', $noJurnal)->sum('kredit');
         $this->assertEqualsWithDelta($debit, $kredit, 0.01);
     }
 }

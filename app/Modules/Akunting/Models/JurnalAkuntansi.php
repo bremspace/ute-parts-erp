@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'no_jurnal', 'tanggal', 'cabang_id', 'akun_coa_id', 'sumber',
-    'deskripsi', 'debit', 'kredit', 'referensi_tipe', 'referensi_id', 'user_id'
+    'deskripsi', 'debit', 'kredit', 'referensi_tipe', 'referensi_id', 'user_id',
 ])]
 class JurnalAkuntansi extends Model
 {

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'judul', 'pesan', 'channel', 'segment', 'status', 'dijadwalkan_at',
-    'dikirim_at', 'user_id', 'total_target', 'total_terkirim', 'total_gagal'
+    'dikirim_at', 'user_id', 'total_target', 'total_terkirim', 'total_gagal',
 ])]
 class KampanyeBroadcast extends Model
 {

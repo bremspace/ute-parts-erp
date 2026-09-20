@@ -75,7 +75,7 @@
             />
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
             <select wire:model.live="filterKategori" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
                 <option value="" class="text-ink-400">Semua Kategori</option>
                 @foreach($categories as $k)
@@ -87,6 +87,18 @@
                 <option value="baru">Baru</option>
                 <option value="oem">OEM</option>
                 <option value="compatible">Compatible</option>
+            </select>
+            <select wire:model.live="filterHpMerk" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
+                <option value="" class="text-ink-400">Merk HP</option>
+                @foreach($hpMerkList as $m)
+                    <option value="{{ $m }}" class="text-ink-900">{{ $m }}</option>
+                @endforeach
+            </select>
+            <select wire:model.live="filterHpModel" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
+                <option value="" class="text-ink-400">Model HP</option>
+                @foreach($hpModelList as $m)
+                    <option value="{{ $m }}" class="text-ink-900">{{ $m }}</option>
+                @endforeach
             </select>
             <select wire:model.live="filterBrand" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
                 <option value="" class="text-ink-400">Semua Brand</option>

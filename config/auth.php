@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Modules\Crm\Models\Pelanggan;
 
 return [
 
@@ -67,7 +68,7 @@ return [
     |
     */
 
-'providers' => [
+    'providers' => [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
@@ -76,7 +77,7 @@ return [
         // Provider untuk guard customer (model Pelanggan Crm)
         'customers' => [
             'driver' => 'eloquent',
-            'model' => App\Modules\Crm\Models\Pelanggan::class,
+            'model' => Pelanggan::class,
         ],
 
         // 'users' => [

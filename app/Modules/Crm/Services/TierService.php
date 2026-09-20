@@ -51,6 +51,7 @@ class TierService
         $newId = $targetTier?->id;
         if ($pelanggan->tier_membership_id !== $newId) {
             $pelanggan->update(['tier_membership_id' => $newId]);
+
             return true;
         }
 
@@ -81,6 +82,7 @@ class TierService
     public function hitungPoin(float $nominalBelanja, ?TierMembership $tier = null): int
     {
         $multiplier = $tier ? (float) $tier->poin_multiplier : 1.0;
+
         return (int) floor(($nominalBelanja / 1000) * $multiplier);
     }
 }

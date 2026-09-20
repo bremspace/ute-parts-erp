@@ -14,26 +14,36 @@ class KonfigurasiService
     public function get(string $kunci, mixed $default = null): mixed
     {
         $row = DB::table('konfigurasi')->where('kunci', $kunci)->first();
-        if (!$row) {
+        if (! $row) {
             return $default;
         }
 
         $val = $row->nilai;
         $decoded = json_decode((string) $val, true);
+
         return json_last_error() === JSON_ERROR_NONE ? $decoded : $val;
     }
 
     public function set(string $kunci, mixed $nilai, ?string $deskripsi = null): void
     {
-        DB::table('konfigurasi')->updateOrInsert(
-            ['kunci' => $kunci],
-            [
+        $existing = DB::table('konfigurasi')->where('kunci', $kunci)->first();
+        $now = now();
+        
+        if ($existing) {
+            DB::table('konfigurasi')->where('kunci', $kunci)->update([
                 'nilai' => is_scalar($nilai) ? (string) $nilai : json_encode($nilai),
                 'deskripsi' => $deskripsi,
-                'updated_at' => now(),
-                'created_at' => DB::raw('COALESCE((SELECT created_at FROM konfigurasi WHERE kunci = "' . $kunci . '"), "' . now() . '")'),
-            ]
-        );
+                'updated_at' => $now,
+            ]);
+        } else {
+            DB::table('konfigurasi')->insert([
+                'kunci' => $kunci,
+                'nilai' => is_scalar($nilai) ? (string) $nilai : json_encode($nilai),
+                'deskripsi' => $deskripsi,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
     }
 
     /**

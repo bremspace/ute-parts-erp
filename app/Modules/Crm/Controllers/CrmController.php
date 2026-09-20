@@ -5,9 +5,14 @@ namespace App\Modules\Crm\Controllers;
 use App\Modules\Crm\Models\KampanyeBroadcast;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Crm\Services\BroadcastService;
+use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -63,7 +68,7 @@ class CrmController extends Controller
     // [API: CRM-06][T-04] Create pelanggan dari backoffice (satu sumber: POS/Servis/CRM)
     public function store(Request $request)
     {
-        $pelanggan = app(\App\Modules\Crm\Services\PelangganService::class)->create($request->all());
+        $pelanggan = app(PelangganService::class)->create($request->all());
 
         return $this->success($pelanggan, 'Pelanggan berhasil dibuat', 201);
     }
@@ -71,10 +76,18 @@ class CrmController extends Controller
     // [API: CRM-07][T-22] Konfigurasi strategi loyalitas (editable tanpa deploy)
     public function config(Request $request)
     {
-        $config = app(\App\Modules\Crm\Services\KonfigurasiService::class);
+        $config = app(KonfigurasiService::class);
 
         if ($request->isMethod('get')) {
-            return $this->success($config->defaults(), 'Konfigurasi loyalitas berhasil dimuat');
+            // [T-22] GET harus membaca nilai TERSIMPAN (bukan hardcode defaults()):
+            // tiap kunci: nilai DB bila ada, fallback default bila belum pernah disimpan.
+            $stored = [];
+            foreach (array_keys($config->defaults()) as $kunci) {
+                $stored[$kunci] = $config->get($kunci) ?? $config->defaults()[$kunci];
+            }
+            $stored['skema_komisi_default'] = SkemaKomisi::orderBy('id')->get();
+
+            return $this->success($stored, 'Konfigurasi loyalitas berhasil dimuat');
         }
 
         $request->validate([
@@ -90,9 +103,9 @@ class CrmController extends Controller
         }
 
         // Terapkan diskon tier
-        \App\Modules\Crm\Models\TierMembership::where('kode', 'silver')->update(['diskon_persen' => $request->diskon_silver]);
-        \App\Modules\Crm\Models\TierMembership::where('kode', 'gold')->update(['diskon_persen' => $request->diskon_gold]);
-        \App\Modules\Crm\Models\TierMembership::where('kode', 'platinum')->update(['diskon_persen' => $request->diskon_platinum]);
+        TierMembership::where('kode', 'silver')->update(['diskon_persen' => $request->diskon_silver]);
+        TierMembership::where('kode', 'gold')->update(['diskon_persen' => $request->diskon_gold]);
+        TierMembership::where('kode', 'platinum')->update(['diskon_persen' => $request->diskon_platinum]);
 
         return $this->success(null, 'Konfigurasi loyalitas tersimpan');
     }
@@ -118,8 +131,8 @@ class CrmController extends Controller
             'user_id' => auth()->id(),
         ]);
 
-        if (!$request->jadiwalkan_at) {
-            app(\App\Modules\Crm\Services\BroadcastService::class)->kirimSekarang($kampanye);
+        if (! $request->jadiwalkan_at) {
+            app(BroadcastService::class)->kirimSekarang($kampanye);
         }
 
         return $this->success($kampanye, 'Broadcast kampanye dibuat', 201);
@@ -129,7 +142,7 @@ class CrmController extends Controller
     public function broadcastLog(Request $request, $id)
     {
         return $this->success(
-            app(\App\Modules\Crm\Services\BroadcastService::class)->logPengiriman($id),
+            app(BroadcastService::class)->logPengiriman($id),
             'Log pengiriman kampanye berhasil dimuat'
         );
     }
@@ -146,8 +159,8 @@ class CrmController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('telepon', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('telepon', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -190,7 +203,7 @@ class CrmController extends Controller
 
         $request->validate([
             'nama' => 'sometimes|string|max:255',
-            'kode' => 'sometimes|string|max:50|unique:tier_memberships,kode,' . $id,
+            'kode' => 'sometimes|string|max:50|unique:tier_memberships,kode,'.$id,
             'min_belanja_12bulan' => 'sometimes|numeric|min:0',
             'diskon_persen' => 'sometimes|numeric|min:0|max:100',
             'poin_multiplier' => 'sometimes|numeric|min:0',
@@ -199,7 +212,7 @@ class CrmController extends Controller
 
         $tier->update($request->all());
 
-        app(\App\Modules\Rbac\Services\AuditService::class)->catat(
+        app(AuditService::class)->catat(
             'TierMembership', 'update', $tier->id,
             "Konfigurasi tier {$tier->nama} diperbarui (diskon {$tier->diskon_persen}%, min belanja {$tier->min_belanja_12bulan})"
         );
@@ -259,7 +272,7 @@ class CrmController extends Controller
         $current = $tiers->firstWhere('id', $pelanggan->tier_membership_id);
         $next = $tiers->first(fn ($t) => (float) $t->min_belanja_12bulan > $belanja);
 
-        if (!$next) {
+        if (! $next) {
             return ['tier_berikutnya' => null, 'progress_persen' => 100, 'sisa_belanja' => 0];
         }
 

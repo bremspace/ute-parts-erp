@@ -17,10 +17,12 @@ class ResellerDashboard extends Component
 
     // Komisi filter
     public string $filterStatus = '';
+
     public array $selectedKomisiIds = [];
 
     // Skema komisi modal
     public bool $showSkemaModal = false;
+
     public array $skemaForm = ['id' => null, 'nama' => '', 'kategori' => '', 'tipe' => 'persen', 'nilai' => 5, 'is_active' => true];
 
     public function getResellersProperty()
@@ -72,6 +74,7 @@ class ResellerDashboard extends Component
     {
         if (empty($this->selectedKomisiIds)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih minimal satu komisi terlebih dahulu']);
+
             return;
         }
 
@@ -82,7 +85,7 @@ class ResellerDashboard extends Component
                 'type' => 'success',
                 'message' => $action === 'approve'
                     ? "{$approved} komisi disetujui — jurnal & utang dibuat otomatis"
-                    : count($approved) . ' komisi ditolak',
+                    : count($approved).' komisi ditolak',
             ]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);

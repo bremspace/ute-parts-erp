@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'tiket_servis_id', 'durasi_hari', 'tanggal_mulai', 'tanggal_berakhir', 'keterangan'
+    'tiket_servis_id', 'durasi_hari', 'tanggal_mulai', 'tanggal_berakhir', 'keterangan',
 ])]
 class Garansi extends Model
 {

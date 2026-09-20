@@ -25,7 +25,7 @@ class PricingService
             ? (float) $variant->harga_jual_retail
             : (float) $produk->harga_jual_retail;
 
-        if (!$pelanggan) {
+        if (! $pelanggan) {
             return [
                 'harga' => $hargaDasar,
                 'harga_dasar' => $hargaDasar,
@@ -50,6 +50,7 @@ class PricingService
 
             if ($hargaReseller) {
                 $finalHarga = (float) $hargaReseller->harga;
+
                 return [
                     'harga' => $finalHarga,
                     'harga_dasar' => $hargaDasar,
@@ -76,6 +77,7 @@ class PricingService
 
             if ($tierOverride) {
                 $finalHarga = (float) $tierOverride->harga;
+
                 return [
                     'harga' => $finalHarga,
                     'harga_dasar' => $hargaDasar,
@@ -89,6 +91,7 @@ class PricingService
             if ($tier->diskon_persen > 0) {
                 $diskonNominal = round(($hargaDasar * (float) $tier->diskon_persen) / 100, 2);
                 $finalHarga = max(0, $hargaDasar - $diskonNominal);
+
                 return [
                     'harga' => $finalHarga,
                     'harga_dasar' => $hargaDasar,

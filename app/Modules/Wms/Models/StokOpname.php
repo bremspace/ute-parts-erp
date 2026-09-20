@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'no_opname', 'gudang_id', 'user_id', 'approver_id',
-    'status', 'tanggal_approval', 'catatan_approval', 'catatan'
+    'no_opname', 'gudang_id', 'rak_id', 'user_id', 'approver_id',
+    'status', 'tanggal_approval', 'catatan_approval', 'catatan',
 ])]
 class StokOpname extends Model
 {
@@ -23,6 +23,11 @@ class StokOpname extends Model
     public function gudang(): BelongsTo
     {
         return $this->belongsTo(Gudang::class);
+    }
+
+    public function rak(): BelongsTo
+    {
+        return $this->belongsTo(Rak::class);
     }
 
     public function pembuat(): BelongsTo

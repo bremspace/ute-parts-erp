@@ -3,18 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Models\SkemaKomisi;
+use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
+use Database\Seeders\AkunCoaSeeder;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Database\Seeders\TierMembershipSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -26,8 +28,8 @@ class ResellerFase5Test extends TestCase
 
     private function setupAdmin(): void
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
-        $this->seed(\Database\Seeders\TierMembershipSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $this->seed(TierMembershipSeeder::class);
 
         $admin = User::create([
             'name' => 'Admin', 'email' => 'admin@uteparts.test',
@@ -50,7 +52,7 @@ class ResellerFase5Test extends TestCase
         StokItem::create(['produk_id' => $produk->id, 'sku_variant_id' => $var->id, 'gudang_id' => $gudang->id, 'jumlah' => 10]);
 
         // COA utk jurnal
-        $this->seed(\Database\Seeders\AkunCoaSeeder::class);
+        $this->seed(AkunCoaSeeder::class);
 
         // Skema default: 5% semua kategori
         SkemaKomisi::create(['nama' => 'Default', 'kategori' => null, 'tipe' => 'persen', 'nilai' => 5]);
@@ -74,7 +76,7 @@ class ResellerFase5Test extends TestCase
         $this->assertDatabaseHas('skema_komisi_reseller', ['pelanggan_id' => $reseller->id, 'kategori' => 'LCD', 'nilai' => 10]);
 
         // Hitung komisi utk transaksi 100k kategori LCD → harus 10% (10.000) bukan 5% (5.000)
-        $komisi = app(\App\Modules\Reseller\Services\KomisiService::class)->hitungKomisiDariItems(
+        $komisi = app(KomisiService::class)->hitungKomisiDariItems(
             $reseller,
             [['kategori' => 'LCD', 'subtotal' => 100000, 'jumlah' => 1]],
             ['keterangan' => 'test']
@@ -96,7 +98,7 @@ class ResellerFase5Test extends TestCase
             'diskon_platinum' => 12,
         ])->assertSuccessful();
 
-        $svc = app(\App\Modules\Crm\Services\KonfigurasiService::class);
+        $svc = app(KonfigurasiService::class);
         $this->assertEquals(8, (float) $svc->get('poin_earn_persen'));
         $this->assertEquals(120, (float) $svc->get('poin_redeem_rupiah'));
 

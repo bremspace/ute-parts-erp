@@ -103,6 +103,12 @@ npm run build
 - `CHANGELOG.md` — update after each fase selesai
 - Context7 MCP for current Laravel 13 / Livewire / Spatie Permission docs
 
+## Workflow Rules (user-mandated, 2026-09-20 — WAJIB diingat)
+- **Model subagent = model main agent (`9router/antig`)** — JANGAN pernah spawn subagent tanpa `model: "9router/antig"` (default `openai/gpt-5.6-luna` rusak/unavailable). Berlaku untuk SEMUA subagent (explorer, fixer, designer, oracle, librarian).
+- **Implement-plan checklist flow**: untuk SETIAP plan/implement-plan → (1) baca plan, (2) verifikasi kebutuhan ke kode aktual, (3) eksekusi task, (4) review acceptance criteria, (5) centang checkbox `- [x]` di implement-plan.md HANYA jika sudah terverifikasi benar, (6) lanjut otomatis ke task/fase berikutnya. Jangan centang task yang belum diverifikasi.
+- **Izin akses**: user memberi izin penuh semua akses sesi kerja (per 2026-09-20) — lanjut tanpa minta konfirmasi berulang untuk eksekusi kode/deploy/dev.
+- **Template checklist**: setiap implement-plan baru harus punya checkbox per task (format `- [ ] T-XX — ...` di Acceptance Criteria) yang dicentang hanya setelah verified.
+
 ## Agent skills
 
 ### Issue tracker

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'channel_id', 'produk_id', 'gudang_id', 'channel_sku',
-    'channel_item_id', 'status', 'error_message'
+    'channel_item_id', 'status', 'error_message',
 ])]
 class ChannelProductMapping extends Model
 {

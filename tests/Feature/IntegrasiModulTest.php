@@ -8,16 +8,21 @@ use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -31,6 +36,7 @@ class IntegrasiModulTest extends TestCase
     use RefreshDatabase;
 
     private Cabang $cabang;
+
     private User $kasir;
 
     private function setUpFixtures(): array
@@ -73,9 +79,9 @@ class IntegrasiModulTest extends TestCase
             'komisi.approve', 'user.view', 'crm.view',
         ];
         foreach ($needed as $name) {
-            \Spatie\Permission\Models\Permission::firstOrCreate(['name' => $name]);
+            Permission::firstOrCreate(['name' => $name]);
         }
-        $role = \Spatie\Permission\Models\Role::findOrCreate('super-admin');
+        $role = Role::findOrCreate('super-admin');
         $role->syncPermissions($needed);
         $this->kasir->assignRole('super-admin');
         $this->kasir->cabangs()->attach($this->cabang->id, ['is_default' => true]);
@@ -83,7 +89,7 @@ class IntegrasiModulTest extends TestCase
 
         // [T-09] Buka kas sesi agar POS tunai tidak diblokir di test integrasi
         try {
-            app(\App\Modules\Pos\Services\KasSesiState::class)->bukaKas(0, $this->cabang->id, $this->kasir->id);
+            app(KasSesiState::class)->bukaKas(0, $this->cabang->id, $this->kasir->id);
         } catch (\Throwable) {
             // sudah ada sesi terbuka — abaikan
         }
@@ -158,7 +164,7 @@ class IntegrasiModulTest extends TestCase
             'action' => 'approve',
         ]);
         if ($respApprove->status() !== 200) {
-            $this->fail('HTTP ' . $respApprove->status() . ': ' . ($respApprove->json('message') ?? 'unknown'));
+            $this->fail('HTTP '.$respApprove->status().': '.($respApprove->json('message') ?? 'unknown'));
         }
         $this->assertEmpty($respApprove->json('message') !== null && str_contains($respApprove->json('message'), 'gagal'), 'approve error');
 
@@ -204,10 +210,10 @@ class IntegrasiModulTest extends TestCase
             ]],
         ])->assertSuccessful(); // 201
 
-        $this->putJson('/api/wms/transfer/' . $transfer->json('data.id') . '/kirim')->assertSuccessful();
+        $this->putJson('/api/wms/transfer/'.$transfer->json('data.id').'/kirim')->assertSuccessful();
         // stok asal 17 (18 - 1 kasbon - 3 transfer)
         $this->assertDatabaseHas('stok_items', ['produk_id' => $produk->id, 'gudang_id' => $gudang->id, 'jumlah' => 14]);
-        $this->putJson('/api/wms/transfer/' . $transfer->json('data.id') . '/terima')->assertSuccessful();
+        $this->putJson('/api/wms/transfer/'.$transfer->json('data.id').'/terima')->assertSuccessful();
         $this->assertDatabaseHas('stok_items', ['produk_id' => $produk->id, 'gudang_id' => $gudang2->id, 'jumlah' => 3]);
 
         // ===== 7. SERVIŞ FLOW → GARANSI + JURNAL JASA =====
@@ -261,8 +267,8 @@ class IntegrasiModulTest extends TestCase
         ]);
 
         // ===== 8. KESEIMBANGAN JURNAL GLOBAL (double-entry integrity) =====
-        $debitTotal = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->sum('debit');
-        $kreditTotal = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->sum('kredit');
+        $debitTotal = DB::table('jurnal_akuntansi')->sum('debit');
+        $kreditTotal = DB::table('jurnal_akuntansi')->sum('kredit');
         $this->assertEqualsWithDelta($debitTotal, $kreditTotal, 0.01, 'Total debit harus = total kredit (double-entry)');
     }
 
@@ -276,7 +282,7 @@ class IntegrasiModulTest extends TestCase
             'nama' => 'LCD Test', 'slug' => 'lcd-test', 'kategori' => 'LCD',
             'kondisi' => 'baru', 'harga_beli' => 100000, 'harga_jual_retail' => 150000,
         ]);
-        $variant = \App\Modules\Wms\Models\SkuVariant::create([
+        $variant = SkuVariant::create([
             'produk_id' => $produk->id, 'sku' => 'LCD-1', 'nama_varian' => 'Standar',
             'harga_beli' => 100000, 'harga_jual_retail' => 150000,
         ]);
@@ -335,10 +341,10 @@ class IntegrasiModulTest extends TestCase
         ]);
 
         // Balance
-        $no = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')
+        $no = DB::table('jurnal_akuntansi')
             ->where('sumber', 'servis')->where('referensi_id', $tiket->id)->value('no_jurnal');
-        $d = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->where('no_jurnal', $no)->sum('debit');
-        $k = \Illuminate\Support\Facades\DB::table('jurnal_akuntansi')->where('no_jurnal', $no)->sum('kredit');
+        $d = DB::table('jurnal_akuntansi')->where('no_jurnal', $no)->sum('debit');
+        $k = DB::table('jurnal_akuntansi')->where('no_jurnal', $no)->sum('kredit');
         $this->assertEqualsWithDelta($d, $k, 0.01);
     }
 }

@@ -3,8 +3,10 @@
 namespace App\Modules\Wms\Services;
 
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +46,7 @@ class ProdukService
         return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId) {
             $produk = Produk::create([
                 'nama' => $nama,
-                'slug' => Str::slug($nama) . '-' . Str::lower(Str::random(4)),
+                'slug' => Str::slug($nama).'-'.Str::lower(Str::random(4)),
                 'deskripsi' => null,
                 'kategori' => $kategori ?: 'Umum',
                 'brand_kompatibel' => $brand,
@@ -58,7 +60,7 @@ class ProdukService
 
             $variant = SkuVariant::create([
                 'produk_id' => $produk->id,
-                'sku' => $sku ?: 'SKU-' . strtoupper(Str::random(6)),
+                'sku' => $sku ?: 'SKU-'.strtoupper(Str::random(6)),
                 'nama_varian' => 'Standar',
                 'harga_beli' => $hargaBeli,
                 'harga_jual_retail' => $hargaJual,
@@ -96,21 +98,27 @@ class ProdukService
         int $qty,
         float $hargaBeli,
         string $keterangan,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $rakId = null,
+        bool $postJurnal = true
     ): StokItem {
         if ($qty <= 0) {
             throw new \Exception('Kuantitas harus > 0');
         }
 
-        return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId) {
+        return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId, $rakId, $postJurnal) {
             $stok = StokItem::firstOrCreate(
                 ['produk_id' => $produkId, 'sku_variant_id' => $variantId, 'gudang_id' => $gudangId],
-                ['jumlah' => 0, 'jumlah_minimum' => 0]
+                ['jumlah' => 0, 'jumlah_minimum' => 0, 'rak_id' => $rakId]
             );
 
             $sebelum = $stok->jumlah;
             $setelah = $sebelum + $qty;
-            $stok->update(['jumlah' => $setelah]);
+            $update = ['jumlah' => $setelah];
+            if ($rakId) {
+                $update['rak_id'] = $rakId; // [T-12] stok masuk ke rak terpilih
+            }
+            $stok->update($update);
 
             StokLog::create([
                 'gudang_id' => $gudangId,
@@ -127,7 +135,7 @@ class ProdukService
             ]);
 
             // [T-26] SOT mutation log
-            \App\Modules\Wms\Models\StockMutationLog::create([
+            StockMutationLog::create([
                 'produk_id' => $produkId,
                 'sku_variant_id' => $variantId,
                 'gudang_id' => $gudangId,
@@ -138,10 +146,12 @@ class ProdukService
                 'terjadi_at' => now(),
             ]);
 
-            // Jurnal pembelian (PRD §4.6): Persediaan debit / Utang Usaha kredit
+            // Jurnal pembelian (PRD §4.6): Persediaan debit / Utang Usaha kredit.
+            // Saat dipanggil dari terimaBarang PO: jurnal agregat dibuat di PurchaseOrderService
+            // (postJurnal=false) agar tidak dobel-posting per item.
             $total = round($hargaBeli * $qty, 2);
-            if ($total > 0) {
-                $cabangId = \App\Modules\Wms\Models\Gudang::find($gudangId)?->cabang_id;
+            if ($postJurnal && $total > 0) {
+                $cabangId = Gudang::find($gudangId)?->cabang_id;
                 $this->jurnalService->post(
                     $this->jurnalService->generateNoJurnal('beli', $cabangId),
                     now(),

@@ -62,7 +62,7 @@ class ProdukImport implements ToModel, WithHeadingRow, WithValidation
             ]
         );
 
-        $sku = $row['sku'] ?? ('SKU-' . strtoupper(Str::random(8)));
+        $sku = $row['sku'] ?? ('SKU-'.strtoupper(Str::random(8)));
         SkuVariant::firstOrCreate(
             ['sku' => $sku],
             [

@@ -22,6 +22,7 @@ class KirimNotifikasiJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public int $backoff = 60;
 
     public function __construct(
@@ -32,14 +33,14 @@ class KirimNotifikasiJob implements ShouldQueue
     {
         $log = NotifikasiKeluar::find($this->notifikasiId);
 
-        if (!$log || $log->status === 'terkirim') {
+        if (! $log || $log->status === 'terkirim') {
             return;
         }
 
         try {
             match ($log->tipe) {
                 'email' => $this->kirimEmail($log),
-                'wa'    => $this->kirimWhatsApp($log),
+                'wa' => $this->kirimWhatsApp($log),
                 default => null, // inapp — handled by database notification, no outbound
             };
 
@@ -47,12 +48,12 @@ class KirimNotifikasiJob implements ShouldQueue
         } catch (\Exception $e) {
             $log->update([
                 'status' => 'gagal',
-                'error'  => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             Log::error("Notifikasi {$log->tipe} gagal: {$e->getMessage()}", [
                 'notifikasi_id' => $log->id,
-                'tujuan'        => $log->tujuan,
+                'tujuan' => $log->tujuan,
             ]);
 
             throw $e; // re-throw agar queue retry
@@ -61,7 +62,7 @@ class KirimNotifikasiJob implements ShouldQueue
 
     protected function kirimEmail(NotifikasiKeluar $log): void
     {
-        if (!$log->tujuan) {
+        if (! $log->tujuan) {
             return;
         }
 
@@ -86,10 +87,9 @@ class KirimNotifikasiJob implements ShouldQueue
          * Headers: Authorization: Bearer {WA_GATEWAY_TOKEN}
          * Body: { phone: $log->tujuan, message: $log->konten, device_id: env('WA_GATEWAY_DEVICE_ID') }
          */
-
         Log::channel('stack')->info('WA GATEWAY DISPATCH (placeholder)', [
             'tujuan' => $log->tujuan,
-            'judul'  => $log->judul,
+            'judul' => $log->judul,
             'konten' => $log->konten,
             'status' => 'akan_dikirim_ketika_provider_dikonfigurasi',
         ]);

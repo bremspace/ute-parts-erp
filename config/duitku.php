@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\Config;
-
 // Konfigurasi Duitku payment gateway (PRD §4.7)
 return [
     'merchant_code' => env('DUITKU_MERCHANT_CODE', ''),

@@ -14,9 +14,13 @@ use Illuminate\Support\Facades\Http;
 class DuitkuService
 {
     private string $merchantCode;
+
     private string $apiKey;
+
     private string $merchantKey;
+
     private bool $sandbox;
+
     private string $baseUrl;
 
     public function __construct()
@@ -38,14 +42,8 @@ class DuitkuService
     /**
      * Buat transaksi Duitku.
      *
-     * @param string $merchantOrderId  no_transaksi lokal
-     * @param float $amount
-     * @param string $customerName
-     * @param string|null $customerEmail
-     * @param string|null $phoneNumber
-     * @param string|null $paymentMethod  VA|QRIS|OVO|... (null = ambil dari getPaymentMethods)
-     * @param string|null $callbackUrl
-     * @param string|null $returnUrl
+     * @param  string  $merchantOrderId  no_transaksi lokal
+     * @param  string|null  $paymentMethod  VA|QRIS|OVO|... (null = ambil dari getPaymentMethods)
      */
     public function createTransaction(
         string $merchantOrderId,
@@ -62,7 +60,7 @@ class DuitkuService
             'paymentAmount' => (int) round($amount),
             'paymentMethod' => $paymentMethod,
             'merchantOrderId' => $merchantOrderId,
-            'productDetails' => 'Order Ute Parts ' . $merchantOrderId,
+            'productDetails' => 'Order Ute Parts '.$merchantOrderId,
             'email' => $customerEmail,
             'phoneNumber' => $phoneNumber,
             'customerVaName' => $customerName ?: 'Customer',
@@ -72,12 +70,12 @@ class DuitkuService
             'signature' => $this->makeSignature($merchantOrderId, $amount),
         ];
 
-        $response = Http::timeout(20)->post($this->baseUrl . '/createPaymentMethodV2', $payload);
+        $response = Http::timeout(20)->post($this->baseUrl.'/createPaymentMethodV2', $payload);
 
         $data = $response->json();
 
         if (isset($data['responseCode']) && (string) $data['responseCode'] !== '00') {
-            throw new \Exception('Duitku: ' . ($data['message'] ?? 'Transaksi gagal dibuat'));
+            throw new \Exception('Duitku: '.($data['message'] ?? 'Transaksi gagal dibuat'));
         }
 
         return [
@@ -96,7 +94,7 @@ class DuitkuService
      */
     private function makeSignature(string $merchantOrderId, float $amount): string
     {
-        return md5($this->merchantCode . $merchantOrderId . (int) round($amount) . $this->apiKey);
+        return md5($this->merchantCode.$merchantOrderId.(int) round($amount).$this->apiKey);
     }
 
     /**
@@ -105,7 +103,8 @@ class DuitkuService
      */
     public function verifyCallbackSignature(int $amount, string $merchantOrderId, string $signature): bool
     {
-        $expected = md5($this->merchantCode . (int) $amount . $merchantOrderId . $this->apiKey);
+        $expected = md5($this->merchantCode.(int) $amount.$merchantOrderId.$this->apiKey);
+
         return hash_equals($expected, $signature);
     }
 
@@ -117,10 +116,10 @@ class DuitkuService
         $payload = [
             'merchantCode' => $this->merchantCode,
             'amount' => (int) round($amount),
-            'signature' => md5($this->merchantCode . (int) round($amount) . $this->apiKey),
+            'signature' => md5($this->merchantCode.(int) round($amount).$this->apiKey),
         ];
 
-        $response = Http::timeout(15)->post($this->baseUrl . '/getPaymentMethodV2', $payload);
+        $response = Http::timeout(15)->post($this->baseUrl.'/getPaymentMethodV2', $payload);
         $methods = collect($response->json('paymentFee') ?? []);
 
         return $methods->map(fn ($m) => [

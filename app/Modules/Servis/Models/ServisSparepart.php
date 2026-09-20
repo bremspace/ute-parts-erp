@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'tiket_servis_id', 'produk_id', 'sku_variant_id', 'gudang_id',
-    'jumlah', 'harga_satuan', 'hpp'
+    'jumlah', 'harga_satuan', 'hpp',
 ])]
 class ServisSparepart extends Model
 {

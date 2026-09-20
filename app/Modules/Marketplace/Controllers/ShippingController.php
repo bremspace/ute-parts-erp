@@ -6,10 +6,12 @@ use App\Modules\Marketplace\Models\Pengiriman;
 use App\Modules\Marketplace\Services\BiteshipService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 
 class ShippingController extends Controller
 {
@@ -32,7 +34,7 @@ class ShippingController extends Controller
             'kurir' => 'nullable|string|max:100',
         ]);
 
-        if (!$this->biteship->isConfigured()) {
+        if (! $this->biteship->isConfigured()) {
             return $this->error('Biteship belum dikonfigurasi — set BITESHIP_API_KEY di .env', 503);
         }
 
@@ -46,7 +48,8 @@ class ShippingController extends Controller
 
             // Items format Biteship: [{name, description, value, length, width, height, weight, quantity}]
             $items = collect($request->items)->map(function ($it) {
-                $produk = \App\Modules\Wms\Models\Produk::find($it['produk_id']);
+                $produk = Produk::find($it['produk_id']);
+
                 return [
                     'name' => $produk?->nama ?? 'Sparepart',
                     'description' => $produk?->kategori ?? 'Sparepart',
@@ -136,7 +139,7 @@ class ShippingController extends Controller
                 ]);
             } catch (\Exception $e) {
                 // Jika Biteship gagal, pengiriman tetap tercatat "diproses" — bisa di-retry manual
-                \Illuminate\Support\Facades\Log::warning('Biteship createOrder gagal: ' . $e->getMessage());
+                Log::warning('Biteship createOrder gagal: '.$e->getMessage());
             }
         }
 

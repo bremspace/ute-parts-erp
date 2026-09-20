@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Modules\Rbac\Models\Cabang;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Modules\Rbac\Models\Cabang;
 
 class CabangSeeder extends Seeder
 {

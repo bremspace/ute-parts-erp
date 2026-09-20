@@ -99,6 +99,11 @@ class PosKasir extends Component
 
         // [T-09] Deteksi sesi kas terbuka utk user/cabang
         $this->checkKasSesi();
+
+        // [T-09] Auto-open modal buka kas saat masuk POS bila sesi belum aktif (transaksi tunai diblokir)
+        if (! app(KasSesiState::class)->isActiveSesi()) {
+            $this->bukaKasModal();
+        }
     }
 
     public function checkKasSesi(): void
@@ -314,6 +319,14 @@ class PosKasir extends Component
     public function processTransaction()
     {
         $cabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
+
+        // [T-09] Validasi sesi kas utk pembayaran tunai (sama dgn API POS-01) — wajib buka kas dulu
+        if ($this->metodeBayar === 'tunai' && ! app(KasSesiState::class)->isActiveSesi()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Kas belum dibuka — buka sesi kas terlebih dahulu sebelum transaksi tunai']);
+            $this->bukaKasModal();
+
+            return;
+        }
 
         if ($this->metodeBayar === 'tunai' && $this->jumlahBayar < $this->totalAkhir) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Jumlah bayar kurang dari total belanja']);
@@ -596,6 +609,13 @@ class PosKasir extends Component
     }
 
     // ==================== [T-08] PELANGGAN QUICK-ADD ====================
+
+    /** [T-18] Dipanggil komponen <x-customer-picker> → buka modal create pelanggan. */
+    public function openPelangganBaru()
+    {
+        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => ''];
+        $this->showPelangganBaruModal = true;
+    }
 
     public function getPelangganCariProperty()
     {

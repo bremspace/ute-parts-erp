@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'transaksi_id', 'kurir', 'layanan', 'ongkir', 'asal_cabang',
-    'nama_penerima', 'alamat_tujuan', 'telepon_tujuan', 'tracking_id', 'status'
+    'nama_penerima', 'alamat_tujuan', 'telepon_tujuan', 'tracking_id', 'status',
 ])]
 class Pengiriman extends Model
 {

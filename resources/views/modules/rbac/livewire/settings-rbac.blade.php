@@ -1,7 +1,7 @@
 <div class="space-y-6">
     <!-- Tabs -->
     <div class="flex items-center gap-2 border-b border-white/5 pb-4 flex-wrap">
-        @foreach(['users' => '👥 Manajemen User', 'role' => '🔐 Role & Permission', 'cabang' => '🏬 Cabang & Gudang', 'master' => '📋 Master Data'] as $kode => $label)
+        @foreach(['users' => '👥 Manajemen User', 'role' => '🔐 Role & Permission', 'cabang' => '🏬 Cabang & Gudang', 'master' => '📋 Master Data', 'loyalitas' => '💎 Strategi Loyalitas'] as $kode => $label)
             <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">{{ $label }}</button>
         @endforeach
 
@@ -174,6 +174,61 @@
                         </div>
                     @endforeach
                 </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    <!-- TAB: STRATEGI LOYALITAS [T-22] -->
+    @if($activeTab === 'loyalitas')
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <x-prism.glass-card title="Strategi Loyalitas" subtitle="Rasio poin & diskon per tier — editable tanpa deploy (T-22)">
+                <form wire:submit="simpanLoyalitas" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Rasio Earn Poin (% dari transaksi)</label>
+                            <input type="number" step="0.01" wire:model="loyalitasForm.poin_earn_persen" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium tabular-nums" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Rasio Redeem (1 poin = Rp ...)</label>
+                            <input type="number" step="0.01" wire:model="loyalitasForm.poin_redeem_rupiah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium tabular-nums" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Diskon Silver (%)</label>
+                            <input type="number" step="0.01" wire:model="loyalitasForm.diskon_silver" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium tabular-nums" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Diskon Gold (%)</label>
+                            <input type="number" step="0.01" wire:model="loyalitasForm.diskon_gold" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium tabular-nums" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Diskon Platinum (%)</label>
+                            <input type="number" step="0.01" wire:model="loyalitasForm.diskon_platinum" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium tabular-nums" />
+                        </div>
+                    </div>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer">Simpan Strategi</button>
+                </form>
+                <p class="text-[10px] text-up-amber mt-3">⚠️ Perubahan <strong>non-retroaktif</strong> — hanya berlaku untuk transaksi baru, riwayat lama tidak berubah.</p>
+            </x-prism.glass-card>
+
+            <x-prism.glass-card title="Skema Komisi Default" subtitle="Fallback komisi reseller bila tidak ada skema custom per reseller">
+                <div class="space-y-3">
+                    @foreach($skemaKomisiForm as $i => $sk)
+                        <div class="flex items-center gap-2 pb-2.5 border-b border-white/5 last:border-0 flex-wrap">
+                            <div class="flex-1 min-w-[140px]">
+                                <p class="text-xs font-bold text-white">{{ $sk['nama'] }}</p>
+                                <p class="text-[10px] text-ink-400">{{ $sk['kategori'] ?: 'Semua kategori' }}</p>
+                            </div>
+                            <select wire:model="skemaKomisiForm.{{ $i }}.tipe" class="px-2 py-1.5 rounded-lg glass-input text-[11px] font-medium">
+                                <option value="persen" class="bg-ink-900">%</option>
+                                <option value="nominal" class="bg-ink-900">Rp</option>
+                            </select>
+                            <input type="number" step="0.01" min="0" wire:model="skemaKomisiForm.{{ $i }}.nilai" class="w-24 px-2 py-1.5 rounded-lg glass-input text-[11px] font-medium tabular-nums" />
+                        </div>
+                    @endforeach
+                </div>
+                <p class="text-[10px] text-ink-500 mt-3">Disimpan bersama strategi loyalitas (tombol "Simpan Strategi").</p>
             </x-prism.glass-card>
         </div>
     @endif

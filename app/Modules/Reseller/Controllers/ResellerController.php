@@ -3,8 +3,10 @@
 namespace App\Modules\Reseller\Controllers;
 
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\SkemaKomisi;
+use App\Modules\Reseller\Models\SkemaKomisiReseller;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -31,18 +33,16 @@ class ResellerController extends Controller
             'skema.*.nilai' => 'required|numeric|min:0',
         ]);
 
-        $tier = \App\Modules\Crm\Models\TierMembership::where('is_active', true)->first();
-
-        $pelanggan = \App\Modules\Crm\Models\Pelanggan::create([
+        // [T-36] Single source of truth: PelangganService (validasi tanggal_lahir dll. ikut terpusat)
+        $pelanggan = app(PelangganService::class)->create([
             'nama' => $request->nama,
             'telepon' => $request->telepon,
             'email' => $request->email,
-            'tier_membership_id' => $tier?->id,
-            'is_reseller' => true,
+            'is_reseller' => true, // flag reseller tetap dipertahankan
         ]);
 
         foreach ($request->skema as $s) {
-            \App\Modules\Reseller\Models\SkemaKomisiReseller::create([
+            SkemaKomisiReseller::create([
                 'pelanggan_id' => $pelanggan->id,
                 'kategori' => $s['kategori'] ?: null,
                 'tipe' => $s['tipe'],
@@ -58,7 +58,7 @@ class ResellerController extends Controller
     public function skemaReseller(Request $request, $id)
     {
         return $this->success(
-            \App\Modules\Reseller\Models\SkemaKomisiReseller::where('pelanggan_id', $id)->get(),
+            SkemaKomisiReseller::where('pelanggan_id', $id)->get(),
             'Skema custom reseller berhasil dimuat'
         );
     }
@@ -75,7 +75,7 @@ class ResellerController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('telepon', 'like', "%{$search}%");
+                    ->orWhere('telepon', 'like', "%{$search}%");
             });
         }
 

@@ -4,9 +4,10 @@ namespace App\Modules\Marketplace\Controllers;
 
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Marketplace\Services\OrderService;
+use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Produk;
-use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ class ShopController extends Controller
     private function customerAktif(): ?Pelanggan
     {
         $customer = auth('customer')->user();
+
         return $customer ? $customer->load('tierMembership') : null;
     }
 
@@ -43,15 +45,15 @@ class ShopController extends Controller
 
         $query = Produk::query()
             ->where('is_active', true)
-            ->with(['skuVariants' => fn($q) => $q->where('is_active', true)])
+            ->with(['skuVariants' => fn ($q) => $q->where('is_active', true)])
             ->withCount('stokItems');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('brand_kompatibel', 'like', "%{$search}%")
-                  ->orWhere('model_kompatibel', 'like', "%{$search}%")
-                  ->orWhere('kategori', 'like', "%{$search}%");
+                    ->orWhere('brand_kompatibel', 'like', "%{$search}%")
+                    ->orWhere('model_kompatibel', 'like', "%{$search}%")
+                    ->orWhere('kategori', 'like', "%{$search}%");
             });
         }
         if ($kategori) {
@@ -103,7 +105,7 @@ class ShopController extends Controller
     {
         $produk = Produk::where('slug', $slug)
             ->where('is_active', true)
-            ->with(['skuVariants' => fn($q) => $q->where('is_active', true)])
+            ->with(['skuVariants' => fn ($q) => $q->where('is_active', true)])
             ->firstOrFail();
 
         $customer = $this->customerAktif();
@@ -113,8 +115,8 @@ class ShopController extends Controller
         $stokPerCabang = StokItem::with('gudang.cabang')
             ->where('produk_id', $produk->id)
             ->get()
-            ->groupBy(fn($s) => $s->gudang?->cabang_id)
-            ->map(fn($rows) => [
+            ->groupBy(fn ($s) => $s->gudang?->cabang_id)
+            ->map(fn ($rows) => [
                 'cabang' => $rows->first()->gudang?->cabang?->nama,
                 'stok' => $rows->sum('jumlah'),
             ])
@@ -122,6 +124,7 @@ class ShopController extends Controller
 
         $variants = $produk->skuVariants->map(function ($v) use ($produk, $customer) {
             $vp = $this->pricingService->resolve($produk, $customer, $v);
+
             return [
                 'id' => $v->id,
                 'sku' => $v->sku,
@@ -145,7 +148,7 @@ class ShopController extends Controller
     public function checkout(Request $request)
     {
         $customer = auth('customer')->user();
-        if (!$customer) {
+        if (! $customer) {
             return $this->error('Silakan login sebagai pelanggan untuk checkout', 401);
         }
 
@@ -183,11 +186,11 @@ class ShopController extends Controller
     public function accountOrders(Request $request)
     {
         $customer = auth('customer')->user();
-        if (!$customer) {
+        if (! $customer) {
             return $this->error('Silakan login', 401);
         }
 
-        $orders = \App\Modules\Pos\Models\Transaksi::with(['items.produk', 'cabang'])
+        $orders = Transaksi::with(['items.produk', 'cabang'])
             ->where('pelanggan_id', $customer->id)
             ->latest()
             ->paginate(10);
@@ -199,11 +202,11 @@ class ShopController extends Controller
     public function accountServis(Request $request)
     {
         $customer = auth('customer')->user();
-        if (!$customer) {
+        if (! $customer) {
             return $this->error('Silakan login', 401);
         }
 
-        $servis = \App\Modules\Servis\Models\TiketServis::with('garansi', 'jenisServis')
+        $servis = TiketServis::with('garansi', 'jenisServis')
             ->where('pelanggan_id', $customer->id)
             ->latest()
             ->get();

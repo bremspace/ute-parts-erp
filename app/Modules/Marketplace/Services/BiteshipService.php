@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Http;
 class BiteshipService
 {
     private string $apiKey;
+
     private string $baseUrl;
 
     public function __construct()
@@ -52,10 +53,10 @@ class BiteshipService
 
         $response = Http::withHeaders($this->withAuth())
             ->timeout(25)
-            ->post($this->baseUrl . '/rates/couriers', $payload);
+            ->post($this->baseUrl.'/rates/couriers', $payload);
 
         if ($response->failed()) {
-            throw new \Exception('Biteship: ' . ($response->json('error') ?? 'Gagal mengambil tarif kurir'));
+            throw new \Exception('Biteship: '.($response->json('error') ?? 'Gagal mengambil tarif kurir'));
         }
 
         return collect($response->json('pricing') ?? [])->map(fn ($r) => [
@@ -74,13 +75,14 @@ class BiteshipService
     {
         $response = Http::withHeaders($this->withAuth())
             ->timeout(25)
-            ->post($this->baseUrl . '/orders', $payload);
+            ->post($this->baseUrl.'/orders', $payload);
 
         if ($response->failed()) {
-            throw new \Exception('Biteship: ' . ($response->json('error') ?? 'Gagal membuat order pengiriman'));
+            throw new \Exception('Biteship: '.($response->json('error') ?? 'Gagal membuat order pengiriman'));
         }
 
         $data = $response->json();
+
         return [
             'order_id' => $data['order_id'] ?? null,
             'tracking_id' => $data['tracking_id'] ?? null,
@@ -96,7 +98,7 @@ class BiteshipService
     {
         $response = Http::withHeaders($this->withAuth())
             ->timeout(15)
-            ->get($this->baseUrl . '/trackings/' . $trackingId);
+            ->get($this->baseUrl.'/trackings/'.$trackingId);
 
         if ($response->failed()) {
             throw new \Exception('Biteship: Gagal mengambil tracking');

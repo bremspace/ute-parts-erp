@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 class AdminUserSeeder extends Seeder
@@ -27,7 +27,7 @@ class AdminUserSeeder extends Seeder
         $user->assignRole('super-admin');
 
         $cabang = Cabang::first();
-        if ($cabang && !$user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+        if ($cabang && ! $user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
             $user->cabangs()->attach($cabang->id, ['is_default' => true]);
         }
     }

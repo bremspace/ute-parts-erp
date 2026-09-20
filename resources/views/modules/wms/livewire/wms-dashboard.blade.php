@@ -395,6 +395,16 @@
                                     @endforeach
                                 </select>
                             </div>
+                            <div class="w-32">
+                                <select wire:model="transferItems.{{ $index }}.rak_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs">
+                                    <option value="" class="bg-ink-900">Rak Tujuan</option>
+                                    @foreach($raks as $rk)
+                                        @if($rk->gudang_id == $transferGudangTujuanId)
+                                            <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->kode }}</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </div>
                             <div class="w-24">
                                 <input
                                     type="number"
@@ -441,6 +451,17 @@
                     <select wire:model.live="opnameGudangId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                         @foreach($gudangs as $g)
                             <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->kode }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Rak (Opsional — filter per lokasi)</label>
+                    <select wire:model.live="opnameRakId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                        <option value="" class="bg-ink-900">Semua Rak di Gudang</option>
+                        @foreach($raks as $rk)
+                            @if($rk->gudang_id == $opnameGudangId)
+                                <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->kode }} - {{ $rk->nama }}</option>
+                            @endif
                         @endforeach
                     </select>
                 </div>
@@ -593,6 +614,17 @@
                             <option value="" class="bg-ink-900">Pilih Gudang...</option>
                             @foreach($gudangs as $g)
                                 <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->kode }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Rak (Bin) *</label>
+                        <select wire:model="tambahStokForm.rak_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="" class="bg-ink-900">Pilih Rak...</option>
+                            @foreach($raks as $rk)
+                                @if($rk->gudang_id == (isset($tambahStokForm['gudang_id']) ? $tambahStokForm['gudang_id'] : $filterGudangId))
+                                    <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->kode }} - {{ $rk->nama }}</option>
+                                @endif
                             @endforeach
                         </select>
                     </div>

@@ -6,6 +6,7 @@ use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Marketplace\Services\DuitkuService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ApiResponse;
@@ -45,7 +46,7 @@ class PaymentController extends Controller
             return $this->error('Transaksi tidak dalam status menunggu pembayaran', 422);
         }
 
-        if (!$this->duitku->isConfigured()) {
+        if (! $this->duitku->isConfigured()) {
             return $this->error(
                 'Duitku belum dikonfigurasi — set DUITKU_MERCHANT_CODE, DUITKU_API_KEY, DUITKU_MERCHANT_KEY di .env (sandbox=true untuk testing)',
                 503
@@ -77,7 +78,7 @@ class PaymentController extends Controller
                 'sandbox' => $this->duitku->isSandbox(),
             ], 'Transaksi Duitku berhasil dibuat');
         } catch (\Exception $e) {
-            return $this->error('Duitku: ' . $e->getMessage(), 502);
+            return $this->error('Duitku: '.$e->getMessage(), 502);
         }
     }
 
@@ -97,8 +98,9 @@ class PaymentController extends Controller
         Log::info('[Duitku-webhook] Incoming', $request->all());
 
         // 1. Verify signature (anti-perusakan)
-        if (!$this->duitku->verifyCallbackSignature($amount, $merchantOrderId, $signature)) {
+        if (! $this->duitku->verifyCallbackSignature($amount, $merchantOrderId, $signature)) {
             Log::warning('[Duitku-webhook] Signature mismatch', ['order' => $merchantOrderId]);
+
             return response()->json(['success' => false, 'message' => 'Invalid signature'], 400);
         }
 
@@ -112,8 +114,9 @@ class PaymentController extends Controller
             ->where('no_transaksi', $merchantOrderId)
             ->first();
 
-        if (!$transaksi) {
+        if (! $transaksi) {
             Log::warning('[Duitku-webhook] Order tidak ditemukan', ['order' => $merchantOrderId]);
+
             return response()->json(['success' => false, 'message' => 'Order not found'], 404);
         }
 
@@ -124,6 +127,7 @@ class PaymentController extends Controller
                 'order' => $merchantOrderId,
                 'status' => $transaksi->status,
             ]);
+
             return response()->json(['success' => true, 'message' => 'Already processed']);
         }
 
@@ -141,7 +145,7 @@ class PaymentController extends Controller
                     ]);
 
                     // b. Kurangi stok per item (gudang tersedia di cabang transaksi)
-                    $cabangId = $transaksi->cabang_id ?: \App\Modules\Rbac\Models\Cabang::firstOrFail()->id;
+                    $cabangId = $transaksi->cabang_id ?: Cabang::firstOrFail()->id;
                     foreach ($transaksi->items as $item) {
                         $this->stokDeduction->kurangiDariGudangTersedia(
                             $item->produk_id,
@@ -193,6 +197,7 @@ class PaymentController extends Controller
                 });
 
                 Log::info('[Duitku-webhook] Payment success processed', ['order' => $merchantOrderId]);
+
                 return response()->json(['success' => true, 'message' => 'OK']);
             } catch (\Exception $e) {
                 Log::error('[Duitku-webhook] Process failed, status revoked', [
@@ -204,6 +209,7 @@ class PaymentController extends Controller
                     'status' => 'menunggu_pembayaran',
                     'paid_at' => null,
                 ]);
+
                 // Partial stok deduction di rollback oleh DB::transaction — aman.
                 return response()->json(['success' => false, 'message' => 'Processing failed'], 500);
             }
@@ -224,6 +230,7 @@ class PaymentController extends Controller
             );
 
             Log::info('[Duitku-webhook] Payment failed', ['order' => $merchantOrderId, 'resultCode' => $resultCode]);
+
             return response()->json(['success' => true, 'message' => 'Recorded as failed']);
         }
 
@@ -239,9 +246,10 @@ class PaymentController extends Controller
         $amount = (float) ($request->query('amount', 0));
         try {
             $methods = $this->duitku->getPaymentMethods($amount);
+
             return $this->success($methods, 'Daftar metode pembayaran berhasil dimuat');
         } catch (\Exception $e) {
-            return $this->error('Duitku: ' . $e->getMessage(), 502);
+            return $this->error('Duitku: '.$e->getMessage(), 502);
         }
     }
 }

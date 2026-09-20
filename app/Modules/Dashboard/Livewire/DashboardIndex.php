@@ -2,12 +2,19 @@
 
 namespace App\Modules\Dashboard\Livewire;
 
+use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Crm\Models\KampanyeBroadcast;
+use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
-use App\Modules\Servis\Models\TiketServis;
-use App\Modules\Wms\Models\StokItem;
-use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Reseller\Models\Komisi;
+use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\StokItem;
 use Livewire\Component;
 
 /**
@@ -61,7 +68,7 @@ class DashboardIndex extends Component
             $query->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId));
         }
 
-        $items = $query->orderByRaw('(jumlah_minimum - jumlah) desc')->limit(8)->get();
+        $items = $query->orderByRaw('(jumlah_minimum - jumlah) desc')->limit(10)->get();
 
         return [
             'total' => (clone $query)->count(),
@@ -161,6 +168,7 @@ class DashboardIndex extends Component
             if (session('cabang_id')) {
                 $q->where('cabang_id', session('cabang_id'));
             }
+
             return $q->count();
         })->values()->all();
 
@@ -176,10 +184,15 @@ class DashboardIndex extends Component
         $buckets = ['0-30 hari' => 0, '31-60 hari' => 0, '61-90 hari' => 0, '>90 hari' => 0];
         foreach ($semua as $p) {
             $umur = $now->diffInDays($p->jatuh_tempo ?? $now);
-            if ($umur <= 30) $buckets['0-30 hari'] += (float) $p->sisa;
-            elseif ($umur <= 60) $buckets['31-60 hari'] += (float) $p->sisa;
-            elseif ($umur <= 90) $buckets['61-90 hari'] += (float) $p->sisa;
-            else $buckets['>90 hari'] += (float) $p->sisa;
+            if ($umur <= 30) {
+                $buckets['0-30 hari'] += (float) $p->sisa;
+            } elseif ($umur <= 60) {
+                $buckets['31-60 hari'] += (float) $p->sisa;
+            } elseif ($umur <= 90) {
+                $buckets['61-90 hari'] += (float) $p->sisa;
+            } else {
+                $buckets['>90 hari'] += (float) $p->sisa;
+            }
         }
 
         return ['labels' => array_keys($buckets), 'values' => array_values($buckets)];
@@ -189,6 +202,7 @@ class DashboardIndex extends Component
     public function getChartStokKritisProperty(): array
     {
         $items = $this->stokKritis['items']->take(10);
+
         return [
             'labels' => $items->map(fn ($s) => $s->produk?->nama)->values()->all(),
             'values' => $items->map(fn ($s) => $s->jumlah)->values()->all(),
@@ -198,6 +212,99 @@ class DashboardIndex extends Component
     public function getRoleProperty(): string
     {
         return auth()->user()?->getRoleNames()->first() ?? 'super-admin';
+    }
+
+    // ===== [T-27] Widget per role (agregasi server-side, query ringan) =====
+
+    /** Kasir: omzet shift SENDIRI dari KasSesi (sesi buka) — scoped kasir_id + cabang */
+    public function getOmzetShiftKasirProperty(): array
+    {
+        $user = auth()->user();
+        $sesi = app(KasSesiState::class)->sesiKasAktif();
+
+        $query = Transaksi::where('status', 'selesai')
+            ->where('kasir_id', $user?->id);
+
+        if ($sesi) {
+            $query->where('cabang_id', $sesi->cabang_id)->where('created_at', '>=', $sesi->dibuka_at);
+        } else {
+            $query->whereDate('created_at', now()->toDateString());
+        }
+
+        return [
+            'omzet' => round((float) $query->sum('total_akhir'), 2),
+            'jumlah_transaksi' => (clone $query)->count(),
+            'sesi' => $sesi ? '#'.$sesi->id.' ('.$sesi->dibuka_at.')' : 'tanpa sesi (omzet hari ini)',
+        ];
+    }
+
+    /** Finance: laba bersih bulan berjalan + total piutang belum lunas */
+    public function getRingkasanKeuanganProperty(): array
+    {
+        $cabangId = session('cabang_id');
+        $query = JurnalAkuntansi::with('akun')
+            ->whereDate('tanggal', '>=', now()->startOfMonth())
+            ->whereDate('tanggal', '<=', now()->toDateString())
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId));
+
+        $j = $query->get();
+
+        $laba = round(
+            $j->where('akun.tipe', 'pendapatan')->sum(fn ($x) => (float) $x->kredit - (float) $x->debit)
+            - $j->where('akun.tipe', 'beban')->sum(fn ($x) => (float) $x->debit - (float) $x->kredit),
+            2
+        );
+
+        return [
+            'laba_bulan_ini' => $laba,
+            'total_piutang' => round((float) Piutang::where('status', '!=', 'lunas')->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->sum('sisa'), 2),
+            'piutang_lewat' => Piutang::where('status', '!=', 'lunas')
+                ->whereDate('jatuh_tempo', '<', now()->toDateString())
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->count(),
+        ];
+    }
+
+    /** Marketing: komposisi tier pelanggan + performa broadcast (dari notifikasi_keluar) */
+    public function getMarketInsightProperty(): array
+    {
+        $tierRows = TierMembership::withCount('pelanggan')->orderBy('urutan')->get();
+        $totalPelanggan = max(1, (int) Pelanggan::count());
+
+        $notifikasi = NotifikasiKeluar::whereNotNull('kampanye_broadcast_id')
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return [
+            'tier' => $tierRows->map(fn ($t) => [
+                'nama' => $t->nama,
+                'jumlah' => $t->pelanggan_count,
+                'persen' => round($t->pelanggan_count / $totalPelanggan * 100, 1),
+            ])->values(),
+            'total_pelanggan' => Pelanggan::count(),
+            'broadcast' => [
+                'total_kampanye' => KampanyeBroadcast::count(),
+                'terkirim' => (int) ($notifikasi['terkirim'] ?? 0),
+                'pending' => (int) ($notifikasi['pending'] ?? 0),
+                'gagal' => (int) ($notifikasi['gagal'] ?? 0),
+            ],
+        ];
+    }
+
+    /** Staff-gudang: PO pending (draft/menunggu) selain stok kritis */
+    public function getPoPendingProperty(): array
+    {
+        $query = PurchaseOrder::with('supplier')->whereIn('status', ['draft', 'dikirim']);
+        if (session('cabang_id')) {
+            $query->whereHas('gudangTujuan', fn ($q) => $q->where('cabang_id', session('cabang_id')));
+        }
+
+        return [
+            'total' => (clone $query)->count(),
+            'total_nilai' => round((float) (clone $query)->sum('total'), 2),
+            'items' => $query->orderByDesc('created_at')->limit(6)->get(),
+        ];
     }
 
     public function render()
@@ -220,6 +327,18 @@ class DashboardIndex extends Component
             'chartPiutangAging' => $this->chartPiutangAging,
             'chartStokKritis' => $this->chartStokKritis,
             'currentRole' => $this->role,
-        ])->layout('layouts.backoffice', ['header' => 'Dashboard']);
+        ] + match ($this->role) {
+            // [T-27] Widget role-scoped: hanya properti role ini yg dievaluasi (query ringan, lazy via accessor)
+            'kasir' => ['omzetShiftKasir' => $this->omzetShiftKasir],
+            'finance' => ['ringkasanKeuangan' => $this->ringkasanKeuangan],
+            'marketing' => ['marketInsight' => $this->marketInsight],
+            'staff-gudang' => ['poPending' => $this->poPending],
+            default => [
+                'omzetShiftKasir' => $this->omzetShiftKasir,
+                'ringkasanKeuangan' => $this->ringkasanKeuangan,
+                'marketInsight' => $this->marketInsight,
+                'poPending' => $this->poPending,
+            ],
+        })->layout('layouts.backoffice', ['header' => 'Dashboard']);
     }
 }

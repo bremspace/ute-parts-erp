@@ -33,7 +33,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
     private function signedHeaders(array $cred, string $path, string $body = ''): array
     {
         $timestamp = time();
-        $baseString = (string) $cred['partner_id'] . $timestamp . $path . $body;
+        $baseString = (string) $cred['partner_id'].$timestamp.$path.$body;
         $sign = hash_hmac('sha256', $baseString, $cred['partner_key']);
 
         return [
@@ -49,7 +49,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
 
         $response = Http::withHeaders($this->signedHeaders($cred, $path))
             ->timeout(15)
-            ->post($this->baseUrl . $path, [
+            ->post($this->baseUrl.$path, [
                 'partner_id' => $cred['partner_id'],
                 'shopid' => $cred['shop_id'],
                 'timestamp' => time(),
@@ -58,7 +58,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
         $data = $response->json();
 
         if (($data['error'] ?? '') !== '' && ($data['error'] ?? null) !== null && ($data['error'] ?? null) !== '0') {
-            throw new \Exception('Shopee: ' . ($data['message'] ?? 'Koneksi gagal'));
+            throw new \Exception('Shopee: '.($data['message'] ?? 'Koneksi gagal'));
         }
 
         return true;
@@ -71,7 +71,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
 
         $response = Http::withHeaders($this->signedHeaders($cred, $path))
             ->timeout(20)
-            ->post($this->baseUrl . $path, [
+            ->post($this->baseUrl.$path, [
                 'partner_id' => $cred['partner_id'],
                 'shopid' => $cred['shop_id'],
                 'timestamp' => time(),
@@ -85,7 +85,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
         $data = $response->json();
 
         if (isset($data['error']) && $data['error'] !== '') {
-            throw new \Exception('Shopee: ' . ($data['message'] ?? 'Gagal tarik order'));
+            throw new \Exception('Shopee: '.($data['message'] ?? 'Gagal tarik order'));
         }
 
         return $data['response']['order_list'] ?? [];
@@ -98,7 +98,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
 
         $response = Http::withHeaders($this->signedHeaders($cred, $path, json_encode(['_item_list' => $items])))
             ->timeout(20)
-            ->post($this->baseUrl . $path, [
+            ->post($this->baseUrl.$path, [
                 'partner_id' => $cred['partner_id'],
                 'shopid' => $cred['shop_id'],
                 'timestamp' => time(),
@@ -107,7 +107,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
 
         $data = $response->json();
 
-        return (($data['error'] ?? '') === '' || ($data['error'] ?? null) === '0');
+        return ($data['error'] ?? '') === '' || ($data['error'] ?? null) === '0';
     }
 
     public function pushPrice(array $kredensial, array $items): bool
@@ -117,7 +117,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
 
         $response = Http::withHeaders($this->signedHeaders($cred, $path))
             ->timeout(20)
-            ->post($this->baseUrl . $path, [
+            ->post($this->baseUrl.$path, [
                 'partner_id' => $cred['partner_id'],
                 'shopid' => $cred['shop_id'],
                 'timestamp' => time(),
@@ -127,7 +127,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
 
         $data = $response->json();
 
-        return (($data['error'] ?? '') === '' || ($data['error'] ?? null) === '0');
+        return ($data['error'] ?? '') === '' || ($data['error'] ?? null) === '0';
     }
 
     public function fetchProducts(array $kredensial): array
@@ -137,7 +137,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
 
         $response = Http::withHeaders($this->signedHeaders($cred, $path))
             ->timeout(20)
-            ->post($this->baseUrl . $path, [
+            ->post($this->baseUrl.$path, [
                 'partner_id' => $cred['partner_id'],
                 'shopid' => $cred['shop_id'],
                 'timestamp' => time(),
@@ -148,7 +148,7 @@ class ShopeeAdapter implements ChannelAdapterInterface
         $data = $response->json();
 
         if (isset($data['error']) && $data['error'] !== '') {
-            throw new \Exception('Shopee: ' . ($data['message'] ?? 'Gagal ambil produk'));
+            throw new \Exception('Shopee: '.($data['message'] ?? 'Gagal ambil produk'));
         }
 
         return array_map(fn ($p) => [

@@ -2,11 +2,14 @@
 
 namespace App\Modules\Wms\Controllers;
 
+use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
-use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\Rak;
+use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\StokOpname;
@@ -14,6 +17,7 @@ use App\Modules\Wms\Models\StokOpnameItem;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
 use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Services\PurchaseOrderService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -47,8 +51,8 @@ class WmsController extends Controller
         if ($search) {
             $query->whereHas('produk', function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('brand_kompatibel', 'like', "%{$search}%")
-                  ->orWhere('model_kompatibel', 'like', "%{$search}%");
+                    ->orWhere('brand_kompatibel', 'like', "%{$search}%")
+                    ->orWhere('model_kompatibel', 'like', "%{$search}%");
             })->orWhereHas('skuVariant', function ($q) use ($search) {
                 $q->where('sku', 'like', "%{$search}%");
             });
@@ -61,6 +65,11 @@ class WmsController extends Controller
         }
 
         $stokItems = $query->paginate(20);
+
+        // [T-13] Warning: tampilkan qty terkunci transfer pending per item stok
+        foreach ($stokItems as $stok) {
+            $stok->stok_dikunci = StokTransfer::pendingLockedFor($stok);
+        }
 
         return $this->success($stokItems, 'Data stok berhasil diambil');
     }
@@ -75,6 +84,7 @@ class WmsController extends Controller
             'items' => 'required|array|min:1',
             'items.*.produk_id' => 'required|exists:produk,id',
             'items.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
+            'items.*.rak_id' => 'nullable|exists:rak,id', // [T-12] rak tujuan di gudang tujuan
             'items.*.jumlah' => 'required|integer|min:1',
         ]);
 
@@ -97,6 +107,7 @@ class WmsController extends Controller
                     'stok_transfer_id' => $transfer->id,
                     'produk_id' => $item['produk_id'],
                     'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                    'rak_id' => $item['rak_id'] ?? null,
                     'jumlah' => $item['jumlah'],
                 ]);
             }
@@ -124,15 +135,17 @@ class WmsController extends Controller
                     ->first();
 
                 $sebelum = $stokAsal ? $stokAsal->jumlah : 0;
-                if ($sebelum < $item->jumlah) {
-                    throw new \Exception("Stok gudang asal tidak mencukupi untuk item ID {$item->produk_id}");
+                // [T-13] stok yang terkunci transfer pending lain tidak boleh dipakai
+                $locked = $stokAsal ? StokTransfer::pendingLockedFor($stokAsal, $transfer->id) : 0;
+                if ($sebelum - $locked < $item->jumlah) {
+                    throw new \Exception("Stok gudang asal tidak mencukupi untuk item ID {$item->produk_id}".($locked > 0 ? " ({$locked} unit terkunci transfer pending)" : ''));
                 }
 
                 $setelah = $sebelum - $item->jumlah;
                 $stokAsal->update(['jumlah' => $setelah]);
 
                 // [T-26] SOT
-                \App\Modules\Wms\Models\StockMutationLog::create([
+                StockMutationLog::create([
                     'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
                     'gudang_id' => $transfer->gudang_asal_id, 'delta' => -$item->jumlah,
                     'sumber' => 'transfer', 'referensi_tipe' => StokTransfer::class,
@@ -186,10 +199,14 @@ class WmsController extends Controller
 
                 $sebelum = $stokTujuan->jumlah;
                 $setelah = $sebelum + $item->jumlah;
-                $stokTujuan->update(['jumlah' => $setelah]);
+                $update = ['jumlah' => $setelah];
+                if ($item->rak_id) {
+                    $update['rak_id'] = $item->rak_id; // [T-12] stok masuk rak tujuan terpilih
+                }
+                $stokTujuan->update($update);
 
                 // [T-26] SOT
-                \App\Modules\Wms\Models\StockMutationLog::create([
+                StockMutationLog::create([
                     'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
                     'gudang_id' => $transfer->gudang_tujuan_id, 'delta' => $item->jumlah,
                     'sumber' => 'transfer', 'referensi_tipe' => StokTransfer::class,
@@ -226,6 +243,7 @@ class WmsController extends Controller
     {
         $request->validate([
             'gudang_id' => 'required|exists:gudang,id',
+            'rak_id' => 'nullable|exists:rak,id', // [T-14] scope sesi per rak/lokasi
             'catatan' => 'nullable|string',
         ]);
 
@@ -236,6 +254,7 @@ class WmsController extends Controller
         $opname = StokOpname::create([
             'no_opname' => $noOpname,
             'gudang_id' => $request->gudang_id,
+            'rak_id' => $request->rak_id,
             'user_id' => auth()->id(),
             'status' => 'draft',
             'catatan' => $request->catatan,
@@ -257,16 +276,23 @@ class WmsController extends Controller
             'items' => 'required|array|min:1',
             'items.*.produk_id' => 'required|exists:produk,id',
             'items.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
+            'items.*.rak_id' => 'nullable|exists:rak,id', // [T-14] item per rak
             'items.*.stok_fisik' => 'required|integer|min:0',
             'items.*.catatan' => 'nullable|string',
         ]);
 
         return DB::transaction(function () use ($request, $opname) {
             foreach ($request->items as $item) {
-                $stokSistem = StokItem::where('gudang_id', $opname->gudang_id)
+                // [T-14] stok_sistem dibaca dari StokItem per rak bila opname scope rak
+                $stokQuery = StokItem::where('gudang_id', $opname->gudang_id)
                     ->where('produk_id', $item['produk_id'])
-                    ->where('sku_variant_id', $item['sku_variant_id'] ?? null)
-                    ->value('jumlah') ?? 0;
+                    ->where('sku_variant_id', $item['sku_variant_id'] ?? null);
+                if ($opname->rak_id) {
+                    $stokQuery->where('rak_id', $opname->rak_id);
+                } elseif (! empty($item['rak_id'])) {
+                    $stokQuery->where('rak_id', $item['rak_id']);
+                }
+                $stokSistem = $stokQuery->value('jumlah') ?? 0;
 
                 $stokFisik = (int) $item['stok_fisik'];
                 $selisih = $stokFisik - $stokSistem;
@@ -278,6 +304,7 @@ class WmsController extends Controller
                         'sku_variant_id' => $item['sku_variant_id'] ?? null,
                     ],
                     [
+                        'rak_id' => $item['rak_id'] ?? null,
                         'stok_sistem' => $stokSistem,
                         'stok_fisik' => $stokFisik,
                         'selisih' => $selisih,
@@ -313,10 +340,14 @@ class WmsController extends Controller
                 'tanggal_approval' => now(),
                 'catatan_approval' => $request->catatan_approval,
             ]);
+
             return $this->success($opname, 'Stock opname ditolak');
         }
 
         return DB::transaction(function () use ($opname, $request) {
+            $jurnalLines = [];
+            $totalSelisihAbs = 0;
+
             foreach ($opname->items as $item) {
                 $stok = StokItem::firstOrCreate(
                     [
@@ -332,7 +363,7 @@ class WmsController extends Controller
 
                 if ($item->selisih !== 0) {
                     // [T-26] SOT
-                    \App\Modules\Wms\Models\StockMutationLog::create([
+                    StockMutationLog::create([
                         'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
                         'gudang_id' => $opname->gudang_id, 'delta' => $item->selisih,
                         'sumber' => 'opname', 'referensi_tipe' => StokOpname::class,
@@ -350,9 +381,37 @@ class WmsController extends Controller
                         'jumlah_sebelum' => $sebelum,
                         'perubahan' => $item->selisih,
                         'jumlah_setelah' => $item->stok_fisik,
-                        'catatan' => "Penyesuaian Opname {$opname->no_opname}: " . ($item->catatan ?? ''),
+                        'catatan' => "Penyesuaian Opname {$opname->no_opname}: ".($item->catatan ?? ''),
                     ]);
+
+                    // [T-14] Akumulasi jurnal penyesuaian stok: Persediaan (130-01) vs Selisih Stok (520-08)
+                    // selisih > 0 (fisik > sistem): Persediaan debit, 520-08 kredit (penemuan stok)
+                    // selisih < 0 (fisik < sistem): Persediaan kredit, 520-08 debit (kehilangan stok)
+                    $jurnalLines[] = $item->selisih > 0
+                        ? ['akun_kode' => '130-01', 'debit' => abs($item->selisih), 'kredit' => 0]
+                        : ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => abs($item->selisih)];
+                    $jurnalLines[] = $item->selisih > 0
+                        ? ['akun_kode' => '520-08', 'debit' => 0, 'kredit' => abs($item->selisih)]
+                        : ['akun_kode' => '520-08', 'debit' => abs($item->selisih), 'kredit' => 0];
+
+                    $totalSelisihAbs += abs($item->selisih);
                 }
+            }
+
+            // Post jurnal balance jika ada selisih (T-14)
+            if (! empty($jurnalLines)) {
+                $cabangId = $opname->gudang?->cabang_id;
+                app(JurnalService::class)->post(
+                    app(JurnalService::class)->generateNoJurnal('opname', $cabangId),
+                    now(),
+                    'opname',
+                    $jurnalLines,
+                    "Penyesuaian Stock Opname {$opname->no_opname}",
+                    $cabangId,
+                    auth()->id(),
+                    StokOpname::class,
+                    $opname->id
+                );
             }
 
             $opname->update([
@@ -363,13 +422,13 @@ class WmsController extends Controller
             ]);
 
             // Audit stok manual (PRD §6)
-            app(\App\Modules\Rbac\Services\AuditService::class)->catat(
+            app(AuditService::class)->catat(
                 'StokItem', 'adjust', $opname->gudang_id,
-                "Stock opname {$opname->no_opname} disetujui — " . $opname->items->count() . " item disesuaikan",
+                "Stock opname {$opname->no_opname} disetujui — ".$opname->items->count().' item disesuaikan',
                 null, ['status' => $opname->status]
             );
 
-            return $this->success($opname, 'Stock opname disetujui dan stok telah disesuaikan');
+            return $this->success($opname, 'Stock opname disetujui dan stok telah disesuaikan'.($totalSelisihAbs ? ' + jurnal penyesuaian dibuat' : ''));
         });
     }
 
@@ -410,6 +469,95 @@ class WmsController extends Controller
         $supplier = Supplier::create($request->all());
 
         return $this->success($supplier, 'Supplier berhasil dibuat', 201);
+    }
+
+    public function updateSupplier(Request $request, $id)
+    {
+        $supplier = Supplier::findOrFail($id);
+        $request->validate([
+            'nama' => 'required|string|max:255',
+            'kontak' => 'nullable|string|max:255',
+            'telepon' => 'nullable|string|max:20',
+            'alamat' => 'nullable|string',
+            'termin_hari' => 'nullable|integer|min:0',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $supplier->update($request->all());
+
+        return $this->success($supplier, 'Supplier berhasil diperbarui');
+    }
+
+    public function destroySupplier($id)
+    {
+        $supplier = Supplier::findOrFail($id);
+
+        // Cek relasi PO
+        if ($supplier->purchaseOrders()->exists()) {
+            return $this->error('Supplier memiliki PO terkait, tidak bisa dihapus. Nonaktifkan saja.', 422);
+        }
+
+        $supplier->delete();
+
+        return $this->success(null, 'Supplier berhasil dihapus');
+    }
+
+    // [T-12] Rak CRUD (scope cabang via gudang)
+    public function indexRak(Request $request)
+    {
+        $cabangId = session('cabang_id');
+        $query = Rak::with('gudang.cabang');
+        if ($cabangId) {
+            $query->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId));
+        }
+
+        return $this->success($query->orderBy('kode')->get(), 'Daftar rak berhasil dimuat');
+    }
+
+    public function storeRak(Request $request)
+    {
+        $request->validate([
+            'gudang_id' => 'required|exists:gudang,id',
+            'nama' => 'required|string|max:255',
+            'kode' => 'required|string|max:20|unique:rak,kode',
+            'zona' => 'nullable|string|max:50',
+        ]);
+
+        $rak = Rak::create($request->all());
+
+        return $this->success($rak, 'Rak berhasil dibuat', 201);
+    }
+
+    public function updateRak(Request $request, $id)
+    {
+        $rak = Rak::findOrFail($id);
+        $request->validate([
+            'nama' => 'required|string|max:255',
+            'kode' => 'required|string|max:20|unique:rak,kode,'.$id,
+            'zona' => 'nullable|string|max:50',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $rak->update($request->all());
+
+        return $this->success($rak, 'Rak berhasil diperbarui');
+    }
+
+    public function destroyRak($id)
+    {
+        $rak = Rak::findOrFail($id);
+
+        // Cek relasi stok/transfer/opname
+        if (StokItem::where('rak_id', $id)->exists() ||
+            StokTransferItem::where('rak_id', $id)->exists() ||
+            StokOpname::where('rak_id', $id)->exists() ||
+            StokOpnameItem::where('rak_id', $id)->exists()) {
+            return $this->error('Rak memiliki data stok/transfer/opname terkait, tidak bisa dihapus. Nonaktifkan saja.', 422);
+        }
+
+        $rak->delete();
+
+        return $this->success(null, 'Rak berhasil dihapus');
     }
 
     // [API: WMS-10] CRUD PO + ubah status
@@ -483,16 +631,19 @@ class WmsController extends Controller
 
         if ($action === 'dibatalkan' && in_array($po->status, ['draft', 'dikirim'], true)) {
             $po->update(['status' => 'dibatalkan']);
+
             return $this->success($po, 'PO dibatalkan');
         }
 
         if ($action === 'dikirim' && $po->status === 'draft') {
             $po->update(['status' => 'dikirim']);
+
             return $this->success($po, 'PO dikirim');
         }
 
         if ($action === 'diterima' && $po->status === 'dikirim') {
-            $po = app(\App\Modules\Wms\Services\PurchaseOrderService::class)->terimaBarang($po, auth()->id());
+            $po = app(PurchaseOrderService::class)->terimaBarang($po, auth()->id());
+
             return $this->success($po->load('items', 'supplier'), 'PO diterima — stok & jurnal akunting dibuat');
         }
 
@@ -512,7 +663,7 @@ class WmsController extends Controller
         // Varian juga (jika belum)
         $variant = $produk->skuVariants()->first();
         if ($variant && empty($variant->barcode)) {
-            $variant->update(['barcode' => $produk->barcode . '-' . $variant->id]);
+            $variant->update(['barcode' => $produk->barcode.'-'.$variant->id]);
         }
 
         return $this->success($produk->fresh(), 'Barcode berhasil digenerate');
@@ -524,11 +675,12 @@ class WmsController extends Controller
         $request->validate(['jumlah' => 'required|numeric|min:1']);
 
         try {
-            $po = app(\App\Modules\Wms\Services\PurchaseOrderService::class)->bayarPO(
+            $po = app(PurchaseOrderService::class)->bayarPO(
                 PurchaseOrder::findOrFail($id),
                 (float) $request->jumlah,
                 auth()->id()
             );
+
             return $this->success($po, 'Pembayaran PO tercatat — sisa utang terupdate');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 422);

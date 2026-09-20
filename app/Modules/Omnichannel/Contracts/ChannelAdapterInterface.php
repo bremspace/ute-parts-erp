@@ -28,15 +28,14 @@ interface ChannelAdapterInterface
     /**
      * Push stok produk terpilih ke channel.
      *
-     * @param array $kredensial
-     * @param array $items [['channel_item_id' => ..., 'stok' => int], ...]
+     * @param  array  $items  [['channel_item_id' => ..., 'stok' => int], ...]
      */
     public function pushStock(array $kredensial, array $items): bool;
 
     /**
      * Push harga produk terpilih ke channel.
      *
-     * @param array $items [['channel_item_id' => ..., 'harga' => float], ...]
+     * @param  array  $items  [['channel_item_id' => ..., 'harga' => float], ...]
      */
     public function pushPrice(array $kredensial, array $items): bool;
 

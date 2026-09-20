@@ -4,6 +4,7 @@ namespace App\Modules\Marketplace\Services;
 
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use Illuminate\Support\Facades\Session;
 
@@ -19,7 +20,7 @@ class CartService
 
     private function cartKey(?int $variantId): string
     {
-        return $variantId ? 'v' . $variantId : 'p0';
+        return $variantId ? 'v'.$variantId : 'p0';
     }
 
     public function all(): array
@@ -34,7 +35,7 @@ class CartService
 
         // Cek stok total tersedia
         $stokTotal = StokItem::where('produk_id', $produkId)
-            ->when($variantId, fn($q) => $q->where('sku_variant_id', $variantId))
+            ->when($variantId, fn ($q) => $q->where('sku_variant_id', $variantId))
             ->sum('jumlah');
 
         $cart = $this->all();
@@ -52,21 +53,21 @@ class CartService
 
         $customer = auth('customer')->user();
         $variant = $variantId
-            ? \App\Modules\Wms\Models\SkuVariant::find($variantId)
+            ? SkuVariant::find($variantId)
             : null;
 
         $pricing = $this->pricingService->resolve($produk, $customer, $variant);
 
         $cart[$key] = [
-            'product_id'   => $produkId,
-            'variant_id'   => $variantId,
-            'name'         => $produk->nama,
+            'product_id' => $produkId,
+            'variant_id' => $variantId,
+            'name' => $produk->nama,
             'variant_name' => $variant?->nama_varian,
-            'harga'        => $pricing['harga'],
+            'harga' => $pricing['harga'],
             'harga_retail' => (float) $produk->harga_jual_retail,
-            'qty'          => $newQty,
+            'qty' => $newQty,
             'alasan_harga' => $pricing['alasan'],
-            'stok_max'     => (int) $stokTotal,
+            'stok_max' => (int) $stokTotal,
         ];
 
         Session::put('shop.cart', $cart);
@@ -79,7 +80,7 @@ class CartService
         $key = $this->cartKey($variantId);
         $cart = $this->all();
 
-        if (!isset($cart[$key])) {
+        if (! isset($cart[$key])) {
             return $cart;
         }
 
@@ -118,6 +119,7 @@ class CartService
         foreach ($this->all() as $item) {
             $total += (float) $item['harga'] * (int) $item['qty'];
         }
+
         return $total;
     }
 

@@ -2,9 +2,9 @@
 
 namespace App\Modules\Servis\Models;
 
+use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Rbac\Models\Cabang;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'nama_pelanggan', 'telepon_pelanggan', 'jenis_hp', 'seri_hp', 'tipe_kunci', 'kunci_terenkripsi',
     'keluhan', 'kondisi_fisik', 'foto_unit', 'status', 'sumber', 'estimasi_biaya',
     'alasan_estimasi', 'token_approval', 'tanggal_terima', 'tanggal_selesai',
-    'tanggal_diambil', 'catatan_admin'
+    'tanggal_diambil', 'catatan_admin',
 ])]
 class TiketServis extends Model
 {

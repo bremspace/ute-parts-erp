@@ -208,4 +208,96 @@
             </div>
         </x-prism.glass-card>
     @endif
+
+    {{-- [T-27] Widget per role — server-aggregated, render condisional via @role --}}
+    @role('kasir')
+        <x-prism.glass-card title="Omzet Shift Saya" subtitle="{{$omzetShiftKasir['sesi'] ?? 'Shift aktif' }}">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-2xl font-black text-up-mint tabular-nums">Rp {{ number_format($omzetShiftKasir['omzet'] ?? 0, 0, ',', '.') }}</p>
+                    <p class="text-[11px] text-ink-500 mt-0.5">{{ $omzetShiftKasir['jumlah_transaksi'] ?? 0 }} transaksi selesai</p>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-up-mint/10 border border-up-mint/30 flex items-center justify-center text-up-mint">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </x-prism.glass-card>
+    @endrole
+
+    @role('finance')
+        <x-prism.glass-card title="Ringkasan Keuangan Bulan Ini" subtitle="Laba/rugi + Piutang">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Laba Bersih</p>
+                    <p class="text-xl font-black {{ ($ringkasanKeuangan['laba_bulan_ini'] ?? 0) >= 0 ? 'text-up-mint' : 'text-up-red' }} tabular-nums mt-1">
+                        Rp {{ number_format(abs($ringkasanKeuangan['laba_bulan_ini'] ?? 0), 0, ',', '.') }}
+                    </p>
+                </div>
+                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Total Piutang</p>
+                    <p class="text-xl font-black text-up-amber tabular-nums mt-1">
+                        Rp {{ number_format($ringkasanKeuangan['total_piutang'] ?? 0, 0, ',', '.') }}
+                    </p>
+                </div>
+                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Piutang Lewat Tempo</p>
+                    <p class="text-xl font-black text-up-red tabular-nums mt-1">{{ $ringkasanKeuangan['piutang_lewat'] ?? 0 }}</p>
+                </div>
+            </div>
+        </x-prism.glass-card>
+    @endrole
+
+    @role('marketing')
+        <x-prism.glass-card title="Komposisi Tier Pelanggan" subtitle="Total: {{$marketInsight['total_pelanggan'] ?? 0}} pelanggan">
+            <div class="space-y-2">
+                @foreach($marketInsight['tier'] as $t)
+                    <div class="flex items-center gap-2 text-[11px]">
+                        <span class="w-24 truncate text-ink-300">{{ $t['nama'] }}</span>
+                        <div class="flex-1 h-3 rounded bg-white/5 overflow-hidden">
+                            <div class="h-full" style="width: {{ $t['persen'] }}%; background: {{ colorHsl(($loop->index) * 50 + 250, 70) }}"></div>
+                        </div>
+                        <span class="tabular-nums text-white font-semibold">{{ $t['persen'] }}%</span>
+                        <span class="text-ink-500">({{ $t['jumlah'] }})</span>
+                    </div>
+                @endforeach
+            </div>
+        </x-prism.glass-card>
+        <x-prism.glass-card title="Performa Broadcast" subtitle="{{$marketInsight['broadcast']['total_kampanye'] ?? 0}} kampanye total">
+            <div class="flex items-center gap-6 text-sm">
+                <div class="text-center flex-1">
+                    <p class="text-2xl font-black text-up-mint tabular-nums">{{ $marketInsight['broadcast']['terkirim'] ?? 0 }}</p>
+                    <p class="text-[10px] text-ink-500">Terkirim</p>
+                </div>
+                <div class="text-center flex-1">
+                    <p class="text-2xl font-black text-up-amber tabular-nums">{{ $marketInsight['broadcast']['pending'] ?? 0 }}</p>
+                    <p class="text-[10px] text-ink-500">Pending</p>
+                </div>
+                <div class="text-center flex-1">
+                    <p class="text-2xl font-black text-up-red tabular-nums">{{ $marketInsight['broadcast']['gagal'] ?? 0 }}</p>
+                    <p class="text-[10px] text-ink-500">Gagal</p>
+                </div>
+            </div>
+        </x-prism.glass-card>
+    @endrole
+
+    @role('staff-gudang')
+        <x-prism.glass-card title="PO Pending (Draft/Disetujui)" subtitle="Total nilai: Rp {{ number_format($poPending['total_nilai'] ?? 0, 0, ',', '.') }} ({{ $poPending['total'] ?? 0 }} PO)">
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+                @forelse($poPending['items'] as $po)
+                    <div class="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-semibold text-white font-mono">{{ $po->no_po }}</p>
+                            <p class="text-[10px] text-ink-500 truncate">{{ $po->supplier?->nama }}</p>
+                        </div>
+                        <div class="text-right flex-shrink-0 ml-3">
+                            <p class="text-xs font-bold text-up-amber tabular-nums">Rp {{ number_format($po->total, 0, ',', '.') }}</p>
+                            <x-prism.status-pill :status="$po->status" size="sm" />
+                        </div>
+                    </div>
+                @empty
+                    <p class="text-xs text-ink-500 py-4 text-center">Tidak ada PO pending.</p>
+                @endforelse
+            </div>
+        </x-prism.glass-card>
+    @endrole
 </div>

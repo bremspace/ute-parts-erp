@@ -87,14 +87,14 @@ class DuitkuWebhookTest extends TestCase
     {
         $merchantCode = 'TST001';
         $amount = 100000;
-        $signature = md5($merchantCode . $amount . $orderId . 'testapikey123');
+        $signature = md5($merchantCode.$amount.$orderId.'testapikey123');
 
         return [
             'merchantCode' => $merchantCode,
             'amount' => $amount,
             'merchantOrderId' => $orderId,
             'resultCode' => $resultCode,
-            'reference' => 'REF-' . $orderId,
+            'reference' => 'REF-'.$orderId,
             'signature' => $signature,
         ];
     }

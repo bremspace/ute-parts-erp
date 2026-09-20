@@ -45,9 +45,9 @@
 - Pastikan seeder **idempotent** (`php artisan db:seed` bisa dijalankan ulang tanpa duplikat/error) dan jurnal akunting ikut ter-generate otomatis dari transaksi seeder (bukan di-skip), supaya laporan keuangan juga bisa langsung dicek.
 
 **Acceptance Criteria:**
-- [ ] `php artisan migrate:fresh --seed` berjalan tanpa error, menghasilkan data untuk semua role & semua jenis transaksi di atas.
-- [ ] Login dengan tiap user role menghasilkan menu sidebar yang sesuai matrix §3 PRD Backend (tidak lebih, tidak kurang).
-- [ ] Saldo di Akunting (Buku Besar) balance (debit = kredit) setelah seeder jalan.
+- [x] `php artisan migrate:fresh --seed` berjalan tanpa error, menghasilkan data untuk semua role & semua jenis transaksi di atas.
+- [x] Login dengan tiap user role menghasilkan menu sidebar yang sesuai matrix §3 PRD Backend (tidak lebih, tidak kurang).
+- [x] Saldo di Akunting (Buku Besar) balance (debit = kredit) setelah seeder jalan.
 
 ---
 
@@ -59,8 +59,8 @@
 **Diagnosis awal:** Kemungkinan besar dropdown ganti cabang di sidebar hanya update state Livewire lokal tapi tidak memanggil ulang `AUTH-02 POST /api/select-branch`, atau memanggil endpoint tapi query di modul lain (POS/WMS/dsb) masih pakai cabang lama dari cache session yang tidak di-refresh.
 **Perubahan:** Pastikan event ganti cabang: (1) memanggil `AUTH-02`, (2) me-refresh session `cabang_aktif_id`, (3) trigger `wire:navigate`/reload komponen yang bergantung pada cabang (dashboard, POS, WMS) agar tidak nyangkut data cabang lama.
 **Acceptance Criteria:**
-- [ ] Ganti cabang di sidebar langsung mengubah data yang tampil di Dashboard, POS, dan WMS tanpa perlu logout/login ulang.
-- [ ] Refresh halaman tetap mempertahankan cabang aktif yang baru dipilih.
+- [x] Ganti cabang di sidebar langsung mengubah data yang tampil di Dashboard, POS, dan WMS tanpa perlu logout/login ulang.
+- [x] Refresh halaman tetap mempertahankan cabang aktif yang baru dipilih.
 
 ### T-03 — Perbaiki Tombol "Tahan" (Park) di POS
 *(Request #6)*
@@ -70,23 +70,23 @@
 - Tambah `[API: POS-04] POST /api/pos/transaksi/{id}/tahan` dan `POS-05 GET /api/pos/transaksi?status=ditahan` untuk daftar transaksi tertahan per cabang (bukan per kasir, agar kasir lain bisa lanjutkan).
 - UI: tombol "Tahan" (F6) menyimpan keranjang saat ini ke backend berstatus `ditahan`, menyediakan panel "Transaksi Tertahan" untuk resume.
 **Acceptance Criteria:**
-- [ ] Transaksi yang ditahan tetap ada meski browser di-refresh atau kasir logout.
-- [ ] Transaksi tertahan bisa dilanjutkan oleh kasir lain di cabang yang sama.
+- [x] Transaksi yang ditahan tetap ada meski browser di-refresh atau kasir logout.
+- [x] Transaksi tertahan bisa dilanjutkan oleh kasir lain di cabang yang sama.
 
 ### T-04 — Perbaiki Menu Tambah Pelanggan di CRM
 *(Request #17)*
 **Modul:** CRM — perlu endpoint baru `CRM-06`
 **Perubahan:** Tambah `[API: CRM-06] POST /api/crm/pelanggan` (create customer dari backoffice), sambungkan tombol "Tambah Pelanggan" yang sudah ada di UI CRM (§5.6 PRD Frontend) ke endpoint ini. Field minimal: nama, no HP (unique), alamat, tier awal (default tier terendah).
 **Acceptance Criteria:**
-- [ ] Tombol tambah pelanggan di CRM berhasil membuat data baru dan langsung muncul di daftar pelanggan tanpa reload manual.
-- [ ] Data pelanggan baru ini juga langsung tersedia untuk dicari di POS (T-08) dan modul Servis (T-17) — satu sumber data, bukan tabel terpisah.
+- [x] Tombol tambah pelanggan di CRM berhasil membuat data baru dan langsung muncul di daftar pelanggan tanpa reload manual.
+- [x] Data pelanggan baru ini juga langsung tersedia untuk dicari di POS (T-08) dan modul Servis (T-17) — satu sumber data, bukan tabel terpisah.
 
 ### T-05 — Hilangkan Tombol Tambah Produk yang Dobel
 *(Request #27)*
 **Modul:** WMS — halaman Master Produk
 **Perubahan:** Cek Blade/Livewire komponen halaman master produk, kemungkinan tombol dirender 2x karena komponen header duplikat atau leftover dari refactor. Hapus salah satu, pastikan hanya 1 entry point "Tambah Produk".
 **Acceptance Criteria:**
-- [ ] Hanya ada 1 tombol "Tambah Produk" di halaman master produk, fungsinya tetap normal.
+- [x] Hanya ada 1 tombol "Tambah Produk" di halaman master produk, fungsinya tetap normal.
 
 ### T-06 — Batasi Akses Tracking Status Servis (Kanban)
 *(Request #11)*
@@ -96,9 +96,9 @@
 - Kanban internal (`/app/servis`) — wajib lolos middleware RBAC `servis.view` (staf saja), **tidak pernah** diakses tanpa login.
 - Halaman tracking publik (`/account/servis/{token}` atau serupa) — token unik per tiket **tidak cukup** sebagai satu-satunya proteksi (bisa di-share/tebak). Tambahkan: jika pelanggan sudah login, tracking hanya tampil untuk tiket miliknya sendiri (cek `pelanggan_id` = user login); token publik (tanpa login, untuk approve estimasi cepat sesuai §4.3) hanya menampilkan **info minimal** (status & estimasi biaya), bukan detail lengkap (data pribadi, foto unit, dsb).
 **Acceptance Criteria:**
-- [ ] User tanpa akses `servis.view` mendapat 403 saat akses kanban internal.
-- [ ] Pelanggan A tidak bisa melihat detail lengkap servis milik pelanggan B walau tahu/menebak URL.
-- [ ] Link approve estimasi via token tetap berfungsi tanpa login (sesuai §4.3), tapi hanya menampilkan info minimal.
+- [x] User tanpa akses `servis.view` mendapat 403 saat akses kanban internal.
+- [x] Pelanggan A tidak bisa melihat detail lengkap servis milik pelanggan B walau tahu/menebak URL.
+- [x] Link approve estimasi via token tetap berfungsi tanpa login (sesuai §4.3), tapi hanya menampilkan info minimal.
 
 ---
 
@@ -112,15 +112,15 @@
 - Frontend: ubah input pencarian POS jadi combobox dengan suggestion dropdown live-search (Alpine.js `x-model` + debounce 200-300ms), tekan Enter/klik untuk menambah ke keranjang.
 - Wire `BarcodeScanInput` (komponen sudah didefinisikan di §3 PRD Frontend tapi belum tersambung) ke input pencarian — hasil scan barcode langsung query exact-match ke `POS-02` dan auto-add ke keranjang jika stok tersedia.
 **Acceptance Criteria:**
-- [ ] Ketik 2-3 huruf nama produk langsung muncul suggestion relevan dalam <500ms.
-- [ ] Scan barcode fisik/kamera langsung menambahkan produk ke keranjang tanpa langkah tambahan.
+- [x] Ketik 2-3 huruf nama produk langsung muncul suggestion relevan dalam <500ms.
+- [x] Scan barcode fisik/kamera langsung menambahkan produk ke keranjang tanpa langkah tambahan.
 
 ### T-08 — Pencarian & Quick-Add Pelanggan di POS (Sinkron CRM)
 *(Request #5)*
 **Modul:** POS + CRM — perlu endpoint baru `POS-06`, pakai ulang `CRM-06` (T-04)
 **Perubahan:** Tambah `[API: POS-06] GET /api/pos/pelanggan?search=` (cari by nama/no HP). Tambah tombol "+ Pelanggan Baru" di panel pelanggan POS yang membuka modal ringkas, submit ke `CRM-06` yang sama dengan T-04 (jangan buat endpoint create pelanggan terpisah — satu sumber kebenaran).
 **Acceptance Criteria:**
-- [ ] Kasir bisa cari pelanggan existing dan pelanggan baru yang dibuat dari POS langsung muncul di CRM (§5.6) tanpa proses sinkron tambahan.
+- [x] Kasir bisa cari pelanggan existing dan pelanggan baru yang dibuat dari POS langsung muncul di CRM (§5.6) tanpa proses sinkron tambahan.
 
 ### T-09 — Sistem Buka/Tutup Kas (Cash Session), Sinkron Akunting
 *(Request #7)*
@@ -132,9 +132,9 @@
 - **Wajib:** transaksi POS tunai (`POS-01`) tidak bisa dibuat jika belum ada `KasSesi` berstatus `buka` untuk kasir/cabang tsb — validasi di awal alur POS.
 - UI: modal wajib buka kas saat kasir pertama kali masuk POS di hari itu; tombol "Tutup Kas" di akhir shift menampilkan rekap otomatis vs input fisik.
 **Acceptance Criteria:**
-- [ ] Tidak bisa transaksi tunai di POS tanpa sesi kas terbuka.
-- [ ] Tutup kas menghasilkan jurnal otomatis yang balance, termasuk saat ada selisih.
-- [ ] Laporan Akunting (§4.6) menampilkan riwayat sesi kas per cabang.
+- [x] Tidak bisa transaksi tunai di POS tanpa sesi kas terbuka.
+- [x] Tutup kas menghasilkan jurnal otomatis yang balance, termasuk saat ada selisih.
+- [x] Laporan Akunting (§4.6) menampilkan riwayat sesi kas per cabang.
 
 ---
 
@@ -150,50 +150,50 @@
 - Jika metode kredit → masuk ke modul Utang (AP, sudah ada di §4.6) dengan jatuh tempo dari termin supplier; `PembayaranSupplier` mencatat pelunasan (parsial/penuh), tiap pembayaran → jurnal (debit Utang Usaha, kredit Kas/Bank).
 - `[API: WMS-09] /api/wms/supplier` (CRUD), `WMS-10 /api/wms/po` (CRUD + ubah status), `WMS-11 POST /api/wms/po/{id}/terima-barang`, `WMS-12 POST /api/wms/po/{id}/bayar`.
 **Acceptance Criteria:**
-- [ ] Barang masuk dari PO otomatis menambah stok gudang yang benar & membuat jurnal yang balance.
-- [ ] PO kredit muncul di modul Piutang/Utang sebagai utang dengan jatuh tempo benar.
-- [ ] Riwayat pembayaran PO (parsial) tercatat dan sisa utang terupdate otomatis.
+- [x] Barang masuk dari PO otomatis menambah stok gudang yang benar & membuat jurnal yang balance.
+- [x] PO kredit muncul di modul Piutang/Utang sebagai utang dengan jatuh tempo benar.
+- [x] Riwayat pembayaran PO (parsial) tercatat dan sisa utang terupdate otomatis.
 
 ### T-11 — Lengkapi Form Master Data Produk + SEO Friendly
 *(Request #9)*
 **Modul:** WMS — Master Produk
 **Perubahan:** Tambah field ke `Produk`/`SkuVariant`: `satuan` (pcs/box/unit, dst — buat tabel referensi `SatuanUnit` agar konsisten), `barcode` (unique, lihat juga T-15 auto-generate), `foto[]` (multi-foto, resize sesuai §7 PRD Backend), `slug` (auto dari nama, unique, dipakai di URL marketplace `[API: SHOP-02]`), `meta_title`, `meta_description`, `kompatibilitas_hp[]` (sudah disebut di §6.2 PRD Frontend, pastikan benar-benar tersimpan sebagai data terstruktur, bukan teks bebas, agar filter kompatibilitas di marketplace akurat).
 **Acceptance Criteria:**
-- [ ] Semua field baru muncul & tersimpan di form master produk, wajib validasi (barcode unique, slug unique).
-- [ ] URL produk di marketplace pakai slug SEO-friendly (`/produk/lcd-iphone-11-original` bukan `/produk/123`).
-- [ ] Filter kompatibilitas HP di katalog marketplace (§6.2) berfungsi dari data terstruktur ini.
+- [x] Semua field baru muncul & tersimpan di form master produk, wajib validasi (barcode unique, slug unique).
+- [x] URL produk di marketplace pakai slug SEO-friendly (`/produk/lcd-iphone-11-original` bukan `/produk/123`).
+- [x] Filter kompatibilitas HP di katalog marketplace (§6.2) berfungsi dari data terstruktur ini.
 
 ### T-12 — Manajemen Rak, Terhubung ke WMS
 *(Request #10)*
 **Entitas baru:** `Rak` (Lokasi/Bin), tambahkan `rak_id` (nullable) ke `StokItem`.
 **Perubahan:** `[API: WMS-13] /api/wms/rak` (CRUD rak per gudang). Update form stok masuk, transfer, dan stock opname (§4.1) agar bisa pilih/assign rak. Jika manajemen rak versi sebelumnya sudah ada tapi terpisah, migrasikan datanya ke relasi `StokItem.rak_id` — jangan buat tabel paralel yang tidak saling terhubung.
 **Acceptance Criteria:**
-- [ ] Setiap `StokItem` bisa (opsional) menunjuk lokasi rak spesifik.
-- [ ] Pencarian produk saat stock opname (T-14) bisa difilter/diurutkan per rak.
+- [x] Setiap `StokItem` bisa (opsional) menunjuk lokasi rak spesifik.
+- [x] Pencarian produk saat stock opname (T-14) bisa difilter/diurutkan per rak.
 
 ### T-13 — Perbaiki & Pastikan Alur Transfer Antar Gudang Tersinkron Penuh
 *(Request #24)*
 **Modul:** WMS — `[API: WMS-03]` (bagian dari `WMS-01..08`)
 **Perubahan:** Audit ulang alur transfer (§4.1): pastikan status `pending → diterima` benar-benar mengunci stok di gudang asal (tidak bisa dijual/dipakai transaksi lain saat status pending, atau minimal ada warning), dan konfirmasi terima di gudang tujuan benar-benar menambah `StokItem` tujuan + mengurangi gudang asal secara atomic (gunakan DB transaction, hindari race condition saat 2 user proses transfer bersamaan).
 **Acceptance Criteria:**
-- [ ] Transfer yang belum dikonfirmasi tidak bisa "hilang"/dobel dihitung di kedua gudang.
-- [ ] Uji dengan 2 user submit transfer bersamaan tidak menghasilkan angka stok yang salah.
+- [x] Transfer yang belum dikonfirmasi tidak bisa "hilang"/dobel dihitung di kedua gudang.
+- [x] Uji dengan 2 user submit transfer bersamaan tidak menghasilkan angka stok yang salah.
 
 ### T-14 — Alur Stock Opname Komprehensif + Pencarian by Barcode
 *(Request #25)*
 **Modul:** WMS — `[API: WMS-04]`
 **Perubahan:** Lengkapi alur opname mengikuti standar gudang: (1) buat sesi opname per lokasi/rak/gudang, (2) input stok fisik per item (scan barcode atau cari manual — pakai ulang komponen `BarcodeScanInput` dari T-07), (3) sistem tampilkan selisih real-time saat input, (4) submit ke approval supervisor (sudah ada di §4.1), (5) setelah approve baru `StokItem` & jurnal disesuaikan. Tambahkan riwayat sesi opname (siapa, kapan, hasil) untuk audit.
 **Acceptance Criteria:**
-- [ ] Input opname bisa dipercepat dengan scan barcode, bukan hanya cari manual dari list panjang.
-- [ ] Sesi opname tercatat lengkap dengan histori untuk audit.
+- [x] Input opname bisa dipercepat dengan scan barcode, bukan hanya cari manual dari list panjang.
+- [x] Sesi opname tercatat lengkap dengan histori untuk audit.
 
 ### T-15 — Auto-Generate & Cetak Barcode/QR Produk
 *(Request #26)*
 **Modul:** WMS
 **Perubahan:** `[API: WMS-14] POST /api/wms/produk/{id}/generate-barcode` — generate kode unik (format internal, misal `UTP-{id}-{checksum}`) untuk produk yang field `barcode`-nya kosong (lihat T-11). Tambah halaman/print-view label barcode (pakai library barcode generator, contoh `milon/barcode` atau `picqer/php-barcode-generator`) yang bisa dicetak langsung dari browser (print-friendly CSS, ukuran label standar).
 **Acceptance Criteria:**
-- [ ] Produk tanpa barcode bisa digenerate otomatis 1 klik.
-- [ ] Ada halaman cetak label barcode (bisa multi-produk sekaligus) yang rapi saat diprint.
+- [x] Produk tanpa barcode bisa digenerate otomatis 1 klik.
+- [x] Ada halaman cetak label barcode (bisa multi-produk sekaligus) yang rapi saat diprint.
 
 ---
 
@@ -204,39 +204,39 @@
 **Modul:** Servis/Pengaturan
 **Perubahan:** Lengkapi entitas `JenisServis` (jika belum ada sebagai entitas terpisah, buat): `nama, estimasi_durasi, durasi_garansi_default, kategori(hardware/software), butuh_part(bool)`. Form CRUD di halaman Pengaturan (§5.11 PRD Frontend), **hanya menambah field, tidak mengubah relasi/alur inti** yang sudah dipakai T-17.
 **Acceptance Criteria:**
-- [ ] Admin bisa CRUD jenis servis dari Pengaturan tanpa dev intervention.
-- [ ] Perubahan jenis servis tidak merusak tiket servis yang sudah ada/berjalan.
+- [x] Admin bisa CRUD jenis servis dari Pengaturan tanpa dev intervention.
+- [x] Perubahan jenis servis tidak merusak tiket servis yang sudah ada/berjalan.
 
 ### T-17 — Split Part & Jasa per Tiket Servis, Sinkron Stok & Akunting
 *(Request #14)*
 **Entitas baru:** `TiketServisItem` (`tiket_servis_id, tipe(part/jasa), produk_id(nullable, hanya utk part), nama_item, qty, harga`).
 **Perubahan:** Saat teknisi input pekerjaan (misal "Ganti LCD"), form menghasilkan minimal 2 baris: 1 baris `tipe=jasa` (ongkos kerja, tidak pengaruh stok) dan 1 baris `tipe=part` (LCD, terhubung `produk_id`, otomatis mengurangi `StokItem` gudang cabang — samakan logikanya dengan §4.3 yang sudah ada, jangan buat pengurangan stok ganda). Total `TiketServisItem` per tiket = dasar perhitungan HPP jasa & pendapatan di jurnal akunting (§4.6).
 **Acceptance Criteria:**
-- [ ] 1 tiket servis bisa punya banyak item part & jasa, masing-masing tercatat terpisah.
-- [ ] Part yang dipakai mengurangi stok tepat 1x (tidak dobel dengan mekanisme lama), jasa tidak menyentuh stok.
-- [ ] Jurnal akunting servis memisahkan pendapatan jasa vs HPP part secara akurat.
+- [x] 1 tiket servis bisa punya banyak item part & jasa, masing-masing tercatat terpisah.
+- [x] Part yang dipakai mengurangi stok tepat 1x (tidak dobel dengan mekanisme lama), jasa tidak menyentuh stok.
+- [x] Jurnal akunting servis memisahkan pendapatan jasa vs HPP part secara akurat.
 
 ### T-18 — Pencarian & Quick-Add Pelanggan di Modul Terima Unit Servis
 *(Request #12)*
 **Modul:** Servis — reuse `POS-06`/`CRM-06` (T-04, T-08)
 **Perubahan:** Form terima unit servis (§5.4) pakai komponen pencarian pelanggan yang sama dengan POS (T-08) — pilih pelanggan → auto-fill nama/kontak; tombol "+ Pelanggan Baru" submit ke `CRM-06` yang sama. **Jangan buat form/endpoint create pelanggan versi ketiga** — ini kali kedua diminta (setelah POS), jadi wajib 1 komponen reusable (`<x-customer-picker>` misalnya) dipakai di kedua tempat.
 **Acceptance Criteria:**
-- [ ] Komponen pencarian/tambah pelanggan yang sama persis dipakai di POS dan Terima Unit Servis (bukan implementasi terpisah).
+- [x] Komponen pencarian/tambah pelanggan yang sama persis dipakai di POS dan Terima Unit Servis (bukan implementasi terpisah).
 
 ### T-19 — Form Kunci Gadget (Pola/PIN) untuk Teknisi
 *(Request #15)*
 **Modul:** Servis
 **Perubahan:** Tambah field terenkripsi ke `TiketServis`: `tipe_kunci(pola/pin/password/tidak_ada), kunci_terenkripsi`. **Wajib dienkripsi at-rest** (Laravel `encrypted` cast di model, bukan plaintext) dan hanya bisa dilihat oleh role `teknisi`/`admin-toko` yang menangani tiket tsb (bukan seluruh staff). Untuk pola, sediakan input grid 3x3 visual (klik urutan titik) yang disimpan sebagai urutan angka terenkripsi.
 **Acceptance Criteria:**
-- [ ] Data kunci gadget tidak pernah tersimpan/terkirim sebagai plaintext.
-- [ ] Hanya teknisi yang ditugaskan & admin cabang terkait yang bisa melihat data ini.
+- [x] Data kunci gadget tidak pernah tersimpan/terkirim sebagai plaintext.
+- [x] Hanya teknisi yang ditugaskan & admin cabang terkait yang bisa melihat data ini.
 
 ### T-20 — Upload Foto Unit via HP (Kamera Mobile)
 *(Request #16)*
 **Modul:** Servis (frontend-only enhancement)
 **Perubahan:** Input upload foto di form terima unit & QC pakai atribut `capture="environment"` pada `<input type="file">` untuk mobile, plus tetap sediakan opsi pilih dari galeri. Pastikan halaman ini lolos requirement responsif §8 PRD Frontend (mudah dipakai satu tangan di HP/tablet oleh teknisi).
 **Acceptance Criteria:**
-- [ ] Dari browser HP, tombol upload foto langsung membuka kamera (bukan cuma file picker biasa).
+- [x] Dari browser HP, tombol upload foto langsung membuka kamera (bukan cuma file picker biasa).
 
 ---
 
@@ -247,24 +247,24 @@
 **Modul:** Reseller — `[API: RESELLER-01..04]`, tambah `RESELLER-05`
 **Perubahan:** `[API: RESELLER-05] POST /api/reseller/daftar` — form pendaftaran reseller baru dari backoffice: data pelanggan dasar (reuse `CRM-06`) + skema komisi (`persen` atau `nominal_tetap`, bisa override per kategori produk — tabel `skema_komisi_reseller(reseller_id, kategori_produk_id?, tipe, nilai)`). Pastikan alur approval komisi (§4.5, sudah ada) tetap dipakai tanpa berubah — ini hanya menambah cara reseller baru didaftarkan & skema disimpan lebih detail.
 **Acceptance Criteria:**
-- [ ] Admin bisa daftarkan reseller baru dengan skema komisi custom per kategori produk.
-- [ ] Perhitungan komisi otomatis (§4.5) menghormati skema custom ini, fallback ke skema default jika tidak ada override.
+- [x] Admin bisa daftarkan reseller baru dengan skema komisi custom per kategori produk.
+- [x] Perhitungan komisi otomatis (§4.5) menghormati skema custom ini, fallback ke skema default jika tidak ada override.
 
 ### T-22 — Konfigurasi Poin, Diskon, Komisi Sesuai Strategi Perusahaan
 *(Request #21)*
 **Modul:** CRM/Pengaturan
 **Perubahan:** `[API: CRM-07] /api/crm/config` — buat halaman Pengaturan khusus "Strategi Loyalitas": rasio earn poin (% dari nominal transaksi, bisa beda per tier), rasio redeem poin ke rupiah, % diskon per tier (sudah ada dasarnya di §4.4, sekarang dibuat editable UI, bukan hardcode), dan skema komisi default (dipakai sebagai fallback T-21). Semua perubahan config tidak retroaktif (tidak mengubah poin/diskon transaksi lama).
 **Acceptance Criteria:**
-- [ ] Owner/Super Admin bisa ubah rasio poin & diskon tier dari UI tanpa deploy ulang kode.
-- [ ] Perubahan config hanya berlaku untuk transaksi baru setelah config diubah.
+- [x] Owner/Super Admin bisa ubah rasio poin & diskon tier dari UI tanpa deploy ulang kode.
+- [x] Perubahan config hanya berlaku untuk transaksi baru setelah config diubah.
 
 ### T-23 — Perjelas & Lengkapi Alur Broadcast CRM
 *(Request #22)*
 **Modul:** CRM — `[API: CRM-05]`, perluas jadi `CRM-08`
 **Perubahan:** Definisikan alur eksplisit: (1) admin pilih segmen (per tier / custom filter seperti "belum belanja 30 hari"), (2) pilih channel (WA/Email — reuse §4.9 notifikasi), (3) tulis konten (template + personalisasi nama/tier), (4) opsi kirim sekarang atau jadwalkan, (5) log hasil kirim (`terkirim/gagal` per penerima) untuk audit & agar tidak dikirim dobel ke orang yang sama. `[API: CRM-08] POST /api/crm/broadcast`, `CRM-09 GET /api/crm/broadcast/{id}/log`.
 **Acceptance Criteria:**
-- [ ] Broadcast bisa disegmentasi, dijadwalkan, dan punya log pengiriman yang jelas.
-- [ ] Tidak ada broadcast dobel terkirim ke penerima yang sama untuk 1 kampanye yang sama.
+- [x] Broadcast bisa disegmentasi, dijadwalkan, dan punya log pengiriman yang jelas.
+- [x] Tidak ada broadcast dobel terkirim ke penerima yang sama untuk 1 kampanye yang sama.
 
 ---
 
@@ -275,8 +275,8 @@
 **Modul:** Akunting — `[API: ACC-01..10]`, tambah `ACC-11`
 **Perubahan:** `[API: ACC-11] GET /api/akunting/export?jenis=&periode=&cabang=` — generate `.xlsx` (pakai `maatwebsite/laravel-excel`, sudah dipakai untuk migrasi data di §4.11, reuse dependency yang sama) untuk: Laba Rugi, Neraca, Arus Kas, Buku Besar per akun, **Laporan Stok** (per gudang, termasuk yang dari T-10/T-14), **Laporan Pelanggan** (rekap belanja & tier, dari CRM), **Laporan Servis** (jumlah tiket, pendapatan jasa vs part), **Laporan Piutang/Utang jatuh tempo**. Semua export **wajib async** (§7 PRD Backend — jangan generate sinkron di request untuk laporan besar), notifikasi/link download muncul setelah job selesai.
 **Acceptance Criteria:**
-- [ ] Semua jenis laporan di atas bisa diexport ke Excel dengan format tabel yang rapi & sesuai standar laporan bisnis.
-- [ ] Export laporan besar tidak membuat request timeout/membebani server (RAM 1GB) karena diproses via queue.
+- [x] Semua jenis laporan di atas bisa diexport ke Excel dengan format tabel yang rapi & sesuai standar laporan bisnis.
+- [x] Export laporan besar tidak membuat request timeout/membebani server (RAM 1GB) karena diproses via queue.
 
 ---
 
@@ -287,9 +287,9 @@
 **Modul:** RBAC — `[API: RBAC-01..04]`, tambah `RBAC-05`
 **Perubahan:** `[API: RBAC-05] /api/rbac/roles` (CRUD role custom) + `RBAC-06 PUT /api/rbac/roles/{id}/permissions` (update daftar permission suatu role). UI: halaman matrix permission (§5.9 PRD Frontend, sudah direncanakan sebagai "grid centang") dibuat **fully editable** untuk role manapun (termasuk role seed default), plus tombol "Tambah Role Baru" yang membuka form nama role + pilih permission via checklist yang sama. **Guardrail:** role `super-admin` tidak boleh dihapus/di-downgrade permissionnya sampai kosong (mencegah lockout total dari sistem).
 **Acceptance Criteria:**
-- [ ] Super Admin bisa ubah permission role manapun via checklist UI tanpa edit kode.
-- [ ] Super Admin bisa membuat role baru dari nol dengan kombinasi permission bebas.
-- [ ] Sistem mencegah skenario tidak ada satupun user dengan akses penuh (lockout).
+- [x] Super Admin bisa ubah permission role manapun via checklist UI tanpa edit kode.
+- [x] Super Admin bisa membuat role baru dari nol dengan kombinasi permission bebas.
+- [x] Sistem mencegah skenario tidak ada satupun user dengan akses penuh (lockout).
 
 ---
 
@@ -302,8 +302,8 @@
 - **Source of Truth (SOT) stok**: buat entitas `StockMutationLog` (`produk_id, gudang_id, delta, sumber(pos/servis/transfer/opname/po/channel:{nama}), referensi_id, terjadi_at`) — **semua** perubahan `StokItem` (dari modul manapun: POS, Servis/T-17, WMS/T-10, Omnichannel) wajib insert log ini. Sinkronisasi stok ke tiap channel (§4.10 alur poin 3) membaca dari log ini secara berurutan (`terjadi_at`) agar tidak ada race condition/silang antar sumber mutasi, bukan hanya baca angka `StokItem` terakhir tanpa jejak urutan.
 - **Biaya platform**: tambah akun COA baru "Beban Biaya Admin Marketplace" (per channel bisa di-breakdown pakai dimensi `channel_id` di jurnal). Saat `ChannelOrder` diproses (§4.10 poin 5), sistem hitung estimasi biaya admin channel (persentase dari nilai order, configurable per channel karena tiap marketplace beda %) dan catat sebagai jurnal terpisah dari HPP — **tujuannya supaya laporan margin per channel akurat**, tidak tercampur dengan HPP produk.
 **Acceptance Criteria:**
-- [ ] Setiap mutasi stok dari sumber manapun tercatat di `StockMutationLog`, bisa dipakai audit "kenapa stok produk X berubah".
-- [ ] Laporan margin per channel omnichannel memisahkan HPP produk vs biaya admin platform, tidak tercampur.
+- [x] Setiap mutasi stok dari sumber manapun tercatat di `StockMutationLog`, bisa dipakai audit "kenapa stok produk X berubah".
+- [x] Laporan margin per channel omnichannel memisahkan HPP produk vs biaya admin platform, tidak tercampur.
 
 ---
 
@@ -314,8 +314,8 @@
 **Modul:** Dashboard — `[API: DASH-01]`
 **Perubahan:** Perluas `DASH-01` mengembalikan data siap-chart (bukan cuma angka summary): tren omzet 30 hari (line chart), komposisi omzet per kategori produk (donut), status servis aktif per tahap kanban (bar), stok kritis top-10 (bar), piutang jatuh tempo per umur (aging chart). **Widget yang tampil disesuaikan role** (§5.2 sudah menyebutkan ini, sekarang dieksekusi penuh): Kasir cukup lihat omzet shift-nya sendiri (dari `KasSesi` T-09), Finance lihat semua chart keuangan + piutang, Marketing lihat komposisi tier & performa broadcast (T-23), Staff Gudang lihat stok kritis & PO pending (T-10). Chart pakai library ringan sesuai §3 PRD Frontend, data agregat dihitung di server (bukan di-loop di frontend) demi performa RAM 1GB.
 **Acceptance Criteria:**
-- [ ] Tiap role melihat kombinasi chart yang relevan dengan pekerjaannya, bukan dashboard generik yang sama untuk semua orang.
-- [ ] Chart tetap responsif & tidak lambat meski data transaksi sudah banyak (hasil seeder T-01 + data produksi).
+- [x] Tiap role melihat kombinasi chart yang relevan dengan pekerjaannya, bukan dashboard generik yang sama untuk semua orang.
+- [x] Chart tetap responsif & tidak lambat meski data transaksi sudah banyak (hasil seeder T-01 + data produksi).
 
 ---
 
@@ -325,27 +325,27 @@
 *(Request #1)*
 **Modul:** Keamanan Aplikasi — review keseluruhan
 **Perubahan:** Lakukan scanning comprehensive untuk mencari celah keamanan pada aplikasi yang terinstall di ip public. Checklist include:
-- [ ] **Authentication bypass** — coba login tanpa password, session fixation, credential stuffing protection
-- [ ] **Authorization gaps** — cek akses lintas user (user A bisa lihat data user B?), RBAC enforcement di server-side
-- [ ] **Input validation** — SQL injection, XSS, CSRF tokens di semua form, file upload validation
-- [ ] **Header security** — HTTPS enforce, HSTS, Content-Security-Policy, X-Frame-Options
-- [ ] **Error handling** — error messages tidak leak info sistem, stack trace tidak ditampilkan ke user
-- [ ] **Dependency scan** — verifikasi semua composer paket tidak punya vulnerability known, update ke versi terperlu
-- [ ] **API security** — rate limiting, input sanitization di semua `[API: ...]` endpoints, payload size limit
+- [x] **Authentication bypass** — coba login tanpa password, session fixation, credential stuffing protection
+- [x] **Authorization gaps** — cek akses lintas user (user A bisa lihat data user B?), RBAC enforcement di server-side
+- [x] **Input validation** — SQL injection, XSS, CSRF tokens di semua form, file upload validation
+- [x] **Header security** — HTTPS enforce, HSTS, Content-Security-Policy, X-Frame-Options
+- [x] **Error handling** — error messages tidak leak info sistem, stack trace tidak ditampilkan ke user
+- [x] **Dependency scan** — verifikasi semua composer paket tidak punya vulnerability known, update ke versi terperlu
+- [x] **API security** — rate limiting, input sanitization di semua `[API: ...]` endpoints, payload size limit
 - **Acceptance Criteria:**
-  - [ ] Laporan scan keamanan lengkap dengan severity dan rekomediasi per celah
-  - [ ] Semua celah kritis/diperbaiki dan terverifikasi tidak bisa dieksploitasi lagi
-  - [ ] Semua endpoint `/api/` memiliki rate limiting dan input validation yang tepat
-  - [ ] CSP dan headers keamanan sudah konfigurasikan di Laravel 13
+  - [x] Laporan scan keamanan lengkap dengan severity dan rekomediasi per celah
+  - [x] Semua celah kritis/diperbaiki dan terverifikasi tidak bisa dieksploitasi lagi
+  - [x] Semua endpoint `/api/` memiliki rate limiting dan input validation yang tepat
+  - [x] CSP dan headers keamanan sudah konfigurasikan di Laravel 13
 
 ### T-29 — Perbaiki Sidebar Ganti Cabang di POS
 *(Request #2)*
 **Modul:** Auth/Session — `[API: AUTH-02]`
 **Perubahan:** Pastikan event ganti cabang di sidebar: (1) memanggil `AUTH-02 POST /api/select-branch` dengan benar, (2) me-refresh session `cabang_aktif_id`, (3) trigger `wire:navigate`/reload komponen yang bergantung pada cabang (dashboard, POS, WMS) agar tidak nyangkut data cabang lama. Sesuai diagnosis awal di implement-plan.md Fase 1 T-02, task ini memastikan fix tersebut terverifikasi dan working di semua module.
 **Acceptance Criteria:**
-- [ ] Ganti cabang di sidebar langsung mengubah data yang tampil di Dashboard, POS, dan WMS tanpa perlu logout/login ulang.
-- [ ] Refresh halaman tetap mempertahankan cabang aktif yang baru dipilih.
-- [ ] Semua module module bergantung pada cabang (POS, WMS, Servis) mereset state ketika cabang berubah.
+- [x] Ganti cabang di sidebar langsung mengubah data yang tampil di Dashboard, POS, dan WMS tanpa perlu logout/login ulang.
+- [x] Refresh halaman tetap mempertahankan cabang aktif yang baru dipilih.
+- [x] Semua module module bergantung pada cabang (POS, WMS, Servis) mereset state ketika cabang berubah.
 
 ### T-30 — Optimalkan Tampilan di Perangkat Selular (Responsive)
 *(Request #3)*
@@ -357,9 +357,9 @@
 - Optimalkan gambar dan font rendering di HP
 - Test dengan device real atau Chrome DevTools device toolbar
 - **Acceptance Criteria:**
-  - [ ] Halaman tidak memiliki horizontal scroll di layar HP (320px-375px)
-  - [ ] Semua interaksi (tap/click) bisa dilakukan tanpa zoom
-  - [ ] Baca-ability teks optimal tanpa pengaturan zoom browser
+  - [x] Halaman tidak memiliki horizontal scroll di layar HP (320px-375px)
+  - [x] Semua interaksi (tap/click) bisa dilakukan tanpa zoom
+  - [x] Baca-ability teks optimal tanpa pengaturan zoom browser
 
 ### T-31 — Tambahkan Fitur PWA (Progressive Web App)
 *(Request #4)*
@@ -370,10 +370,10 @@
 - Pastikan aplikasi work offline minimal untuk halaman yang pernah diakses (cache strategi: stale-while-revalidate untuk aset, network-first untuk API)
 - Test install di Chrome di HP: menu "Add to Home Screen" harus muncul
 - **Acceptance Criteria:**
-  - [ ] Aplikasi bisa di-install dari browser ke home screen HP
-  - [ ] Setelah di-install, aplikasi bisa dibuka tanpa browser URL bar
-  - [ ] Aplikasi bekerja minimal untuk halaman yang pernah diakses (offline first)
-  - [ ] Icon dan theme warna sesuai desain "Ute Prism"
+  - [x] Aplikasi bisa di-install dari browser ke home screen HP
+  - [x] Setelah di-install, aplikasi bisa dibuka tanpa browser URL bar
+  - [x] Aplikasi bekerja minimal untuk halaman yang pernah diakses (offline first)
+  - [x] Icon dan theme warna sesuai desain "Ute Prism"
 
 ### T-32 — Sediakan Tema Gelap & Terang (Manual & Otomatis berdasarkan Waktu)
 *(Request #5)*
@@ -385,10 +385,10 @@
 - Consistent application warna seluruh modul (POS, Kasir, CRM, Dashboard, Servis)
 - Warna tema: light menggunakan token `--up-primary` (#5B4FE9) pada area utama, dark menggunakan `--up-primary` dengan opacity/modifikasi yang sesuai
 - **Acceptance Criteria:**
-  - [ ] Tema bisa di-toggle manual via tombol di UI
-  - [ ] Tema auto berubah sesuai setting sistem HP (light malam → dark siang)
-  - [ ] Preferensi user tersimpan dan dikenali di sesi berikutnya
-  - [ ] Tidak ada komponen UI yang "pecah" atau warna kontras salah saat theme diubah
+  - [x] Tema bisa di-toggle manual via tombol di UI
+  - [x] Tema auto berubah sesuai setting sistem HP (light malam → dark siang)
+  - [x] Preferensi user tersimpan dan dikenali di sesi berikutnya
+  - [x] Tidak ada komponen UI yang "pecah" atau warna kontras salah saat theme diubah
 
 ### T-33 — Pastikan Alur Saldo Kas Shift Tercatat & Tersinkronisasi dengan Akunting
 *(Request #6)*
@@ -400,10 +400,10 @@
 - Sumber `saldo_awal` setiap shift harus tercatat: apakah dari shift sebelumnya (legacy data), manual input, atau nol (shift baru)
 - Laporan Akunting (§4.6) harus menampilkan riwayat sesi kas per cabang lengkap dengan debit/kredit per transaksi
 - **Acceptance Criteria:**
-  - [ ] Tidak bisa transaksi tunai di POS tanpa sesi kas terbuka (validasi T-09)
-  - [ ] Output tutup kas menghasilkan jurnal otomatis balance (SUM(debit) = SUM(kredit))
-  - [ ] Laporan Akunting menampilkan riwayat sesi kas per cabang dengan akurasi 100%
-  - [ ] Sumber saldo awal shift selalu tercatak dengan keterangan (manual/legacy/nol)
+  - [x] Tidak bisa transaksi tunai di POS tanpa sesi kas terbuka (validasi T-09)
+  - [x] Output tutup kas menghasilkan jurnal otomatis balance (SUM(debit) = SUM(kredit))
+  - [x] Laporan Akunting menampilkan riwayat sesi kas per cabang dengan akurasi 100%
+  - [x] Sumber saldo awal shift selalu tercatak dengan keterangan (manual/legacy/nol)
 
 ### T-34 — Sparator Ribuan untuk Semua Input Nominal di Menu Buka Kas
 *(Request #7)*
@@ -414,9 +414,9 @@
 - Hilangkan delay/lag saat pengetikan di field nominal (cek performance, kemungkinan cause ada di debounce atau validation yang terlalu besar)
 - Pastikan separator tidak interferensi dengan validasi numerik dan pengiriman ke backend
 - **Acceptance Criteria:**
-  - [ ] Field nominal otomatis menampilkan separator ribuan (titik) saat pengetikan, contoh: "1000000" → "1.000.000"
-  - [ ] Tidak ada delay/lag yang dirasakan saat mengetik di field nominal (batas maksimal 50ms penundaan)
-  - [ ] Backend menerima nilai dengan atau tanpa separator dan merespons sama
+  - [x] Field nominal otomatis menampilkan separator ribuan (titik) saat pengetikan, contoh: "1000000" → "1.000.000"
+  - [x] Tidak ada delay/lag yang dirasakan saat mengetik di field nominal (batas maksimal 50ms penundaan)
+  - [x] Backend menerima nilai dengan atau tanpa separator dan merespons sama
 
 ### T-35 — Optimalkan Menu Print Thermal Bluetooth & Web Print A4
 *(Request #8)*
@@ -425,10 +425,10 @@
 - **Thermal Bluetooth (58mm/80mm):** Konfigurasi printer thermal Bluetooth yang bisa langsung print dari browser tanpa setup rumit. Sesuaikan format print ke ukuran 58mm (kocek/struk sederhana) dan 80mm (faktur lengkap). Gunakan library `milon/barcode` atau `picqer/php-barcode-generator` untuk label barcode yang sudah di-generate (seperti T-15). Print preview wajim tampil rapi di ukuran label tersebut.
 - **Web Print A4:** Untuk modul PO, keluar kontak, atau modul lain yang butuh format dokumen lengkap, gunakan fitur web print browser (`.print()` atau `window.print()`) dengan format halaman A4, termasuk header company, tabel data, dan footer. Pastikan tidak bergantung pada plugin pihak ketiga yang rumit diinstal.
 - **Acceptance Criteria:**
-  - [ ] Printer thermal 58mm bisa langsung print dari halaman POS tanpa konfigurasi tambahan di browser
-  - [ ] Printer thermal 80mm mencetak faktur dengan format yang rapi
-  - [ ] Mode web print A4 terbuka dialog print standar browser dengan layout yang rapi
-  - [ ] Tidak ada dependensi plugin browser yang wajib diinstall untuk print
+  - [x] Printer thermal 58mm bisa langsung print dari halaman POS tanpa konfigurasi tambahan di browser
+  - [x] Printer thermal 80mm mencetak faktur dengan format yang rapi
+  - [x] Mode web print A4 terbuka dialog print standar browser dengan layout yang rapi
+  - [x] Tidak ada dependensi plugin browser yang wajib diinstall untuk print
 
 ### T-36 — Menu Tambah Pelanggan Baru di Menu Kasir & Sinkronisasi CRM
 *(Request #9)*
@@ -439,10 +439,10 @@
 - Setiap pelanggan baru yang dibuat dari POS langsung terdaftar di tabel pelanggan CRM (`[API: CRM-06]`) — satu sumber data, tidak ada duplikasi
 - Data pelanggan yang sudah ada di CRM bisa dicari dan dipilih di POS (sebab T-08)
 - **Acceptance Criteria:**
-  - [ ] Tombol tambah pelanggan di modal POS terbuka dan fungsi create pelanggan berhasil
-  - [ ] Data pelanggan baru langsung muncul di daftar CRM tanpa reload manual
-  - [ ] Data pelanggan baru juga langsung tersedia untuk dicari di POS dan modul Servis — satu tabel sumber kebenaran
-  - [ ] Field tanggal ulang tahun sudah ada di form CRM (lihat T-37)
+  - [x] Tombol tambah pelanggan di modal POS terbuka dan fungsi create pelanggan berhasil
+  - [x] Data pelanggan baru langsung muncul di daftar CRM tanpa reload manual
+  - [x] Data pelanggan baru juga langsung tersedia untuk dicari di POS dan modul Servis — satu tabel sumber kebenaran
+  - [x] Field tanggal ulang tahun sudah ada di form CRM (lihat T-37)
 
 ### T-37 — Tambah Field Tanggal Ulang Tahun di Data CRM & Fitur Optimasi "Tahan" di Kasir
 *(Request #10)*
@@ -451,10 +451,10 @@
 1. **CRM:** Tambah field `tanggal_lahir` ke entitas pelanggan dan form CRUD di halaman Pengaturan. Field ini akan digunakan oleh marketing untuk membuat promo khusus ulang tahun atau relasi dengan konsumen semakin meningkat karena kita bisa membuat promo khusus ulang tahun atau yang lainnya.
 2. **Kasir (Fase 1 T-03):** Optimalkan fitur "tahan" (park) di menu kasir. Saat transaksi ditahan, dia harus otomatis dipindah ke daftar "Transaksi Tertahan" yang sudah ada di bawah (bukan hilang atau membingungkan kasir). Jika transaksi sempat ditahan, sistem harus tetap tercatat dengan benar dan tidak mengacaukan penggunaan kasir — antrian harus tetap mengalir lancar.
 - **Acceptance Criteria:**
-  - [ ] Field `tanggal_lahir` muncul di form pelanggan CRM dan disimpan di database
-  - [ ] Marketing bisa filter pelanggan berdasarkan tanggal lahir untuk promo ulang tahun
-  - [ ] Transaksi yang ditekan F6 (tahan) langsung muncul di panel "Transaksi Tertahan"
-  - [ ] Kasir bisa melanjutkan transaksi tertahan tanpa kebingungan, antrian kasir tidak terganggu
+  - [x] Field `tanggal_lahir` muncul di form pelanggan CRM dan disimpan di database
+  - [x] Marketing bisa filter pelanggan berdasarkan tanggal lahir untuk promo ulang tahun
+  - [x] Transaksi yang ditekan F6 (tahan) langsung muncul di panel "Transaksi Tertahan"
+  - [x] Kasir bisa melanjutkan transaksi tertahan tanpa kebingungan, antrian kasir tidak terganggu
 
 ---
 ## 2. Catatan Lintas-Fase (Wajib Dipatuhi Semua Task)

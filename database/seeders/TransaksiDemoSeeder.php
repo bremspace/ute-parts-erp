@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Modules\Akunting\Models\AkunCOA;
+use App\Models\User;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Models\Pelanggan;
@@ -14,34 +14,47 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Models\Komisi;
+use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\PembayaranSupplier;
 use App\Modules\Wms\Models\Produk;
-use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\StokOpnameItem;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
-use App\Models\User;
+use App\Modules\Wms\Models\Supplier;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
  * [T-01] Data uji semua jenis transaksi (idempotent).
  * Menciptakan: POS (tunai/transfer/member tiap tier/reseller), marketplace lunas,
- * channel dummy, servis di tiap status, transfer, opname, broadcast.
- * Semua membuat jurnal otomatis yang balance (acceptance: debit = kredit).
+ * channel dummy, servis di tiap status (+ jurnal onSelesai via ServisService),
+ * PO supplier kredit & tunai (+ jurnal + pembayaran parsial + jurnal),
+ * transfer gudang, opname (+ jurnal selisih 520-07/130-01),
+ * broadcast.
+ * Semua membuat jurnal otomatis yang balance (acceptance: debit = kredit per jurnal).
  */
 class TransaksiDemoSeeder extends Seeder
 {
     private JurnalService $jurnal;
+
     private ?Cabang $cabang;
+
     private ?Gudang $gudangUtama;
+
     private ?Gudang $gudangKedua;
+
     private ?User $kasir;
+
     private ?User $teknisi;
 
     // Guard: hanya jalankan sekali (idempotent secara keseluruhan)
@@ -64,7 +77,7 @@ class TransaksiDemoSeeder extends Seeder
         $this->kasir = User::role('kasir')->first();
         $this->teknisi = User::role('teknisi')->first();
 
-        if (!$this->cabang || !$this->gudangUtama) {
+        if (! $this->cabang || ! $this->gudangUtama) {
             return;
         }
 
@@ -80,8 +93,8 @@ class TransaksiDemoSeeder extends Seeder
 
             // ===== 3-5. POS MEMBER tiap tier =====
             foreach (TierMembership::all() as $tier) {
-                $member = Pelanggan::where('telepon', 'demo-member-' . $tier->kode)->first();
-                $this->buatPos('Tier' . ucfirst($tier->kode), 'tunai', $member);
+                $member = Pelanggan::where('telepon', 'demo-member-'.$tier->kode)->first();
+                $this->buatPos('Tier'.ucfirst($tier->kode), 'tunai', $member);
             }
 
             // ===== 6. POS RESELLER (komisi pending) =====
@@ -89,7 +102,7 @@ class TransaksiDemoSeeder extends Seeder
             if ($reseller) {
                 $transaksi = $this->buatPos('Reseller', 'tunai', $reseller);
                 if ($transaksi && $reseller->is_reseller) {
-                    app(\App\Modules\Reseller\Services\KomisiService::class)->hitungKomisi($transaksi, $reseller);
+                    app(KomisiService::class)->hitungKomisi($transaksi, $reseller);
                 }
             }
 
@@ -107,6 +120,9 @@ class TransaksiDemoSeeder extends Seeder
 
             // ===== 11. STOCK OPNAME dengan selisih =====
             $this->buatOpname();
+
+            // ===== 11b. PO SUPPLIER (kredit + tunai) + jurnal + pembayaran parsial + jurnal =====
+            $this->buatPurchaseOrder();
 
             // ===== 12. BROADCAST CRM contoh =====
             NotifikasiKeluar::firstOrCreate(
@@ -134,7 +150,7 @@ class TransaksiDemoSeeder extends Seeder
             Pelanggan::firstOrCreate(
                 ['telepon' => "demo-member-{$kode}"],
                 [
-                    'nama' => 'Member Demo ' . ucfirst($kode),
+                    'nama' => 'Member Demo '.ucfirst($kode),
                     'email' => "member.{$kode}@demo.test",
                     'tier_membership_id' => $tier?->id,
                     'is_reseller' => $reseller,
@@ -162,7 +178,7 @@ class TransaksiDemoSeeder extends Seeder
     {
         $produk = $this->produkPertama();
         $variant = $produk?->skuVariants()->first();
-        if (!$produk || !$produk->harga_jual_retail) {
+        if (! $produk || ! $produk->harga_jual_retail) {
             return null;
         }
 
@@ -254,11 +270,11 @@ class TransaksiDemoSeeder extends Seeder
     {
         $produk = $this->produkPertama();
         $member = Pelanggan::where('telepon', 'demo-member-gold')->first();
-        if (!$produk) {
+        if (! $produk) {
             return;
         }
 
-        $no = 'DEMO-MP-' . now()->format('Ymd') . '-0001';
+        $no = 'DEMO-MP-'.now()->format('Ymd').'-0001';
         $harga = (float) $produk->harga_jual_retail;
 
         $transaksi = Transaksi::create([
@@ -328,9 +344,9 @@ class TransaksiDemoSeeder extends Seeder
                 ['status' => 'terhubung', 'kredensial' => [], 'is_active' => true]
             );
 
-            $orderId = 'DEMO-' . $channel->platform . '-' . now()->timestamp;
+            $orderId = 'DEMO-'.$channel->platform.'-'.now()->timestamp;
 
-            if (!ChannelOrder::where('channel_id', $channel->id)->where('channel_order_id', $orderId)->exists()) {
+            if (! ChannelOrder::where('channel_id', $channel->id)->where('channel_order_id', $orderId)->exists()) {
                 ChannelOrder::create([
                     'channel_id' => $channel->id,
                     'channel_order_id' => $orderId,
@@ -346,12 +362,13 @@ class TransaksiDemoSeeder extends Seeder
 
     private function buatServisPerStatus(): void
     {
-        if (!$this->teknisi) {
+        if (! $this->teknisi) {
             return;
         }
 
         $cabangId = $this->cabang->id;
         $member = Pelanggan::where('telepon', 'demo-member-gold')->first();
+        $servisService = app(ServisService::class);
 
         $statuses = [
             'diterima', 'diagnosa', 'menunggu_approval', 'disetujui',
@@ -365,6 +382,7 @@ class TransaksiDemoSeeder extends Seeder
                 continue;
             }
 
+            // Create ticket in initial state 'diterima', then transition via ServisService
             $tiket = TiketServis::create([
                 'no_tiket' => $no,
                 'cabang_id' => $cabangId,
@@ -375,25 +393,62 @@ class TransaksiDemoSeeder extends Seeder
                 'keluhan' => 'Layar retak + baterai cepat habis (demo)',
                 'kondisi_fisik' => ['Layar', 'Baterai'],
                 'foto_unit' => null,
-                'status' => $status,
+                'status' => 'diterima',
                 'sumber' => 'walkin',
-                'estimasi_biaya' => in_array($status, ['menunggu_approval', 'disetujui', 'dikerjakan', 'qc', 'selesai', 'diambil']) ? 250000 : null,
+                'estimasi_biaya' => 250000,
                 'token_approval' => Str::random(64),
                 'tanggal_terima' => now()->subDays(5),
                 'teknisi_id' => $this->teknisi->id,
             ]);
 
+            // Transition through state machine to desired status
+            // This triggers onSelesai jurnal when reaching 'selesai'
+            try {
+                $targetStatus = $status;
+                $currentStatus = 'diterima';
+                $transitions = [
+                    'diterima' => 'diagnosa',
+                    'diagnosa' => 'menunggu_approval',
+                    'menunggu_approval' => 'disetujui',
+                    'disetujui' => 'dikerjakan',
+                    'dikerjakan' => 'qc',
+                    'qc' => 'selesai',
+                    'selesai' => 'diambil',
+                ];
+
+                while ($currentStatus !== $targetStatus && isset($transitions[$currentStatus])) {
+                    $nextStatus = $transitions[$currentStatus];
+                    $tiket = $servisService->updateStatus($tiket, $nextStatus, $this->teknisi, "Demo seeder transisi: {$currentStatus} → {$nextStatus}");
+                    $currentStatus = $nextStatus;
+
+                    // Stop if we reached target or target is 'ditolak' (special case)
+                    if ($targetStatus === 'ditolak') {
+                        // For 'ditolak', go: diterima -> diagnosa -> menunggu_approval -> ditolak
+                        if ($currentStatus === 'menunggu_approval') {
+                            $tiket = $servisService->updateStatus($tiket, 'ditolak', $this->teknisi, 'Demo seeder: estimasi ditolak');
+                            break;
+                        }
+                    }
+                    if ($currentStatus === $targetStatus) {
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // If transition fails, keep ticket at whatever status it reached
+                Log::warning("Demo servis transisi gagal: {$e->getMessage()}", ['tiket' => $no]);
+            }
+
             // Garansi: tiket selesai lama (expired) + selesai baru (masih garansi)
-            if ($status === 'selesai') {
+            if ($status === 'selesai' || $status === 'diambil') {
                 $tiket->update(['tanggal_selesai' => now()->subDays(40)]);
                 // garansi 30 hari → sudah expired
             }
         }
 
         // Satu tiket selesai baru (masih dalam garansi) + status diambil
-        $baru = 'DEMO-SRV-' . now()->format('Ymd') . '-99';
-        if (!TiketServis::where('no_tiket', $baru)->exists()) {
-            TiketServis::create([
+        $baru = 'DEMO-SRV-'.now()->format('Ymd').'-99';
+        if (! TiketServis::where('no_tiket', $baru)->exists()) {
+            $tiket = TiketServis::create([
                 'no_tiket' => $baru,
                 'cabang_id' => $cabangId,
                 'pelanggan_id' => $member?->id,
@@ -401,29 +456,50 @@ class TransaksiDemoSeeder extends Seeder
                 'telepon_pelanggan' => $member?->telepon ?? '08000000000',
                 'jenis_hp' => 'Samsung A52 Demo',
                 'keluhan' => 'Ganti baterai (demo - dalam garansi)',
-                'status' => 'selesai',
+                'status' => 'diterima',
                 'sumber' => 'walkin',
                 'estimasi_biaya' => 150000,
                 'token_approval' => Str::random(64),
                 'tanggal_terima' => now()->subDays(2),
-                'tanggal_selesai' => now()->subHours(5),
                 'teknisi_id' => $this->teknisi->id,
             ]);
+
+            // Transition to selesai via ServisService to trigger jurnal
+            try {
+                $currentStatus = 'diterima';
+                $transitions = [
+                    'diterima' => 'diagnosa',
+                    'diagnosa' => 'menunggu_approval',
+                    'menunggu_approval' => 'disetujui',
+                    'disetujui' => 'dikerjakan',
+                    'dikerjakan' => 'qc',
+                    'qc' => 'selesai',
+                ];
+                while ($currentStatus !== 'selesai' && isset($transitions[$currentStatus])) {
+                    $nextStatus = $transitions[$currentStatus];
+                    $tiket = $servisService->updateStatus($tiket, $nextStatus, $this->teknisi, "Demo seeder transisi: {$currentStatus} → {$nextStatus}");
+                    $currentStatus = $nextStatus;
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Demo servis transisi gagal (baru): {$e->getMessage()}", ['tiket' => $baru]);
+            }
+
+            $tiket->update(['tanggal_selesai' => now()->subHours(5)]);
         }
     }
 
     private function buatTransfer(): void
     {
-        if (!$this->gudangKedua) {
+        if (! $this->gudangKedua) {
             return;
         }
 
         $produk = $this->produkPertama();
-        if (!$produk) {
+        if (! $produk) {
             return;
         }
 
-        $no = 'DEMO-TRF-' . now()->format('Ymd') . '-0001';
+        $no = 'DEMO-TRF-'.now()->format('Ymd').'-0001';
         if (StokTransfer::where('no_transfer', $no)->exists()) {
             return;
         }
@@ -443,7 +519,7 @@ class TransaksiDemoSeeder extends Seeder
         ]);
 
         // Selesai (kirim + terima)
-        $no2 = 'DEMO-TRF-' . now()->format('Ymd') . '-0002';
+        $no2 = 'DEMO-TRF-'.now()->format('Ymd').'-0002';
         $transfer2 = StokTransfer::create([
             'no_transfer' => $no2,
             'gudang_asal_id' => $this->gudangUtama->id,
@@ -465,11 +541,11 @@ class TransaksiDemoSeeder extends Seeder
     private function buatOpname(): void
     {
         $produk = $this->produkPertama();
-        if (!$produk) {
+        if (! $produk) {
             return;
         }
 
-        $no = 'DEMO-OPN-' . now()->format('Ymd') . '-0001';
+        $no = 'DEMO-OPN-'.now()->format('Ymd').'-0001';
         if (StokOpname::where('no_opname', $no)->exists()) {
             return;
         }
@@ -493,5 +569,149 @@ class TransaksiDemoSeeder extends Seeder
             'stok_fisik' => max(0, $stokSistem - 1), // selisih -1
             'selisih' => -1,
         ]);
+
+        // Jurnal selisih opname: 520-07 (Selisih Kas) debit / 130-01 (Persediaan) kredit
+        $hpp = (float) $produk->harga_beli;
+        $selisihNilai = round($hpp * 1, 2); // selisih 1 unit
+        if ($selisihNilai > 0) {
+            $this->jurnal->post(
+                $this->jurnal->generateNoJurnal('opname', $this->cabang->id),
+                now(),
+                'opname',
+                [
+                    ['akun_kode' => '520-07', 'debit' => $selisihNilai, 'kredit' => 0],
+                    ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $selisihNilai],
+                ],
+                "Selisih opname {$no} (1 unit @ HPP {$hpp})",
+                $this->cabang->id,
+                $this->kasir?->id,
+                StokOpname::class,
+                $opname->id
+            );
+        }
+    }
+
+    private function buatPurchaseOrder(): void
+    {
+        if (! $this->gudangUtama || ! $this->kasir) {
+            return;
+        }
+
+        $produk = $this->produkPertama();
+        if (! $produk) {
+            return;
+        }
+
+        $supplier = Supplier::firstOrCreate(
+            ['nama' => 'Supplier Demo Utama'],
+            ['kontak' => 'Bpk. Supplier', 'telepon' => '081200000001', 'alamat' => 'Jl. Demo No. 1', 'termin_hari' => 30, 'is_active' => true]
+        );
+        $supplier2 = Supplier::firstOrCreate(
+            ['nama' => 'Supplier Demo Kedua'],
+            ['kontak' => 'Ibu Supplier', 'telepon' => '081200000002', 'alamat' => 'Jl. Demo No. 2', 'termin_hari' => 15, 'is_active' => true]
+        );
+
+        // PO 1: KREDIT (parsial bayar)
+        $noPo1 = 'DEMO-PO-'.now()->format('Ymd').'-0001';
+        if (! PurchaseOrder::where('no_po', $noPo1)->exists()) {
+            $po1 = PurchaseOrder::create([
+                'no_po' => $noPo1,
+                'supplier_id' => $supplier->id,
+                'gudang_tujuan_id' => $this->gudangUtama->id,
+                'status' => 'diterima',
+                'metode_bayar' => 'kredit',
+                'jatuh_tempo' => now()->addDays(30),
+                'total' => 500000,
+                'total_dibayar' => 200000,
+                'catatan' => 'Demo seeder PO kredit parsial',
+            ]);
+            PurchaseOrderItem::create([
+                'purchase_order_id' => $po1->id,
+                'produk_id' => $produk->id,
+                'sku_variant_id' => $produk->skuVariants()->first()?->id,
+                'harga_beli' => 50000,
+                'jumlah' => 10,
+                'subtotal' => 500000,
+            ]);
+
+            // Jurnal PO diterima kredit: 130-01 debit / 210-01 kredit
+            $this->jurnal->post(
+                $this->jurnal->generateNoJurnal('beli', $this->cabang->id),
+                now(),
+                'pembelian',
+                [
+                    ['akun_kode' => '130-01', 'debit' => 500000, 'kredit' => 0],
+                    ['akun_kode' => '210-01', 'debit' => 0, 'kredit' => 500000],
+                ],
+                "PO {$noPo1} diterima (kredit)",
+                $this->cabang->id,
+                $this->kasir?->id,
+                PurchaseOrder::class,
+                $po1->id
+            );
+
+            // Pembayaran parsial
+            PembayaranSupplier::create([
+                'po_id' => $po1->id,
+                'jumlah' => 200000,
+                'dibayar_at' => now(),
+                'user_id' => $this->kasir->id,
+                'keterangan' => 'Bayar parsial PO '.$noPo1,
+            ]);
+
+            // Jurnal bayar parsial: 210-01 debit / 110-01 kredit
+            $this->jurnal->post(
+                $this->jurnal->generateNoJurnal('bayar', $this->cabang->id),
+                now(),
+                'manual',
+                [
+                    ['akun_kode' => '210-01', 'debit' => 200000, 'kredit' => 0],
+                    ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => 200000],
+                ],
+                "Bayar parsial PO {$noPo1}",
+                $this->cabang->id,
+                $this->kasir->id
+            );
+        }
+
+        // PO 2: TUNAI (lunas langsung)
+        $noPo2 = 'DEMO-PO-'.now()->format('Ymd').'-0002';
+        if (! PurchaseOrder::where('no_po', $noPo2)->exists()) {
+            $po2 = PurchaseOrder::create([
+                'no_po' => $noPo2,
+                'supplier_id' => $supplier2->id,
+                'gudang_tujuan_id' => $this->gudangUtama->id,
+                'status' => 'diterima',
+                'metode_bayar' => 'tunai',
+                'jatuh_tempo' => now(),
+                'total' => 300000,
+                'total_dibayar' => 300000,
+                'catatan' => 'Demo seeder PO tunai lunas',
+            ]);
+            PurchaseOrderItem::create([
+                'purchase_order_id' => $po2->id,
+                'produk_id' => $produk->id,
+                'sku_variant_id' => $produk->skuVariants()->first()?->id,
+                'harga_beli' => 30000,
+                'jumlah' => 10,
+                'subtotal' => 300000,
+            ]);
+
+            // Jurnal PO diterima tunai: 130-01 debit / 110-01 kredit
+            $this->jurnal->post(
+                $this->jurnal->generateNoJurnal('beli', $this->cabang->id),
+                now(),
+                'pembelian',
+                [
+                    ['akun_kode' => '130-01', 'debit' => 300000, 'kredit' => 0],
+                    ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => 300000],
+                ],
+                "PO {$noPo2} diterima (tunai lunas)",
+                $this->cabang->id,
+                $this->kasir?->id,
+                PurchaseOrder::class,
+                $po2->id
+            );
+        }
     }
 }

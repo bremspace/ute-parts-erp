@@ -294,26 +294,29 @@ class AkuntingController extends Controller
     }
 
     // [API: ACC-11][T-24] Export laporan → queue (async, RAM-heap friendly)
+    // Method-agnostik: bekerja utk POST (form/JSON) maupun GET (?jenis=&periode_dari=&periode_sampai=).
+    // Route GET /api/akunting/export belum didaftarkan di routes/api.php:148 (di luar scope fixer) —
+    // tambahkan Route::match(['get','post']) agar frontend bisa memakai query param.
     public function export(Request $request)
     {
         $request->validate([
-            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,stok,pelanggan,servis,piutang,utang',
+            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,arus_kas,stok,pelanggan,servis,piutang,utang',
             'periode_dari' => 'nullable|date',
             'periode_sampai' => 'nullable|date',
             'akun_id' => 'nullable|exists:akun_coa,id',
         ]);
 
         dispatch(new ExportLaporanJob(
-            jenis: $request->jenis,
-            periodeDari: $request->periode_dari,
-            periodeSampai: $request->periode_sampai,
+            jenis: $request->input('jenis'),
+            periodeDari: $request->input('periode_dari'),
+            periodeSampai: $request->input('periode_sampai'),
             cabangId: session('cabang_id'),
-            akunId: $request->akun_id,
+            akunId: $request->input('akun_id'),
             userId: auth()->id()
         ));
 
         return $this->success(
-            ['status' => 'queued', 'pesan' => 'Export diproses via antrian — link muncul setelah selesai'],
+            ['status' => 'queued', 'pesan' => 'Export diproses via antrian — notifikasi + link download muncul setelah selesai'],
             'Export laporan dijadwalkan (async)'
         );
     }

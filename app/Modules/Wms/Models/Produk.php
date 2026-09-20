@@ -2,19 +2,19 @@
 
 namespace App\Modules\Wms\Models;
 
-use App\Modules\Wms\Models\SkuVariant;
-use App\Modules\Wms\Models\StokItem;
+use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\HargaTier;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'nama', 'slug', 'barcode', 'deskripsi', 'kategori', 'brand_kompatibel',
     'model_kompatibel', 'kondisi', 'satuan', 'harga_beli',
     'harga_jual_retail', 'gambar', 'foto', 'meta_title', 'meta_description',
-    'kompatibilitas_hp', 'is_active'
+    'kompatibilitas_hp', 'is_active',
 ])]
-class Produk extends \Illuminate\Database\Eloquent\Model
+class Produk extends Model
 {
     protected $table = 'produk';
 
@@ -33,7 +33,7 @@ class Produk extends \Illuminate\Database\Eloquent\Model
 
     public function channelMappings(): HasMany
     {
-        return $this->hasMany(\App\Modules\Omnichannel\Models\ChannelProductMapping::class);
+        return $this->hasMany(ChannelProductMapping::class);
     }
 
     public function purchaseOrderItems(): HasMany

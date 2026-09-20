@@ -26,13 +26,13 @@ class RoleUserSeeder extends Seeder
         $cabangs = Cabang::orderBy('id')->get();
 
         $users = [
-            'super-admin'   => ['name' => 'Super Admin Demo',   'email' => 'super-admin@uteparts.test'],
-            'admin-toko'    => ['name' => 'Admin Toko Demo',    'email' => 'admin-toko@uteparts.test'],
-            'kasir'         => ['name' => 'Kasir Demo',         'email' => 'kasir@uteparts.test'],
-            'teknisi'       => ['name' => 'Teknisi Demo',       'email' => 'teknisi@uteparts.test'],
-            'staff-gudang'  => ['name' => 'Staff Gudang Demo',  'email' => 'staff-gudang@uteparts.test'],
-            'finance'       => ['name' => 'Finance Demo',       'email' => 'finance@uteparts.test'],
-            'marketing'     => ['name' => 'Marketing Demo',     'email' => 'marketing@uteparts.test'],
+            'super-admin' => ['name' => 'Super Admin Demo',   'email' => 'super-admin@uteparts.test'],
+            'admin-toko' => ['name' => 'Admin Toko Demo',    'email' => 'admin-toko@uteparts.test'],
+            'kasir' => ['name' => 'Kasir Demo',         'email' => 'kasir@uteparts.test'],
+            'teknisi' => ['name' => 'Teknisi Demo',       'email' => 'teknisi@uteparts.test'],
+            'staff-gudang' => ['name' => 'Staff Gudang Demo',  'email' => 'staff-gudang@uteparts.test'],
+            'finance' => ['name' => 'Finance Demo',       'email' => 'finance@uteparts.test'],
+            'marketing' => ['name' => 'Marketing Demo',     'email' => 'marketing@uteparts.test'],
         ];
 
         foreach ($users as $role => $data) {
@@ -40,7 +40,7 @@ class RoleUserSeeder extends Seeder
                 ['email' => $data['email']],
                 [
                     'name' => $data['name'],
-                    'phone' => '08' . str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT),
+                    'phone' => '08'.str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT),
                     'password' => Hash::make('password'),
                     'is_active' => true,
                 ]
@@ -50,7 +50,7 @@ class RoleUserSeeder extends Seeder
 
             // User multi-cabang: semua role dapat akses ke semua cabang yang ada
             foreach ($cabangs as $cabang) {
-                if (!$user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+                if (! $user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
                     $user->cabangs()->attach($cabang->id);
                 }
             }

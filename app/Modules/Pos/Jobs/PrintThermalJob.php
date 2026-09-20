@@ -64,7 +64,7 @@ class PrintThermalJob implements ShouldQueue
         }
 
         // Fallback staging: simpan artefak agar perilaku dapat diverifikasi tanpa hardware printer.
-        $path = 'prints/' . $transaksi->no_transaksi . '_' . uniqid() . '.bin';
+        $path = 'prints/'.$transaksi->no_transaksi.'_'.uniqid().'.bin';
         Storage::disk('local')->put($path, $bytes);
         Log::info('Thermal print artifact (no printer configured)', [
             'path' => Storage::disk('local')->path($path),
@@ -78,10 +78,10 @@ class PrintThermalJob implements ShouldQueue
     {
         $nama = $item->produk?->nama;
         if (! $nama && $item->produk_id) {
-            $nama = 'Item #' . $item->produk_id;
+            $nama = 'Item #'.$item->produk_id;
         }
         if ($item->skuVariant?->nama_varian) {
-            $nama .= ' (' . $item->skuVariant->nama_varian . ')';
+            $nama .= ' ('.$item->skuVariant->nama_varian.')';
         }
 
         return $nama;

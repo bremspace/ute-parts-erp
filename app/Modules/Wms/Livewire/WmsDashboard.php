@@ -4,13 +4,19 @@ namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
-use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\PurchaseOrderItem;
+use App\Modules\Wms\Models\Rak;
+use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\StokOpnameItem;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
+use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Services\ProdukService;
+use App\Modules\Wms\Services\PurchaseOrderService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -23,18 +29,25 @@ class WmsDashboard extends Component
 
     // [T-10] PO dan Supplier
     public bool $showPoModal = false;
+
     public array $poForm = [
         'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'jatuh_tempo' => '',
         'items' => [],
     ];
+
     public bool $showSupplierModal = false;
+
     public array $supplierForm = ['nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30];
+
     public ?int $bayarPoId = null;
+
     public float $bayarPoJumlah = 0;
 
     // Stok Tab filters
     public string $search = '';
+
     public string $kategori = '';
+
     public ?int $filterGudangId = null;
 
     // Produk tab filters
@@ -42,6 +55,7 @@ class WmsDashboard extends Component
 
     // New Produk Modal (Tambah Produk — sinkron Akunting)
     public bool $showProdukModal = false;
+
     public array $produkForm = [
         'nama' => '', 'kategori' => '', 'brand_kompatibel' => '', 'model_kompatibel' => '',
         'kondisi' => 'baru', 'harga_beli' => 0, 'harga_jual_retail' => 0,
@@ -50,26 +64,38 @@ class WmsDashboard extends Component
 
     // Tambah Stok Modal (pembelian — sinkron Akunting)
     public bool $showTambahStokModal = false;
+
     public ?int $stokProdukId = null;
+
     public array $tambahStokForm = [
         'gudang_id' => null, 'rak_id' => null, 'qty' => 1, 'harga_beli' => 0, 'keterangan' => 'Pembelian dari supplier',
     ];
 
     // [T-12] Rak management
     public bool $showRakModal = false;
+
     public array $rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
 
     // New Transfer Modal state
     public bool $showTransferModal = false;
+
     public ?int $transferGudangAsalId = null;
+
     public ?int $transferGudangTujuanId = null;
+
     public string $transferCatatan = '';
+
     public array $transferItems = []; // [['produk_id' => ..., 'sku_variant_id' => ..., 'jumlah' => ...]]
 
     // New Opname Modal state
     public bool $showOpnameModal = false;
+
     public ?int $opnameGudangId = null;
+
+    public ?int $opnameRakId = null; // [T-14] scope opname per rak
+
     public string $opnameCatatan = '';
+
     public array $opnameRows = []; // [['produk_id' => ..., 'nama' => ..., 'stok_sistem' => ..., 'stok_fisik' => ...]]
 
     // Active Opname View / Review
@@ -95,14 +121,14 @@ class WmsDashboard extends Component
         $this->transferGudangTujuanId = null;
         $this->transferCatatan = '';
         $this->transferItems = [
-            ['produk_id' => null, 'sku_variant_id' => null, 'jumlah' => 1],
+            ['produk_id' => null, 'sku_variant_id' => null, 'rak_id' => null, 'jumlah' => 1],
         ];
         $this->showTransferModal = true;
     }
 
     public function addTransferRow()
     {
-        $this->transferItems[] = ['produk_id' => null, 'sku_variant_id' => null, 'jumlah' => 1];
+        $this->transferItems[] = ['produk_id' => null, 'sku_variant_id' => null, 'rak_id' => null, 'jumlah' => 1];
     }
 
     public function removeTransferRow(int $index)
@@ -118,6 +144,7 @@ class WmsDashboard extends Component
             'transferGudangTujuanId' => 'required|exists:gudang,id|different:transferGudangAsalId',
             'transferItems' => 'required|array|min:1',
             'transferItems.*.produk_id' => 'required|exists:produk,id',
+            'transferItems.*.rak_id' => 'nullable|exists:rak,id',
             'transferItems.*.jumlah' => 'required|integer|min:1',
         ]);
 
@@ -140,6 +167,7 @@ class WmsDashboard extends Component
                     'stok_transfer_id' => $transfer->id,
                     'produk_id' => $item['produk_id'],
                     'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                    'rak_id' => $item['rak_id'] ?? null,
                     'jumlah' => $item['jumlah'],
                 ]);
             }
@@ -248,15 +276,25 @@ class WmsDashboard extends Component
     public function openNewOpnameModal()
     {
         $this->opnameGudangId = $this->filterGudangId;
+        $this->opnameRakId = null;
         $this->opnameCatatan = '';
 
-        // Pre-fill with all products in warehouse
-        $products = Produk::where('is_active', true)->take(20)->get();
+        // Pre-fill with all products in warehouse (optionally filtered by rak)
+        $stokQuery = StokItem::where('gudang_id', $this->filterGudangId);
+        if ($this->opnameRakId) {
+            $stokQuery->where('rak_id', $this->opnameRakId);
+        }
+        $products = Produk::where('is_active', true)
+            ->whereHas('stokItems', fn ($q) => $q->where('gudang_id', $this->filterGudangId)
+                ->when($this->opnameRakId, fn ($q2) => $q2->where('rak_id', $this->opnameRakId)))
+            ->take(20)->get();
         $this->opnameRows = [];
 
         foreach ($products as $prod) {
             $stok = $this->opnameGudangId
-                ? StokItem::where('produk_id', $prod->id)->where('gudang_id', $this->opnameGudangId)->value('jumlah') ?? 0
+                ? StokItem::where('produk_id', $prod->id)->where('gudang_id', $this->opnameGudangId)
+                    ->when($this->opnameRakId, fn ($q) => $q->where('rak_id', $this->opnameRakId))
+                    ->value('jumlah') ?? 0
                 : 0;
 
             $this->opnameRows[] = [
@@ -282,6 +320,7 @@ class WmsDashboard extends Component
     {
         $this->validate([
             'opnameGudangId' => 'required|exists:gudang,id',
+            'opnameRakId' => 'nullable|exists:rak,id',
             'opnameRows' => 'required|array|min:1',
         ]);
 
@@ -293,6 +332,7 @@ class WmsDashboard extends Component
             $opname = StokOpname::create([
                 'no_opname' => $noOpname,
                 'gudang_id' => $this->opnameGudangId,
+                'rak_id' => $this->opnameRakId,
                 'user_id' => auth()->id() ?? 1,
                 'status' => 'menunggu_approval',
                 'catatan' => $this->opnameCatatan,
@@ -303,6 +343,7 @@ class WmsDashboard extends Component
                     'stok_opname_id' => $opname->id,
                     'produk_id' => $row['produk_id'],
                     'sku_variant_id' => null,
+                    'rak_id' => $this->opnameRakId, // [T-14] scope per rak
                     'stok_sistem' => $row['stok_sistem'],
                     'stok_fisik' => $row['stok_fisik'],
                     'selisih' => $row['selisih'],
@@ -325,6 +366,7 @@ class WmsDashboard extends Component
                         'gudang_id' => $opname->gudang_id,
                         'produk_id' => $item->produk_id,
                         'sku_variant_id' => $item->sku_variant_id,
+                        'rak_id' => $item->rak_id ?? $opname->rak_id, // [T-14] scope rak
                     ],
                     ['jumlah' => 0, 'jumlah_minimum' => 0]
                 );
@@ -333,6 +375,17 @@ class WmsDashboard extends Component
                 $stok->update(['jumlah' => $item->stok_fisik]);
 
                 if ($item->selisih !== 0) {
+                    StockMutationLog::create([
+                        'produk_id' => $item->produk_id,
+                        'sku_variant_id' => $item->sku_variant_id,
+                        'gudang_id' => $opname->gudang_id,
+                        'delta' => $item->selisih,
+                        'sumber' => 'opname',
+                        'referensi_tipe' => StokOpname::class,
+                        'referensi_id' => $opname->id,
+                        'terjadi_at' => now(),
+                    ]);
+
                     StokLog::create([
                         'gudang_id' => $opname->gudang_id,
                         'produk_id' => $item->produk_id,
@@ -381,7 +434,7 @@ class WmsDashboard extends Component
         ]);
 
         try {
-            app(\App\Modules\Wms\Services\ProdukService::class)->buatProduk(
+            app(ProdukService::class)->buatProduk(
                 nama: $this->produkForm['nama'],
                 kategori: $this->produkForm['kategori'],
                 brand: $this->produkForm['brand_kompatibel'] ?: null,
@@ -399,7 +452,7 @@ class WmsDashboard extends Component
             $this->showProdukModal = false;
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => 'Produk tersimpan' . ((int) $this->produkForm['stok_awal'] > 0 ? ' + jurnal pembelian dibuat' : ''),
+                'message' => 'Produk tersimpan'.((int) $this->produkForm['stok_awal'] > 0 ? ' + jurnal pembelian dibuat' : ''),
             ]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
@@ -415,7 +468,7 @@ class WmsDashboard extends Component
             'gudang_id' => $this->filterGudangId,
             'qty' => 1,
             'harga_beli' => $variant?->harga_beli ?? $produk->harga_beli ?? 0,
-            'keterangan' => 'Pembelian stok ' . $produk->nama,
+            'keterangan' => 'Pembelian stok '.$produk->nama,
         ];
         $this->showTambahStokModal = true;
     }
@@ -424,6 +477,7 @@ class WmsDashboard extends Component
     {
         $this->validate([
             'tambahStokForm.gudang_id' => 'required|exists:gudang,id',
+            'tambahStokForm.rak_id' => 'nullable|exists:rak,id', // [T-12]
             'tambahStokForm.qty' => 'required|integer|min:1',
             'tambahStokForm.harga_beli' => 'required|numeric|min:0',
         ]);
@@ -432,14 +486,15 @@ class WmsDashboard extends Component
             $produk = Produk::with('skuVariants')->findOrFail($this->stokProdukId);
             $variant = $produk->skuVariants->first();
 
-            app(\App\Modules\Wms\Services\ProdukService::class)->tambahStokPembelian(
+            app(ProdukService::class)->tambahStokPembelian(
                 produkId: $produk->id,
                 variantId: $variant?->id,
                 gudangId: (int) $this->tambahStokForm['gudang_id'],
                 qty: (int) $this->tambahStokForm['qty'],
                 hargaBeli: (float) $this->tambahStokForm['harga_beli'],
                 keterangan: $this->tambahStokForm['keterangan'] ?: 'Pembelian dari supplier',
-                userId: auth()->id()
+                userId: auth()->id(),
+                rakId: $this->tambahStokForm['rak_id'] ?? null // [T-12]
             );
 
             $this->showTambahStokModal = false;
@@ -488,7 +543,7 @@ class WmsDashboard extends Component
         ]);
 
         $today = now()->format('Ymd');
-        $count = \App\Modules\Wms\Models\PurchaseOrder::whereDate('created_at', now()->toDateString())->count() + 1;
+        $count = PurchaseOrder::whereDate('created_at', now()->toDateString())->count() + 1;
         $noPo = sprintf('PO-%s-%03d', $today, $count);
 
         $total = 0;
@@ -496,19 +551,19 @@ class WmsDashboard extends Component
             $total += (float) ($i['harga_beli'] ?? 0) * (int) ($i['jumlah'] ?? 1);
         }
 
-        $po = \App\Modules\Wms\Models\PurchaseOrder::create([
+        $po = PurchaseOrder::create([
             'no_po' => $noPo,
             'supplier_id' => $this->poForm['supplier_id'],
             'gudang_tujuan_id' => $this->poForm['gudang_tujuan_id'],
             'status' => 'draft',
             'metode_bayar' => $this->poForm['metode_bayar'],
-            'jatuh_tempo' => $this->poForm['jatuh_tempo'] ?: now()->addDays((int) \App\Modules\Wms\Models\Supplier::find($this->poForm['supplier_id'])?->termin_hari ?? 30)->toDateString(),
+            'jatuh_tempo' => $this->poForm['jatuh_tempo'] ?: now()->addDays((int) Supplier::find($this->poForm['supplier_id'])?->termin_hari ?? 30)->toDateString(),
             'total' => $total,
             'total_dibayar' => 0,
         ]);
 
         foreach ($this->poForm['items'] as $i) {
-            \App\Modules\Wms\Models\PurchaseOrderItem::create([
+            PurchaseOrderItem::create([
                 'purchase_order_id' => $po->id,
                 'produk_id' => $i['produk_id'],
                 'sku_variant_id' => $i['sku_variant_id'] ?? null,
@@ -524,15 +579,15 @@ class WmsDashboard extends Component
 
     public function kirimPo(int $id)
     {
-        \App\Modules\Wms\Models\PurchaseOrder::findOrFail($id)->update(['status' => 'dikirim']);
+        PurchaseOrder::findOrFail($id)->update(['status' => 'dikirim']);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'PO dikirim ke supplier']);
     }
 
     public function terimaPo(int $id)
     {
         try {
-            app(\App\Modules\Wms\Services\PurchaseOrderService::class)->terimaBarang(
-                \App\Modules\Wms\Models\PurchaseOrder::findOrFail($id),
+            app(PurchaseOrderService::class)->terimaBarang(
+                PurchaseOrder::findOrFail($id),
                 auth()->id()
             );
             $this->dispatch('alert', ['type' => 'success', 'message' => 'PO diterima — stok & jurnal akunting dibuat']);
@@ -544,15 +599,15 @@ class WmsDashboard extends Component
     public function bukaBayarPo(int $id)
     {
         $this->bayarPoId = $id;
-        $this->bayarPoJumlah = (float) \App\Modules\Wms\Models\PurchaseOrder::find($id)?->sisa ?? 0;
+        $this->bayarPoJumlah = (float) PurchaseOrder::find($id)?->sisa ?? 0;
         $this->dispatch('alert-open-bayar-po', ['id' => $id]);
     }
 
     public function bayarPo()
     {
         try {
-            app(\App\Modules\Wms\Services\PurchaseOrderService::class)->bayarPO(
-                \App\Modules\Wms\Models\PurchaseOrder::findOrFail($this->bayarPoId),
+            app(PurchaseOrderService::class)->bayarPO(
+                PurchaseOrder::findOrFail($this->bayarPoId),
                 (float) $this->bayarPoJumlah,
                 auth()->id()
             );
@@ -568,7 +623,7 @@ class WmsDashboard extends Component
             'supplierForm.nama' => 'required|string|max:255',
         ]);
 
-        \App\Modules\Wms\Models\Supplier::create($this->supplierForm);
+        Supplier::create($this->supplierForm);
         $this->showSupplierModal = false;
         $this->supplierForm = ['nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier disimpan']);
@@ -586,10 +641,10 @@ class WmsDashboard extends Component
 
         $variant = $produk->skuVariants()->first();
         if ($variant && empty($variant->barcode)) {
-            $variant->update(['barcode' => $produk->barcode . '-' . $variant->id]);
+            $variant->update(['barcode' => $produk->barcode.'-'.$variant->id]);
         }
 
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Barcode: ' . $produk->fresh()->barcode]);
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Barcode: '.$produk->fresh()->barcode]);
     }
 
     // [T-12] Rak
@@ -601,7 +656,7 @@ class WmsDashboard extends Component
             'rakForm.kode' => 'required|string|max:20|unique:rak,kode',
         ]);
 
-        \App\Modules\Wms\Models\Rak::create($this->rakForm);
+        Rak::create($this->rakForm);
         $this->showRakModal = false;
         $this->rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Rak ditambahkan']);
@@ -617,12 +672,12 @@ class WmsDashboard extends Component
         if ($this->filterGudangId) {
             $stokQuery->where('gudang_id', $this->filterGudangId);
         }
-        if (!empty($this->search)) {
+        if (! empty($this->search)) {
             $s = $this->search;
             $stokQuery->whereHas('produk', function ($q) use ($s) {
                 $q->where('nama', 'like', "%{$s}%")
-                  ->orWhere('brand_kompatibel', 'like', "%{$s}%")
-                  ->orWhere('model_kompatibel', 'like', "%{$s}%");
+                    ->orWhere('brand_kompatibel', 'like', "%{$s}%")
+                    ->orWhere('model_kompatibel', 'like', "%{$s}%");
             });
         }
         $stokItems = $stokQuery->paginate(15);
@@ -645,9 +700,9 @@ class WmsDashboard extends Component
             'stokItems' => $stokItems,
             'transfers' => $transfers,
             'opnames' => $opnames,
-            'suppliers' => \App\Modules\Wms\Models\Supplier::orderBy('nama')->get(),
-            'raks' => \App\Modules\Wms\Models\Rak::with('gudang')->get(),
-            'poList' => \App\Modules\Wms\Models\PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk'])->latest()->paginate(15, pageName: 'po'),
+            'suppliers' => Supplier::orderBy('nama')->get(),
+            'raks' => Rak::with('gudang')->get(),
+            'poList' => PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk'])->latest()->paginate(15, pageName: 'po'),
             'produks' => Produk::with(['skuVariants', 'stokItems.gudang'])
                 ->when($this->produkSearch, fn ($q) => $q->where(function ($q2) {
                     $q2->where('nama', 'like', "%{$this->produkSearch}%")

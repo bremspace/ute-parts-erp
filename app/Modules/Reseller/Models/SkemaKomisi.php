@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
-    'nama', 'kategori', 'tipe', 'nilai', 'is_active'
+    'nama', 'kategori', 'tipe', 'nilai', 'is_active',
 ])]
 class SkemaKomisi extends Model
 {

@@ -18,6 +18,10 @@ export default defineConfig({
         tailwindcss(),
         VitePWA({
             registerType: 'autoUpdate',
+            // 'script-defer' => plugin generates registerSW.js artifact (AC verifikasi).
+            // Laravel tidak punya HTML build-time, jadi tidak ada <script> ter-inject;
+            // registrasi runtime tetap SATU: import virtual:pwa-register di resources/js/app.js.
+            injectRegister: 'script-defer',
             includeAssets: ['favicon.ico', 'robots.txt', 'icons/icon.svg'],
             manifest: {
                 name: 'Ute Parts',
@@ -76,7 +80,27 @@ export default defineConfig({
             },
             workbox: {
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+                // Offline fallback: pastikan /offline.html ter-precache & dipakai utk navigasi (T-31)
+                navigateFallback: '/offline.html',
+                navigateFallbackDenylist: [/^\/api\//, /^\/build\//],
+                additionalManifestEntries: [{ url: '/offline.html', revision: null }],
                 runtimeCaching: [
+                    {
+                        // Aset CSS/JS (non-precache): stale-while-revalidate sesuai AC T-31
+                        urlPattern: /\.(?:css|js|mjs)$/i,
+                        handler: 'StaleWhileRevalidate',
+                        options: {
+                            cacheName: 'assets-cache',
+                            expiration: {
+                                maxEntries: 50,
+                                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                                purgeOnQuotaError: true,
+                            },
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                        },
+                    },
                     {
                         urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
                         handler: 'CacheFirst',

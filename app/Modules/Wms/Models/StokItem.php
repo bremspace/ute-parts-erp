@@ -2,14 +2,12 @@
 
 namespace App\Modules\Wms\Models;
 
-use App\Modules\Wms\Models\Produk;
-use App\Modules\Wms\Models\SkuVariant;
-use App\Modules\Wms\Models\Gudang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['produk_id', 'sku_variant_id', 'gudang_id', 'jumlah', 'jumlah_minimum'])]
-class StokItem extends \Illuminate\Database\Eloquent\Model
+#[Fillable(['produk_id', 'sku_variant_id', 'gudang_id', 'rak_id', 'jumlah', 'jumlah_minimum'])]
+class StokItem extends Model
 {
     protected $casts = [
         'jumlah' => 'integer',
@@ -29,5 +27,10 @@ class StokItem extends \Illuminate\Database\Eloquent\Model
     public function gudang(): BelongsTo
     {
         return $this->belongsTo(Gudang::class);
+    }
+
+    public function rak(): BelongsTo
+    {
+        return $this->belongsTo(Rak::class);
     }
 }

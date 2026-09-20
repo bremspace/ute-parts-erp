@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'tiket_servis_id', 'tipe', 'produk_id', 'sku_variant_id',
-    'nama_item', 'qty', 'harga', 'hpp'
+    'nama_item', 'qty', 'harga', 'hpp',
 ])]
 class TiketServisItem extends Model
 {

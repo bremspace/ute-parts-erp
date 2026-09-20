@@ -3,14 +3,18 @@
 namespace App\Modules\Rbac\Livewire;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\JenisServis;
-use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Wms\Models\Gudang;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -21,10 +25,74 @@ class SettingsRbac extends Component
 {
     use WithPagination;
 
-    public string $activeTab = 'users'; // users, cabang, master
+    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas
+
+    // [T-22] Strategi Loyalitas (editable tanpa deploy, non-retroaktif)
+    public array $loyalitasForm = [
+        'poin_earn_persen' => 5,
+        'poin_redeem_rupiah' => 100,
+        'diskon_silver' => 3,
+        'diskon_gold' => 5,
+        'diskon_platinum' => 10,
+    ];
+
+    public array $skemaKomisiForm = [];
+
+    public function mount(): void
+    {
+        $config = app(KonfigurasiService::class);
+
+        // Nilai TERSIMPAN dari tabel konfigurasi, fallback default bila kosong
+        foreach (array_keys($this->loyalitasForm) as $kunci) {
+            $this->loyalitasForm[$kunci] = (float) ($config->get($kunci) ?? $config->defaults()[$kunci]);
+        }
+
+        // Skema komisi default (tabel skema_komisi)
+        $this->skemaKomisiForm = SkemaKomisi::orderBy('id')
+            ->get(['id', 'nama', 'kategori', 'tipe', 'nilai', 'is_active'])
+            ->toArray();
+    }
+
+    /** [T-22] Simpan strategi loyalitas → tabel konfigurasi + diskon tier + skema komisi default. Non-retroaktif: hanya berlaku utk transaksi baru. */
+    public function simpanLoyalitas()
+    {
+        $this->validate([
+            'loyalitasForm.poin_earn_persen' => 'required|numeric|min:0|max:100',
+            'loyalitasForm.poin_redeem_rupiah' => 'required|numeric|min:0',
+            'loyalitasForm.diskon_silver' => 'required|numeric|min:0|max:100',
+            'loyalitasForm.diskon_gold' => 'required|numeric|min:0|max:100',
+            'loyalitasForm.diskon_platinum' => 'required|numeric|min:0|max:100',
+            'skemaKomisiForm.*.tipe' => 'required|in:persen,nominal',
+            'skemaKomisiForm.*.nilai' => 'required|numeric|min:0',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+        foreach ($this->loyalitasForm as $kunci => $nilai) {
+            $config->set($kunci, (float) $nilai, 'Strategi loyalitas');
+        }
+
+        // Terapkan diskon tier (sama dengan PUT /api/crm/config)
+        foreach (['silver', 'gold', 'platinum'] as $kode) {
+            TierMembership::where('kode', $kode)
+                ->update(['diskon_persen' => (float) $this->loyalitasForm["diskon_{$kode}"]]);
+        }
+
+        // Skema komisi default
+        foreach ($this->skemaKomisiForm as $row) {
+            SkemaKomisi::findOrFail($row['id'])->update([
+                'tipe' => $row['tipe'],
+                'nilai' => (float) $row['nilai'],
+            ]);
+        }
+
+        app(AuditService::class)->catat('Konfigurasi', 'update', null, 'Strategi loyalitas diperbarui (poin/diskon/skema komisi) — non-retroaktif');
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Strategi loyalitas tersimpan (berlaku utk transaksi baru)']);
+    }
 
     // User CRUD
     public bool $showUserModal = false;
+
     public array $userForm = [
         'id' => null, 'name' => '', 'email' => '', 'password' => '', 'phone' => '',
         'role' => '', 'cabang_ids' => [], 'is_active' => true,
@@ -32,14 +100,17 @@ class SettingsRbac extends Component
 
     // Cabang CRUD
     public bool $showCabangModal = false;
+
     public array $cabangForm = ['id' => null, 'nama' => '', 'kode' => '', 'alamat' => '', 'telepon' => '', 'is_active' => true];
 
     // Gudang CRUD
     public bool $showGudangModal = false;
+
     public array $gudangForm = ['id' => null, 'cabang_id' => null, 'nama' => '', 'kode' => '', 'is_active' => true];
 
     // [T-16] JenisServis CRUD editable
     public bool $showJenisServisModal = false;
+
     public array $jenisServisForm = [
         'id' => null, 'nama' => '', 'kode' => '', 'kategori' => 'hardware',
         'estimasi_durasi' => 120, 'durasi_garansi_hari' => 30, 'butuh_part' => true,
@@ -48,20 +119,24 @@ class SettingsRbac extends Component
 
     // [T-25] RBAC fleksibel: role baru + permission matrix per role
     public bool $showRoleModal = false;
+
     public string $roleBaruNama = '';
+
     public array $roleBaruPermissions = [];
+
     public ?int $editRoleId = null;
+
     public array $editRolePermissions = [];
 
     public function getPermissionsListProperty()
     {
-        return \Spatie\Permission\Models\Permission::orderBy('name')->get();
+        return Permission::orderBy('name')->get();
     }
 
     // Role: semua role + permission (recompute)
     public function getRolesFullProperty()
     {
-        return \Spatie\Permission\Models\Role::with('permissions')->orderBy('name')->get();
+        return Role::with('permissions')->orderBy('name')->get();
     }
 
     public function openRoleModal()
@@ -75,8 +150,8 @@ class SettingsRbac extends Component
     {
         $this->validate(['roleBaruNama' => 'required|string|max:255|unique:roles,name']);
 
-        $role = \Spatie\Permission\Models\Role::create(['name' => $this->roleBaruNama]);
-        if (!empty($this->roleBaruPermissions)) {
+        $role = Role::create(['name' => $this->roleBaruNama]);
+        if (! empty($this->roleBaruPermissions)) {
             $role->syncPermissions($this->roleBaruPermissions);
         }
 
@@ -88,18 +163,19 @@ class SettingsRbac extends Component
 
     public function openEditRole(int $roleId)
     {
-        $role = \Spatie\Permission\Models\Role::with('permissions')->findOrFail($roleId);
+        $role = Role::with('permissions')->findOrFail($roleId);
         $this->editRoleId = $roleId;
         $this->editRolePermissions = $role->permissions->pluck('name')->toArray();
     }
 
     public function saveEditRolePermissions()
     {
-        $role = \Spatie\Permission\Models\Role::findOrFail($this->editRoleId);
+        $role = Role::findOrFail($this->editRoleId);
 
         // Guardrail: super-admin tidak boleh dikosongkan (anti lockout)
         if ($role->name === 'super-admin' && empty($this->editRolePermissions)) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'super-admin wajib punya minimal 1 permission']);
+
             return;
         }
 
@@ -155,7 +231,7 @@ class SettingsRbac extends Component
     {
         $this->validate([
             'jenisServisForm.nama' => 'required|string|max:255',
-            'jenisServisForm.kode' => 'required|string|max:20|unique:jenis_servis,kode,' . ($this->jenisServisForm['id'] ?? 'NULL'),
+            'jenisServisForm.kode' => 'required|string|max:20|unique:jenis_servis,kode,'.($this->jenisServisForm['id'] ?? 'NULL'),
         ]);
 
         if ($this->jenisServisForm['id']) {
@@ -196,10 +272,10 @@ class SettingsRbac extends Component
     {
         $this->validate([
             'userForm.name' => 'required|string|max:255',
-            'userForm.email' => 'required|email|unique:users,email,' . ($this->userForm['id'] ?? 'NULL'),
+            'userForm.email' => 'required|email|unique:users,email,'.($this->userForm['id'] ?? 'NULL'),
         ]);
 
-        if (!$this->userForm['id']) {
+        if (! $this->userForm['id']) {
             $this->validate(['userForm.password' => 'required|string|min:6']);
 
             $user = User::create([
@@ -238,8 +314,8 @@ class SettingsRbac extends Component
     public function toggleUserActive(int $id)
     {
         $u = User::findOrFail($id);
-        $u->update(['is_active' => !$u->is_active]);
-        app(AuditService::class)->catat('User', 'update', $u->id, "Status user {$u->name} → " . ($u->is_active ? 'aktif' : 'nonaktif'));
+        $u->update(['is_active' => ! $u->is_active]);
+        app(AuditService::class)->catat('User', 'update', $u->id, "Status user {$u->name} → ".($u->is_active ? 'aktif' : 'nonaktif'));
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status user diubah']);
     }
 
@@ -259,7 +335,7 @@ class SettingsRbac extends Component
     {
         $this->validate([
             'cabangForm.nama' => 'required|string|max:255',
-            'cabangForm.kode' => 'required|string|max:20|unique:cabang,kode,' . ($this->cabangForm['id'] ?? 'NULL'),
+            'cabangForm.kode' => 'required|string|max:20|unique:cabang,kode,'.($this->cabangForm['id'] ?? 'NULL'),
         ]);
 
         if ($this->cabangForm['id']) {
@@ -289,7 +365,7 @@ class SettingsRbac extends Component
         $this->validate([
             'gudangForm.cabang_id' => 'required|exists:cabang,id',
             'gudangForm.nama' => 'required|string|max:255',
-            'gudangForm.kode' => 'required|string|max:20|unique:gudang,kode,' . ($this->gudangForm['id'] ?? 'NULL'),
+            'gudangForm.kode' => 'required|string|max:20|unique:gudang,kode,'.($this->gudangForm['id'] ?? 'NULL'),
         ]);
 
         if ($this->gudangForm['id']) {

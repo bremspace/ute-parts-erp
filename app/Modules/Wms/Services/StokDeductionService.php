@@ -2,8 +2,11 @@
 
 namespace App\Modules\Wms\Services;
 
+use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Models\StokTransfer;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -38,8 +41,17 @@ class StokDeductionService
             ->lockForUpdate()
             ->first();
 
-        if (!$stok || $stok->jumlah < $qty) {
-            throw new \Exception("Stok tidak mencukupi (produk ID {$produkId}, tersedia: " . ($stok?->jumlah ?? 0) . ")");
+        if (! $stok || $stok->jumlah < $qty) {
+            throw new \Exception("Stok tidak mencukupi (produk ID {$produkId}, tersedia: ".($stok?->jumlah ?? 0).')');
+        }
+
+        // [T-13] Guard pending transfer (status draft): qty yang menunggu kirim
+        // di gudang asal tidak boleh dipakai transaksi lain (POS/servis/marketplace).
+        $locked = StokTransfer::pendingLockedFor($stok);
+        if ($locked > 0 && $stok->jumlah - $locked < $qty) {
+            throw new \Exception(
+                "Stok tidak mencukupi karena {$locked} unit sedang terkunci transfer pending (produk ID {$produkId}, tersedia bebas: ".max(0, $stok->jumlah - $locked).')'
+            );
         }
 
         $sebelum = $stok->jumlah;
@@ -47,29 +59,29 @@ class StokDeductionService
         $stok->update(['jumlah' => $setelah]);
 
         StokLog::create([
-            'gudang_id'      => $gudangId,
-            'produk_id'      => $produkId,
+            'gudang_id' => $gudangId,
+            'produk_id' => $produkId,
             'sku_variant_id' => $skuVariantId,
-            'user_id'        => $userId,
-            'jenis'          => $jenis,
+            'user_id' => $userId,
+            'jenis' => $jenis,
             'referensi_tipe' => $referensiTipe,
-            'referensi_id'   => $referensiId,
+            'referensi_id' => $referensiId,
             'jumlah_sebelum' => $sebelum,
-            'perubahan'      => -$qty,
+            'perubahan' => -$qty,
             'jumlah_setelah' => $setelah,
-            'catatan'        => $catatan,
+            'catatan' => $catatan,
         ]);
 
         // [T-26] SOT mutation log
-        \App\Modules\Wms\Models\StockMutationLog::create([
-            'produk_id'      => $produkId,
+        StockMutationLog::create([
+            'produk_id' => $produkId,
             'sku_variant_id' => $skuVariantId,
-            'gudang_id'      => $gudangId,
-            'delta'          => -$qty,
-            'sumber'         => $jenis,
+            'gudang_id' => $gudangId,
+            'delta' => -$qty,
+            'sumber' => $jenis,
             'referensi_tipe' => $referensiTipe,
-            'referensi_id'   => $referensiId,
-            'terjadi_at'     => now(),
+            'referensi_id' => $referensiId,
+            'terjadi_at' => now(),
         ]);
 
         return $stok;
@@ -92,11 +104,11 @@ class StokDeductionService
         ?int $userId,
         ?string $catatan = null
     ): array {
-        $gudangIds = \App\Modules\Wms\Models\Gudang::where('cabang_id', $cabangId)->pluck('id');
+        $gudangIds = Gudang::where('cabang_id', $cabangId)->pluck('id');
         $tersisa = $qty;
         $logs = [];
 
-        DB::transaction(function () use ($produkId, $skuVariantId, $cabangId, $qty, $jenis, $referensiTipe, $referensiId, $userId, $catatan, $gudangIds, &$tersisa, &$logs) {
+        DB::transaction(function () use ($produkId, $skuVariantId, $jenis, $referensiTipe, $referensiId, $userId, $catatan, $gudangIds, &$tersisa, &$logs) {
             // Prioritaskan gudang dengan stok cukup paling besar terlebih dahulu
             $stoks = StokItem::where('produk_id', $produkId)
                 ->whereIn('gudang_id', $gudangIds)

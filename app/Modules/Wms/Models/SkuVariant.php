@@ -2,17 +2,16 @@
 
 namespace App\Modules\Wms\Models;
 
-use App\Modules\Wms\Models\Produk;
-use App\Modules\Wms\Models\StokItem;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'produk_id', 'sku', 'barcode', 'nama_varian', 'satuan_kode', 'atribut', 'harga_beli',
-    'harga_jual_retail', 'is_active'
+    'harga_jual_retail', 'is_active',
 ])]
-class SkuVariant extends \Illuminate\Database\Eloquent\Model
+class SkuVariant extends Model
 {
     protected $casts = [
         'is_active' => 'boolean',

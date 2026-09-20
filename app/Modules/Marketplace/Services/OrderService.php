@@ -59,33 +59,33 @@ class OrderService
             }
 
             $transaksi = Transaksi::create([
-                'no_transaksi'   => $noTransaksi,
-                'cabang_id'      => $cabangId,
-                'kasir_id'       => null, // bukan staf kasir
-                'pelanggan_id'   => $pelanggan->id,
-                'sumber'         => 'marketplace',
-                'subtotal'       => $subtotal,
-                'diskon_persen'  => 0,
+                'no_transaksi' => $noTransaksi,
+                'cabang_id' => $cabangId,
+                'kasir_id' => null, // bukan staf kasir
+                'pelanggan_id' => $pelanggan->id,
+                'sumber' => 'marketplace',
+                'subtotal' => $subtotal,
+                'diskon_persen' => 0,
                 'diskon_nominal' => 0,
-                'pajak_nominal'  => 0,
-                'total_akhir'    => $subtotal,
-                'metode_bayar'   => 'menunggu', // payment Duitku Hari 6
-                'jumlah_bayar'   => 0,
-                'kembalian'      => 0,
-                'status'         => 'menunggu_pembayaran',
-                'catatan'        => "Order marketplace [ambil: {$metodeAmbil}] " . ($catatan ?? ''),
+                'pajak_nominal' => 0,
+                'total_akhir' => $subtotal,
+                'metode_bayar' => 'menunggu', // payment Duitku Hari 6
+                'jumlah_bayar' => 0,
+                'kembalian' => 0,
+                'status' => 'menunggu_pembayaran',
+                'catatan' => "Order marketplace [ambil: {$metodeAmbil}] ".($catatan ?? ''),
             ]);
 
             foreach ($rows as $row) {
                 TransaksiItem::create([
-                    'transaksi_id'    => $transaksi->id,
-                    'produk_id'       => $row['produk']->id,
-                    'sku_variant_id'  => $row['sku_variant_id'],
-                    'jumlah'          => $row['jumlah'],
-                    'harga_satuan'    => $row['harga_satuan'],
-                    'diskon_nominal'  => 0,
-                    'subtotal'        => $row['subtotal'],
-                    'hpp'             => $row['hpp'],
+                    'transaksi_id' => $transaksi->id,
+                    'produk_id' => $row['produk']->id,
+                    'sku_variant_id' => $row['sku_variant_id'],
+                    'jumlah' => $row['jumlah'],
+                    'harga_satuan' => $row['harga_satuan'],
+                    'diskon_nominal' => 0,
+                    'subtotal' => $row['subtotal'],
+                    'hpp' => $row['hpp'],
                 ]);
             }
 

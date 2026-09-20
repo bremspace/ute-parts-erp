@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'tiket_servis_id', 'status_dari', 'status_ke', 'user_id', 'aksi', 'alasan'
+    'tiket_servis_id', 'status_dari', 'status_ke', 'user_id', 'aksi', 'alasan',
 ])]
 class ServisStatusLog extends Model
 {

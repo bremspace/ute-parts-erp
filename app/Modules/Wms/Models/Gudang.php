@@ -3,13 +3,13 @@
 namespace App\Modules\Wms\Models;
 
 use App\Modules\Rbac\Models\Cabang;
-use App\Modules\Wms\Models\StokItem;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['cabang_id', 'nama', 'kode', 'is_active'])]
-class Gudang extends \Illuminate\Database\Eloquent\Model
+class Gudang extends Model
 {
     protected $table = 'gudang';
 

@@ -157,7 +157,7 @@ class ProdukDanStokSeeder extends Seeder
 
             // Sku Variant Default
             $sku = SkuVariant::firstOrCreate(
-                ['sku' => 'SKU-' . strtoupper(Str::random(6))],
+                ['sku' => 'SKU-'.strtoupper(Str::random(6))],
                 [
                     'produk_id' => $produk->id,
                     'nama_varian' => 'Standar',

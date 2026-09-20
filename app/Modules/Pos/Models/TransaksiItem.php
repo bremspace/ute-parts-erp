@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'transaksi_id', 'produk_id', 'sku_variant_id', 'jumlah',
-    'harga_satuan', 'diskon_nominal', 'subtotal', 'hpp'
+    'harga_satuan', 'diskon_nominal', 'subtotal', 'hpp',
 ])]
 class TransaksiItem extends Model
 {

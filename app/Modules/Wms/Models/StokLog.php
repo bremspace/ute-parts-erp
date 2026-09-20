@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'gudang_id', 'produk_id', 'sku_variant_id', 'user_id',
     'jenis', 'referensi_tipe', 'referensi_id',
-    'jumlah_sebelum', 'perubahan', 'jumlah_setelah', 'catatan'
+    'jumlah_sebelum', 'perubahan', 'jumlah_setelah', 'catatan',
 ])]
 class StokLog extends Model
 {

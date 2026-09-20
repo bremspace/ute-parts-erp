@@ -7,6 +7,7 @@ use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
 use App\Modules\Wms\Models\Produk;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 /**
@@ -19,6 +20,7 @@ class OmnichannelCommandCenter extends Component
 
     // Modal hubungkan channel
     public bool $showConnectModal = false;
+
     public array $connectForm = [
         'nama' => '', 'platform' => 'shopee',
         'partner_id' => '', 'partner_key' => '', 'shop_id' => '',
@@ -26,7 +28,9 @@ class OmnichannelCommandCenter extends Component
 
     // Mapping: produk terpilih
     public array $selectedProdukIds = [];
+
     public ?int $mappingChannelId = null;
+
     public string $autoMatchSku = '';
 
     // Trigger sync result
@@ -60,7 +64,7 @@ class OmnichannelCommandCenter extends Component
             ->get();
     }
 
-    public function getMappingsProperty(): \Illuminate\Support\Collection
+    public function getMappingsProperty(): Collection
     {
         $query = ChannelProductMapping::with(['channel', 'produk'])
             ->latest();
@@ -118,18 +122,18 @@ class OmnichannelCommandCenter extends Component
         );
 
         $adapter = app(ChannelSyncService::class)->adapterFor($this->connectForm['platform']);
-        if ($adapter && !empty($kredensial)) {
+        if ($adapter && ! empty($kredensial)) {
             try {
                 $adapter->testConnection($kredensial);
                 $channel->update(['status' => 'terhubung']);
             } catch (\Throwable $e) {
                 $channel->update(['status' => 'token_bermasalah']);
-                $this->dispatch('alert', ['type' => 'warning', 'message' => 'Channel disimpan tapi koneksi bermasalah: ' . $e->getMessage()]);
+                $this->dispatch('alert', ['type' => 'warning', 'message' => 'Channel disimpan tapi koneksi bermasalah: '.$e->getMessage()]);
             }
         }
 
         $this->showConnectModal = false;
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Channel ' . $channel->nama . ' berhasil dihubungkan']);
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Channel '.$channel->nama.' berhasil dihubungkan']);
     }
 
     public function setMappingChannel(int $channelId)
@@ -146,8 +150,9 @@ class OmnichannelCommandCenter extends Component
 
     public function saveMapping()
     {
-        if (!$this->mappingChannelId || empty($this->selectedProdukIds)) {
+        if (! $this->mappingChannelId || empty($this->selectedProdukIds)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih channel & minimal 1 produk']);
+
             return;
         }
 
@@ -177,7 +182,7 @@ class OmnichannelCommandCenter extends Component
             foreach ($produkIds as $pid) {
                 app(ChannelSyncService::class)->syncStokSemuaChannel($pid);
             }
-            $this->syncMessage = 'Sinkronisasi stok di-trigger untuk ' . $produkIds->count() . ' produk';
+            $this->syncMessage = 'Sinkronisasi stok di-trigger untuk '.$produkIds->count().' produk';
             $this->dispatch('alert', ['type' => 'success', 'message' => $this->syncMessage]);
         } catch (\Throwable $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);

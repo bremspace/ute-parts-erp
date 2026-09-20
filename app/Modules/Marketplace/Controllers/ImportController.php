@@ -30,7 +30,7 @@ class ImportController extends Controller
 
         // Validasi heading awal — mapping kolom sumber → field Ute Parts (SID Retail generik)
         try {
-            $headings = Excel::toArray(new HeadingRowImport(), storage_path('app/' . $path));
+            $headings = Excel::toArray(new HeadingRowImport, storage_path('app/'.$path));
             $kolom = collect($headings[0][0] ?? [])->toArray();
         } catch (\Throwable $e) {
             // Bukan error fatal — ToModel WithValidation akan menangkap per-row
@@ -38,7 +38,7 @@ class ImportController extends Controller
         }
 
         $import = new ProdukImport(preview: true);
-        $rows = Excel::toCollection($import, storage_path('app/' . $path));
+        $rows = Excel::toCollection($import, storage_path('app/'.$path));
 
         $valid = 0;
         $invalid = 0;
@@ -85,11 +85,11 @@ class ImportController extends Controller
 
         try {
             $import = new ProdukImport(preview: false);
-            $count = Excel::import($import, storage_path('app/' . $path));
+            $count = Excel::import($import, storage_path('app/'.$path));
 
             return $this->success(['rows_processed' => $count], 'Import produk berhasil disimpan');
         } catch (\Throwable $e) {
-            return $this->error('Import gagal: ' . $e->getMessage(), 422);
+            return $this->error('Import gagal: '.$e->getMessage(), 422);
         }
     }
 }

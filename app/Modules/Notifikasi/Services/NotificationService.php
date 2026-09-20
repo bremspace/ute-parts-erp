@@ -2,8 +2,8 @@
 
 namespace App\Modules\Notifikasi\Services;
 
-use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Notifikasi\Jobs\KirimNotifikasiJob;
+use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use Illuminate\Support\Facades\Queue;
 
 class NotificationService
@@ -12,11 +12,8 @@ class NotificationService
      * Dispatch notifikasi via queue (database driver).
      * Channel: wa, email, inapp — provider WA keputusan user (Fonnte/Wablas placeholder siap).
      *
-     * @param string $tipe  wa | email | inapp
-     * @param string|null $tujuan  nomor HP / email
-     * @param string $judul
-     * @param string $konten
-     * @param array $payload
+     * @param  string  $tipe  wa | email | inapp
+     * @param  string|null  $tujuan  nomor HP / email
      */
     public function kirim(
         string $tipe,
@@ -26,12 +23,12 @@ class NotificationService
         array $payload = []
     ): NotifikasiKeluar {
         $log = NotifikasiKeluar::create([
-            'tipe'     => $tipe,
-            'tujuan'   => $tujuan,
-            'judul'    => $judul,
-            'konten'   => $konten,
-            'payload'  => $payload,
-            'status'   => 'pending',
+            'tipe' => $tipe,
+            'tujuan' => $tujuan,
+            'judul' => $judul,
+            'konten' => $konten,
+            'payload' => $payload,
+            'status' => 'pending',
         ]);
 
         // Dispatch via queue — database driver + Supervisor (PRD §4.9 §7)

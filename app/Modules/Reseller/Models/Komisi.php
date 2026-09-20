@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'no_komisi', 'pelanggan_id', 'transaksi_id', 'skema_komisi_id',
-    'jumlah_transaksi', 'nominal_komisi', 'status', 'approved_by_id', 'approved_at', 'keterangan'
+    'jumlah_transaksi', 'nominal_komisi', 'status', 'approved_by_id', 'approved_at', 'keterangan',
 ])]
 class Komisi extends Model
 {

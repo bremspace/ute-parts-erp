@@ -4,7 +4,6 @@ namespace App\Modules\Wms\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['nama', 'kontak', 'telepon', 'alamat', 'termin_hari', 'is_active'])]

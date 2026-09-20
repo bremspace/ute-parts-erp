@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Config;
 
 /**
  * Dynamically set ASSET_URL based on request host.
- * 
+ *
  * When accessing via IP: assets load from http://{IP}/build/assets/...
  * When accessing via domain: assets load from https://{domain}/build/assets/...
  */
@@ -20,7 +20,7 @@ class SetAssetUrl
     public function handle(Request $request, Closure $next)
     {
         $host = $request->getHttpHost(); // includes port when non-standard
-        
+
         // Check if host is an IP address
         if (filter_var($host, FILTER_VALIDATE_IP)) {
             // IP access: use HTTP with IP

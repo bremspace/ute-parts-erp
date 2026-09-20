@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'no_po', 'supplier_id', 'gudang_tujuan_id', 'status', 'metode_bayar',
-    'jatuh_tempo', 'total', 'total_dibayar', 'catatan'
+    'jatuh_tempo', 'total', 'total_dibayar', 'catatan',
 ])]
 class PurchaseOrder extends Model
 {

@@ -5,6 +5,7 @@ namespace App\Modules\Marketplace\Livewire;
 use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -17,13 +18,22 @@ class ShopPage extends Component
 
     // Catalog filters
     public string $search = '';
+
     public string $filterKategori = '';
+
     public string $filterKondisi = '';
+
     public string $filterBrand = '';
+
+    public string $filterHpMerk = ''; // [T-11] filter dari kompatibilitas_hp JSON
+
+    public string $filterHpModel = ''; // [T-11] filter dari kompatibilitas_hp JSON
+
     public ?int $hargaMax = null;
 
     // Detail: pilihan varian & qty
     public ?int $selectedVariantId = null;
+
     public int $qty = 1;
 
     public function mount(?string $slug = null)
@@ -41,6 +51,37 @@ class ShopPage extends Component
         return Produk::where('is_active', true)->distinct()->orderBy('kategori')->pluck('kategori')->filter()->values();
     }
 
+    public function getHpMerkListProperty()
+    {
+        // [T-11] Ekstrak merk unik dari kompatibilitas_hp JSON
+        return Produk::where('is_active', true)
+            ->whereNotNull('kompatibilitas_hp')
+            ->where('kompatibilitas_hp', '!=', '[]')
+            ->get()
+            ->flatMap(fn ($p) => collect($p->kompatibilitas_hp ?? [])->pluck('merk'))
+            ->unique()
+            ->sort()
+            ->values();
+    }
+
+    public function getHpModelListProperty()
+    {
+        // [T-11] Ekstrak model unik dari kompatibilitas_hp JSON (filtered by merk if selected)
+        $query = Produk::where('is_active', true)
+            ->whereNotNull('kompatibilitas_hp')
+            ->where('kompatibilitas_hp', '!=', '[]');
+
+        if ($this->filterHpMerk) {
+            $query->whereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['merk' => $this->filterHpMerk])]);
+        }
+
+        return $query->get()
+            ->flatMap(fn ($p) => collect($p->kompatibilitas_hp ?? [])->pluck('model'))
+            ->unique()
+            ->sort()
+            ->values();
+    }
+
     public function getBrandsProperty()
     {
         return Produk::where('is_active', true)->distinct()->orderBy('brand_kompatibel')->pluck('brand_kompatibel')->filter()->values();
@@ -53,9 +94,11 @@ class ShopPage extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('nama', 'like', "%{$this->search}%")
-                  ->orWhere('brand_kompatibel', 'like', "%{$this->search}%")
-                  ->orWhere('model_kompatibel', 'like', "%{$this->search}%")
-                  ->orWhere('kategori', 'like', "%{$this->search}%");
+                    ->orWhere('brand_kompatibel', 'like', "%{$this->search}%")
+                    ->orWhere('model_kompatibel', 'like', "%{$this->search}%")
+                    ->orWhere('kategori', 'like', "%{$this->search}%")
+                  // [T-11] Search juga di kompatibilitas_hp JSON
+                    ->orWhereRaw("JSON_SEARCH(kompatibilitas_hp, 'one', ?) IS NOT NULL", ["%{$this->search}%"]);
             });
         }
         if ($this->filterKategori) {
@@ -67,6 +110,13 @@ class ShopPage extends Component
         if ($this->filterBrand) {
             $query->where('brand_kompatibel', $this->filterBrand);
         }
+        // [T-11] Filter by HP merk/model dari kompatibilitas_hp terstruktur (prioritaskan data terstruktur)
+        if ($this->filterHpMerk) {
+            $query->whereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['merk' => $this->filterHpMerk])]);
+        }
+        if ($this->filterHpModel) {
+            $query->whereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['model' => $this->filterHpModel])]);
+        }
         if ($this->hargaMax) {
             $query->where('harga_jual_retail', '<=', $this->hargaMax);
         }
@@ -76,27 +126,28 @@ class ShopPage extends Component
 
     public function getProductDetailProperty(): ?Produk
     {
-        if (!$this->slug) {
+        if (! $this->slug) {
             return null;
         }
+
         return Produk::where('slug', $this->slug)
             ->where('is_active', true)
-            ->with(['skuVariants' => fn($q) => $q->where('is_active', true)])
+            ->with(['skuVariants' => fn ($q) => $q->where('is_active', true)])
             ->first();
     }
 
     public function getStokPerCabangProperty(): array
     {
         $produk = $this->productDetail;
-        if (!$produk) {
+        if (! $produk) {
             return [];
         }
 
         return StokItem::with('gudang.cabang')
             ->where('produk_id', $produk->id)
             ->get()
-            ->groupBy(fn($s) => $s->gudang?->cabang_id)
-            ->map(fn($rows) => [
+            ->groupBy(fn ($s) => $s->gudang?->cabang_id)
+            ->map(fn ($rows) => [
                 'cabang' => $rows->first()->gudang?->cabang?->nama,
                 'alamat' => $rows->first()->gudang?->cabang?->alamat,
                 'stok' => $rows->sum('jumlah'),
@@ -113,12 +164,12 @@ class ShopPage extends Component
     public function getHargaInfoProperty(): array
     {
         $produk = $this->productDetail;
-        if (!$produk) {
+        if (! $produk) {
             return [];
         }
 
         $customer = auth('customer')->user();
-        $variant = $this->selectedVariantId ? \App\Modules\Wms\Models\SkuVariant::find($this->selectedVariantId) : null;
+        $variant = $this->selectedVariantId ? SkuVariant::find($this->selectedVariantId) : null;
 
         return app(PricingService::class)->resolve($produk, $customer, $variant);
     }
@@ -126,7 +177,7 @@ class ShopPage extends Component
     public function addToCart(?int $produkId = null)
     {
         $produk = $produkId ? Produk::find($produkId) : $this->productDetail;
-        if (!$produk) {
+        if (! $produk) {
             return;
         }
 
@@ -156,6 +207,8 @@ class ShopPage extends Component
         return view('modules.marketplace.livewire.shop-catalog', [
             'categories' => $this->categories,
             'brands' => $this->brands,
+            'hpMerkList' => $this->hpMerkList,
+            'hpModelList' => $this->hpModelList,
             'products' => $this->products,
         ])->layout('layouts.marketplace', ['title' => 'Katalog Sparepart']);
     }

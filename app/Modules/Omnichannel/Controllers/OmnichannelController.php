@@ -11,6 +11,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 
 class OmnichannelController extends Controller
 {
@@ -127,6 +128,7 @@ class OmnichannelController extends Controller
 
         if ($request->produk_id) {
             $this->syncService->syncStokSemuaChannel($request->produk_id);
+
             return $this->success(null, 'Sinkronisasi stok produk berhasil di-trigger');
         }
 
@@ -162,20 +164,20 @@ class OmnichannelController extends Controller
     public function webhook(Request $request, $channelId)
     {
         $channel = Channel::find($channelId);
-        if (!$channel) {
+        if (! $channel) {
             return response()->json(['success' => false, 'message' => 'Channel tidak ditemukan'], 404);
         }
 
         // Rate limit per channel
-        $rateKey = 'channel-webhook:' . $channelId . ':' . $request->ip();
-        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($rateKey, 60)) {
+        $rateKey = 'channel-webhook:'.$channelId.':'.$request->ip();
+        if (RateLimiter::tooManyAttempts($rateKey, 60)) {
             return response()->json(['success' => false, 'message' => 'Terlalu banyak request'], 429);
         }
-        \Illuminate\Support\Facades\RateLimiter::hit($rateKey, 60);
+        RateLimiter::hit($rateKey, 60);
 
         // Idempotency: payload harus berisi channel_order_id unik
         $orderId = $request->input('order_sn') ?? $request->input('order_id') ?? $request->input('data.order_sn');
-        if (!$orderId) {
+        if (! $orderId) {
             return response()->json(['success' => false, 'message' => 'order_id wajib'], 422);
         }
 
@@ -188,6 +190,12 @@ class OmnichannelController extends Controller
                     'payload' => array_merge($existing->payload ?? [], $request->all()),
                 ]);
             }
+            // [T-26] Status jadi COMPLETED via webhook → jurnal biaya admin (idempoten per order)
+            if ($request->input('order_status') === 'COMPLETED' && $existing && $existing->status !== 'selesai') {
+                $existing->update(['status' => 'selesai']);
+                $this->syncService->prosesBiayaAdmin($existing);
+            }
+
             return response()->json(['success' => true, 'message' => 'Duplikat diabaikan (idempotent)']);
         }
 
@@ -197,9 +205,21 @@ class OmnichannelController extends Controller
             'payload' => $request->all(),
             'channel_status' => $request->input('order_status'),
             'status' => 'menunggu_proses',
+            // [T-26] Estimasi biaya admin marketplace per payload + biaya_persen kredensial (fallback 5%)
+            'estimasi_biaya_platform' => round(((float) ($request->input('total_amount') ?? $request->input('data.total_amount') ?? 0))
+                * ((float) ($channel->kredensial['biaya_persen'] ?? 5)) / 100, 2),
         ]);
 
-        Log::info("[{channel}-webhook] Order baru", ['channel' => $channel->nama, 'order' => $orderId]);
+        // [T-26] Order langsung COMPLETED dari webhook → jurnal biaya admin (idempoten)
+        if ($request->input('order_status') === 'COMPLETED') {
+            $fresh = ChannelOrder::where('channel_id', $channel->id)->where('channel_order_id', $orderId)->first();
+            if ($fresh) {
+                $fresh->update(['status' => 'selesai']);
+                $this->syncService->prosesBiayaAdmin($fresh);
+            }
+        }
+
+        Log::info('[{channel}-webhook] Order baru', ['channel' => $channel->nama, 'order' => $orderId]);
 
         return response()->json(['success' => true, 'message' => 'OK']);
     }

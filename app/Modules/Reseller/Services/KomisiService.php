@@ -6,8 +6,10 @@ use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\SkemaKomisi;
+use App\Modules\Reseller\Models\SkemaKomisiReseller;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,11 +26,11 @@ class KomisiService
     /**
      * Hitung komisi dari item agregat (untuk servis & jalur non-Transaksi).
      *
-     * @param array $itemsAgregat [['kategori' => string, 'subtotal' => float, 'jumlah' => int], ...]
+     * @param  array  $itemsAgregat  [['kategori' => string, 'subtotal' => float, 'jumlah' => int], ...]
      */
     public function hitungKomisiDariItems(Pelanggan $pelanggan, array $itemsAgregat, array $referensi): ?Komisi
     {
-        if (!$pelanggan->is_reseller || empty($itemsAgregat)) {
+        if (! $pelanggan->is_reseller || empty($itemsAgregat)) {
             return null;
         }
 
@@ -39,14 +41,14 @@ class KomisiService
             $kategori = $agregat['kategori'] ?? 'umum';
 
             // [T-21] Cek override skema PER RESELLER terlebih dahulu; fallback ke skema default
-            $skema = \App\Modules\Reseller\Models\SkemaKomisiReseller::where('pelanggan_id', $pelanggan->id)
+            $skema = SkemaKomisiReseller::where('pelanggan_id', $pelanggan->id)
                 ->where('is_active', true)
                 ->where(function ($q) use ($kategori) {
                     $q->whereNull('kategori')->orWhere('kategori', $kategori);
                 })
                 ->first();
 
-            if (!$skema) {
+            if (! $skema) {
                 $skema = SkemaKomisi::where('is_active', true)
                     ->where(function ($q) use ($kategori) {
                         $q->whereNull('kategori')->orWhere('kategori', $kategori);
@@ -72,14 +74,14 @@ class KomisiService
         $noKomisi = sprintf('KMS-%s-%04d', $today, $count);
 
         return Komisi::create([
-            'no_komisi'         => $noKomisi,
-            'pelanggan_id'      => $pelanggan->id,
-            'transaksi_id'      => $referensi['transaksi_id'] ?? null,
-            'skema_komisi_id'   => $skemaTerpakai?->id,
-            'jumlah_transaksi'  => $referensi['jumlah_transaksi'] ?? array_sum(array_column($itemsAgregat, 'subtotal')),
-            'nominal_komisi'    => $totalKomisi,
-            'status'            => 'pending',
-            'keterangan'        => $referensi['keterangan'] ?? 'Komisi dari transaksi',
+            'no_komisi' => $noKomisi,
+            'pelanggan_id' => $pelanggan->id,
+            'transaksi_id' => $referensi['transaksi_id'] ?? null,
+            'skema_komisi_id' => $skemaTerpakai?->id,
+            'jumlah_transaksi' => $referensi['jumlah_transaksi'] ?? array_sum(array_column($itemsAgregat, 'subtotal')),
+            'nominal_komisi' => $totalKomisi,
+            'status' => 'pending',
+            'keterangan' => $referensi['keterangan'] ?? 'Komisi dari transaksi',
         ]);
     }
 
@@ -97,14 +99,14 @@ class KomisiService
             $itemsAgregat[] = [
                 'kategori' => $kategori,
                 'subtotal' => $items->sum(fn ($i) => (float) $i->subtotal),
-                'jumlah'   => $items->sum('jumlah'),
+                'jumlah' => $items->sum('jumlah'),
             ];
         }
 
         return $this->hitungKomisiDariItems($pelanggan, $itemsAgregat, [
             'jumlah_transaksi' => $transaksi->total_akhir,
-            'keterangan'       => 'Komisi dari transaksi ' . $transaksi->no_transaksi,
-            'transaksi_id'     => $transaksi->id,
+            'keterangan' => 'Komisi dari transaksi '.$transaksi->no_transaksi,
+            'transaksi_id' => $transaksi->id,
         ]);
     }
 
@@ -112,8 +114,7 @@ class KomisiService
      * Update status komisi (bulk) + buat jurnal & utang saat disetujui.
      * Butler: yang boleh approve = role finance (dicek di controller).
      *
-     * @param array $komisiIds
-     * @param string $action approve|reject
+     * @param  string  $action  approve|reject
      */
     public function prosesApproval(array $komisiIds, string $action, int $userId): array
     {
@@ -122,22 +123,23 @@ class KomisiService
         DB::transaction(function () use ($komisiIds, $action, $userId, &$approvedUtangIds) {
             foreach ($komisiIds as $id) {
                 $komisi = Komisi::where('id', $id)->where('status', 'pending')->lockForUpdate()->first();
-                if (!$komisi) {
+                if (! $komisi) {
                     continue;
                 }
 
                 if ($action === 'reject') {
                     $komisi->update([
-                        'status'          => 'ditolak',
-                        'approved_by_id'  => $userId,
-                        'approved_at'     => now(),
+                        'status' => 'ditolak',
+                        'approved_by_id' => $userId,
+                        'approved_at' => now(),
                     ]);
 
-                    app(\App\Modules\Rbac\Services\AuditService::class)->catat(
+                    app(AuditService::class)->catat(
                         'Komisi', 'reject', $komisi->id,
                         "Komisi {$komisi->no_komisi} ditolak (Rp {$komisi->nominal_komisi})",
                         ['status' => 'pending'], ['status' => 'ditolak']
                     );
+
                     continue;
                 }
 
@@ -162,27 +164,27 @@ class KomisiService
                 Utang::updateOrCreate(
                     [
                         'referensi_tipe' => 'komisi',
-                        'referensi_id'   => $komisi->id,
+                        'referensi_id' => $komisi->id,
                     ],
                     [
-                        'no_utang'       => $noUtang,
-                        'pelanggan_id'   => $komisi->pelanggan_id,
-                        'kreditor_nama'  => $komisi->pelanggan?->nama,
-                        'jumlah'         => (float) $komisi->nominal_komisi,
+                        'no_utang' => $noUtang,
+                        'pelanggan_id' => $komisi->pelanggan_id,
+                        'kreditor_nama' => $komisi->pelanggan?->nama,
+                        'jumlah' => (float) $komisi->nominal_komisi,
                         'jumlah_dibayar' => 0,
-                        'status'         => 'belum_lunas',
-                        'keterangan'     => 'Utang komisi ' . $komisi->no_komisi,
+                        'status' => 'belum_lunas',
+                        'keterangan' => 'Utang komisi '.$komisi->no_komisi,
                     ]
                 );
                 $approvedUtangIds[] = $komisi->id;
 
                 $komisi->update([
-                    'status'         => 'disetujui',
+                    'status' => 'disetujui',
                     'approved_by_id' => $userId,
-                    'approved_at'    => now(),
+                    'approved_at' => now(),
                 ]);
 
-                app(\App\Modules\Rbac\Services\AuditService::class)->catat(
+                app(AuditService::class)->catat(
                     'Komisi', 'approve', $komisi->id,
                     "Komisi {$komisi->no_komisi} disetujui — jurnal {$noJurnal} + utang {$noUtang}",
                     ['status' => 'pending'], ['status' => 'disetujui']

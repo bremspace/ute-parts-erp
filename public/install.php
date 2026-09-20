@@ -6,12 +6,13 @@
  * Cek otomatis: jika .env sudah terisi + key ada → redirect ke /app/login
  */
 
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Process;
 
 // --- Boot Laravel minimal untuk akses artisan ---
-require __DIR__ . '/../vendor/autoload.php';
-$app = require_once __DIR__ . '/../bootstrap/app.php';
-$kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+require __DIR__.'/../vendor/autoload.php';
+$app = require_once __DIR__.'/../bootstrap/app.php';
+$kernel = $app->make(Kernel::class);
 $kernel->bootstrap();
 
 $isConfigured = (
@@ -51,12 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $pdo->exec('SELECT 1');
         } catch (PDOException $e) {
-            $error = 'Koneksi database gagal: ' . $e->getMessage();
+            $error = 'Koneksi database gagal: '.$e->getMessage();
         }
 
-        if (!$error) {
+        if (! $error) {
             // 2. Tulis .env
-            $envPath = __DIR__ . '/../.env';
+            $envPath = __DIR__.'/../.env';
             $envContent = <<<EOF
 APP_NAME={$appName}
 APP_ENV=production
@@ -98,27 +99,27 @@ EOF;
             // 3. Generate APP_KEY
             $keyProc = Process::run([
                 $this->getPhpBinary(), 'artisan', 'key:generate', '--force',
-            ], cwd: __DIR__ . '/..');
+            ], cwd: __DIR__.'/..');
 
-            if (!$keyProc->successful()) {
-                $error = 'Gagal generate APP_KEY: ' . $keyProc->errorOutput();
+            if (! $keyProc->successful()) {
+                $error = 'Gagal generate APP_KEY: '.$keyProc->errorOutput();
             } else {
                 // 4. Migrate
                 $migProc = Process::run([
                     $this->getPhpBinary(), 'artisan', 'migrate', '--force',
-                ], cwd: __DIR__ . '/..');
+                ], cwd: __DIR__.'/..');
 
-                if (!$migProc->successful()) {
-                    $error = 'Migrate gagal: ' . $migProc->errorOutput();
+                if (! $migProc->successful()) {
+                    $error = 'Migrate gagal: '.$migProc->errorOutput();
                 } else {
                     // 5. Seed
-                    Process::run([$this->getPhpBinary(), 'artisan', 'db:seed', '--force'], cwd: __DIR__ . '/..');
+                    Process::run([$this->getPhpBinary(), 'artisan', 'db:seed', '--force'], cwd: __DIR__.'/..');
 
                     // 6. Cache
-                    Process::run([$this->getPhpBinary(), 'artisan', 'config:cache'], cwd: __DIR__ . '/..');
-                    Process::run([$this->getPhpBinary(), 'artisan', 'route:cache'], cwd: __DIR__ . '/..');
-                    Process::run([$this->getPhpBinary(), 'artisan', 'view:cache'], cwd: __DIR__ . '/..');
-                    Process::run([$this->getPhpBinary(), 'artisan', 'storage:link'], cwd: __DIR__ . '/..');
+                    Process::run([$this->getPhpBinary(), 'artisan', 'config:cache'], cwd: __DIR__.'/..');
+                    Process::run([$this->getPhpBinary(), 'artisan', 'route:cache'], cwd: __DIR__.'/..');
+                    Process::run([$this->getPhpBinary(), 'artisan', 'view:cache'], cwd: __DIR__.'/..');
+                    Process::run([$this->getPhpBinary(), 'artisan', 'storage:link'], cwd: __DIR__.'/..');
 
                     $success = 'Setup berhasil! Redirect ke login dalam 3 detik...';
                     header('Refresh:3;url=/app/login');
@@ -143,6 +144,7 @@ function getPhpBinary(): string
             return $php;
         }
     }
+
     return 'php';
 }
 ?>
@@ -183,15 +185,15 @@ function getPhpBinary(): string
         <h1 style="text-align:center">Instalasi Ute Parts ERP</h1>
         <p class="sub" style="text-align:center">Buat database dulu di CyberPanel → isi data di bawah → Install</p>
 
-        <?php if ($success): ?>
+        <?php if ($success) { ?>
             <div class="msg success">✅ <?= htmlspecialchars($success) ?></div>
-        <?php endif; ?>
+        <?php } ?>
 
-        <?php if ($error): ?>
+        <?php if ($error) { ?>
             <div class="msg error">❌ <?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
+        <?php } ?>
 
-        <?php if (!$isConfigured): ?>
+        <?php if (! $isConfigured) { ?>
         <div class="note">
             <strong>Persiapan sebelumnya:</strong> Buka CyberPanel → Websites → <b>YourDomain</b> → <b>Manage Database</b> → Create Database. Catat nama database, username, dan password-nya. Lalu isi di bawah.
         </div>
@@ -232,7 +234,7 @@ function getPhpBinary(): string
                 ⚡ Install & Jalankan
             </button>
         </form>
-        <?php endif; ?>
+        <?php } ?>
     </div>
 </body>
 </html>

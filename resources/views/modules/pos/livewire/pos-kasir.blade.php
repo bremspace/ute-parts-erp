@@ -184,60 +184,41 @@
                 </div>
 
                 <div class="flex gap-2">
-                    <div class="flex-1 relative">
-                    <select
-                        wire:model.live="selectedCustomerId"
-                        wire:change="setPelanggan($event.target.value)"
-                        class="flex-1 w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
-                    >
-                        @if(!$pelangganCari->isEmpty())<option value="" class="bg-ink-900">— Pilih dari daftar / cari di bawah —</option>@endif
-                        <option value="" class="bg-ink-900">Pelanggan Umum (Tanpa Member)</option>
-                        @foreach($customers as $c)
-                            <option value="{{ $c->id }}" class="bg-ink-900">
-                                {{ $c->nama }} — {{ $c->telepon ?? '-' }} ({{ $c->tierMembership?->nama ?? 'Retail' }})
-                            </option>
-                        @endforeach
-                    </select>
-
-                    <!-- [T-08] pencarian pelanggan live + tambah baru -->
-                    <input
-                        type="text"
-                        wire:model.live.debounce.250ms="pelangganSearch"
-                        placeholder="Cari pelanggan: nama / no HP..."
-                        class="mt-2 w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
-                    />
-                    @if($pelangganCari->isNotEmpty())
-                        <div class="absolute z-20 mt-1 w-full glass-panel rounded-xl overflow-hidden text-xs">
-                            @foreach($pelangganCari as $pc)
-                                <button
-                                    wire:click="setPelanggan({{ $pc->id }}); $set('pelangganSearch', '')"
-                                    class="w-full text-left px-3 py-2 hover:bg-white/5 text-ink-200 cursor-pointer"
-                                >
-                                    <span class="font-semibold">{{ $pc->nama }}</span>
-                                    <span class="text-ink-400 font-mono ml-1">{{ $pc->telepon }}</span>
-                                </button>
+                    <div class="flex-1">
+                        <select
+                            wire:model.live="selectedCustomerId"
+                            wire:change="setPelanggan($event.target.value)"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
+                        >
+                            @if(!$pelangganCari->isEmpty())<option value="" class="bg-ink-900">— Pilih dari daftar / cari di bawah —</option>@endif
+                            <option value="" class="bg-ink-900">Pelanggan Umum (Tanpa Member)</option>
+                            @foreach($customers as $c)
+                                <option value="{{ $c->id }}" class="bg-ink-900">
+                                    {{ $c->nama }} — {{ $c->telepon ?? '-' }} ({{ $c->tierMembership?->nama ?? 'Retail' }})
+                                </option>
                             @endforeach
-                        </div>
-                    @endif
-                </div>
+                        </select>
+                    </div>
 
-                @if($selectedCustomerId)
-                    <button
-                        wire:click="setPelanggan(null)"
-                        class="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white text-xs"
-                        title="Reset Pelanggan"
-                    >
-                        ✕
-                    </button>
-                @endif
-                <button
-                    wire:click="$set('showPelangganBaruModal', true)"
-                    class="px-3 py-2 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 text-[11px] font-bold whitespace-nowrap"
-                    title="Tambah Pelanggan Baru (sinkron ke CRM)"
-                >
-                    + Baru
-                </button>
-            </div>
+                    @if($selectedCustomerId)
+                        <button
+                            wire:click="setPelanggan(null)"
+                            class="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white text-xs"
+                            title="Reset Pelanggan"
+                        >
+                            ✕
+                        </button>
+                    @endif
+
+                    <!-- [T-18] Pencarian + tambah pelanggan reusable (sinkron CRM-06 via PelangganService) -->
+                    <x-customer-picker
+                        :results="$pelangganCari"
+                        wireModel="pelangganSearch"
+                        selectAction="setPelanggan"
+                        addAction="openPelangganBaru"
+                        searchPlaceholder="Cari pelanggan: nama / no HP..."
+                    />
+                </div>
 
             @if($this->customer && $this->customer->tierMembership)
                 <div class="mt-2 text-[11px] text-up-mint flex items-center gap-1.5 font-medium">

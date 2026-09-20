@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Security Headers Middleware
- * 
+ *
  * Adds security headers to all responses per ADR 0006 / T-28 requirements.
  * CSP policy configured for Laravel 13 + Livewire + Alpine.js + Vite.
  */
@@ -66,7 +66,7 @@ class SecurityHeaders
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com",
             "img-src 'self' data: https:",
-            "connect-src 'self'" . ($isLocal ? " ws://localhost:5173 http://localhost:5173" : ""),
+            "connect-src 'self'".($isLocal ? ' ws://localhost:5173 http://localhost:5173' : ''),
             "frame-src 'none'",
             "object-src 'none'",
             "base-uri 'self'",

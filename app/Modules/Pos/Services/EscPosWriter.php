@@ -29,12 +29,12 @@ class EscPosWriter
     /**
      * Build full 58mm receipt bytes.
      *
-     * @param array $data {
-     *   headerLines: string[], items: [{nama, qty, harga, subtotal}],
-     *   total: float, bayar: float, kembali: float,
-     *   no_transaksi: string, metode_bayar: string, footerLines: string[],
-     *   tanggal: string, kasir: string, cabang: string,
-     * }
+     * @param  array  $data  {
+     *                       headerLines: string[], items: [{nama, qty, harga, subtotal}],
+     *                       total: float, bayar: float, kembali: float,
+     *                       no_transaksi: string, metode_bayar: string, footerLines: string[],
+     *                       tanggal: string, kasir: string, cabang: string,
+     *                       }
      */
     public function receipt(array $data): string
     {
@@ -52,10 +52,10 @@ class EscPosWriter
         }
 
         $this->align(0)->rule();
-        $this->text('No    : ' . $data['no_transaksi']);
-        $this->text('Tgl   : ' . $data['tanggal']);
-        $this->text('Kasir : ' . $data['kasir']);
-        $this->text('Cabang: ' . $data['cabang']);
+        $this->text('No    : '.$data['no_transaksi']);
+        $this->text('Tgl   : '.$data['tanggal']);
+        $this->text('Kasir : '.$data['kasir']);
+        $this->text('Cabang: '.$data['cabang']);
         $this->rule();
 
         foreach ($data['items'] as $item) {
@@ -63,16 +63,16 @@ class EscPosWriter
                 $this->text($namaLine);
             }
             $this->text($this->pad(
-                "{$item['qty']} x " . $this->money($item['harga']),
+                "{$item['qty']} x ".$this->money($item['harga']),
                 $this->money($item['subtotal'])
             ));
         }
 
         $this->rule();
         $this->bold(true)->text($this->pad('TOTAL', $this->money($data['total'])))->bold(false);
-        $this->text('Bayar   : ' . $this->money($data['bayar']));
-        $this->text('Kembali : ' . $this->money($data['kembali']));
-        $this->text('Metode  : ' . $data['metode_bayar']);
+        $this->text('Bayar   : '.$this->money($data['bayar']));
+        $this->text('Kembali : '.$this->money($data['kembali']));
+        $this->text('Metode  : '.$data['metode_bayar']);
 
         $this->rule()->feed(1);
 
@@ -80,7 +80,7 @@ class EscPosWriter
         $no = $this->ascii($data['no_transaksi']);
         $this->align(1);
         $this->buf .= "\x1d\x48\x02"; // HRI below
-        $this->buf .= "\x1d\x6b\x49" . chr(strlen($no) & 0xFF) . chr((strlen($no) >> 8) & 0xFF) . $no;
+        $this->buf .= "\x1d\x6b\x49".chr(strlen($no) & 0xFF).chr((strlen($no) >> 8) & 0xFF).$no;
         $this->feed(1);
 
         // Footer
@@ -103,14 +103,14 @@ class EscPosWriter
     /** Alignment: 0 kiri, 1 tengah, 2 kanan. */
     private function align(int $mode): self
     {
-        $this->buf .= "\x1b\x61" . chr($mode);
+        $this->buf .= "\x1b\x61".chr($mode);
 
         return $this;
     }
 
     private function bold(bool $on): self
     {
-        $this->buf .= "\x1b\x45" . chr($on ? 1 : 0);
+        $this->buf .= "\x1b\x45".chr($on ? 1 : 0);
 
         return $this;
     }
@@ -118,7 +118,7 @@ class EscPosWriter
     /** GS ! — 0 normal, 1 double height+width. */
     private function size(int $n): self
     {
-        $this->buf .= "\x1d\x21" . chr($n);
+        $this->buf .= "\x1d\x21".chr($n);
 
         return $this;
     }
@@ -144,7 +144,7 @@ class EscPosWriter
 
     private function text(string $text): self
     {
-        $this->buf .= $this->ascii($text) . "\n";
+        $this->buf .= $this->ascii($text)."\n";
 
         return $this;
     }
@@ -156,7 +156,7 @@ class EscPosWriter
         $right = $this->ascii($right);
         $pad = max(1, self::COLUMNS - strlen($left) - strlen($right));
 
-        return $left . str_repeat(' ', $pad) . $right;
+        return $left.str_repeat(' ', $pad).$right;
     }
 
     private function wrap(string $text): array
@@ -166,7 +166,7 @@ class EscPosWriter
 
     private function money($v): string
     {
-        return 'Rp' . number_format((float) $v, 0, ',', '.');
+        return 'Rp'.number_format((float) $v, 0, ',', '.');
     }
 
     private function ascii(string $text): string

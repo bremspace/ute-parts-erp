@@ -4,7 +4,6 @@ namespace Tests\Unit;
 
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
-use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
@@ -17,12 +16,12 @@ class PricingServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->pricingService = new PricingService();
+        $this->pricingService = new PricingService;
     }
 
     public function test_resolves_retail_default_when_no_customer_provided(): void
     {
-        $produk = new Produk();
+        $produk = new Produk;
         $produk->id = 1;
         $produk->harga_jual_retail = 100000;
 
@@ -36,16 +35,16 @@ class PricingServiceTest extends TestCase
 
     public function test_resolves_tier_percentage_discount(): void
     {
-        $produk = new Produk();
+        $produk = new Produk;
         $produk->id = 1;
         $produk->harga_jual_retail = 100000;
 
-        $tier = new TierMembership();
+        $tier = new TierMembership;
         $tier->id = 10;
         $tier->nama = 'Gold';
         $tier->diskon_persen = 10.0;
 
-        $pelanggan = new Pelanggan();
+        $pelanggan = new Pelanggan;
         $pelanggan->is_reseller = false;
         $pelanggan->tier_membership_id = 10;
         $pelanggan->setRelation('tierMembership', $tier);
@@ -59,11 +58,11 @@ class PricingServiceTest extends TestCase
 
     public function test_variant_price_overrides_base_product_price(): void
     {
-        $produk = new Produk();
+        $produk = new Produk;
         $produk->id = 1;
         $produk->harga_jual_retail = 100000;
 
-        $variant = new SkuVariant();
+        $variant = new SkuVariant;
         $variant->id = 5;
         $variant->harga_jual_retail = 120000;
 

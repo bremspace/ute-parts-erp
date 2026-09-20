@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Models;
 
+use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Reseller\Models\Komisi;
 use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -34,11 +36,11 @@ class Pelanggan extends Model implements Authenticatable
 
     public function komisi(): HasMany
     {
-        return $this->hasMany(\App\Modules\Reseller\Models\Komisi::class);
+        return $this->hasMany(Komisi::class);
     }
 
     public function transaksi(): HasMany
     {
-        return $this->hasMany(\App\Modules\Pos\Models\Transaksi::class);
+        return $this->hasMany(Transaksi::class);
     }
 }

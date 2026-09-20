@@ -2,12 +2,12 @@
 
 namespace App\Modules\Rbac\Controllers;
 
+use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\AuditService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use App\Models\User;
-use Illuminate\Support\Facades\Session;
 
 class RbacController extends Controller
 {
@@ -20,7 +20,7 @@ class RbacController extends Controller
 
         // Scope to cabang_id if not super-admin
         $cabangId = session('cabang_id');
-        if (!auth()->user()->hasRole('super-admin') && $cabangId) {
+        if (! auth()->user()->hasRole('super-admin') && $cabangId) {
             $query->whereHas('cabangs', function ($q) use ($cabangId) {
                 $q->where('cabang_id', $cabangId);
             });
@@ -55,7 +55,7 @@ class RbacController extends Controller
             $user->cabangs()->attach($cabangId);
         }
 
-        app(\App\Modules\Rbac\Services\AuditService::class)->catat(
+        app(AuditService::class)->catat(
             'User', 'create', $user->id,
             "User {$user->name} dibuat, role {$request->role}"
         );
@@ -68,7 +68,7 @@ class RbacController extends Controller
     {
         $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+            'email' => 'sometimes|required|email|unique:users,email,'.$user->id,
             'password' => 'sometimes|required|string|min:8',
             'role' => 'sometimes|required|string',
             'cabang_ids' => 'sometimes|required|array',
@@ -94,7 +94,7 @@ class RbacController extends Controller
             $user->cabangs()->sync($request->cabang_ids);
         }
 
-        app(\App\Modules\Rbac\Services\AuditService::class)->catat(
+        app(AuditService::class)->catat(
             'User', 'update', $user->id,
             "User {$user->name} diperbarui"
         );

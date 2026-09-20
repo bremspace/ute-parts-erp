@@ -3,26 +3,32 @@
 namespace App\Modules\Marketplace\Livewire;
 
 use App\Modules\Marketplace\Services\CartService;
-use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Marketplace\Services\OrderService;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Models\Cabang;
 use Livewire\Component;
 
 class CartCheckout extends Component
 {
     public string $mode = 'cart'; // cart | checkout
+
     public ?int $selectedCabangId = null;
+
     public string $metodeAmbil = 'ambil_ke_toko';
+
     public string $catatan = '';
 
     public ?string $orderNo = null;
+
     public ?float $orderTotal = null;
+
     public bool $orderSuccess = false;
 
     public function mount()
     {
         // Parameter route bukan penting — deteksi dari URL
         $this->mode = request()->is('checkout') ? 'checkout' : 'cart';
-        if (!$this->selectedCabangId) {
+        if (! $this->selectedCabangId) {
             $this->selectedCabangId = Cabang::where('is_active', true)->first()?->id;
         }
     }
@@ -61,20 +67,23 @@ class CartCheckout extends Component
     {
         if (count($this->cart) === 0) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Keranjang kosong']);
+
             return;
         }
+
         return redirect()->to('/checkout');
     }
 
     public function placeOrder()
     {
         $customer = auth('customer')->user();
-        if (!$customer) {
+        if (! $customer) {
             return redirect('/login-pelanggan');
         }
 
         if (empty($this->cart)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Keranjang kosong']);
+
             return;
         }
 
@@ -93,7 +102,7 @@ class CartCheckout extends Component
         }
 
         try {
-            $order = app(\App\Modules\Marketplace\Services\OrderService::class)->buatOrder(
+            $order = app(OrderService::class)->buatOrder(
                 $customer,
                 $items,
                 $this->selectedCabangId,

@@ -2,19 +2,24 @@
 
 namespace App\Modules\Servis\Services;
 
+use App\Models\User;
+use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\Garansi;
-use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\ServisSparepart;
 use App\Modules\Servis\Models\ServisStatusLog;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisItem;
+use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Modules\Notifikasi\Services\NotificationService;
-use App\Models\User;
-use App\Modules\Rbac\Models\Cabang;
 
 class ServisService
 {
@@ -28,7 +33,7 @@ class ServisService
     public function terimaUnit(array $data, User $user): TiketServis
     {
         $cabangId = $data['cabang_id'] ?? session('cabang_id') ?? $user->cabangs()->first()?->id;
-        if (!$cabangId) {
+        if (! $cabangId) {
             throw new \Exception('Cabang aktif belum dipilih');
         }
 
@@ -39,23 +44,23 @@ class ServisService
         $noTiket = sprintf('SRV-C%02d-%s-%04d', $cabangId, $today, $count);
 
         $tiket = TiketServis::create([
-            'no_tiket'           => $noTiket,
-            'cabang_id'          => $cabangId,
-            'jenis_servis_id'    => $data['jenis_servis_id'] ?? null,
-            'pelanggan_id'       => $data['pelanggan_id'] ?? null,
-            'nama_pelanggan'     => $data['nama_pelanggan'] ?? null,
-            'telepon_pelanggan'  => $data['telepon_pelanggan'] ?? null,
-            'jenis_hp'           => $data['jenis_hp'],
-            'seri_hp'            => $data['seri_hp'] ?? null,
+            'no_tiket' => $noTiket,
+            'cabang_id' => $cabangId,
+            'jenis_servis_id' => $data['jenis_servis_id'] ?? null,
+            'pelanggan_id' => $data['pelanggan_id'] ?? null,
+            'nama_pelanggan' => $data['nama_pelanggan'] ?? null,
+            'telepon_pelanggan' => $data['telepon_pelanggan'] ?? null,
+            'jenis_hp' => $data['jenis_hp'],
+            'seri_hp' => $data['seri_hp'] ?? null,
             // [T-19] kunci gadget: terenkripsi at-rest (cast encrypted)
-            'tipe_kunci'         => $data['tipe_kunci'] ?? null,
-            'kunci_terenkripsi'  => $data['kunci_terenkripsi'] ?? null,
-            'keluhan'            => $data['keluhan'],
-            'kondisi_fisik'      => $data['kondisi_fisik'] ?? null,
-            'foto_unit'          => $data['foto_unit'] ?? null,
-            'status'             => 'diterima',
-            'sumber'             => $data['sumber'] ?? 'walkin',
-            'tanggal_terima'     => now(),
+            'tipe_kunci' => $data['tipe_kunci'] ?? null,
+            'kunci_terenkripsi' => $data['kunci_terenkripsi'] ?? null,
+            'keluhan' => $data['keluhan'],
+            'kondisi_fisik' => $data['kondisi_fisik'] ?? null,
+            'foto_unit' => $data['foto_unit'] ?? null,
+            'status' => 'diterima',
+            'sumber' => $data['sumber'] ?? 'walkin',
+            'tanggal_terima' => now(),
         ]);
 
         $this->logStatus($tiket, null, 'diterima', $user, 'transisi', 'Unit servis diterima');
@@ -75,18 +80,18 @@ class ServisService
         $noTiket = sprintf('SRV-ONL-%s-%04d', $today, $count);
 
         $tiket = TiketServis::create([
-            'no_tiket'          => $noTiket,
-            'cabang_id'         => $cabangId,
-            'pelanggan_id'      => $data['pelanggan_id'] ?? null,
-            'nama_pelanggan'    => $data['nama'] ?? null,
+            'no_tiket' => $noTiket,
+            'cabang_id' => $cabangId,
+            'pelanggan_id' => $data['pelanggan_id'] ?? null,
+            'nama_pelanggan' => $data['nama'] ?? null,
             'telepon_pelanggan' => $data['telepon'] ?? null,
-            'jenis_hp'          => $data['jenis_hp'],
-            'seri_hp'           => $data['seri_hp'] ?? null,
-            'keluhan'           => $data['keluhan'],
-            'kondisi_fisik'     => $data['kondisi_fisik'] ?? null,
-            'foto_unit'         => $data['foto_unit'] ?? null,
-            'status'            => 'diajukan_online',
-            'sumber'            => 'online',
+            'jenis_hp' => $data['jenis_hp'],
+            'seri_hp' => $data['seri_hp'] ?? null,
+            'keluhan' => $data['keluhan'],
+            'kondisi_fisik' => $data['kondisi_fisik'] ?? null,
+            'foto_unit' => $data['foto_unit'] ?? null,
+            'status' => 'diajukan_online',
+            'sumber' => 'online',
         ]);
 
         $this->logStatus($tiket, null, 'diajukan_online', null, 'transisi', 'Booking servis online');
@@ -111,8 +116,8 @@ class ServisService
         $statusLama = $tiket->status;
 
         // Validasi transisi forward
-        if (!ServisStateMachine::dapatTransisi($statusLama, $statusBaru)) {
-            if (!$user || !$user->can('servis.override-status')) {
+        if (! ServisStateMachine::dapatTransisi($statusLama, $statusBaru)) {
+            if (! $user || ! $user->can('servis.override-status')) {
                 throw new \Exception(
                     "Transisi dari '{$statusLama}' ke '{$statusBaru}' tidak valid. Hanya admin dengan override yang diizinkan."
                 );
@@ -128,10 +133,10 @@ class ServisService
         // Side effects per status
         match ($statusBaru) {
             'menunggu_approval' => $this->onMenungguApproval($tiket),
-            'diterima'          => $this->onDiterima($tiket),
-            'selesai'           => $this->onSelesai($tiket),
-            'diambil'           => $this->onDiambil($tiket),
-            default             => null,
+            'diterima' => $this->onDiterima($tiket),
+            'selesai' => $this->onSelesai($tiket),
+            'diambil' => $this->onDiambil($tiket),
+            default => null,
         };
 
         // Notifikasi ke pelanggan
@@ -150,15 +155,15 @@ class ServisService
     public function setEstimasi(TiketServis $tiket, float $biaya, string $alasan, User $user): TiketServis
     {
         $validForEstimate = ['diagnosa', 'ditolak'];
-        if (!in_array($tiket->status, $validForEstimate, true)) {
+        if (! in_array($tiket->status, $validForEstimate, true)) {
             throw new \Exception("Hanya tiket berstatus 'diagnosa' atau 'ditolak' yang dapat diestimasi");
         }
 
         $tiket->update([
-            'estimasi_biaya'  => $biaya,
+            'estimasi_biaya' => $biaya,
             'alasan_estimasi' => $alasan,
-            'token_approval'  => Str::random(64),
-            'status'          => 'menunggu_approval',
+            'token_approval' => Str::random(64),
+            'status' => 'menunggu_approval',
         ]);
 
         $this->logStatus($tiket, $tiket->status, 'menunggu_approval', $user, 'transisi', "Estimasi biaya: Rp {$biaya}");
@@ -169,7 +174,7 @@ class ServisService
         $this->notifService->kirim(
             'inapp', null,
             'Estimasi Servis Perlu Approval',
-            "Estimasi Rp " . number_format($biaya, 0, ',', '.') . " untuk {$tiket->jenis_hp}. Approve: {$linkApprove}",
+            'Estimasi Rp '.number_format($biaya, 0, ',', '.')." untuk {$tiket->jenis_hp}. Approve: {$linkApprove}",
             ['tiket_id' => $tiket->id, 'token' => $token]
         );
 
@@ -199,15 +204,21 @@ class ServisService
      */
     public function inputSparepart(TiketServis $tiket, array $items, int $gudangId, User $user): array
     {
-        if (!in_array($tiket->status, ['diagnosa', 'dikerjakan', 'disetujui'], true)) {
+        if (! in_array($tiket->status, ['diagnosa', 'dikerjakan', 'disetujui'], true)) {
             throw new \Exception('Input sparepart hanya dapat dilakukan saat status diagnosa, disetujui, atau dikerjakan');
+        }
+
+        // [T-17] Anti dobel potong stok: jalur legacy hanya boleh dipakai bila belum ada
+        // item part via form pekerjaan (TiketServisItem). Bila sudah — tolak.
+        if (TiketServisItem::where('tiket_servis_id', $tiket->id)->where('tipe', 'part')->exists()) {
+            throw new \Exception('Item sudah dicatat via form pekerjaan');
         }
 
         $created = [];
 
         DB::transaction(function () use ($tiket, $items, $gudangId, $user, &$created) {
             foreach ($items as $item) {
-                $produk = \App\Modules\Wms\Models\Produk::findOrFail($item['produk_id']);
+                $produk = Produk::findOrFail($item['produk_id']);
                 $qty = (int) $item['jumlah'];
 
                 // Deduct stock
@@ -216,7 +227,7 @@ class ServisService
                     ->where('sku_variant_id', $item['sku_variant_id'] ?? null)
                     ->first();
 
-                if (!$stok || $stok->jumlah < $qty) {
+                if (! $stok || $stok->jumlah < $qty) {
                     $tersedia = $stok ? $stok->jumlah : 0;
                     throw new \Exception("Stok sparepart {$produk->nama} tidak mencukupi (tersedia: {$tersedia})");
                 }
@@ -226,27 +237,27 @@ class ServisService
                 $stok->update(['jumlah' => $setelah]);
 
                 StokLog::create([
-                    'gudang_id'       => $gudangId,
-                    'produk_id'       => $produk->id,
-                    'sku_variant_id'  => $item['sku_variant_id'] ?? null,
-                    'user_id'         => $user->id,
-                    'jenis'           => 'servis',
-                    'referensi_tipe'  => TiketServis::class,
-                    'referensi_id'    => $tiket->id,
-                    'jumlah_sebelum'  => $sebelum,
-                    'perubahan'       => -$qty,
-                    'jumlah_setelah'  => $setelah,
-                    'catatan'         => "Servis {$tiket->no_tiket} — sparepart terpakai",
+                    'gudang_id' => $gudangId,
+                    'produk_id' => $produk->id,
+                    'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                    'user_id' => $user->id,
+                    'jenis' => 'servis',
+                    'referensi_tipe' => TiketServis::class,
+                    'referensi_id' => $tiket->id,
+                    'jumlah_sebelum' => $sebelum,
+                    'perubahan' => -$qty,
+                    'jumlah_setelah' => $setelah,
+                    'catatan' => "Servis {$tiket->no_tiket} — sparepart terpakai",
                 ]);
 
                 $sparepart = ServisSparepart::create([
                     'tiket_servis_id' => $tiket->id,
-                    'produk_id'       => $produk->id,
-                    'sku_variant_id'  => $item['sku_variant_id'] ?? null,
-                    'gudang_id'       => $gudangId,
-                    'jumlah'          => $qty,
-                    'harga_satuan'    => $item['harga_satuan'] ?? (float) $produk->harga_jual_retail,
-                    'hpp'             => (float) $produk->harga_beli,
+                    'produk_id' => $produk->id,
+                    'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                    'gudang_id' => $gudangId,
+                    'jumlah' => $qty,
+                    'harga_satuan' => $item['harga_satuan'] ?? (float) $produk->harga_jual_retail,
+                    'hpp' => (float) $produk->harga_beli,
                 ]);
 
                 $created[] = $sparepart;
@@ -260,11 +271,11 @@ class ServisService
      * [T-17] Input pekerjaan teknisi — split part & jasa via TiketServisItem.
      * Baris tipe=jasa: tidak menyentuh stok. Baris tipe=part: kurangi StokItem 1x + StokLog.
      *
-     * @param array $items [['tipe'=>'part|jasa','produk_id'=>?,'sku_variant_id'=>?,'nama_item'=>string,'qty'=>int,'harga'=>float,'gudang_id'=>(wajib utk part)], ...]
+     * @param  array  $items  [['tipe'=>'part|jasa','produk_id'=>?,'sku_variant_id'=>?,'nama_item'=>string,'qty'=>int,'harga'=>float,'gudang_id'=>(wajib utk part)], ...]
      */
     public function inputPekerjaan(TiketServis $tiket, array $items, User $user): array
     {
-        if (!in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
+        if (! in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
             throw new \Exception('Input pekerjaan hanya saat status disetujui / dikerjakan / qc');
         }
 
@@ -279,12 +290,12 @@ class ServisService
 
                 if ($tipe === 'part') {
                     $produkId = $item['produk_id'] ?? null;
-                    if (!$produkId) {
+                    if (! $produkId) {
                         throw new \Exception("Item part '{$namaItem}' wajib pilih produk");
                     }
-                    $produk = \App\Modules\Wms\Models\Produk::findOrFail($produkId);
+                    $produk = Produk::findOrFail($produkId);
                     $gudangId = $item['gudang_id'] ?? null;
-                    if (!$gudangId) {
+                    if (! $gudangId) {
                         throw new \Exception("Part '{$namaItem}' wajib pilih gudang");
                     }
 
@@ -301,7 +312,7 @@ class ServisService
                     'qty' => $qty,
                     'harga' => $harga,
                     'hpp' => $tipe === 'part' && ($item['produk_id'] ?? null)
-                        ? (float) (\App\Modules\Wms\Models\Produk::find($item['produk_id'])?->harga_beli ?? 0)
+                        ? (float) (Produk::find($item['produk_id'])?->harga_beli ?? 0)
                         : 0,
                 ]);
             }
@@ -318,7 +329,7 @@ class ServisService
             ->lockForUpdate()
             ->first();
 
-        if (!$stok || $stok->jumlah < $qty) {
+        if (! $stok || $stok->jumlah < $qty) {
             $tersedia = $stok ? $stok->jumlah : 0;
             throw new \Exception("Stok sparepart tidak mencukupi di gudang terpilih (tersedia: {$tersedia})");
         }
@@ -327,7 +338,7 @@ class ServisService
         $stok->update(['jumlah' => $sebelum - $qty]);
 
         // [T-26] SOT mutation log
-        \App\Modules\Wms\Models\StockMutationLog::create([
+        StockMutationLog::create([
             'produk_id' => $produkId,
             'sku_variant_id' => $variantId,
             'gudang_id' => $gudangId,
@@ -339,17 +350,17 @@ class ServisService
         ]);
 
         StokLog::create([
-            'gudang_id'      => $gudangId,
-            'produk_id'      => $produkId,
+            'gudang_id' => $gudangId,
+            'produk_id' => $produkId,
             'sku_variant_id' => $variantId,
-            'user_id'        => $user->id,
-            'jenis'          => 'servis',
+            'user_id' => $user->id,
+            'jenis' => 'servis',
             'referensi_tipe' => TiketServis::class,
-            'referensi_id'   => $tiket->id,
+            'referensi_id' => $tiket->id,
             'jumlah_sebelum' => $sebelum,
-            'perubahan'      => -$qty,
+            'perubahan' => -$qty,
             'jumlah_setelah' => $sebelum - $qty,
-            'catatan'        => "Servis {$tiket->no_tiket} — item part",
+            'catatan' => "Servis {$tiket->no_tiket} — item part",
         ]);
     }
 
@@ -367,14 +378,14 @@ class ServisService
 
     private function onMenungguApproval(TiketServis $tiket): void
     {
-        if (!$tiket->token_approval) {
+        if (! $tiket->token_approval) {
             $tiket->update(['token_approval' => Str::random(64)]);
         }
     }
 
     private function onDiterima(TiketServis $tiket): void
     {
-        if (!$tiket->tanggal_terima) {
+        if (! $tiket->tanggal_terima) {
             $tiket->update(['tanggal_terima' => now()]);
         }
     }
@@ -393,10 +404,10 @@ class ServisService
         Garansi::updateOrCreate(
             ['tiket_servis_id' => $tiket->id],
             [
-                'durasi_hari'      => $durasiHari,
-                'tanggal_mulai'    => now()->toDateString(),
+                'durasi_hari' => $durasiHari,
+                'tanggal_mulai' => now()->toDateString(),
                 'tanggal_berakhir' => now()->addDays($durasiHari)->toDateString(),
-                'keterangan'       => "Garansi {$durasiHari} hari — Servis {$tiket->no_tiket}",
+                'keterangan' => "Garansi {$durasiHari} hari — Servis {$tiket->no_tiket}",
             ]
         );
 
@@ -405,7 +416,7 @@ class ServisService
         // - HPP sparepart terpakai (510-02) debit, Persediaan (130-01) kredit
         // - Kas (110-01) debit = total tagihan (jasa + sparepart)
         try {
-            $jurnalService = app(\App\Modules\Akunting\Services\JurnalService::class);
+            $jurnalService = app(JurnalService::class);
 
             $jasaServis = (float) ($tiket->estimasi_biaya ?? 0);
 
@@ -466,19 +477,19 @@ class ServisService
 
                 // Komisi reseller: jika servis milik reseller, hitung komisi
                 if ($tiket->pelanggan?->is_reseller) {
-                    $komisiService = app(\App\Modules\Reseller\Services\KomisiService::class);
+                    $komisiService = app(KomisiService::class);
                     $komisiService->hitungKomisiDariItems(
                         $tiket->pelanggan,
                         [
                             [
                                 'kategori' => 'Servis',
                                 'subtotal' => $jasaServis,
-                                'jumlah'   => 1,
+                                'jumlah' => 1,
                             ],
                         ],
                         [
                             'jumlah_transaksi' => $totalTagihan,
-                            'keterangan'       => 'Komisi dari servis ' . $tiket->no_tiket,
+                            'keterangan' => 'Komisi dari servis '.$tiket->no_tiket,
                         ]
                     );
                 }
@@ -486,7 +497,7 @@ class ServisService
         } catch (\Exception $e) {
             // Jangan blokir selesai servis jika jurnal gagal — log & lanjut
             // (COA harus ter-seed; kegagalan dicatat agar bisa diperbaiki)
-            \Illuminate\Support\Facades\Log::warning("Jurnal otomatis servis gagal: {$e->getMessage()}", [
+            Log::warning("Jurnal otomatis servis gagal: {$e->getMessage()}", [
                 'tiket' => $tiket->no_tiket,
             ]);
         }
@@ -507,16 +518,16 @@ class ServisService
     ): void {
         ServisStatusLog::create([
             'tiket_servis_id' => $tiket->id,
-            'status_dari'     => $dari,
-            'status_ke'       => $ke,
-            'user_id'         => $user?->id,
-            'aksi'            => $aksi,
-            'alasan'          => $alasan,
+            'status_dari' => $dari,
+            'status_ke' => $ke,
+            'user_id' => $user?->id,
+            'aksi' => $aksi,
+            'alasan' => $alasan,
         ]);
 
         // Audit: override status wajib tercatat (PRD §6)
         if ($aksi === 'override') {
-            app(\App\Modules\Rbac\Services\AuditService::class)->catat(
+            app(AuditService::class)->catat(
                 'TiketServis', 'override', $tiket->id,
                 "Override status {$dari} → {$ke} pada {$tiket->no_tiket}: {$alasan}",
                 ['status' => $dari], ['status' => $ke]

@@ -21,24 +21,25 @@ class ServisController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'jenis_servis_id'     => 'nullable|exists:jenis_servis,id',
-            'pelanggan_id'        => 'nullable|exists:pelanggan,id',
-            'nama_pelanggan'      => 'required_without:pelanggan_id|string|max:255',
-            'telepon_pelanggan'   => 'required_without:pelanggan_id|nullable|string|max:20',
-            'jenis_hp'            => 'required|string|max:255',
-            'seri_hp'             => 'nullable|string|max:255',
+            'jenis_servis_id' => 'nullable|exists:jenis_servis,id',
+            'pelanggan_id' => 'nullable|exists:pelanggan,id',
+            'nama_pelanggan' => 'required_without:pelanggan_id|string|max:255',
+            'telepon_pelanggan' => 'required_without:pelanggan_id|nullable|string|max:20',
+            'jenis_hp' => 'required|string|max:255',
+            'seri_hp' => 'nullable|string|max:255',
             // [T-19] kunci gadget
-            'tipe_kunci'          => 'nullable|in:pola,pin,password,tidak_ada',
-            'kunci_terenkripsi'   => 'required_with:tipe_kunci|nullable|string',
-            'keluhan'             => 'required|string',
-            'kondisi_fisik'       => 'nullable|array',
-            'foto_unit'           => 'required|array|min:2', // wajib minimal 2 foto
-            'foto_unit.*'         => 'string',
-            'cabang_id'           => 'nullable|exists:cabang,id',
+            'tipe_kunci' => 'nullable|in:pola,pin,password,tidak_ada',
+            'kunci_terenkripsi' => 'required_with:tipe_kunci|nullable|string',
+            'keluhan' => 'required|string',
+            'kondisi_fisik' => 'nullable|array',
+            'foto_unit' => 'required|array|min:2', // wajib minimal 2 foto
+            'foto_unit.*' => 'string',
+            'cabang_id' => 'nullable|exists:cabang,id',
         ]);
 
         try {
             $tiket = $this->servisService->terimaUnit($request->all(), $request->user());
+
             return $this->success($tiket->load('jenisServis', 'pelanggan'), 'Unit servis diterima', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
@@ -67,9 +68,9 @@ class ServisController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('no_tiket', 'like', "%{$search}%")
-                  ->orWhere('jenis_hp', 'like', "%{$search}%")
-                  ->orWhere('nama_pelanggan', 'like', "%{$search}%")
-                  ->orWhere('telepon_pelanggan', 'like', "%{$search}%");
+                    ->orWhere('jenis_hp', 'like', "%{$search}%")
+                    ->orWhere('nama_pelanggan', 'like', "%{$search}%")
+                    ->orWhere('telepon_pelanggan', 'like', "%{$search}%");
             });
         }
 
@@ -93,7 +94,7 @@ class ServisController extends Controller
             && ($user->hasRole(['super-admin', 'admin-toko'])
                 || ($user->hasRole('teknisi') && $tiket->teknisi_id === $user->id));
 
-        if (!$bolehLihatKunci) {
+        if (! $bolehLihatKunci) {
             $tiket->makeHidden(['kunci_terenkripsi']);
             $tiket->setAttribute('kunci_terenkripsi', null);
         }
@@ -118,6 +119,7 @@ class ServisController extends Controller
                 $request->user(),
                 $request->alasan ?? ''
             );
+
             return $this->success($tiket->load('garansi'), 'Status tiket servis diperbarui');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
@@ -129,7 +131,7 @@ class ServisController extends Controller
     {
         $request->validate([
             'estimasi_biaya' => 'required|numeric|min:0',
-            'alasan'         => 'required|string',
+            'alasan' => 'required|string',
         ]);
 
         $tiket = TiketServis::findOrFail($id);
@@ -141,6 +143,7 @@ class ServisController extends Controller
                 $request->alasan,
                 $request->user()
             );
+
             return $this->success($tiket, 'Estimasi biaya tersimpan, menunggu approval pelanggan');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
@@ -151,12 +154,12 @@ class ServisController extends Controller
     public function inputSparepart(Request $request, $id)
     {
         $request->validate([
-            'gudang_id'       => 'required|exists:gudang,id',
-            'items'           => 'required|array|min:1',
-            'items.*.produk_id'          => 'required|exists:produk,id',
-            'items.*.sku_variant_id'     => 'nullable|exists:sku_variants,id',
-            'items.*.jumlah'             => 'required|integer|min:1',
-            'items.*.harga_satuan'       => 'nullable|numeric|min:0',
+            'gudang_id' => 'required|exists:gudang,id',
+            'items' => 'required|array|min:1',
+            'items.*.produk_id' => 'required|exists:produk,id',
+            'items.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
+            'items.*.jumlah' => 'required|integer|min:1',
+            'items.*.harga_satuan' => 'nullable|numeric|min:0',
         ]);
 
         $tiket = TiketServis::findOrFail($id);
@@ -168,6 +171,7 @@ class ServisController extends Controller
                 (int) $request->gudang_id,
                 $request->user()
             );
+
             return $this->success($parts, 'Sparepart dicatat & stok berkurang');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
@@ -191,6 +195,7 @@ class ServisController extends Controller
 
         try {
             $rows = $this->servisService->inputPekerjaan($tiket, $request->items, $request->user());
+
             return $this->success($rows, 'Pekerjaan servis dicatat (part & jasa terpisah)');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
@@ -202,24 +207,25 @@ class ServisController extends Controller
     // [API: SERVICE-07] Booking servis online dari marketplace (public)
     public function bookingOnline(Request $request)
     {
-        $rateKey = 'servis-booking:' . $request->ip();
+        $rateKey = 'servis-booking:'.$request->ip();
         if (RateLimiter::tooManyAttempts($rateKey, 3)) {
             return $this->error('Terlalu banyak booking, coba lagi nanti', 429);
         }
         RateLimiter::hit($rateKey, 60);
 
         $request->validate([
-            'cabang_id'       => 'nullable|exists:cabang,id',
-            'nama'            => 'required|string|max:255',
-            'telepon'         => 'required|string|max:20',
-            'jenis_hp'        => 'required|string|max:255',
-            'seri_hp'         => 'nullable|string|max:255',
-            'keluhan'         => 'required|string',
-            'foto_unit'       => 'nullable|array',
+            'cabang_id' => 'nullable|exists:cabang,id',
+            'nama' => 'required|string|max:255',
+            'telepon' => 'required|string|max:20',
+            'jenis_hp' => 'required|string|max:255',
+            'seri_hp' => 'nullable|string|max:255',
+            'keluhan' => 'required|string',
+            'foto_unit' => 'nullable|array',
         ]);
 
         try {
             $tiket = $this->servisService->bookingOnline($request->all());
+
             return $this->success($tiket, 'Booking servis online berhasil, tunggu konfirmasi cabang', 201);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
@@ -230,7 +236,7 @@ class ServisController extends Controller
     public function publicApprove(string $token, Request $request)
     {
         // Rate limit publik: 5 per menit per token
-        $rateKey = 'servis-approve:' . $token;
+        $rateKey = 'servis-approve:'.$token;
         if (RateLimiter::tooManyAttempts($rateKey, 5)) {
             return $this->error('Terlalu banyak percobaan, coba lagi dalam 1 menit', 429);
         }
@@ -243,10 +249,11 @@ class ServisController extends Controller
 
         try {
             $tiket = $this->servisService->approveByToken($token, $request->action, $request->alasan ?? '');
+
             return $this->success([
-                'no_tiket'  => $tiket->no_tiket,
-                'status'    => $tiket->status,
-                'message'   => $request->action === 'approve'
+                'no_tiket' => $tiket->no_tiket,
+                'status' => $tiket->status,
+                'message' => $request->action === 'approve'
                     ? 'Estimasi disetujui, servis akan dikerjakan'
                     : 'Estimasi ditolak',
             ]);
@@ -262,7 +269,7 @@ class ServisController extends Controller
             ->where('token_approval', $token)
             ->first();
 
-        if (!$tiket) {
+        if (! $tiket) {
             return $this->error('Tiket servis tidak ditemukan', 404);
         }
 

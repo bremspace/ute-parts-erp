@@ -34,7 +34,7 @@ class RbacFlexController extends Controller
         ]);
 
         $role = Role::findOrCreate($request->name);
-        if (!empty($request->permissions)) {
+        if (! empty($request->permissions)) {
             $role->syncPermissions($request->permissions);
         }
 
@@ -62,7 +62,7 @@ class RbacFlexController extends Controller
 
         app(AuditService::class)->catat(
             'Role', 'update', $role->id,
-            "Permission role {$role->name} diubah (" . count($request->permissions) . ' permission)'
+            "Permission role {$role->name} diubah (".count($request->permissions).' permission)'
         );
 
         return $this->success($role->load('permissions'), 'Permission role diperbarui');

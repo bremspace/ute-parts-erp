@@ -6,6 +6,7 @@ use App\Modules\Crm\Models\KampanyeBroadcast;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Notifikasi\Services\NotificationService;
+use Illuminate\Support\Collection;
 
 /**
  * [T-23] Broadcast lengkap: segment, kirim sekarang/jadwal, log per penerima (anti dobel).
@@ -17,7 +18,7 @@ class BroadcastService
         protected NotificationService $notifService
     ) {}
 
-    public function resolveTarget(KampanyeBroadcast $kampanye): \Illuminate\Support\Collection
+    public function resolveTarget(KampanyeBroadcast $kampanye): Collection
     {
         $target = Pelanggan::query();
         $segments = $kampanye->segment ?? [];
@@ -25,7 +26,7 @@ class BroadcastService
         foreach ($segments as $seg) {
             switch ($seg['tipe'] ?? '') {
                 case 'tier':
-                    if (!empty($seg['nilai'])) {
+                    if (! empty($seg['nilai'])) {
                         $target->where('tier_membership_id', $seg['nilai']);
                     }
                     break;
@@ -33,17 +34,17 @@ class BroadcastService
                     $target->where('is_reseller', true);
                     break;
                 case 'belum_belanja_hari':
-                    if (!empty($seg['nilai'])) {
+                    if (! empty($seg['nilai'])) {
                         $target->whereDoesntHave('transaksi', fn ($q) => $q->where('created_at', '>=', now()->subDays((int) $seg['nilai'])));
                     }
                     break;
                 case 'birthday_month': // [T-37] Promo ulang tahun: semua pelanggan yg lahir di bulan ini
-                    if (!empty($seg['nilai'])) {
+                    if (! empty($seg['nilai'])) {
                         $target->whereMonth('tanggal_lahir', (int) $seg['nilai']);
                     }
                     break;
                 case 'birthday_day': // [T-37] Kombinasi month+day = tepat tanggal lahir
-                    if (!empty($seg['nilai'])) {
+                    if (! empty($seg['nilai'])) {
                         $target->whereDay('tanggal_lahir', (int) $seg['nilai']);
                     }
                     break;
@@ -63,6 +64,7 @@ class BroadcastService
         // Idempotency: cek apakah sudah ada notifikasi utk kampanye ini & channel ini
         if (NotifikasiKeluar::where('kampanye_broadcast_id', $kampanye->id)->exists()) {
             $kampanye->update(['status' => 'terkirim', 'dikirim_at' => now()]);
+
             return $kampanye;
         }
 
@@ -104,7 +106,7 @@ class BroadcastService
         return $kampanye;
     }
 
-    public function logPengiriman(int $kampanyeId): \Illuminate\Support\Collection
+    public function logPengiriman(int $kampanyeId): Collection
     {
         return NotifikasiKeluar::where('kampanye_broadcast_id', $kampanyeId)
             ->orderBy('id')

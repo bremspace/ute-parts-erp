@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'kode', 'nama', 'tipe', 'kelompok', 'saldo_normal', 'parent_id', 'is_active'
+    'kode', 'nama', 'tipe', 'kelompok', 'saldo_normal', 'parent_id', 'is_active',
 ])]
 class AkunCOA extends Model
 {

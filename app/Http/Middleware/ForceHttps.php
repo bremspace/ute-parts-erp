@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Force HTTPS Middleware
- * 
+ *
  * Redirects all HTTP requests to HTTPS in production.
  * Can be disabled via FORCE_HTTPS=false env var.
  */
@@ -20,7 +20,7 @@ class ForceHttps
     public function handle(Request $request, Closure $next): Response
     {
         // Skip if not in production or FORCE_HTTPS is disabled
-        if (!config('app.force_https', true) || !$this->shouldForceHttps($request)) {
+        if (! config('app.force_https', true) || ! $this->shouldForceHttps($request)) {
             return $next($request);
         }
 

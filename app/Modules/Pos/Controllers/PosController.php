@@ -2,10 +2,15 @@
 
 namespace App\Modules\Pos\Controllers;
 
+use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
+use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
@@ -27,9 +32,41 @@ class PosController extends Controller
     // [API: POS-02] Cari produk + stok untuk kasir
     public function products(Request $request)
     {
-        $search = $request->query('search', '');
         $gudangId = $request->query('gudang_id', session('gudang_id'));
         $customerId = $request->query('customer_id');
+
+        // [T-07] Mode ringkas utk autocomplete/debounce: ?q= atau ?query= → payload kecil, limit 10
+        $q = $request->query('q', $request->query('query', ''));
+        if ($q !== '') {
+            $query = Produk::query()
+                ->where('is_active', true)
+                ->with(['skuVariants' => fn ($sq) => $sq->where('is_active', true)])
+                ->where(fn ($sub) => $sub
+                    ->where('nama', 'like', "%{$q}%")
+                    ->orWhere('kategori', 'like', "%{$q}%")
+                    ->orWhere('brand_kompatibel', 'like', "%{$q}%")
+                    ->orWhere('model_kompatibel', 'like', "%{$q}%")
+                    ->orWhereHas('skuVariants', fn ($sq) => $sq->where('sku', 'like', "%{$q}%"))
+                );
+
+            $pelanggan = $customerId ? Pelanggan::with('tierMembership')->find($customerId) : null;
+
+            $items = $query->limit(10)->get()->map(fn ($product) => [
+                'id' => $product->id,
+                'nama' => $product->nama,
+                'sku' => $product->skuVariants->first()?->sku,
+                'harga' => (float) $this->pricingService->resolve($product, $pelanggan)['harga'],
+                'stok' => $gudangId
+                    ? (int) StokItem::where('produk_id', $product->id)->where('gudang_id', $gudangId)->sum('jumlah')
+                    : 0,
+                'foto' => $product->foto[0] ?? $product->gambar,
+            ]);
+
+            return $this->success($items, 'Hasil pencarian produk (ringkas)');
+        }
+
+        // Jalur legacy (param `search`) — respons paginasi penuh, tidak berubah
+        $search = $request->query('search', '');
 
         $pelanggan = $customerId ? Pelanggan::with('tierMembership')->find($customerId) : null;
 
@@ -39,16 +76,16 @@ class PosController extends Controller
                 $q->where('is_active', true);
             }]);
 
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('kategori', 'like', "%{$search}%")
-                  ->orWhere('brand_kompatibel', 'like', "%{$search}%")
-                  ->orWhere('model_kompatibel', 'like', "%{$search}%")
-                  ->orWhereHas('skuVariants', function ($sq) use ($search) {
-                      $sq->where('sku', 'like', "%{$search}%")
-                         ->orWhere('nama_varian', 'like', "%{$search}%");
-                  });
+                    ->orWhere('kategori', 'like', "%{$search}%")
+                    ->orWhere('brand_kompatibel', 'like', "%{$search}%")
+                    ->orWhere('model_kompatibel', 'like', "%{$search}%")
+                    ->orWhereHas('skuVariants', function ($sq) use ($search) {
+                        $sq->where('sku', 'like', "%{$search}%")
+                            ->orWhere('nama_varian', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -144,19 +181,19 @@ class PosController extends Controller
 
         // [T-09] Validasi sesi kas utk pembayaran tunai (blokir bila belum buka kas)
         if ($request->metode_bayar === 'tunai') {
-            $kasSesi = app(\App\Modules\Pos\Services\KasSesiState::class);
-            if (!$kasSesi->isActiveSesi()) {
+            $kasSesi = app(KasSesiState::class);
+            if (! $kasSesi->isActiveSesi()) {
                 return $this->error('Kas belum dibuka — buka sesi kas terlebih dahulu sebelum transaksi tunai', 422);
             }
         }
 
         $cabangId = session('cabang_id') ?? auth()->user()->cabangs()->first()?->id;
-        if (!$cabangId) {
+        if (! $cabangId) {
             return $this->error('Cabang aktif belum dipilih', 400);
         }
 
         $gudangId = $request->gudang_id ?? session('gudang_id');
-        if (!$gudangId) {
+        if (! $gudangId) {
             $firstGudang = Gudang::where('cabang_id', $cabangId)->first();
             $gudangId = $firstGudang?->id;
         }
@@ -293,8 +330,8 @@ class PosController extends Controller
                 }
             }
 
-// Jurnal akuntansi otomatis (PRD §4.6): Kas masuk, Pendapatan, HPP, Persediaan turun
-            $jurnalService = app(\App\Modules\Akunting\Services\JurnalService::class);
+            // Jurnal akuntansi otomatis (PRD §4.6): Kas masuk, Pendapatan, HPP, Persediaan turun
+            $jurnalService = app(JurnalService::class);
             $totalHpp = 0.0;
             foreach ($itemsData as $row) {
                 $totalHpp += (float) $row['hpp'] * $row['jumlah'];
@@ -327,16 +364,16 @@ class PosController extends Controller
 
             // Kasbon → catat Piutang (AR)
             if ($kasbon && $request->pelanggan_id) {
-                $countPiutang = \App\Modules\Akunting\Models\Piutang::whereDate('created_at', now()->toDateString())->count() + 1;
-                \App\Modules\Akunting\Models\Piutang::create([
-                    'no_piutang'    => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
-                    'pelanggan_id'  => $request->pelanggan_id,
-                    'transaksi_id'  => $transaksi->id,
-                    'jumlah'        => $totalAkhir,
-                    'jumlah_dibayar'=> 0,
-                    'jatuh_tempo'   => now()->addDays(30)->toDateString(),
-                    'status'        => 'belum_lunas',
-                    'keterangan'    => 'Kasbon POS ' . $noTransaksi,
+                $countPiutang = Piutang::whereDate('created_at', now()->toDateString())->count() + 1;
+                Piutang::create([
+                    'no_piutang' => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
+                    'pelanggan_id' => $request->pelanggan_id,
+                    'transaksi_id' => $transaksi->id,
+                    'jumlah' => $totalAkhir,
+                    'jumlah_dibayar' => 0,
+                    'jatuh_tempo' => now()->addDays(30)->toDateString(),
+                    'status' => 'belum_lunas',
+                    'keterangan' => 'Kasbon POS '.$noTransaksi,
                 ]);
             }
 
@@ -344,7 +381,7 @@ class PosController extends Controller
             if ($request->pelanggan_id) {
                 $pelanggan = Pelanggan::find($request->pelanggan_id);
                 if ($pelanggan && $pelanggan->is_reseller) {
-                    app(\App\Modules\Reseller\Services\KomisiService::class)->hitungKomisi($transaksi, $pelanggan);
+                    app(KomisiService::class)->hitungKomisi($transaksi, $pelanggan);
                 }
             }
 
@@ -417,8 +454,8 @@ class PosController extends Controller
         if (strlen($search) >= 2) {
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('telepon', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('telepon', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -434,11 +471,12 @@ class PosController extends Controller
         ]);
 
         try {
-            $sesi = app(\App\Modules\Pos\Services\KasSesiState::class)->bukaKas(
+            $sesi = app(KasSesiState::class)->bukaKas(
                 (float) $request->saldo_awal,
                 $request->cabang_id ?? session('cabang_id'),
                 auth()->id()
             );
+
             return $this->success($sesi, 'Kas berhasil dibuka');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 422);
@@ -453,7 +491,8 @@ class PosController extends Controller
         ]);
 
         try {
-            $hasil = app(\App\Modules\Pos\Services\KasSesiState::class)->tutupKas((float) $request->saldo_fisik);
+            $hasil = app(KasSesiState::class)->tutupKas((float) $request->saldo_fisik);
+
             return $this->success($hasil, 'Kas berhasil ditutup');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 422);
@@ -464,7 +503,7 @@ class PosController extends Controller
     public function riwayatKas(Request $request)
     {
         return $this->success(
-            app(\App\Modules\Pos\Services\KasSesiState::class)->riwayat($request->cabang_id ?? session('cabang_id')),
+            app(KasSesiState::class)->riwayat($request->cabang_id ?? session('cabang_id')),
             'Riwayat sesi kas berhasil dimuat'
         );
     }
@@ -482,7 +521,7 @@ class PosController extends Controller
             return $this->error('Transaksi tidak ditemukan', 404);
         }
 
-        \App\Modules\Pos\Jobs\PrintThermalJob::dispatch($transaksi->id);
+        PrintThermalJob::dispatch($transaksi->id);
 
         return $this->success(
             ['no_transaksi' => $transaksi->no_transaksi],

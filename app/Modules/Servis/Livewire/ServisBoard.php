@@ -2,15 +2,15 @@
 
 namespace App\Modules\Servis\Livewire;
 
+use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Servis\Services\ServisStateMachine;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
-use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -20,6 +20,7 @@ class ServisBoard extends Component
 
     // Search & filter
     public string $search = '';
+
     public string $filterStatus = ''; // empty = all
 
     // Terima Unit Modal
@@ -28,23 +29,29 @@ class ServisBoard extends Component
     // [T-18] customer picker reusable (sama seperti POS)
     public string $pelangganSearch = '';
 
+    // [T-18] quick-add pelanggan baru dari terima unit (CRM-06 path)
+    public bool $showPelangganBaruModal = false;
+
+    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'alamat' => ''];
+
     public array $terimaForm = [
-        'pelanggan_id'    => null,
-        'nama_pelanggan'  => '',
+        'pelanggan_id' => null,
+        'nama_pelanggan' => '',
         'telepon_pelanggan' => '',
         'jenis_servis_id' => null,
-        'jenis_hp'        => '',
-        'seri_hp'         => '',
+        'jenis_hp' => '',
+        'seri_hp' => '',
         // [T-19] kunci gadget
-        'tipe_kunci'      => null,
+        'tipe_kunci' => null,
         'kunci_terenkripsi' => '',
-        'keluhan'         => '',
-        'kondisi_fisik'   => [],
-        'foto_unit'       => [], // BASE64 data URLs (min 2)
+        'keluhan' => '',
+        'kondisi_fisik' => [],
+        'foto_unit' => [], // BASE64 data URLs (min 2)
     ];
 
     // Foto preview (base64)
     public array $fotoPreviews = [];
+
     public array $photoInputs = [];
 
     // Detail Modal
@@ -52,18 +59,29 @@ class ServisBoard extends Component
 
     // Estimasi Modal
     public bool $showEstimasiModal = false;
+
     public ?int $estimasiTiketId = null;
+
     public float $estimasiBiaya = 0;
+
     public string $estimasiAlasan = '';
 
     // Approve/Reject Modal (menunggu_approval)
     public bool $showApproveModal = false;
+
     public ?int $approveTiketId = null;
+
     public string $approveAlasan = '';
 
     // Drag & drop target status
     public ?string $dropTargetStatus = null;
+
     public ?int $dropTiketId = null;
+
+    // [T-17] Form pekerjaan teknisi (item part/jasa) di modal detail
+    public array $pekerjaanItems = [];
+
+    public ?int $pekerjaanGudangId = null;
 
     public function mount()
     {
@@ -88,9 +106,9 @@ class ServisBoard extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('no_tiket', 'like', "%{$this->search}%")
-                  ->orWhere('jenis_hp', 'like', "%{$this->search}%")
-                  ->orWhere('nama_pelanggan', 'like', "%{$this->search}%")
-                  ->orWhere('telepon_pelanggan', 'like', "%{$this->search}%");
+                    ->orWhere('jenis_hp', 'like', "%{$this->search}%")
+                    ->orWhere('nama_pelanggan', 'like', "%{$this->search}%")
+                    ->orWhere('telepon_pelanggan', 'like', "%{$this->search}%");
             });
         }
 
@@ -108,7 +126,9 @@ class ServisBoard extends Component
     // --- Foto handling (base64, min 2, wajib) ---
     public function handleFotoUpload(int $index, $content)
     {
-        if (!$content) return;
+        if (! $content) {
+            return;
+        }
 
         // Data URL: data:image/png;base64,xxx
         $this->photoInputs[$index] = $content;
@@ -138,17 +158,17 @@ class ServisBoard extends Component
     public function openTerimaModal()
     {
         $this->terimaForm = [
-            'pelanggan_id'    => null,
-            'nama_pelanggan'  => '',
+            'pelanggan_id' => null,
+            'nama_pelanggan' => '',
             'telepon_pelanggan' => '',
             'jenis_servis_id' => JenisServis::where('is_active', true)->first()?->id,
-            'jenis_hp'        => '',
-            'seri_hp'         => '',
-            'tipe_kunci'      => null,
+            'jenis_hp' => '',
+            'seri_hp' => '',
+            'tipe_kunci' => null,
             'kunci_terenkripsi' => '',
-            'keluhan'         => '',
-            'kondisi_fisik'   => [],
-            'foto_unit'       => [],
+            'keluhan' => '',
+            'kondisi_fisik' => [],
+            'foto_unit' => [],
         ];
         $this->pelangganSearch = '';
         $this->photoInputs = [null, null, null];
@@ -165,7 +185,7 @@ class ServisBoard extends Component
         return Pelanggan::with('tierMembership')
             ->where(function ($q) {
                 $q->where('nama', 'like', "%{$this->pelangganSearch}%")
-                  ->orWhere('telepon', 'like', "%{$this->pelangganSearch}%");
+                    ->orWhere('telepon', 'like', "%{$this->pelangganSearch}%");
             })
             ->limit(8)
             ->get();
@@ -183,17 +203,40 @@ class ServisBoard extends Component
         $this->pelangganSearch = '';
     }
 
-    /** [T-18] quick-add pelanggan baru dari terima unit — satu sumber (CRM-06 path) */
+    /** [T-18] buka modal quick-add pelanggan baru dari terima unit — satu sumber (CRM-06 path) */
     public function openPelangganBaruServis()
     {
-        $this->dispatch('alert', ['type' => 'info', 'message' => 'Buat pelanggan via CRM lalu kaitkan; POS & Servis pakai data yang sama']);
+        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'alamat' => ''];
+        $this->showPelangganBaruModal = true;
+    }
+
+    /** [T-18] simpan pelanggan baru via PelangganService (sama dgn CRM-06 / POS) → langsung dipilih */
+    public function simpanPelangganBaruServis()
+    {
+        $this->validate([
+            'pelangganBaruForm.nama' => 'required|string|max:255',
+            'pelangganBaruForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon',
+        ]);
+
+        try {
+            $pelanggan = app(PelangganService::class)->create([
+                'nama' => $this->pelangganBaruForm['nama'],
+                'telepon' => $this->pelangganBaruForm['telepon'],
+                'alamat' => $this->pelangganBaruForm['alamat'] ?: null,
+            ]);
+            $this->setPelangganServis($pelanggan->id);
+            $this->showPelangganBaruModal = false;
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan & dipilih (sinkron CRM)']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     public function simpanTerima()
     {
         $this->validate([
-            'terimaForm.jenis_hp'       => 'required|string|max:255',
-            'terimaForm.keluhan'        => 'required|string',
+            'terimaForm.jenis_hp' => 'required|string|max:255',
+            'terimaForm.keluhan' => 'required|string',
             'terimaForm.nama_pelanggan' => 'required_if:terimaForm.pelanggan_id,',
             'terimaForm.telepon_pelanggan' => 'nullable|string|max:20',
         ]);
@@ -202,6 +245,7 @@ class ServisBoard extends Component
 
         if (count($foto) < 2) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Foto unit wajib minimal 2']);
+
             return;
         }
 
@@ -249,7 +293,7 @@ class ServisBoard extends Component
     public function simpanEstimasi()
     {
         $this->validate([
-            'estimasiBiaya'  => 'required|numeric|min:0',
+            'estimasiBiaya' => 'required|numeric|min:0',
             'estimasiAlasan' => 'required|string|min:5',
         ]);
 
@@ -297,6 +341,87 @@ class ServisBoard extends Component
     public function openDetail(int $tiketId)
     {
         $this->selectedTiketId = $tiketId;
+
+        // [T-17] init satu baris kosong + gudang default cabang sesi
+        $this->pekerjaanItems = [$this->pekerjaanRowBaru()];
+        if (! $this->pekerjaanGudangId) {
+            $cabangId = session('cabang_id');
+            $this->pekerjaanGudangId = $cabangId
+                ? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
+                : Gudang::where('is_active', true)->value('id');
+        }
+    }
+
+    private function pekerjaanRowBaru(): array
+    {
+        return [
+            'tipe' => 'jasa',
+            'produk_id' => null,
+            'nama_item' => '',
+            'qty' => 1,
+            'harga' => 0,
+            'gudang_id' => null,
+        ];
+    }
+
+    public function addPekerjaanRow()
+    {
+        $this->pekerjaanItems[] = $this->pekerjaanRowBaru();
+    }
+
+    public function removePekerjaanRow(int $idx)
+    {
+        unset($this->pekerjaanItems[$idx]);
+        $this->pekerjaanItems = array_values($this->pekerjaanItems);
+    }
+
+    /** [T-17] Simpan item pekerjaan → ServisService::inputPekerjaan (part: stok 1x, jasa: tagihan) */
+    public function simpanPekerjaan()
+    {
+        $tiket = TiketServis::findOrFail($this->selectedTiketId);
+
+        if (! auth()->user()->can('servis.input-sparepart')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin input sparepart/pekerjaan']);
+
+            return;
+        }
+
+        $items = [];
+        foreach ($this->pekerjaanItems as $row) {
+            $tipe = ($row['tipe'] ?? 'jasa') === 'part' ? 'part' : 'jasa';
+            $produkId = $tipe === 'part' ? ($row['produk_id'] ?? null) : null;
+
+            $namaItem = trim($row['nama_item'] ?? '');
+            if ($tipe === 'part' && $produkId && $namaItem === '') {
+                $namaItem = (string) (Produk::find($produkId)?->nama ?? '');
+            }
+            if ($namaItem === '') {
+                continue; // baris kosong dilewati
+            }
+
+            $items[] = [
+                'tipe' => $tipe,
+                'produk_id' => $produkId,
+                'nama_item' => $namaItem,
+                'qty' => max(1, (int) ($row['qty'] ?? 1)),
+                'harga' => (float) ($row['harga'] ?? 0),
+                'gudang_id' => $tipe === 'part' ? ($row['gudang_id'] ?? $this->pekerjaanGudangId) : null,
+            ];
+        }
+
+        if (count($items) === 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tambah minimal 1 baris item pekerjaan (isi nama item)']);
+
+            return;
+        }
+
+        try {
+            app(ServisService::class)->inputPekerjaan($tiket, $items, auth()->user());
+            $this->pekerjaanItems = [$this->pekerjaanRowBaru()];
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Item pekerjaan dicatat — part: stok berkurang 1x, jasa: tagihan']);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     public function getSelectedTiketProperty(): ?TiketServis
@@ -305,6 +430,7 @@ class ServisBoard extends Component
             ? TiketServis::with([
                 'jenisServis', 'pelanggan.tierMembership', 'teknisi', 'garansi',
                 'statusLogs.user', 'spareparts.produk', 'spareparts.skuVariant', 'cabang',
+                'items', // [T-17]
             ])->find($this->selectedTiketId)
             : null;
     }
@@ -313,14 +439,14 @@ class ServisBoard extends Component
     {
         return view('modules.servis.livewire.servis-board', [
             'jenisServisList' => JenisServis::where('is_active', true)->get(),
-            'pelangganList'   => Pelanggan::with('tierMembership')->limit(10)->get(),
-            'teknisiList'     => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(),
-            'gudangList'      => Gudang::where('is_active', true)->get(),
-            'produkList'      => Produk::where('is_active', true)->orderBy('nama')->limit(50)->get(),
+            'pelangganList' => Pelanggan::with('tierMembership')->limit(10)->get(),
+            'teknisiList' => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(),
+            'gudangList' => Gudang::where('is_active', true)->get(),
+            'produkList' => Produk::where('is_active', true)->orderBy('nama')->limit(50)->get(),
             'stateMachineColumns' => $this->stateMachineColumns,
-            'groupedTikets'   => $this->groupedTikets,
-            'selectedTiket'   => $this->selectedTiket,
-            'fotoCount'       => $this->fotoCount,
+            'groupedTikets' => $this->groupedTikets,
+            'selectedTiket' => $this->selectedTiket,
+            'fotoCount' => $this->fotoCount,
             'pelangganCariServis' => $this->pelangganCariServis,
         ])->layout('layouts.backoffice', ['header' => 'Servis HP — Papan Kanban']);
     }

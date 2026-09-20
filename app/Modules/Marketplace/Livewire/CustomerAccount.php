@@ -17,7 +17,7 @@ class CustomerAccount extends Component
     public function getOrdersProperty()
     {
         $customer = auth('customer')->user();
-        if (!$customer) {
+        if (! $customer) {
             return collect();
         }
 
@@ -31,7 +31,7 @@ class CustomerAccount extends Component
     public function getServisProperty()
     {
         $customer = auth('customer')->user();
-        if (!$customer) {
+        if (! $customer) {
             return collect();
         }
 
@@ -44,7 +44,7 @@ class CustomerAccount extends Component
     public function getKomisiProperty()
     {
         $customer = auth('customer')->user();
-        if (!$customer || !$customer->is_reseller) {
+        if (! $customer || ! $customer->is_reseller) {
             return collect();
         }
 

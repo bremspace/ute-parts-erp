@@ -2,14 +2,18 @@
 
 namespace App\Modules\Omnichannel\Services;
 
+use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Omnichannel\Adapters\ShopeeAdapter;
 use App\Modules\Omnichannel\Contracts\ChannelAdapterInterface;
 use App\Modules\Omnichannel\Models\Channel;
+use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Pos\Models\TransaksiItem;
-use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Models\StockMutationLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Orkestrasi sinkronisasi channel (PRD §4.10):
@@ -23,7 +27,7 @@ class ChannelSyncService
 
     public function __construct()
     {
-        $this->adapters['shopee'] = new ShopeeAdapter();
+        $this->adapters['shopee'] = new ShopeeAdapter;
         // Fase 2: tokopedia, blibli, tiktok, lazada — implement interface yang sama
     }
 
@@ -43,19 +47,25 @@ class ChannelSyncService
             ->get();
 
         foreach ($mappings as $mapping) {
-            if (!$mapping->channel || $mapping->channel->status !== 'terhubung') {
+            if (! $mapping->channel || $mapping->channel->status !== 'terhubung') {
                 continue;
             }
 
             $stok = 0;
             if ($mapping->gudang_id) {
-                $stok = (int) StokItem::where('produk_id', $produkId)
+                // [T-26] SOT: stok = delta kumulatif StockMutationLog (urut terjadi_at) per produk+gudang.
+                // BUKAN StokItem::sum — mutasi yang tidak tercatat log (lihat laporan "PERLU StockMutationLog di")
+                // tidak ikut terhitung, jadi saldo channel konsisten dengan buku mutasi.
+                // ponytail: untuk incremental push, tambah watermark last_sync pada mapping lalu filter terjadi_at > watermark.
+                $stok = (int) StockMutationLog::where('produk_id', $produkId)
                     ->where('gudang_id', $mapping->gudang_id)
-                    ->sum('jumlah');
+                    ->orderBy('terjadi_at')
+                    ->get()
+                    ->sum('delta');
             }
 
             $adapter = $this->adapterFor($mapping->channel->platform);
-            if (!$adapter) {
+            if (! $adapter) {
                 continue;
             }
 
@@ -90,7 +100,7 @@ class ChannelSyncService
     public function pullOrders(Channel $channel): int
     {
         $adapter = $this->adapterFor($channel->platform);
-        if (!$adapter) {
+        if (! $adapter) {
             throw new \Exception("Adapter untuk platform {$channel->platform} belum tersedia");
         }
 
@@ -100,17 +110,17 @@ class ChannelSyncService
         DB::transaction(function () use ($channel, $orders, &$created) {
             foreach ($orders as $order) {
                 $orderId = $order['order_sn'] ?? $order['order_id'] ?? null;
-                if (!$orderId) {
+                if (! $orderId) {
                     continue;
                 }
 
                 // Idempotent: order_id channel unik
-                if (\App\Modules\Omnichannel\Models\ChannelOrder::where('channel_id', $channel->id)
+                if (ChannelOrder::where('channel_id', $channel->id)
                     ->where('channel_order_id', $orderId)->exists()) {
                     continue;
                 }
 
-                $channelOrder = \App\Modules\Omnichannel\Models\ChannelOrder::create([
+                $channelOrder = ChannelOrder::create([
                     'channel_id' => $channel->id,
                     'channel_order_id' => $orderId,
                     'payload' => $order,
@@ -129,11 +139,68 @@ class ChannelSyncService
 
                 $channelOrder->update(['status' => $jenisStatus]);
                 $created++;
+
+                // [T-26] Jurnal biaya admin marketplace (520-06) saat order selesai — idempoten per order
+                if ($jenisStatus === 'selesai') {
+                    $this->prosesBiayaAdmin($channelOrder);
+                }
             }
         });
 
         $channel->update(['last_sync_at' => now(), 'last_sync_status' => 'sukses']);
 
         return $created;
+    }
+
+    /**
+     * [T-26] Jurnal beban biaya admin marketplace saat ChannelOrder diproses (status selesai).
+     * Jurnal: Debit 520-06 "Beban Biaya Admin Marketplace" / Kredit 110-01 Kas (atau kontra sepadan).
+     * Idempoten per order: satu pasang baris jurnal per referensi_tipe='channel_order' + referensi_id.
+     */
+    public function prosesBiayaAdmin(ChannelOrder $order): void
+    {
+        // Idempotency guard: sudah dijurnal → skip (duplikat callback tidak dobel posting)
+        $sudahAda = JurnalAkuntansi::where('referensi_tipe', 'channel_order')
+            ->where('referensi_id', $order->id)
+            ->exists();
+        if ($sudahAda) {
+            return;
+        }
+
+        $biaya = round((float) $order->estimasi_biaya_platform, 2);
+        if ($biaya <= 0) {
+            return;
+        }
+
+        // Akun COA dipastikan ada (fallback firstOrCreate, pola KasSesiState)
+        AkunCOA::firstOrCreate(
+            ['kode' => '520-06'],
+            ['nama' => 'Beban Biaya Admin Marketplace', 'tipe' => 'beban', 'kelompok' => 'biaya_marketplace', 'saldo_normal' => 'debit', 'is_active' => true]
+        );
+        AkunCOA::firstOrCreate(
+            ['kode' => '110-01'],
+            ['nama' => 'Kas', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit', 'is_active' => true]
+        );
+
+        try {
+            $cabangId = $order->payload['cabang_id'] ?? session('cabang_id') ?? null;
+            app(JurnalService::class)->post(
+                app(JurnalService::class)->generateNoJurnal('channel', $cabangId),
+                $order->updated_at ?? now(),
+                'channel',
+                [
+                    ['akun_kode' => '520-06', 'debit' => $biaya, 'kredit' => 0],
+                    ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => $biaya],
+                ],
+                'Biaya admin marketplace '.($order->channel?->nama ?? 'channel').' — order '.$order->channel_order_id,
+                $cabangId,
+                null,
+                'channel_order',
+                $order->id
+            );
+        } catch (\Throwable $e) {
+            // Jurnal gagal jangan blokir alur order — log utk audit finance
+            Log::warning("Jurnal biaya admin channel gagal (order #{$order->id}): {$e->getMessage()}");
+        }
     }
 }

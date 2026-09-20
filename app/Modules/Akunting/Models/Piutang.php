@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'no_piutang', 'pelanggan_id', 'transaksi_id', 'jumlah',
-    'jumlah_dibayar', 'jatuh_tempo', 'status', 'keterangan'
+    'jumlah_dibayar', 'jatuh_tempo', 'status', 'keterangan',
 ])]
 class Piutang extends Model
 {

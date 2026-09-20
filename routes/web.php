@@ -2,22 +2,34 @@
 
 use App\Modules\Akunting\Livewire\AkuntingDashboard;
 use App\Modules\Crm\Livewire\CrmDashboard;
+use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Dashboard\Livewire\DashboardIndex;
+use App\Modules\Marketplace\Controllers\PaymentController;
 use App\Modules\Marketplace\Livewire\CartCheckout;
+use App\Modules\Marketplace\Livewire\CustomerAccount;
 use App\Modules\Marketplace\Livewire\ShopPage;
+use App\Modules\Omnichannel\Controllers\OmnichannelController;
+use App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter;
 use App\Modules\Pos\Livewire\PosKasir;
+use App\Modules\Rbac\Livewire\SettingsRbac;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Livewire\ResellerDashboard;
 use App\Modules\Servis\Livewire\ServisBoard;
+use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Livewire\WmsDashboard;
+use App\Modules\Wms\Models\Produk;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // ===== Zona Marketplace (public storefront, light mode) =====
-Route::get('/', fn() => redirect('/shop'));
+Route::get('/', fn () => redirect('/shop'));
 Route::get('/shop', ShopPage::class)->name('shop');
 Route::get('/shop/{slug}', ShopPage::class)->name('shop.detail');
 
 // Tracking servis publik (PRD §4.3: link status via token, tanpa login)
 Route::get('/tracking/{token}', function ($token) {
-    $tiket = App\Modules\Servis\Models\TiketServis::with('garansi')
+    $tiket = TiketServis::with('garansi')
         ->where('token_approval', $token)
         ->first();
 
@@ -41,18 +53,18 @@ Route::get('/tracking/{token}', function ($token) {
 
 // ===== [API: PAY-02] Webhook Duitku — path tanpa prefix /api (PRD §5) =====
 // Duitku menembak POST /webhook/duitku dengan json body — bebaskan dari CSRF.
-Route::post('/webhook/duitku', [App\Modules\Marketplace\Controllers\PaymentController::class, 'webhook'])
+Route::post('/webhook/duitku', [PaymentController::class, 'webhook'])
     ->middleware('throttle:60,1')
-    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+    ->withoutMiddleware(ValidateCsrfToken::class);
 
 // ===== [API: OMNI-05] Webhook channel marketplace (publik) =====
-Route::post('/webhook/channel/{channelId}', [App\Modules\Omnichannel\Controllers\OmnichannelController::class, 'webhook'])
+Route::post('/webhook/channel/{channelId}', [OmnichannelController::class, 'webhook'])
     ->middleware('throttle:120,1')
-    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+    ->withoutMiddleware(ValidateCsrfToken::class);
 
 // Auth + akun pelanggan
-Route::get('/login-pelanggan', fn() => view('auth.customer-login'))->name('customer.login');
-Route::post('/login-pelanggan', function (Illuminate\Http\Request $request) {
+Route::get('/login-pelanggan', fn () => view('auth.customer-login'))->name('customer.login');
+Route::post('/login-pelanggan', function (Request $request) {
     $credentials = $request->validate([
         'telepon' => 'required|string',
         'password' => 'required|string',
@@ -65,15 +77,15 @@ Route::post('/login-pelanggan', function (Illuminate\Http\Request $request) {
     return back()->withErrors(['telepon' => 'Telepon atau password salah']);
 })->middleware('throttle:10,1')->name('customer.login.post');
 
-Route::get('/daftar-pelanggan', fn() => view('auth.customer-register'))->name('customer.register');
-Route::post('/daftar-pelanggan', function (Illuminate\Http\Request $request) {
+Route::get('/daftar-pelanggan', fn () => view('auth.customer-register'))->name('customer.register');
+Route::post('/daftar-pelanggan', function (Request $request) {
     $request->validate([
         'nama' => 'required|string|max:255',
         'telepon' => 'required|string|max:20|unique:pelanggan,telepon',
         'password' => 'required|string|min:6',
     ]);
 
-    $pelanggan = App\Modules\Crm\Models\Pelanggan::create([
+    $pelanggan = Pelanggan::create([
         'nama' => $request->nama,
         'telepon' => $request->telepon,
         'password' => $request->password,
@@ -87,6 +99,7 @@ Route::post('/daftar-pelanggan', function (Illuminate\Http\Request $request) {
 
 Route::post('/logout-pelanggan', function () {
     Auth::guard('customer')->logout();
+
     return redirect('/shop');
 })->name('customer.logout');
 
@@ -95,19 +108,19 @@ Route::get('/cart', CartCheckout::class)->name('cart');
 Route::get('/checkout', CartCheckout::class)->name('checkout');
 
 // Dashboard akun pelanggan (ACCOUNT-01..05)
-Route::get('/account', App\Modules\Marketplace\Livewire\CustomerAccount::class)
+Route::get('/account', CustomerAccount::class)
     ->middleware('auth:customer')
     ->name('customer.account');
 
 // [T-15] Cetak label barcode (multi-produk via ?ids=1,2,3)
-Route::get('/print-barcode', function (Illuminate\Http\Request $request) {
+Route::get('/print-barcode', function (Request $request) {
     $ids = collect(explode(',', (string) $request->query('ids', '')))
         ->filter(fn ($v) => is_numeric($v))
         ->map(fn ($v) => (int) $v);
 
     $produks = $ids->isEmpty()
-        ? \App\Modules\Wms\Models\Produk::where('is_active', true)->limit(20)->get()
-        : \App\Modules\Wms\Models\Produk::whereIn('id', $ids)->get();
+        ? Produk::where('is_active', true)->limit(20)->get()
+        : Produk::whereIn('id', $ids)->get();
 
     return view('wms.barcode-label', ['produks' => $produks]);
 })->middleware('auth')->name('barcode.print');
@@ -117,7 +130,7 @@ Route::get('/app/login', function () {
     return view('auth.login');
 })->name('login');
 
-Route::post('/app/login', function (\Illuminate\Http\Request $request) {
+Route::post('/app/login', function (Request $request) {
     $credentials = $request->validate([
         'email' => 'required|email',
         'password' => 'required',
@@ -126,12 +139,13 @@ Route::post('/app/login', function (\Illuminate\Http\Request $request) {
     // Preserve CSRF token before authentication
     $csrfToken = $request->session()->token();
 
-    if (!Auth::attempt($credentials)) {
+    if (! Auth::attempt($credentials)) {
         return back()->withErrors(['email' => 'Email atau password salah']);
     }
 
-    if (!auth()->user()->is_active) {
+    if (! auth()->user()->is_active) {
         Auth::logout();
+
         return back()->withErrors(['email' => 'Akun tidak aktif']);
     }
 
@@ -142,16 +156,16 @@ Route::post('/app/login', function (\Illuminate\Http\Request $request) {
 })->middleware('throttle:10,1')->name('login.post');
 
 Route::prefix('app')->middleware('auth')->group(function () {
-    Route::get('/', fn() => redirect('/app/dashboard'));
+    Route::get('/', fn () => redirect('/app/dashboard'));
 
     // [T-02] Ganti cabang aktif — perbarui session + kembali ke halaman asal (full reload supaya semua modul re-query)
-    Route::post('/pilih-cabang', function (Illuminate\Http\Request $request) {
+    Route::post('/pilih-cabang', function (Request $request) {
         $request->validate(['cabang_id' => 'required|exists:cabang,id']);
 
-        $cabang = App\Modules\Rbac\Models\Cabang::findOrFail($request->cabang_id);
+        $cabang = Cabang::findOrFail($request->cabang_id);
         $user = auth()->user();
 
-        if (!$user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+        if (! $user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
             abort(403, 'Anda tidak memiliki akses ke cabang ini');
         }
 
@@ -164,7 +178,7 @@ Route::prefix('app')->middleware('auth')->group(function () {
     })->name('pilih-cabang');
 
     // Dashboard (DASH-01 widget per role)
-    Route::get('/dashboard', App\Modules\Dashboard\Livewire\DashboardIndex::class)->name('dashboard');
+    Route::get('/dashboard', DashboardIndex::class)->name('dashboard');
 
     // POS Kasir Screen
     Route::get('/pos', PosKasir::class)->name('pos');
@@ -185,8 +199,8 @@ Route::prefix('app')->middleware('auth')->group(function () {
     Route::get('/akunting', AkuntingDashboard::class)->name('akunting');
 
     // Omnichannel Command Center Screen
-    Route::get('/omnichannel', App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter::class)->name('omnichannel');
+    Route::get('/omnichannel', OmnichannelCommandCenter::class)->name('omnichannel');
 
     // Pengaturan & RBAC Screen
-    Route::get('/pengaturan', App\Modules\Rbac\Livewire\SettingsRbac::class)->name('pengaturan');
+    Route::get('/pengaturan', SettingsRbac::class)->name('pengaturan');
 });

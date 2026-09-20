@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'no_transfer', 'gudang_asal_id', 'gudang_tujuan_id', 'user_pengirim_id',
-    'user_penerima_id', 'status', 'tanggal_kirim', 'tanggal_terima', 'catatan'
+    'user_penerima_id', 'status', 'tanggal_kirim', 'tanggal_terima', 'catatan',
 ])]
 class StokTransfer extends Model
 {
@@ -44,5 +44,37 @@ class StokTransfer extends Model
     public function items(): HasMany
     {
         return $this->hasMany(StokTransferItem::class);
+    }
+
+    /**
+     * [T-13] Qty stok asal yang terkunci oleh transfer berstatus draft (pending).
+     * Map "produk_id:sku_variant_id" => total qty pending — dipakai sbg guard
+     * stok tersedia (StokDeductionService) & penanda (kolom virtual stok_dikunci).
+     */
+    public static function pendingLockedByGudang(int $gudangId, ?int $excludeTransferId = null): array
+    {
+        return self::query()
+            ->where('gudang_asal_id', $gudangId)
+            ->where('status', 'draft')
+            ->when($excludeTransferId, fn ($q) => $q->where('id', '!=', $excludeTransferId))
+            ->with('items')
+            ->get()
+            ->flatMap(fn ($t) => $t->items)
+            ->reduce(function (array $carry, StokTransferItem $item): array {
+                $key = $item->produk_id.':'.($item->sku_variant_id ?? 'null');
+                $carry[$key] = ($carry[$key] ?? 0) + $item->jumlah;
+
+                return $carry;
+            }, []);
+    }
+
+    /**
+     * [T-13] Qty terkunci utk satu kombinasi produk/varian di gudang asal.
+     */
+    public static function pendingLockedFor(StokItem $stok, ?int $excludeTransferId = null): int
+    {
+        return (int) (self::pendingLockedByGudang($stok->gudang_id, $excludeTransferId)[
+            $stok->produk_id.':'.($stok->sku_variant_id ?? 'null')
+        ] ?? 0);
     }
 }

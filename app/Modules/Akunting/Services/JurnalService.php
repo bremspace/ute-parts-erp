@@ -16,16 +16,11 @@ class JurnalService
     /**
      * Post entri jurnal double-entry.
      *
-     * @param string $noJurnal unique journal number
-     * @param \DateTimeInterface|null $tanggal
-     * @param string $sumber pos|servis|komisi|opname|pembelian|manual
-     * @param array $lines [['akun_kode' => '110-01', 'debit' => 1000, 'kredit' => 0], ...]
-     *              minimal satu line debit dan satu line kredit
-     * @param string|null $deskripsi
-     * @param int|null $cabangId
-     * @param int|null $userId
-     * @param string|null $referensiTipe
-     * @param int|null $referensiId
+     * @param  string  $noJurnal  unique journal number
+     * @param  \DateTimeInterface|null  $tanggal
+     * @param  string  $sumber  pos|servis|komisi|opname|pembelian|manual
+     * @param  array  $lines  [['akun_kode' => '110-01', 'debit' => 1000, 'kredit' => 0], ...]
+     *                        minimal satu line debit dan satu line kredit
      *
      * @throws \Exception jika balance tidak seimbang atau no_jurnal duplikat
      */
@@ -55,7 +50,7 @@ class JurnalService
         $normalized = [];
         foreach ($lines as $line) {
             $akun = AkunCOA::where('kode', $line['akun_kode'] ?? '')->first();
-            if (!$akun) {
+            if (! $akun) {
                 throw new \Exception("Akun COA tidak ditemukan: {$line['akun_kode']}");
             }
 
@@ -65,25 +60,25 @@ class JurnalService
             $totalKredit += $kredit;
 
             $normalized[] = [
-                'no_jurnal'        => $noJurnal,
-                'tanggal'          => $tanggal ?? now(),
-                'cabang_id'        => $cabangId,
-                'akun_coa_id'      => $akun->id,
-                'sumber'           => $sumber,
-                'deskripsi'        => $deskripsi ?? "Jurnal {$sumber} {$noJurnal}",
-                'debit'            => $debit,
-                'kredit'           => $kredit,
-                'referensi_tipe'   => $referensiTipe,
-                'referensi_id'     => $referensiId,
-                'user_id'          => $userId,
+                'no_jurnal' => $noJurnal,
+                'tanggal' => $tanggal ?? now(),
+                'cabang_id' => $cabangId,
+                'akun_coa_id' => $akun->id,
+                'sumber' => $sumber,
+                'deskripsi' => $deskripsi ?? "Jurnal {$sumber} {$noJurnal}",
+                'debit' => $debit,
+                'kredit' => $kredit,
+                'referensi_tipe' => $referensiTipe,
+                'referensi_id' => $referensiId,
+                'user_id' => $userId,
             ];
         }
 
         // Double-entry balance check
         if (round($totalDebit, 2) !== round($totalKredit, 2)) {
             throw new \Exception(
-                "Jurnal tidak balance: debit Rp " . number_format($totalDebit, 2) .
-                " ≠ kredit Rp " . number_format($totalKredit, 2)
+                'Jurnal tidak balance: debit Rp '.number_format($totalDebit, 2).
+                ' ≠ kredit Rp '.number_format($totalKredit, 2)
             );
         }
 
@@ -96,6 +91,7 @@ class JurnalService
             foreach ($normalized as $row) {
                 $created[] = JurnalAkuntansi::create($row);
             }
+
             return $created;
         });
     }

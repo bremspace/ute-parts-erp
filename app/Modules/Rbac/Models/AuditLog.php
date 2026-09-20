@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'user_id', 'entitas', 'aksi', 'entitas_id', 'deskripsi', 'sebelum', 'sesudah', 'ip'
+    'user_id', 'entitas', 'aksi', 'entitas_id', 'deskripsi', 'sebelum', 'sesudah', 'ip',
 ])]
 class AuditLog extends Model
 {

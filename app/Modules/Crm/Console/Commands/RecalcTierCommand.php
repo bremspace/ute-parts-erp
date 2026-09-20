@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 class RecalcTierCommand extends Command
 {
     protected $signature = 'tier:recalc';
+
     protected $description = 'Rekalkulasi tier membership semua pelanggan dari total belanja 12 bulan (PRD §4.4)';
 
     public function handle(TierService $tierService): int

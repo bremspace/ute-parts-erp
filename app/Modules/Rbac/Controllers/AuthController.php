@@ -2,12 +2,12 @@
 
 namespace App\Modules\Rbac\Controllers;
 
+use App\Models\User;
+use App\Modules\Rbac\Models\Cabang;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User;
-use App\Modules\Rbac\Models\Cabang;
 
 class AuthController extends Controller
 {
@@ -23,12 +23,13 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
+        if (! Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
             return $this->error('Email atau password salah', 401);
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             Auth::logout();
+
             return $this->error('Akun tidak aktif', 403);
         }
 
@@ -58,7 +59,7 @@ class AuthController extends Controller
     {
         $theme = $request->input('theme');
 
-        if (!in_array($theme, ['light', 'dark', 'auto'], true)) {
+        if (! in_array($theme, ['light', 'dark', 'auto'], true)) {
             return $this->error('Tema tidak valid', 422);
         }
 
@@ -82,7 +83,7 @@ class AuthController extends Controller
         // Verify user has access to this cabang
         $hasAccess = $user->cabangs()->where('cabang_id', $request->cabang_id)->exists();
 
-        if (!$hasAccess) {
+        if (! $hasAccess) {
             return $this->error('Anda tidak memiliki akses ke cabang ini', 403);
         }
 

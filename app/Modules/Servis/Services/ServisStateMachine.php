@@ -18,15 +18,15 @@ class ServisStateMachine
      * Daftar transisi valid (status_dari => [status_ke[]]).
      */
     private const TRANSITIONS = [
-        'diajukan_online'  => ['diterima'],
-        'diterima'         => ['diagnosa'],
-        'diagnosa'         => ['menunggu_approval'],
-        'menunggu_approval'=> ['disetujui', 'ditolak'],
-        'disetujui'        => ['dikerjakan'],
-        'dikerjakan'       => ['qc'],
-        'qc'               => ['selesai'],
-        'selesai'          => ['diambil'],
-        'ditolak'          => ['diagnosa'], // re-estimasi
+        'diajukan_online' => ['diterima'],
+        'diterima' => ['diagnosa'],
+        'diagnosa' => ['menunggu_approval'],
+        'menunggu_approval' => ['disetujui', 'ditolak'],
+        'disetujui' => ['dikerjakan'],
+        'dikerjakan' => ['qc'],
+        'qc' => ['selesai'],
+        'selesai' => ['diambil'],
+        'ditolak' => ['diagnosa'], // re-estimasi
     ];
 
     private const STATUS_VALID = [
@@ -55,7 +55,7 @@ class ServisStateMachine
      */
     public static function isTerminal(string $status): bool
     {
-        return !isset(self::TRANSITIONS[$status]);
+        return ! isset(self::TRANSITIONS[$status]);
     }
 
     /**
@@ -72,14 +72,14 @@ class ServisStateMachine
     public static function kanbanColumns(): array
     {
         return [
-            'diterima'          => ['label' => 'Diterima',       'color' => 'ink-400'],
-            'diagnosa'          => ['label' => 'Diagnosa',       'color' => 'up-primary'],
-            'menunggu_approval' => ['label' => 'Menunggu Approval','color' => 'up-amber'],
-            'disetujui'         => ['label' => 'Disetujui',      'color' => 'up-mint'],
-            'dikerjakan'        => ['label' => 'Dikerjakan',     'color' => 'up-primary'],
-            'qc'                => ['label' => 'QC',             'color' => 'up-accent'],
-            'selesai'           => ['label' => 'Selesai',        'color' => 'up-mint'],
-            'diambil'           => ['label' => 'Diambil',        'color' => 'ink-100'],
+            'diterima' => ['label' => 'Diterima',       'color' => 'ink-400'],
+            'diagnosa' => ['label' => 'Diagnosa',       'color' => 'up-primary'],
+            'menunggu_approval' => ['label' => 'Menunggu Approval', 'color' => 'up-amber'],
+            'disetujui' => ['label' => 'Disetujui',      'color' => 'up-mint'],
+            'dikerjakan' => ['label' => 'Dikerjakan',     'color' => 'up-primary'],
+            'qc' => ['label' => 'QC',             'color' => 'up-accent'],
+            'selesai' => ['label' => 'Selesai',        'color' => 'up-mint'],
+            'diambil' => ['label' => 'Diambil',        'color' => 'ink-100'],
         ];
     }
 }

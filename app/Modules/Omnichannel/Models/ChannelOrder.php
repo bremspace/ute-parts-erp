@@ -2,13 +2,14 @@
 
 namespace App\Modules\Omnichannel\Models;
 
+use App\Modules\Pos\Models\Transaksi;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'channel_id', 'channel_order_id', 'transaksi_id', 'payload',
-    'channel_status', 'status', 'catatan'
+    'channel_status', 'status', 'catatan', 'estimasi_biaya_platform',
 ])]
 class ChannelOrder extends Model
 {
@@ -25,6 +26,6 @@ class ChannelOrder extends Model
 
     public function transaksi(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\Pos\Models\Transaksi::class);
+        return $this->belongsTo(Transaksi::class);
     }
 }

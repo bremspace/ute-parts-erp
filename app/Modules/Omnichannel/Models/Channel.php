@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
-    'nama', 'platform', 'status', 'kredensial', 'last_sync_at', 'last_sync_status', 'is_active'
+    'nama', 'platform', 'status', 'kredensial', 'last_sync_at', 'last_sync_status', 'is_active',
 ])]
 class Channel extends Model
 {

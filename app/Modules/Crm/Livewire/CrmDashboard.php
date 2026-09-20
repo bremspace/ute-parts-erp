@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Livewire;
 
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
@@ -16,7 +17,9 @@ class CrmDashboard extends Component
     use WithPagination;
 
     public string $search = '';
+
     public ?int $filterTierId = null;
+
     public bool $filterReseller = false;
 
     // Detail customer modal
@@ -24,6 +27,7 @@ class CrmDashboard extends Component
 
     // Tier modal
     public bool $showTierModal = false;
+
     public array $tierForm = [
         'id' => null, 'nama' => '', 'kode' => '', 'min_belanja_12bulan' => 0,
         'diskon_persen' => 0, 'poin_multiplier' => 1.0, 'urutan' => 0, 'is_active' => true,
@@ -31,13 +35,18 @@ class CrmDashboard extends Component
 
     // Broadcast modal
     public bool $showBroadcastModal = false;
+
     public string $broadcastJudul = '';
+
     public string $broadcastPesan = '';
+
     public ?int $broadcastTierId = null;
+
     public bool $broadcastReseller = false;
 
     // [T-04] Tambah pelanggan dari CRM (CRM-06)
     public bool $showPelangganBaruModal = false;
+
     public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false];
 
     public function simpanPelangganBaruCrm()
@@ -48,7 +57,7 @@ class CrmDashboard extends Component
             'pelangganBaruForm.email' => 'nullable|email|unique:pelanggan,email',
         ]);
 
-        $pelanggan = app(\App\Modules\Crm\Services\PelangganService::class)->create([
+        $pelanggan = app(PelangganService::class)->create([
             'nama' => $this->pelangganBaruForm['nama'],
             'telepon' => $this->pelangganBaruForm['telepon'],
             'email' => $this->pelangganBaruForm['email'] ?: null,
@@ -73,8 +82,8 @@ class CrmDashboard extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('nama', 'like', "%{$this->search}%")
-                  ->orWhere('telepon', 'like', "%{$this->search}%")
-                  ->orWhere('email', 'like', "%{$this->search}%");
+                    ->orWhere('telepon', 'like', "%{$this->search}%")
+                    ->orWhere('email', 'like', "%{$this->search}%");
             });
         }
         if ($this->filterTierId) {
@@ -90,12 +99,12 @@ class CrmDashboard extends Component
     // ===== DETAIL 360 =====
     public function getSelectedCustomerProperty(): ?array
     {
-        if (!$this->selectedCustomerId) {
+        if (! $this->selectedCustomerId) {
             return null;
         }
 
         $pelanggan = Pelanggan::with('tierMembership')->find($this->selectedCustomerId);
-        if (!$pelanggan) {
+        if (! $pelanggan) {
             return null;
         }
 

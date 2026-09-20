@@ -2,12 +2,12 @@
 
 namespace App\Modules\Crm\Models;
 
-use App\Modules\Crm\Models\Pelanggan;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['nama', 'kode', 'min_belanja_12bulan', 'diskon_persen', 'poin_multiplier', 'urutan', 'is_active'])]
-class TierMembership extends \Illuminate\Database\Eloquent\Model
+class TierMembership extends Model
 {
     protected $table = 'tier_memberships';
 

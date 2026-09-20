@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'no_transaksi', 'cabang_id', 'kasir_id', 'pelanggan_id', 'gudang_id',
     'sumber', 'subtotal', 'diskon_persen', 'diskon_nominal', 'pajak_nominal',
     'total_akhir', 'metode_bayar', 'jumlah_bayar', 'kembalian', 'split_detail',
-    'status', 'catatan'
+    'status', 'catatan',
 ])]
 class Transaksi extends Model
 {
