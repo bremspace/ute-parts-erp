@@ -29,6 +29,7 @@ log "Versi lama: $OLD_REV"
 
 # --- Backup build asset lama (rollback CSS/JS jika build gagal) ---
 if [ -d public/build ]; then
+    rm -rf /tmp/ute-build-backup
     mv public/build /tmp/ute-build-backup
     log "Backup public/build -> /tmp/ute-build-backup"
 fi
@@ -60,6 +61,11 @@ git merge --ff-only origin/main >>"$LOG" 2>&1 || rollback "git merge"
 
 NEW_REV="$(git rev-parse HEAD)"
 if [ "$NEW_REV" = "$OLD_REV" ]; then
+    # pulihkan build yg sudah dipindah ke backup (jika ada)
+    if [ -d /tmp/ute-build-backup ] && [ ! -d public/build ]; then
+        mv /tmp/ute-build-backup public/build
+        log "Pulihkan public/build dari backup."
+    fi
     log "Tidak ada perubahan — selesai."
     exit 0
 fi
