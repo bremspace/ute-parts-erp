@@ -18,11 +18,15 @@ use App\Modules\Reseller\Controllers\ResellerController;
 use App\Modules\Servis\Controllers\ServisController;
 use App\Modules\Wms\Controllers\WmsController;
 
+// ===== Global API rate limiting (T-28) =====
+// Apply throttle:60,1 to all API routes unless overridden by specific route
+Route::middleware(['throttle:60,1'])->group(function () {
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-// [API: AUTH-01] Login — rate limited (PRD §6)
+// [API: AUTH-01] Login — rate limited (PRD §6) - stricter limit
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
 // [API: SERVICE-06b] Approve/reject estimasi publik (token, tanpa login)
@@ -34,6 +38,8 @@ Route::post('/servis/booking-online', [ServisController::class, 'bookingOnline']
 Route::middleware('auth:sanctum')->group(function () {
     // [API: AUTH-02] Select branch
     Route::post('/select-branch', [AuthController::class, 'selectBranch']);
+    // [API: AUTH-03] Theme preference (T-32)
+    Route::post('/user/theme', [AuthController::class, 'updateTheme']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // [API: RBAC-02] My permissions
@@ -64,6 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/kas/buka', [PosController::class, 'bukaKas'])->middleware('permission:pos.create'); // POS-07
         Route::post('/kas/tutup', [PosController::class, 'tutupKas'])->middleware('permission:pos.create'); // POS-08
         Route::get('/kas/riwayat', [PosController::class, 'riwayatKas'])->middleware('permission:pos.view'); // POS-09
+        Route::post('/transaksi/{id}/print', [PosController::class, 'printStruk'])->middleware('permission:pos.view'); // [T-35] POS-10
     });
     Route::get('/pricing/{produk_id}', [PosController::class, 'resolvePrice'])->middleware('permission:pos.view');
 
@@ -137,6 +144,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/laporan/laba-rugi', [AkuntingController::class, 'labaRugi'])->middleware('permission:laporan.cabang');
         Route::get('/laporan/neraca', [AkuntingController::class, 'neraca'])->middleware('permission:laporan.cabang');
         Route::get('/laporan/arus-kas', [AkuntingController::class, 'arusKas'])->middleware('permission:laporan.cabang');
+        Route::get('/kas-sesi', [AkuntingController::class, 'kasSesi'])->middleware('permission:laporan.cabang'); // [T-33] riwayat sesi kas
         Route::post('/export', [AkuntingController::class, 'export'])->middleware('permission:laporan.cabang'); // [T-24] ACC-11
         Route::get('/export/download', [AkuntingController::class, 'exportDownload'])->middleware('permission:laporan.cabang'); // ACC-11b
         Route::get('/buku-besar/{akunId}', [AkuntingController::class, 'bukuBesar'])->middleware('permission:akunting.view');
@@ -199,3 +207,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // [API: SERVICE-08] Tracking servis publik
     Route::get('/servis/tracking/{token}', [ServisController::class, 'trackingPublik']);
 });
+
+}); // End global throttle:60,1 group (T-28)

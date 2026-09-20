@@ -63,28 +63,9 @@ class CrmController extends Controller
     // [API: CRM-06][T-04] Create pelanggan dari backoffice (satu sumber: POS/Servis/CRM)
     public function store(Request $request)
     {
-        $request->validate([
-            'nama' => 'required|string|max:255',
-            'telepon' => 'required|string|max:20|unique:pelanggan,telepon',
-            'email' => 'nullable|email|unique:pelanggan,email',
-            'alamat' => 'nullable|string',
-            'is_reseller' => 'sometimes|boolean',
-        ]);
+        $pelanggan = app(\App\Modules\Crm\Services\PelangganService::class)->create($request->all());
 
-        $tierTerendah = TierMembership::where('is_active', true)->orderBy('min_belanja_12bulan')->first();
-
-        $pelanggan = Pelanggan::create([
-            'nama' => $request->nama,
-            'telepon' => $request->telepon,
-            'email' => $request->email,
-            'alamat' => $request->alamat,
-            'tier_membership_id' => $tierTerendah?->id,
-            'is_reseller' => (bool) ($request->is_reseller ?? false),
-            'total_belanja_12bulan' => 0,
-            'poin_loyalty' => 0,
-        ]);
-
-        return $this->success($pelanggan->load('tierMembership'), 'Pelanggan berhasil dibuat', 201);
+        return $this->success($pelanggan, 'Pelanggan berhasil dibuat', 201);
     }
 
     // [API: CRM-07][T-22] Konfigurasi strategi loyalitas (editable tanpa deploy)

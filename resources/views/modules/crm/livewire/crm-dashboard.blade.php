@@ -116,7 +116,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Min. Belanja 12 Bulan (Rp) *</label>
-                        <input type="number" wire:model="tierForm.min_belanja_12bulan" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                        <input type="text" inputmode="numeric" x-format-number wire:model="tierForm.min_belanja_12bulan" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -331,6 +331,10 @@
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
                         <textarea wire:model="pelangganBaruForm.alamat" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal Lahir (opsional)</label>
+                        <input type="date" wire:model="pelangganBaruForm.tanggal_lahir" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                     </div>
                     <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
                         <input type="checkbox" wire:model="pelangganBaruForm.is_reseller" class="accent-up-accent w-4 h-4" />

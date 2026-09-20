@@ -186,6 +186,35 @@
                 </div>
             </x-prism.glass-card>
         </div>
+
+        <!-- [T-33] Riwayat Sesi Kas -->
+        <x-prism.glass-card title="Riwayat Sesi Kas" :subtitle="'50 sesi terakhir — cabang aktif'" circuit="true">
+            @php $sumberLabel = ['manual' => 'Manual', 'legacy' => 'Legacy', 'carryover' => 'Lanjutan Shift']; @endphp
+            <x-prism.data-table :headers="['Sesi', 'Kasir', 'Saldo Awal', 'Saldo Sistem', 'Saldo Fisik', 'Selisih', 'Sumber', 'Status', 'Dibuka', 'Ditutup']">
+                @forelse($kasSesiRiwayat as $s)
+                    <tr class="hover:bg-white/[0.02] transition-colors text-xs">
+                        <td class="py-3.5 px-4 font-mono font-bold text-white">#{{ $s->id }}</td>
+                        <td class="py-3.5 px-4 text-ink-100 font-medium">{{ $s->kasir }}</td>
+                        <td class="py-3.5 px-4 tabular-nums text-white">Rp {{ number_format($s->saldo_awal, 0, ',', '.') }}</td>
+                        <td class="py-3.5 px-4 tabular-nums text-ink-200">{{ $s->saldo_akhir_sistem !== null ? 'Rp '.number_format($s->saldo_akhir_sistem, 0, ',', '.') : '-' }}</td>
+                        <td class="py-3.5 px-4 tabular-nums text-ink-200">{{ $s->saldo_akhir_fisik !== null ? 'Rp '.number_format($s->saldo_akhir_fisik, 0, ',', '.') : '-' }}</td>
+                        <td class="py-3.5 px-4 tabular-nums {{ $s->selisih === null ? 'text-ink-500' : (abs($s->selisih) < 0.01 ? 'text-up-mint font-semibold' : 'text-up-amber font-semibold') }}">
+                            {{ $s->selisih !== null ? ($s->selisih >= 0 ? '+' : '-') . ' Rp ' . number_format(abs($s->selisih), 0, ',', '.') : '-' }}
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <span class="text-[10px] font-semibold capitalize {{ $s->sumber === 'carryover' ? 'text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-full' : 'bg-white/5 text-ink-300 px-2 py-0.5 rounded-full' }}">
+                                {{ $sumberLabel[$s->sumber] ?? $s->sumber }}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4"><x-prism.status-pill :status="$s->status" /></td>
+                        <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $s->dibuka_at ? \Carbon\Carbon::parse($s->dibuka_at)->format('d/m/Y H:i') : '-' }}</td>
+                        <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $s->ditutup_at ? \Carbon\Carbon::parse($s->ditutup_at)->format('d/m/Y H:i') : '-' }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="10" class="py-12 text-center text-ink-400">Belum ada riwayat sesi kas untuk cabang ini.</td></tr>
+                @endforelse
+            </x-prism.data-table>
+        </x-prism.glass-card>
     @endif
 
     <!-- TAB: JURNAL -->
@@ -336,10 +365,10 @@
                                         <input type="text" wire:model="manualLines.{{ $idx }}.akun_kode" placeholder="Kode akun (ex: 110-01)" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono font-medium" />
                                     </div>
                                     <div class="w-28">
-                                        <input type="number" wire:model.live="manualLines.{{ $idx }}.debit" step="500" min="0" placeholder="Debit" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold tabular-nums text-up-amber" />
+                                        <input type="text" inputmode="numeric" x-format-number wire:model.live="manualLines.{{ $idx }}.debit" step="500" min="0" placeholder="Debit" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold tabular-nums text-up-amber" />
                                     </div>
                                     <div class="w-28">
-                                        <input type="number" wire:model.live="manualLines.{{ $idx }}.kredit" step="500" min="0" placeholder="Kredit" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold tabular-nums text-up-mint" />
+                                        <input type="text" inputmode="numeric" x-format-number wire:model.live="manualLines.{{ $idx }}.kredit" step="500" min="0" placeholder="Kredit" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold tabular-nums text-up-mint" />
                                     </div>
                                     <button wire:click="removeManualLine({{ $idx }})" class="p-2 text-up-red hover:bg-white/5 rounded-lg text-xs cursor-pointer">✕</button>
                                 </div>
@@ -442,7 +471,7 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jumlah Bayar (Rp) *</label>
-                            <input type="number" wire:model.live="bayarUtangJumlah" step="500" min="1" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="bayarUtangJumlah" step="500" min="1" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
                         </div>
 
                         <div class="flex gap-2 flex-wrap">
@@ -490,7 +519,7 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jumlah Diterima (Rp) *</label>
-                            <input type="number" wire:model.live="bayarPiutangJumlah" step="500" min="1" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="bayarPiutangJumlah" step="500" min="1" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
                         </div>
 
                         <div class="flex gap-2 flex-wrap">

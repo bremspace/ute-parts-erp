@@ -2,15 +2,19 @@
 
 namespace App\Modules\Akunting\Controllers;
 
+use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Pos\Services\KasSesiState;
+use App\Modules\Rbac\Services\AuditService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class AkuntingController extends Controller
 {
@@ -56,7 +60,7 @@ class AkuntingController extends Controller
         $akun = AkunCOA::findOrFail($id);
 
         $request->validate([
-            'kode' => 'sometimes|string|max:20|unique:akun_coa,kode,' . $akun->id,
+            'kode' => 'sometimes|string|max:20|unique:akun_coa,kode,'.$akun->id,
             'nama' => 'sometimes|string|max:255',
             'tipe' => 'sometimes|in:aset,kewajiban,ekuitas,pendapatan,beban',
             'kelompok' => 'sometimes|string|max:100',
@@ -66,7 +70,7 @@ class AkuntingController extends Controller
 
         $akun->update($request->all());
 
-        app(\App\Modules\Rbac\Services\AuditService::class)->catat(
+        app(AuditService::class)->catat(
             'AkunCOA', 'update', $akun->id,
             "Akun COA {$akun->kode} — {$akun->nama} diperbarui"
         );
@@ -219,7 +223,9 @@ class AkuntingController extends Controller
 
             $grouped = $jurnals->groupBy('akun_coa_id')->map(function ($rows) {
                 $akun = $rows->first()->akun;
-                if (!$akun) return null;
+                if (! $akun) {
+                    return null;
+                }
 
                 $saldo = $akun->saldo_normal === 'debit'
                     ? $rows->sum('debit') - $rows->sum('kredit')
@@ -297,7 +303,7 @@ class AkuntingController extends Controller
             'akun_id' => 'nullable|exists:akun_coa,id',
         ]);
 
-        dispatch(new \App\Modules\Akunting\Jobs\ExportLaporanJob(
+        dispatch(new ExportLaporanJob(
             jenis: $request->jenis,
             periodeDari: $request->periode_dari,
             periodeSampai: $request->periode_sampai,
@@ -316,12 +322,12 @@ class AkuntingController extends Controller
     public function exportDownload(Request $request)
     {
         $path = base64_decode((string) $request->query('path', ''));
-        if (str_contains($path, '..') || !str_starts_with($path, 'exports/')) {
+        if (str_contains($path, '..') || ! str_starts_with($path, 'exports/')) {
             return $this->error('Path tidak valid', 400);
         }
 
-        $full = storage_path('app/' . $path);
-        if (!file_exists($full)) {
+        $full = storage_path('app/'.$path);
+        if (! file_exists($full)) {
             return $this->error('File export tidak ditemukan atau belum siap', 404);
         }
 
@@ -426,7 +432,7 @@ class AkuntingController extends Controller
             );
         } catch (\Exception $e) {
             // Jurnal gagal jangan blokir pembayaran — log
-            \Illuminate\Support\Facades\Log::warning("Jurnal bayar utang gagal: {$e->getMessage()}");
+            Log::warning("Jurnal bayar utang gagal: {$e->getMessage()}");
         }
 
         return $this->success($utang->fresh(), 'Pembayaran utang berhasil dicatat');
@@ -467,10 +473,19 @@ class AkuntingController extends Controller
                 auth()->id()
             );
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("Jurnal bayar piutang gagal: {$e->getMessage()}");
+            Log::warning("Jurnal bayar piutang gagal: {$e->getMessage()}");
         }
 
         return $this->success($piutang->fresh(), 'Pembayaran piutang berhasil dicatat');
+    }
+
+    // [T-33] Riwayat sesi kas per cabang (untuk laporan Akunting)
+    public function kasSesi(Request $request)
+    {
+        $sesi = app(KasSesiState::class)
+            ->riwayat($request->query('cabang_id') ?? session('cabang_id'), 50);
+
+        return $this->success(['sesi' => $sesi], 'Riwayat kas sesi');
     }
 
     // [API: ACC-04b] Laporan Arus Kas — metode tidak langsung (PRD §4.6)
@@ -490,8 +505,8 @@ class AkuntingController extends Controller
 
         // Laba bersih = total pendapatan - total beban (metode tidak langsung)
         $labaBersih = round(
-            $jurnals->where('akun.tipe', 'pendapatan')->sum(fn($j) => (float) $j->kredit - (float) $j->debit)
-            - $jurnals->where('akun.tipe', 'beban')->sum(fn($j) => (float) $j->debit - (float) $j->kredit),
+            $jurnals->where('akun.tipe', 'pendapatan')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit)
+            - $jurnals->where('akun.tipe', 'beban')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit),
             2
         );
 
@@ -506,14 +521,14 @@ class AkuntingController extends Controller
 
         // Arus investasi (asets non-modal kerja) & pendanaan (ekuitas/modal)
         $arusInvestasi = round(
-            -$jurnals->where('akun.kelompok', 'aset_tetap')->sum(fn($j) => (float) $j->debit - (float) $j->kredit)
-            - $jurnals->where('akun.kelompok', 'peralatan')->sum(fn($j) => (float) $j->debit - (float) $j->kredit)
-            - $jurnals->where('akun.kelompok', 'perlengkapan')->sum(fn($j) => (float) $j->debit - (float) $j->kredit),
+            -$jurnals->where('akun.kelompok', 'aset_tetap')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit)
+            - $jurnals->where('akun.kelompok', 'peralatan')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit)
+            - $jurnals->where('akun.kelompok', 'perlengkapan')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit),
             2
         );
         $arusPendanaan = round(
-            $jurnals->where('akun.kelompok', 'modal')->sum(fn($j) => (float) $j->kredit - (float) $j->debit)
-            + $jurnals->where('akun.kelompok', 'laba_ditahan')->sum(fn($j) => (float) $j->kredit - (float) $j->debit),
+            $jurnals->where('akun.kelompok', 'modal')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit)
+            + $jurnals->where('akun.kelompok', 'laba_ditahan')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit),
             2
         );
 

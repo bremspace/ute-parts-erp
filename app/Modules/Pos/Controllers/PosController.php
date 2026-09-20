@@ -468,4 +468,25 @@ class PosController extends Controller
             'Riwayat sesi kas berhasil dimuat'
         );
     }
+
+    // [API: POS-10][T-35] Cetak struk thermal — hanya antri, tidak blocking request
+    public function printStruk(int $id)
+    {
+        $cabangId = session('cabang_id') ?? auth()->user()->cabangs()->first()?->id;
+
+        $transaksi = Transaksi::where('id', $id)
+            ->where('cabang_id', $cabangId)
+            ->first();
+
+        if (! $transaksi) {
+            return $this->error('Transaksi tidak ditemukan', 404);
+        }
+
+        \App\Modules\Pos\Jobs\PrintThermalJob::dispatch($transaksi->id);
+
+        return $this->success(
+            ['no_transaksi' => $transaksi->no_transaksi],
+            'Struk masuk antrian cetak'
+        );
+    }
 }

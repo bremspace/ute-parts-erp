@@ -1,14 +1,15 @@
 <div
-    class="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8.5rem)]"
-    x-data="{}"
+    class="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8.5rem)]"
+    x-data="{ cartOpen: false }"
     @keydown.window.f4.prevent="$wire.openPaymentModal()"
+    @keydown.window.f6.prevent="$wire.tahanTransaksi()"
     @keydown.window.escape.prevent="$wire.clearCart()"
 >
-    <!-- LEFT COLUMN: Product Catalog & Search (60%) -->
+    <!-- LEFT COLUMN: Product Catalog & Search -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <!-- Top Toolbar: Search & Gudang Selector -->
-        <div class="flex items-center gap-4 mb-4 flex-shrink-0">
-            <div class="flex-1">
+        <div class="flex items-center gap-3 mb-3 flex-shrink-0 flex-wrap">
+            <div class="flex-1 min-w-0">
                 <div class="relative">
                     <x-prism.barcode-scan-input
                         placeholder="Scan Barcode atau ketik nama/tipe HP (Tekan F2, Enter=add)..."
@@ -16,15 +17,15 @@
                         wire:keydown.enter="scanEnter"
                     />
                     <button wire:click="scanEnter"
-                            class="absolute right-14 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/40 text-up-primary text-[10px] font-bold cursor-pointer"
+                            class="absolute right-12 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/40 text-up-primary text-xs font-bold cursor-pointer"
                             title="Tambah dari barcode/SKU (Enter)">ADD</button>
                 </div>
             </div>
 
-            <div class="w-48">
+            <div class="w-full lg:w-48">
                 <select
                     wire:model.live="selectedGudangId"
-                    class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"
+                    class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-medium"
                 >
                     <option value="" class="bg-ink-900">Pilih Gudang...</option>
                     @foreach(\App\Modules\Wms\Models\Gudang::all() as $g)
@@ -36,7 +37,7 @@
 
         <!-- Product Grid -->
         <div class="flex-1 overflow-y-auto pr-1">
-            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
+            <div class="grid grid-cols-1 xxs:grid-cols-2 xl:grid-cols-3 gap-3">
                 @forelse($products as $prod)
                     @php
                         $stokTotal = $selectedGudangId
@@ -100,19 +101,90 @@
         </div>
     </div>
 
-    <!-- RIGHT COLUMN: Customer, Cart & Payment Summary (40%) -->
-    <div class="w-full lg:w-[420px] flex-shrink-0 flex flex-col h-full bg-ink-900 border border-white/5 rounded-3xl p-5 overflow-hidden shadow-2xl">
-        <!-- Customer Selector -->
-        <div class="mb-4 pb-3.5 border-b border-white/5 flex-shrink-0">
-            <div class="flex items-center justify-between mb-2">
-                <label class="text-xs font-semibold text-ink-300 uppercase tracking-wider">Pelanggan / Member</label>
-                @if($this->customer)
-                    <x-prism.tier-badge :tier="$this->customer->tierMembership?->nama ?? ($this->customer->is_reseller ? 'Reseller' : 'Retail')" />
-                @endif
-            </div>
+    <!-- RIGHT COLUMN: Customer, Cart & Payment Summary -->
+    <!-- Mobile: Bottom Sheet | Desktop: Side Panel -->
+    <div x-data="{ cartPanelOpen: false }"
+         x-init="cartPanelOpen = window.innerWidth >= 1024"
+         @resize.window.debounce.100ms="cartPanelOpen = window.innerWidth >= 1024"
+         class="lg:w-[420px] lg:flex-shrink-0 lg:flex lg:flex-col lg:h-full lg:bg-ink-900 lg:border lg:border-white/5 lg:rounded-3xl lg:p-5 lg:overflow-hidden lg:shadow-2xl">
 
-            <div class="flex gap-2">
-                <div class="flex-1 relative">
+        <!-- Mobile: Cart Toggle Button -->
+        <button @click="cartPanelOpen = !cartPanelOpen"
+                class="lg:hidden w-full px-4 py-3 rounded-xl bg-ink-900 border border-white/5 flex items-center justify-between text-sm font-medium shadow-lg sticky bottom-0 z-10"
+                :aria-expanded="cartPanelOpen"
+                :aria-label="cartPanelOpen ? 'Tutup keranjang' : 'Buka keranjang'">
+            <span class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-up-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                <span>Keranjang</span>
+            </span>
+            <span class="px-2 py-0.5 rounded-full bg-up-mint/20 text-up-mint text-xs font-bold tabular-nums">
+                {{ count($cart) ?? 0 }}
+            </span>
+            <svg class="w-5 h-5 text-ink-400 transition-transform" :class="{ 'rotate-180': cartPanelOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+
+        <!-- Mobile: Bottom Sheet Overlay + Panel -->
+        <div x-show="cartPanelOpen && window.innerWidth < 1024"
+             x-transition:enter="transition-opacity ease-linear duration-150"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition-opacity ease-linear duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-black/60 z-50 lg:hidden"
+             @click="cartPanelOpen = false"
+             aria-hidden="true"></div>
+
+        <aside x-show="cartPanelOpen && window.innerWidth < 1024"
+               x-transition:enter="transition-transform ease-out duration-200"
+               x-transition:enter-start="translate-y-full"
+               x-transition:enter-end="translate-y-0"
+               x-transition:leave="transition-transform ease-in duration-150"
+               x-transition:leave-start="translate-y-0"
+               x-transition:leave-end="translate-y-full"
+               class="fixed bottom-0 left-0 right-0 z-50 max-h-[80vh] lg:hidden"
+               @click.outside="cartPanelOpen = false">
+            <div class="bg-ink-900 border-t border-white/5 rounded-t-3xl p-4 shadow-2xl max-h-[80vh] flex flex-col">
+                <!-- Drag Handle -->
+                <div class="w-10 h-1.5 bg-white/10 rounded-full mx-auto mb-3"></div>
+                <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+                    <h3 class="text-lg font-bold text-white">Keranjang</h3>
+                    <button @click="cartPanelOpen = false"
+                            class="p-2 text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto space-y-3">
+                    @include('modules.pos.livewire.partials.cart-content', [
+                        'cart' => $cart,
+                        'total' => $total,
+                        'diskonTotal' => $diskonTotal,
+                        'totalBayar' => $totalBayar,
+                        'customer' => $this->customer,
+                    ])
+                </div>
+            </div>
+        </aside>
+
+        <!-- Desktop: Side Panel Content -->
+        <div class="hidden lg:flex lg:flex-col lg:h-full lg:bg-ink-900 lg:border lg:border-white/5 lg:rounded-3xl lg:p-5 lg:overflow-hidden lg:shadow-2xl">
+            <!-- Customer Selector -->
+            <div class="mb-4 pb-3.5 border-b border-white/5 flex-shrink-0">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs font-semibold text-ink-300 uppercase tracking-wider">Pelanggan / Member</label>
+                    @if($this->customer)
+                        <x-prism.tier-badge :tier="$this->customer->tierMembership?->nama ?? ($this->customer->is_reseller ? 'Reseller' : 'Retail')" />
+                    @endif
+                </div>
+
+                <div class="flex gap-2">
+                    <div class="flex-1 relative">
                     <select
                         wire:model.live="selectedCustomerId"
                         wire:change="setPelanggan($event.target.value)"
@@ -359,7 +431,7 @@
                     <div class="space-y-3 mb-5">
                         <label class="block text-xs font-semibold text-ink-300">Uang Diterima</label>
                         <input
-                            type="number"
+                            type="text" inputmode="numeric" x-format-number
                             wire:model.live="jumlahBayar"
                             class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums text-white"
                         />
@@ -384,11 +456,11 @@
                     <div class="space-y-3 mb-5">
                         <div>
                             <label class="block text-xs text-ink-300 mb-1">Nominal Tunai</label>
-                            <input type="number" wire:model.live="splitTunai" class="w-full px-3 py-2 rounded-xl glass-input text-sm font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="splitTunai" class="w-full px-3 py-2 rounded-xl glass-input text-sm font-bold tabular-nums" />
                         </div>
                         <div>
                             <label class="block text-xs text-ink-300 mb-1">Nominal Non-Tunai</label>
-                            <input type="number" wire:model.live="splitNonTunai" class="w-full px-3 py-2 rounded-xl glass-input text-sm font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="splitNonTunai" class="w-full px-3 py-2 rounded-xl glass-input text-sm font-bold tabular-nums" />
                         </div>
                     </div>
                 @elseif($metodeBayar === 'piutang')
@@ -431,13 +503,18 @@
 
     <!-- RECEIPT MODAL (Thermal Print Preview) -->
     @if($showReceiptModal && $receiptData)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            x-data="thermalPrinter(@json($receiptData))"
+        >
+            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative"> 
                 <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                     <h4 class="text-sm font-bold text-white">Struk Transaksi Selesai</h4>
                     <button wire:click="$set('showReceiptModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
 
+                <!-- [T-35] A4 Web Print: konten modal dicetak apa adanya via window.print() -->
+                <div class="print-area print-a4">
                 <!-- Thermal Paper Simulation -->
                 <div class="bg-white text-ink-950 p-5 rounded-xl font-mono text-xs shadow-inner space-y-3" id="thermalReceipt">
                     <div class="text-center pb-2 border-b border-dashed border-gray-400">
@@ -495,6 +572,36 @@
                         <p>Garansi part sesuai ketentuan toko.</p>
                     </div>
                 </div>
+                </div><!-- end print-a4 -->
+
+                <!-- [T-35] Target cetak tersembunyi: fallback Web Print 58/80 (diisi JS saat gagal Bluetooth) -->
+                <div class="print-area print-58" id="printTarget-58" aria-hidden="true"></div>
+                <div class="print-area print-80" id="printTarget-80" aria-hidden="true"></div>
+
+                <!-- [T-35] Cetak thermal via Web Bluetooth (Chrome Android/Edge) -->
+                <div class="mt-4 flex gap-2">
+                    <button
+                        type="button"
+                        @click="printStruk58()"
+                        class="flex-1 py-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-xs shadow-lg shadow-up-mint/20 cursor-pointer min-h-[44px]"
+                        aria-label="Cetak struk 58mm langsung ke printer Bluetooth"
+                    >
+                        <span class="block">Cetak Bluetooth 58mm</span>
+                        <span class="block text-[9px] font-medium opacity-80">langsung ke printer</span>
+                    </button>
+                    <button
+                        type="button"
+                        @click="printFaktur80()"
+                        class="flex-1 py-3 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:opacity-95 text-white font-bold text-xs shadow-lg shadow-up-primary/20 cursor-pointer min-h-[44px]"
+                        aria-label="Cetak faktur 80mm langsung ke printer Bluetooth"
+                    >
+                        <span class="block">Cetak Faktur 80mm</span>
+                        <span class="block text-[9px] font-medium opacity-80">lembar penuh + barcode</span>
+                    </button>
+                </div>
+                <p class="mt-2 text-[10px] text-ink-400">
+                    Di iPhone/tablet, pakai <span class="font-semibold text-ink-300">Cetak Struk (A4)</span>.
+                </p>
 
                 <!-- Print Action Button -->
                 <div class="mt-4 flex gap-2">
@@ -540,6 +647,10 @@
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
                         <textarea wire:model="pelangganBaruForm.alamat" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
                     </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal Lahir (opsional)</label>
+                        <input type="date" wire:model="pelangganBaruForm.tanggal_lahir" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
                     <p class="text-[10px] text-ink-500">Pelanggan baru langsung tersedia di POS, CRM, dan Servis (satu data).</p>
                 </div>
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
@@ -564,7 +675,7 @@
                         @if($kasModeBuka)
                             <div>
                                 <label class="block text-xs font-semibold text-ink-300 mb-1.5">Saldo Awal (Rp)</label>
-                                <input type="number" wire:model.live="kasSaldoAwal" min="0" class="w-full px-3 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" placeholder="0" />
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live="kasSaldoAwal" min="0" class="w-full px-3 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" placeholder="0" />
                             </div>
                         @else
                             <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs space-y-1.5">
@@ -575,7 +686,7 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-ink-300 mb-1.5">Saldo Fisik Akhir (Rp) *</label>
-                                <input type="number" wire:model.live="kasSaldoFisik" min="0" step="500" class="w-full px-3 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live="kasSaldoFisik" min="0" step="500" class="w-full px-3 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
                             </div>
                             <p class="text-[10px] text-ink-500">Sistem menghitung saldo sistem & selisih otomatis; selisih ≠ 0 membuat jurnal penyesuaian.</p>
                         @endif

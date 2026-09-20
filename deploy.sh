@@ -55,7 +55,6 @@ rollback() {
 
 # --- 1. Pull kode terbaru ---
 log "Fetch & pull origin/main..."
-git stash --include-untracked >>"$LOG" 2>&1 || true          # amankan modif lokal tak terduga
 git fetch origin main >>"$LOG" 2>&1 || rollback "git fetch"
 git merge --ff-only origin/main >>"$LOG" 2>&1 || rollback "git merge"
 

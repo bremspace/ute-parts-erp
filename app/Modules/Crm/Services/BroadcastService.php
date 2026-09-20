@@ -19,7 +19,7 @@ class BroadcastService
 
     public function resolveTarget(KampanyeBroadcast $kampanye): \Illuminate\Support\Collection
     {
-        $target = Pelanggan::query()->where('is_active', true);
+        $target = Pelanggan::query();
         $segments = $kampanye->segment ?? [];
 
         foreach ($segments as $seg) {
@@ -35,6 +35,16 @@ class BroadcastService
                 case 'belum_belanja_hari':
                     if (!empty($seg['nilai'])) {
                         $target->whereDoesntHave('transaksi', fn ($q) => $q->where('created_at', '>=', now()->subDays((int) $seg['nilai'])));
+                    }
+                    break;
+                case 'birthday_month': // [T-37] Promo ulang tahun: semua pelanggan yg lahir di bulan ini
+                    if (!empty($seg['nilai'])) {
+                        $target->whereMonth('tanggal_lahir', (int) $seg['nilai']);
+                    }
+                    break;
+                case 'birthday_day': // [T-37] Kombinasi month+day = tepat tanggal lahir
+                    if (!empty($seg['nilai'])) {
+                        $target->whereDay('tanggal_lahir', (int) $seg['nilai']);
                     }
                     break;
             }

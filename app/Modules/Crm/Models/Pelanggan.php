@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['nama', 'telepon', 'email', 'alamat', 'tier_membership_id', 'is_reseller', 'total_belanja_12bulan', 'poin_loyalty', 'password'])]
+#[Fillable(['nama', 'telepon', 'email', 'alamat', 'tanggal_lahir', 'tier_membership_id', 'is_reseller', 'total_belanja_12bulan', 'poin_loyalty', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class Pelanggan extends Model implements Authenticatable
 {
@@ -20,6 +20,7 @@ class Pelanggan extends Model implements Authenticatable
     protected $table = 'pelanggan';
 
     protected $casts = [
+        'tanggal_lahir' => 'date',
         'is_reseller' => 'boolean',
         'total_belanja_12bulan' => 'decimal:2',
         'poin_loyalty' => 'integer',

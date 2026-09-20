@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 @import './prism-tokens.css';
+@import './print.css';
+
+/* [T-32] Variant dark berbasis class (.dark) */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -26,6 +30,38 @@
     --color-ink-600: #334375;
     --color-ink-500: #64748B;
     --color-ink-400: #94A3B8;
+    --color-ink-300: #CBD5E1;
+    --color-ink-200: #D3DCEE;
     --color-ink-100: #E2E8F0;
     --color-ink-50: #F6F7FB;
+
+    /* [T-30] Custom breakpoints for mobile-first responsive design */
+    --breakpoint-xxs: 320px;  /* iPhone SE, small Android */
+    --breakpoint-xs: 375px;   /* iPhone 12/13/14 standard */
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+}
+
+/* [T-32] Tema terang: remap token ink-* saat runtime di bawah scope data-theme="light".
+   Utility Tailwind memakai var(--color-ink-*) jadi override plain CSS ini me-re-theme
+   seluruh app tanpa menyentuh blade modul. */
+html[data-theme="light"] {
+    color-scheme: light;
+    --color-ink-950: #F8FAFC;
+    --color-ink-900: #F1F5F9;
+    --color-ink-850: #E9EEF7;
+    --color-ink-800: #E2E8F0;
+    --color-ink-700: #CBD5E1;
+    --color-ink-600: #94A3B8;
+    --color-ink-500: #64748B;
+    --color-ink-400: #55637A;
+    --color-ink-100: #334155;
+    --color-ink-50: #1E293B;
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark;
 }

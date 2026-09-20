@@ -38,7 +38,7 @@ class CrmDashboard extends Component
 
     // [T-04] Tambah pelanggan dari CRM (CRM-06)
     public bool $showPelangganBaruModal = false;
-    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'is_reseller' => false];
+    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false];
 
     public function simpanPelangganBaruCrm()
     {
@@ -48,19 +48,17 @@ class CrmDashboard extends Component
             'pelangganBaruForm.email' => 'nullable|email|unique:pelanggan,email',
         ]);
 
-        $tier = TierMembership::where('is_active', true)->orderBy('min_belanja_12bulan')->first();
-
-        Pelanggan::create([
+        $pelanggan = app(\App\Modules\Crm\Services\PelangganService::class)->create([
             'nama' => $this->pelangganBaruForm['nama'],
             'telepon' => $this->pelangganBaruForm['telepon'],
             'email' => $this->pelangganBaruForm['email'] ?: null,
             'alamat' => $this->pelangganBaruForm['alamat'] ?: null,
-            'tier_membership_id' => $tier?->id,
+            'tanggal_lahir' => $this->pelangganBaruForm['tanggal_lahir'] ?: null,
             'is_reseller' => $this->pelangganBaruForm['is_reseller'],
         ]);
 
         $this->showPelangganBaruModal = false;
-        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'is_reseller' => false];
+        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan (tersedia di POS & Servis)']);
     }
 

@@ -2,11 +2,13 @@
 
 namespace App\Modules\Akunting\Livewire;
 
+use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Pos\Services\KasSesiState;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -15,29 +17,39 @@ class AkuntingDashboard extends Component
     use WithPagination;
 
     public string $activeTab = 'laporan'; // laporan, jurnal, coa, piutang, utang
+
     public string $periodeDari = '';
+
     public string $periodeSampai = '';
 
     // Jurnal manual modal
     public bool $showJurnalManual = false;
+
     public string $manualTanggal = '';
+
     public string $manualDeskripsi = '';
+
     public array $manualLines = [];
 
     // COA modal
     public bool $showCoaModal = false;
+
     public array $coaForm = [
         'kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit',
     ];
 
     // Bayar utang modal
     public bool $showBayarUtangModal = false;
+
     public ?int $utangId = null;
+
     public float $bayarUtangJumlah = 0;
 
     // Bayar piutang modal
     public bool $showBayarPiutangModal = false;
+
     public ?int $piutangId = null;
+
     public float $bayarPiutangJumlah = 0;
 
     public function mount()
@@ -99,12 +111,13 @@ class AkuntingDashboard extends Component
 
         $grouped = $jurnals->groupBy('akun_coa_id')->map(function ($rows) {
             $akun = $rows->first()->akun;
-            if (!$akun) {
+            if (! $akun) {
                 return null;
             }
             $saldo = $akun->saldo_normal === 'debit'
                 ? $rows->sum('debit') - $rows->sum('kredit')
                 : $rows->sum('kredit') - $rows->sum('debit');
+
             return [
                 'tipe' => $akun->tipe,
                 'kelompok' => $akun->kelompok,
@@ -144,7 +157,9 @@ class AkuntingDashboard extends Component
 
     public function removeManualLine(int $index)
     {
-        if (count($this->manualLines) <= 2) return;
+        if (count($this->manualLines) <= 2) {
+            return;
+        }
         unset($this->manualLines[$index]);
         $this->manualLines = array_values($this->manualLines);
     }
@@ -217,8 +232,8 @@ class AkuntingDashboard extends Component
         $jurnals = $query->with('akun')->get();
 
         $labaBersih = round(
-            $jurnals->where('akun.tipe', 'pendapatan')->sum(fn($j) => (float) $j->kredit - (float) $j->debit)
-            - $jurnals->where('akun.tipe', 'beban')->sum(fn($j) => (float) $j->debit - (float) $j->kredit),
+            $jurnals->where('akun.tipe', 'pendapatan')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit)
+            - $jurnals->where('akun.tipe', 'beban')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit),
             2
         );
 
@@ -233,15 +248,15 @@ class AkuntingDashboard extends Component
         $arusKasOperasi = round($labaBersih - $piutangDelta - $persediaanDelta + $utangDelta, 2);
 
         $arusInvestasi = round(
-            -$jurnals->where('akun.kelompok', 'aset_tetap')->sum(fn($j) => (float) $j->debit - (float) $j->kredit)
-            - $jurnals->where('akun.kelompok', 'peralatan')->sum(fn($j) => (float) $j->debit - (float) $j->kredit)
-            - $jurnals->where('akun.kelompok', 'perlengkapan')->sum(fn($j) => (float) $j->debit - (float) $j->kredit),
+            -$jurnals->where('akun.kelompok', 'aset_tetap')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit)
+            - $jurnals->where('akun.kelompok', 'peralatan')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit)
+            - $jurnals->where('akun.kelompok', 'perlengkapan')->sum(fn ($j) => (float) $j->debit - (float) $j->kredit),
             2
         );
 
         $arusPendanaan = round(
-            $jurnals->where('akun.kelompok', 'modal')->sum(fn($j) => (float) $j->kredit - (float) $j->debit)
-            + $jurnals->where('akun.kelompok', 'laba_ditahan')->sum(fn($j) => (float) $j->kredit - (float) $j->debit),
+            $jurnals->where('akun.kelompok', 'modal')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit)
+            + $jurnals->where('akun.kelompok', 'laba_ditahan')->sum(fn ($j) => (float) $j->kredit - (float) $j->debit),
             2
         );
 
@@ -274,6 +289,7 @@ class AkuntingDashboard extends Component
 
         if ($dibayar > (float) $piutang->jumlah) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Pembayaran melebihi sisa piutang']);
+
             return;
         }
 
@@ -306,6 +322,7 @@ class AkuntingDashboard extends Component
 
         if ($dibayar > (float) $utang->jumlah) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Pembayaran melebihi sisa utang']);
+
             return;
         }
 
@@ -318,6 +335,27 @@ class AkuntingDashboard extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Pembayaran utang dicatat']);
     }
 
+    // [T-33] Riwayat sesi kas per cabang (laporan Akunting)
+    public function getKasSesiRiwayatProperty()
+    {
+        $rows = app(KasSesiState::class)->riwayat(session('cabang_id'), 50);
+        $userIds = $rows->pluck('user_id')->filter()->unique()->values();
+        $users = User::whereIn('id', $userIds)->pluck('name', 'id');
+
+        return $rows->map(fn ($r) => (object) [
+            'id' => $r->id,
+            'kasir' => $r->user_id ? ($users[$r->user_id] ?? "Kasir #{$r->user_id}") : 'Bersama (legacy)',
+            'saldo_awal' => $r->saldo_awal,
+            'saldo_akhir_sistem' => $r->saldo_akhir_sistem,
+            'saldo_akhir_fisik' => $r->saldo_akhir_fisik,
+            'selisih' => $r->selisih,
+            'sumber' => $r->sumber ?? 'manual',
+            'status' => $r->status,
+            'dibuka_at' => $r->dibuka_at,
+            'ditutup_at' => $r->ditutup_at,
+        ]);
+    }
+
     public function render()
     {
         return view('modules.akunting.livewire.akunting-dashboard', [
@@ -328,6 +366,7 @@ class AkuntingDashboard extends Component
             'jurnals' => $this->jurnals,
             'piutangs' => $this->piutangs,
             'utangs' => $this->utangs,
+            'kasSesiRiwayat' => $this->kasSesiRiwayat,
         ])->layout('layouts.backoffice', ['header' => 'Akunting & Keuangan']);
     }
 }

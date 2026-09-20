@@ -53,6 +53,22 @@ class AuthController extends Controller
         return $this->success($data, 'Login berhasil');
     }
 
+    // [API: AUTH-03] Update theme preference (T-32)
+    public function updateTheme(Request $request)
+    {
+        $theme = $request->input('theme');
+
+        if (!in_array($theme, ['light', 'dark', 'auto'], true)) {
+            return $this->error('Tema tidak valid', 422);
+        }
+
+        $user = $request->user();
+        $user->theme_preference = $theme;
+        $user->save();
+
+        return $this->success(['theme' => $theme], 'Preferensi tema disimpan');
+    }
+
     // [API: AUTH-02] Select branch
     public function selectBranch(Request $request)
     {

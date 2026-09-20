@@ -319,6 +319,144 @@
 
 ---
 
+## FASE 10 — Keamanan & Optimasi UI
+
+### T-28 — Scan Keamanan Komprehensif & Perbaiki Celah Login
+*(Request #1)*
+**Modul:** Keamanan Aplikasi — review keseluruhan
+**Perubahan:** Lakukan scanning comprehensive untuk mencari celah keamanan pada aplikasi yang terinstall di ip public. Checklist include:
+- [ ] **Authentication bypass** — coba login tanpa password, session fixation, credential stuffing protection
+- [ ] **Authorization gaps** — cek akses lintas user (user A bisa lihat data user B?), RBAC enforcement di server-side
+- [ ] **Input validation** — SQL injection, XSS, CSRF tokens di semua form, file upload validation
+- [ ] **Header security** — HTTPS enforce, HSTS, Content-Security-Policy, X-Frame-Options
+- [ ] **Error handling** — error messages tidak leak info sistem, stack trace tidak ditampilkan ke user
+- [ ] **Dependency scan** — verifikasi semua composer paket tidak punya vulnerability known, update ke versi terperlu
+- [ ] **API security** — rate limiting, input sanitization di semua `[API: ...]` endpoints, payload size limit
+- **Acceptance Criteria:**
+  - [ ] Laporan scan keamanan lengkap dengan severity dan rekomediasi per celah
+  - [ ] Semua celah kritis/diperbaiki dan terverifikasi tidak bisa dieksploitasi lagi
+  - [ ] Semua endpoint `/api/` memiliki rate limiting dan input validation yang tepat
+  - [ ] CSP dan headers keamanan sudah konfigurasikan di Laravel 13
+
+### T-29 — Perbaiki Sidebar Ganti Cabang di POS
+*(Request #2)*
+**Modul:** Auth/Session — `[API: AUTH-02]`
+**Perubahan:** Pastikan event ganti cabang di sidebar: (1) memanggil `AUTH-02 POST /api/select-branch` dengan benar, (2) me-refresh session `cabang_aktif_id`, (3) trigger `wire:navigate`/reload komponen yang bergantung pada cabang (dashboard, POS, WMS) agar tidak nyangkut data cabang lama. Sesuai diagnosis awal di implement-plan.md Fase 1 T-02, task ini memastikan fix tersebut terverifikasi dan working di semua module.
+**Acceptance Criteria:**
+- [ ] Ganti cabang di sidebar langsung mengubah data yang tampil di Dashboard, POS, dan WMS tanpa perlu logout/login ulang.
+- [ ] Refresh halaman tetap mempertahankan cabang aktif yang baru dipilih.
+- [ ] Semua module module bergantung pada cabang (POS, WMS, Servis) mereset state ketika cabang berubah.
+
+### T-30 — Optimalkan Tampilan di Perangkat Selular (Responsive)
+*(Request #3)*
+**Modul:** Frontend — seluruh modul (POS, Kasir, CRM, Dashboard)
+**Perubahan:** Lakukan audit UI/UX di berbagai ukuran layar (320px, 375px, 768px, 1440px). Masalah utama saat ini: komponen yang dirancang untuk desktop membuat horizontal scroll di HP, tombol terlalu kecil untuk di-tap, dan teks tidak mudah dibaca tanpa zoom. Perbaiki dengan:
+- Gunakan Tailwind 4 utility-first untuk breakpoint yang lebih baik
+- Pastikan semua tombol minimal 44x44px untuk touch target
+- Gunakan `max-width` dan `overflow-hidden` pada container utama
+- Optimalkan gambar dan font rendering di HP
+- Test dengan device real atau Chrome DevTools device toolbar
+- **Acceptance Criteria:**
+  - [ ] Halaman tidak memiliki horizontal scroll di layar HP (320px-375px)
+  - [ ] Semua interaksi (tap/click) bisa dilakukan tanpa zoom
+  - [ ] Baca-ability teks optimal tanpa pengaturan zoom browser
+
+### T-31 — Tambahkan Fitur PWA (Progressive Web App)
+*(Request #4)*
+**Modul:** Frontend — `vite.config.js`, `manifest.json`, service worker
+**Perubahan:** Konfigurasi PWA agar aplikasi bisa di-install di perangkat apapun (HP, tablet, desktop):
+- Buat `manifest.json` dengan nama, short_name, icons (192x192 dan 512x512), theme_color, background_color, display: "standalone"
+- Tambahkan service worker script yang meregistrasi di `vite.config.js` via `laravel-vite-plugin` v3
+- Pastikan aplikasi work offline minimal untuk halaman yang pernah diakses (cache strategi: stale-while-revalidate untuk aset, network-first untuk API)
+- Test install di Chrome di HP: menu "Add to Home Screen" harus muncul
+- **Acceptance Criteria:**
+  - [ ] Aplikasi bisa di-install dari browser ke home screen HP
+  - [ ] Setelah di-install, aplikasi bisa dibuka tanpa browser URL bar
+  - [ ] Aplikasi bekerja minimal untuk halaman yang pernah diakses (offline first)
+  - [ ] Icon dan theme warna sesuai desain "Ute Prism"
+
+### T-32 — Sediakan Tema Gelap & Terang (Manual & Otomatis berdasarkan Waktu)
+*(Request #5)*
+**Modul:** Frontend — Global CSS, Tailwind config, Vue/Livewire component
+**Perubahan:** Implementasi toggle tema yang bisa:
+- Dipilih manual user (tombol switch di sidebar/header)
+- Otomatis berdasarkan waktu sistem (system preferences via `prefers-color-scheme` media query)
+- Simpan preferensi user di `localStorage` atau database per user
+- Consistent application warna seluruh modul (POS, Kasir, CRM, Dashboard, Servis)
+- Warna tema: light menggunakan token `--up-primary` (#5B4FE9) pada area utama, dark menggunakan `--up-primary` dengan opacity/modifikasi yang sesuai
+- **Acceptance Criteria:**
+  - [ ] Tema bisa di-toggle manual via tombol di UI
+  - [ ] Tema auto berubah sesuai setting sistem HP (light malam → dark siang)
+  - [ ] Preferensi user tersimpan dan dikenali di sesi berikutnya
+  - [ ] Tidak ada komponen UI yang "pecah" atau warna kontras salah saat theme diubah
+
+### T-33 — Pastikan Alur Saldo Kas Shift Tercatat & Tersinkronisasi dengan Akunting
+*(Request #6)*
+**Modul:** KasSesi — `[API: POS-07]`, `[API: POS-08]`, entitas `KasSesi`
+**Perubahan:** Verifikasi dan lengkapi alur saldo kas agar tercatat dan tersinkronisasi total dengan sistem akunting (§4.6 PRD Backend):
+- Pastikan `KasSesi` entitas memiliki `saldo_awal` (input saat buka shift), `saldo_akhir_sistem` (akumulasi transaksi tunai), `saldo_akhir_fisik` (input kasir), dan `selisih` (perbedaan keduanya)
+- Setiap transaksi POS tunai (`[API: POS-01]`) wajib memiliki validasi `KasSesi` berstatus `buka` untuk cabang/casir tsb (sebab T-09)
+- Saat tutup kas (`[API: POS-08]`), sistem otomatis buat `JurnalAkuntansi` balance: debit Kas, kredit "Saldo Shift Akhir" atau akun penyesuaian sesuai akunting principle
+- Sumber `saldo_awal` setiap shift harus tercatat: apakah dari shift sebelumnya (legacy data), manual input, atau nol (shift baru)
+- Laporan Akunting (§4.6) harus menampilkan riwayat sesi kas per cabang lengkap dengan debit/kredit per transaksi
+- **Acceptance Criteria:**
+  - [ ] Tidak bisa transaksi tunai di POS tanpa sesi kas terbuka (validasi T-09)
+  - [ ] Output tutup kas menghasilkan jurnal otomatis balance (SUM(debit) = SUM(kredit))
+  - [ ] Laporan Akunting menampilkan riwayat sesi kas per cabang dengan akurasi 100%
+  - [ ] Sumber saldo awal shift selalu tercatak dengan keterangan (manual/legacy/nol)
+
+### T-34 — Sparator Ribuan untuk Semua Input Nominal di Menu Buka Kas
+*(Request #7)*
+**Modul:** POS — input field nominal, Livewire components
+**Perubahan:** Semua field input nominal di menu buka kas dan transaksi POS harus menyertakan separator ribuan untuk pembacaan yang lebih mudah, serta menghilangkan delay saat pengetikan:
+- Gunakan PHP formatter `number_format()` atau Tailwind `numeric` input type di server-side rendering
+- Di frontend, gunakan Alpine.js `x-format` atau komponen input yang otomatis menambahkan titik ribuan saat pengguna mengetik (contoh: mengetik "1000000" langsung tampil "1.000.000")
+- Hilangkan delay/lag saat pengetikan di field nominal (cek performance, kemungkinan cause ada di debounce atau validation yang terlalu besar)
+- Pastikan separator tidak interferensi dengan validasi numerik dan pengiriman ke backend
+- **Acceptance Criteria:**
+  - [ ] Field nominal otomatis menampilkan separator ribuan (titik) saat pengetikan, contoh: "1000000" → "1.000.000"
+  - [ ] Tidak ada delay/lag yang dirasakan saat mengetik di field nominal (batas maksimal 50ms penundaan)
+  - [ ] Backend menerima nilai dengan atau tanpa separator dan merespons sama
+
+### T-35 — Optimalkan Menu Print Thermal Bluetooth & Web Print A4
+*(Request #8)*
+**Modul:** Print — thermal printer, web print
+**Perubahan:** Dua mode print yang didukung aplikasi:
+- **Thermal Bluetooth (58mm/80mm):** Konfigurasi printer thermal Bluetooth yang bisa langsung print dari browser tanpa setup rumit. Sesuaikan format print ke ukuran 58mm (kocek/struk sederhana) dan 80mm (faktur lengkap). Gunakan library `milon/barcode` atau `picqer/php-barcode-generator` untuk label barcode yang sudah di-generate (seperti T-15). Print preview wajim tampil rapi di ukuran label tersebut.
+- **Web Print A4:** Untuk modul PO, keluar kontak, atau modul lain yang butuh format dokumen lengkap, gunakan fitur web print browser (`.print()` atau `window.print()`) dengan format halaman A4, termasuk header company, tabel data, dan footer. Pastikan tidak bergantung pada plugin pihak ketiga yang rumit diinstal.
+- **Acceptance Criteria:**
+  - [ ] Printer thermal 58mm bisa langsung print dari halaman POS tanpa konfigurasi tambahan di browser
+  - [ ] Printer thermal 80mm mencetak faktur dengan format yang rapi
+  - [ ] Mode web print A4 terbuka dialog print standar browser dengan layout yang rapi
+  - [ ] Tidak ada dependensi plugin browser yang wajib diinstall untuk print
+
+### T-36 — Menu Tambah Pelanggan Baru di Menu Kasir & Sinkronisasi CRM
+*(Request #9)*
+**Modul:** Kasir — `[API: POS-06]`, CRM — `[API: CRM-06]`
+**Perubahan:** Pastikan tombol "Tambah Pelanggan Baru" di menu kasir (dan modul lain yang menggunakan data pelanggan) benar-benar berfungsi dan terhubung dengan CRM:
+- Tombol "+ Pelanggan Baru" di POS membuka modal ringkas yang sama dengan modal di CRM (§5.6 PRD Frontend)
+- Field minimal: nama, no HP (unique), alamat, tier awal (default tier terendah)
+- Setiap pelanggan baru yang dibuat dari POS langsung terdaftar di tabel pelanggan CRM (`[API: CRM-06]`) — satu sumber data, tidak ada duplikasi
+- Data pelanggan yang sudah ada di CRM bisa dicari dan dipilih di POS (sebab T-08)
+- **Acceptance Criteria:**
+  - [ ] Tombol tambah pelanggan di modal POS terbuka dan fungsi create pelanggan berhasil
+  - [ ] Data pelanggan baru langsung muncul di daftar CRM tanpa reload manual
+  - [ ] Data pelanggan baru juga langsung tersedia untuk dicari di POS dan modul Servis — satu tabel sumber kebenaran
+  - [ ] Field tanggal ulang tahun sudah ada di form CRM (lihat T-37)
+
+### T-37 — Tambah Field Tanggal Ulang Tahun di Data CRM & Fitur Optimasi "Tahan" di Kasir
+*(Request #10)*
+**Modul:** CRM — form pelanggan, Kasir — transaksi ditahan
+**Perubahan:** Dua perbaikan kecil namun krusial:
+1. **CRM:** Tambah field `tanggal_lahir` ke entitas pelanggan dan form CRUD di halaman Pengaturan. Field ini akan digunakan oleh marketing untuk membuat promo khusus ulang tahun atau relasi dengan konsumen semakin meningkat karena kita bisa membuat promo khusus ulang tahun atau yang lainnya.
+2. **Kasir (Fase 1 T-03):** Optimalkan fitur "tahan" (park) di menu kasir. Saat transaksi ditahan, dia harus otomatis dipindah ke daftar "Transaksi Tertahan" yang sudah ada di bawah (bukan hilang atau membingungkan kasir). Jika transaksi sempat ditahan, sistem harus tetap tercatat dengan benar dan tidak mengacaukan penggunaan kasir — antrian harus tetap mengalir lancar.
+- **Acceptance Criteria:**
+  - [ ] Field `tanggal_lahir` muncul di form pelanggan CRM dan disimpan di database
+  - [ ] Marketing bisa filter pelanggan berdasarkan tanggal lahir untuk promo ulang tahun
+  - [ ] Transaksi yang ditekan F6 (tahan) langsung muncul di panel "Transaksi Tertahan"
+  - [ ] Kasir bisa melanjutkan transaksi tertahan tanpa kebingungan, antrian kasir tidak terganggu
+
+---
 ## 2. Catatan Lintas-Fase (Wajib Dipatuhi Semua Task)
 
 - **Satu komponen pencarian/tambah pelanggan** dipakai ulang di POS (T-08), Servis (T-18), dan CRM (T-04) — jangan triplikasi logic.
@@ -344,3 +482,176 @@ Ikuti pola yang sama seperti saat build awal (lihat §10.1 PRD Backend), plan in
    - Setelah selesai & dicek: *"Lanjut Fase 1: kerjakan T-02 sampai T-06, satu per satu, jalankan acceptance criteria masing-masing sebelum lanjut ke task berikutnya."*
 4. Untuk task yang sifatnya bug fix (Fase 1), minta agent **diagnosis dulu sebelum ngoding** — prompt seperti: *"Sebelum perbaiki T-03, telusuri dulu kode POS existing terkait tombol tahan, laporkan root cause-nya, baru eksekusi perbaikan."* Ini penting karena diagnosis awal di dokumen ini masih dugaan (belum lihat kode aktual), agent harus verifikasi ke kode nyata dulu.
 5. Karena ini kerja lanjutan di atas app yang sudah hidup (bukan project kosong), **selalu minta agent jalan di branch terpisah per Fase** (`git checkout -b fase-1-bugfix`, dst) dan buka PR untuk direview sebelum merge ke `main` — jangan langsung commit ke `main`, karena risiko merusak fitur yang sudah jalan lebih tinggi dibanding saat MVP awal.
+
+
+---
+## 4. Alur Skill (Skill Flow) — Mapping Skill ke Tahap Development
+
+Berdasarkan analisis skill yang tersedia (`ask-matt` dan daftar skill lain), berikut mapping skill ke tahap implementasi proyek Ute Parts. **Wajib diikuti urutannya** untuk menjaga konteks dan kualitas kode.
+
+### Prasyarat (Sekali di Awal)
+| Skill | Tujuan | Kapan |
+|-------|--------|-------|
+| `/setup-matt-pocock-skills` | Setup issue tracker, triage labels, doc layout yang diasumsikan skill lain | Sebelum memulai fase pertama (sekali saja) |
+
+---
+
+### Tahap 1: Persiapan & Analisis (Sebelum Mulai Kode)
+
+| Skill | Tahap | Deskripsi | Output |
+|-------|-------|-----------|--------|
+| `/grill-with-docs` | **Sharpening** | Interview terlena untuk sharpen rencana Fase 10 (dan fase lain yang belum dikerjakan). Menyimpan hasil ke `CONTEXT.md` dan ADR. Wajib dijalankan **di working directory** ini (`/var/www/test.uteparts.id`). | `CONTEXT.md`, ADR decisions, clarified scope per task |
+| `/domain-modeling` | **Domain clarity** | Jika ada istilah ambigu (misal "saldo awal kas" vs "modal kas", "tahan" vs "park", "print thermal" vs "web print"), gunakan skill ini untuk sharpen definisi & record ke `CONTEXT.md` | Glossary terms, resolved ambiguities |
+| `/codebase-design` | **Deep module design** | Untuk task kompleks (T-28 security scan, T-31 PWA, T-33 kas accounting sync, T-35 print thermal) — design module interface, seam, adapter sebelum implement. | Module interface sketches, seam definitions |
+
+**Catatan:** Jalankan `/grill-with-docs` **satu kali** untuk seluruh Fase 10 (bukan per task). Simpan context, jangan `/clear` sampai selesai `/to-tickets`.
+
+---
+
+### Tahap 2: Breakdown ke Tickets
+
+| Skill | Tahap | Deskripsi | Output |
+|-------|-------|-----------|--------|
+| `/to-spec` | **Spec creation** | Collapse hasil grill + design decisions menjadi spec yang buildable untuk Fase 10. Hanya jika Fase 10 terasa "multi-session" (lebih dari 1-2 jam kerja). | Spec document (markdown) |
+| `/to-tickets` | **Ticket breakdown** | Pecah spec menjadi tracer-bullet tickets (T-28 s.d T-37) dengan **blocking edges** yang eksplisit. Setiap ticket punya file sendiri di `.scratch/fase-10/issues/` (local tracker) atau native blocking di GitHub Issues. | Ticket files dengan blocking edges |
+
+---
+
+### Tahap 3: Implementasi Per Ticket (Loop per Ticket)
+
+**Untuk setiap ticket (T-28 sampai T-37):**
+
+| Skill | Tahap | Deskripsi | Kapan |
+|-------|-------|-----------|-------|
+| `/diagnosing-bugs` | **Diagnosis** | Wajib untuk ticket bug fix (T-28, T-29, T-37 bagian "tahan"). Jangan langsung coding — buat tight feedback loop (test yang gagal), lalu fix dengan regression test. | Semua ticket bug fix / behavior yang tidak jelas |
+| `/implement` | **Build** | Implementasi ticket. Internal drive `/tdd` (red-green-refactor per slice). Close dengan `/code-review` (Standards + Spec). **Context fresh per ticket** — `/clear` sebelum mulai ticket baru. | Code changes + passing tests |
+| `/code-review` | **Review** | Two-axis review: Standards (PSR-12, Laravel best practices, AGENTS.md compliance) + Spec (match acceptance criteria). Jalankan sebelum commit/merge. | Review report, ready-to-merge |
+| `/tdd` | **Test-first** | (Internal ke `/implement`) — gunakan standalone jika ingin build behavior spesifik test-first tanpa full spec. | Passing tests dulu, baru implement |
+
+**Phase boundary di antar ticket:** `/clear` context, checkout branch baru (`git checkout -b fase-10-t-28`), implement, review, PR, merge, baru lanjut T-29.
+
+---
+
+### Tahap 4: Quality Gates & Health (Paralel / Periodik)
+
+| Skill | Tahap | Deskripsi | Frekuensi |
+|-------|-------|-----------|-----------|
+| `/improve-codebase-architecture` | **Architecture health** | Scan deepening opportunities, surface candidates untuk refactor. Bisa jalan saat menunggu review PR atau di akhir fase. | Akhir setiap Fase / mingguan |
+| `/research` | **External knowledge** | Delegate riset ke background agent: Laravel 13 security config, PWA best practices, thermal printer web API, Tailwind 4 dark mode patterns. Bawa hasil ke `/grill-with-docs` berikutnya. | Saat butuh docs/library research |
+| `/prototype` | **UI/UX validation** | Untuk T-30 (responsive), T-31 (PWA install flow), T-32 (theme toggle) — buat throwaway prototype jawab "apakah ini feel right?" sebelum implement penuh. | Saat design question sulut diselesaikan di paper |
+| `/code-review` | **Standalone review** | Review branch/PR dari contributor lain atau PR lama yang belum di-merge. | On-demand |
+
+---
+
+### Tahap 5: Dokumentasi & Knowledge Capture (Akhir Fase)
+
+| Skill | Tahap | Deskripsi | Output |
+|-------|-------|-----------|--------|
+| `/retro` | **Retrospective** | Review sesi kerja: apa yang cepat, apa yang slow, skill mana berguna, friction apa. Generate action items untuk next fase. | Retro notes, process improvements |
+| `/writing-for-agents` | **Doc quality** | Pastikan `AGENTS.md`, `CHANGELOG.md`, `CONTEXT.md`, ADR readable oleh agent sesi berikutnya. | Polished agent docs |
+
+---
+
+### Skill On-Demand (Situasional)
+
+| Skill | Gunakan Saat |
+|-------|--------------|
+| `/handoff` | Perlu fork side-task ke directory terpisah (misal: prototype PWA di folder terpisah), atau handover ke agent/session lain |
+| `/wayfinder` | Jika Fase 11+ (future) terasa "foggy" — greenfield besar, butuh decision map dulu |
+| `/triage` | Bug report masuk dari user/production yang bukan kita buat (bukan ticket dari `/to-tickets`) |
+| `/wizard` | Setup credential Duitku/Biteship/WA Gateway di VPS yang butuh human click-through |
+| `/wait-what` | Mid-conversation jika message tidak land (re-pitch dengan vocabulary `CONTEXT.md`) |
+| `/teach` | Belajar concept baru (misal: Laravel 13 Octane, Livewire 3, Tailwind 4) over multiple sessions |
+| `/resolving-merge-conflicts` | Jika merge conflict saat PR merge (resolusi by intent, bukan line-picking) |
+| `/loop-me` | Grill diri sendiri tentang spec workflow yang mau dibangun |
+
+---
+
+### Ringkasan Alur Utama (Main Flow) untuk Fase 10:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. /setup-matt-pocock-skills     (sekali di awal project)      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. /grill-with-docs  ──→  /domain-modeling  ──→  /codebase-design │
+│    (sharpen plan)         (resolve terms)      (design modules)   │
+│    Output: CONTEXT.md, ADRs, module interfaces                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. /to-spec  (jika multi-session)  ──→  /to-tickets             │
+│    (collapse to spec)                (break to tickets w/ edges)│
+│    Output: spec.md, ticket files di .scratch/fase-10/issues/    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. LOOP per ticket (T-28 → T-37):                               │
+│    ┌─────────────────────────────────────────────────────────┐  │
+│    │ /clear context                                          │  │
+│    │ git checkout -b fase-10-t-XX                            │  │
+│    │ /diagnosing-bugs (jika bug fix)                         │  │
+│    │ /implement  (drives /tdd internally)                    │  │
+│    │ /code-review (Standards + Spec)                         │  │
+│    │ commit, push, PR, merge                                 │  │
+│    └─────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 5. /improve-codebase-architecture  (periodik/akhir fase)       │
+│    /research (background, parallel)                             │
+│    /retro  (akhir fase)                                         │
+│    Update CHANGELOG.md, AGENTS.md, CONTEXT.md                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Mapping Skill ke Setiap Task Fase 10:
+
+| Task | Skill Utama | Skill Pendukung |
+|------|-------------|-----------------|
+| T-28 Security Scan | `/diagnosing-bugs` (tight loop), `/research` (Laravel security config), `/implement` | `/code-review` |
+| T-29 Sidebar Cabang | `/diagnosing-bugs` (root cause dulu), `/implement` | `/code-review` |
+| T-30 Responsive UI | `/prototype` (test breakpoint), `/implement`, `/code-review` | `/research` (Tailwind 4 responsive patterns) |
+| T-31 PWA | `/prototype` (install flow), `/implement`, `/code-review` | `/research` (Vite PWA plugin, service worker strategies) |
+| T-32 Dark/Light Theme | `/prototype` (theme toggle UX), `/implement`, `/code-review` | `/research` (CSS custom properties, prefers-color-scheme) |
+| T-33 Kas-Akunting Sync | `/domain-modeling` (clarify accounting terms), `/implement` (drives `/tdd`), `/code-review` | `/codebase-design` (module seam Kas↔Akunting) |
+| T-34 Ribuan Separator | `/implement` (UI component), `/code-review` | `/prototype` (input feel test) |
+| T-35 Thermal/Web Print | `/prototype` (print layout test), `/implement`, `/code-review` | `/research` (Web Bluetooth API, print CSS @page) |
+| T-36 Customer Create | `/implement` (reuse CRM-06), `/code-review` | - |
+| T-37 Birthday + Tahan | `/implement` (2 sub-fix), `/code-review` | `/diagnosing-bugs` (untuk fix "tahan") |
+
+---
+
+### Catatan Penting untuk Agent:
+
+1. **Jangan skip `/grill-with-docs`** — ini satu-satunya skill yang stateful dan leave paper trail (`CONTEXT.md`, ADR). Tanpa ini, session berikutnya buta konteks.
+2. **`/clear` antar ticket** — mencegah context pollution. Setiap ticket fresh context.
+3. **`/code-review` wajib** — two-axis (Standards + Spec). Jangan merge tanpa review.
+4. **Branch per ticket** — `fase-10-t-28`, `fase-10-t-29`, dst. PR review sebelum merge ke `main`.
+5. **`/research` pakai background** — biarkan jalan sambil kamu kerjakan ticket lain. Hasilnya bawa ke grill berikutnya.
+6. **Update `CHANGELOG.md` setiap fase selesai** — sudah di Section 3, tapi diulang di sini untuk emphasis.
+
+---
+
+### Setup Skill Directory (Jika Belum):
+
+```bash
+# Jalankan sekali di root project
+/setup-matt-pocock-skills
+```
+
+Ini akan setup:
+- Issue tracker config (local `.scratch/` atau GitHub)
+- Triage labels vocabulary
+- Doc layout (CONTEXT.md, ADR folder, CHANGELOG.md structure)
+
+---
+
+> **Referensi Skill Lengkap:** Lihat `/root/.agents/skills/` untuk 35+ skill tersedia. Skill di atas adalah subset yang relevan untuk proyek Ute Parts Fase 10. Skill lain (seperti `writing-*`, `scaffold-exercises`, `git-guardrails-claude-code`) bersifat optional/situasional.

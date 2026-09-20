@@ -2,11 +2,16 @@
 
 namespace App\Modules\Pos\Livewire;
 
+use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
+use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
@@ -22,7 +27,9 @@ class PosKasir extends Component
 
     // Search & Filter state
     public string $search = '';
+
     public ?int $selectedCustomerId = null;
+
     public ?int $selectedGudangId = null;
 
     // Cart state: [item_key => ['produk_id', 'sku_variant_id', 'nama', 'varian', 'harga', 'qty', 'diskon', 'subtotal', 'stok_max']]
@@ -30,23 +37,32 @@ class PosKasir extends Component
 
     // Summary state
     public float $diskonPersen = 0.0;
+
     public float $diskonNominal = 0.0;
+
     public float $pajakNominal = 0.0;
 
     // Payment modal state
     public bool $showPaymentModal = false;
+
     public string $metodeBayar = 'tunai'; // tunai, transfer, qris, split
+
     public float $jumlahBayar = 0.0;
+
     public string $catatan = '';
 
     // Split payment details
     public float $splitTunai = 0.0;
+
     public float $splitNonTunai = 0.0;
+
     public string $splitMetodeNonTunai = 'qris';
 
     // Receipt modal state
     public bool $showReceiptModal = false;
+
     public ?int $completedTransactionId = null;
+
     public ?array $receiptData = null;
 
     // [T-03] Transaksi ditahan (park)
@@ -54,15 +70,24 @@ class PosKasir extends Component
 
     // [T-08] Pencarian & tambah pelanggan quick
     public string $pelangganSearch = '';
+
     public bool $showPelangganBaruModal = false;
-    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => ''];
+
+    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => ''];
 
     // [T-09] Kas sesi modal
     public bool $showKasModal = false;
+
     public bool $kasModeBuka = true;
+
     public float $kasSaldoAwal = 0;
+
     public float $kasSaldoFisik = 0;
+
     public ?array $kasHasil = null;
+
+    // [T-33] sumber saldo awal sesi: manual | carryover (diisi dari sesi tutup sebelumnya)
+    public string $kasSumber = 'manual';
 
     public function mount()
     {
@@ -78,12 +103,12 @@ class PosKasir extends Component
 
     public function checkKasSesi(): void
     {
-        $this->kasAktif = app(\App\Modules\Pos\Services\KasSesiState::class)->sesiKasAktif();
+        $this->kasAktif = app(KasSesiState::class)->sesiKasAktif();
     }
 
     public function getKasAktifProperty()
     {
-        return app(\App\Modules\Pos\Services\KasSesiState::class)->sesiKasAktif();
+        return app(KasSesiState::class)->sesiKasAktif();
     }
 
     public function getCustomerProperty()
@@ -95,7 +120,7 @@ class PosKasir extends Component
 
     public function getSubtotalProperty(): float
     {
-        return array_reduce($this->cart, fn($carry, $item) => $carry + ($item['subtotal'] ?? 0), 0.0);
+        return array_reduce($this->cart, fn ($carry, $item) => $carry + ($item['subtotal'] ?? 0), 0.0);
     }
 
     public function getTotalAkhirProperty(): float
@@ -105,7 +130,29 @@ class PosKasir extends Component
         if ($this->diskonPersen > 0) {
             $diskon += round(($sub * $this->diskonPersen) / 100, 2);
         }
+
         return max(0.0, $sub - $diskon + $this->pajakNominal);
+    }
+
+    // For cart partial
+    public function getTotalProperty(): float
+    {
+        return $this->subtotal;
+    }
+
+    public function getDiskonTotalProperty(): float
+    {
+        $diskon = $this->diskonNominal;
+        if ($this->diskonPersen > 0) {
+            $diskon += round(($this->subtotal * $this->diskonPersen) / 100, 2);
+        }
+
+        return $diskon;
+    }
+
+    public function getTotalBayarProperty(): float
+    {
+        return $this->totalAkhir;
     }
 
     public function getKembalianProperty(): float
@@ -115,8 +162,10 @@ class PosKasir extends Component
         }
         if ($this->metodeBayar === 'split') {
             $totalBayar = $this->splitTunai + $this->splitNonTunai;
+
             return max(0.0, $totalBayar - $this->totalAkhir);
         }
+
         return 0.0;
     }
 
@@ -132,6 +181,7 @@ class PosKasir extends Component
         if ($variant) {
             $this->addToCart($variant->produk_id, $variant->id);
             $this->search = '';
+
             return;
         }
 
@@ -158,6 +208,7 @@ class PosKasir extends Component
 
             if ($stokTersedia <= 0) {
                 $this->dispatch('alert', ['type' => 'error', 'message' => "Stok produk {$produk->nama} habis"]);
+
                 return;
             }
         }
@@ -169,7 +220,8 @@ class PosKasir extends Component
 
         if (isset($this->cart[$itemKey])) {
             if ($this->cart[$itemKey]['qty'] + 1 > $stokTersedia) {
-                $this->dispatch('alert', ['type' => 'warning', 'message' => "Stok maksimal tercapai"]);
+                $this->dispatch('alert', ['type' => 'warning', 'message' => 'Stok maksimal tercapai']);
+
                 return;
             }
             $this->cart[$itemKey]['qty'] += 1;
@@ -191,16 +243,20 @@ class PosKasir extends Component
 
     public function updateQty(string $itemKey, int $delta)
     {
-        if (!isset($this->cart[$itemKey])) return;
+        if (! isset($this->cart[$itemKey])) {
+            return;
+        }
 
         $newQty = $this->cart[$itemKey]['qty'] + $delta;
         if ($newQty <= 0) {
             $this->removeFromCart($itemKey);
+
             return;
         }
 
         if ($newQty > $this->cart[$itemKey]['stok_max']) {
-            $this->dispatch('alert', ['type' => 'warning', 'message' => "Maksimal stok tercapai"]);
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Maksimal stok tercapai']);
+
             return;
         }
 
@@ -241,6 +297,7 @@ class PosKasir extends Component
     {
         if (empty($this->cart)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Keranjang transaksi masih kosong']);
+
             return;
         }
         $this->jumlahBayar = $this->totalAkhir;
@@ -260,11 +317,13 @@ class PosKasir extends Component
 
         if ($this->metodeBayar === 'tunai' && $this->jumlahBayar < $this->totalAkhir) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Jumlah bayar kurang dari total belanja']);
+
             return;
         }
 
         if ($this->metodeBayar === 'split' && ($this->splitTunai + $this->splitNonTunai) < $this->totalAkhir) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Total pembayaran split kurang']);
+
             return;
         }
 
@@ -360,7 +419,7 @@ class PosKasir extends Component
                 }
 
                 // Jurnal akuntansi otomatis (PRD §4.6)
-                $jurnalService = app(\App\Modules\Akunting\Services\JurnalService::class);
+                $jurnalService = app(JurnalService::class);
                 $totalHpp = 0.0;
                 foreach ($this->cart as $item) {
                     $produk = Produk::find($item['produk_id']);
@@ -394,22 +453,22 @@ class PosKasir extends Component
                 if ($this->selectedCustomerId) {
                     $pelanggan = Pelanggan::find($this->selectedCustomerId);
                     if ($pelanggan && $pelanggan->is_reseller) {
-                        app(\App\Modules\Reseller\Services\KomisiService::class)->hitungKomisi($transaksi, $pelanggan);
+                        app(KomisiService::class)->hitungKomisi($transaksi, $pelanggan);
                     }
                 }
 
                 // Kasbon → catat Piutang (AR)
                 if ($kasbon && $this->selectedCustomerId) {
-                    $countPiutang = \App\Modules\Akunting\Models\Piutang::whereDate('created_at', now()->toDateString())->count() + 1;
-                    \App\Modules\Akunting\Models\Piutang::create([
-                        'no_piutang'    => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
-                        'pelanggan_id'  => $this->selectedCustomerId,
-                        'transaksi_id'  => $transaksi->id,
-                        'jumlah'        => $this->totalAkhir,
-                        'jumlah_dibayar'=> 0,
-                        'jatuh_tempo'   => now()->addDays(30)->toDateString(),
-                        'status'        => 'belum_lunas',
-                        'keterangan'    => 'Kasbon POS ' . $noTransaksi,
+                    $countPiutang = Piutang::whereDate('created_at', now()->toDateString())->count() + 1;
+                    Piutang::create([
+                        'no_piutang' => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
+                        'pelanggan_id' => $this->selectedCustomerId,
+                        'transaksi_id' => $transaksi->id,
+                        'jumlah' => $this->totalAkhir,
+                        'jumlah_dibayar' => 0,
+                        'jatuh_tempo' => now()->addDays(30)->toDateString(),
+                        'status' => 'belum_lunas',
+                        'keterangan' => 'Kasbon POS '.$noTransaksi,
                     ]);
                 }
 
@@ -436,7 +495,7 @@ class PosKasir extends Component
             $this->clearCart();
             $this->checkKasSesi();
         } catch (\Exception $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memproses transaksi: ' . $e->getMessage()]);
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal memproses transaksi: '.$e->getMessage()]);
         }
     }
 
@@ -447,6 +506,7 @@ class PosKasir extends Component
     {
         if (empty($this->cart)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Keranjang kosong, tidak ada yang ditahan']);
+
             return;
         }
 
@@ -475,7 +535,7 @@ class PosKasir extends Component
                         'cart' => array_values($this->cart),
                         'diskon_persen' => $this->diskonPersen,
                         'diskon_nominal' => $this->diskonNominal,
-                        'catatan' => 'Ditahan (park) oleh ' . (auth()->user()?->name ?? 'kasir'),
+                        'catatan' => 'Ditahan (park) oleh '.(auth()->user()?->name ?? 'kasir'),
                     ],
                     'status' => 'ditahan',
                     'catatan' => 'Transaksi ditahan (park)',
@@ -483,6 +543,7 @@ class PosKasir extends Component
             });
 
             $this->clearCart();
+            $this->showDitahanPanel = true; // [T-37] panel tertahan langsung terbuka setelah F6
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Transaksi ditahan — dapat dilanjutkan kasir lain di cabang ini']);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
@@ -512,6 +573,7 @@ class PosKasir extends Component
 
         if (empty($cartItems)) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Data keranjang ditahan tidak ditemukan']);
+
             return;
         }
 
@@ -519,8 +581,8 @@ class PosKasir extends Component
         $this->clearCart();
         foreach ($cartItems as $item) {
             $key = isset($item['sku_variant_id']) && $item['sku_variant_id']
-                ? $item['produk_id'] . '-' . $item['sku_variant_id']
-                : $item['produk_id'] . '-0';
+                ? $item['produk_id'].'-'.$item['sku_variant_id']
+                : $item['produk_id'].'-0';
             $this->cart[$key] = $item;
         }
         $this->diskonPersen = (float) ($detail['diskon_persen'] ?? 0);
@@ -528,7 +590,7 @@ class PosKasir extends Component
         $this->selectedCustomerId = $transaksi->pelanggan_id;
 
         // Tandai transaksi asli dipindahkan → status 'batal' (tidak dipakai lagi), tanpa jurnal
-        $transaksi->update(['status' => 'dibatalkan', 'catatan' => 'Dilanjutkan (resume) oleh ' . (auth()->user()?->name ?? 'kasir')]);
+        $transaksi->update(['status' => 'dibatalkan', 'catatan' => 'Dilanjutkan (resume) oleh '.(auth()->user()?->name ?? 'kasir')]);
 
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Transaksi ditahan dilanjutkan — silakan lanjut bayar']);
     }
@@ -544,8 +606,8 @@ class PosKasir extends Component
         return Pelanggan::with('tierMembership')
             ->where(function ($q) {
                 $q->where('nama', 'like', "%{$this->pelangganSearch}%")
-                  ->orWhere('telepon', 'like', "%{$this->pelangganSearch}%")
-                  ->orWhere('email', 'like', "%{$this->pelangganSearch}%");
+                    ->orWhere('telepon', 'like', "%{$this->pelangganSearch}%")
+                    ->orWhere('email', 'like', "%{$this->pelangganSearch}%");
             })
             ->limit(8)
             ->get();
@@ -559,21 +621,18 @@ class PosKasir extends Component
             'pelangganBaruForm.email' => 'nullable|email|unique:pelanggan,email',
         ]);
 
-        $tier = \App\Modules\Crm\Models\TierMembership::where('is_active', true)
-            ->orderBy('min_belanja_12bulan')->first();
-
-        $pelanggan = Pelanggan::create([
+        $pelanggan = app(PelangganService::class)->create([
             'nama' => $this->pelangganBaruForm['nama'],
             'telepon' => $this->pelangganBaruForm['telepon'],
             'email' => $this->pelangganBaruForm['email'] ?: null,
             'alamat' => $this->pelangganBaruForm['alamat'] ?: null,
-            'tier_membership_id' => $tier?->id,
+            'tanggal_lahir' => $this->pelangganBaruForm['tanggal_lahir'] ?: null,
             'is_reseller' => false,
         ]);
 
         $this->setPelanggan($pelanggan->id);
         $this->showPelangganBaruModal = false;
-        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => ''];
+        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => ''];
 
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan & dipilih (sinkron ke CRM)']);
     }
@@ -583,8 +642,30 @@ class PosKasir extends Component
     public function bukaKasModal()
     {
         $this->kasModeBuka = true;
-        $this->kasSaldoAwal = 0;
         $this->kasHasil = null;
+
+        // [T-33] Carryover: saldo awal shift berikutnya = saldo_akhir_fisik sesi tutup terakhir
+        // (prioritas sesi milik kasir ini, fallback sesi bersama legacy user_id NULL)
+        $prev = DB::table('kas_sesi')
+            ->where('cabang_id', session('cabang_id'))
+            ->where('status', 'tutup')
+            ->whereNotNull('saldo_akhir_fisik')
+            ->where('user_id', auth()->id())
+            ->latest('id')
+            ->first();
+
+        if (! $prev) {
+            $prev = DB::table('kas_sesi')
+                ->where('cabang_id', session('cabang_id'))
+                ->where('status', 'tutup')
+                ->whereNotNull('saldo_akhir_fisik')
+                ->whereNull('user_id')
+                ->latest('id')
+                ->first();
+        }
+
+        $this->kasSumber = $prev ? 'carryover' : 'manual';
+        $this->kasSaldoAwal = $prev ? (float) $prev->saldo_akhir_fisik : 0;
         $this->showKasModal = true;
     }
 
@@ -600,14 +681,14 @@ class PosKasir extends Component
     public function prosesKas()
     {
         try {
-            $svc = app(\App\Modules\Pos\Services\KasSesiState::class);
+            $svc = app(KasSesiState::class);
             if ($this->kasModeBuka) {
-                $this->kasHasil = $svc->bukaKas((float) $this->kasSaldoAwal, session('cabang_id'), auth()->id());
+                $this->kasHasil = $svc->bukaKas((float) $this->kasSaldoAwal, session('cabang_id'), auth()->id(), $this->kasSumber);
             } else {
                 $this->kasHasil = $svc->tutupKas((float) $this->kasSaldoFisik);
             }
             $this->checkKasSesi();
-            $this->dispatch('alert', ['type' => 'success', 'message' => $this->kasModeBuka ? 'Kas dibuka' : 'Kas ditutup' . ($this->kasHasil['selisih'] != 0 ? ' — selisih tercatat' : '')]);
+            $this->dispatch('alert', ['type' => 'success', 'message' => $this->kasModeBuka ? 'Kas dibuka' : 'Kas ditutup'.($this->kasHasil['selisih'] != 0 ? ' — selisih tercatat' : '')]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
@@ -617,27 +698,32 @@ class PosKasir extends Component
     {
         $productsQuery = Produk::query()
             ->where('is_active', true)
-            ->with(['skuVariants' => fn($q) => $q->where('is_active', true)]);
+            ->with(['skuVariants' => fn ($q) => $q->where('is_active', true)]);
 
-        if (!empty($this->search)) {
+        if (! empty($this->search)) {
             $search = $this->search;
             $productsQuery->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('brand_kompatibel', 'like', "%{$search}%")
-                  ->orWhere('model_kompatibel', 'like', "%{$search}%")
-                  ->orWhereHas('skuVariants', fn($sq) => $sq->where('sku', 'like', "%{$search}%"));
+                    ->orWhere('brand_kompatibel', 'like', "%{$search}%")
+                    ->orWhere('model_kompatibel', 'like', "%{$search}%")
+                    ->orWhereHas('skuVariants', fn ($sq) => $sq->where('sku', 'like', "%{$search}%"));
             });
         }
 
         $products = $productsQuery->take(16)->get();
         $customers = Pelanggan::with('tierMembership')->take(10)->get();
 
+        // Explicitly pass all data needed by the view
         return view('modules.pos.livewire.pos-kasir', [
             'products' => $products,
             'customers' => $customers,
             'pelangganCari' => $this->pelangganCari,
             'ditahanList' => $this->ditahanList,
             'kasAktif' => $this->kasAktif,
+            'total' => $this->total,
+            'diskonTotal' => $this->diskonTotal,
+            'totalBayar' => $this->totalBayar,
+            'subtotal' => $this->subtotal,
         ])->layout('layouts.backoffice', ['header' => 'Kasir Point of Sale (POS)']);
     }
 }

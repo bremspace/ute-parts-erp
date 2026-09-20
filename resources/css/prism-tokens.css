@@ -45,6 +45,7 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #F8FAFC;
     transition: all 0.2s ease;
+    min-height: 44px; /* [T-30] Touch-friendly minimum height */
 }
 
 .glass-input:focus {
@@ -52,6 +53,24 @@
     border-color: var(--up-primary);
     box-shadow: 0 0 0 2px rgba(91, 79, 233, 0.25);
     background: rgba(14, 21, 43, 0.95);
+}
+
+/* [T-30] Mobile touch-friendly form elements */
+@media (max-width: 767px) {
+    .glass-input {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    select.glass-input {
+        padding: 12px 16px;
+    }
+}
+
+/* [T-30] Touch-friendly buttons */
+@media (max-width: 767px) {
+    button, [role="button"], .btn-touch {
+        min-height: 44px;
+        min-width: 44px;
+    }
 }
 
 /* Circuit lines decorative motif */
@@ -89,4 +108,35 @@
 }
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(91, 79, 233, 0.6);
+}
+
+/* [T-32] Tema terang: glass surface, input, dan scrollbar theme-aware */
+html[data-theme="light"] {
+    --up-glass-bg: rgba(255, 255, 255, 0.72);
+    --up-glass-border: rgba(15, 23, 42, 0.1);
+    --up-glass-shadow: 0 12px 32px 0 rgba(15, 23, 42, 0.12);
+}
+
+html[data-theme="light"] .glass-input {
+    background: rgba(15, 23, 42, 0.06);
+    border-color: rgba(15, 23, 42, 0.16);
+    color: #1E293B;
+}
+
+html[data-theme="light"] .glass-input:focus {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: var(--up-primary);
+    box-shadow: 0 0 0 2px rgba(91, 79, 233, 0.25);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.05);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.22);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 23, 42, 0.45);
 }
