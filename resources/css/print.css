@@ -1,0 +1,78 @@
+/* [T-35] [ADR 0009] Cetak thermal 58mm/80mm + Web Print A4
+   - Bluetooth ESC/POS: layout 58/80 di JS (komponen thermal-print.js), bukan CSS.
+   - Fallback Web Print: area render tersembunyi (.print-58/.print-80) diisi JS lalu window.print().
+   - A4: modal struk lama tetap tercetak apa adanya (dibungkus .print-a4).
+   - @page per-elemen via named pages (Chrome/Edge); browser lain jatuh ke A4 default.
+*/
+
+/* Screen: hanya area A4 (isi modal) yang tampil; target 58/80 tersembunyi. */
+.print-58, .print-80 {
+    display: none;
+}
+
+@media print {
+    /* Sembunyikan seluruh UI; hanya area cetak yang terlihat. */
+    body * {
+        visibility: hidden;
+    }
+    .print-area, .print-area * {
+        visibility: visible;
+    }
+    .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        color: #000;
+        background: #fff;
+    }
+
+    /* Target 58/80 hanya tampil saat JS menetapkan mode (fallback aktif). */
+    .print-58, .print-80 {
+        display: none !important;
+    }
+    body[data-modal-print="58"] .print-58 {
+        display: block !important;
+    }
+    body[data-modal-print="80"] .print-80 {
+        display: block !important;
+    }
+
+    /* Named pages: ukuran kertas per area. */
+    @page a4page { size: A4; margin: 1cm; }
+    @page struk58 { size: 58mm auto; margin: 0; }
+    @page faktur80 { size: 80mm auto; margin: 0; }
+
+    .print-a4  { page: a4page; }
+    .print-58  { page: struk58; }
+    .print-80  { page: faktur80; }
+
+    /* Tipografi struk: monospace, hitam pekat, tanpa background dekoratif. */
+    .print-58, .print-80 {
+        font-family: 'Courier New', ui-monospace, monospace;
+        font-size: 10.5px;
+        line-height: 1.35;
+        font-weight: 400;
+        white-space: pre-wrap;
+    }
+    .print-58 { width: 48mm; margin: 1mm auto; }
+    .print-80 { width: 72mm; margin: 1mm auto; }
+
+    .print-58 div, .print-80 div {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .print-58 div.c, .print-80 div.c { text-align: center; }
+    .print-58 div.r, .print-80 div.r { text-align: right; }
+    .print-58 div.b, .print-80 div.b { font-weight: 700; }
+    .print-58 div.h2, .print-80 div.h2 { font-size: 1.55em; font-weight: 700; }
+    .print-58 div.h4, .print-80 div.h4 { font-size: 2em; font-weight: 700; }
+}
+
+/* Page default (fallback saat named pages tak didukung): A4 bersih. */
+@page {
+    size: A4;
+    margin: 1cm;
+}

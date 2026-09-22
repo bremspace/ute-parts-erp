@@ -1,0 +1,41 @@
+{
+  "name": "Ute Parts — ERP/POS Sparepart & Servis",
+  "short_name": "UteParts",
+  "description": "ERP/POS untuk toko sparepart & servis HP. Kelola pos, gudang, servis, akunting.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B0D17",
+  "theme_color": "#5B4FE9",
+  "lang": "id",
+  "categories": ["business", "shopping"],
+  "icons": [
+    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Kasir POS",
+      "short_name": "POS",
+      "description": "Buka kasir point of sale",
+      "url": "/app/pos",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Gudang (WMS)",
+      "short_name": "Gudang",
+      "description": "Kelola stok & mutasi gudang",
+      "url": "/app/wms",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Servis",
+      "short_name": "Servis",
+      "description": "Tiket servis & status pengerjaan",
+      "url": "/app/servis",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}
