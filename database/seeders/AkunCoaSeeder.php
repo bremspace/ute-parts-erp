@@ -31,6 +31,7 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '210-02', 'nama' => 'Utang Gaji',                   'tipe' => 'kewajiban',  'kelompok' => 'utang_gaji',  'saldo_normal' => 'kredit'],
             ['kode' => '210-03', 'nama' => 'Utang Komisi',                 'tipe' => 'kewajiban',  'kelompok' => 'utang_komisi', 'saldo_normal' => 'kredit'],
             ['kode' => '220-01', 'nama' => 'Pajak Dibayar Dimuka',         'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'],
+            ['kode' => '220-02', 'nama' => 'PPN Keluaran',                 'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'],
 
             // EKUITAS
             ['kode' => '310-01', 'nama' => 'Modal Pemilik',                'tipe' => 'ekuitas',   'kelompok' => 'modal',        'saldo_normal' => 'kredit'],

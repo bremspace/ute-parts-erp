@@ -14,25 +14,46 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('stok_transfer')) {
+            return;
+        }
         Schema::table('stok_transfer', function (Blueprint $table) {
-            $table->foreignId('approved_by')->nullable()->after('user_penerima_id')->constrained('users')->nullOnDelete();
-            $table->timestamp('approved_at')->nullable()->after('tanggal_terima');
+            if (! $table->hasColumn('approved_by')) {
+                $table->foreignId('approved_by')->nullable()->after('user_penerima_id')->constrained('users')->nullOnDelete();
+            }
+            if (! $table->hasColumn('approved_at')) {
+                $table->timestamp('approved_at')->nullable()->after('tanggal_terima');
+            }
         });
 
-        Schema::table('stok_transfer_item', function (Blueprint $table) {
-            $table->foreignId('created_by')->nullable()->after('jumlah')->constrained('users')->nullOnDelete();
-        });
+        if (Schema::hasTable('stok_transfer_item')) {
+            Schema::table('stok_transfer_item', function (Blueprint $table) {
+                if (! $table->hasColumn('created_by')) {
+                    $table->foreignId('created_by')->nullable()->after('jumlah')->constrained('users')->nullOnDelete();
+                }
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('stok_transfer_item', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('created_by');
-        });
+        if (Schema::hasTable('stok_transfer_item')) {
+            Schema::table('stok_transfer_item', function (Blueprint $table) {
+                if ($table->hasColumn('created_by')) {
+                    $table->dropConstrainedForeignId('created_by');
+                }
+            });
+        }
 
-        Schema::table('stok_transfer', function (Blueprint $table) {
-            $table->dropColumn('approved_at');
-            $table->dropConstrainedForeignId('approved_by');
-        });
+        if (Schema::hasTable('stok_transfer')) {
+            Schema::table('stok_transfer', function (Blueprint $table) {
+                if ($table->hasColumn('approved_at')) {
+                    $table->dropColumn('approved_at');
+                }
+                if ($table->hasColumn('approved_by')) {
+                    $table->dropConstrainedForeignId('approved_by');
+                }
+            });
+        }
     }
 };

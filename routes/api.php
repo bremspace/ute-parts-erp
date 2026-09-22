@@ -131,6 +131,17 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::post('/broadcast/kampanye', [CrmController::class, 'broadcastKampanye'])->middleware('permission:crm.broadcast'); // [T-23] CRM-08
             Route::get('/broadcast/{id}/log', [CrmController::class, 'broadcastLog'])->middleware('permission:crm.broadcast'); // [T-23] CRM-09
             Route::post('/broadcast', [CrmController::class, 'broadcast'])->middleware('permission:crm.broadcast');
+
+            // [API: CRM-10..18][F2-1] Lead Pipeline
+            Route::get('/leads', [CrmController::class, 'indexLeads'])->middleware('permission:crm.view');
+            Route::post('/leads', [CrmController::class, 'storeLead'])->middleware('permission:crm.create');
+            Route::get('/leads/{id}', [CrmController::class, 'showLead'])->middleware('permission:crm.view');
+            Route::put('/leads/{id}', [CrmController::class, 'updateLead'])->middleware('permission:crm.edit');
+            Route::delete('/leads/{id}', [CrmController::class, 'destroyLead'])->middleware('permission:crm.delete');
+            Route::post('/leads/bulk-stage', [CrmController::class, 'bulkUpdateLeadStage'])->middleware('permission:crm.edit');
+            Route::post('/leads/{id}/convert', [CrmController::class, 'convertLead'])->middleware('permission:crm.edit');
+            Route::get('/leads/kanban', [CrmController::class, 'kanbanLeads'])->middleware('permission:crm.view');
+            Route::get('/leads/funnel', [CrmController::class, 'funnelLeads'])->middleware('permission:crm.view');
         });
 
         // [API: RESELLER-01..06][T-21] Modul Reseller & Komisi

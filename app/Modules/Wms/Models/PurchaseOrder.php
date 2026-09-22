@@ -19,6 +19,7 @@ class PurchaseOrder extends Model
         'jatuh_tempo' => 'date',
         'total' => 'decimal:2',
         'total_dibayar' => 'decimal:2',
+        'status' => 'string',
     ];
 
     public function supplier(): BelongsTo

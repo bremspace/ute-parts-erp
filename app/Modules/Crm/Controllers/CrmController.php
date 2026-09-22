@@ -3,10 +3,12 @@
 namespace App\Modules\Crm\Controllers;
 
 use App\Modules\Crm\Models\KampanyeBroadcast;
+use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\BroadcastService;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Crm\Services\LeadService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Notifikasi\Services\NotificationService;
@@ -24,7 +26,8 @@ class CrmController extends Controller
 
     public function __construct(
         protected TierService $tierService,
-        protected NotificationService $notifService
+        protected NotificationService $notifService,
+        protected LeadService $leadService
     ) {}
 
     // [API: CRM-01] Profil pelanggan 360°
@@ -286,5 +289,155 @@ class CrmController extends Controller
             'progress_persen' => min(100, max(0, $progress)),
             'sisa_belanja' => max(0, $nextThreshold - $belanja),
         ];
+    }
+
+    // ========== LEAD PIPELINE (F2-1) ==========
+
+    // [API: CRM-10] Daftar lead (paginated, filterable)
+    public function indexLeads(Request $request)
+    {
+        $search = $request->query('search');
+        $stage = $request->query('stage');
+        $sumber = $request->query('sumber');
+        $assignedTo = $request->query('assigned_to');
+
+        $query = Lead::with(['assignedTo', 'pelanggan'])
+            ->forCabang()
+            ->latest();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                    ->orWhere('telepon', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($stage) {
+            $query->where('stage', $stage);
+        }
+
+        if ($sumber) {
+            $query->where('sumber', $sumber);
+        }
+
+        if ($assignedTo) {
+            $query->where('assigned_to', $assignedTo);
+        }
+
+        return $this->success($query->paginate(20), 'Daftar lead berhasil diambil');
+    }
+
+    // [API: CRM-11] Detail lead
+    public function showLead(Request $request, $id)
+    {
+        $lead = Lead::with(['assignedTo', 'pelanggan', 'cabang'])
+            ->forCabang()
+            ->findOrFail($id);
+
+        return $this->success($lead, 'Detail lead berhasil diambil');
+    }
+
+    // [API: CRM-12] Create lead
+    public function storeLead(Request $request)
+    {
+        $request->validate([
+            'sumber' => 'required|string|in:walkin,phone,website,referral,social_media,marketplace,lain',
+            'stage' => 'sometimes|in:baru,kontak,kualifikasi,negosiasi,won,lost',
+            'nama' => 'required|string|max:255',
+            'telepon' => 'nullable|string|max:20|unique:leads,telepon',
+            'email' => 'nullable|email|unique:leads,email',
+            'nilai_estimasi' => 'sometimes|numeric|min:0',
+            'assigned_to' => 'nullable|exists:users,id',
+            'catatan' => 'nullable|string',
+        ]);
+
+        $data = $request->all();
+        $data['cabang_id'] = session('cabang_aktif_id');
+
+        $lead = $this->leadService->create($data);
+
+        return $this->success($lead, 'Lead berhasil dibuat', 201);
+    }
+
+    // [API: CRM-13] Update lead
+    public function updateLead(Request $request, $id)
+    {
+        $lead = Lead::forCabang()->findOrFail($id);
+
+        $request->validate([
+            'sumber' => 'sometimes|string|in:walkin,phone,website,referral,social_media,marketplace,lain',
+            'stage' => 'sometimes|in:baru,kontak,kualifikasi,negosiasi,won,lost',
+            'nama' => 'sometimes|string|max:255',
+            'telepon' => 'nullable|string|max:20|unique:leads,telepon,'.$id,
+            'email' => 'nullable|email|unique:leads,email,'.$id,
+            'nilai_estimasi' => 'sometimes|numeric|min:0',
+            'assigned_to' => 'nullable|exists:users,id',
+            'catatan' => 'nullable|string',
+            'lost_reason' => 'nullable|string|in:harga,kompetitor,tidak_butuh,lain',
+        ]);
+
+        $lead = $this->leadService->update($lead, $request->all());
+
+        return $this->success($lead, 'Lead berhasil diperbarui');
+    }
+
+    // [API: CRM-14] Bulk update lead stage (drag-and-drop kanban)
+    public function bulkUpdateLeadStage(Request $request)
+    {
+        $request->validate([
+            'lead_ids' => 'required|array|min:1',
+            'lead_ids.*' => 'exists:leads,id',
+            'stage' => 'required|in:baru,kontak,kualifikasi,negosiasi,won,lost',
+        ]);
+
+        $updated = $this->leadService->bulkUpdateStage(
+            $request->lead_ids,
+            $request->stage
+        );
+
+        return $this->success(['updated' => $updated], "{$updated} lead diperbarui ke stage {$request->stage}");
+    }
+
+    // [API: CRM-15] Convert won lead to pelanggan
+    public function convertLead(Request $request, $id)
+    {
+        $lead = Lead::forCabang()->findOrFail($id);
+
+        if (! $lead->canConvert()) {
+            return $this->error('Lead tidak dapat dikonversi: harus stage Won dan belum memiliki pelanggan.', 422);
+        }
+
+        $pelanggan = $this->leadService->convertToPelanggan($lead);
+
+        return $this->success($pelanggan, 'Lead berhasil dikonversi ke pelanggan');
+    }
+
+    // [API: CRM-16] Lead kanban data (grouped by stage)
+    public function kanbanLeads(Request $request)
+    {
+        $assignedTo = $request->query('assigned_to') ? (int) $request->query('assigned_to') : null;
+
+        $data = $this->leadService->getKanbanData(null, $assignedTo);
+
+        return $this->success($data, 'Data kanban lead berhasil diambil');
+    }
+
+    // [API: CRM-17] Lead funnel data (for dashboard)
+    public function funnelLeads(Request $request)
+    {
+        $data = $this->leadService->getFunnelData();
+
+        return $this->success($data, 'Data funnel lead berhasil diambil');
+    }
+
+    // [API: CRM-18] Delete lead
+    public function destroyLead(Request $request, $id)
+    {
+        $lead = Lead::forCabang()->findOrFail($id);
+
+        $this->leadService->delete($lead);
+
+        return $this->success(null, 'Lead berhasil dihapus');
     }
 }

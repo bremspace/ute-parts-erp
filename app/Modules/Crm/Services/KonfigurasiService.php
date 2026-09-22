@@ -69,4 +69,52 @@ class KonfigurasiService
     {
         return (float) ($this->get('poin_redeem_rupiah') ?? 0);
     }
+
+    /**
+     * Apakah Pajak Otomatis diaktifkan di cabang ini?
+     * Returning nullable utk backward compatibility.
+     */
+    public function getPpnEnabled(?int $cabangId = null): ?bool
+    {
+        $key = $cabangId ? "ppn_enabled.{$cabangId}" : 'ppn_enabled';
+        $val = $this->get($key);
+        return $val === null ? null : (bool) $val;
+    }
+
+    /**
+     * Persen PPN utk cabang ini (default 11).
+     */
+    public function getPpnPercent(?int $cabangId = null): float
+    {
+        $key = $cabangId ? "ppn_percent.{$cabangId}" : 'ppn_percent';
+        return (float) ($this->get($key) ?? 11);
+    }
+
+    /**
+     * Simpan konfigurasi Pajak Otomatis.
+     */
+    public function setPpn(?int $cabangId, bool $enabled, float $percent): void
+    {
+        $this->set("ppn_enabled.{$cabangId}", $enabled, 'Pajak Otomatis diaktifkan di cabang');
+        $this->set("ppn_percent.{$cabangId}", $percent, 'Persen PPN per cabang');
+    }
+
+    /**
+     * Setup konfigurasi PPN default (idempotent).
+     */
+    public function seedPpnDefaults(): void
+    {
+        $this->set('ppn_enabled', false, 'Aktifkan Pajak Otomatis per cabang');
+        $this->set('ppn_percent', 11, 'Persen PPN nasional default');
+    }
+}
+
+    /**
+     * Setup konfigurasi PPN default (idempotent).
+     */
+    public function seedPpnDefaults(): void
+    {
+        $this->set('ppn_enabled', false, 'Aktifkan Pajak Otomatis per cabang');
+        $this->set('ppn_percent', 11, 'Persen PPN nasional default');
+    }
 }

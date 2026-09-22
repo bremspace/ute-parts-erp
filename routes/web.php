@@ -219,4 +219,9 @@ Route::prefix('app')->middleware('auth')->group(function () {
 
     // Pengaturan & RBAC Screen
     Route::get('/pengaturan', SettingsRbac::class)->name('pengaturan');
+
+    // Workflow Approval Inbox
+    Route::get('/approvals', function () {
+        return view('modules.workflow.livewire.approval-inbox');
+    })->name('approvals');
 });

@@ -809,7 +809,17 @@ class WmsDashboard extends Component
 
     public function kirimPo(int $id)
     {
-        PurchaseOrder::findOrFail($id)->update(['status' => 'dikirim']);
+        $po = PurchaseOrder::findOrFail($id);
+
+        // Cek apakah PO menunggu approval (rule match)
+        $cabangId = session('cabang_id');
+        $approvalService = app(\App\Modules\Workflow\Services\ApprovalService::class);
+        if ($approvalService->adaPending('po', $po->id)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'PO menunggu approval dan tidak dapat dikirim']);
+            return;
+        }
+
+        $po->update(['status' => 'dikirim']);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'PO dikirim ke supplier']);
     }
 

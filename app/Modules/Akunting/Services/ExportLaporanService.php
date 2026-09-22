@@ -7,6 +7,7 @@ use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\StokItem;
 use Illuminate\Support\Collection;
@@ -233,5 +234,51 @@ class ExportLaporanService
                 'saldo' => round($saldo, 2),
             ];
         })->values();
+    }
+
+    /**
+     * Rekap data pajak per periode (PPN Keluaran) untuk UI & export.
+     * Periode: inclusive $dari -> $sampai (YYYY-MM-DD).
+     */
+    public function recapsPpnPeriode(?int $cabangId, string $dari, string $sampai): array
+    {
+        $rows = [['REKAP PPN', $dari.' s.d. '.$sampai], []];
+        $rows[] = ['TANGGAL', 'NO TRANSAKSI', 'NO JURNAL', 'DPP (Rp)', 'PPN PERCENT', 'PPN NOMINAL (Rp)'];
+
+        $query = Transaksi::whereDate('created_at', '>=', $dari)
+            ->whereDate('created_at', '<=', $sampai);
+
+        if ($cabangId) {
+            $query->where('cabang_id', $cabangId);
+        }
+
+        $totalDpp = 0;
+        $totalPpn = 0;
+        $ppnCount = 0;
+
+        foreach ($query->get() as $t) {
+            if ($t->pajak_nominal > 0) {
+                $dpp = $t->subtotal - $t->diskon_nominal;
+                $percent = $dpp > 0 ? round(($t->pajak_nominal / $dpp) * 100, 2) : 0;
+                $rows[] = [
+                    $t->created_at->format('d/m/Y'),
+                    $t->no_transaksi,
+                    $t->no_jurnal ?? '-',
+                    $dpp,
+                    $percent,
+                    $t->pajak_nominal,
+                ];
+                $totalDpp += $dpp;
+                $totalPpn += $t->pajak_nominal;
+                $ppnCount++;
+            }
+        }
+
+        $rows[] = [];
+        $rows[] = ['TOTAL', '', '', $totalDpp, '', $totalPpn];
+        $rows[] = [];
+        $rows[] = ['KETERANGAN', 'Jumlah transaksi yang terkena PPN: ' . $ppnCount];
+
+        return $rows;
     }
 }

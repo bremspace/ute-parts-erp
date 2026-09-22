@@ -150,6 +150,26 @@ class PosKasir extends Component
         return max(0.0, $sub - $diskon + $this->pajakNominal);
     }
 
+    /**
+     * Rekonsiliasi otomatis PPN per cabang (diaktifkan via konfigurasi).
+     * Called setelah cart berubah (add/update/remove/setHargaFleksibel/clear).
+     */
+    private function recalcPajak(): void
+    {
+        $cabangId = session('cabang_id');
+        $pajakService = app(PajakService::class);
+        $enabled = $cabangId ? $pajakService->enabled($cabangId) : false;
+
+        if (! $enabled) {
+            $this->pajakNominal = 0.0;
+            return;
+        }
+
+        $dpp = max(0.0, $this->subtotal - $this->diskonNominal);
+        $result = $pajakService->hitung($cabangId, $dpp);
+        $this->pajakNominal = $result['ppn_nominal'];
+    }
+
     // For cart partial
     public function getTotalProperty(): float
     {
@@ -213,6 +233,9 @@ class PosKasir extends Component
         $produk = Produk::findOrFail($produkId);
         $variant = $variantId ? SkuVariant::find($variantId) : null;
         $itemKey = $variantId ? "{$produkId}-{$variantId}" : "{$produkId}-0";
+
+        // Hitung ulang PPN setelah perubahan keranjang
+        $this->recalcPajak();
 
         // Cek stok tersedia
         $stokTersedia = 999;
@@ -295,11 +318,13 @@ class PosKasir extends Component
 
         $this->cart[$itemKey]['qty'] = $newQty;
         $this->cart[$itemKey]['subtotal'] = $newQty * $this->cart[$itemKey]['harga'];
+        $this->recalcPajak();
     }
 
     public function removeFromCart(string $itemKey)
     {
         unset($this->cart[$itemKey]);
+        $this->recalcPajak();
     }
 
     public function clearCart()
@@ -308,6 +333,7 @@ class PosKasir extends Component
         $this->diskonPersen = 0.0;
         $this->diskonNominal = 0.0;
         $this->pajakNominal = 0.0;
+        $this->recalcPajak();
     }
 
     /**
@@ -352,6 +378,7 @@ class PosKasir extends Component
 
         $this->cart[$itemKey]['harga'] = $harga;
         $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $harga;
+        $this->recalcPajak();
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Harga fleksibel diupdate']);
     }
 
