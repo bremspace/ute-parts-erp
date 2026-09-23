@@ -346,6 +346,9 @@
                                 <span class="tabular-nums">Rp {{ number_format($item['harga'], 0, ',', '.') }}</span>
                             @endif
                         </div>
+
+                        {{-- [F2-3] SN wajib utk produk sn=true --}}
+                        @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
                     </div>
 
                     <!-- Quantity Controls -->

@@ -169,6 +169,7 @@ class KomisiService
                     [
                         'no_utang' => $noUtang,
                         'pelanggan_id' => $komisi->pelanggan_id,
+                        'cabang_id' => $komisi->transaksi?->cabang_id, // [F2-5] stamp cabang utk export scoping
                         'kreditor_nama' => $komisi->pelanggan?->nama,
                         'jumlah' => (float) $komisi->nominal_komisi,
                         'jumlah_dibayar' => 0,

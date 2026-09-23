@@ -15,6 +15,12 @@
                 @endforeach
             </select>
 
+            <!-- [F2-5] Export laporan servis (queue) -->
+            @can('laporan.cabang')
+                <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
+                <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+            @endcan
+
             <button
                 type="button"
                 wire:click="openTerimaModal"
@@ -596,6 +602,17 @@
                                     <input type="number" wire:model="pekerjaanItems.{{ $idx }}.harga" min="0" step="500" placeholder="Harga" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
                                     <button wire:click="removePekerjaanRow({{ $idx }})" class="col-span-1 text-up-red hover:text-white text-sm cursor-pointer" title="Hapus baris">✕</button>
                                 </div>
+                                {{-- [F2-3] SN utk produk sn=true — wajib, jumlah = qty --}}
+                                @if(($row['tipe'] ?? 'jasa') === 'part')
+                                    <div class="mb-2">
+                                        <input
+                                            type="text"
+                                            wire:model="pekerjaanItems.{{ $idx }}.sn"
+                                            placeholder="Nomor seri (wajib utk produk SN — pisah koma/baris)"
+                                            class="w-full px-2 py-2 rounded-lg glass-input text-[11px] font-mono"
+                                        />
+                                    </div>
+                                @endif
                             @endforeach
                             <div class="flex flex-wrap gap-2">
                                 <button wire:click="addPekerjaanRow" class="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 text-[11px] font-semibold border border-white/10 cursor-pointer">+ Baris</button>

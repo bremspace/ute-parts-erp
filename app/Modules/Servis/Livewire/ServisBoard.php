@@ -3,6 +3,7 @@
 namespace App\Modules\Servis\Livewire;
 
 use App\Models\User;
+use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Servis\Models\JenisServis;
@@ -11,6 +12,7 @@ use App\Modules\Servis\Services\ServisService;
 use App\Modules\Servis\Services\ServisStateMachine;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Services\NomorSeriService;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -86,6 +88,31 @@ class ServisBoard extends Component
     public function mount()
     {
         $this->photoInputs = [null, null, null]; // max 3 foto
+    }
+
+    /** [F2-5] Export laporan servis via queue (async — jangan sinkron di request). */
+    public function exportLaporan(string $format = 'xlsx'): void
+    {
+        if (! auth()->user()?->can('laporan.cabang')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
+
+            return;
+        }
+
+        dispatch(new ExportLaporanJob(
+            jenis: 'servis',
+            periodeDari: null,
+            periodeSampai: null,
+            cabangId: session('cabang_id'),
+            akunId: null,
+            userId: auth()->id(),
+            format: $format === 'csv' ? 'csv' : 'xlsx',
+        ));
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Export servis diantre — notifikasi + link unduh muncul setelah selesai.',
+        ]);
     }
 
     public function getStateMachineColumnsProperty(): array
@@ -361,6 +388,7 @@ class ServisBoard extends Component
             'qty' => 1,
             'harga' => 0,
             'gudang_id' => null,
+            'sn' => '', // [F2-3] daftar SN utk produk sn=true (newline/koma)
         ];
     }
 
@@ -406,6 +434,8 @@ class ServisBoard extends Component
                 'qty' => max(1, (int) ($row['qty'] ?? 1)),
                 'harga' => (float) ($row['harga'] ?? 0),
                 'gudang_id' => $tipe === 'part' ? ($row['gudang_id'] ?? $this->pekerjaanGudangId) : null,
+                // [F2-3] SN utk produk sn=true — divalidasi di ServisService::inputPekerjaan
+                'sn' => app(NomorSeriService::class)->parseList((string) ($row['sn'] ?? '')),
             ];
         }
 

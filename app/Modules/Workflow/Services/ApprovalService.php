@@ -4,6 +4,7 @@ namespace App\Modules\Workflow\Services;
 
 use App\Models\User;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Wms\Services\GrnService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Support\Facades\DB;
@@ -119,8 +120,10 @@ class ApprovalService
                 $lanjut = $this->lanjutLevelBerikut($request->fresh());
             }
 
-            // Rantai selesai (semua level disetujui / ditolak) → kabari pemohon via queue
+            // Rantai selesai (semua level disetujui / ditolak) → efek entitas + kabari pemohon via queue
             if (! $lanjut) {
+                $this->selesaikanEntity($request, $status, $actionedBy, $catatan);
+
                 $this->notifikasiUser(
                     $request->requested_by,
                     "Approval {$request->entity_type} #{$request->entity_id} ".($status === 'disetujui' ? 'disetujui' : 'ditolak'),
@@ -133,6 +136,26 @@ class ApprovalService
 
             return $request->fresh();
         });
+    }
+
+    /**
+     * [F2-2] Efek samping rantai final pada entitas — hook khusus GRN.
+     * Disetujui → GrnService finalisasi (jurnal AP + stok masuk); ditolak → status ditolak.
+     * Idempoten di sisi GrnService (hanya transisi dari status draft).
+     */
+    protected function selesaikanEntity(ApprovalRequest $request, string $status, int $actionedBy, ?string $catatan): void
+    {
+        if ($request->entity_type !== 'grn') {
+            return;
+        }
+
+        $grnService = app(GrnService::class);
+
+        if ($status === 'disetujui') {
+            $grnService->setujuiGrn($request->entity_id, $actionedBy);
+        } else {
+            $grnService->tolakGrn($request->entity_id, $actionedBy, (string) $catatan);
+        }
     }
 
     /**

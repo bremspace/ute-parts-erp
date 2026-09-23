@@ -11,6 +11,7 @@ use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\KasSesiState;
+use App\Modules\Report\Services\ReportBuilderService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\PurchaseOrder;
@@ -106,6 +107,18 @@ class DashboardIndex extends Component
             ->latest()
             ->limit(6)
             ->get();
+    }
+
+    /** Generate drill-down URL for a given model + item id */
+    public function getDrillDownUrl(string $model, int $id): string
+    {
+        return route('laporan.drill', ['model' => $model, 'id' => $id]);
+    }
+
+    /** Get available drill-down models from whitelist */
+    public function getDrillDownModels(): array
+    {
+        return ReportBuilderService::MODEL_WHITELIST;
     }
 
     // ===== [T-27] Data siap-chart (server-computed, ringan untuk RAM 1GB) =====
@@ -329,6 +342,7 @@ class DashboardIndex extends Component
             'chartPiutangAging' => $this->chartPiutangAging,
             'chartStokKritis' => $this->chartStokKritis,
             'currentRole' => $this->role,
+            'drillDownModels' => $this->getDrillDownModels(),
         ] + match ($this->role) {
             // [T-27] Widget role-scoped: hanya properti role ini yg dievaluasi (query ringan, lazy via accessor)
             'kasir' => ['omzetShiftKasir' => $this->omzetShiftKasir],

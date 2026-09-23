@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             AkunCoaSeeder::class,
             KomisiSkemaSeeder::class,
             TransaksiDemoSeeder::class,
+            ReportSeeder::class,
         ]);
     }
 }

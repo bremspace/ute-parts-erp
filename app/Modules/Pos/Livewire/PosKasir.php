@@ -20,6 +20,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Services\NomorSeriService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -105,6 +106,11 @@ class PosKasir extends Component
 
     // [T-33] sumber saldo awal sesi: manual | carryover (diisi dari sesi tutup sebelumnya)
     public string $kasSumber = 'manual';
+
+    // [F2-3] Scan/autocomplete nomor seri utk item keranjang sn=true
+    public string $snSearch = '';
+
+    public string $snItemKey = '';
 
     // Harga fleksibel permission guard
     public bool $canHargaFleksibel = false;
@@ -322,8 +328,117 @@ class PosKasir extends Component
                 'subtotal' => $harga,
                 'stok_max' => $stokTersedia,
                 'flex' => $produk->harga_fleksibel ? true : false,
+                // [F2-3] sn=true → wajib isi SN sebelum bayar
+                'sn' => (bool) $produk->sn,
+                'sn_list' => [],
             ];
         }
+    }
+
+    // ==================== [F2-3] NOMOR SERI ====================
+
+    /** Autocomplete SN tersedia utk item keranjang aktif (scope cabang + produk). */
+    public function getSnCariProperty()
+    {
+        if ($this->snItemKey === '' || ! isset($this->cart[$this->snItemKey])) {
+            return collect();
+        }
+
+        return app(NomorSeriService::class)->cariTersedia(
+            (int) (session('cabang_id') ?? 0) ?: null,
+            (int) $this->cart[$this->snItemKey]['produk_id'],
+            trim($this->snSearch)
+        );
+    }
+
+    public function setSnItemKey(string $itemKey): void
+    {
+        if ($this->snItemKey !== $itemKey) {
+            $this->snItemKey = $itemKey;
+            $this->snSearch = '';
+        }
+    }
+
+    /** Tambah SN dari input scan/teks (Enter / tombol +). */
+    public function pilihSn(string $itemKey): void
+    {
+        $this->tambahSnKeItem($itemKey, trim($this->snSearch));
+    }
+
+    /** Tambah SN dari daftar hasil autocomplete. */
+    public function pilihSnLangsung(string $itemKey, string $sn): void
+    {
+        $this->tambahSnKeItem($itemKey, trim($sn));
+    }
+
+    public function hapusSn(string $itemKey, int $idx): void
+    {
+        if (! isset($this->cart[$itemKey]['sn_list'])) {
+            return;
+        }
+        unset($this->cart[$itemKey]['sn_list'][$idx]);
+        $this->cart[$itemKey]['sn_list'] = array_values($this->cart[$itemKey]['sn_list']);
+    }
+
+    private function tambahSnKeItem(string $itemKey, string $sn): void
+    {
+        if ($sn === '' || ! isset($this->cart[$itemKey])) {
+            return;
+        }
+
+        // [P2-2] SN hanya boleh masuk ke item yang sedang aktif di input SN —
+        // snSearch di-typed utk item A tidak boleh masuk ke item B (payload
+        // klien bisa memanggil pilihSn/pilihSnLangsung dgn itemKey sembarang).
+        if ($itemKey !== $this->snItemKey) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => 'SN tidak ditambahkan — pencarian SN sedang aktif untuk item lain',
+            ]);
+
+            return;
+        }
+
+        $list = $this->cart[$itemKey]['sn_list'] ?? [];
+        if (in_array($sn, $list, true)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => "SN {$sn} sudah dipilih"]);
+
+            return;
+        }
+        if (count($list) >= (int) $this->cart[$itemKey]['qty']) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Jumlah SN sudah sama dengan qty — kurangi qty atau hapus SN dulu']);
+
+            return;
+        }
+
+        $this->cart[$itemKey]['sn_list'] = [...$list, $sn];
+        $this->snSearch = '';
+    }
+
+    /**
+     * [P1-3] Flag sn TIDAK dipercaya dari state publik Livewire ($cart bisa
+     * di-tamper client → sn=false utk melewat klaim). Selalu derive ulang dari
+     * data produk di server — pola sama dgn resumeDitahan.
+     */
+    private function snProdukDariItem(array $item): bool
+    {
+        return (bool) (Produk::find($item['produk_id'] ?? 0)?->sn);
+    }
+
+    /** [F2-3] Gate sebelum modal bayar — item sn=true wajib SN lengkap (== qty). */
+    private function validasiSnKeranjang(): ?string
+    {
+        foreach ($this->cart as $item) {
+            if (! $this->snProdukDariItem($item)) {
+                continue;
+            }
+            $jumlah = count($item['sn_list'] ?? []);
+            $qty = (int) $item['qty'];
+            if ($jumlah !== $qty) {
+                return "Produk {$item['nama']} wajib {$qty} nomor seri — baru terisi {$jumlah}. Scan/tambah SN dulu.";
+            }
+        }
+
+        return null;
     }
 
     public function updateQty(string $itemKey, int $delta)
@@ -347,6 +462,20 @@ class PosKasir extends Component
 
         $this->cart[$itemKey]['qty'] = $newQty;
         $this->cart[$itemKey]['subtotal'] = $newQty * $this->cart[$itemKey]['harga'];
+
+        // [P2-1] Qty turun → sn_list dipangkas (keep first N) agar count == qty
+        // segera, bukan baru ketahuan di gate bayar. Qty naik tidak di-fill —
+        // gate di openPaymentModal tetap menghitung ulang count == qty.
+        $snList = array_values($this->cart[$itemKey]['sn_list'] ?? []);
+        if (count($snList) > $newQty) {
+            $terbuang = count($snList) - $newQty;
+            $this->cart[$itemKey]['sn_list'] = array_slice($snList, 0, $newQty);
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "{$terbuang} SN dihapus dari {$this->cart[$itemKey]['nama']} karena qty dikurangi",
+            ]);
+        }
+
         $this->recalcPajak();
     }
 
@@ -463,6 +592,15 @@ class PosKasir extends Component
 
             return;
         }
+
+        // [F2-3] Item sn=true wajib SN lengkap sebelum bayar
+        $snError = $this->validasiSnKeranjang();
+        if ($snError) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $snError]);
+
+            return;
+        }
+
         $this->jumlahBayar = $this->totalAkhir;
         $this->splitTunai = $this->totalAkhir;
         $this->splitNonTunai = 0.0;
@@ -546,7 +684,7 @@ class PosKasir extends Component
                 foreach ($this->cart as $item) {
                     $produk = Produk::find($item['produk_id']);
 
-                    TransaksiItem::create([
+                    $transaksiItem = TransaksiItem::create([
                         'transaksi_id' => $transaksi->id,
                         'produk_id' => $item['produk_id'],
                         'sku_variant_id' => $item['sku_variant_id'],
@@ -556,6 +694,21 @@ class PosKasir extends Component
                         'subtotal' => $item['subtotal'],
                         'hpp' => $produk ? (float) $produk->harga_beli : 0,
                     ]);
+
+                    // [F2-3] Klaim SN → status terjual + tautan transaksi_item
+                    // (validasi: jumlah == qty, unik, ada, tersedia, cabang aktif).
+                    // Throw → seluruh transaksi rollback (tidak ada transaksi/jurnal/stok).
+                    // [P1-3] Flag sn di-derive ulang dari produk — $cart[i]['sn']
+                    // adalah prop publik Livewire yg bisa di-tamper client.
+                    if ($this->snProdukDariItem($item)) {
+                        app(NomorSeriService::class)->klaimJual(
+                            $item['sn_list'] ?? [],
+                            (int) $item['produk_id'],
+                            (int) $cabangId,
+                            (int) $item['qty'],
+                            $transaksiItem->id
+                        );
+                    }
 
                     if ($this->selectedGudangId) {
                         $stok = StokItem::where('produk_id', $item['produk_id'])
@@ -784,7 +937,13 @@ class PosKasir extends Component
             $key = isset($item['sku_variant_id']) && $item['sku_variant_id']
                 ? $item['produk_id'].'-'.$item['sku_variant_id']
                 : $item['produk_id'].'-0';
-            $this->cart[$key] = $item;
+            // [F2-3][P2-3] Compat keranjang lama — flag sn SELALU di-derive ulang
+            // dari produk (server-side). Array + mempertahankan key kiri (payload
+            // lama), jadi pakai array_merge agar 'sn' selalu nilai segar.
+            $this->cart[$key] = array_merge($item, [
+                'sn' => $this->snProdukDariItem($item),
+                'sn_list' => $item['sn_list'] ?? [],
+            ]);
         }
         $this->diskonPersen = (float) ($detail['diskon_persen'] ?? 0);
         $this->diskonNominal = (float) ($detail['diskon_nominal'] ?? 0);
@@ -1031,6 +1190,9 @@ class PosKasir extends Component
             'ppnPersen' => $this->ppnPersen,
             'totalBayar' => $this->totalBayar,
             'subtotal' => $this->subtotal,
+            // [F2-3] computed props SN — pass eksplisit (WAIBS)
+            'snCari' => $this->snCari,
+            'snItemKey' => $this->snItemKey,
         ])->layout('layouts.backoffice', ['header' => 'Kasir Point of Sale (POS)']);
     }
 }

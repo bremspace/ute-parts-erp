@@ -9,6 +9,7 @@ use App\Modules\Akunting\Models\Utang;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\AktivitasLog;
 use App\Modules\Rbac\Services\AktivitasCabang;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\StokItem;
@@ -32,6 +33,7 @@ class RiwayatAktivitas extends Component
         'jurnal' => JurnalAkuntansi::class,
         'stok' => StokItem::class,
         'po' => PurchaseOrder::class,
+        'grn' => Grn::class,
         'piutang' => Piutang::class,
         'utang' => Utang::class,
         'produk' => Produk::class,

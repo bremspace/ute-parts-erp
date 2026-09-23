@@ -18,9 +18,12 @@ use App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Report\Livewire\DrillDownViewer;
+use App\Modules\Report\Livewire\ReportBuilder;
 use App\Modules\Reseller\Livewire\ResellerDashboard;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Wms\Livewire\LaporanNomorSeri;
 use App\Modules\Wms\Livewire\WmsDashboard;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Workflow\Livewire\ApprovalInbox;
@@ -223,8 +226,10 @@ Route::prefix('app')->middleware('auth')->group(function () {
     // POS Kasir Screen
     Route::get('/pos', PosKasir::class)->name('pos');
 
-    // WMS Gudang & Stok Screen
-    Route::get('/wms', WmsDashboard::class)->name('wms');
+    // WMS Gudang & Stok Screen — [F2-2] RBAC: permission wms.view (pola servis.view/crm.view)
+    Route::get('/wms', WmsDashboard::class)
+        ->name('wms')
+        ->middleware('permission:wms.view');
 
     // Servis HP Kanban Screen — [T-06] wajib role dgn permission servis.view (staf)
     Route::get('/servis', ServisBoard::class)->name('servis')->middleware('permission:servis.view');
@@ -251,6 +256,15 @@ Route::prefix('app')->middleware('auth')->group(function () {
 
     // Pengaturan & RBAC Screen
     Route::get('/pengaturan', SettingsRbac::class)->name('pengaturan');
+
+    // [F2-4] BI Drill-down & Custom Report Builder
+    Route::get('/laporan', ReportBuilder::class)->name('laporan')->middleware('permission:laporan.cabang');
+    Route::get('/laporan/drill/{model}/{id?}', DrillDownViewer::class)->name('laporan.drill')->middleware('permission:laporan.cabang');
+
+    // [F2-3] Laporan Histori Nomor Seri (trace garansi) — RBAC: permission laporan.cabang (pola laporan existing)
+    Route::get('/laporan/nomor-seri', LaporanNomorSeri::class)
+        ->name('laporan.nomor-seri')
+        ->middleware('permission:laporan.cabang');
 
     // [F1-1] Workflow Approval Inbox — RBAC: permission approve-workflow (spatie middleware)
     Route::get('/approvals', ApprovalInbox::class)

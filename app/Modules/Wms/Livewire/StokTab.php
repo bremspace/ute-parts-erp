@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Rak;
@@ -62,6 +63,31 @@ class StokTab extends Component
         $this->showRakModal = false;
         $this->rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Rak ditambahkan']);
+    }
+
+    /** [F2-5] Export laporan stok via queue (async — jangan sinkron di request). */
+    public function exportLaporan(string $format = 'xlsx'): void
+    {
+        if (! auth()->user()?->can('laporan.cabang')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
+
+            return;
+        }
+
+        dispatch(new ExportLaporanJob(
+            jenis: 'stok',
+            periodeDari: null,
+            periodeSampai: null,
+            cabangId: session('cabang_id'),
+            akunId: null,
+            userId: auth()->id(),
+            format: $format === 'csv' ? 'csv' : 'xlsx',
+        ));
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Export stok diantre — notifikasi + link unduh muncul setelah selesai.',
+        ]);
     }
 
     public function render()

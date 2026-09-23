@@ -2,6 +2,7 @@
 
 namespace App\Modules\Reseller\Livewire;
 
+use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\SkemaKomisi;
@@ -59,6 +60,31 @@ class ResellerDashboard extends Component
     public function getSkemaListProperty()
     {
         return SkemaKomisi::orderBy('id')->get();
+    }
+
+    /** [F2-5] Export laporan komisi reseller via queue (async — jangan sinkron di request). */
+    public function exportLaporan(string $format = 'xlsx'): void
+    {
+        if (! auth()->user()?->can('laporan.cabang')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
+
+            return;
+        }
+
+        dispatch(new ExportLaporanJob(
+            jenis: 'komisi',
+            periodeDari: null,
+            periodeSampai: null,
+            cabangId: session('cabang_id'),
+            akunId: null,
+            userId: auth()->id(),
+            format: $format === 'csv' ? 'csv' : 'xlsx',
+        ));
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Export komisi diantre — notifikasi + link unduh muncul setelah selesai.',
+        ]);
     }
 
     public function toggleKomisi(int $id)

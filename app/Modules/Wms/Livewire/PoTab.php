@@ -169,17 +169,15 @@ class PoTab extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'PO dikirim ke supplier']);
     }
 
-    public function terimaPo(int $id)
+    public function terimaPo(int $id): void
     {
-        try {
-            app(PurchaseOrderService::class)->terimaBarang(
-                PurchaseOrder::findOrFail($id),
-                auth()->id()
-            );
-            $this->dispatch('alert', ['type' => 'success', 'message' => 'PO diterima — stok & jurnal akunting dibuat']);
-        } catch (\Exception $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
-        }
+        // [F2-2] Penerimaan langsung DITUTUP — wajib lewat GRN agar tidak ada
+        // double stok / double jurnal (PO diterima ganda via tab + GRN).
+        unset($id);
+        $this->dispatch('alert', [
+            'type' => 'error',
+            'message' => 'Penerimaan barang wajib lewat GRN — buka tab GRN untuk menerima PO ini.',
+        ]);
     }
 
     public function bukaBayarPo(int $id)

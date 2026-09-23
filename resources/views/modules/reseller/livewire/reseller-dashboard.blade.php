@@ -11,6 +11,11 @@
 
         @if($activeTab === 'komisi')
             <div class="flex items-center gap-2">
+                <!-- [F2-5] Export laporan komisi (queue) -->
+                @can('laporan.cabang')
+                    <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
+                    <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+                @endcan
                 <span class="text-[11px] text-ink-400 font-medium">
                     {{ count($selectedKomisiIds) }} terpilih
                 </span>

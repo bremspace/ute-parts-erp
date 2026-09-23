@@ -17,6 +17,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Services\NomorSeriService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -138,6 +139,15 @@ class ServisService
             'diambil' => $this->onDiambil($tiket),
             default => null,
         };
+
+        // [P1-5] Lepas klaim SN: saat transisi ke 'ditolak' (valid maupun
+        // override), atau override mundur melewati 'disetujui' — tanpa ini SN
+        // macet status 'servis' selamanya (tidak bisa dijual, tak terlihat di
+        // 'tersedia'). lepasServis TIDAK meng-clear tautan riwayat
+        // (tiket_servis_id & tiket_servis_item_id tetap utk trace garansi).
+        if ($this->perluLepasSn($statusBaru, $aksi)) {
+            app(NomorSeriService::class)->lepasServis((int) $tiket->id);
+        }
 
         // Notifikasi ke pelanggan
         $this->notifService->kirim('inapp', null,
@@ -287,6 +297,7 @@ class ServisService
                 $namaItem = $item['nama_item'];
                 $qty = (int) ($item['qty'] ?? 1);
                 $harga = (float) ($item['harga'] ?? 0);
+                $produk = null;
 
                 if ($tipe === 'part') {
                     $produkId = $item['produk_id'] ?? null;
@@ -303,7 +314,7 @@ class ServisService
                     $this->kurangiStokServis($produk->id, $item['sku_variant_id'] ?? null, $gudangId, $qty, $tiket, $user);
                 }
 
-                $created[] = TiketServisItem::create([
+                $tiketItem = TiketServisItem::create([
                     'tiket_servis_id' => $tiket->id,
                     'tipe' => $tipe,
                     'produk_id' => $tipe === 'part' ? ($item['produk_id'] ?? null) : null,
@@ -315,6 +326,22 @@ class ServisService
                         ? (float) (Produk::find($item['produk_id'])?->harga_beli ?? 0)
                         : 0,
                 ]);
+
+                // [F2-3] Produk sn=true → SN wajib: validasi (jumlah == qty, tersedia,
+                // cabang aktif) + klaim status 'servis' + tautan tiket & item.
+                // Throw → rollback seluruh pekerjaan (stok & item ikut batal).
+                if ($tipe === 'part' && $produk?->sn) {
+                    app(NomorSeriService::class)->klaimServis(
+                        array_values($item['sn'] ?? []),
+                        (int) $produk->id,
+                        (int) $tiket->cabang_id,
+                        $qty,
+                        (int) $tiket->id,
+                        (int) $tiketItem->id
+                    );
+                }
+
+                $created[] = $tiketItem;
             }
         });
 
@@ -376,6 +403,24 @@ class ServisService
 
     // --- Private side-effect methods ---
 
+    /**
+     * [P1-5] Apakah SN wajib dilepas pada transisi ini?
+     * - 'ditolak': selalu (valid dari menunggu_approval / override dari mana pun).
+     * - override ke status di luar zona kerja (disetujui/dikerjakan/qc): klaim SN
+     *   tidak lagi sah utk tiket ini (mundur melewati disetujui — atau melompat
+     *   lewati selesai, krn onSelesai tidak jalan). Idempoten — no-op bila tiket
+     *   ini tidak menahan SN status 'servis'.
+     */
+    private function perluLepasSn(string $statusBaru, string $aksi): bool
+    {
+        if ($statusBaru === 'ditolak') {
+            return true;
+        }
+
+        return $aksi === 'override'
+            && ! in_array($statusBaru, ['disetujui', 'dikerjakan', 'qc'], true);
+    }
+
     private function onMenungguApproval(TiketServis $tiket): void
     {
         if (! $tiket->token_approval) {
@@ -393,6 +438,10 @@ class ServisService
     private function onSelesai(TiketServis $tiket): void
     {
         $tiket->update(['tanggal_selesai' => now()]);
+
+        // [F2-3] SN terkait tiket ini: kembali 'tersedia' — tautan riwayat
+        // (tiket_servis_id & tiket_servis_item_id) TETAP disimpan utk trace garansi.
+        app(NomorSeriService::class)->lepasServis((int) $tiket->id);
 
         // Auto-create garansi dari konfigurasi jenis servis
         $durasiHari = 30; // default

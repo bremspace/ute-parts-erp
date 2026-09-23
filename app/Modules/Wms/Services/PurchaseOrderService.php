@@ -4,9 +4,11 @@ namespace App\Modules\Wms\Services;
 
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\PembayaranSupplier;
 use App\Modules\Wms\Models\PurchaseOrder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * [T-10] Manajemen PO + pembayaran (kredit/tunai), sinkron Akunting & Stok.
@@ -24,6 +26,14 @@ class PurchaseOrderService
     {
         if (! in_array($po->status, ['draft', 'dikirim'], true)) {
             throw new \Exception('PO ini tidak bisa diterima dalam status saat ini');
+        }
+
+        // [F2-2] Bila PO sudah punya GRN → penerimaan hanya boleh lewat GRN
+        // (mencegah double stok & double jurnal jalur legacy vs GRN).
+        if (Grn::where('po_id', $po->id)->exists()) {
+            throw ValidationException::withMessages([
+                'msg' => 'PO ini sudah memiliki GRN — penerimaan barang wajib lewat GRN (tidak boleh diterima dua kali)',
+            ]);
         }
 
         return DB::transaction(function () use ($po, $userId) {

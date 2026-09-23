@@ -6,12 +6,12 @@ use Livewire\Component;
 
 /**
  * [F1-8 / S-01] Shell tipis — hanya tab navigation + host 5 tab component fokus
- * (StokTab, ProdukTab, TransferTab, OpnameTab, PoTab). Route, view name, dan
+ * (StokTab, ProdukTab, TransferTab, OpnameTab, PoTab, GrnTab). Route, view name, dan
  * perilaku user tetap sama dengan sebelum split (behavior parity).
  */
 class WmsDashboard extends Component
 {
-    public string $activeTab = 'stok'; // stok, produk, transfer, opname, po
+    public string $activeTab = 'stok'; // stok, produk, transfer, opname, po, grn
 
     public function render()
     {

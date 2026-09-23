@@ -33,6 +33,12 @@
             >
                 PO & Supplier
             </button>
+            <button
+                wire:click="$set('activeTab', 'grn')"
+                class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $activeTab === 'grn' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}"
+            >
+                GRN
+            </button>
         </div>
 
         <!-- Tab-specific Quick Action — dispatch event ke tab component aktif (#[On] listener) -->
@@ -101,5 +107,10 @@
     <!-- TAB 4: PO & SUPPLIER [T-10] -->
     <div @unless($activeTab === 'po') class="hidden" @endunless>
         @livewire(\App\Modules\Wms\Livewire\PoTab::class)
+    </div>
+
+    <!-- TAB 5: GRN (penerimaan barang) [F2-2] -->
+    <div @unless($activeTab === 'grn') class="hidden" @endunless>
+        @livewire(\App\Modules\Wms\Livewire\GrnTab::class)
     </div>
 </div>

@@ -88,10 +88,10 @@ Ute Parts ERP saat ini **kompetitif untuk bisnis lokal** — 11 modul lengkap, d
 ### FASE 2 — Proses Bisnis Inti (target: sprint 2-3)
 
 - [x] **F2-1 Lead Pipeline** — model `Lead` (sumber, stage: baru/kontak/kualifikasi/negosiasi/won/lost, nilai estimasi, assigned_to); kanban drag Livewire; konversi won → auto-create Pelanggan + link; dashboard mini funnel.
-- [ ] **F2-2 GRN** — flow PO `dikirim` → **terima** wajib lewat GRN: input qty diterima per item vs qty PO, selisih tolak/partial → approval F1-1; jurnal hutang (AP) saat GRN approve; stok log `jenis: GRN`.
-- [ ] **F2-3 Serial Number** — aktif per produk `sn=true`; input SN range saat GRN/tambah stok; scan/autocomplete di POS & tiket servis (wajib bila sn=true); tabel `nomor_seri` ada — extend: relasi transaksi_item & tiket_servis_item, trace laporan histori per SN (garansi!).
-- [ ] **F2-4 BI Drill-down** — dashboard widget klik → laporan detail → klik baris → transaksi/item; custom builder: pilih sumber data (model terdaftar whitelist), kolom, filter, grup, export Excel/CSV queue; simpan laporan user.
-- [ ] **F2-5 Export lengkap semua laporan** — stok, transaksi, jurnal, piutang, utang, servis, komisi — pakai `ExportLaporanService` yang ada + queue job pattern.
+- [x] **F2-2 GRN** — flow PO `dikirim` → **terima** wajib lewat GRN: input qty diterima per item vs qty PO, selisih tolak/partial → approval F1-1; jurnal hutang (AP) saat GRN approve; stok log `jenis: GRN`.
+- [x] **F2-3 Serial Number** — aktif per produk `sn=true`; input SN range saat GRN/tambah stok; scan/autocomplete di POS & tiket servis (wajib bila sn=true); tabel `nomor_seri` ada — extend: relasi transaksi_item & tiket_servis_item, trace laporan histori per SN (garansi!).
+- [x] **F2-4 BI Drill-down** — dashboard widget klik → laporan detail → klik baris → transaksi/item; custom builder: pilih sumber data (model terdaftar whitelist), kolom, filter, grup, export Excel/CSV queue; simpan laporan user.
+- [x] **F2-5 Export lengkap semua laporan** — stok, transaksi, jurnal, piutang, utang, servis, komisi — pakai `ExportLaporanService` yang ada + queue job pattern.
 
 ### FASE 3 — Pendalaman & Hardening (target: sprint 4)
 

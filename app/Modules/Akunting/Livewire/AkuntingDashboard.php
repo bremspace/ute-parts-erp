@@ -3,6 +3,7 @@
 namespace App\Modules\Akunting\Livewire;
 
 use App\Models\User;
+use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
@@ -66,6 +67,39 @@ class AkuntingDashboard extends Component
     }
 
     // ===== LAPORAN =====
+
+    /**
+     * [F2-5] Export tab jurnal/piutang/utang via queue (async — jangan sinkron di request).
+     */
+    public function exportLaporan(string $jenis, string $format = 'xlsx'): void
+    {
+        if (! in_array($jenis, ['jurnal', 'piutang', 'utang'], true)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Jenis export tidak didukung']);
+
+            return;
+        }
+        if (! auth()->user()?->can('laporan.cabang')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
+
+            return;
+        }
+
+        dispatch(new ExportLaporanJob(
+            jenis: $jenis,
+            periodeDari: $this->periodeDari ?: null,
+            periodeSampai: $this->periodeSampai ?: null,
+            cabangId: session('cabang_id'),
+            akunId: null,
+            userId: auth()->id(),
+            format: $format === 'csv' ? 'csv' : 'xlsx',
+        ));
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Export '.str_replace('_', ' ', $jenis).' diantre — notifikasi + link unduh muncul setelah selesai.',
+        ]);
+    }
+
     public function getLabaRugiProperty(): array
     {
         $dari = $this->periodeDari;

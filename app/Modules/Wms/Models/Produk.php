@@ -22,6 +22,8 @@ use Spatie\Activitylog\Support\LogOptions;
     'brand_id', 'kualitas_id',
     // [HARGA FLEKSIBEL]
     'harga_fleksibel',
+    // [F2-3] Serial number tracking
+    'sn',
 ])]
 class Produk extends Model
 {
@@ -37,6 +39,7 @@ class Produk extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'sn' => 'boolean', // [F2-3] wajib SN di GRN/POS/servis
         'harga_beli' => 'decimal:2',
         'harga_jual_retail' => 'decimal:2',
         'foto' => 'array', // [T-11]
@@ -86,5 +89,10 @@ class Produk extends Model
     public function hargaTier(): HasMany
     {
         return $this->hasMany(HargaTier::class);
+    }
+
+    public function nomorSeris(): HasMany
+    {
+        return $this->hasMany(NomorSeri::class);
     }
 }

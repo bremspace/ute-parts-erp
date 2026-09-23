@@ -18,6 +18,14 @@
                         @endforeach
                     </select>
                 </div>
+
+                <!-- [F2-5] Export laporan stok (queue) -->
+                <div class="flex items-center gap-2">
+                    @can('laporan.cabang')
+                        <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
+                        <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+                    @endcan
+                </div>
             </div>
 
             <!-- DataTable Dual-Mode -->

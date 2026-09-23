@@ -7,6 +7,7 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
+use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Rbac\Services\AuditService;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class AkuntingController extends Controller
 {
@@ -300,11 +302,15 @@ class AkuntingController extends Controller
     public function export(Request $request)
     {
         $request->validate([
-            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,arus_kas,stok,pelanggan,servis,piutang,utang,pajak',
+            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,arus_kas,stok,pelanggan,servis,piutang,utang,pajak,jurnal,transaksi,komisi',
             'periode_dari' => 'nullable|date',
             'periode_sampai' => 'nullable|date',
             'akun_id' => 'nullable|exists:akun_coa,id',
+            'format' => 'nullable|in:xlsx,csv', // [F2-5]
         ]);
+
+        // [P2-10b] Opportunistic prune berkas exports/ usia >7 hari — tidak boleh menggagalkan dispatch
+        ExportLaporanService::pruneOldExports();
 
         dispatch(new ExportLaporanJob(
             jenis: $request->input('jenis'),
@@ -312,7 +318,8 @@ class AkuntingController extends Controller
             periodeSampai: $request->input('periode_sampai'),
             cabangId: session('cabang_id'),
             akunId: $request->input('akun_id'),
-            userId: auth()->id()
+            userId: auth()->id(),
+            format: $request->input('format', 'xlsx')
         ));
 
         return $this->success(
@@ -329,7 +336,13 @@ class AkuntingController extends Controller
             return $this->error('Path tidak valid', 400);
         }
 
-        $full = storage_path('app/'.$path);
+        // [P2-10c] Ownership: prefix {userId}_ di nama berkas wajib milik user aktif
+        $basename = basename($path);
+        if (! preg_match('/^(\d+)_/', $basename, $m) || (int) $m[1] !== (int) auth()->id()) {
+            return $this->error('Anda tidak berhak mengunduh berkas ekspor milik pengguna lain.', 403);
+        }
+
+        $full = Storage::disk('local')->path($path); // [F2-5] disk 'local' root = storage/app/private — path konsisten dgn lokasi tulis export
         if (! file_exists($full)) {
             return $this->error('File export tidak ditemukan atau belum siap', 404);
         }

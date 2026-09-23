@@ -39,7 +39,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'piutang.view', 'piutang.manage',
             // UTANG
             'utang.view', 'utang.manage',
-            // LAPORAN
+            // LAPORAN — [P2-9] `laporan.kustom` dihapus: PRD-Advanced F2-4 tidak
+            // mendefinisikan permission terpisah; PRD-Backend §3 matriks RBAC hanya
+            // mencantumkan `laporan.cabang` (admin-toko). Route builder /laporan
+            // tetap memakai `permission:laporan.cabang`.
             'laporan.cabang', 'laporan.konsolidasi',
             // USER
             'user.view', 'user.create', 'user.edit', 'user.delete',

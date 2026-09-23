@@ -219,7 +219,14 @@
 
     <!-- TAB: JURNAL -->
     @if($activeTab === 'jurnal')
-        <div class="flex justify-end mb-4">
+        <div class="flex justify-between items-center gap-2 mb-4 flex-wrap">
+            <!-- [F2-5] Export laporan jurnal (queue) -->
+            @can('laporan.cabang')
+                <div class="flex items-center gap-2">
+                    <button type="button" wire:click="exportLaporan('jurnal', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
+                    <button type="button" wire:click="exportLaporan('jurnal', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+                </div>
+            @endcan
             <button wire:click="openJurnalManualModal" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer">+ Jurnal Manual</button>
         </div>
 
@@ -278,6 +285,13 @@
 
     <!-- TAB: PIUTANG -->
     @if($activeTab === 'piutang')
+        <!-- [F2-5] Export laporan piutang (queue) -->
+        <div class="flex items-center gap-2 mb-4">
+            @can('laporan.cabang')
+                <button type="button" wire:click="exportLaporan('piutang', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
+                <button type="button" wire:click="exportLaporan('piutang', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+            @endcan
+        </div>
         <x-prism.data-table :headers="['No. Piutang', 'Pelanggan', 'Jumlah', 'Dibayar', 'Sisa', 'Jatuh Tempo', 'Status', '']">
             @forelse($piutangs as $p)
                 <tr class="hover:bg-white/[0.02] transition-colors text-xs">
@@ -312,6 +326,13 @@
 
     <!-- TAB: UTANG -->
     @if($activeTab === 'utang')
+        <!-- [F2-5] Export laporan utang (queue) -->
+        <div class="flex items-center gap-2 mb-4">
+            @can('laporan.cabang')
+                <button type="button" wire:click="exportLaporan('utang', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
+                <button type="button" wire:click="exportLaporan('utang', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+            @endcan
+        </div>
         <x-prism.data-table :headers="['No. Utang', 'Kreditor', 'Referensi', 'Jumlah', 'Sisa', 'Jatuh Tempo', 'Status', '']">
             @forelse($utangs as $u)
                 <tr class="hover:bg-white/[0.02] transition-colors text-xs">

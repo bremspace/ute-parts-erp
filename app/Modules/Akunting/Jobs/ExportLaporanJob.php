@@ -29,13 +29,14 @@ class ExportLaporanJob implements ShouldQueue
         public ?string $periodeSampai,
         public ?int $cabangId,
         public ?int $akunId,
-        public ?int $userId
+        public ?int $userId,
+        public string $format = 'xlsx' // [F2-5] xlsx | csv
     ) {}
 
     public function handle(ExportLaporanService $service, NotificationService $notif): void
     {
         try {
-            $path = $service->export($this->jenis, $this->periodeDari, $this->periodeSampai, $this->cabangId, $this->akunId);
+            $path = $service->export($this->jenis, $this->periodeDari, $this->periodeSampai, $this->cabangId, $this->akunId, $this->format);
 
             // Notifikasi persist + queue (inapp = catat di database, tanpa outbound)
             $notif->kirim(

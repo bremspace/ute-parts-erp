@@ -164,8 +164,9 @@
                     <p class="text-xs text-ink-500 py-4 text-center">Tidak ada piutang jatuh tempo — aman 🎉</p>
                 @endforelse
             </div>
-            <div class="mt-3">
+            <div class="mt-3 flex gap-2">
                 <a href="/app/akunting" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Buka Modul Akunting →</a>
+                <a href="{{ route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Piutang →</a>
             </div>
         </x-prism.glass-card>
 
@@ -187,6 +188,8 @@
                 @empty
                     <p class="text-xs text-ink-500 py-4 text-center">Belum ada transaksi tercatat.</p>
                 @endforelse
+            <div class="mt-2">
+                <a href="{{ route('laporan.drill', ['model' => 'Transaksi']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Transaksi →</a>
             </div>
         </x-prism.glass-card>
     </div>
@@ -205,6 +208,9 @@
                         </div>
                     </div>
                 @endforeach
+            </div>
+            <div class="mt-2">
+                <a href="{{ route('laporan.drill', ['model' => 'StokItem']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Stok Item →</a>
             </div>
         </x-prism.glass-card>
     @endif
