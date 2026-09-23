@@ -5,11 +5,11 @@ namespace App\Modules\Akunting\Services;
 use Illuminate\Support\Facades\DB;
 
 /**
- * [T-22] Pajak Otomatis (PPN) — service rekonsiliasi per-cabang.
- * Konfigurasi disimpan di tabel `konfigurasi`:
- *   - ppn_enabled (boolean) — opt-in per cabang, default false
- *   - ppn_percent (float) — persen (default 11)
- *   Perubahan konfigurasi hanya berlaku utk transaksi baru (tidak retroaktif).
+ * [T-22][F1-2] Pajak Otomatis (PPN) — service per-cabang.
+ * Konfigurasi di tabel `konfigurasi` (kontrak AC F1-2):
+ *   - pajak_enabled.{cabangId} / pajak_enabled — opt-in per cabang (fallback: ppn_enabled lama), default false
+ *   - ppn_percent.{cabangId} / ppn_percent     — persen PPN (default 11)
+ * Perubahan konfigurasi hanya berlaku utk transaksi baru (tidak retroaktif).
  */
 class PajakService
 {
@@ -17,7 +17,7 @@ class PajakService
      * Hitung nilai PPN untuk DPP (Harga Pokok Penjualan) yang diberikan.
      *
      * @param  ?int  $cabangId  — cabang aktif (session), nullable utk fallback global
-     * @param  float $dpp        — harga di luar pajak (existing "harga" di Transaksi)
+     * @param  float  $dpp  — harga di luar pajak (existing "harga" di Transaksi)
      * @return array ['ppn_percent'=>float, 'ppn_nominal'=>float, 'dpp'=>float, 'enabled'=>bool]
      */
     public function hitung(?int $cabangId, float $dpp): array
@@ -36,74 +36,87 @@ class PajakService
 
     /**
      * Apakah fitur Pajak Otomatis diaktifkan utk cabang ini?
+     * Kunci utama: pajak_enabled.{cabang} / pajak_enabled (kontrak AC F1-2).
+     * Fallback: ppn_enabled.{cabang} / ppn_enabled (konfigurasi lama — backward compat).
      */
     public function enabled(?int $cabangId): bool
     {
-        $key = $cabangId ? "ppn_enabled.{$cabangId}" : 'ppn_enabled';
-        $val = DB::table('konfigurasi')->where('kunci', $key)->value('nilai');
-        if ($val === null) {
-            return false; // default false — aman
+        $perKey = $cabangId ? "pajak_enabled.{$cabangId}" : 'pajak_enabled';
+        $legacyPerKey = $cabangId ? "ppn_enabled.{$cabangId}" : 'ppn_enabled';
+
+        foreach ([$perKey, $legacyPerKey] as $key) {
+            $val = DB::table('konfigurasi')->where('kunci', $key)->value('nilai');
+            if ($val !== null) {
+                $decoded = json_decode((string) $val, true);
+
+                return (bool) ($decoded ?? $val);
+            }
         }
-        $decoded = json_decode((string) $val, true);
-        return (bool) ($decoded ?? $val);
+
+        return false; // default false — aman
     }
 
     /**
-     * Ambil persen PPN utk cabang (default 11).
+     * Persen PPN utk cabang ini (default 11 — kontrak AC F1-2).
+     * Kunci: ppn_percent.{cabang} / ppn_percent.
      */
     public function getPercent(?int $cabangId): float
     {
         $key = $cabangId ? "ppn_percent.{$cabangId}" : 'ppn_percent';
         $val = DB::table('konfigurasi')->where('kunci', $key)->value('nilai');
+        if ($val === null && $cabangId !== null) {
+            $val = DB::table('konfigurasi')->where('kunci', 'ppn_percent')->value('nilai'); // fallback global
+        }
         if ($val === null) {
-            return 11.0; // default nasional
+            return 11.0;
         }
         $decoded = json_decode((string) $val, true);
-        $num = is_array($decoded) ? ($decoded['value'] ?? 0) : $val;
-        return (float) $num;
+        if (is_array($decoded)) {
+            $decoded = $decoded['value'] ?? null;
+        }
+
+        return (float) ($decoded ?? $val);
     }
 
     /**
-     * Atur konfigurasi Pajak Otomatis.
+     * Atur konfigurasi Pajak Otomatis (tulis key baru pajak_enabled + legacy ppn_enabled).
      *
-     * @param  ?int  $cabangId  nullable utk set global (belum digunakan saat ini)
-     * @param  bool  $enabled
-     * @param  float $percent  0-100
+     * @param  ?int  $cabangId  nullable utk set global
+     * @param  float  $percent  0-100
      */
     public function set(?int $cabangId, bool $enabled, float $percent): void
     {
-        $this->setBool($cabangId, 'ppn_enabled', $enabled);
+        $this->setBool($cabangId, 'pajak_enabled', $enabled);   // kontrak AC F1-2
+        $this->setBool($cabangId, 'ppn_enabled', $enabled);     // backward compat
         $this->setFloat($cabangId, 'ppn_percent', $percent);
     }
 
     /**
-     * Baris jurnal untuk PPN Keluaran.
-     * Dipakai di PosController & ServisController agar konsisten.
+     * Baris jurnal untuk PPN Keluaran — akun 220-01 (kontrak AC F1-2).
+     * Dipakai di PosKasir & PosController agar konsisten.
      *
-     * @param  float $nominal               nilai PPN Keluaran
-     * @param  string $noJurnal             untuk referensi
-     * @param  int   $cabangId
-     * @param  int   $userId
-     * @return array [['akun_kode'=>'220-02', 'debit'=>0, 'kredit'=>$nominal], ...]
+     * @param  float  $nominal  nilai PPN Keluaran
+     * @param  string  $noJurnal  untuk referensi
+     * @return array [['akun_kode'=>'220-01', 'debit'=>0, 'kredit'=>$nominal], ...]
      */
     public function jurnalLines(float $nominal, string $noJurnal, int $cabangId, int $userId): array
     {
         if ($nominal <= 0) {
             return [];
         }
-        // Akun PPN Keluaran (buat migrasi seeder baru bila belum ada)
+
         return [
-            ['akun_kode' => '220-02', 'debit' => 0, 'kredit' => $nominal],
+            ['akun_kode' => '220-01', 'debit' => 0, 'kredit' => $nominal],
         ];
     }
 
     /**
-     * Inisialisasi baris konfigurasi default di tabel `konfigurasi`.
-     * Harus dijalankan sekali via migration seeder (idempotent).
+     * Inisialisasi baris konfigurasi default di tabel `konfigurasi` (idempotent).
      */
     public function seedDefaults(): void
     {
         $defaults = [
+            ['kunci' => 'pajak_enabled', 'nilai' => 'false', 'deskripsi' => 'Aktifkan Pajak Otomatis (PPN) global'],
             ['kunci' => 'ppn_enabled', 'nilai' => 'false', 'deskripsi' => 'Aktifkan Pajak Otomatis per cabang'],
             ['kunci' => 'ppn_percent', 'nilai' => '11', 'deskripsi' => 'Persen PPN nasional default'],
         ];
@@ -111,7 +124,7 @@ class PajakService
         foreach ($defaults as $d) {
             DB::table('konfigurasi')->updateOrInsert(
                 ['kunci' => $d['kunci']],
-                ['nilai' => $d['nilai'], 'deskripsi' => $d['deskripsi'], 'updated_at' => now()]
+                ['nilai' => $d['nilai'], 'deskripsi' => $d['deskripsi'], 'created_at' => now(), 'updated_at' => now()]
             );
         }
     }
@@ -124,7 +137,7 @@ class PajakService
         $kunci = $cabangId ? "{$base}.{$cabangId}" : $base;
         DB::table('konfigurasi')->updateOrInsert(
             ['kunci' => $kunci],
-            ['nilai' => (string) $val, 'deskripsi' => null, 'updated_at' => now()]
+            ['nilai' => (string) $val, 'deskripsi' => null, 'created_at' => now(), 'updated_at' => now()]
         );
     }
 
@@ -136,7 +149,7 @@ class PajakService
         $kunci = $cabangId ? "{$base}.{$cabangId}" : $base;
         DB::table('konfigurasi')->updateOrInsert(
             ['kunci' => $kunci],
-            ['nilai' => (string) $val, 'deskripsi' => null, 'updated_at' => now()]
+            ['nilai' => (string) $val, 'deskripsi' => null, 'created_at' => now(), 'updated_at' => now()]
         );
     }
 }

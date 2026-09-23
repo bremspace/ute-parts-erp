@@ -2,6 +2,7 @@
 
 namespace App\Modules\Workflow\Models;
 
+use App\Modules\Rbac\Models\Cabang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,7 +30,7 @@ class ApprovalRule extends Model
 
     public function cabang(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\Rbac\Models\Cabang::class);
+        return $this->belongsTo(Cabang::class);
     }
 
     public function requests(): HasMany

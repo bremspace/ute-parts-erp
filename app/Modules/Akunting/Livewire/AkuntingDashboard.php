@@ -9,11 +9,13 @@ use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Pos\Services\KasSesiState;
+use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class AkuntingDashboard extends Component
 {
+    use PunyaRiwayatAktivitas;
     use WithPagination;
 
     public string $activeTab = 'laporan'; // laporan, jurnal, coa, piutang, utang

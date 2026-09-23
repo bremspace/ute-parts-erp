@@ -300,7 +300,7 @@ class AkuntingController extends Controller
     public function export(Request $request)
     {
         $request->validate([
-            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,arus_kas,stok,pelanggan,servis,piutang,utang',
+            'jenis' => 'required|in:laba_rugi,neraca,buku_besar,arus_kas,stok,pelanggan,servis,piutang,utang,pajak',
             'periode_dari' => 'nullable|date',
             'periode_sampai' => 'nullable|date',
             'akun_id' => 'nullable|exists:akun_coa,id',

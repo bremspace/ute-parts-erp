@@ -6,6 +6,7 @@ use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetAssetUrl;
 use App\Modules\Crm\Console\Commands\EksekusiBroadcastTerjadwal;
 use App\Modules\Crm\Console\Commands\RecalcTierCommand;
+use App\Modules\Wms\Jobs\ReorderOtomatisJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -24,6 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        // F1-7: GET /healthz (db + queue check) — routes/web.php hot file,
+        // diregistrasi via mekanisme additional-routing `then` milik ApplicationBuilder.
+        then: function (): void {
+            require __DIR__.'/../routes/healthz.php';
+        },
     )
     ->withCommands(
         commands: [RecalcTierCommand::class, EksekusiBroadcastTerjadwal::class, SidImportRaw::class],
@@ -73,6 +79,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // [T-23] Eksekusi broadcast terjadwal tiap menit
         $schedule->command('crm:broadcast-terjadwal')->everyMinute();
+
+        // [F1-6] Backup database harian 02:00 (mysqldump gzip, rotasi 7 hari)
+        $schedule->command('ute:backup')->dailyAt('02:00');
+
+        // [F1-5] Reorder otomatis harian 03:00 (queue: stok < minimum → usulan PO)
+        $schedule->job(ReorderOtomatisJob::class)->dailyAt('03:00');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

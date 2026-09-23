@@ -7,7 +7,7 @@ use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\Pelanggan;
-use App\Modules\Crm\Models\Transaksi;
+use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\StokItem;
 use Illuminate\Support\Collection;
@@ -40,6 +40,7 @@ class ExportLaporanService
             'servis' => $this->dataServis($dari, $sampai, $cabangId),
             'piutang' => $this->dataPiutangUtang('piutang'),
             'utang' => $this->dataPiutangUtang('utang'),
+            'pajak' => $this->recapsPpnPeriode($cabangId, $dari, $sampai), // [F1-2] e-Faktur-ready
             default => throw new \Exception("Jenis laporan '{$jenis}' tidak dikenal"),
         };
 
@@ -237,12 +238,15 @@ class ExportLaporanService
     }
 
     /**
-     * Rekap data pajak per periode (PPN Keluaran) untuk UI & export.
+     * Rekap data pajak per periode (e-Faktur-ready) untuk UI & export. [F1-2]
+     * Keluaran: transaksi dgn ppn_nominal > 0 (fallback pajak_nominal) — kolom DPP + PPN.
+     * Masukan: baris jurnal akun 110-03 (PPN Masukan) — cabang-scoped.
      * Periode: inclusive $dari -> $sampai (YYYY-MM-DD).
      */
     public function recapsPpnPeriode(?int $cabangId, string $dari, string $sampai): array
     {
-        $rows = [['REKAP PPN', $dari.' s.d. '.$sampai], []];
+        $rows = [['REKAP PPN (E-FAKTUR)', $dari.' s.d. '.$sampai], []];
+        $rows[] = ['=== PPN KELUARAN ==='];
         $rows[] = ['TANGGAL', 'NO TRANSAKSI', 'NO JURNAL', 'DPP (Rp)', 'PPN PERCENT', 'PPN NOMINAL (Rp)'];
 
         $query = Transaksi::whereDate('created_at', '>=', $dari)
@@ -257,27 +261,50 @@ class ExportLaporanService
         $ppnCount = 0;
 
         foreach ($query->get() as $t) {
-            if ($t->pajak_nominal > 0) {
-                $dpp = $t->subtotal - $t->diskon_nominal;
-                $percent = $dpp > 0 ? round(($t->pajak_nominal / $dpp) * 100, 2) : 0;
+            // [F1-2] pakai kolom ppn_nominal/dpp bila terisi; fallback kolom lama pajak_nominal
+            $ppn = (float) ($t->ppn_nominal ?? 0) > 0 ? (float) $t->ppn_nominal : (float) $t->pajak_nominal;
+            if ($ppn > 0) {
+                $dpp = (float) ($t->dpp ?? 0) > 0 ? (float) $t->dpp : max(0, (float) $t->subtotal - (float) $t->diskon_nominal);
+                $percent = $dpp > 0 ? round(($ppn / $dpp) * 100, 2) : 0;
                 $rows[] = [
                     $t->created_at->format('d/m/Y'),
                     $t->no_transaksi,
                     $t->no_jurnal ?? '-',
                     $dpp,
                     $percent,
-                    $t->pajak_nominal,
+                    $ppn,
                 ];
                 $totalDpp += $dpp;
-                $totalPpn += $t->pajak_nominal;
+                $totalPpn += $ppn;
                 $ppnCount++;
             }
         }
 
+        $rows[] = ['TOTAL KELUARAN', '', '', $totalDpp, '', $totalPpn];
         $rows[] = [];
-        $rows[] = ['TOTAL', '', '', $totalDpp, '', $totalPpn];
+        $rows[] = ['=== PPN MASUKAN ==='];
+        $rows[] = ['AKUN', 'KETERANGAN', '', 'DEBIT (Rp)', '', 'KREDIT (Rp)'];
+
+        $masukanAkun = AkunCOA::where('kode', '110-03')->first();
+        $totalMasukan = 0.0;
+        if ($masukanAkun) {
+            $jMasukan = JurnalAkuntansi::with('akun')
+                ->where('akun_coa_id', $masukanAkun->id)
+                ->whereDate('tanggal', '>=', $dari)
+                ->whereDate('tanggal', '<=', $sampai);
+            if ($cabangId) {
+                $jMasukan->where('cabang_id', $cabangId);
+            }
+            foreach ($jMasukan->get() as $j) {
+                $rows[] = ['110-03', $j->deskripsi, '', (float) $j->debit, '', (float) $j->kredit];
+                $totalMasukan += (float) $j->debit - (float) $j->kredit;
+            }
+        }
+        $rows[] = ['TOTAL MASUKAN', '', '', '', '', round($totalMasukan, 2)];
         $rows[] = [];
-        $rows[] = ['KETERANGAN', 'Jumlah transaksi yang terkena PPN: ' . $ppnCount];
+        $rows[] = ['PPN TERUTANG (Keluaran - Masukan)', '', '', '', '', round($totalPpn - $totalMasukan, 2)];
+        $rows[] = [];
+        $rows[] = ['KETERANGAN', 'Jumlah transaksi yang terkena PPN: '.$ppnCount];
 
         return $rows;
     }

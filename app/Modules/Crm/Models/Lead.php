@@ -2,7 +2,8 @@
 
 namespace App\Modules\Crm\Models;
 
-use App\Modules\Rbac\Models\User;
+use App\Models\User;
+use App\Modules\Rbac\Models\Cabang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,7 +25,7 @@ class Lead extends Model
 
     public function cabang(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\Rbac\Models\Cabang::class);
+        return $this->belongsTo(Cabang::class);
     }
 
     public function assignedTo(): BelongsTo
@@ -43,6 +44,7 @@ class Lead extends Model
     public function scopeForCabang($query, ?int $cabangId = null)
     {
         $cabangId = $cabangId ?? session('cabang_aktif_id');
+
         return $query->where('cabang_id', $cabangId);
     }
 
@@ -67,7 +69,7 @@ class Lead extends Model
      */
     public function canConvert(): bool
     {
-        return $this->stage === 'won' && !$this->pelanggan_id;
+        return $this->stage === 'won' && ! $this->pelanggan_id;
     }
 
     /**

@@ -135,13 +135,13 @@ Route::middleware(['throttle:60,1'])->group(function () {
             // [API: CRM-10..18][F2-1] Lead Pipeline
             Route::get('/leads', [CrmController::class, 'indexLeads'])->middleware('permission:crm.view');
             Route::post('/leads', [CrmController::class, 'storeLead'])->middleware('permission:crm.create');
+            Route::get('/leads/kanban', [CrmController::class, 'kanbanLeads'])->middleware('permission:crm.view');
+            Route::get('/leads/funnel', [CrmController::class, 'funnelLeads'])->middleware('permission:crm.view');
+            Route::post('/leads/bulk-stage', [CrmController::class, 'bulkUpdateLeadStage'])->middleware('permission:crm.edit');
             Route::get('/leads/{id}', [CrmController::class, 'showLead'])->middleware('permission:crm.view');
             Route::put('/leads/{id}', [CrmController::class, 'updateLead'])->middleware('permission:crm.edit');
             Route::delete('/leads/{id}', [CrmController::class, 'destroyLead'])->middleware('permission:crm.delete');
-            Route::post('/leads/bulk-stage', [CrmController::class, 'bulkUpdateLeadStage'])->middleware('permission:crm.edit');
             Route::post('/leads/{id}/convert', [CrmController::class, 'convertLead'])->middleware('permission:crm.edit');
-            Route::get('/leads/kanban', [CrmController::class, 'kanbanLeads'])->middleware('permission:crm.view');
-            Route::get('/leads/funnel', [CrmController::class, 'funnelLeads'])->middleware('permission:crm.view');
         });
 
         // [API: RESELLER-01..06][T-21] Modul Reseller & Komisi
@@ -232,12 +232,11 @@ Route::middleware(['throttle:60,1'])->group(function () {
 }); // End global throttle:60,1 group (T-28)
 
 // WMS-09 Supplier CRUD (update/delete)
-Route::put('/wms/supplier/{id}', [\App\Modules\Wms\Controllers\WmsController::class, 'updateSupplier'])->name('wms.supplier.update')->middleware('permission:wms.supplier.edit');
-Route::delete('/wms/supplier/{id}', [\App\Modules\Wms\Controllers\WmsController::class, 'destroySupplier'])->name('wms.supplier.destroy')->middleware('permission:wms.supplier.delete');
+Route::put('/wms/supplier/{id}', [WmsController::class, 'updateSupplier'])->name('wms.supplier.update')->middleware('permission:wms.supplier.edit');
+Route::delete('/wms/supplier/{id}', [WmsController::class, 'destroySupplier'])->name('wms.supplier.destroy')->middleware('permission:wms.supplier.delete');
 
 // WMS-13 Rak CRUD
-Route::get('/wms/rak', [\App\Modules\Wms\Controllers\WmsController::class, 'indexRak'])->name('wms.rak.index')->middleware('permission:wms.rak.view');
-Route::post('/wms/rak', [\App\Modules\Wms\Controllers\WmsController::class, 'storeRak'])->name('wms.rak.store')->middleware('permission:wms.rak.create');
-Route::put('/wms/rak/{id}', [\App\Modules\Wms\Controllers\WmsController::class, 'updateRak'])->name('wms.rak.update')->middleware('permission:wms.rak.edit');
-Route::delete('/wms/rak/{id}', [\App\Modules\Wms\Controllers\WmsController::class, 'destroyRak'])->name('wms.rak.destroy')->middleware('permission:wms.rak.delete');
-
+Route::get('/wms/rak', [WmsController::class, 'indexRak'])->name('wms.rak.index')->middleware('permission:wms.rak.view');
+Route::post('/wms/rak', [WmsController::class, 'storeRak'])->name('wms.rak.store')->middleware('permission:wms.rak.create');
+Route::put('/wms/rak/{id}', [WmsController::class, 'updateRak'])->name('wms.rak.update')->middleware('permission:wms.rak.edit');
+Route::delete('/wms/rak/{id}', [WmsController::class, 'destroyRak'])->name('wms.rak.destroy')->middleware('permission:wms.rak.delete');

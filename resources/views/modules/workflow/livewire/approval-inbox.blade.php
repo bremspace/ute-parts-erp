@@ -64,7 +64,7 @@
                                                 {{ $request->entity_type }} #{{ $request->entity_id }}
                                             </div>
                                             <div class="text-xs text-gray-500 dark:text-gray-400">
-                                                Rule: {{ $request->rule->approver_role }}
+                                                Rule: {{ $request->rule?->approver_role }} (Lv{{ $request->rule?->level }})
                                             </div>
                                         </div>
                                     </div>
@@ -89,13 +89,18 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     @php
+                                        // Status PRD F1-1: pending / disetujui / ditolak (+ alias lama approved/rejected)
                                         $statusColors = [
                                             'pending' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                                            'disetujui' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                                            'ditolak' => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
                                             'approved' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
                                             'rejected' => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
                                         ];
                                         $statusLabels = [
                                             'pending' => 'Menunggu',
+                                            'disetujui' => 'Disetujui',
+                                            'ditolak' => 'Ditolak',
                                             'approved' => 'Disetujui',
                                             'rejected' => 'Ditolak',
                                         ];

@@ -2,6 +2,9 @@
 
 namespace App\Modules\Workflow\Models;
 
+use App\Models\User;
+use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,21 +33,32 @@ class ApprovalRequest extends Model
 
     public function rule(): BelongsTo
     {
-        return $this->belongsTo(ApprovalRule::class);
+        return $this->belongsTo(ApprovalRule::class, 'approval_rule_id');
     }
 
     public function cabang(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\Rbac\Models\Cabang::class);
+        return $this->belongsTo(Cabang::class);
     }
 
     public function requestedBy(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'requested_by');
+        return $this->belongsTo(User::class, 'requested_by');
     }
 
     public function actionedBy(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'actioned_by');
+        return $this->belongsTo(User::class, 'actioned_by');
+    }
+
+    /**
+     * Proses approval via service (role/permission check + multi-level chain).
+     *
+     * @param  string  $action  approved | rejected | disetujui | ditolak
+     */
+    public function proses(string $action, int $actionedBy, ?string $catatan = null): self
+    {
+        return app(ApprovalService::class)
+            ->proses($this->id, $action, $actionedBy, $catatan);
     }
 }

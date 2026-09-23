@@ -28,7 +28,7 @@ class KonfigurasiService
     {
         $existing = DB::table('konfigurasi')->where('kunci', $kunci)->first();
         $now = now();
-        
+
         if ($existing) {
             DB::table('konfigurasi')->where('kunci', $kunci)->update([
                 'nilai' => is_scalar($nilai) ? (string) $nilai : json_encode($nilai),
@@ -78,6 +78,7 @@ class KonfigurasiService
     {
         $key = $cabangId ? "ppn_enabled.{$cabangId}" : 'ppn_enabled';
         $val = $this->get($key);
+
         return $val === null ? null : (bool) $val;
     }
 
@@ -87,6 +88,7 @@ class KonfigurasiService
     public function getPpnPercent(?int $cabangId = null): float
     {
         $key = $cabangId ? "ppn_percent.{$cabangId}" : 'ppn_percent';
+
         return (float) ($this->get($key) ?? 11);
     }
 
@@ -98,16 +100,6 @@ class KonfigurasiService
         $this->set("ppn_enabled.{$cabangId}", $enabled, 'Pajak Otomatis diaktifkan di cabang');
         $this->set("ppn_percent.{$cabangId}", $percent, 'Persen PPN per cabang');
     }
-
-    /**
-     * Setup konfigurasi PPN default (idempotent).
-     */
-    public function seedPpnDefaults(): void
-    {
-        $this->set('ppn_enabled', false, 'Aktifkan Pajak Otomatis per cabang');
-        $this->set('ppn_percent', 11, 'Persen PPN nasional default');
-    }
-}
 
     /**
      * Setup konfigurasi PPN default (idempotent).

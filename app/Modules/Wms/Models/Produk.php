@@ -4,11 +4,14 @@ namespace App\Modules\Wms\Models;
 
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\HargaTier;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'nama', 'slug', 'barcode', 'deskripsi', 'kategori', 'brand_kompatibel',
@@ -22,7 +25,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class Produk extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
     protected $table = 'produk';
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('Produk');
+    }
 
     protected $casts = [
         'is_active' => 'boolean',

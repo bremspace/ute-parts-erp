@@ -7,6 +7,7 @@ use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
@@ -172,6 +173,7 @@ class ImportProdukService
                         'Format kolom tidak dikenali. Baris 1 harus berisi header: sku, nama, satuan, harga_beli, harga_jual, ... (unduh template untuk contoh).'
                     );
                 }
+
                 continue;
             }
 
@@ -273,13 +275,16 @@ class ImportProdukService
     public function preview(string $filePath): array
     {
         $rows = $this->parseRows($filePath);
-        $konteks = $this->konteksDuplikat($rows);
+        // Konteks duplikat diakumulasi per baris SETELAH validasi (prebuild file-penuh
+        // menandai baris itu sendiri → semua baris dianggap duplikat).
+        $konteks = ['skuDalamFile' => [], 'barcodeDalamFile' => []];
 
         $hasil = [];
         $valid = 0;
         $invalid = 0;
         foreach ($rows as $i => $row) {
             $errors = $this->validateRow($row, $konteks);
+            $this->catatKonteks($row, $konteks);
             if ($errors) {
                 $invalid++;
             } else {
@@ -311,7 +316,7 @@ class ImportProdukService
     public function commit(string $filePath, int $importLogId, ?int $userId = null): array
     {
         $rows = $this->parseRows($filePath);
-        $konteks = $this->konteksDuplikat($rows);
+        $konteks = ['skuDalamFile' => [], 'barcodeDalamFile' => []];
 
         $sukses = 0;
         $gagal = 0;
@@ -320,9 +325,10 @@ class ImportProdukService
         $cabangId = null;
 
         foreach (array_chunk($rows, 100) as $chunk) {
-            DB::transaction(function () use ($chunk, $konteks, $importLogId, &$sukses, &$gagal, &$detail, &$totalStokNilai, &$cabangId, $userId) {
+            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$detail, &$totalStokNilai, &$cabangId, $userId) {
                 foreach ($chunk as $i => $row) {
                     $errors = $this->validateRow($row, $konteks);
+                    $this->catatKonteks($row, $konteks);
                     $nomorBaris = 0; // dihitung di loop luar — diisi ulang di bawah
                     try {
                         if ($errors) {
@@ -367,22 +373,20 @@ class ImportProdukService
         ];
     }
 
-    protected function konteksDuplikat(array $rows): array
+    /**
+     * Catat sku/barcode setelah baris divalidasi — duplikat in-file hanya terdeteksi
+     * pada kemunculan BERIKUTNYA (kemunculan pertama sah kecuali sudah ada di DB).
+     */
+    protected function catatKonteks(array $row, array &$konteks): void
     {
-        $sku = [];
-        $barcode = [];
-        foreach ($rows as $row) {
-            $s = trim((string) ($row['sku'] ?? ''));
-            $b = trim((string) ($row['barcode'] ?? ''));
-            if ($s) {
-                $sku[$s] = true;
-            }
-            if ($b) {
-                $barcode[$b] = true;
-            }
+        $s = trim((string) ($row['sku'] ?? ''));
+        if ($s !== '') {
+            $konteks['skuDalamFile'][$s] = true;
         }
-
-        return ['skuDalamFile' => $sku, 'barcodeDalamFile' => $barcode];
+        $b = trim((string) ($row['barcode'] ?? ''));
+        if ($b !== '') {
+            $konteks['barcodeDalamFile'][$b] = true;
+        }
     }
 
     /**
@@ -497,7 +501,7 @@ class ImportProdukService
                 'sku_variant_id' => $variant->id,
                 'user_id' => $userId,
                 'jenis' => 'import',
-                'referensi_tipe' => \App\Modules\Wms\Models\ImportLog::class,
+                'referensi_tipe' => ImportLog::class,
                 'referensi_id' => $importLogId,
                 'jumlah_sebelum' => $sebelum,
                 'perubahan' => $stokAwal,
@@ -511,7 +515,7 @@ class ImportProdukService
                 'gudang_id' => $gudangId,
                 'delta' => $stokAwal,
                 'sumber' => 'import:excel',
-                'referensi_tipe' => \App\Modules\Wms\Models\ImportLog::class,
+                'referensi_tipe' => ImportLog::class,
                 'referensi_id' => $importLogId,
                 'terjadi_at' => now(),
             ]);
@@ -545,7 +549,7 @@ class ImportProdukService
             'Jurnal stok awal import produk (import_log #'.$importLogId.')',
             $cabangId,
             $userId,
-            \App\Modules\Wms\Models\ImportLog::class,
+            ImportLog::class,
             $importLogId
         );
     }

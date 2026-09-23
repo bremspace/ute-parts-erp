@@ -76,18 +76,18 @@ Ute Parts ERP saat ini **kompetitif untuk bisnis lokal** — 11 modul lengkap, d
 ### FASE 1 — Fondasi Operasional (Quick Wins, target: sprint 1)
 > Backend: fixer lane | Frontend: designer lane | Test wajib per fitur
 
-- [ ] **F1-1 Approval Engine** — tabel `approval_rule` (entity_type, min_amount, approver_role, level, cabang_id nullable), `approval_request` (status: pending/disetujui/ditolak, payload JSON, requested_by). Trait/observer auto-fire. UI: notifikasi badge + halaman approval inbox per role. Applies: PO > threshold, retur > threshold, diskon besar.
-- [ ] **F1-2 Pajak Otomatis** — config per-cabang `ppn_percent` (default 11), `pajak_enabled`; field `ppn_nominal` + `dpp` di transaksi; jurnal PPN keluaran (akun 220-01) saat faktur; laporan pajak bulanan (rekap PPN keluaran/masukan → e-Faktur-ready export).
-- [ ] **F1-3 2FA TOTP** — package `pragmarx/google2fa` (Laravel Fortify-compatible sederhana); enforce role super-admin/finance; backup codes 8x; UI setup + login challenge.
-- [ ] **F1-4 Audit Trail** — package `spatie/laravel-activitylog` (RAM ringan); log semua model kritis (Transaksi, Jurnal, StokItem, PO, Piutang, Produk); UI tab riwayat per entitas + filter.
-- [ ] **F1-5 Reorder Otomatis** — job harian (queue) cek `stok_minimum` vs saldo; buat notif + **usulan PO draft** (status `usulan`) grouped per supplier terakhir; UI konfirmasi 1 klik.
-- [ ] **F1-6 Backup** — command `ute:backup` (mysqldump gzip → `storage/app/backups/`, rotasi 7 hari); schedule `schedule:run` daily 02:00; notif hasil.
-- [ ] **F1-7 Ops config** — file `deploy/supervisor/*.conf` (queue worker, 1 proses), logrotate config, route `GET /healthz` (db + queue check).
-- [ ] **F1-8 Split WmsDashboard** → 5 komponen fokus (S-01); behavior paritas dgn existing; test smoke render tiap tab.
+- [x] **F1-1 Approval Engine** — tabel `approval_rule` (entity_type, min_amount, approver_role, level, cabang_id nullable), `approval_request` (status: pending/disetujui/ditolak, payload JSON, requested_by). Trait/observer auto-fire. UI: notifikasi badge + halaman approval inbox per role. Applies: PO > threshold, retur > threshold, diskon besar.
+- [x] **F1-2 Pajak Otomatis** — config per-cabang `ppn_percent` (default 11), `pajak_enabled`; field `ppn_nominal` + `dpp` di transaksi; jurnal PPN keluaran (akun 220-01) saat faktur; laporan pajak bulanan (rekap PPN keluaran/masukan → e-Faktur-ready export).
+- [x] **F1-3 2FA TOTP** — package `pragmarx/google2fa` (Laravel Fortify-compatible sederhana); enforce role super-admin/finance; backup codes 8x; UI setup + login challenge.
+- [x] **F1-4 Audit Trail** — package `spatie/laravel-activitylog` (RAM ringan); log semua model kritis (Transaksi, Jurnal, StokItem, PO, Piutang, Produk); UI tab riwayat per entitas + filter.
+- [x] **F1-5 Reorder Otomatis** — job harian (queue) cek `stok_minimum` vs saldo; buat notif + **usulan PO draft** (status `usulan`) grouped per supplier terakhir; UI konfirmasi 1 klik.
+- [x] **F1-6 Backup** — command `ute:backup` (mysqldump gzip → `storage/app/backups/`, rotasi 7 hari); schedule `schedule:run` daily 02:00; notif hasil.
+- [x] **F1-7 Ops config** — file `deploy/supervisor/*.conf` (queue worker, 1 proses), logrotate config, route `GET /healthz` (db + queue check).
+- [x] **F1-8 Split WmsDashboard** → 5 komponen fokus (S-01); behavior paritas dgn existing; test smoke render tiap tab.
 
 ### FASE 2 — Proses Bisnis Inti (target: sprint 2-3)
 
-- [ ] **F2-1 Lead Pipeline** — model `Lead` (sumber, stage: baru/kontak/kualifikasi/negosiasi/won/lost, nilai estimasi, assigned_to); kanban drag Livewire; konversi won → auto-create Pelanggan + link; dashboard mini funnel.
+- [x] **F2-1 Lead Pipeline** — model `Lead` (sumber, stage: baru/kontak/kualifikasi/negosiasi/won/lost, nilai estimasi, assigned_to); kanban drag Livewire; konversi won → auto-create Pelanggan + link; dashboard mini funnel.
 - [ ] **F2-2 GRN** — flow PO `dikirim` → **terima** wajib lewat GRN: input qty diterima per item vs qty PO, selisih tolak/partial → approval F1-1; jurnal hutang (AP) saat GRN approve; stok log `jenis: GRN`.
 - [ ] **F2-3 Serial Number** — aktif per produk `sn=true`; input SN range saat GRN/tambah stok; scan/autocomplete di POS & tiket servis (wajib bila sn=true); tabel `nomor_seri` ada — extend: relasi transaksi_item & tiket_servis_item, trace laporan histori per SN (garansi!).
 - [ ] **F2-4 BI Drill-down** — dashboard widget klik → laporan detail → klik baris → transaksi/item; custom builder: pilih sumber data (model terdaftar whitelist), kolom, filter, grup, export Excel/CSV queue; simpan laporan user.

@@ -4,9 +4,7 @@ namespace App\Modules\Crm\Services;
 
 use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Models\Pelanggan;
-use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -31,7 +29,7 @@ class LeadService
             : 'nullable|email';
 
         return [
-            'cabang_id' => 'required|exists:cabangs,id',
+            'cabang_id' => 'required|exists:cabang,id',
             'sumber' => 'required|string|in:walkin,phone,website,referral,social_media,marketplace,lain',
             'stage' => 'sometimes|in:baru,kontak,kualifikasi,negosiasi,won,lost',
             'nama' => 'required|string|max:255',
@@ -108,7 +106,7 @@ class LeadService
      */
     public function convertToPelanggan(Lead $lead): Pelanggan
     {
-        if (!$lead->canConvert()) {
+        if (! $lead->canConvert()) {
             throw new \InvalidArgumentException('Lead tidak dapat dikonversi: harus stage Won dan belum memiliki pelanggan.');
         }
 
@@ -211,7 +209,7 @@ class LeadService
     public function bulkUpdateStage(array $leadIds, string $newStage, ?int $cabangId = null): int
     {
         $allowedStages = ['baru', 'kontak', 'kualifikasi', 'negosiasi', 'won', 'lost'];
-        if (!in_array($newStage, $allowedStages)) {
+        if (! in_array($newStage, $allowedStages)) {
             throw new \InvalidArgumentException('Stage tidak valid.');
         }
 

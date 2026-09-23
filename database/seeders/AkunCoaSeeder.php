@@ -20,6 +20,7 @@ class AkunCoaSeeder extends Seeder
             // ASET
             ['kode' => '110-01', 'nama' => 'Kas',                          'tipe' => 'aset',      'kelompok' => 'kas',         'saldo_normal' => 'debit'],
             ['kode' => '110-02', 'nama' => 'Bank',                         'tipe' => 'aset',      'kelompok' => 'bank',        'saldo_normal' => 'debit'],
+            ['kode' => '110-03', 'nama' => 'PPN Masukan',                  'tipe' => 'aset',      'kelompok' => 'pajak',       'saldo_normal' => 'debit'], // [F1-2] rekap PPN masukan
             ['kode' => '120-01', 'nama' => 'Piutang Usaha',                'tipe' => 'aset',      'kelompok' => 'piutang',     'saldo_normal' => 'debit'],
             ['kode' => '130-01', 'nama' => 'Persediaan Barang Dagang',     'tipe' => 'aset',      'kelompok' => 'persediaan',  'saldo_normal' => 'debit'],
             ['kode' => '140-01', 'nama' => 'Perlengkapan Toko',            'tipe' => 'aset',      'kelompok' => 'perlengkapan', 'saldo_normal' => 'debit'],
@@ -30,8 +31,8 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '210-01', 'nama' => 'Utang Usaha',                  'tipe' => 'kewajiban',  'kelompok' => 'utang_usaha', 'saldo_normal' => 'kredit'],
             ['kode' => '210-02', 'nama' => 'Utang Gaji',                   'tipe' => 'kewajiban',  'kelompok' => 'utang_gaji',  'saldo_normal' => 'kredit'],
             ['kode' => '210-03', 'nama' => 'Utang Komisi',                 'tipe' => 'kewajiban',  'kelompok' => 'utang_komisi', 'saldo_normal' => 'kredit'],
-            ['kode' => '220-01', 'nama' => 'Pajak Dibayar Dimuka',         'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'],
-            ['kode' => '220-02', 'nama' => 'PPN Keluaran',                 'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'],
+            ['kode' => '220-01', 'nama' => 'PPN Keluaran',                 'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'], // [F1-2] kontrak AC: jurnal PPN keluaran
+            ['kode' => '220-02', 'nama' => 'PPN Keluaran (Legacy 220-02)', 'tipe' => 'kewajiban',  'kelompok' => 'pajak',       'saldo_normal' => 'kredit'],
 
             // EKUITAS
             ['kode' => '310-01', 'nama' => 'Modal Pemilik',                'tipe' => 'ekuitas',   'kelompok' => 'modal',        'saldo_normal' => 'kredit'],

@@ -2,10 +2,13 @@
 
 namespace App\Modules\Wms\Models;
 
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'no_po', 'supplier_id', 'gudang_tujuan_id', 'status', 'metode_bayar',
@@ -13,7 +16,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class PurchaseOrder extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
     protected $table = 'purchase_order';
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('Purchase Order');
+    }
 
     protected $casts = [
         'jatuh_tempo' => 'date',

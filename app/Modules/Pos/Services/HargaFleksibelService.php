@@ -3,6 +3,7 @@
 namespace App\Modules\Pos\Services;
 
 use App\Modules\Wms\Models\Produk;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Validation\ValidationException;
 
 class HargaFleksibelService
@@ -12,13 +13,13 @@ class HargaFleksibelService
      *
      * @throws ValidationException
      */
-    public function validasi(Produk $produk, float $harga, ?\Illuminate\Contracts\Auth\Authenticatable $user): void
+    public function validasi(Produk $produk, float $harga, ?Authenticatable $user): void
     {
         // 1) Produk fleksibel tapi user tidak punya permission
         if ($produk->harga_fleksibel) {
             if (! $user || ! $user->hasPermissionTo('atur-harga-fleksibel')) {
                 throw ValidationException::withMessages([
-                    'harga' => "Harga fleksibel hanya dapat diinput oleh superadmin",
+                    'harga' => 'Harga fleksibel hanya dapat diinput oleh superadmin',
                 ]);
             }
 
@@ -26,7 +27,7 @@ class HargaFleksibelService
             $minimum = $this->hargaMinimum($produk);
             if ($produk->harga_beli > 0 && $harga < $minimum) {
                 throw ValidationException::withMessages([
-                    'harga' => "Harga tidak boleh lebih rendah dari modal (Rp " . number_format($minimum, 0, ',', '.') . ")",
+                    'harga' => 'Harga tidak boleh lebih rendah dari modal (Rp '.number_format($minimum, 0, ',', '.').')',
                 ]);
             }
         }

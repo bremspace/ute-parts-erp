@@ -4,6 +4,7 @@ namespace App\Modules\Pos\Controllers;
 
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Models\Transaksi;
@@ -250,7 +251,12 @@ class PosController extends Controller
                 $diskonHeader += round(($subtotal * (float) $request->diskon_persen) / 100, 2);
             }
 
-            $totalAkhir = max(0, $subtotal - $diskonHeader);
+            // [F1-2] PPN per cabang: DPP = subtotal - diskon; totalAkhir = DPP + PPN
+            $dpp = max(0, $subtotal - $diskonHeader);
+            $pajak = app(PajakService::class)->hitung($cabangId, $dpp);
+            $ppnNominal = (float) $pajak['ppn_nominal'];
+
+            $totalAkhir = $dpp + $ppnNominal;
             $jumlahBayar = (float) $request->jumlah_bayar;
             $kembalian = max(0, $jumlahBayar - $totalAkhir);
 
@@ -264,7 +270,9 @@ class PosController extends Controller
                 'subtotal' => $subtotal,
                 'diskon_persen' => (float) ($request->diskon_persen ?? 0),
                 'diskon_nominal' => $diskonHeader,
-                'pajak_nominal' => 0,
+                'dpp' => $dpp,
+                'pajak_nominal' => $ppnNominal,
+                'ppn_nominal' => $ppnNominal,
                 'total_akhir' => $totalAkhir,
                 'metode_bayar' => $request->metode_bayar,
                 'jumlah_bayar' => $jumlahBayar,
@@ -341,10 +349,15 @@ class PosController extends Controller
             $kasbon = $request->metode_bayar === 'piutang';
 
             // Kasbon (piutang): debit Piutang Usaha 120-01, bukan Kas 110-01
+            // [F1-2] Balance: debit totalAkhir = kredit (DPP 410-01 + PPN 220-01)
             $lines = [
                 ['akun_kode' => $kasbon ? '120-01' : '110-01', 'debit' => (float) $totalAkhir, 'kredit' => 0],
-                ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => (float) $totalAkhir],  // Pendapatan Penjualan
+                ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? (float) $dpp : (float) $totalAkhir],  // Pendapatan = DPP
             ];
+            // PPN Keluaran → akun 220-01 (kontrak AC F1-2)
+            foreach (app(PajakService::class)->jurnalLines($ppnNominal, $noJurnal, $cabangId, auth()->id() ?? 0) as $ppnLine) {
+                $lines[] = $ppnLine;
+            }
             if ($totalHpp > 0) {
                 $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0]; // HPP
                 $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp]; // Persediaan turun

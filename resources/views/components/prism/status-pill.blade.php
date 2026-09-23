@@ -19,7 +19,7 @@ $config = match(strtolower($status)) {
         'dot' => 'bg-up-primary animate-pulse',
         'label' => ucfirst($status),
     ],
-    'menunggu_approval', 'menunggu', 'draft', 'pending' => [
+    'menunggu_approval', 'menunggu', 'draft', 'pending', 'usulan' => [
         'bg' => 'bg-up-amber/15',
         'text' => 'text-up-amber',
         'border' => 'border-up-amber/30',

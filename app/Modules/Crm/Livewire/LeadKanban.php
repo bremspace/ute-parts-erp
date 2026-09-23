@@ -2,9 +2,9 @@
 
 namespace App\Modules\Crm\Livewire;
 
+use App\Models\User;
 use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Services\LeadService;
-use App\Modules\Rbac\Models\User;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -203,11 +203,26 @@ class LeadKanban extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Lead berhasil diperbarui']);
     }
 
+    public function updateStage(int $leadId, string $stage): void
+    {
+        if (! array_key_exists($stage, $this->stages)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tahap tidak valid.']);
+
+            return;
+        }
+
+        $lead = Lead::forCabang()->findOrFail($leadId);
+        app(LeadService::class)->update($lead, ['stage' => $stage]);
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Lead dipindahkan ke tahap {$this->stages[$stage]['label']}"]);
+    }
+
     public function confirmConvert(int $leadId): void
     {
         $lead = Lead::forCabang()->findOrFail($leadId);
         if (! $lead->canConvert()) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Lead tidak dapat dikonversi: harus stage Won dan belum memiliki pelanggan.']);
+
             return;
         }
         $this->convertLeadId = $leadId;

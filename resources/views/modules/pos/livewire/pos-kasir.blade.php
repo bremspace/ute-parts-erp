@@ -595,7 +595,17 @@
             <div class="w-full max-w-sm glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative"> 
                 <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                     <h4 class="text-sm font-bold text-white">Struk Transaksi Selesai</h4>
-                    <button wire:click="$set('showReceiptModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <div class="flex items-center gap-3">
+                        @if($completedTransactionId && auth()->user()?->can('lihat-audit-log'))
+                            <button
+                                wire:click="bukaRiwayat('transaksi', {{ $completedTransactionId }})"
+                                class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer"
+                            >
+                                Riwayat
+                            </button>
+                        @endif
+                        <button wire:click="$set('showReceiptModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    </div>
                 </div>
 
                 <!-- [T-35] A4 Web Print: konten modal dicetak apa adanya via window.print() -->
@@ -829,4 +839,7 @@
             </div>
         </div>
     @endif
+
+    {{-- [F1-4] Modal riwayat audit trail transaksi (dibuka dari header struk) --}}
+    @include('partials.riwayat-modal')
 </div>

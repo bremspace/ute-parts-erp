@@ -5,14 +5,14 @@ namespace App\Modules\Workflow\Controllers;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Foundation\Validation\ValidationException;
+use Illuminate\Validation\ValidationException;
 
 class ApprovalController
 {
     public function ajukan(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'entity_type' => 'required|string|in:po,retur',
+            'entity_type' => 'required|string|in:po,retur,retur_pembelian,diskon',
             'entity_id' => 'required|integer',
             'payload' => 'required|array',
             'payload.amount' => 'required|numeric|min:0',
@@ -48,7 +48,7 @@ class ApprovalController
     public function proses(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
-            'action' => 'required|in:approved,rejected',
+            'action' => 'required|in:approved,rejected,disetujui,ditolak',
             'catatan' => 'nullable|string|max:255',
         ]);
 
@@ -56,10 +56,10 @@ class ApprovalController
 
         try {
             $service = app(ApprovalService::class);
-            $status = $validated['action'] === 'approved' ? 'approved' : 'rejected';
+            // Service menormalisasi action (approved/disetujui → 'disetujui', rejected/ditolak → 'ditolak')
             $approvalRequest = $service->proses(
                 $id,
-                $status,
+                $validated['action'],
                 $actionedBy,
                 $validated['catatan'] ?? null
             );
@@ -85,7 +85,7 @@ class ApprovalController
     public function adaPending(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'entity_type' => 'required|string|in:po,retur',
+            'entity_type' => 'required|string|in:po,retur,retur_pembelian,diskon',
             'entity_id' => 'required|integer',
         ]);
 

@@ -26,7 +26,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // SERVIS
             'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
             // CRM
-            'crm.view', 'crm.create', 'crm.edit', 'crm.broadcast',
+            'crm.view', 'crm.create', 'crm.edit', 'crm.delete', 'crm.broadcast',
             // TIER
             'tier.manage',
             // RESELLER
@@ -49,6 +49,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'pengaturan.manage',
             // OMNICHANNEL
             'omnichannel.view', 'omnichannel.manage',
+            // WORKFLOW (F1-1)
+            'approve-workflow',
+            // AUDIT TRAIL (F1-4)
+            'lihat-audit-log',
         ];
 
         foreach ($permissions as $permission) {
@@ -66,6 +70,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
             'crm.view',
             'laporan.cabang',
+            'approve-workflow',
+            'lihat-audit-log', // [F1-4] admin melihat riwayat audit cabangnya
         ]);
 
         $kasir = Role::findOrCreate('kasir');
@@ -90,11 +96,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'utang.view', 'utang.manage',
             'komisi.approve',
             'laporan.cabang', 'laporan.konsolidasi',
+            'approve-workflow',
+            'lihat-audit-log', // [F1-4] finance melihat riwayat audit
         ]);
 
         $marketing = Role::findOrCreate('marketing');
         $marketing->givePermissionTo([
-            'crm.view', 'crm.create', 'crm.edit', 'crm.broadcast',
+            'crm.view', 'crm.create', 'crm.edit', 'crm.delete', 'crm.broadcast',
             'tier.manage',
             'reseller.view',
         ]);

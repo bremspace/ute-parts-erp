@@ -8,6 +8,7 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
@@ -18,12 +19,11 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
-use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
 use Database\Seeders\AkunCoaSeeder;
-use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Enumerable;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Facades\Excel;
@@ -63,11 +63,14 @@ class WmsImportVerifyTest extends TestCase
                 'foto_url' => '',
             ];
         }
-        // 4 baris INVALID: duplikat SKU, satuan tak dikenal, harga negatif, stok>0 tanpa gudang
-        $rows[] = ['sku' => 'VER-1-SKU', 'nama' => 'Duplikat SKU', 'barcode' => 'X1', 'satuan' => 'pcs', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 0, 'gudang_id' => $gudangId];
-        $rows[] = ['sku' => 'VER-BAD-SATUAN', 'nama' => 'Satuan Salah', 'barcode' => 'X2', 'satuan' => 'galon-xyz', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 0];
-        $rows[] = ['sku' => 'VER-NEGATIF', 'nama' => 'Harga Negatif', 'barcode' => 'X3', 'satuan' => 'pcs', 'harga_beli' => -50, 'harga_jual' => 200, 'stok_awal' => 0];
-        $rows[] = ['sku' => 'VER-TANPA-GUDANG', 'nama' => 'Stok Tanpa Gudang', 'barcode' => 'X4', 'satuan' => 'pcs', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 5];
+        // 4 baris INVALID: duplikat SKU, satuan tak dikenal, harga negatif, stok>0 tanpa gudang.
+        // NB: Excel::store CSV menulis array POSITIONAL — baris sparse harus dipadding
+        // sepanjang $kolom supaya tiap nilai jatuh di kolom heading yang benar.
+        $pad = fn (array $over): array => array_merge(array_fill_keys($this->kolom, ''), $over);
+        $rows[] = $pad(['sku' => 'VER-1-SKU', 'nama' => 'Duplikat SKU', 'barcode' => 'X1', 'satuan' => 'pcs', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 0, 'gudang_id' => $gudangId]);
+        $rows[] = $pad(['sku' => 'VER-BAD-SATUAN', 'nama' => 'Satuan Salah', 'barcode' => 'X2', 'satuan' => 'galon-xyz', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 0]);
+        $rows[] = $pad(['sku' => 'VER-NEGATIF', 'nama' => 'Harga Negatif', 'barcode' => 'X3', 'satuan' => 'pcs', 'harga_beli' => -50, 'harga_jual' => 200, 'stok_awal' => 0]);
+        $rows[] = $pad(['sku' => 'VER-TANPA-GUDANG', 'nama' => 'Stok Tanpa Gudang', 'barcode' => 'X4', 'satuan' => 'pcs', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 5]);
 
         return $rows;
     }
@@ -125,7 +128,7 @@ class WmsImportVerifyTest extends TestCase
                 return $this->kolom;
             }
 
-            public function collection()
+            public function collection(): Enumerable
             {
                 return collect($this->baris);
             }
@@ -133,7 +136,8 @@ class WmsImportVerifyTest extends TestCase
 
         $file = 'import-tmp/verify-import.csv';
         Excel::store($export, $file, null, \Maatwebsite\Excel\Excel::CSV);
-        $path = storage_path('app/'.$file);
+        // Excel::store memakai default disk ('local' → root storage/app/private) — baca dari lokasi yg sama
+        $path = Storage::disk('local')->path($file);
 
         $importSvc = app(ImportProdukService::class);
 
@@ -148,10 +152,23 @@ class WmsImportVerifyTest extends TestCase
         $this->assertStringContainsString('tidak boleh negatif', $pesanSemua);
         $this->assertStringContainsString('gudang_id wajib diisi', $pesanSemua);
 
-        // Commit lewat service (job sync path menyamai; langsung panggil service agar deterministik)
-        $hasil = $importSvc->commit($path, 1, null);
-        $this->assertSame(10, $hasil['sukses']);
-        $this->assertSame(4, $hasil['gagal']);
+        // Commit lewat JOB (QUEUE_CONNECTION=sync) — notifikasi "Import Produk Selesai"
+        // hanya dikirim dari ImportProdukExcelJob, bukan dari service.
+        // Salin file dulu: job meng-unlink file setelah sukses, run-2 butuh file kedua.
+        $pathUlang = storage_path('app/import-tmp/verify-rerun.csv');
+        if (! is_dir(dirname($pathUlang))) {
+            mkdir(dirname($pathUlang), 0775, true);
+        }
+        copy($path, $pathUlang);
+        $logImp = ImportLog::create([
+            'tipe' => 'produk_excel', 'nama_file' => 'verify-import.csv',
+            'total_baris' => 0, 'sukses' => 0, 'gagal' => 0, 'status' => 'proses',
+        ]);
+        ImportProdukExcelJob::dispatch($logImp->id, $path, null);
+        $logImp->refresh();
+        $this->assertSame('selesai', $logImp->status);
+        $this->assertSame(10, $logImp->sukses);
+        $this->assertSame(4, $logImp->gagal);
 
         // Data lengkap: produk + sku_variant + harga_tier + tipe_hp pivot + stok
         $this->assertSame(10, Produk::where('nama', 'like', 'Produk Verifikasi%')->count());
@@ -159,7 +176,7 @@ class WmsImportVerifyTest extends TestCase
         $this->assertSame(30, HargaTier::whereHas('produk', fn ($q) => $q->where('nama', 'like', 'Produk Verifikasi%'))->count()); // 10 × 3 tipe
         $p1 = Produk::where('nama', 'Produk Verifikasi 1')->first();
         $this->assertNotNull($p1);
-        $this->assertSame(80000 + 1 * 1000, (float) HargaTier::where('produk_id', $p1->id)->where('tipe_konsumen', 'reseller')->value('nominal_tetap'));
+        $this->assertSame((float) (80000 + 1 * 1000), (float) HargaTier::where('produk_id', $p1->id)->where('tipe_konsumen', 'reseller')->value('nominal_tetap'));
         $this->assertTrue($p1->tipeHps()->exists());
         $this->assertSame('TestBrand', Brand::where('nama', 'TestBrand')->value('nama'));
         $this->assertSame('Grade A', KualitasProduk::where('nama', 'Grade A')->value('nama'));
@@ -187,7 +204,7 @@ class WmsImportVerifyTest extends TestCase
         $this->assertSame(4, $notif->payload['gagal']);
 
         // ===== Idempotensi: run ulang → 0 sukses, 14 gagal, tidak dobel =====
-        $hasil2 = $importSvc->commit($path, 2, null);
+        $hasil2 = $importSvc->commit($pathUlang, 2, null);
         $this->assertSame(0, $hasil2['sukses']);
         $this->assertSame(14, $hasil2['gagal']);
         $this->assertSame(10, Produk::where('nama', 'like', 'Produk Verifikasi%')->count());

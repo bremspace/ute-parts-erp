@@ -223,7 +223,7 @@
             <button wire:click="openJurnalManualModal" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer">+ Jurnal Manual</button>
         </div>
 
-        <x-prism.data-table :headers="['No. Jurnal', 'Akun', 'Sumber', 'Deskripsi', 'Debit', 'Kredit']">
+        <x-prism.data-table :headers="['No. Jurnal', 'Akun', 'Sumber', 'Deskripsi', 'Debit', 'Kredit', '']">
             @forelse($jurnals as $j)
                 <tr class="hover:bg-white/[0.02] transition-colors text-xs">
                     <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $j->no_jurnal }}</td>
@@ -235,10 +235,15 @@
                     <td class="py-3.5 px-4 text-ink-300">{{ $j->deskripsi }}</td>
                     <td class="py-3.5 px-4 tabular-nums {{ $j->debit > 0 ? 'text-up-amber font-semibold' : 'text-ink-500' }}">{{ $j->debit > 0 ? 'Rp '.number_format($j->debit, 0, ',', '.') : '-' }}</td>
                     <td class="py-3.5 px-4 tabular-nums {{ $j->kredit > 0 ? 'text-up-mint font-semibold' : 'text-ink-500' }}">{{ $j->kredit > 0 ? 'Rp '.number_format($j->kredit, 0, ',', '.') : '-' }}</td>
+                    <td class="py-3.5 px-4">
+                        @can('lihat-audit-log')
+                            <button wire:click="bukaRiwayat('jurnal', {{ $j->id }})" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer">Riwayat</button>
+                        @endcan
+                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="py-12 text-center text-ink-400">
+                    <td colspan="7" class="py-12 text-center text-ink-400">
                         Belum ada jurnal. Jurnal dibuat otomatis dari transaksi POS, Servis, dan komisi reseller.
                     </td>
                 </tr>
@@ -294,6 +299,9 @@
                         @if($p->sisa > 0)
                             <button wire:click="openBayarPiutangModal({{ $p->id }})" class="px-3 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[11px] transition-all cursor-pointer">Terima Bayar</button>
                         @endif
+                        @can('lihat-audit-log')
+                            <button wire:click="bukaRiwayat('piutang', {{ $p->id }})" class="px-2.5 py-1 ml-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer">Riwayat</button>
+                        @endcan
                     </td>
                 </tr>
             @empty
@@ -318,6 +326,9 @@
                         @if($u->sisa > 0)
                             <button wire:click="openBayarUtangModal({{ $u->id }})" class="px-3 py-1.5 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-[11px] transition-all cursor-pointer">Bayar</button>
                         @endif
+                        @can('lihat-audit-log')
+                            <button wire:click="bukaRiwayat('utang', {{ $u->id }})" class="px-2.5 py-1 ml-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer">Riwayat</button>
+                        @endcan
                     </td>
                 </tr>
             @empty
@@ -541,4 +552,7 @@
             </div>
         </div>
     @endif
+
+    {{-- [F1-4] Modal riwayat audit trail per entitas (jurnal / piutang / utang) --}}
+    @include('partials.riwayat-modal')
 </div>

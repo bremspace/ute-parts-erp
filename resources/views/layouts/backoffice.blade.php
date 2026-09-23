@@ -173,6 +173,25 @@
                     <span class="sidebar-badge ml-auto text-[9px] font-semibold text-up-mint bg-up-mint/10 border border-up-mint/20 px-1.5 py-0.5 rounded">Shopee</span>
                 </a>
 
+                <!-- [F1-1] Approval Inbox + badge pending (cabang-aware) -->
+                @can('approve-workflow')
+                    @php
+                        $pendingApprovalCount = \App\Modules\Workflow\Models\ApprovalRequest::query()
+                            ->where('status', 'pending')
+                            ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', session('cabang_id')))
+                            ->count();
+                    @endphp
+                    <a href="/app/approvals" title="Approval Inbox" class="sidebar-nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium {{ request()->is('app/approvals*') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }} transition-all">
+                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="sidebar-label">Approval</span>
+                        @if($pendingApprovalCount > 0)
+                            <span class="sidebar-badge ml-auto text-[10px] font-semibold text-white bg-up-red px-1.5 py-0.5 rounded">{{ $pendingApprovalCount }}</span>
+                        @endif
+                    </a>
+                @endcan
+
                 <!-- Pengaturan -->
                 <a href="/app/pengaturan" title="Pengaturan & RBAC" class="sidebar-nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium {{ request()->is('app/pengaturan*') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }} transition-all">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -266,6 +285,16 @@
 
             <!-- Page Content -->
             <main class="flex-1 overflow-y-auto p-3 lg:p-6 bg-gradient-to-b from-ink-900/20 to-ink-950">
+                {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out) --}}
+                @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
+                    <div class="mb-4 p-3.5 rounded-xl bg-up-amber/15 border border-up-amber/30 text-up-amber text-sm font-medium flex items-center justify-between gap-3 flex-wrap">
+                        <span>Keamanan akun: aktifkan verifikasi dua faktor (2FA) untuk role Anda.</span>
+                        <a href="{{ route('two-factor.setup') }}" class="px-3 py-1.5 rounded-lg bg-up-amber text-ink-950 text-xs font-bold hover:opacity-90 transition-opacity whitespace-nowrap">
+                            Aktifkan 2FA
+                        </a>
+                    </div>
+                @endif
+
                 {{ $slot }}
             </main>
         </div>

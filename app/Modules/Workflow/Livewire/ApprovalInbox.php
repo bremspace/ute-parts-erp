@@ -2,8 +2,9 @@
 
 namespace App\Modules\Workflow\Livewire;
 
+use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
-use Illuminate\Foundation\Validation\ValidationException;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -12,8 +13,11 @@ class ApprovalInbox extends Component
     use WithPagination;
 
     public $search = '';
+
     public $selectedRequest = null;
+
     public $catatan = '';
+
     public $processing = false;
 
     protected $rules = [
@@ -31,7 +35,7 @@ class ApprovalInbox extends Component
         $this->processing = true;
 
         try {
-            app(ApprovalService::class)->proses($requestId, 'approved', auth()->id(), $this->catatan);
+            app(ApprovalService::class)->proses($requestId, 'disetujui', auth()->id(), $this->catatan);
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Permintaan disetujui']);
             $this->reset(['selectedRequest', 'catatan']);
         } catch (ValidationException $e) {
@@ -49,7 +53,7 @@ class ApprovalInbox extends Component
         $this->processing = true;
 
         try {
-            app(ApprovalService::class)->proses($requestId, 'rejected', auth()->id(), $this->catatan);
+            app(ApprovalService::class)->proses($requestId, 'ditolak', auth()->id(), $this->catatan);
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Permintaan ditolak']);
             $this->reset(['selectedRequest', 'catatan']);
         } catch (ValidationException $e) {
@@ -70,22 +74,28 @@ class ApprovalInbox extends Component
 
     public function render()
     {
+        $user = auth()->user();
+        $roles = $user?->getRoleNames() ?? collect();
+        // Pemegang permission approve-workflow boleh melihat seluruh antrean cabang
+        // (wajib: super-admin dapat menyetujui request role lain — lihat ApprovalService::proses)
+        $seeAll = (bool) $user?->can('approve-workflow');
+
         $requests = ApprovalRequest::with(['rule', 'requestedBy'])
-            ->where('approver_role', function ($query) {
-                $query->whereIn('approver_role', auth()->user()->getRoleNames()->toArray())
-                    ->orWhereHas('rule', function ($q) {
-                        $q->where('approver_role', auth()->user()->getRoleNames()->first());
-                    });
-            })
-            ->when($this->search, fn ($q) => $q->where('entity_type', 'like', "%{$this->search}%")
-                ->orWhere('payload_json->amount', 'like', "%{$this->search}%")
-                ->orWhere('payload_json->no_po', 'like', "%{$this->search}%")
-            )
+            ->when(! $seeAll, fn ($q) => $q->whereIn('approver_role', $roles))
+            // Scope cabang: request global (null) + cabang aktif sesi — PRD §2.2
+            ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', session('cabang_id')))
+            ->when($this->search !== '', fn ($q) => $q->where(function ($w) {
+                $w->where('entity_type', 'like', "%{$this->search}%")
+                    ->orWhere('payload_json->amount', 'like', "%{$this->search}%")
+                    ->orWhere('payload_json->no_po', 'like', "%{$this->search}%")
+                    ->orWhere('payload_json->no_return', 'like', "%{$this->search}%")
+                    ->orWhere('payload_json->no_transaksi', 'like', "%{$this->search}%");
+            }))
             ->latest()
             ->paginate(10);
 
         return view('modules.workflow.livewire.approval-inbox', [
             'requests' => $requests,
-        ]);
+        ])->layout('layouts.backoffice', ['header' => 'Approval Inbox']);
     }
 }

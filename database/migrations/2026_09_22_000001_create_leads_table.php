@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('leads', function (Blueprint $table) {
             $table->bigIncrements('id');
-            $table->foreignId('cabang_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('cabang_id')->constrained('cabang')->cascadeOnDelete();
             $table->string('sumber'); // walkin, phone, website, referral, social_media, marketplace, lain
             $table->enum('stage', ['baru', 'kontak', 'kualifikasi', 'negosiasi', 'won', 'lost'])->default('baru');
             $table->string('nama');
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('assigned_to')->nullable()->constrained('users')->nullOnDelete();
             $table->text('catatan')->nullable();
             $table->string('lost_reason')->nullable(); // alasan lost: harga, kompetitor, tidak_butuh, lain
-            $table->foreignId('pelanggan_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('pelanggan_id')->nullable()->constrained('pelanggan')->nullOnDelete();
             $table->timestamp('won_at')->nullable();
             $table->timestamp('lost_at')->nullable();
             $table->timestamps();

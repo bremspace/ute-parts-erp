@@ -4,6 +4,7 @@ namespace App\Modules\Pos\Livewire;
 
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Models\Transaksi;
@@ -12,6 +13,7 @@ use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
@@ -19,10 +21,13 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class PosKasir extends Component
 {
+    use PunyaRiwayatAktivitas;
+
     // [T-09] state sesi kas
     public $kasAktif = null;
 
@@ -42,6 +47,11 @@ class PosKasir extends Component
     public float $diskonNominal = 0.0;
 
     public float $pajakNominal = 0.0;
+
+    // [F1-2] DPP (dasar pengenaan PPN) = subtotal - diskon — ikut pajakNominal di totalAkhir
+    public float $dpp = 0.0;
+
+    public float $ppnPersen = 0.0;
 
     // Payment modal state
     public bool $showPaymentModal = false;
@@ -83,10 +93,12 @@ class PosKasir extends Component
 
     // Raw input values (user types "1.000.000" → stored as "1000000")
     public string $kasSaldoAwalRaw = '';
+
     public string $kasSaldoFisikRaw = '';
 
     // Parsed numeric values for backend
     public float $kasSaldoAwal = 0;
+
     public float $kasSaldoFisik = 0;
 
     public ?array $kasHasil = null;
@@ -151,23 +163,40 @@ class PosKasir extends Component
     }
 
     /**
-     * Rekonsiliasi otomatis PPN per cabang (diaktifkan via konfigurasi).
-     * Called setelah cart berubah (add/update/remove/setHargaFleksibel/clear).
+     * Rekonsiliasi otomatis PPN per cabang (diaktifkan via konfigurasi pajak_enabled).
+     * Dipanggil setelah cart / diskon berubah (add/update/remove/setHargaFleksibel/clear/updatedDiskon*).
+     * [F1-2] DPP = subtotal - diskonTotal; pajakNominal = PPN dari DPP.
      */
     private function recalcPajak(): void
     {
         $cabangId = session('cabang_id');
         $pajakService = app(PajakService::class);
+        $dpp = max(0.0, $this->subtotal - $this->diskonTotal);
+        $this->dpp = $dpp;
+
         $enabled = $cabangId ? $pajakService->enabled($cabangId) : false;
 
         if (! $enabled) {
             $this->pajakNominal = 0.0;
+            $this->ppnPersen = 0.0;
+
             return;
         }
 
-        $dpp = max(0.0, $this->subtotal - $this->diskonNominal);
         $result = $pajakService->hitung($cabangId, $dpp);
         $this->pajakNominal = $result['ppn_nominal'];
+        $this->ppnPersen = $result['ppn_percent'];
+    }
+
+    // [F1-2] Diskon berubah → wajib rehitung PPN (DPP berubah)
+    public function updatedDiskonPersen(): void
+    {
+        $this->recalcPajak();
+    }
+
+    public function updatedDiskonNominal(): void
+    {
+        $this->recalcPajak();
     }
 
     // For cart partial
@@ -333,6 +362,8 @@ class PosKasir extends Component
         $this->diskonPersen = 0.0;
         $this->diskonNominal = 0.0;
         $this->pajakNominal = 0.0;
+        $this->dpp = 0.0;
+        $this->ppnPersen = 0.0;
         $this->recalcPajak();
     }
 
@@ -370,7 +401,7 @@ class PosKasir extends Component
 
         try {
             app(HargaFleksibelService::class)->validasi($produk, $harga, auth()->user());
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
 
             return;
@@ -401,7 +432,7 @@ class PosKasir extends Component
             // Harga sudah diset saat addToCart (harga minimum), tapi guard double-check
             try {
                 app(HargaFleksibelService::class)->validasi($produk, (float) $item['harga'], auth()->user());
-            } catch (\Illuminate\Validation\ValidationException $e) {
+            } catch (ValidationException $e) {
                 return $e->getMessage();
             }
         }
@@ -499,7 +530,9 @@ class PosKasir extends Component
                     'subtotal' => $this->subtotal,
                     'diskon_persen' => $this->diskonPersen,
                     'diskon_nominal' => $this->diskonNominal,
+                    'dpp' => $this->dpp,
                     'pajak_nominal' => $this->pajakNominal,
+                    'ppn_nominal' => $this->pajakNominal,
                     'total_akhir' => $this->totalAkhir,
                     'metode_bayar' => $this->metodeBayar,
                     'jumlah_bayar' => $this->metodeBayar === 'split' ? ($this->splitTunai + $this->splitNonTunai) : $this->jumlahBayar,
@@ -576,11 +609,20 @@ class PosKasir extends Component
                 }
                 $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
                 $kasbon = $this->metodeBayar === 'piutang';
+                $ppnNominal = (float) $this->pajakNominal;
+                $dpp = (float) $this->dpp;
+
+                // [F1-2] Balance: debit totalAkhir = kredit (DPP pendapatan + PPN 220-01)
+                // Saat PPN aktif: 410-01 kredit = DPP (bukan totalAkhir) agar seimbang dgn baris 220-01.
                 $lines = [
                     // Kasbon (piutang) → debit Piutang Usaha 120-01, bukan Kas
                     ['akun_kode' => $kasbon ? '120-01' : '110-01', 'debit' => $this->totalAkhir, 'kredit' => 0],
-                    ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $this->totalAkhir],
+                    ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? $dpp : (float) $this->totalAkhir],
                 ];
+                // PPN Keluaran → akun 220-01 (kontrak AC F1-2)
+                foreach (app(PajakService::class)->jurnalLines($ppnNominal, $noJurnal, $cabangId, auth()->id() ?? 0) as $ppnLine) {
+                    $lines[] = $ppnLine;
+                }
                 if ($totalHpp > 0) {
                     $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
                     $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
@@ -632,6 +674,9 @@ class PosKasir extends Component
                     'items' => array_values($this->cart),
                     'subtotal' => $this->subtotal,
                     'diskon' => $this->diskonNominal,
+                    'dpp' => $this->dpp,
+                    'pajak' => $this->pajakNominal,
+                    'ppn_persen' => $this->ppnPersen,
                     'total' => $this->totalAkhir,
                     'bayar' => $transaksi->jumlah_bayar,
                     'kembali' => $this->kembalian,
@@ -678,6 +723,11 @@ class PosKasir extends Component
                     'gudang_id' => $this->selectedGudangId,
                     'sumber' => 'pos',
                     'subtotal' => $this->subtotal,
+                    'diskon_persen' => $this->diskonPersen,
+                    'diskon_nominal' => $this->diskonNominal,
+                    'dpp' => $this->dpp,
+                    'pajak_nominal' => $this->pajakNominal,
+                    'ppn_nominal' => $this->pajakNominal,
                     'total_akhir' => $this->totalAkhir,
                     'metode_bayar' => 'ditahan',
                     'jumlah_bayar' => 0,
@@ -738,6 +788,7 @@ class PosKasir extends Component
         }
         $this->diskonPersen = (float) ($detail['diskon_persen'] ?? 0);
         $this->diskonNominal = (float) ($detail['diskon_nominal'] ?? 0);
+        $this->recalcPajak(); // [F1-2] resume park → rehitung PPN dari diskon tersimpan
         $this->selectedCustomerId = $transaksi->pelanggan_id;
 
         // Tandai transaksi asli dipindahkan → status 'batal' (tidak dipakai lagi), tanpa jurnal
@@ -806,7 +857,7 @@ class PosKasir extends Component
         // [T-33] Carryover: saldo awal shift berikutnya = saldo_akhir_fisik sesi tutup terakhir
         // (prioritas sesi milik kasir ini, fallback sesi bersama legacy user_id NULL)
         $cabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
-        
+
         $prev = DB::table('kas_sesi')
             ->where('cabang_id', $cabangId)
             ->where('status', 'tutup')
@@ -975,6 +1026,9 @@ class PosKasir extends Component
             'kasAktif' => $this->kasAktif,
             'total' => $this->total,
             'diskonTotal' => $this->diskonTotal,
+            'dpp' => $this->dpp,
+            'pajakNominal' => $this->pajakNominal,
+            'ppnPersen' => $this->ppnPersen,
             'totalBayar' => $this->totalBayar,
             'subtotal' => $this->subtotal,
         ])->layout('layouts.backoffice', ['header' => 'Kasir Point of Sale (POS)']);

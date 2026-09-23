@@ -4,9 +4,12 @@ namespace App\Modules\Akunting\Models;
 
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'no_jurnal', 'tanggal', 'cabang_id', 'akun_coa_id', 'sumber',
@@ -14,7 +17,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class JurnalAkuntansi extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
     protected $table = 'jurnal_akuntansi';
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('Jurnal');
+    }
 
     protected $casts = [
         'tanggal' => 'datetime',
