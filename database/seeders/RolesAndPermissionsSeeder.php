@@ -61,6 +61,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'lihat.margin',
             // [F3-8] HR & Payroll permissions — pakai di givePermissionTo role kelola-hr
             'kelola-hr',
+            // [PRD §4.3] RBAC payroll: permission khusus `kelola-payroll` (super-admin + finance saja)
+            'kelola-payroll',
             'payroll.view',
             'payroll.create',
             'payroll.approve',
@@ -131,9 +133,11 @@ class RolesAndPermissionsSeeder extends Seeder
         $hr->givePermissionTo([
             'kelola-hr', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri',
         ]);
-        $superAdmin->givePermissionTo(['kelola-hr', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
-        $finance->givePermissionTo(['kelola-hr', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
-        $adminToko->givePermissionTo(['kelola-hr', 'payroll.view', 'hr.lihat-sendiri']);
+        // [PRD §4.3] `kelola-payroll` hanya super-admin + finance (payroll management);
+        // admin-toko TIDAK lagi dapat payroll.view (hanya kelola-hr + hr.lihat-sendiri)
+        $superAdmin->givePermissionTo(['kelola-hr', 'kelola-payroll', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
+        $finance->givePermissionTo(['kelola-hr', 'kelola-payroll', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
+        $adminToko->givePermissionTo(['kelola-hr', 'hr.lihat-sendiri']);
 
         // [F3-8b] Karyawan (kasir/teknisi/marketing/staff) lihat absensi & KPI sendiri
         foreach ([$kasir, $teknisi, $marketing, $staffGudang] as $roleKaryawan) {

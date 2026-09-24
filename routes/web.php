@@ -277,10 +277,11 @@ Route::prefix('app')->middleware('auth')->group(function () {
         ->name('laporan.nomor-seri')
         ->middleware('permission:laporan.cabang');
 
-    // [F3-8] HR & Payroll Screen
+    // [F3-8] HR & Payroll Screen — [PRD §4.3] RBAC `kelola-payroll` (super-admin + finance saja);
+    // teknisi lihat slip sendiri hanya via guard komponen PayrollSlipDetail (user_id + cabang)
     Route::get('/hr/payroll', PayrollPage::class)
         ->name('hr.payroll')
-        ->middleware('permission:kelola-hr');
+        ->middleware('permission:kelola-payroll');
 
     // [F3-8b] HR Absensi, Shift & KPI — admin/finance (kelola-hr)
     Route::get('/hr/absensi', HrAbsensiKpiPage::class)

@@ -102,7 +102,6 @@ class HrSeeder extends Seeder
             ['nama' => 'Reseller umum 3% penjualan', 'aktor_tipe' => 'reseller', 'aktor_id' => null, 'trigger_tipe' => 'penjualan', 'kategori' => null, 'tipe' => 'persen', 'nilai' => 3, 'min_amount' => 0, 'cabang_id' => null],
             ['nama' => 'Agen umum 2% penjualan', 'aktor_tipe' => 'agen', 'aktor_id' => null, 'trigger_tipe' => 'penjualan', 'kategori' => null, 'tipe' => 'persen', 'nilai' => 2, 'min_amount' => 0, 'cabang_id' => null],
             ['nama' => 'Marketing lead won Rp50.000', 'aktor_tipe' => 'karyawan', 'aktor_id' => null, 'trigger_tipe' => 'lead_won', 'kategori' => null, 'tipe' => 'nominal', 'nilai' => 50000, 'min_amount' => 0, 'cabang_id' => null],
-            ['nama' => 'Teknisi per tiket servis Rp10.000', 'aktor_tipe' => 'karyawan', 'aktor_id' => null, 'trigger_tipe' => 'tiket_servis', 'kategori' => null, 'tipe' => 'nominal', 'nilai' => 10000, 'min_amount' => 0, 'cabang_id' => null],
         ];
         foreach ($ruleKomisi as $r) {
             KomisiSkema::updateOrCreate(

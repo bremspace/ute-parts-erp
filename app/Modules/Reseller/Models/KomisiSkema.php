@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class KomisiSkema extends Model
 {
+    public const TRIGGER_TARGET_KPI = 'target_kpi';
+
     protected $table = 'komisi_skema';
 
     protected $casts = [

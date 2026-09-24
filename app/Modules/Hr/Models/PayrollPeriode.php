@@ -14,6 +14,14 @@ class PayrollPeriode extends Model
 {
     use LogsActivity;
 
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_DIPROSES = 'diproses';
+
+    public const STATUS_SELESAI = 'selesai';
+
+    public const STATUS_DIBAYAR = 'dibayar';
+
     protected $table = 'payroll_periode';
 
     protected $casts = ['status' => 'string'];

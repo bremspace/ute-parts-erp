@@ -124,14 +124,14 @@ class PayrollPage extends Component
             $this->showApproveModal = true;
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Approval diperlukan (total > Rp '.number_format($result['threshold'], 0, ',', '.').')']);
         } else {
-            $this->finalizasiDisetujui();
+            $this->finalisasiDisetujui();
         }
     }
 
-    public function finalizasiDisetujui(): void
+    public function finalisasiDisetujui(): void
     {
         try {
-            $result = app(PayrollService::class)->finalizasiDisetujui($this->periode);
+            $result = app(PayrollService::class)->finalisasiDisetujui($this->periode);
             $this->showApproveModal = false;
             $this->loadSlips();
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Payroll periode '.$this->periode.' disetujui. Jurnal: '.$result['no_jurnal']]);
@@ -165,6 +165,6 @@ class PayrollPage extends Component
             'totalGaji' => $this->totalGaji,
             'periodeList' => $this->periodeList,
             'statusFilter' => $this->statusFilter,
-        ]);
+        ])->layout('layouts.backoffice', ['header' => 'HR & Payroll', 'title' => 'HR & Payroll']);
     }
 }

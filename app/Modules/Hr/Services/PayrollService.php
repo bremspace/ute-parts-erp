@@ -10,6 +10,7 @@ use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 
 /**
@@ -83,20 +84,37 @@ class PayrollService
 
     /**
      * Finalisasi setelah F1-1 approval dikonfirmasi.
+     * Efek samping: flip status periode → 'selesai' (enum DB: draft/diproses/
+     * selesai/dibayar — 'disetujui' bukan nilai valid) DAN post jurnal payroll
+     * via approvePayroll (debit Beban Gaji/Komisi, kredit Hutang Gaji).
+     * Total di atas THRESHOLD_APPROVAL wajib sudah ada ApprovalRequest
+     * (entity_type payroll) berstatus 'disetujui' — §4.1 alur 2.
      */
-    public function finalizasiDisetujui(string $periode): array
+    public function finalisasiDisetujui(string $periode): array
     {
         $periodeId = $this->getOrCreatePeriode($periode);
         $periodeRecord = PayrollPeriode::find($periodeId);
         if (! $periodeRecord) {
             throw new \Exception('Periode tidak ditemukan');
         }
-        if ($periodeRecord->status !== 'draft') {
+        if ($periodeRecord->status !== PayrollPeriode::STATUS_DRAFT) {
             throw new \Exception('Periode sudah diproses');
         }
 
+        // [F3-8] §4.1 alur 2 — total di atas threshold wajib approval F1-1 (guard, bukan auto-approve)
+        $totalGaji = (float) PayrollSlip::where('payroll_periode_id', $periodeId)->sum('total_gaji');
+        if ($totalGaji > self::THRESHOLD_APPROVAL) {
+            $disetujui = ApprovalRequest::where('entity_type', 'payroll')
+                ->where('entity_id', $periodeId)
+                ->where('status', 'disetujui')
+                ->exists();
+            if (! $disetujui) {
+                throw new \DomainException('Payroll belum disetujui via F1-1 approval engine.');
+            }
+        }
+
         // Update status periode
-        $periodeRecord->update(['status' => 'disetujui']);
+        $periodeRecord->update(['status' => PayrollPeriode::STATUS_SELESAI]);
 
         // Post jurnal via approvePayroll
         return $this->approvePayroll($periode);
@@ -121,7 +139,7 @@ class PayrollService
         ];
 
         $noJurnal = sprintf('JRL-PR-%s', $periode);
-        $this->jurnalService->post(
+        $jurnalRows = $this->jurnalService->post(
             $noJurnal,
             now(),
             'payroll',
@@ -133,10 +151,10 @@ class PayrollService
             $periodeId
         );
 
-        // Update status slip
+        // Update status slip; jurnal_id adalah FK id baris jurnal (bukan no_jurnal)
         PayrollSlip::where('payroll_periode_id', $periodeId)
             ->where('status', 'draft')
-            ->update(['status' => 'approved', 'jurnal_id' => $noJurnal]);
+            ->update(['status' => 'approved', 'jurnal_id' => $jurnalRows[0]->id ?? null]);
 
         return ['no_jurnal' => $noJurnal, 'total_gaji' => $totalGaji, 'total_komisi' => $totalKomisi];
     }
@@ -208,7 +226,8 @@ class PayrollService
     {
         $pokok = $karyawan->gaji_pokok;
         $tunjangan = $this->hitungTunjangan($karyawan->id);
-        $potongan = $this->hitungPotongan($karyawan->id);
+        $potonganAbsen = app(AbsensiService::class)->potonganAbsen($karyawan->id, $periode);
+        $potongan = $this->hitungPotongan($karyawan->id, $periode);
         $komisiTeknisi = $this->hitungKomisiTeknisi($karyawan->id, $periode);
         $komisiInternal = $this->hitungKomisiInternal($karyawan->id, $periode);
         $komisi = $komisiTeknisi + $komisiInternal;
@@ -229,6 +248,7 @@ class PayrollService
                     'pokok' => $pokok,
                     'tunjangan' => $tunjangan,
                     'potongan' => $potongan,
+                    'potongan_absen' => $potonganAbsen,
                     'komisi' => $komisi,
                     'komisi_teknisi' => $komisiTeknisi,
                     'komisi_internal' => $komisiInternal,
@@ -250,14 +270,19 @@ class PayrollService
     }
 
     /**
-     * Hitung total potongan komponen.
+     * Hitung total potongan komponen + potongan disiplin absen §4.2 alur 4.
      */
-    protected function hitungPotongan(int $karyawanId): float
+    protected function hitungPotongan(int $karyawanId, string $periode): float
     {
-        return KaryawanKomponenGaji::where('karyawan_id', $karyawanId)
+        $komponen = (float) KaryawanKomponenGaji::where('karyawan_id', $karyawanId)
             ->where('tipe', 'potongan')
             ->where('is_aktif', true)
             ->sum('nominal_bulanan');
+
+        // [F3-8b] §4.2 alur 4 — potongan absen tanpa izin (opt-in per cabang)
+        $potonganAbsen = app(AbsensiService::class)->potonganAbsen($karyawanId, $periode);
+
+        return $komponen + $potonganAbsen;
     }
 
     /**
@@ -281,6 +306,17 @@ class PayrollService
         $tanggalMulai = substr($periode.'-01', 0, 7);
         $tanggalSelesai = date('Y-m-t', strtotime($periode.'-01'));
 
+        // [F3-8c] 1 tiket = 1 komisi di slip; engine menang, KomisiTeknisiRule
+        // hanya utk tiket tanpa catatan engine (status pending/disetujui).
+        // Kolom komisi tdk punya trigger_tipe — tiket_servis_id NOT NULL hanya
+        // diisi utk row engine trigger tiket_servis (lihat KomisiService::catatKomisi).
+        $tiketDibayarEngine = Komisi::where('aktor_tipe', 'karyawan')
+            ->where('aktor_id', $karyawanId)
+            ->whereNotNull('tiket_servis_id')
+            ->whereIn('status', [Komisi::STATUS_PENDING, Komisi::STATUS_DISETUJUI])
+            ->whereBetween('created_at', [$periode.'-01 00:00:00', $tanggalSelesai.' 23:59:59'])
+            ->pluck('tiket_servis_id');
+
         // tiket_servis.teknisi_id → users (bukan karyawan.id) — konsisten dgn KPI §4.2
         $tiket = TiketServis::where('teknisi_id', $karyawan->user_id)
             ->where('status', 'selesai')
@@ -288,6 +324,9 @@ class PayrollService
             ->get();
 
         foreach ($tiket as $t) {
+            if ($tiketDibayarEngine->contains($t->id)) {
+                continue;
+            }
             foreach ($rules as $rule) {
                 if ($rule->jenis === 'per_tiket') {
                     $totalKomisi += $rule->nominal;

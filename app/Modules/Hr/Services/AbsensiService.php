@@ -139,6 +139,40 @@ class AbsensiService
     }
 
     /**
+     * [F3-8b] §4.2 alur 4 — potongan disiplin absen tanpa izin (opt-in per cabang).
+     * Hitung: (jumlah absen - threshold) x nominal_per_hari bila cabang aktif;
+     * selain itu 0. Murni komputasi (idempotent, tanpa write).
+     */
+    public function potonganAbsen(int $karyawanId, string $periode): float
+    {
+        $karyawan = Karyawan::find($karyawanId);
+        if (! $karyawan) {
+            return 0.0;
+        }
+
+        $cabangAktif = (array) config('hr.potongan_absen.cabang_aktif', []);
+        if (! in_array($karyawan->cabang_id, $cabangAktif, true)) {
+            return 0.0;
+        }
+
+        ['mulai' => $mulai, 'selesai' => $selesai] = $this->rentangPeriode($periode);
+
+        $jumlahAbsen = AbsensiLog::where('karyawan_id', $karyawanId)
+            ->where('status', AbsensiLog::STATUS_ABSEN)
+            ->whereBetween('tanggal', [$mulai, $selesai])
+            ->count();
+
+        $threshold = (int) config('hr.potongan_absen.threshold', 3);
+        if ($jumlahAbsen <= $threshold) {
+            return 0.0;
+        }
+
+        $nominalPerHari = (float) config('hr.potongan_absen.nominal_per_hari', 0);
+
+        return round(($jumlahAbsen - $threshold) * $nominalPerHari, 2);
+    }
+
+    /**
      * Auto-tandai 'absen' utk hari kerja (Sen-Jum, non-future) tanpa log.
      * Basis potongan disiplin payroll (komponen 'potongan', threshold opt-in cabang).
      * Idempotent.

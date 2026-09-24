@@ -3,6 +3,31 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-09-24 — Review owner/hardening Fase 4.1–4.3 (perbaikan temuan review dua-sumbu) ✅
+
+Review dua-sumbu (Standards vs Spec, fixed point `d3beaa6...HEAD` = `4cda9f1`) menemukan 5 temuan spec + 7 smell standards; semua temuan substansial diperbaiki (smell judgement-call non-kritis dibiarkan, terdokumentasi di bawah):
+
+**Spec — diperbaiki:**
+1. **Double-count komisi teknisi (temuan terburuk)** — `hitungKaryawan` menjumlah `komisiTeknisi + komisiInternal` tanpa dedup: satu tiket dibayar 2× (KomisiTeknisiRule Rp50.000 + rule `komisi_skema` tiket_servis, keduanya di-seed). Fix: **engine-wins per tiket** — `hitungKomisiTeknisi` skip tiket yg sudah punya baris `komisi` engine (status pending/disetujui, window periode; dedup via `whereNotNull('tiket_servis_id')` — kolom `trigger_tipe` tidak ada di tabel `komisi`, hanya di `komisi_skema`). Rule `komisi_skema` teknisi tiket dihapus dari HrSeeder (jadi **3 rule demo**); trigger `tiket_servis` tetap tersedia via rule builder.
+2. **§4.2 alur 4 potongan absen — dari partial ke implemented** — `AbsensiService::potonganAbsen()` (count log `absen`/periode, over threshold → nominal/hari × kelebihan; pure & idempotent) + config baru `config/hr.php` (`threshold` 3, `nominal_per_hari` 25.000, `cabang_aktif` [] = **opt-in per cabang, default nonaktif semua**); masuk `hitungPotongan(karyawanId, periode)` → `total_potongan` + key `potongan_absen` di rincian slip.
+3. **RBAC `kelola-payroll` (PRD §4.3 L166)** — permission baru di RolesAndPermissionsSeeder → super-admin + finance; route `/app/hr/payroll` gate `kelola-hr` → `kelola-payroll`; `payroll.view` dicabut dari admin-toko. Slip detail `PayrollSlipDetail::open()` di-guard: non-`kelola-payroll`/`kelola-hr` hanya boleh lihat slip where `karyawan.user_id == auth` AND `cabang_id == session cabang` (else 403). Baru: `PayrollPermissionTest` 3 test (admin/finance 200, admin-toko 403, teknisi slip sendiri saja).
+4. **`finalizasiDisetujui` bypass F1-1** — guard: total gaji > `THRESHOLD_APPROVAL` (Rp10jt) wajib ada `ApprovalRequest` payroll status `disetujui`, else `DomainException`. Rename typo → **`finalisasiDisetujui`** + docblock side-effect (flip status + post jurnal).
+5. **lead_won konversi — false positive, tanpa fix** — verifikasi: `canConvert()` mensyaratkan stage sudah 'won' (hook `update()` sudah terpicu duluan); `'stage' => 'won'` di konversi = no-op re-set.
+
+**Standards — diperbaiki:**
+- **Duplicated rule-matching (temuan terburuk)** — 3 salinan query rule di `KomisiService` → helper `queryRuleAktif()`; `matchRule` + `hitungKomisiTargetKpi` pakai helper; **fork `min_amount` per-trigger sengaja dipertahankan** (engine: subtotal kategori; target_kpi: `nilai_aktual` + gate `persen_capaian ≥ 100`) — didokumentasikan di helper; legacy `hitungKomisiDariItems` zero-diff (paritas utuh).
+- **Primitive obsession ringan** — konstanta `Komisi::STATUS_{PENDING,DISETUJUI,DITOLAK}` + `PayrollPeriode::STATUS_{DRAFT,DIPROSES,SELESAI,DIBAYAR}` dipakai di kode yg disentuh.
+- **Mysterious name** — rename finalisasi (lihat #4).
+
+**Bug laten terungkap & ikut diperbaiki saat implementasi:**
+- Enum `payroll_periode.status` = `draft/diproses/selesai/dibayar` — nilai `'disetujui'` lama **selalu melanggar CHECK** (tak pernah ketahuan karena tak ada test finalisasi) → kini `STATUS_SELESAI`.
+- `PayrollSlip.jurnal_id` menyimpan string `no_jurnal` ke kolom FK → kini simpan `$jurnalRows[0]->id` (FK id baris jurnal).
+- `payroll.blade` pakai `@extends` v2 di komponen Livewire v3 (multiple root → 500 semua user) + `PayrollSlip` tanpa relasi `periode()`/`komisiDetails()` (500) → convert single-root + `->layout('layouts.backoffice')` + relasi ditambahkan.
+
+**Tidak diperbaiki (judgement call, dibiarkan):** duplikasi `rentangPeriode` Absensi/Kpi/Payroll (3 tempat, ringan), `KasSesiState` re-implement clock-in/out (feature envy ringan — ganti ke AbsensiService = luas scope POS), shotgun-surgery trigger hooks (YAGNI, call sites defensible), `min_amount`/`cabang_id` spec generality (diminta spec — reviewer salah baca).
+
+- Verifikasi (2026-09-24): PayrollServiceTest **6/22**, PayrollApprovalTest **4/13**, AbsensiShiftTest **7/17**, KpiHitungTest **6/22**, RosterTest **3/7**, KomisiMultiAktorTest **8/41**, ResellerFase5Test **2/9**, LeadConversionTest **9/55**, DuitkuWebhookTest **4/16**, SemuaHalamanTest **9/55**, PayrollPermissionTest baru **3/7** — semua PASS; `view:cache` OK; `pint --test` PASS 17 file; seeder re-run idempotent di db_staging (RolesAndPermissions + Hr; kelola-payroll aktif, 3 rule komisi).
+
 ## 2026-09-24 — PRD-Advanced Fase 4.3: Komisi/Insentif Multi-Aktor (F3-8c) ✅
 
 - **Migrasi** `2026_09_24_230000_create_komisi_skema_tables.php`: tabel baru `komisi_skema` (rule configurable: `aktor_tipe` karyawan/reseller/agen, `aktor_id` nullable = rule umum tipe aktor, `trigger_tipe` penjualan/lead_won/tiket_servis/target_kpi, `kategori` nullable = paritas skema lama, `tipe` persen/nominal, `nilai`, `min_amount`, `cabang_id` nullable, `is_aktif`) + perluasan tabel `komisi` (`aktor_tipe` default `reseller` — kompatibel lama, `aktor_id`, `komisi_skema_id`, `lead_id`, `tiket_servis_id`, `idempotensi_key` unique; `pelanggan_id` → nullable utk komisi karyawan internal tanpa pelanggan). Migrasi + `2026_09_24_230100_add_referral_kode_to_pelanggan_table.php`: `pelanggan.kode_agen` (unique, identitas agen) + `pelanggan.referral_kode` (index, kode agen yang dipakai pembeli).

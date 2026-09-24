@@ -15,6 +15,7 @@ use App\Modules\Reseller\Models\KomisiSkema;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Reseller\Models\SkemaKomisiReseller;
 use App\Modules\Servis\Models\TiketServis;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -421,11 +422,25 @@ class KomisiService
      * Rule yg berlaku utk aktor+kategori — prioritas spesifik (aktor_id) lalu umum
      * (aktor_id null), setara alur lama (override per reseller → skema default).
      */
+    /**
+     * Query dasar rule aktif (aktor_tipe + trigger_tipe + is_aktif), dipakai
+     * matchRule & hitungKomisiTargetKpi; semantik min_amount berbeda per trigger
+     * (engine: subtotal kategori; target_kpi: nilai_aktual) — sengaja.
+     */
+    protected function queryRuleAktif(string $aktorTipe, string $triggerTipe): Builder
+    {
+        return KomisiSkema::where('aktor_tipe', $aktorTipe)
+            ->where('trigger_tipe', $triggerTipe)
+            ->where('is_aktif', true);
+    }
+
+    /**
+     * Rule yg berlaku utk aktor+kategori — prioritas spesifik (aktor_id) lalu umum
+     * (aktor_id null), setara alur lama (override per reseller → skema default).
+     */
     protected function matchRule(string $aktorTipe, string $triggerTipe, int $aktorId, ?int $cabangId, ?string $kategori): ?KomisiSkema
     {
-        $query = fn () => KomisiSkema::where('aktor_tipe', $aktorTipe)
-            ->where('trigger_tipe', $triggerTipe)
-            ->where('is_aktif', true)
+        $query = fn () => $this->queryRuleAktif($aktorTipe, $triggerTipe)
             ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId))
             ->where(fn ($q) => $q->whereNull('kategori')->orWhere('kategori', $kategori));
 
@@ -497,9 +512,7 @@ class KomisiService
             $karyawanId = (int) $kpi->karyawan_id;
             $kategori = (string) ($kpi->kpi_metric_id ?? 0);
 
-            $rules = KomisiSkema::where('aktor_tipe', 'karyawan')
-                ->where('trigger_tipe', 'target_kpi')
-                ->where('is_aktif', true)
+            $rules = $this->queryRuleAktif('karyawan', KomisiSkema::TRIGGER_TARGET_KPI)
                 ->where(fn ($q) => $q->whereNull('aktor_id')->orWhere('aktor_id', $karyawanId))
                 ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', session('cabang_id')))
                 ->get();

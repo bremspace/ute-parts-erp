@@ -18,6 +18,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Komisi extends Model
 {
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_DISETUJUI = 'disetujui';
+
+    public const STATUS_DITOLAK = 'ditolak';
+
     protected $table = 'komisi';
 
     protected $casts = [

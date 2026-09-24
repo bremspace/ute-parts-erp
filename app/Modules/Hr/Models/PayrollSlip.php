@@ -5,6 +5,7 @@ namespace App\Modules\Hr\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -27,6 +28,16 @@ class PayrollSlip extends Model
     public function karyawan(): BelongsTo
     {
         return $this->belongsTo(Karyawan::class);
+    }
+
+    public function periode(): BelongsTo
+    {
+        return $this->belongsTo(PayrollPeriode::class, 'payroll_periode_id');
+    }
+
+    public function komisiDetails(): HasMany
+    {
+        return $this->hasMany(PayrollKomisiDetail::class, 'slip_id');
     }
 
     public function getActivitylogOptions(): LogOptions
