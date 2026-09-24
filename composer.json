@@ -18,12 +18,15 @@
         "spatie/laravel-permission": "*"
     },
     "require-dev": {
+        "deptrac/deptrac": "^4.7",
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.12",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
+        "nunomaduro/phpinsights": "^2.14.2",
         "phpunit/phpunit": "^12.5.12"
     },
     "autoload": {
@@ -59,6 +62,19 @@
             "@php artisan config:clear --ansi @no_additional_args",
             "@php artisan test"
         ],
+        "qa": [
+            "@qa:format",
+            "@qa:stan",
+            "@qa:deptrac",
+            "@qa:audit"
+        ],
+        "qa:format": "vendor/bin/pint --test",
+        "qa:stan": "vendor/bin/phpstan analyse --no-progress --memory-limit=${PHPSTAN_MEMORY_LIMIT:-512M}",
+        "qa:stan:lowram": "vendor/bin/phpstan analyse --no-progress --memory-limit=256M --processes=1",
+        "qa:stan:full": "vendor/bin/phpstan analyse --no-progress --memory-limit=1G --processes=4",
+        "qa:deptrac": "vendor/bin/deptrac analyse --no-progress",
+        "qa:insights": "vendor/bin/phpinsights analyse app --no-interaction --min-quality=0 --min-complexity=0 --min-architecture=0 --min-style=0 --threads=1",
+        "qa:audit": "composer audit --no-interaction",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

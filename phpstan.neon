@@ -1,0 +1,25 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    # Analisis level 6 (Larastan) — keseimbangan ketat vs noise untuk proyek modular.
+    # Naikkan ke 7-8 bertahap setelah temuan level 6 bersih.
+    level: 6
+
+    paths:
+        - app
+
+    tmpDir: storage/framework/cache/phpstan
+
+    # Batas memori & proses paralel dikendalikan lewat CLI (lihat skrip composer
+    # qa:stan) karena PHPStan 2 menghapus kunci parameters.memoryLimit.
+    parallel:
+        maximumNumberOfProcesses: 2
+
+    # PHPStan 2: tipe iterable hilang dinilai lewat error identifier, bukan
+    # parameter boolean. Bypass sementara (noise rendah) untuk magic
+    # magic Livewire/eloquent yang meledak di level 6 murni:
+    ignoreErrors:
+        - identifier: missingType.iterableValue
+        - identifier: missingType.generics

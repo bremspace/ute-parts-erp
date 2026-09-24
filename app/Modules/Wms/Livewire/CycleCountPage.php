@@ -4,9 +4,6 @@ namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Wms\Models\CycleCountSchedule;
 use App\Modules\Wms\Models\CycleCountTask;
-use App\Modules\Wms\Models\Gudang;
-use App\Modules\Wms\Models\Rak;
-use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\CycleCountService;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -20,24 +17,37 @@ use Livewire\Component;
 class CycleCountPage extends Component
 {
     public string $search = '';
+
     public string $filterStatus = 'semua';
+
     public int $perPage = 10;
 
     // Schedule form
     public bool $showScheduleForm = false;
+
     public string $scheduleNama = '';
+
     public string $tipeTarget = 'rak';
+
     public int $targetId = 0;
+
     public string $targetKategori = '';
+
     public string $frekuensi = 'mingguan';
+
     public int $hari = 1;
+
     public string $jam = '08:00';
+
     public int $sampleSize = 10;
+
     public int $thresholdUnit = 5;
+
     public int $thresholdPersen = 10;
 
     // Count form
     public ?int $selectedTaskId = null;
+
     public array $fisikPerItem = [];
 
     protected $listeners = ['taskGenerated', 'countSubmitted'];
@@ -56,6 +66,7 @@ class CycleCountPage extends Component
     {
         if (! auth()->user()?->can('wms.approve-opname')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak punya izin mengelola jadwal cycle count.']);
+
             return;
         }
         $this->resetScheduleForm();
@@ -80,6 +91,7 @@ class CycleCountPage extends Component
     {
         if (! auth()->user()?->can('wms.approve-opname')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak punya izin.']);
+
             return;
         }
 
@@ -123,6 +135,7 @@ class CycleCountPage extends Component
     {
         if (! auth()->user()?->can('wms.approve-opname')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak punya izin.']);
+
             return;
         }
 
@@ -130,7 +143,7 @@ class CycleCountPage extends Component
         $service = app(CycleCountService::class);
         $tasks = $service->jalankanHarian();
 
-        $this->dispatch('alert', ['type' => 'success', 'message' => $tasks->count() . ' task cycle count dibuat.']);
+        $this->dispatch('alert', ['type' => 'success', 'message' => $tasks->count().' task cycle count dibuat.']);
     }
 
     // ===== Count =====
@@ -196,7 +209,7 @@ class CycleCountPage extends Component
         }
 
         if ($this->search) {
-            $query->where('no_task', 'like', '%' . $this->search . '%');
+            $query->where('no_task', 'like', '%'.$this->search.'%');
         }
 
         return $query->orderBy('created_at', 'desc')->paginate($this->perPage);
@@ -204,7 +217,7 @@ class CycleCountPage extends Component
 
     public function getRaksProperty(): Collection
     {
-        return app(\App\Modules\Wms\Services\CycleCountService::class)
+        return app(CycleCountService::class)
             ->raksCabang(session('cabang_id'));
     }
 

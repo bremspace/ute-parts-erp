@@ -15,6 +15,7 @@ use Livewire\Component;
 class SessionManagementPage extends Component
 {
     public string $search = '';
+
     public int $perPage = 15;
 
     protected $listeners = ['deviceLoggedOut' => '$refresh'];
@@ -26,7 +27,7 @@ class SessionManagementPage extends Component
             ->orderBy('last_activity', 'desc');
 
         if ($this->search) {
-            $query->whereHas('user', fn ($q) => $q->where('name', 'like', '%' . $this->search . '%'));
+            $query->whereHas('user', fn ($q) => $q->where('name', 'like', '%'.$this->search.'%'));
         }
 
         return $query->paginate($this->perPage);
@@ -36,6 +37,7 @@ class SessionManagementPage extends Component
     {
         if (! auth()->user()?->can('kelola-sesi')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak punya izin.']);
+
             return;
         }
 
@@ -54,6 +56,7 @@ class SessionManagementPage extends Component
     {
         if (! auth()->user()?->can('kelola-sesi')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak punya izin.']);
+
             return;
         }
 
