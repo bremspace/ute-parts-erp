@@ -125,6 +125,70 @@ export INSIGHTS_THREADS=1
 
 ---
 
+## One-Command Auto Runner: `scripts/qa-auto.sh` 🎯
+
+**Satu perintah untuk semua lingkungan** — cek PHP, RAM, install deps, jalankan full pipeline, output log terstruktur untuk AI.
+
+```bash
+# Jalankan lengkap (auto-detect RAM, install deps jika perlu, clear cache, run all)
+./scripts/qa-auto.sh
+```
+
+**Yang dilakukan otomatis:**
+1. ✅ Cek PHP version (min 8.3, dari `composer.json`)
+2. ✅ Deteksi total RAM → pilih profil `lowram` (<1GB) / `normal` (1-2GB) / `highram` (>2GB)
+3. ✅ Cek Composer & `vendor/` → `composer install` jika belum ada
+4. ✅ Clear Laravel caches (config, route, view)
+5. ✅ **Pint** — format check
+6. ✅ **PHPStan** — static analysis (level 6 + baseline, memory/proses sesuai profil)
+7. ✅ **Deptrac** — architecture check
+8. ✅ **Composer Audit** — vulnerability scan
+9. ✅ Generate 3 file log di `qa-results/`:
+   - `qa-YYYYMMDD-HHMMSS.log` — human-readable full output
+   - `qa-YYYYMMDD-HHMMSS.json` — struktur data untuk AI parsing
+   - `qa-YYYYMMDD-HHMMSS.summary.txt` — ringkasan + next actions untuk AI
+
+**Profil RAM otomatis:**
+
+| RAM | Profil | PHPStan Memory | PHPStan Parallel |
+|-----|--------|----------------|------------------|
+| < 1 GB | lowram | 256M | 1 (serial) |
+| 1-2 GB | normal | 512M | 2 |
+| > 2 GB | highram | 1G | 4 |
+
+**Output JSON untuk AI:**
+```json
+{
+  "timestamp": "20260924-132208",
+  "hostname": "New-indra",
+  "php_version": "8.4.25",
+  "ram_mb": 955,
+  "steps": [
+    {"name": "pint-format-check", "status": "success", "duration_ms": 1698, "output": "..."},
+    {"name": "phpstan", "status": "failed", "duration_ms": 10374, "output": "3 non-baseline errors..."},
+    {"name": "deptrac", "status": "success", "duration_ms": 2968, "output": "0 violations..."},
+    {"name": "composer-audit", "status": "success", "duration_ms": 1008, "output": "OK: No vulnerabilities"}
+  ]
+}
+```
+
+**AI Consumption:**
+```bash
+# 1. Jalankan auto-runner
+./scripts/qa-auto.sh
+
+# 2. Baca summary untuk next actions
+cat qa-results/qa-*.summary.txt
+
+# 3. Parse JSON untuk detail error
+jq '.steps[] | select(.status=="failed")' qa-results/qa-*.json
+
+# 4. Minta AI perbaiki error spesifik
+# "Berikut output PHPStan dari qa-auto.sh, perbaiki 3 error method.childReturnType..."
+```
+
+---
+
 ## Alur Kerja Rekomendasi
 
 ### Development (local)
