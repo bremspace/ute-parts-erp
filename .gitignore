@@ -37,3 +37,6 @@ Thumbs.db
 /.omo/
 
 .deptrac.cache
+
+# QA runtime logs
+/qa-results/
