@@ -8,16 +8,20 @@ Semua tools di bawah **gratis (MIT/BSD)**, dijalankan via terminal, output teks 
 
 ## Ringkasan Perintah
 
-| Perintah | Deskripsi |
-|----------|-----------|
-| `composer qa` | Jalankan seluruh pipeline QA (format → stan → deptrac → audit) |
-| `composer qa:format` | Cek style code dengan Laravel Pint (--test, tidak menulis file) |
-| `composer qa:stan` | Analisis statis PHPStan level 6 + baseline |
-| `composer qa:stan:lowram` | PHPStan hemat RAM (256M, 1 proses) |
-| `composer qa:stan:full` | PHPStan penuh (1G, 4 proses) untuk mesin kuat |
-| `composer qa:deptrac` | Cek arsitektur dependensi antar modul |
-| `composer qa:audit` | Scan kerentanan keamanan dependency (Composer Audit) |
-| `./scripts/qa-runner.sh [perintah] [profil]` | Wrapper fleksibel RAM (lowram/normal/highram) |
+| Perintah | Berlaku di | Deskripsi |
+|----------|-----------|-----------|
+| `composer qa-auto` | Windows, Linux, macOS | **Perintah utama** — cek env, deteksi RAM, install deps, pipeline QA, tulis log |
+| `php scripts/qa-auto.php` | Windows, Linux, macOS | Sama seperti di atas, tanpa composer |
+| `composer qa` | Windows, Linux, macOS | Pipeline QA saja (format → stan → deptrac → audit) |
+| `composer qa:format` | Windows, Linux, macOS | Cek style code dengan Laravel Pint (--test, tidak menulis file) |
+| `composer qa:stan` | Windows, Linux, macOS | Analisis statis PHPStan level 6 + baseline |
+| `composer qa:stan:lowram` | Windows, Linux, macOS | PHPStan hemat RAM (256M, serial) |
+| `composer qa:stan:full` | Windows, Linux, macOS | PHPStan penuh (1G, paralel) untuk mesin kuat |
+| `composer qa:deptrac` | Windows, Linux, macOS | Cek arsitektur dependensi antar modul |
+| `composer qa:audit` | Windows, Linux, macOS | Scan kerentanan keamanan dependency (Composer Audit) |
+| `./scripts/qa-runner.sh [perintah] [profil]` | Linux, macOS | Wrapper fleksibel RAM (padanan `.php` ada di bawah) |
+
+> Untuk **Windows**, gunakan `composer qa-auto` atau `php scripts/qa-auto.php`. Script `.sh` hanya untuk Linux/macOS.
 
 ---
 
@@ -99,7 +103,148 @@ composer audit --no-interaction
 
 ---
 
-## Wrapper Fleksibel RAM: `scripts/qa-runner.sh`
+## Perintah Utama (Universal): `scripts/qa-auto.php`
+
+Runner ini berbasis PHP, bukan bash, sehingga **perintah yang sama** jalan di Windows, Linux, dan macOS. Windows tidak memerlukan bash, Git Bash, maupun WSL.
+
+### Cara menjalankan
+
+Selalu jalankan dari **folder root project** (tempat `composer.json` berada).
+
+| OS | Perintah |
+|----|----------|
+| Windows (PowerShell / CMD) | `composer qa-auto` |
+| Windows (PowerShell / CMD) | `php scripts/qa-auto.php` |
+| Linux | `composer qa-auto` |
+| Linux | `php scripts/qa-auto.php` |
+| macOS | `composer qa-auto` |
+| macOS | `php scripts/qa-auto.php` |
+
+Kedua perintah itu identik — `composer qa-auto` hanyalah alias yang memanggil `php scripts/qa-auto.php`.
+
+### Yang dilakukan otomatis
+
+1. Cek versi PHP (minimal 8.3, mengikuti `composer.json`) — berhenti dengan pesan jelas bila tidak sesuai
+2. Deteksi total RAM → pilih profil `lowram` / `normal` / `highram`
+3. Cek Composer dan `vendor/autoload.php` → jalankan `composer install` bila dependency belum ada
+4. Verifikasi binary `vendor/bin/pint`, `phpstan`, `deptrac`
+5. Clear cache Laravel (config, route, view)
+6. Jalankan pipeline: **Pint** → **PHPStan** → **Deptrac** → **Composer Audit**
+7. Tulis 3 file log di `qa-results/`
+
+Pipeline tidak berhenti di tengah bila satu step gagal. Semua step tetap dijalankan, lalu exit code menyatakan ada atau tidaknya kegagalan.
+
+### Profil RAM otomatis
+
+| RAM | Profil | PHPStan memory | PHPStan paralel |
+|-----|--------|----------------|-----------------|
+| < 1 GB | `lowram` | 256M | tidak (serial) |
+| 1–2 GB | `normal` | 512M | ya (2 proses) |
+| > 2 GB | `highram` | 1G | ya (4 proses) |
+
+Deteksi RAM membaca `/proc/meminfo` langsung di Linux tanpa memanggil program eksternal. Bila RAM tidak terdeteksi, runner memakai profil paling aman (`lowram`) dan memberi tahu. Untuk memaksa nilai tertentu, set environment variable:
+
+```powershell
+# Windows PowerShell
+$env:SYSTEM_TOTAL_MEMORY_MB="2048"; php scripts/qa-auto.php
+```
+
+```bash
+# Linux / macOS
+SYSTEM_TOTAL_MEMORY_MB=2048 php scripts/qa-auto.php
+```
+
+### Output log
+
+```
+qa-results/
+├── qa-<timestamp>.log           # output lengkap, human-readable
+├── qa-<timestamp>.json          # terstruktur, siap di-parse AI
+└── qa-<timestamp>.summary.txt   # ringkasan status + Next Actions for AI
+```
+
+Ketiganya memakai newline `\n` dan encoding UTF-8, sehingga konsisten di semua OS (tidak ada `\r\n` yang mengganggu diff atau parsing).
+
+Struktur JSON:
+
+```json
+{
+  "timestamp": "20260924-153908",
+  "hostname": "New-indra",
+  "os": "Linux",
+  "php_version": "8.4.25",
+  "ram_mb": 955,
+  "profile": "lowram",
+  "phpstan_memory": "256M",
+  "phpstan_parallel": false,
+  "overall_status": "failed",
+  "steps": [
+    {"name": "cache-clear", "status": "success", "duration_ms": 2291, "output": "..."},
+    {"name": "pint-format-check", "status": "success", "duration_ms": 2623, "output": "..."},
+    {"name": "phpstan", "status": "failed", "duration_ms": 16546, "output": "3 non-baseline errors..."},
+    {"name": "deptrac", "status": "success", "duration_ms": 3167, "output": "0 violations..."},
+    {"name": "composer-audit", "status": "success", "duration_ms": 1533, "output": "No vulnerabilities"}
+  ]
+}
+```
+
+`steps[].output` dibatasi 200 baris pertama agar file tidak membengkak. Output lengkap tersedia di file `.log`.
+
+### Cara dibantu AI
+
+```bash
+# 1. Jalankan auto-runner
+php scripts/qa-auto.php
+
+# 2. Baca ringkasan — berisi status tiap step + Next Actions for AI
+cat qa-results/qa-*.summary.txt
+```
+
+Contoh isi bagian Next Actions:
+
+```
+Next Actions for AI:
+  - FIX: phpstan — [ERROR] Found 3 errors
+  - RETRY: composer-audit — step tidak tervalidasi (kemungkinan masalah jaringan, bukan bug)
+```
+
+### Arti status tiap step
+
+| Status | Arti |
+|--------|------|
+| `success` | Step berjalan dan hasilnya bersih |
+| `failed` | Step berjalan dan menemukan masalah nyata — perlu diperbaiki |
+| `inconclusive` | Step tidak bisa tervalidasi, biasanya karena jaringan (contoh: `composer audit` gagal menghubungi packagist.org). Bukan tanda bug — cukup ulangi nanti |
+
+Untuk parsing terstruktur (punya `jq`):
+
+```bash
+jq '.steps[] | select(.status=="failed")' qa-results/qa-*.json
+```
+
+Untuk user Windows tanpa `jq`, cukup kirimkan isi `qa-*.summary.txt` atau `qa-*.json` ke AI secara langsung.
+
+---
+
+## Runner khusus Linux/macOS (opsional)
+
+Dua script shell tetap disediakan untuk user Unix/macOS yang lebih terbiasa dengan shell script. Keduanya **tidak** jalan di Windows tanpa Git Bash atau WSL —padanannya sudah tercakup oleh `qa-auto.php` di atas.
+
+### `scripts/qa-auto.sh`
+
+Padanan `qa-auto.php`:
+
+```bash
+# Jalankan lengkap
+./scripts/qa-auto.sh
+
+# Alias yang sama
+composer qa-auto
+```
+
+### `scripts/qa-runner.sh`
+
+Wrapper fleksibel per tool dengan profil RAM yang dipilih manual:
 
 ```bash
 # Default: profil lowram (<1GB), jalankan semua
@@ -115,7 +260,8 @@ composer audit --no-interaction
 # Profil tersedia: lowram | normal | highram
 ```
 
-**ENV Override** (opsional, sebelum menjalankan):
+ENV override (opsional):
+
 ```bash
 export PHPSTAN_MEMORY_LIMIT=256M
 export PHPSTAN_PROCESSES=1
@@ -123,69 +269,7 @@ export INSIGHTS_THREADS=1
 ./scripts/qa-runner.sh stan lowram
 ```
 
----
-
-## One-Command Auto Runner: `scripts/qa-auto.sh` 🎯
-
-**Satu perintah untuk semua lingkungan** — cek PHP, RAM, install deps, jalankan full pipeline, output log terstruktur untuk AI.
-
-```bash
-# Jalankan lengkap (auto-detect RAM, install deps jika perlu, clear cache, run all)
-./scripts/qa-auto.sh
-```
-
-**Yang dilakukan otomatis:**
-1. ✅ Cek PHP version (min 8.3, dari `composer.json`)
-2. ✅ Deteksi total RAM → pilih profil `lowram` (<1GB) / `normal` (1-2GB) / `highram` (>2GB)
-3. ✅ Cek Composer & `vendor/` → `composer install` jika belum ada
-4. ✅ Clear Laravel caches (config, route, view)
-5. ✅ **Pint** — format check
-6. ✅ **PHPStan** — static analysis (level 6 + baseline, memory/proses sesuai profil)
-7. ✅ **Deptrac** — architecture check
-8. ✅ **Composer Audit** — vulnerability scan
-9. ✅ Generate 3 file log di `qa-results/`:
-   - `qa-YYYYMMDD-HHMMSS.log` — human-readable full output
-   - `qa-YYYYMMDD-HHMMSS.json` — struktur data untuk AI parsing
-   - `qa-YYYYMMDD-HHMMSS.summary.txt` — ringkasan + next actions untuk AI
-
-**Profil RAM otomatis:**
-
-| RAM | Profil | PHPStan Memory | PHPStan Parallel |
-|-----|--------|----------------|------------------|
-| < 1 GB | lowram | 256M | 1 (serial) |
-| 1-2 GB | normal | 512M | 2 |
-| > 2 GB | highram | 1G | 4 |
-
-**Output JSON untuk AI:**
-```json
-{
-  "timestamp": "20260924-132208",
-  "hostname": "New-indra",
-  "php_version": "8.4.25",
-  "ram_mb": 955,
-  "steps": [
-    {"name": "pint-format-check", "status": "success", "duration_ms": 1698, "output": "..."},
-    {"name": "phpstan", "status": "failed", "duration_ms": 10374, "output": "3 non-baseline errors..."},
-    {"name": "deptrac", "status": "success", "duration_ms": 2968, "output": "0 violations..."},
-    {"name": "composer-audit", "status": "success", "duration_ms": 1008, "output": "OK: No vulnerabilities"}
-  ]
-}
-```
-
-**AI Consumption:**
-```bash
-# 1. Jalankan auto-runner
-./scripts/qa-auto.sh
-
-# 2. Baca summary untuk next actions
-cat qa-results/qa-*.summary.txt
-
-# 3. Parse JSON untuk detail error
-jq '.steps[] | select(.status=="failed")' qa-results/qa-*.json
-
-# 4. Minta AI perbaiki error spesifik
-# "Berikut output PHPStan dari qa-auto.sh, perbaiki 3 error method.childReturnType..."
-```
+Untuk menjalankan satu tool saja tanpa wrapper, perintah `composer qa:stan`, `composer qa:deptrac`, dan sejenisnya tetap dapat dipakai langsung di semua OS.
 
 ---
 
@@ -193,7 +277,10 @@ jq '.steps[] | select(.status=="failed")' qa-results/qa-*.json
 
 ### Development (local)
 ```bash
-# Sebelum commit
+# Cara tercepat — cek semuanya sekaligus, semua OS
+php scripts/qa-auto.php
+
+# Atau jalankan per tool (semua OS)
 composer qa:format       # cek style
 composer qa:stan         # cek tipe (pakai baseline)
 composer qa:deptrac      # cek arsitektur
@@ -214,22 +301,26 @@ jobs:
           extensions: mbstring, xml, pdo, pdo_mysql
           coverage: none
       - run: composer install --prefer-dist --no-progress
-      - run: composer qa
-        env:
-          PHPSTAN_MEMORY_LIMIT: 512M
-          PHPSTAN_PROCESSES: 2
+      - run: composer qa-auto
+      - name: Upload QA logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-results
+          path: qa-results/
 ```
 
 ### AI-Assisted Fix Loop
 ```bash
-# 1. Jalankan tool, simpan output
-composer qa:stan 2>&1 | tee phpstan-output.txt
+# 1. Jalankan auto-runner (semua OS) — log otomatis tersimpan di qa-results/
+php scripts/qa-auto.php
 
 # 2. Berikan output ke AI
-# "Berikut output PHPStan, perbaiki error di file X: ..."
+# "Berikut output PHPStan dari qa-auto, perbaiki error di file X: ..."
+# Carrier: qa-results/qa-<timestamp>.summary.txt atau .json
 
 # 3. Setelah fix, jalankan ulang
-composer qa:stan
+php scripts/qa-auto.php
 ```
 
 ---
@@ -238,7 +329,11 @@ composer qa:stan
 
 | Masalah | Solusi |
 |---------|--------|
-| PHPStan OOM (killed) | Kurangi `memory-limit`, set `--processes=1`, gunakan `qa:stan:lowram` |
+| Script `.sh` tidak jalan di Windows | Gunakan `composer qa-auto` atau `php scripts/qa-auto.php` — keduanya universal tanpa bash/Git Bash/WSL |
+| `php` tidak dikenali di Windows | PHP belum ada di PATH. Pasang PHP (contoh: [php.net](https://php.net/downloads) atau XAMPP/Laragon), lalu tambahkan folder PHP ke PATH |
+| `composer` tidak dikenali di Windows | Pasang [Composer](https://getcomposer.org/Composer-Setup.exe), atau jalankan `php composer.phar qa-auto` bila memakai file lokal |
+| RAM tidak terdeteksi otomatis | Set env `SYSTEM_TOTAL_MEMORY_MB` (PowerShell: `$env:SYSTEM_TOTAL_MEMORY_MB="2048"`) |
+| PHPStan OOM (killed) | Kurangi `memory-limit`, jalankan tanpa `--parallel`, atau pakai `composer qa:stan:lowram` |
 | PHPStan baseline tidak terbaca | Pastikan `phpstan-baseline.neon` ada di root & di-include di `phpstan.neon` |
 | Deptrac violation baru | Tambah edge ke `deptrac.php` ruleset layer ybs (`->accesses($targetLayer)`) |
 | Pint gagal di file generated | Exclude di `pint.json` (`"exclude": ["bootstrap/cache/*", "storage/*"]`) |
@@ -254,8 +349,10 @@ composer qa:stan
 | `phpstan.neon` | Config PHPStan level 6 + baseline include |
 | `phpstan-baseline.neon` | 1122 error existing (auto-generated) — **commit file ini** |
 | `deptrac.php` | Layer & ruleset arsitektur modul |
-| `scripts/qa-runner.sh` | Wrapper CLI fleksibel RAM |
-| `composer.json` → `scripts.qa*` | Entry point `composer qa` |
+| `scripts/qa-auto.php` | Runner QA universal (Windows/Linux/macOS) |
+| `scripts/qa-auto.sh` | Padanan `.php` khusus Linux/macOS |
+| `scripts/qa-runner.sh` | Wrapper CLI fleksibel RAM (Linux/macOS) |
+| `composer.json` → `scripts.qa*` | Entry point `composer qa` dan `composer qa-auto` |
 
 ---
 
@@ -293,4 +390,4 @@ Sebelum push:
 - [ ] `composer qa:audit` → No vulnerabilities
 - [ ] `php artisan view:cache` → OK
 - [ ] Test fitur terkait (`vendor/bin/phpunit --filter=NamaTest`) → PASS
-- [ ] Semua file config baru (`phpstan.neon`, `phpstan-baseline.neon`, `deptrac.php`, `scripts/qa-runner.sh`, `docs/QA-TOOLS.md`) di-commit
+- [ ] Semua file config baru (`phpstan.neon`, `phpstan-baseline.neon`, `deptrac.php`, `scripts/qa-auto.php`, `docs/QA-TOOLS.md`) di-commit

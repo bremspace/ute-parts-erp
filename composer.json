@@ -75,6 +75,7 @@
         "qa:deptrac": "vendor/bin/deptrac analyse --no-progress",
         "qa:insights": "vendor/bin/phpinsights analyse app --no-interaction --min-quality=0 --min-complexity=0 --min-architecture=0 --min-style=0 --threads=1",
         "qa:audit": "composer audit --no-interaction",
+        "qa-auto": "@php scripts/qa-auto.php",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
@@ -105,7 +106,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "dealerdirect/phpcodesniffer-composer-installer": false
         }
     },
     "minimum-stability": "stable",
