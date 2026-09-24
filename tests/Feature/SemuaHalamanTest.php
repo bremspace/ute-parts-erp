@@ -4,11 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\Utang;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Services\GrnService;
 use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -166,7 +169,7 @@ class SemuaHalamanTest extends TestCase
         $this->assertNotNull($no);
     }
 
-    // [T-10] PO kredit: dibuat → dikirim → diterima (stok + jurnal) → bayar → sisa utang updated
+    // [T-10] PO kredit: dibuat → dikirim → diterima via GRN (stok + jurnal AP) → bayar → sisa utang updated
     public function test_po_kredit_diterima_dan_dibayar(): void
     {
         $this->authed();
@@ -188,33 +191,66 @@ class SemuaHalamanTest extends TestCase
         ])->assertSuccessful();
         $poId = $poResp->json('data.id');
 
-        // Kirim → terima
+        // Kirim
         $this->putJson("/api/wms/po/{$poId}/status", ['action' => 'dikirim'])->assertSuccessful();
-        $this->putJson("/api/wms/po/{$poId}/status", ['action' => 'diterima'])->assertSuccessful();
+
+        // [F2-2] Penerimaan langsung via API DITUTUP — PO 'dikirim' tanpa GRN wajib 422
+        $this->putJson("/api/wms/po/{$poId}/status", ['action' => 'diterima'])->assertStatus(422);
+
+        // Terima lewat GRN kanonik: qty sesuai (2/2) → auto-finalisasi →
+        // stok masuk + jurnal AP + PO status 'diterima'
+        $po = PurchaseOrder::with('items')->findOrFail($poId);
+        $grn = app(GrnService::class)->inputGudang($po, [$produk->id => 2], auth()->id());
+
+        $this->assertEquals('terima', $grn->status, 'GRN qty sesuai wajib langsung terima');
+        $this->assertDatabaseHas('purchase_order', ['id' => $poId, 'status' => 'diterima']);
 
         // Stok gudang bertambah 2
         $this->assertDatabaseHas('stok_items', ['produk_id' => $produk->id, 'gudang_id' => $gudang->id, 'jumlah' => $stokAwal + 2]);
 
-        // Jurnal pembelian: Persediaan 130-01 debit 200000, Utang 210-01 kredit 200000
+        // Jurnal GRN (AP): Persediaan 130-01 debit 200000, Utang 210-01 kredit 200000
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'sumber' => 'pembelian',
+            'no_jurnal' => $grn->no_grn,
+            'sumber' => 'grn',
             'akun_coa_id' => AkunCOA::where('kode', '130-01')->first()->id,
             'debit' => 200000,
         ]);
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'sumber' => 'pembelian',
+            'no_jurnal' => $grn->no_grn,
+            'sumber' => 'grn',
             'akun_coa_id' => AkunCOA::where('kode', '210-01')->first()->id,
             'kredit' => 200000,
         ]);
+
+        // Subledger Utang (AP): 1 baris per PO, jumlah = jurnal 210-01, cabang-scoped
+        $utang = Utang::where('referensi_tipe', PurchaseOrder::class)
+            ->where('referensi_id', $poId)
+            ->first();
+        $this->assertNotNull($utang, 'Finalisasi GRN wajib membuat baris Utang subledger');
+        $this->assertSame(1, Utang::count(), 'Tepat 1 baris Utang per PO (idempoten)');
+        $this->assertEquals(200000, (float) $utang->jumlah, 'Jumlah Utang = jurnal AP GRN');
+        $this->assertEquals((int) session('cabang_id'), (int) $utang->cabang_id, 'Utang wajib stamp cabang_id');
+        $this->assertEquals('belum_lunas', $utang->status);
 
         // Bayar parsial 50000
         $this->postJson("/api/wms/po/{$poId}/bayar", ['jumlah' => 50000])->assertSuccessful();
         $this->assertDatabaseHas('purchase_order', ['id' => $poId, 'total_dibayar' => 50000]);
 
+        // Utang subledger ikut berkurang oleh bayarPO
+        $utang->refresh();
+        $this->assertEquals(50000, (float) $utang->jumlah_dibayar, 'bayarPO wajib mengurangi Utang subledger');
+        $this->assertEquals('sebagian', $utang->status);
+        $this->assertEquals(150000, $utang->sisa);
+        $this->assertSame(1, Utang::count(), 'Pembayaran tidak boleh membuat baris Utang baru');
+
         // Jurnal bayar: Utang debit 50000, Kas kredit 50000
         $this->assertDatabaseHas('jurnal_akuntansi', [
             'akun_coa_id' => AkunCOA::where('kode', '210-01')->first()->id,
             'debit' => 50000,
+        ]);
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'akun_coa_id' => AkunCOA::where('kode', '110-01')->first()->id,
+            'kredit' => 50000,
         ]);
     }
 

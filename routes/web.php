@@ -23,6 +23,7 @@ use App\Modules\Report\Livewire\ReportBuilder;
 use App\Modules\Reseller\Livewire\ResellerDashboard;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Wms\Livewire\CycleCountPage;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
 use App\Modules\Wms\Livewire\WmsDashboard;
 use App\Modules\Wms\Models\Produk;
@@ -229,6 +230,12 @@ Route::prefix('app')->middleware('auth')->group(function () {
     // WMS Gudang & Stok Screen — [F2-2] RBAC: permission wms.view (pola servis.view/crm.view)
     Route::get('/wms', WmsDashboard::class)
         ->name('wms')
+        ->middleware('permission:wms.view');
+
+    // [F3-7] Cycle Count Otomatis (G-18) — jadwal CRUD + daftar task count
+    // RBAC: permission wms.view utk lihat; mutasi (jadwal/count) di-gate wms.opname di komponen
+    Route::get('/wms/cycle-count', CycleCountPage::class)
+        ->name('wms.cycle-count')
         ->middleware('permission:wms.view');
 
     // Servis HP Kanban Screen — [T-06] wajib role dgn permission servis.view (staf)

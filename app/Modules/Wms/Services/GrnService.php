@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Services;
 
+use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
@@ -24,6 +25,10 @@ use Illuminate\Validation\ValidationException;
  * - Qty partial/tolak → status draft + approval F1-1 (rule entity_type 'grn');
  *   setujui via ApprovalService::proses (hook) atau tab GRN → jurnal AP + stok masuk.
  * - Idempoten: transisi hanya dari status 'draft'; JurnalService::post menjaga no_jurnal unik.
+ * - Subledger Utang (AP): finalisasi membuat 1 baris Utang per PO (kunci
+ *   referensi_tipe=PurchaseOrder + referensi_id) dengan jumlah = jurnal 210-01
+ *   yang diposting — dipakai Laporan Utang & dikurangi PurchaseOrderService::bayarPO.
+ *   Bukan jurnal kedua — murni subledger, idempoten terhadap dobel finalize.
  * - [F2-3] Produk sn=true: $snPerProduk wajib — jumlah SN == qty_received, unik,
  *   belum terdaftar; baris nomor_seri dibuat saat GRN finalisasi (kedua jalur).
  *   Konflik SN saat finalisasi approval → ValidationException (bukan Exception mentah).
@@ -212,7 +217,8 @@ class GrnService
         }
 
         $totalHpp = (float) $grn->total_hpp;
-        $noPo = $grn->purchaseOrder?->no_po ?? '-';
+        $po = $grn->purchaseOrder()->first();
+        $noPo = $po?->no_po ?? '-';
 
         // [F2-3] SN produk sn=true: validasi ulang + simpan baris nomor_seri 'tersedia'
         // SEBELUM jurnal — konflik (SN sudah terdaftar) → throw → rollback seluruh GRN.
@@ -261,6 +267,10 @@ class GrnService
                 Grn::class,
                 $grn->id
             );
+
+            // Subledger Utang (AP) — jumlah sama dgn jurnal 210-01 di atas,
+            // tanpa posting jurnal tambahan (lihat catatUtang).
+            $this->catatUtang($grn, $po, $totalHpp);
         }
 
         foreach ($grn->item_qty_received ?? [] as $item) {
@@ -276,10 +286,52 @@ class GrnService
 
         // [F2-2] PO → 'diterima' saat finalisasi — cegah penerimaan ganda
         // via jalur legacy (PoTab::terimaPo / API updatePoStatus).
-        $po = $grn->purchaseOrder()->first();
         if ($po && $po->status !== 'diterima') {
             $po->update(['status' => 'diterima']);
         }
+    }
+
+    /**
+     * Catat subledger Utang (AP) untuk PO yang baru diterima via GRN.
+     *
+     * - Mencerminkan jurnal 210-01 yang baru diposting di selesaikanGrn —
+     *   TANPA posting jurnal kedua (murni baris subledger).
+     * - Idempoten: kunci (referensi_tipe = PurchaseOrder::class, referensi_id = po_id)
+     *   — satu baris Utang per PO; dobel finalize (auto qty-sesuai + approve path)
+     *   atau row legacy dari PurchaseOrderService::terimaBarang → no-op.
+     * - Kunci ini juga yang dibaca PurchaseOrderService::bayarPO utk mengurangi
+     *   jumlah_dibayar / status — sehingga pembayaran PO menekan Utang ini.
+     * - cabang_id di-stamp dari GRN utk scoping Laporan/export Utang.
+     * - Tanpa Utang bila PO tidak ada (defensif) — jurnal tetap sudah diposting.
+     */
+    protected function catatUtang(Grn $grn, ?PurchaseOrder $po, float $jumlah): void
+    {
+        if (! $po) {
+            return;
+        }
+
+        $ada = Utang::where('referensi_tipe', PurchaseOrder::class)
+            ->where('referensi_id', $po->id)
+            ->exists();
+        if ($ada) {
+            return; // idempoten — sudah tercatat (finalize ganda / jalur legacy)
+        }
+
+        // Nomor mengikuti pola legacy PurchaseOrderService::terimaBarang (UTG-Ymd-####)
+        $count = Utang::whereDate('created_at', now()->toDateString())->count() + 1;
+
+        Utang::create([
+            'no_utang' => sprintf('UTG-%s-%04d', now()->format('Ymd'), $count),
+            'referensi_tipe' => PurchaseOrder::class,
+            'referensi_id' => $po->id,
+            'cabang_id' => $grn->cabang_id,
+            'kreditor_nama' => $po->supplier?->nama,
+            'jumlah' => round($jumlah, 2),
+            'jumlah_dibayar' => 0,
+            'jatuh_tempo' => $po->jatuh_tempo,
+            'status' => 'belum_lunas',
+            'keterangan' => "Utang pembelian PO {$po->no_po} — GRN {$grn->no_grn}",
+        ]);
     }
 
     /**

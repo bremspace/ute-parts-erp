@@ -50,23 +50,41 @@ class SidRekonstruksiStok extends Command
 
     // analisa
     private array $labelDist = [];
-    private int $both = 0, $onlyIn = 0, $onlyOut = 0, $none = 0;
-    private array $lokasiStok = [], $lokasiCabang = [];
+
+    private int $both = 0;
+
+    private int $onlyIn = 0;
+
+    private int $onlyOut = 0;
+
+    private int $none = 0;
+
+    private array $lokasiStok = [];
+
+    private array $lokasiCabang = [];
+
     private array $jenisDist = [];
+
     private array $gudangDist = [];
 
     /** @var array<string,int> */
     private array $produkMap = [];
+
     /** @var array<string,int> */
     private array $skuMap = [];
+
     /** @var array<string,int> gudang kode + nama uppercase → id */
     private array $gudangMap = [];
+
     /** @var array<string,int> transaksi.no_transaksi → id */
     private array $transaksiMap = [];
+
     /** @var array<int,int> produk_id → stok_warning */
     private array $stokWarningMap = [];
+
     /** @var array<int,int> produk_id → sku_variant_id */
     private array $skuByProduk = [];
+
     /** @var string[] */
     private array $deviasiKatalog = [];
 
@@ -112,6 +130,7 @@ class SidRekonstruksiStok extends Command
                 if (! is_array($p)) {
                     $this->none++;
                     $offset += 2000;
+
                     continue;
                 }
                 $label = trim((string) ($p['transaksi'] ?? ''));
@@ -217,6 +236,7 @@ class SidRekonstruksiStok extends Command
                 $kodeSumber = trim((string) $raw->kode_sumber);
                 if ($kodeSumber === '' || isset($migrated[$kodeSumber])) {
                     $this->counts['c05_skipped']++;
+
                     continue;
                 }
 
@@ -521,6 +541,7 @@ class SidRekonstruksiStok extends Command
         if (in_array($label, ['PEMBELIAN'], true)) {
             return 'pembelian';
         }
+
         // DEL*, RETURN*, label tak dikenal/kosong → koreksi (label asli tetap di catatan)
         return 'koreksi';
     }
@@ -659,28 +680,28 @@ class SidRekonstruksiStok extends Command
             $deviasi = '_(daftar lengkap >5: lihat DB via rekonsiliasi — katalog 50 baris teratas di bawah)_';
         }
 
-        $body = "# LAPORAN FASE 3 (C-05..C-06) — REKONSTRUKSI STOK — ".date('Y-m-d H:i:s')."\n\n"
-            . "Mode: **{$mode}** — Perintah: `php artisan sid:rekonstruksi-stok` (idempotent, 2× run = 0 insert kedua)\n\n"
-            . implode("\n", $this->reportLines)."\n"
-            . "## C-05 stok_log 1:1 dari arus_stok\n\n"
-            . "- staging diproses: **{$this->counts['c05_staging']}**, inserted: **{$this->counts['c05_inserted']}**, skip (sudah ada, guard `AS:<kode_sumber>`): **{$this->counts['c05_skipped']}**\n"
-            . "- **DEVIASI GUARD IDEMPOTEN:** spec memakai catatan `AS:<kode>` (payload kode) tapi payload `kode` TIDAK unik (4.015 distinct utk 19.286 baris — `TRX-*` duplikat x7 antar partisi bulanan) → guard memakai **`kode_sumber`** (19286/19286 unik, format `arus_stok_<partisi>|<kode>`). Catatan tetap pola `AS:<kode_sumber> | no: ...`.\n"
-            . "- split baris (masuk>0 DAN keluar>0 → 2 baris `|M`+`|K`): **{$this->counts['c05_split']}** → +2 baris per split\n"
-            . "- dummy produk baru `[ARSIP-SID] <kode_barang>` (produk_id NOT NULL di DB): **{$this->counts['c05_dummy_baru']}**, sku_variant_id NULL: **{$this->counts['c05_sku_null']}**\n"
-            . "- gudang_default (lokasi tak dikenal/kosong → 6): **{$this->counts['c05_gudang_default']}**\n"
-            . "- referensi_tipe Transaksi terisi: **{$this->counts['c05_ref_ada']}**, NULL (no_transaksi kosong/tak match): **{$this->counts['c05_ref_null']}** — referensi_id DIISI (kolom ADA & nullable di DB; spec menyebut 'tak ada kolom referensi_id' — ternyata ada, diisi utk auditability, no_transaksi TETAP di catatan)\n"
-            . "- sisa ≠ awal+masuk−keluar (aritma SID tidak konsisten; data disalin apa adanya): **{$this->counts['c05_sisa_beda']}** baris\n\n"
-            . "Distribusi jenis stok_log:\n".$jenis."\n\n"
-            . "Distribusi gudang_id stok_log:\n".$gudang."\n\n"
-            . "## C-06 stok_items (saldo) — sumber: **arus last-sisa** (last baris per (kode_barang, gudang) by tanggal desc + id desc → sisa; spec 'SALIN dari arus')\n\n"
-            . "- wipe stok_items artefak lama: **{$this->counts['c06_wipe']}** (semua created_at <= 2026-09-21 08:19:59 = artefak migrasi, verified)\n"
-            . "- insert dari arus (sisa>0): **{$this->counts['c06_arus_insert']}**; skip sisa=0: **{$this->counts['c06_arus_zero']}**; skip sisa<0: **{$this->counts['c06_arus_neg']}** (749 baris arus sisa<0 seluruhnya; final per produk-gudang di hitungan skip)\n"
-            . "- fallback payload barang utk produk TANPA arus (toko→gudang6, gudang→gudang5, HANYA >0): insert **{$this->counts['c06_fallback_insert']}**, skip (produk sudah punya baris arus): **{$this->counts['c06_fallback_skip']}**\n"
-            . "- jumlah_minimum = produk.stok_warning ?? 0 — **A-02: SEMUA stok_warning = 0.00 (0 baris >0 di payload warningstok juga) → 0 untuk semua**\n\n"
-            . "## Rekonsiliasi\n\n"
-            . "- arus-last-sisa vs stok_log rekonstruksi (last jumlah_setelah per produk,gudang): mismatch **{$this->counts['rek_stoklog_mismatch']}** (harus 0 — 1:1)\n"
-            . "- arus-last-sisa vs payload toko/gudang (produk dgn arus DAN payload): dicek **{$this->counts['rek_deviasi_cek']}**, deviasi >5: **{$this->counts['rek_deviasi_gt5']}**\n"
-            . $deviasi."\n\n";
+        $body = '# LAPORAN FASE 3 (C-05..C-06) — REKONSTRUKSI STOK — '.date('Y-m-d H:i:s')."\n\n"
+            ."Mode: **{$mode}** — Perintah: `php artisan sid:rekonstruksi-stok` (idempotent, 2× run = 0 insert kedua)\n\n"
+            .implode("\n", $this->reportLines)."\n"
+            ."## C-05 stok_log 1:1 dari arus_stok\n\n"
+            ."- staging diproses: **{$this->counts['c05_staging']}**, inserted: **{$this->counts['c05_inserted']}**, skip (sudah ada, guard `AS:<kode_sumber>`): **{$this->counts['c05_skipped']}**\n"
+            ."- **DEVIASI GUARD IDEMPOTEN:** spec memakai catatan `AS:<kode>` (payload kode) tapi payload `kode` TIDAK unik (4.015 distinct utk 19.286 baris — `TRX-*` duplikat x7 antar partisi bulanan) → guard memakai **`kode_sumber`** (19286/19286 unik, format `arus_stok_<partisi>|<kode>`). Catatan tetap pola `AS:<kode_sumber> | no: ...`.\n"
+            ."- split baris (masuk>0 DAN keluar>0 → 2 baris `|M`+`|K`): **{$this->counts['c05_split']}** → +2 baris per split\n"
+            ."- dummy produk baru `[ARSIP-SID] <kode_barang>` (produk_id NOT NULL di DB): **{$this->counts['c05_dummy_baru']}**, sku_variant_id NULL: **{$this->counts['c05_sku_null']}**\n"
+            ."- gudang_default (lokasi tak dikenal/kosong → 6): **{$this->counts['c05_gudang_default']}**\n"
+            ."- referensi_tipe Transaksi terisi: **{$this->counts['c05_ref_ada']}**, NULL (no_transaksi kosong/tak match): **{$this->counts['c05_ref_null']}** — referensi_id DIISI (kolom ADA & nullable di DB; spec menyebut 'tak ada kolom referensi_id' — ternyata ada, diisi utk auditability, no_transaksi TETAP di catatan)\n"
+            ."- sisa ≠ awal+masuk−keluar (aritma SID tidak konsisten; data disalin apa adanya): **{$this->counts['c05_sisa_beda']}** baris\n\n"
+            ."Distribusi jenis stok_log:\n".$jenis."\n\n"
+            ."Distribusi gudang_id stok_log:\n".$gudang."\n\n"
+            ."## C-06 stok_items (saldo) — sumber: **arus last-sisa** (last baris per (kode_barang, gudang) by tanggal desc + id desc → sisa; spec 'SALIN dari arus')\n\n"
+            ."- wipe stok_items artefak lama: **{$this->counts['c06_wipe']}** (semua created_at <= 2026-09-21 08:19:59 = artefak migrasi, verified)\n"
+            ."- insert dari arus (sisa>0): **{$this->counts['c06_arus_insert']}**; skip sisa=0: **{$this->counts['c06_arus_zero']}**; skip sisa<0: **{$this->counts['c06_arus_neg']}** (749 baris arus sisa<0 seluruhnya; final per produk-gudang di hitungan skip)\n"
+            ."- fallback payload barang utk produk TANPA arus (toko→gudang6, gudang→gudang5, HANYA >0): insert **{$this->counts['c06_fallback_insert']}**, skip (produk sudah punya baris arus): **{$this->counts['c06_fallback_skip']}**\n"
+            ."- jumlah_minimum = produk.stok_warning ?? 0 — **A-02: SEMUA stok_warning = 0.00 (0 baris >0 di payload warningstok juga) → 0 untuk semua**\n\n"
+            ."## Rekonsiliasi\n\n"
+            ."- arus-last-sisa vs stok_log rekonstruksi (last jumlah_setelah per produk,gudang): mismatch **{$this->counts['rek_stoklog_mismatch']}** (harus 0 — 1:1)\n"
+            ."- arus-last-sisa vs payload toko/gudang (produk dgn arus DAN payload): dicek **{$this->counts['rek_deviasi_cek']}**, deviasi >5: **{$this->counts['rek_deviasi_gt5']}**\n"
+            .$deviasi."\n\n";
 
         if ($this->counts['rek_deviasi_gt5'] > 0) {
             $body .= "Katalog deviasi (50 teratas):\n```\n".implode("\n", array_slice($deviasiKatalog ?? [], 0, 50))."\n```\n";
@@ -689,12 +710,12 @@ class SidRekonstruksiStok extends Command
         $produkTanpaStok = DB::table('produk')->count() - DB::table('stok_items')->distinct('produk_id')->count('produk_id');
 
         $body .= "\n## State DB akhir\n\n"
-            . "- stok_log total: **".DB::table('stok_log')->count()."** (target 19.286 + 52 split = 19.338)\n"
-            . "- stok_log is_migrasi_sid=1: **".DB::table('stok_log')->where('is_migrasi_sid', 1)->count()."**\n"
-            . "- stok_items total: **".DB::table('stok_items')->count()."**\n"
-            . "- produk tanpa stok_items (saldo 0 implisit): **{$produkTanpaStok}** dari ".DB::table('produk')->count()." produk\n"
-            . "- produk dummy `[ARSIP-SID]` total: **".DB::table('produk')->where('nama', 'like', '[ARSIP-SID] %')->count()."**\n"
-            . "\n---\nTarget verifikasi: stok_log = 19.286 (+split), 2× run = 0 insert kedua.\n";
+            .'- stok_log total: **'.DB::table('stok_log')->count()."** (target 19.286 + 52 split = 19.338)\n"
+            .'- stok_log is_migrasi_sid=1: **'.DB::table('stok_log')->where('is_migrasi_sid', 1)->count()."**\n"
+            .'- stok_items total: **'.DB::table('stok_items')->count()."**\n"
+            ."- produk tanpa stok_items (saldo 0 implisit): **{$produkTanpaStok}** dari ".DB::table('produk')->count()." produk\n"
+            .'- produk dummy `[ARSIP-SID]` total: **'.DB::table('produk')->where('nama', 'like', '[ARSIP-SID] %')->count()."**\n"
+            ."\n---\nTarget verifikasi: stok_log = 19.286 (+split), 2× run = 0 insert kedua.\n";
 
         file_put_contents($file, $body);
         $this->info("Laporan: {$file}");

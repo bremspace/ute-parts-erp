@@ -170,7 +170,7 @@ class LeadKanban extends Component
         ]);
 
         $data = $this->createForm;
-        $data['cabang_id'] = session('cabang_aktif_id');
+        $data['cabang_id'] = session('cabang_id');
 
         app(LeadService::class)->create($data);
 

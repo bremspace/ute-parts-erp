@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Modules\Akunting\Services\PajakService;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
@@ -16,7 +17,7 @@ abstract class TestCase extends BaseTestCase
     protected function seedPpnDefaults(): void
     {
         // Seed default PPN config for each test
-        $service = app(\App\Modules\Akunting\Services\PajakService::class);
+        $service = app(PajakService::class);
         $service->seedDefaults();
     }
 }

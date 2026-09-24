@@ -15,7 +15,7 @@
                             this.$dispatch('alert', { type: 'error', message: 'Harga tidak valid' });
                             return;
                         }
-                        if (val < {{ $item['harga_beli'] ?? $item['harga'] ?? 0 }}) {
+                        if (val < {{ canSeeField('harga_beli') ? ($item['harga_beli'] ?? $item['harga'] ?? 0) : ($item['harga'] ?? 0) }}) {
                             this.$dispatch('alert', { type: 'error', message: 'Harga tidak boleh di bawah modal (Rp {{ number_format($item['harga_beli'] ?? $item['harga'] ?? 0, 0, '', '') }})' });
                             return;
                         }
@@ -93,7 +93,12 @@
                                     class="w-full px-3 py-2 rounded-lg glass-input text-sm font-bold tabular-nums text-white"
                                     aria-label="Harga jual fleksibel"
                                 />
-                                <p class="text-[10px] text-up-amber/80 mt-1.5">Min: Rp {{ number_format($item['harga_beli'] ?? $item['harga'], 0, ',', '.') }}</p>
+                                <!-- Harga Beli ditampilkan hanya jika user punya permission -->
+@cansee('harga_beli')
+    <p class="text-[10px] text-up-amber/80 mt-1.5">Min: Rp {{ number_format($item['harga_beli'] ?? $item['harga'], 0, ',', '.') }}</p>
+@cannotsee('harga_beli')
+    <p class="text-[10px] text-up-amber/80 mt-1.5">Min: —</p>
+@endcansee
                                 <div class="flex gap-2 mt-2.5">
                                     <button
                                         type="button"

@@ -4,6 +4,7 @@ namespace App\Modules\Workflow\Services;
 
 use App\Models\User;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Wms\Services\CycleCountService;
 use App\Modules\Wms\Services\GrnService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Models\ApprovalRule;
@@ -139,22 +140,33 @@ class ApprovalService
     }
 
     /**
-     * [F2-2] Efek samping rantai final pada entitas — hook khusus GRN.
-     * Disetujui → GrnService finalisasi (jurnal AP + stok masuk); ditolak → status ditolak.
-     * Idempoten di sisi GrnService (hanya transisi dari status draft).
+     * [F2-2] Efek samping rantai final pada entitas — hook khusus GRN & Cycle Count.
+     * GRN: disetujui → GrnService finalisasi (jurnal AP + stok masuk); ditolak → status ditolak.
+     * [F3-7] Cycle Count MAJOR: disetujui → CycleCountService koreksi stok; ditolak → task ditolak.
+     * Idempoten di sisi service (hanya transisi dari status draft / menunggu_approval).
      */
     protected function selesaikanEntity(ApprovalRequest $request, string $status, int $actionedBy, ?string $catatan): void
     {
-        if ($request->entity_type !== 'grn') {
+        if ($request->entity_type === 'grn') {
+            $grnService = app(GrnService::class);
+
+            if ($status === 'disetujui') {
+                $grnService->setujuiGrn($request->entity_id, $actionedBy);
+            } else {
+                $grnService->tolakGrn($request->entity_id, $actionedBy, (string) $catatan);
+            }
+
             return;
         }
 
-        $grnService = app(GrnService::class);
+        if ($request->entity_type === 'cycle_count') {
+            $cycleCountService = app(CycleCountService::class);
 
-        if ($status === 'disetujui') {
-            $grnService->setujuiGrn($request->entity_id, $actionedBy);
-        } else {
-            $grnService->tolakGrn($request->entity_id, $actionedBy, (string) $catatan);
+            if ($status === 'disetujui') {
+                $cycleCountService->terapkanKoreksi((int) $request->entity_id, $actionedBy);
+            } else {
+                $cycleCountService->tolakTask((int) $request->entity_id, $actionedBy, (string) $catatan);
+            }
         }
     }
 

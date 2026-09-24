@@ -6,6 +6,7 @@ use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetAssetUrl;
 use App\Modules\Crm\Console\Commands\EksekusiBroadcastTerjadwal;
 use App\Modules\Crm\Console\Commands\RecalcTierCommand;
+use App\Modules\Wms\Jobs\CycleCountJob;
 use App\Modules\Wms\Jobs\ReorderOtomatisJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -85,6 +86,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // [F1-5] Reorder otomatis harian 03:00 (queue: stok < minimum → usulan PO)
         $schedule->job(ReorderOtomatisJob::class)->dailyAt('03:00');
+
+        // [F3-7] Cycle count — cek jadwal jatuh tempo (hari/jam per schedule) → generate
+        // sample task acak (queue database; hourly agar hormati field `jam` tiap jadwal)
+        $schedule->job(CycleCountJob::class)->hourlyAt('17');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

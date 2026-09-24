@@ -1,15 +1,19 @@
 <?php
 
+use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 return new class extends Migration
 {
     public function up(): void
     {
         // Tabel approval_rules
-        if (!Schema::hasTable('approval_rules')) {
+        if (! Schema::hasTable('approval_rules')) {
             Schema::create('approval_rules', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('cabang_id')->nullable()->constrained('cabang');
@@ -25,7 +29,7 @@ return new class extends Migration
         }
 
         // Tabel approval_requests
-        if (!Schema::hasTable('approval_requests')) {
+        if (! Schema::hasTable('approval_requests')) {
             Schema::create('approval_requests', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('approval_rule_id')->constrained('approval_rules');
@@ -46,19 +50,19 @@ return new class extends Migration
         }
 
         // Seed default approval_rules idempoten
-        $poRule = \Spatie\Permission\Models\Permission::firstOrCreate([
+        $poRule = Permission::firstOrCreate([
             'name' => 'approve-workflow',
             'guard_name' => 'web',
         ]);
-        $superAdminRole = \Spatie\Permission\Models\Role::where('name', 'super-admin')->first();
+        $superAdminRole = Role::where('name', 'super-admin')->first();
         if ($superAdminRole && ! $superAdminRole->hasPermissionTo($poRule)) {
             $superAdminRole->givePermissionTo($poRule);
         }
-        $financeRole = \Spatie\Permission\Models\Role::where('name', 'finance')->first();
+        $financeRole = Role::where('name', 'finance')->first();
         if ($financeRole && ! $financeRole->hasPermissionTo($poRule)) {
             $financeRole->givePermissionTo($poRule);
         }
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         // Insert default rules idempoten
         $rules = [
@@ -82,7 +86,7 @@ return new class extends Migration
             ],
         ];
         foreach ($rules as $rule) {
-            \App\Modules\Workflow\Models\ApprovalRule::firstOrCreate(
+            ApprovalRule::firstOrCreate(
                 ['entity_type' => $rule['entity_type'], 'cabang_id' => $rule['cabang_id']],
                 $rule
             );

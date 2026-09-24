@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\Utang;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Livewire\GrnTab;
 use App\Modules\Wms\Livewire\PoTab;
@@ -17,6 +18,7 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\GrnService;
+use App\Modules\Wms\Services\PurchaseOrderService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,6 +63,11 @@ class GrnTest extends TestCase
         AkunCOA::firstOrCreate(
             ['kode' => '210-01'],
             ['nama' => 'Utang Usaha', 'tipe' => 'kewajiban', 'kelompok' => 'utang_usaha', 'saldo_normal' => 'kredit']
+        );
+        // 110-01 Kas — dipakai jurnal bayarPO (Utang debit / Kas kredit)
+        AkunCOA::firstOrCreate(
+            ['kode' => '110-01'],
+            ['nama' => 'Kas', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit']
         );
 
         $this->cabang = Cabang::create([
@@ -268,6 +275,7 @@ class GrnTest extends TestCase
         $this->assertSame(0, JurnalAkuntansi::where('no_jurnal', $grn->no_grn)->count());
         $this->assertSame(0, StokLog::where('jenis', 'GRN')->count());
         $this->assertSame(0, StokItem::where('produk_id', $this->produk->id)->count());
+        $this->assertSame(0, Utang::count(), 'GRN ditolak tanpa finalisasi tidak boleh membuat Utang');
     }
 
     public function test_qty_diterima_melebihi_qty_po_ditolak(): void
@@ -426,6 +434,79 @@ class GrnTest extends TestCase
         $this->assertSame(0, JurnalAkuntansi::count(), 'Tidak boleh ada jurnal tanpa GRN');
     }
 
+    // ===== Regression P1: API PUT /wms/po/{id}/status tidak boleh bypass GRN (F2-2) =====
+
+    public function test_api_po_diterima_tanpa_grn_ditolak_422(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(10, 50000);
+
+        $this->actingAs($this->user, 'web');
+        $this->withSession(['cabang_id' => $this->cabang->id]);
+
+        $resp = $this->putJson("/api/wms/po/{$po->id}/status", ['action' => 'diterima']);
+        $resp->assertStatus(422)
+            ->assertJsonPath('success', false);
+        $this->assertStringContainsString('GRN', $resp->json('message') ?? '');
+
+        // Tidak ada stok, mutation, atau jurnal yang dibuat
+        $this->assertEquals('dikirim', $po->fresh()->status, 'PO tetap dikirim — penerimaan langsung via API ditutup');
+        $this->assertSame(0, StokLog::count(), 'Tidak boleh ada stok masuk tanpa GRN');
+        $this->assertSame(0, StockMutationLog::count(), 'Tidak boleh ada mutasi stok tanpa GRN');
+        $this->assertSame(0, JurnalAkuntansi::count(), 'Tidak boleh ada jurnal tanpa GRN');
+        $this->assertSame(0, StokItem::where('produk_id', $this->produk->id)->count());
+    }
+
+    public function test_terima_barang_service_dikirim_tanpa_grn_ditolak(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(10, 50000);
+
+        // Guard di service — pertahanan kalau endpoint dipanggil lagi di masa depan
+        try {
+            app(PurchaseOrderService::class)->terimaBarang($po, $this->user->id);
+            $this->fail('terimaBarang utk PO dikirim wajib ditolak — penerimaan wajib lewat GRN');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('GRN', $e->errors()['msg'][0] ?? '');
+        }
+
+        $this->assertEquals('dikirim', $po->fresh()->status);
+        $this->assertSame(0, StokLog::count(), 'Tidak boleh ada stok masuk tanpa GRN');
+        $this->assertSame(0, JurnalAkuntansi::count(), 'Tidak boleh ada jurnal tanpa GRN');
+    }
+
+    public function test_api_po_status_ops_lain_tetap_jalan_dan_grn_selesai_diterima(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(10, 50000);
+        $po->update(['status' => 'draft']);
+
+        $this->actingAs($this->user, 'web');
+        $this->withSession(['cabang_id' => $this->cabang->id]);
+
+        // Route tetap ada utk transisi lain: draft → dikirim
+        $this->putJson("/api/wms/po/{$po->id}/status", ['action' => 'dikirim'])
+            ->assertSuccessful();
+        $this->assertEquals('dikirim', $po->fresh()->status);
+
+        // GRN flow tetap menyelesaikan PO → diterima normal
+        $grn = $this->service()->inputGudang($po->fresh(), [$this->produk->id => 10], $this->user->id);
+        $this->assertEquals('terima', $grn->status);
+        $this->assertEquals('diterima', $po->fresh()->status, 'PO wajib berubah → diterima via GRN');
+
+        // Terima ulang via API → transisi tidak valid (sudah diterima), tidak dobel
+        $this->putJson("/api/wms/po/{$po->id}/status", ['action' => 'diterima'])
+            ->assertStatus(422);
+        $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', $grn->no_grn)->count(), 'Jurnal GRN tidak dobel');
+        $this->assertEquals(10, StokItem::where('produk_id', $this->produk->id)->value('jumlah'), 'Stok tidak dobel');
+
+        // Route tetap bisa dibatalkan (operasi status lain tidak terpengaruh)
+        $po2 = $this->buatPoDikirim(5, 20000);
+        $this->putJson("/api/wms/po/{$po2->id}/status", ['action' => 'dibatalkan'])
+            ->assertSuccessful();
+        $this->assertEquals('dibatalkan', $po2->fresh()->status);
+    }
+
     public function test_route_wms_butuh_permission_wms_view(): void
     {
         $teknisi = User::create([
@@ -440,5 +521,106 @@ class GrnTest extends TestCase
             ->withSession(['cabang_id' => $this->cabang->id])
             ->get('/app/wms')
             ->assertForbidden();
+    }
+
+    // ===== Subledger Utang (AP) dari finalisasi GRN =====
+
+    public function test_auto_finalisasi_membuat_satu_utang_sesuai_jurnal_ap(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(10, 50000); // total 500.000
+
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 10], $this->user->id);
+
+        $this->assertEquals('terima', $grn->status);
+
+        // Tepat SATU baris Utang — kunci per PO (kunci yang sama dibaca bayarPO)
+        $rows = Utang::where('referensi_tipe', PurchaseOrder::class)
+            ->where('referensi_id', $po->id)
+            ->get();
+        $this->assertCount(1, $rows, 'Finalisasi GRN wajib membuat 1 baris Utang subledger per PO');
+        $this->assertSame(1, Utang::count(), 'Tidak boleh ada baris Utang ganda');
+
+        $utang = $rows->first();
+
+        // Jumlah == jurnal AP yang sudah diposting (210-01 kredit) — tanpa jurnal kedua
+        $apKredit = (float) JurnalAkuntansi::where('no_jurnal', $grn->no_grn)->sum('kredit');
+        $this->assertEquals(500000, $apKredit);
+        $this->assertEquals($apKredit, (float) $utang->jumlah, 'Jumlah Utang wajib sama dgn jurnal AP GRN');
+
+        // Scoping cabang + field dasar (pola terimaBarang)
+        $this->assertEquals((int) $this->cabang->id, (int) $utang->cabang_id, 'Utang wajib stamp cabang_id GRN');
+        $this->assertEquals('belum_lunas', $utang->status);
+        $this->assertEquals(0, (float) $utang->jumlah_dibayar);
+        $this->assertEquals($this->supplier->nama, $utang->kreditor_nama);
+        $this->assertNotEmpty($utang->no_utang);
+    }
+
+    public function test_finalisasi_approval_utang_idempoten_dobel_panggil(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(10, 50000);
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 6], $this->user->id); // partial → draft
+
+        $this->assertSame(0, Utang::count(), 'GRN belum final → belum ada Utang');
+
+        $req = $this->requestGrn($grn->id);
+        $approver = $this->approver();
+        $req->proses('approved', $approver->id, 'Selisih wajar');
+
+        $this->assertEquals('terima', $grn->fresh()->status);
+        $this->assertSame(1, Utang::count(), 'Approve finalisasi → tepat 1 Utang');
+
+        $utang = Utang::first();
+        $apKredit = (float) JurnalAkuntansi::where('no_jurnal', $grn->no_grn)->sum('kredit');
+        $this->assertEquals(6 * 50000, $apKredit);
+        $this->assertEquals($apKredit, (float) $utang->jumlah, 'Jumlah Utang = qty diterima × harga beli = jurnal AP');
+        $this->assertEquals((int) $this->cabang->id, (int) $utang->cabang_id);
+
+        // Dobel finalize (auto path + approve path / inbox + tab) → idempoten:
+        // tetap 1 baris Utang, jurnal tetap 2 baris
+        $this->service()->setujuiGrn($grn->id, $approver->id);
+        $this->service()->setujuiGrn($grn->id, $approver->id);
+        $this->assertSame(1, Utang::count(), 'Finalisasi ganda tidak boleh menduplikasi Utang');
+        $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', $grn->no_grn)->count());
+    }
+
+    public function test_bayar_po_setelah_grn_mengurangi_utang_subledger(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(10, 50000); // total 500.000
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 10], $this->user->id);
+
+        $utang = Utang::where('referensi_tipe', PurchaseOrder::class)
+            ->where('referensi_id', $po->id)
+            ->firstOrFail();
+        $this->assertEquals(500000, (float) $utang->jumlah);
+        $this->assertEquals('belum_lunas', $utang->status);
+
+        $service = app(PurchaseOrderService::class);
+
+        // Bayar parsial 200.000 → sebagian
+        $service->bayarPO($po->fresh(), 200000, $this->user->id);
+        $utang->refresh();
+        $this->assertEquals(200000, (float) $utang->jumlah_dibayar, 'Pembayaran PO wajib mengurangi baris Utang dari GRN');
+        $this->assertEquals('sebagian', $utang->status);
+        $this->assertEquals(300000, $utang->sisa);
+        $this->assertSame(1, Utang::count(), 'Pembayaran tidak boleh membuat baris Utang baru');
+
+        // Bayar sisa 300.000 → lunas
+        $service->bayarPO($po->fresh(), 300000, $this->user->id);
+        $utang->refresh();
+        $this->assertEquals(500000, (float) $utang->jumlah_dibayar);
+        $this->assertEquals('lunas', $utang->status);
+        $this->assertEquals(0, $utang->sisa);
+        $this->assertSame(1, Utang::count());
+
+        // Jurnal bayar tetap ada: 210-01 debit total 500.000 (Utang debit / Kas kredit)
+        $akunUtang = AkunCOA::where('kode', '210-01')->firstOrFail();
+        $debitUtang = (float) JurnalAkuntansi::where('akun_coa_id', $akunUtang->id)->sum('debit');
+        $this->assertEqualsWithDelta(500000, $debitUtang, 0.01, 'Jurnal pembayaran 210-01 debit wajib tercatat');
+
+        // Jurnal GRN tetap hanya 2 baris (tidak dobel / tidak ada jurnal kedua)
+        $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', $grn->no_grn)->count());
     }
 }

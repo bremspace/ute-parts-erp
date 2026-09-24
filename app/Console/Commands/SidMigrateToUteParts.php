@@ -2,26 +2,28 @@
 
 namespace App\Console\Commands;
 
-use App\Modules\Akunting\Models\JurnalAkuntansi;
-use App\Modules\Akunting\Services\JurnalService;
+use App\Models\User;
+use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
-use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
-use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\SidImportMap;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
-use App\Modules\Wms\Models\TipeHp;
+use App\Modules\Wms\Models\Supplier;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -36,9 +38,11 @@ use Illuminate\Support\Str;
 class SidMigrateToUteParts extends Command
 {
     protected $signature = 'sid:migrate-ute-parts {--dry-run : Preview without committing} {--step=all : Step to run (referensi|master|transaksi|pelengkap|all)}';
+
     protected $description = 'Migrasi data SID Retail (staging raw) ke skema Ute Parts';
 
     private bool $dryRun = false;
+
     private array $stats = [
         'gudang' => 0,
         'produk' => 0,
@@ -64,7 +68,7 @@ class SidMigrateToUteParts extends Command
         }
 
         $this->info('=== SID Retail → Ute Parts Migration ===');
-        $this->info('Step: ' . $step . ($this->dryRun ? ' (dry-run)' : ''));
+        $this->info('Step: '.$step.($this->dryRun ? ' (dry-run)' : ''));
 
         // Setup cabang default untuk staging
         $cabang = Cabang::firstOrCreate(
@@ -89,22 +93,25 @@ class SidMigrateToUteParts extends Command
         }
 
         $this->printSummary();
+
         return 0;
     }
 
     private function stepReferensi(Cabang $cabang): void
     {
         $this->info("\n--- STEP 1: Referensi (Gudang dari setup_perusahaan) ---");
-        
+
         $setup = DB::table('sid_retail_raw_setup_perusahaan')->first();
         if (! $setup) {
             $this->warn('setup_perusahaan kosong, lewati');
+
             return;
         }
 
         $payload = $setup->payload_normal;
         if (! $payload) {
             $this->warn('payload_normal kosong, lewati');
+
             return;
         }
 
@@ -116,8 +123,10 @@ class SidMigrateToUteParts extends Command
 
         foreach ($lokasi as $nama) {
             $nama = trim((string) $nama);
-            if (! $nama) continue;
-            
+            if (! $nama) {
+                continue;
+            }
+
             $key = "setup_perusahaan|{$nama}";
             if ($this->dryRun) {
                 $this->line("  [DRY] Gudang: {$nama}");
@@ -137,7 +146,7 @@ class SidMigrateToUteParts extends Command
     private function stepMasterBarang(Cabang $cabang): void
     {
         $this->info("\n--- STEP 2: Master Barang (6.433) → Produk + SKU Variants ---");
-        
+
         DB::table('sid_retail_raw_barang')
             ->orderBy('id')
             ->chunkById(500, function ($chunk) use ($cabang) {
@@ -150,14 +159,20 @@ class SidMigrateToUteParts extends Command
     private function processBarang($raw, Cabang $cabang): void
     {
         $kode = trim($raw->kode_sumber);
-        if (! $kode) return;
+        if (! $kode) {
+            return;
+        }
 
         $p = json_decode($raw->payload_normal, true);
-        if (! $p) return;
+        if (! $p) {
+            return;
+        }
 
         // Filter: only BARANG type (products), skip JASA (services)
         $jenis = strtoupper(trim((string) ($p['jenis'] ?? '')));
-        if ($jenis !== 'BARANG') return; // skip services, only import products
+        if ($jenis !== 'BARANG') {
+            return;
+        } // skip services, only import products
 
         // Check already mapped
         if (SidImportMap::exists($kode, 'barang')) {
@@ -170,7 +185,9 @@ class SidMigrateToUteParts extends Command
         $satuan = trim((string) ($p['satuan'] ?? 'pcs'));
         $kategori = trim((string) ($p['golongan'] ?? 'Umum'));
         $subGol = trim((string) ($p['subgolongan1'] ?? ''));
-        if ($subGol) $kategori .= ' > ' . $subGol;
+        if ($subGol) {
+            $kategori .= ' > '.$subGol;
+        }
 
         // Satuan
         $satuanUnit = SatuanUnit::firstOrCreate(
@@ -191,11 +208,16 @@ class SidMigrateToUteParts extends Command
 
         // Kualitas - default based on price tier
         $kualitasId = null;
-        if ($hargaJual > 1000000) $kualitasNama = 'Original';
-        elseif ($hargaJual > 500000) $kualitasNama = 'Grade A';
-        elseif ($hargaJual > 200000) $kualitasNama = 'Grade B';
-        else $kualitasNama = 'Compatible';
-        
+        if ($hargaJual > 1000000) {
+            $kualitasNama = 'Original';
+        } elseif ($hargaJual > 500000) {
+            $kualitasNama = 'Grade A';
+        } elseif ($hargaJual > 200000) {
+            $kualitasNama = 'Grade B';
+        } else {
+            $kualitasNama = 'Compatible';
+        }
+
         $kualitas = KualitasProduk::firstOrCreate(
             ['nama' => $kualitasNama],
             ['is_active' => true]
@@ -208,14 +230,15 @@ class SidMigrateToUteParts extends Command
         if ($this->dryRun) {
             $this->stats['produk']++;
             $this->stats['sku_variants']++;
+
             return;
         }
 
         DB::transaction(function () use ($kode, $p, $hargaJual, $hargaBeli, $satuanUnit, $kategori, $brandId, $kualitasId, $barcode) {
             // Create Produk
             $produk = Produk::create([
-                'nama' => trim((string) ($p['nama'] ?? 'Produk ' . $kode)),
-                'slug' => Str::slug($p['nama'] ?? 'produk-' . $kode) . '-' . Str::lower(Str::random(4)),
+                'nama' => trim((string) ($p['nama'] ?? 'Produk '.$kode)),
+                'slug' => Str::slug($p['nama'] ?? 'produk-'.$kode).'-'.Str::lower(Str::random(4)),
                 'deskripsi' => null,
                 'kategori' => $kategori,
                 'brand_id' => $brandId,
@@ -248,9 +271,9 @@ class SidMigrateToUteParts extends Command
             SidImportMap::setId($kode, 'barang', 'sku_variant', $variant->id);
 
             // HargaTier: retail, reseller, agen using SID price fields
-            // SID has: harga_toko (retail), harga_toko2/3/4, harga_partai, harga_partai2/3/4, 
+            // SID has: harga_toko (retail), harga_toko2/3/4, harga_partai, harga_partai2/3/4,
             //          harga_cabang, harga_cabang2/3/4, harga_member, harga_karyawan
-            
+
             // Retail (always) - harga_toko
             HargaTier::updateOrCreate(
                 ['produk_id' => $produk->id, 'sku_variant_id' => null, 'tier_membership_id' => null, 'tipe_konsumen' => 'retail'],
@@ -259,7 +282,9 @@ class SidMigrateToUteParts extends Command
 
             // Reseller - use harga_member or harga_partai as reseller price
             $hargaReseller = (float) ($p['harga_member'] ?? $p['harga_partai'] ?? $p['harga_karyawan'] ?? $hargaJual);
-            if ($hargaReseller <= 0) $hargaReseller = $hargaJual;
+            if ($hargaReseller <= 0) {
+                $hargaReseller = $hargaJual;
+            }
             HargaTier::updateOrCreate(
                 ['produk_id' => $produk->id, 'sku_variant_id' => null, 'tier_membership_id' => null, 'tipe_konsumen' => 'reseller'],
                 ['is_reseller' => true, 'harga' => $hargaReseller, 'nominal_tetap' => $hargaReseller, 'persen_diskon' => null]
@@ -267,7 +292,9 @@ class SidMigrateToUteParts extends Command
 
             // Agen - use harga_toko2 or harga_partai2
             $hargaAgen = (float) ($p['harga_toko2'] ?? $p['harga_partai2'] ?? $p['harga_cabang'] ?? $hargaReseller);
-            if ($hargaAgen <= 0) $hargaAgen = $hargaReseller;
+            if ($hargaAgen <= 0) {
+                $hargaAgen = $hargaReseller;
+            }
             HargaTier::updateOrCreate(
                 ['produk_id' => $produk->id, 'sku_variant_id' => null, 'tier_membership_id' => null, 'tipe_konsumen' => 'agen'],
                 ['is_reseller' => false, 'harga' => $hargaAgen, 'nominal_tetap' => $hargaAgen, 'persen_diskon' => null]
@@ -282,7 +309,7 @@ class SidMigrateToUteParts extends Command
     private function stepMasterPelanggan(): void
     {
         $this->info("\n--- STEP 3: Master Pelanggan (284) + Member (4) → Pelanggan ---");
-        
+
         // Get or create tier memberships for GROUP 1-4
         $tiers = [];
         foreach (range(1, 4) as $g) {
@@ -319,22 +346,32 @@ class SidMigrateToUteParts extends Command
     private function processPelanggan($raw, array $tiers, int $tierDefault): void
     {
         $kode = trim($raw->kode_sumber);
-        if (! $kode) return;
+        if (! $kode) {
+            return;
+        }
 
         if (SidImportMap::exists($kode, 'pelanggan')) {
             return;
         }
 
         $p = json_decode($raw->payload_normal, true);
-        if (! $p) return;
+        if (! $p) {
+            return;
+        }
 
         $telepon = trim((string) ($p['no_hp'] ?? $p['telepon'] ?? ''));
         $email = trim((string) ($p['email'] ?? ''));
         $alamat = trim((string) ($p['alamat'] ?? ''));
         $tglLahir = $p['tanggal_lahir'] ?? null;
         if ($tglLahir && $tglLahir !== '1899-12-30' && $tglLahir !== '0000-00-00') {
-            try { $tglLahir = Carbon::parse($tglLahir)->format('Y-m-d'); } catch (\Throwable) { $tglLahir = null; }
-        } else { $tglLahir = null; }
+            try {
+                $tglLahir = Carbon::parse($tglLahir)->format('Y-m-d');
+            } catch (\Throwable) {
+                $tglLahir = null;
+            }
+        } else {
+            $tglLahir = null;
+        }
 
         $group = (int) ($p['grouphrgpelanggan'] ?? 0);
         $tierId = $tiers[$group] ?? $tierDefault;
@@ -346,14 +383,17 @@ class SidMigrateToUteParts extends Command
 
         if ($this->dryRun) {
             $this->stats['pelanggan']++;
-            if ($piutang > 0) $this->stats['piutang']++;
+            if ($piutang > 0) {
+                $this->stats['piutang']++;
+            }
+
             return;
         }
 
-        DB::transaction(function () use ($kode, $p, $telepon, $email, $alamat, $tglLahir, $tierId, $tipeKonsumen, $isMember, $piutang) {
+        DB::transaction(function () use ($kode, $p, $telepon, $email, $alamat, $tglLahir, $tierId, $tipeKonsumen, $piutang) {
             $pelanggan = Pelanggan::create([
-                'nama' => trim((string) ($p['nama'] ?? 'Pelanggan ' . $kode)),
-                'telepon' => $telepon ?: '08' . Str::padLeft($kode, 10, '0'),
+                'nama' => trim((string) ($p['nama'] ?? 'Pelanggan '.$kode)),
+                'telepon' => $telepon ?: '08'.Str::padLeft($kode, 10, '0'),
                 'email' => $email ?: null,
                 'alamat' => $alamat ?: null,
                 'tanggal_lahir' => $tglLahir,
@@ -369,10 +409,10 @@ class SidMigrateToUteParts extends Command
 
             // Seed piutang awal jika ada
             if ($piutang > 0) {
-                \App\Modules\Akunting\Models\Piutang::create([
+                Piutang::create([
                     'cabang_id' => 1,
                     'pelanggan_id' => $pelanggan->id,
-                    'no_jurnal' => 'SID-PIU-' . $kode,
+                    'no_jurnal' => 'SID-PIU-'.$kode,
                     'tanggal' => now(),
                     'jumlah' => $piutang,
                     'dibayar' => 0,
@@ -389,13 +429,19 @@ class SidMigrateToUteParts extends Command
     private function processMember($raw, array $tiers, int $tierDefault): void
     {
         $kode = trim($raw->kode_sumber);
-        if (! $kode) return;
+        if (! $kode) {
+            return;
+        }
 
         $p = json_decode($raw->payload_normal, true);
-        if (! $p) return;
+        if (! $p) {
+            return;
+        }
 
         $telepon = trim((string) ($p['no_hp'] ?? $p['telepon'] ?? ''));
-        if (! $telepon) return;
+        if (! $telepon) {
+            return;
+        }
 
         $existing = Pelanggan::where('telepon', $telepon)->first();
         if ($existing) {
@@ -409,6 +455,7 @@ class SidMigrateToUteParts extends Command
                 ]);
             }
             SidImportMap::setId($kode, 'member', 'pelanggan', $existing->id);
+
             return;
         }
 
@@ -419,7 +466,7 @@ class SidMigrateToUteParts extends Command
     private function stepMasterSupplier(): void
     {
         $this->info("\n--- STEP 4: Master Supplier (10) → Supplier + Utang ---");
-        
+
         DB::table('sid_retail_raw_supplier')
             ->orderBy('id')
             ->chunkById(200, function ($chunk) {
@@ -432,26 +479,33 @@ class SidMigrateToUteParts extends Command
     private function processSupplier($raw): void
     {
         $kode = trim($raw->kode_sumber);
-        if (! $kode) return;
+        if (! $kode) {
+            return;
+        }
 
         if (SidImportMap::exists($kode, 'supplier')) {
             return;
         }
 
         $p = json_decode($raw->payload_normal, true);
-        if (! $p) return;
+        if (! $p) {
+            return;
+        }
 
         $hutang = (float) ($p['hutang'] ?? 0);
 
         if ($this->dryRun) {
             $this->stats['supplier']++;
-            if ($hutang > 0) $this->stats['utang']++;
+            if ($hutang > 0) {
+                $this->stats['utang']++;
+            }
+
             return;
         }
 
         DB::transaction(function () use ($kode, $p, $hutang) {
-            $supplier = \App\Modules\Wms\Models\Supplier::create([
-                'nama' => trim((string) ($p['nama'] ?? 'Supplier ' . $kode)),
+            $supplier = Supplier::create([
+                'nama' => trim((string) ($p['nama'] ?? 'Supplier '.$kode)),
                 'kode' => $kode,
                 'alamat' => trim((string) ($p['alamat'] ?? '')) ?: null,
                 'no_telp' => trim((string) ($p['no_telp'] ?? $p['no_hp'] ?? '')) ?: null,
@@ -463,10 +517,10 @@ class SidMigrateToUteParts extends Command
             $this->stats['supplier']++;
 
             if ($hutang > 0) {
-                \App\Modules\Akunting\Models\Utang::create([
+                Utang::create([
                     'cabang_id' => 1,
                     'supplier_id' => $supplier->id,
-                    'no_jurnal' => 'SID-UTG-' . $kode,
+                    'no_jurnal' => 'SID-UTG-'.$kode,
                     'tanggal' => now(),
                     'jumlah' => $hutang,
                     'dibayar' => 0,
@@ -483,8 +537,8 @@ class SidMigrateToUteParts extends Command
     private function stepTransaksiPenjualan(): void
     {
         $this->info("\n--- STEP 5: Transaksi Penjualan (itempenjualan 10.273) → Transaksi + Item ---");
-        
-        $variantMap = \App\Modules\Wms\Models\SkuVariant::query()->pluck('produk_id', 'id')->all();
+
+        $variantMap = SkuVariant::query()->pluck('produk_id', 'id')->all();
 
         // Group by base faktur (kode_sumber format: "R43-200226003|2", extract before |)
         $fakturs = DB::table('sid_retail_raw_itempenjualan')
@@ -494,7 +548,7 @@ class SidMigrateToUteParts extends Command
             ->filter()
             ->values();
 
-        $this->info("  Total faktur unik: " . $fakturs->count());
+        $this->info('  Total faktur unik: '.$fakturs->count());
 
         $progress = 0;
         foreach ($fakturs->chunk(50) as $fakturChunk) {
@@ -514,10 +568,14 @@ class SidMigrateToUteParts extends Command
     private function processFaktur(string $noFaktur, $items, array $variantMap): void
     {
         $first = $items->first();
-        if (! $first) return;
+        if (! $first) {
+            return;
+        }
 
         $p = json_decode($first->payload_normal, true);
-        if (! $p) return;
+        if (! $p) {
+            return;
+        }
 
         // Parse tanggal + jam (tanggal/jam are in payload_normal)
         $tgl = $p['tanggal'] ?? $p['tgl'] ?? now()->format('Y-m-d');
@@ -538,17 +596,18 @@ class SidMigrateToUteParts extends Command
         if ($this->dryRun) {
             $this->stats['transaksi']++;
             $this->stats['transaksi_item'] += $items->count();
+
             return;
         }
 
-        DB::transaction(function () use ($noFaktur, $items, $first, $p, $createdAt, $pelangganId, $cabangId, $variantMap) {
+        DB::transaction(function () use ($noFaktur, $items, $createdAt, $pelangganId, $cabangId, $variantMap) {
             // Handle duplicate no_transaksi by appending counter
             $baseNo = $noFaktur;
             $counter = 0;
             $finalNo = $baseNo;
             while (Transaksi::where('cabang_id', $cabangId)->where('no_transaksi', $finalNo)->exists()) {
                 $counter++;
-                $finalNo = $baseNo . '-' . $counter;
+                $finalNo = $baseNo.'-'.$counter;
             }
 
             // Create Transaksi
@@ -575,7 +634,9 @@ class SidMigrateToUteParts extends Command
 
             foreach ($items as $item) {
                 $ip = json_decode($item->payload_normal, true);
-                if (! $ip) continue;
+                if (! $ip) {
+                    continue;
+                }
 
                 $kodeBarang = trim((string) ($ip['kode_barang'] ?? ''));
                 $produkId = $kodeBarang ? SidImportMap::getId($kodeBarang, 'barang', 'produk') : null;
@@ -587,7 +648,9 @@ class SidMigrateToUteParts extends Command
                     $produkId = $variantMap[$variantId];
                 }
 
-                if (! $produkId || ! $variantId) continue;
+                if (! $produkId || ! $variantId) {
+                    continue;
+                }
 
                 $qty = (float) ($ip['qty'] ?? 1);
                 $hpp = (float) ($ip['hpp'] ?? 0);
@@ -622,8 +685,8 @@ class SidMigrateToUteParts extends Command
     private function stepStokLog(): void
     {
         $this->info("\n--- STEP 6: Stok Log dari arus_stok (19.286) ---");
-        
-        $variantMap = \App\Modules\Wms\Models\SkuVariant::query()->pluck('produk_id', 'id')->all();
+
+        $variantMap = SkuVariant::query()->pluck('produk_id', 'id')->all();
 
         DB::table('sid_retail_raw_arus_stok')
             ->orderBy('id')
@@ -637,7 +700,9 @@ class SidMigrateToUteParts extends Command
     private function processArusStok($raw, array $variantMap): void
     {
         $p = json_decode($raw->payload_normal, true);
-        if (! $p) return;
+        if (! $p) {
+            return;
+        }
 
         $kodeBarang = trim((string) ($p['kode_barang'] ?? $p['kode'] ?? ''));
         $produkId = $kodeBarang ? SidImportMap::getId($kodeBarang, 'barang', 'produk') : null;
@@ -649,7 +714,9 @@ class SidMigrateToUteParts extends Command
             $produkId = $variantMap[$variantId];
         }
 
-        if (! $produkId || ! $variantId) return;
+        if (! $produkId || ! $variantId) {
+            return;
+        }
 
         $gudangId = null;
         $lokasiStok = trim((string) ($p['lokasi_stok'] ?? ''));
@@ -660,7 +727,9 @@ class SidMigrateToUteParts extends Command
         $masuk = (float) ($p['masuk'] ?? $p['nilai_masuk'] ?? 0);
         $keluar = (float) ($p['keluar'] ?? $p['nilai_keluar'] ?? 0);
         $delta = $masuk - $keluar;
-        if ($delta === 0) return;
+        if ($delta === 0) {
+            return;
+        }
 
         $sumber = $p['transaksi'] ?? 'unknown';
         $noTransaksi = trim((string) ($p['no_transaksi'] ?? ''));
@@ -669,11 +738,14 @@ class SidMigrateToUteParts extends Command
 
         if ($noTransaksi) {
             $referensiId = SidImportMap::getId($noTransaksi, 'itempenjualan', 'transaksi');
-            if ($referensiId) $referensiTipe = Transaksi::class;
+            if ($referensiId) {
+                $referensiTipe = Transaksi::class;
+            }
         }
 
         if ($this->dryRun) {
             $this->stats['stok_log']++;
+
             return;
         }
 
@@ -719,7 +791,7 @@ class SidMigrateToUteParts extends Command
     {
         $this->info("\n--- STEP 7: Servis (332) → Tiket Servis ---");
 
-        $variantMap = \App\Modules\Wms\Models\SkuVariant::query()->pluck('produk_id', 'id')->all();
+        $variantMap = SkuVariant::query()->pluck('produk_id', 'id')->all();
 
         // Seed teknisi first - extract from payload_normal (teknisi_id references User)
         $teknisiMap = [];
@@ -727,6 +799,7 @@ class SidMigrateToUteParts extends Command
             ->get()
             ->map(function ($raw) {
                 $p = json_decode($raw->payload_normal, true);
+
                 return $p['teknisi'] ?? null;
             })
             ->filter()
@@ -735,10 +808,12 @@ class SidMigrateToUteParts extends Command
 
         foreach ($teknisis as $tn) {
             $tn = trim((string) $tn);
-            if (! $tn) continue;
-            $teknisi = \App\Models\User::firstOrCreate(
-                ['name' => 'Teknisi ' . $tn],
-                ['email' => 'teknisi-' . $tn . '@ute-parts.local', 'password' => bcrypt('password'), 'is_active' => true]
+            if (! $tn) {
+                continue;
+            }
+            $teknisi = User::firstOrCreate(
+                ['name' => 'Teknisi '.$tn],
+                ['email' => 'teknisi-'.$tn.'@ute-parts.local', 'password' => bcrypt('password'), 'is_active' => true]
             );
             $teknisiMap[$tn] = $teknisi->id;
         }
@@ -755,14 +830,18 @@ class SidMigrateToUteParts extends Command
     private function processServis($raw, array $teknisiMap, array $variantMap): void
     {
         $kode = trim($raw->kode_sumber);
-        if (! $kode) return;
+        if (! $kode) {
+            return;
+        }
 
         if (SidImportMap::exists($kode, 'servis')) {
             return;
         }
 
         $p = json_decode($raw->payload_normal, true);
-        if (! $p) return;
+        if (! $p) {
+            return;
+        }
 
         // Status mapping
         $statusMap = [
@@ -791,16 +870,17 @@ class SidMigrateToUteParts extends Command
 
         if ($this->dryRun) {
             $this->stats['tiket_servis']++;
+
             return;
         }
 
         DB::transaction(function () use ($kode, $p, $status, $pelangganId, $teknisiId, $tgl, $jam, $variantMap) {
-            $tiket = \App\Modules\Servis\Models\TiketServis::create([
+            $tiket = TiketServis::create([
                 'cabang_id' => 1,
                 'jenis_servis_id' => 1, // default jenis servis
                 'pelanggan_id' => $pelangganId,
                 'teknisi_id' => $teknisiId,
-                'no_tiket' => 'SID-' . $kode,
+                'no_tiket' => 'SID-'.$kode,
                 'jenis_hp' => trim((string) ($p['barang'] ?? 'Unknown')),
                 'seri_hp' => trim((string) ($p['no_imei'] ?? '')),
                 'keluhan' => trim((string) ($p['kerusakan'] ?? $p['keluhan'] ?? '')),
@@ -818,7 +898,7 @@ class SidMigrateToUteParts extends Command
             $variantId = $kodeBarang ? SidImportMap::getId($kodeBarang, 'barang', 'sku_variant') : null;
             $produkId = $variantId && isset($variantMap[$variantId]) ? $variantMap[$variantId] : null;
             if ($produkId) {
-                \App\Modules\Servis\Models\TiketServisItem::create([
+                TiketServisItem::create([
                     'tiket_servis_id' => $tiket->id,
                     'tipe' => 'part',
                     'produk_id' => $produkId,
@@ -838,20 +918,24 @@ class SidMigrateToUteParts extends Command
                 return now();
             }
             $dt = Carbon::parse($tgl);
-            
+
             // Parse 12-hour format "12:00:34 PM"
             if (preg_match('/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i', $jam, $m)) {
                 $h = (int) $m[1];
                 $mi = (int) $m[2];
                 $s = (int) $m[3];
                 $ap = strtoupper($m[4]);
-                if ($ap === 'PM' && $h < 12) $h += 12;
-                if ($ap === 'AM' && $h === 12) $h = 0;
+                if ($ap === 'PM' && $h < 12) {
+                    $h += 12;
+                }
+                if ($ap === 'AM' && $h === 12) {
+                    $h = 0;
+                }
                 $dt->setTime($h, $mi, $s);
             } elseif (preg_match('/(\d{1,2}):(\d{2}):(\d{2})/', $jam, $m)) {
                 $dt->setTime((int) $m[1], (int) $m[2], (int) $m[3]);
             }
-            
+
             return $dt;
         } catch (\Throwable) {
             return now();
@@ -865,9 +949,9 @@ class SidMigrateToUteParts extends Command
             $this->line("  {$key}: {$val}");
         }
         if ($this->dryRun) {
-            $this->warn("DRY-RUN: No actual data written");
+            $this->warn('DRY-RUN: No actual data written');
         } else {
-            $this->info("Migration completed. Check sid_import_map table for mapping.");
+            $this->info('Migration completed. Check sid_import_map table for mapping.');
         }
     }
 }

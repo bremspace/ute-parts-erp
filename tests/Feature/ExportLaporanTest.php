@@ -278,6 +278,61 @@ class ExportLaporanTest extends TestCase
     }
 
     /**
+     * [P0] Simulasi kondisi queue worker (auth = null): handle() harus tetap
+     * mem-forward userId dari job → prefix filename {userId}_ (bukan "0_"),
+     * sehingga cek kepemilikan download (ACC-11b) lolos untuk pemilik &
+     * menolak (403) user lain.
+     */
+    public function test_queue_worker_export_without_auth_prefixes_job_user_id(): void
+    {
+        $job = new ExportLaporanJob(
+            jenis: 'jurnal',
+            periodeDari: now()->toDateString(),
+            periodeSampai: now()->toDateString(),
+            cabangId: $this->cabangA->id,
+            akunId: null,
+            userId: $this->user->id,
+            format: 'csv',
+        );
+
+        // Kondisi queue worker: tidak ada sesi login
+        auth()->logout();
+        $this->assertNull(auth()->id(), 'pra-syarat: worker berjalan tanpa auth');
+
+        $job->handle(app(ExportLaporanService::class), app(NotificationService::class));
+
+        $files = Storage::disk('local')->files('exports');
+        $this->assertCount(1, $files);
+        // Prefix WAJIB userId dari job — jatuh ke "0_" berarti unduhan 403 di produksi
+        $this->assertStringStartsWith($this->user->id.'_'.'jurnal_', basename($files[0]));
+
+        $path = $files[0];
+
+        // (1) Pemilik login kembali → download sukses (200)
+        $this->actingAs($this->user, 'web');
+        $this->getJson('/api/akunting/export/download?path='.base64_encode($path))
+            ->assertSuccessful();
+
+        // (2) User lain (role sama, permission laporan.cabang) → 403 ownership (pesan Indonesia)
+        $other = User::create([
+            'name' => 'Other Export',
+            'email' => 'other-export@test.com',
+            'password' => Hash::make('password'),
+            'is_active' => true,
+        ]);
+        $other->assignRole('super-admin');
+        $other->cabangs()->attach($this->cabangA->id);
+
+        $this->actingAs($other, 'web');
+        // Guard sanctum (RequestGuard) meng-cache user hasil resolve pertama —
+        // tanpa lupa cache ini, request berikutnya masih "merasa" user pemilik.
+        auth()->guard('sanctum')->forgetUser();
+        $this->getJson('/api/akunting/export/download?path='.base64_encode($path))
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'Anda tidak berhak mengunduh berkas ekspor milik pengguna lain.');
+    }
+
+    /**
      * [P2-10b] Prune exports/ usia >7 hari.
      * Pilihan: prune di-extract ke method publik statis ExportLaporanService::pruneOldExports()
      * lalu diuji langsung dgn backdating mtime via touch() — deterministik, tanpa menunggu jam.

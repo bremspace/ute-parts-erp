@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -32,6 +33,7 @@ class SidBackfillServis extends Command
     ];
 
     private array $statusMap = [];   // status SID → count
+
     private array $pelangganUnmapped = [];
 
     /** @var array<string,int> kode_lama pelanggan → id */
@@ -523,7 +525,7 @@ class SidBackfillServis extends Command
             return null;
         }
         try {
-            return \Carbon\Carbon::parse($s)->format('Y-m-d');
+            return Carbon::parse($s)->format('Y-m-d');
         } catch (\Throwable) {
             return null;
         }
@@ -539,32 +541,32 @@ class SidBackfillServis extends Command
         }
         $file = $dir.'/D-servis-laporan-'.date('Ymd-His').'.md';
 
-        $body = "# LAPORAN FASE 4 (D-01 tiket_servis, D-02 tiket_servis_item) — ".date('Y-m-d H:i:s')."\n\n"
-            . 'Perintah: `php artisan sid:backfill-servis'.($dry ? ' --dry-run' : '')."` (idempotent, non-destruktif, chunked)\n\n"
-            . "## Ringkasan\n\n"
-            . "- D-01 staging: {$this->counts['d01_staging']}, tiket ditemukan (UPDATE): {$this->counts['d01_tiket_ditemukan']}, insert baru: {$this->counts['d01_tiket_diinsert']}\n"
-            . "- D-01 baris ter-update: {$this->counts['d01_updated']} (status berubah: {$this->counts['d01_status_berubah']}, jenis_hp: {$this->counts['d01_jenis_hp_berubah']}, keluhan: {$this->counts['d01_keluhan_berubah']}, estimasi: {$this->counts['d01_estimasi_berubah']})\n"
-            . "- D-01 pelanggan unmapped (kode_pelanggan tanpa kode_lama): {$this->counts['d01_pelanggan_unmapped']}\n"
-            . "- D-01 servis_status_log snapshot inserted: {$this->counts['d01_statuslog']}, sudah ada (skip): {$this->counts['d01_statuslog_skip']}\n"
-            . "- D-02 item inserted: {$this->counts['d02_inserted']}, tiket tidak ditemukan: {$this->counts['d02_tiket_miss']}, skip (tiket sudah punya item): {$this->counts['d02_skip_tiket_punya_item']}\n\n"
-            . "## Mapping status SID → state machine app (snapshot status akhir)\n\n"
-            . "- `SUDAH DI AMBIL` (290) → `diambil` (terminal)\n"
-            . "- `SELESAI DI SERVIS` (26) → `selesai`\n"
-            . "- `SEDANG DI SERVIS` (14) → `dikerjakan`\n"
-            . "- `DIBATALKAN` (2) → `ditolak` (terminal)\n"
-            . "- hasil: ".$this->mapLines()."\n\n"
-            . "Catatan: snapshot 1 baris `servis_status_log` (status_ke = status akhir, status_dari NULL, alasan `Migrasi SID snapshot status akhir`). Tidak ada transisi/backward — state machine tidak dilanggar.\n\n"
-            . "## Catatan mapping kolom\n\n"
-            . "- jenis_hp = `type` SID (fallback `barang` bila type kosong; 9 baris fallback) — mengikuti spec D-01 (migrasi lama mengisi brand barang).\n"
-            . "- jenis_servis_id tetap apa adanya (migrasi lama = 1; spec: NULL bila kosong — tidak dibuka ulang).\n"
-            . "- estimasi_biaya = payload `jumlah` (jasa+spare_part−diskon; 11 baris jumlah=0 valid).\n"
-            . "- tanggal_terima sudah terisi migrasi lama (tanggal+jam) → tidak disentuh (guard NULL).\n"
-            . "- tanggal_selesai/diambil = `tanggal_kembali`+`jamkembali` (bila selesai/sudahdiambil & tanggal_kembali non-sentinel; 5 baris sentinel → NULL).\n"
-            . "- tanggal_bayar = `tgl_bayar` (semua sentinel/0 → NULL).\n"
-            . "- pembayaran json `{pembayaran, jt, komisi, kode_kas}`; sid_detail json per spec D-01.\n"
-            . "- pelanggan_id guard NULL (semua sudah terisi migrasi lama); nama/telepon_pelanggan diisi dari tabel pelanggan via kode_lama (guard kosong).\n\n"
-            . "## Pelanggan unmapped (kode_pelanggan tak ada di pelanggan.kode_lama)\n\n"
-            . $this->listLines(array_map(fn ($k, $v) => "`{$k}` ×{$v}", array_keys($this->pelangganUnmapped), array_values($this->pelangganUnmapped)));
+        $body = '# LAPORAN FASE 4 (D-01 tiket_servis, D-02 tiket_servis_item) — '.date('Y-m-d H:i:s')."\n\n"
+            .'Perintah: `php artisan sid:backfill-servis'.($dry ? ' --dry-run' : '')."` (idempotent, non-destruktif, chunked)\n\n"
+            ."## Ringkasan\n\n"
+            ."- D-01 staging: {$this->counts['d01_staging']}, tiket ditemukan (UPDATE): {$this->counts['d01_tiket_ditemukan']}, insert baru: {$this->counts['d01_tiket_diinsert']}\n"
+            ."- D-01 baris ter-update: {$this->counts['d01_updated']} (status berubah: {$this->counts['d01_status_berubah']}, jenis_hp: {$this->counts['d01_jenis_hp_berubah']}, keluhan: {$this->counts['d01_keluhan_berubah']}, estimasi: {$this->counts['d01_estimasi_berubah']})\n"
+            ."- D-01 pelanggan unmapped (kode_pelanggan tanpa kode_lama): {$this->counts['d01_pelanggan_unmapped']}\n"
+            ."- D-01 servis_status_log snapshot inserted: {$this->counts['d01_statuslog']}, sudah ada (skip): {$this->counts['d01_statuslog_skip']}\n"
+            ."- D-02 item inserted: {$this->counts['d02_inserted']}, tiket tidak ditemukan: {$this->counts['d02_tiket_miss']}, skip (tiket sudah punya item): {$this->counts['d02_skip_tiket_punya_item']}\n\n"
+            ."## Mapping status SID → state machine app (snapshot status akhir)\n\n"
+            ."- `SUDAH DI AMBIL` (290) → `diambil` (terminal)\n"
+            ."- `SELESAI DI SERVIS` (26) → `selesai`\n"
+            ."- `SEDANG DI SERVIS` (14) → `dikerjakan`\n"
+            ."- `DIBATALKAN` (2) → `ditolak` (terminal)\n"
+            .'- hasil: '.$this->mapLines()."\n\n"
+            ."Catatan: snapshot 1 baris `servis_status_log` (status_ke = status akhir, status_dari NULL, alasan `Migrasi SID snapshot status akhir`). Tidak ada transisi/backward — state machine tidak dilanggar.\n\n"
+            ."## Catatan mapping kolom\n\n"
+            ."- jenis_hp = `type` SID (fallback `barang` bila type kosong; 9 baris fallback) — mengikuti spec D-01 (migrasi lama mengisi brand barang).\n"
+            ."- jenis_servis_id tetap apa adanya (migrasi lama = 1; spec: NULL bila kosong — tidak dibuka ulang).\n"
+            ."- estimasi_biaya = payload `jumlah` (jasa+spare_part−diskon; 11 baris jumlah=0 valid).\n"
+            ."- tanggal_terima sudah terisi migrasi lama (tanggal+jam) → tidak disentuh (guard NULL).\n"
+            ."- tanggal_selesai/diambil = `tanggal_kembali`+`jamkembali` (bila selesai/sudahdiambil & tanggal_kembali non-sentinel; 5 baris sentinel → NULL).\n"
+            ."- tanggal_bayar = `tgl_bayar` (semua sentinel/0 → NULL).\n"
+            ."- pembayaran json `{pembayaran, jt, komisi, kode_kas}`; sid_detail json per spec D-01.\n"
+            ."- pelanggan_id guard NULL (semua sudah terisi migrasi lama); nama/telepon_pelanggan diisi dari tabel pelanggan via kode_lama (guard kosong).\n\n"
+            ."## Pelanggan unmapped (kode_pelanggan tak ada di pelanggan.kode_lama)\n\n"
+            .$this->listLines(array_map(fn ($k, $v) => "`{$k}` ×{$v}", array_keys($this->pelangganUnmapped), array_values($this->pelangganUnmapped)));
 
         file_put_contents($file, $body);
         $this->info("Laporan: {$file}");

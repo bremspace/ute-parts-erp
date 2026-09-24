@@ -4,7 +4,12 @@ namespace App\Modules\Wms\Controllers;
 
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Wms\Exports\ImportProdukTemplateExport;
+use App\Modules\Wms\Jobs\ImportProdukExcelJob;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\ImportLog;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
@@ -17,11 +22,14 @@ use App\Modules\Wms\Models\StokOpnameItem;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
 use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Models\TipeHp;
+use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\PurchaseOrderService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class WmsController extends Controller
 {
@@ -644,11 +652,14 @@ class WmsController extends Controller
 
     public function updatePoStatus(Request $request, $id)
     {
-        $po = PurchaseOrder::findOrFail($id);
+        $po = PurchaseOrder::with('gudangTujuan')->findOrFail($id);
         $action = $request->input('action', 'diterima'); // dikirim | diterima | dibatalkan
 
-        $allowed = ['draft' => ['dikirim'], 'dikirim' => ['diterima', 'dibatalkan'], 'draft' => ['dibatalkan']];
-        $valid = $allowed[$po->status] ?? [];
+        // [P1-x] Scope cabang aktif — PO cabang lain ditolak (pola GrnTab::tolakJikaBukanCabang).
+        $cabangId = session('cabang_id');
+        if ($cabangId !== null && $cabangId !== '' && (int) $po->gudangTujuan?->cabang_id !== (int) $cabangId) {
+            return $this->error('PO bukan milik cabang aktif', 403);
+        }
 
         if ($action === 'dibatalkan' && in_array($po->status, ['draft', 'dikirim'], true)) {
             $po->update(['status' => 'dibatalkan']);
@@ -662,10 +673,10 @@ class WmsController extends Controller
             return $this->success($po, 'PO dikirim');
         }
 
+        // [F2-2] Penerimaan barang HANYA lewat GRN (GrnService finalisasi → PO 'diterima').
+        // Endpoint ini tidak boleh jadi bypass stok+jurnal tanpa GRN/approval.
         if ($action === 'diterima' && $po->status === 'dikirim') {
-            $po = app(PurchaseOrderService::class)->terimaBarang($po, auth()->id());
-
-            return $this->success($po->load('items', 'supplier'), 'PO diterima — stok & jurnal akunting dibuat');
+            return $this->error('PO hanya bisa diterima melalui GRN — buka tab GRN untuk menerima PO ini.', 422);
         }
 
         return $this->error('Transisi status tidak valid', 422);
@@ -715,19 +726,19 @@ class WmsController extends Controller
     /** [API: WMS-BRAND] Daftar brand untuk form Master Produk. */
     public function indexBrand()
     {
-        return $this->success(\App\Modules\Wms\Models\Brand::orderBy('nama')->get(['id', 'nama']), 'Daftar brand');
+        return $this->success(Brand::orderBy('nama')->get(['id', 'nama']), 'Daftar brand');
     }
 
     /** [API: WMS-KUALITAS] Daftar kualitas produk. */
     public function indexKualitas()
     {
-        return $this->success(\App\Modules\Wms\Models\KualitasProduk::orderBy('nama')->get(['id', 'nama']), 'Daftar kualitas produk');
+        return $this->success(KualitasProduk::orderBy('nama')->get(['id', 'nama']), 'Daftar kualitas produk');
     }
 
     /** [API: WMS-TIPEHP] Daftar tipe HP. */
     public function indexTipeHp()
     {
-        return $this->success(\App\Modules\Wms\Models\TipeHp::orderBy('merk')->orderBy('model')->get(['id', 'merk', 'model', 'nama']), 'Daftar tipe HP');
+        return $this->success(TipeHp::orderBy('merk')->orderBy('model')->get(['id', 'merk', 'model', 'nama']), 'Daftar tipe HP');
     }
 
     // ============================================================
@@ -737,8 +748,8 @@ class WmsController extends Controller
     /** [API: WMS-IMP-01] Download template Excel import produk. */
     public function downloadTemplateProduk()
     {
-        return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Modules\Wms\Exports\ImportProdukTemplateExport,
+        return Excel::download(
+            new ImportProdukTemplateExport,
             'template-import-produk.xlsx'
         );
     }
@@ -752,7 +763,7 @@ class WmsController extends Controller
 
         try {
             $path = $request->file('file')->store('import-tmp');
-            $hasil = app(\App\Modules\Wms\Services\ImportProdukService::class)->preview(storage_path('app/'.$path));
+            $hasil = app(ImportProdukService::class)->preview(storage_path('app/'.$path));
             @unlink(storage_path('app/'.$path));
 
             return $this->success($hasil, 'Preview import produk selesai — belum ada data diubah');
@@ -772,14 +783,14 @@ class WmsController extends Controller
         try {
             $path = $request->file('file')->store('import-tmp');
 
-            $log = \App\Modules\Wms\Models\ImportLog::create([
+            $log = ImportLog::create([
                 'tipe' => 'produk_excel',
                 'nama_file' => $request->file('file')->getClientOriginalName(),
                 'status' => 'proses',
                 'user_id' => auth()->id(),
             ]);
 
-            \App\Modules\Wms\Jobs\ImportProdukExcelJob::dispatch($log->id, $path, auth()->id());
+            ImportProdukExcelJob::dispatch($log->id, $path, auth()->id());
 
             return $this->success(
                 ['import_log_id' => $log->id],
@@ -793,7 +804,7 @@ class WmsController extends Controller
     /** [API: WMS-IMP-04] Status import log (hasil sukses/gagal per baris). */
     public function importLog(Request $request, $id)
     {
-        $log = \App\Modules\Wms\Models\ImportLog::findOrFail($id);
+        $log = ImportLog::findOrFail($id);
 
         return $this->success($log, 'Status import');
     }

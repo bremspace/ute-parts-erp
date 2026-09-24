@@ -39,6 +39,14 @@
             >
                 GRN
             </button>
+            {{-- [F3-7] Cycle count — halaman terpisah (bukan tab child) --}}
+            <a
+                href="{{ route('wms.cycle-count') }}"
+                class="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white/5 text-ink-300 hover:bg-white/10 border border-white/10 cursor-pointer"
+                title="Jadwal & task cycle count otomatis"
+            >
+                Cycle Count
+            </a>
         </div>
 
         <!-- Tab-specific Quick Action — dispatch event ke tab component aktif (#[On] listener) -->

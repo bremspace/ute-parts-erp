@@ -63,13 +63,13 @@ class LeadConversionTest extends TestCase
 
     /**
      * Autentikasi user dengan permission crm.* + set session cabang aktif
-     * (Lead::scopeForCabang & CrmController::storeLead membaca cabang_aktif_id).
+     * (Lead::scopeForCabang & CrmController::storeLead membaca session('cabang_id')).
      */
     protected function authAsCrm(Cabang $cabang): User
     {
         $user = $this->createUser('marketing');
         $this->actingAs($user, 'web');
-        session(['cabang_aktif_id' => $cabang->id]);
+        session(['cabang_id' => $cabang->id]);
 
         return $user;
     }
@@ -284,7 +284,7 @@ class LeadConversionTest extends TestCase
         }
     }
 
-    // 7. Cabang scoping: lead cabang A tidak terlihat saat session cabang_aktif_id = cabang B
+    // 7. Cabang scoping: lead cabang A tidak terlihat saat session cabang_id = cabang B
     public function test_lead_cabang_a_invisible_when_session_cabang_b(): void
     {
         $cabangA = $this->createCabang('UTPA3');
@@ -297,7 +297,7 @@ class LeadConversionTest extends TestCase
         $leadB = $this->makeLead($cabangB);
 
         // Session aktif pindah ke cabang B
-        session(['cabang_aktif_id' => $cabangB->id]);
+        session(['cabang_id' => $cabangB->id]);
 
         $resp = $this->getJson('/api/crm/leads');
         if ($resp->status() !== 200) {
@@ -326,5 +326,52 @@ class LeadConversionTest extends TestCase
         $resp->assertStatus(422);
         $resp->assertJsonValidationErrors('stage');
         $this->assertEquals('baru', $lead->fresh()->stage, 'Stage asli tidak boleh berubah saat validasi gagal');
+    }
+
+    // 9. Regression P0: produksi HANYA menulis session('cabang_id') (routes/web.php switchCabang).
+    //    Lead scoping harus menyaring dengan benar & createLead harus sukses —
+    //    tanpa pernah men-set cabang_aktif_id (key lama yang sudah dihapus).
+    public function test_lead_scoping_and_create_work_with_canonical_cabang_id_only(): void
+    {
+        $cabang = $this->createCabang('UTP009');
+        $cabangLain = $this->createCabang('UTP010');
+
+        $user = $this->createUser('marketing');
+        $this->actingAs($user, 'web');
+
+        // Persis pola switchCabang produksi: tulis session('cabang_id') saja.
+        session(['cabang_id' => $cabang->id]);
+        $this->assertNull(
+            session('cabang_aktif_id'),
+            'Key cabang_aktif_id tidak boleh dipakai lagi — hanya cabang_id (kanonik).'
+        );
+
+        $leadKini = $this->makeLead($cabang);
+        $leadLain = $this->makeLead($cabangLain);
+
+        // (a) Scoping: Lead::forCabang() membaca session('cabang_id') → hanya lead cabang aktif tampil
+        $resp = $this->getJson('/api/crm/leads');
+        if ($resp->status() !== 200) {
+            $this->fail('GET /api/crm/leads → HTTP '.$resp->status().': '.$resp->content());
+        }
+        $ids = collect($resp->json('data.data'))->pluck('id')->map(fn ($id) => (int) $id);
+        $this->assertTrue($ids->contains((int) $leadKini->id), 'Lead cabang aktif (session cabang_id) harus terlihat');
+        $this->assertFalse($ids->contains((int) $leadLain->id), 'Lead cabang lain tidak boleh bocor');
+
+        // (b) createLead: cabang_id diambil dari session('cabang_id') → 201, bukan 422 cabang_id required
+        $create = $this->postJson('/api/crm/leads', [
+            'sumber' => 'referral',
+            'nama' => 'Lead Regression Cabang',
+            'telepon' => '089900011122',
+            'nilai_estimasi' => 500000,
+        ]);
+        if ($create->status() !== 201) {
+            $this->fail('POST /api/crm/leads → HTTP '.$create->status().': '.$create->content());
+        }
+        $this->assertDatabaseHas('leads', [
+            'id' => $create->json('data.id'),
+            'cabang_id' => $cabang->id,
+            'nama' => 'Lead Regression Cabang',
+        ]);
     }
 }

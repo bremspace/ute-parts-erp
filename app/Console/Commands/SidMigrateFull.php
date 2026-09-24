@@ -27,14 +27,14 @@ class SidMigrateFull extends Command
     protected $description = 'Pipeline migrasi SID Retail → Ute Parts (fase M→A→B→C→D + V), idempotent';
 
     protected array $steps = [
-        'seed'       => ['cmd' => 'sid:seed-master',        'desc' => 'M-04..M-07 master: brands, gudang, tier, profil', 'dry' => true],
-        'backfill'   => ['cmd' => 'sid:backfill-2a',        'desc' => 'A-02..A-05 backfill produk/pelanggan/supplier/member', 'dry' => false],
-        'migrate2b'  => ['cmd' => 'sid:migrate-2b',         'desc' => 'B-01/B-02/B-04 piutang, PO, return', 'dry' => true],
-        'transaksi'  => ['cmd' => 'sid:rekonstruksi-transaksi', 'desc' => 'C-02..C-04 cleanup artefak + rekonstruksi transaksi', 'dry' => true],
-        'stok'       => ['cmd' => 'sid:rekonstruksi-stok',  'desc' => 'C-05/C-06 stok_log + stok_items', 'dry' => true],
-        'servis'     => ['cmd' => 'sid:backfill-servis',    'desc' => 'D-01/D-02 tiket_servis + item + status_log', 'dry' => true],
-        'merge'      => ['cmd' => 'sid:merge-pelanggan-dup','desc' => 'A-03 dedup pelanggan + remap FK', 'dry' => true],
-        'jurnal'     => ['cmd' => 'sid:jurnal-pembuka',     'desc' => 'C-08 jurnal pembuka (dry-run kecuali --commit-jurnal)', 'dry' => true],
+        'seed' => ['cmd' => 'sid:seed-master',        'desc' => 'M-04..M-07 master: brands, gudang, tier, profil', 'dry' => true],
+        'backfill' => ['cmd' => 'sid:backfill-2a',        'desc' => 'A-02..A-05 backfill produk/pelanggan/supplier/member', 'dry' => false],
+        'migrate2b' => ['cmd' => 'sid:migrate-2b',         'desc' => 'B-01/B-02/B-04 piutang, PO, return', 'dry' => true],
+        'transaksi' => ['cmd' => 'sid:rekonstruksi-transaksi', 'desc' => 'C-02..C-04 cleanup artefak + rekonstruksi transaksi', 'dry' => true],
+        'stok' => ['cmd' => 'sid:rekonstruksi-stok',  'desc' => 'C-05/C-06 stok_log + stok_items', 'dry' => true],
+        'servis' => ['cmd' => 'sid:backfill-servis',    'desc' => 'D-01/D-02 tiket_servis + item + status_log', 'dry' => true],
+        'merge' => ['cmd' => 'sid:merge-pelanggan-dup', 'desc' => 'A-03 dedup pelanggan + remap FK', 'dry' => true],
+        'jurnal' => ['cmd' => 'sid:jurnal-pembuka',     'desc' => 'C-08 jurnal pembuka (dry-run kecuali --commit-jurnal)', 'dry' => true],
     ];
 
     public function handle(): int
@@ -48,7 +48,7 @@ class SidMigrateFull extends Command
             : array_slice($names, $from - 1);
 
         if (! $selected) {
-            $this->error('Tidak ada step valid. Step: ' . implode(',', $names));
+            $this->error('Tidak ada step valid. Step: '.implode(',', $names));
 
             return self::FAILURE;
         }
@@ -56,7 +56,7 @@ class SidMigrateFull extends Command
         $dry = (bool) $this->option('dry-run');
 
         $this->line('==============================================');
-        $this->line('MIGRASI SID → UTE PARTS' . ($dry ? ' (DRY-RUN)' : ''));
+        $this->line('MIGRASI SID → UTE PARTS'.($dry ? ' (DRY-RUN)' : ''));
         $this->line('==============================================');
 
         foreach ($selected as $name) {
@@ -65,7 +65,8 @@ class SidMigrateFull extends Command
             $this->info("[{$name}] {$s['desc']}");
 
             if ($dry && ! ($s['dry'] ?? false)) {
-                $this->warn('  → SKIP dry-run: ' . $s['cmd'] . ' tidak mendukung --dry-run (jalankan tanpa --dry-run utk eksekusi)');
+                $this->warn('  → SKIP dry-run: '.$s['cmd'].' tidak mendukung --dry-run (jalankan tanpa --dry-run utk eksekusi)');
+
                 continue;
             }
 
@@ -90,7 +91,7 @@ class SidMigrateFull extends Command
             } else {
                 foreach (preg_split('/\R/', $out) as $line) {
                     if ($line !== '' && str_contains($line, '|')) {
-                        $this->line('  ' . $line);
+                        $this->line('  '.$line);
                     }
                 }
                 if ($exit !== 0) {
@@ -103,7 +104,7 @@ class SidMigrateFull extends Command
         }
 
         $this->line('');
-        $this->info('SELESAI' . ($dry ? ' (dry-run — tidak ada data ditulis)' : ' — semua fase idempotent, jalankan ulang aman'));
+        $this->info('SELESAI'.($dry ? ' (dry-run — tidak ada data ditulis)' : ' — semua fase idempotent, jalankan ulang aman'));
 
         return self::SUCCESS;
     }

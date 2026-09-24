@@ -8,12 +8,14 @@ use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
+use App\Modules\Rbac\Models\AktivitasLog;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
+use App\Modules\Wms\Livewire\ProdukTab;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\NomorSeri;
@@ -952,5 +954,168 @@ class SerialNumberTest extends TestCase
             ->assertSet('cart.'.$keySn.'.sn_list', ['SN-PARK']); // sn_list payload tetap dipertahankan
 
         $this->assertEquals('dibatalkan', $trx->fresh()->status);
+    }
+
+    // ===== (l) [F2-3/P1] SN toggle di form produk — flag sn bisa diaktifkan via UI =====
+
+    public function test_sn_toggle_form_produk_ada_dan_disimpan_ke_produk(): void
+    {
+        $this->actingAs($this->user, 'web');
+        $this->withSession(['cabang_id' => $this->cabang->id]);
+
+        // Toggle + helper text tampil di modal Tambah Produk
+        $component = Livewire::test(ProdukTab::class)
+            ->call('openProdukModal')
+            ->assertSet('showProdukModal', true)
+            ->assertSee('Serial Number (SN)')
+            ->assertSee('Wajib input SN saat GRN/stok masuk & penjualan');
+
+        // Guard: sn=true + stok_awal>0 ditolak — stok masuk wajib via "+ Stok" (ada input SN)
+        $component->set('produkForm.nama', 'LCD SN Baru')
+            ->set('produkForm.kategori', 'LCD')
+            ->set('produkForm.satuan_kode', 'pcs')
+            ->set('produkForm.harga_beli', 10000)
+            ->set('produkForm.harga_jual_retail', 20000)
+            ->set('produkForm.harga_tier.retail.nominal_tetap', 20000)
+            ->set('produkForm.sn', true)
+            ->set('produkForm.gudang_id', $this->gudang->id)
+            ->set('produkForm.stok_awal', 5)
+            ->call('simpanProduk')
+            ->assertDispatched('alert');
+        $this->assertSame(0, Produk::where('nama', 'LCD SN Baru')->count(), 'sn=true + stok_awal wajib ditolak');
+
+        // Tanpa stok awal → tersimpan dengan sn=true
+        $component->set('produkForm.stok_awal', 0)
+            ->call('simpanProduk')
+            ->assertSet('showProdukModal', false);
+
+        $baru = Produk::where('nama', 'LCD SN Baru')->firstOrFail();
+        $this->assertTrue((bool) $baru->sn, 'Flag sn wajib true setelah disimpan via UI');
+    }
+
+    // ===== (m) [F2-3/P1] Tambah stok produk sn=true — SN wajib, count = qty, persist tersedia =====
+
+    public function test_tambah_stok_produk_sn_wajib_sn_count_sama_dan_persist_tersedia(): void
+    {
+        Queue::fake();
+        $this->actingAs($this->user, 'web');
+        $this->withSession(['cabang_id' => $this->cabang->id]);
+
+        $component = Livewire::test(ProdukTab::class)
+            ->call('openTambahStokModal', $this->produkSn->id)
+            ->assertSet('stokProdukSn', true)
+            ->set('tambahStokForm.gudang_id', $this->gudang->id)
+            ->set('tambahStokForm.qty', 2)
+            ->set('tambahStokForm.harga_beli', 50000)
+            ->set('tambahStokForm.sn', "TSN-1\nTSN-2\nTSN-3"); // 3 ≠ 2
+
+        // Count ≠ qty → ValidationException field-level, tanpa side effect apa pun
+        $component->call('simpanTambahStok')
+            ->assertHasErrors('tambahStokForm.sn')
+            ->assertSet('showTambahStokModal', true);
+        $this->assertSame(0, StokItem::count(), 'Gagal validasi → tanpa stok masuk');
+        $this->assertSame(0, NomorSeri::count());
+        $this->assertSame(0, JurnalAkuntansi::count());
+        $this->assertSame(0, StokLog::count());
+
+        // SN valid (parse koma via NomorSeriService::parseList) → sukses
+        $component->set('tambahStokForm.sn', 'TSN-1,TSN-2')
+            ->call('simpanTambahStok')
+            ->assertHasNoErrors()
+            ->assertSet('showTambahStokModal', false);
+
+        $this->assertEquals(2, StokItem::where('produk_id', $this->produkSn->id)->first()->jumlah);
+        $sns = NomorSeri::where('produk_id', $this->produkSn->id)->get();
+        $this->assertCount(2, $sns);
+        $this->assertEqualsCanonicalizing(['TSN-1', 'TSN-2'], $sns->pluck('nomor_seri')->all());
+        foreach ($sns as $sn) {
+            $this->assertEquals(NomorSeri::STATUS_TERSEDIA, $sn->status, 'SN baru wajib status tersedia');
+            $this->assertEquals((int) $this->cabang->id, (int) $sn->cabang_id, 'SN wajib ter-taut cabang');
+        }
+
+        // Jurnal pembelian tetap balance + StokLog tercatat
+        $this->assertEquals(100000, (float) JurnalAkuntansi::sum('debit'));
+        $this->assertEquals(100000, (float) JurnalAkuntansi::sum('kredit'));
+        $this->assertTrue(
+            StokLog::where('produk_id', $this->produkSn->id)->where('jenis', 'pembelian')->exists()
+        );
+
+        // SN sudah terdaftar → ditolak di dalam transaksi service, stok tidak berubah
+        $component->call('openTambahStokModal', $this->produkSn->id)
+            ->set('tambahStokForm.gudang_id', $this->gudang->id)
+            ->set('tambahStokForm.qty', 1)
+            ->set('tambahStokForm.harga_beli', 50000)
+            ->set('tambahStokForm.sn', 'TSN-1')
+            ->call('simpanTambahStok')
+            ->assertSet('showTambahStokModal', true);
+        $this->assertEquals(2, StokItem::where('produk_id', $this->produkSn->id)->first()->jumlah, 'Tanpa partial stok');
+        $this->assertSame(2, NomorSeri::count());
+        $this->assertEquals(100000, (float) JurnalAkuntansi::sum('debit'), 'Tanpa jurnal dobel');
+    }
+
+    // ===== (n) [F2-3/P1] Tambah stok produk sn=false — tanpa input SN, flow tetap jalan =====
+
+    public function test_tambah_stok_produk_non_sn_tidak_diminta_sn(): void
+    {
+        Queue::fake();
+        $this->actingAs($this->user, 'web');
+        $this->withSession(['cabang_id' => $this->cabang->id]);
+
+        Livewire::test(ProdukTab::class)
+            ->call('openTambahStokModal', $this->produk->id)
+            ->assertSet('stokProdukSn', false)
+            ->assertDontSee('Nomor Seri (wajib)')
+            ->set('tambahStokForm.gudang_id', $this->gudang->id)
+            ->set('tambahStokForm.qty', 3)
+            ->set('tambahStokForm.harga_beli', 50000)
+            ->call('simpanTambahStok')
+            ->assertSet('showTambahStokModal', false);
+
+        $this->assertEquals(3, StokItem::where('produk_id', $this->produk->id)->first()->jumlah);
+        $this->assertSame(0, NomorSeri::count(), 'Produk sn=false → tanpa baris SN');
+        $this->assertSame(0, StokItem::where('produk_id', $this->produkSn->id)->count());
+    }
+
+    // ===== (o) [F2-3/P2] Activity log NomorSeri + NomorSeriEvent (create/status-change) =====
+
+    public function test_activity_log_nomor_seri_dan_event_create_dan_status_change(): void
+    {
+        $this->actingAs($this->user, 'web');
+
+        $ns = NomorSeri::create([
+            'cabang_id' => $this->cabang->id,
+            'produk_id' => $this->produkSn->id,
+            'nomor_seri' => 'SN-LOG-1',
+            'status' => NomorSeri::STATUS_TERSEDIA,
+            'keterangan' => 'GRN TEST',
+        ]);
+
+        $created = AktivitasLog::where('subject_type', NomorSeri::class)
+            ->where('subject_id', $ns->id)->where('event', 'created')->first();
+        $this->assertNotNull($created, 'Create NomorSeri wajib ter-log');
+        $this->assertEquals('Nomor Seri dibuat', $created->description);
+        $this->assertEquals($this->user->id, (int) $created->causer_id);
+        $this->assertEquals((int) $this->cabang->id, (int) $created->cabang_id, 'Log cabang-scoped');
+
+        // Status change (klaim jual) → log updated + before/after status
+        $ns->update(['status' => NomorSeri::STATUS_TERJUAL]);
+        $updated = AktivitasLog::where('subject_type', NomorSeri::class)
+            ->where('subject_id', $ns->id)->where('event', 'updated')->first();
+        $this->assertNotNull($updated, 'Status-change NomorSeri wajib ter-log');
+        $this->assertEquals('Nomor Seri diperbarui', $updated->description);
+        $this->assertEquals(NomorSeri::STATUS_TERSEDIA, $updated->attribute_changes->get('old')['status']);
+        $this->assertEquals(NomorSeri::STATUS_TERJUAL, $updated->attribute_changes->get('attributes')['status']);
+
+        // Snapshot event append-only juga ter-log
+        $ev = NomorSeriEvent::create([
+            'nomor_seri_id' => $ns->id,
+            'cabang_id' => $this->cabang->id,
+            'aksi' => NomorSeriEvent::AKSI_KLAIM_JUAL,
+            'status_sebelum' => NomorSeri::STATUS_TERSEDIA,
+        ]);
+        $evLog = AktivitasLog::where('subject_type', NomorSeriEvent::class)
+            ->where('subject_id', $ev->id)->where('event', 'created')->first();
+        $this->assertNotNull($evLog, 'Create NomorSeriEvent wajib ter-log');
+        $this->assertEquals('Nomor Seri Event dibuat', $evLog->description);
     }
 }

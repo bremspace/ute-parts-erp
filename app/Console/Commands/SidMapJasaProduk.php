@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 class SidMapJasaProduk extends Command
 {
     protected $signature = 'sid:map-jasa-produk';
+
     protected $description = 'Map SID JASA items to JenisServis + mark produk harga 0 as harga_fleksibel (idempotent)';
 
     public function handle(): int
@@ -59,6 +60,7 @@ class SidMapJasaProduk extends Command
                 } else {
                     $skip++;
                 }
+
                 continue;
             }
 
@@ -93,7 +95,7 @@ class SidMapJasaProduk extends Command
         $updated = Produk::where('is_migrasi_sid', 1)
             ->where(function ($q) {
                 $q->whereNull('harga_jual_retail')
-                  ->orWhere('harga_jual_retail', 0);
+                    ->orWhere('harga_jual_retail', 0);
             })
             ->where('harga_fleksibel', 0)
             ->update(['harga_fleksibel' => 1]);
@@ -106,7 +108,7 @@ class SidMapJasaProduk extends Command
         $this->info("JASA baru (JenisServis): {$baru}");
         $this->info("JASA skip (existing): {$skip}");
         $this->info("Produk harga 0 → fleksibel: {$updated}");
-        $this->info("Total perubahan: " . ($baru + $updated));
+        $this->info('Total perubahan: '.($baru + $updated));
 
         return self::SUCCESS;
     }

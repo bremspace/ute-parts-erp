@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -202,18 +203,18 @@ class SidMergePelangganDup extends Command
                 $g['nama_raw'], $g['telp'], $g['canon_kode'], $g['canon_id'], implode(', ', $dups));
         }
 
-        $body = "# LAPORAN A-03 MERGE DEDUP PELANGGAN — ".date('Y-m-d H:i:s')."\n\n"
-            . 'Perintah: `php artisan sid:merge-pelanggan-dup'.($dry ? ' --dry-run' : '')."` (idempotent, remap FK + hapus dup)\n\n"
-            . "## Ringkasan\n\n"
-            . "- Grup dedup (nama, telepon): **{$this->counts['grup']}**\n"
-            . "- Baris dup dihapus: **{$this->counts['hapus']}**\n"
-            . "- FK remap ke canonical: **{$this->counts['remap_fk']}** (".$this->remapDetail().")\n"
-            . "- sid_import_map remap: **{$this->counts['remap_map']}**\n"
-            . "- Grup error (skip): **{$this->counts['grup_error']}**\n\n"
-            . "## Daftar grup\n\n"
-            . implode("\n", $lines)."\n\n"
-            . "## Error\n\n"
-            . ($this->grupErrors ? implode("\n", array_map(fn ($k, $v) => "- **{$k}**: {$v}", array_keys($this->grupErrors), array_values($this->grupErrors)))."\n" : "- (tidak ada)\n");
+        $body = '# LAPORAN A-03 MERGE DEDUP PELANGGAN — '.date('Y-m-d H:i:s')."\n\n"
+            .'Perintah: `php artisan sid:merge-pelanggan-dup'.($dry ? ' --dry-run' : '')."` (idempotent, remap FK + hapus dup)\n\n"
+            ."## Ringkasan\n\n"
+            ."- Grup dedup (nama, telepon): **{$this->counts['grup']}**\n"
+            ."- Baris dup dihapus: **{$this->counts['hapus']}**\n"
+            ."- FK remap ke canonical: **{$this->counts['remap_fk']}** (".$this->remapDetail().")\n"
+            ."- sid_import_map remap: **{$this->counts['remap_map']}**\n"
+            ."- Grup error (skip): **{$this->counts['grup_error']}**\n\n"
+            ."## Daftar grup\n\n"
+            .implode("\n", $lines)."\n\n"
+            ."## Error\n\n"
+            .($this->grupErrors ? implode("\n", array_map(fn ($k, $v) => "- **{$k}**: {$v}", array_keys($this->grupErrors), array_values($this->grupErrors)))."\n" : "- (tidak ada)\n");
 
         file_put_contents($file, $body);
         $this->info("Laporan: {$file}");
@@ -272,7 +273,7 @@ class SidMergePelangganDup extends Command
             return null;
         }
         try {
-            return \Carbon\Carbon::parse($s)->format('Y-m-d');
+            return Carbon::parse($s)->format('Y-m-d');
         } catch (\Throwable) {
             return null;
         }

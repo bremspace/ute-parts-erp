@@ -112,7 +112,11 @@
                                     <option value="{{ $p->id }}" class="bg-ink-900">{{ $p->nama }}</option>
                                 @endforeach
                             </select>
+                            @cansee('harga_beli')
                             <input type="number" wire:model="poForm.items.{{ $idx }}.harga_beli" class="w-24 px-2 py-2 rounded-xl glass-input text-xs tabular-nums" placeholder="Harga" />
+@cannotsee('harga_beli')
+                            <input type="text" class="w-24 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed" placeholder="Harga (superadmin)" disabled />
+@endcansee
                             <input type="number" wire:model="poForm.items.{{ $idx }}.jumlah" min="1" class="w-16 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-center" placeholder="Qty" />
                             <button wire:click="removePoItem({{ $idx }})" class="p-2 text-up-red cursor-pointer text-xs">✕</button>
                         </div>

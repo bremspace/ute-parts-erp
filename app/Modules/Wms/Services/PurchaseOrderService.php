@@ -28,6 +28,15 @@ class PurchaseOrderService
             throw new \Exception('PO ini tidak bisa diterima dalam status saat ini');
         }
 
+        // [F2-2] PO 'dikirim' → penerimaan stok HANYA lewat finalisasi GRN
+        // (GrnService::selesaikanGrn → PO 'diterima'). Jalur legacy langsung
+        // (API updatePoStatus / PoTab) ditutup — cegah stok+jurnal tanpa GRN/approval.
+        if ($po->status === 'dikirim') {
+            throw ValidationException::withMessages([
+                'msg' => 'PO hanya bisa diterima melalui GRN — buka tab GRN untuk menerima PO ini.',
+            ]);
+        }
+
         // [F2-2] Bila PO sudah punya GRN → penerimaan hanya boleh lewat GRN
         // (mencegah double stok & double jurnal jalur legacy vs GRN).
         if (Grn::where('po_id', $po->id)->exists()) {

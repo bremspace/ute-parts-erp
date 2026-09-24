@@ -119,9 +119,15 @@
                         <div class="flex gap-2 items-center text-xs">
                             <div class="flex-1 min-w-0">
                                 <div class="font-bold text-white truncate">{{ $item['produk_nama'] ?? ('#'.$item['produk_id']) }}</div>
-                                <div class="text-ink-400 tabular-nums">
-                                    Harga Rp {{ number_format((float) ($item['harga_beli'] ?? 0), 0, ',', '.') }}
-                                </div>
+                                @cansee('harga_beli')
+                                    <div class="text-ink-400 tabular-nums">
+                                        Harga Rp {{ number_format((float) ($item['harga_beli'] ?? 0), 0, ',', '.') }}
+                                    </div>
+@cannotsee('harga_beli')
+                                    <div class="text-ink-400 tabular-nums">
+                                        Harga —
+                                    </div>
+@endcansee
                             </div>
                             <div class="w-20 text-center tabular-nums text-ink-300">
                                 <div class="text-[10px] text-ink-400">Qty PO</div>

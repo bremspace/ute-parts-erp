@@ -2,8 +2,10 @@
 
 namespace App\Modules\Dashboard\Livewire;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\KampanyeBroadcast;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
@@ -16,6 +18,7 @@ use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\StokItem;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 /**
@@ -280,6 +283,41 @@ class DashboardIndex extends Component
         ];
     }
 
+    /** F3-6 Treasury: proyeksi arus kas 30 hari = kas sekarang + piutang 30d - utang 30d */
+    public function getTreasuryProjectionProperty(): array
+    {
+        $cabangId = session('cabang_id');
+
+        // Kas sekarang: saldo akun 110-01 (Kas) dari jurnal balance — cari via kode COA
+        $akunKasId = (int) AkunCOA::where('kode', '110-01')->value('id');
+        $saldoKas = (float) JurnalAkuntansi::where('akun_coa_id', $akunKasId)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->sum(DB::raw('debit - kredit'));
+
+        // Piutang jatuh tempo ≤ 30 hari (status != lunas)
+        $piutang30d = Piutang::where('status', '!=', 'lunas')
+            ->whereDate('jatuh_tempo', '<=', now()->addDays(30)->toDateString())
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->sum(DB::raw('jumlah - jumlah_dibayar'));
+
+        // Utang jatuh tempo ≤ 30 hari (status belum_lunas/sebagian)
+        $utang30d = Utang::whereIn('status', ['belum_lunas', 'sebagian'])
+            ->whereDate('jatuh_tempo', '<=', now()->addDays(30)->toDateString())
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->sum(DB::raw('jumlah - jumlah_dibayar'));
+
+        $proyeksi30d = round($saldoKas + $piutang30d - $utang30d, 2);
+
+        return [
+            'saldo_kas' => round($saldoKas, 2),
+            'piutang_30d' => round($piutang30d, 2),
+            'utang_30d' => round($utang30d, 2),
+            'proyeksi_30d' => $proyeksi30d,
+            'drill_piutang' => route('laporan.drill', ['model' => 'Piutang']),
+            'drill_utang' => route('laporan.drill', ['model' => 'Utang']),
+        ];
+    }
+
     /** Marketing: komposisi tier pelanggan + performa broadcast (dari notifikasi_keluar) */
     public function getMarketInsightProperty(): array
     {
@@ -346,7 +384,7 @@ class DashboardIndex extends Component
         ] + match ($this->role) {
             // [T-27] Widget role-scoped: hanya properti role ini yg dievaluasi (query ringan, lazy via accessor)
             'kasir' => ['omzetShiftKasir' => $this->omzetShiftKasir],
-            'finance' => ['ringkasanKeuangan' => $this->ringkasanKeuangan],
+            'finance' => ['ringkasanKeuangan' => $this->ringkasanKeuangan, 'treasuryProjection' => $this->treasuryProjection],
             'marketing' => ['marketInsight' => $this->marketInsight],
             'staff-gudang' => ['poPending' => $this->poPending],
             default => [

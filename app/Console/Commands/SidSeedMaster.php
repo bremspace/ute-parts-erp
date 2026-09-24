@@ -42,7 +42,7 @@ class SidSeedMaster extends Command
         $only = array_values(array_filter(array_map('trim', explode(',', (string) $this->option('only')))));
         $run = fn (string $name, callable $fn) => ($only === [] || in_array($name, $only, true));
 
-        $this->info('=== Seed Master SID → Ute Parts (' . ($this->dryRun ? 'DRY-RUN' : 'EKSEKUSI') . ') ===');
+        $this->info('=== Seed Master SID → Ute Parts ('.($this->dryRun ? 'DRY-RUN' : 'EKSEKUSI').') ===');
 
         if ($run('brands', fn () => null)) {
             $this->seedBrands();
@@ -106,12 +106,14 @@ class SidSeedMaster extends Command
                         ->where(fn ($q) => $q->whereNull('keterangan')->orWhere('keterangan', '<>', 'Migrasi SID'))
                         ->update(['keterangan' => 'Migrasi SID']);
                 }
+
                 continue;
             }
             $this->stats['brands']++;
             if ($this->dryRun) {
                 $this->line(sprintf('  [DRY] Brand baru: %s', $canonical));
                 $brandIdByMerk[$lower] = null;
+
                 continue;
             }
             $id = DB::table('brands')->insertGetId([
@@ -203,7 +205,7 @@ class SidSeedMaster extends Command
 
         $lokasi = ['gudang' => 'GUDANG'];
         for ($i = 1; $i <= 15; $i++) {
-            $lokasi['toko' . $i] = 'TOKO' . $i;
+            $lokasi['toko'.$i] = 'TOKO'.$i;
         }
 
         foreach ($lokasi as $key => $kode) {
@@ -214,6 +216,7 @@ class SidSeedMaster extends Command
             $this->stats['gudang']++;
             if ($this->dryRun) {
                 $this->line(sprintf('  [DRY] Gudang %s (%s)', $kode, $nama));
+
                 continue;
             }
             $now = now();
@@ -252,11 +255,12 @@ class SidSeedMaster extends Command
                 $this->stats['tier']++;
                 if ($this->dryRun) {
                     $this->line(sprintf('  [DRY] Tier HRG-%s (%s)', $kode, $nama));
+
                     continue;
                 }
                 $now = now();
                 DB::table('tier_memberships')->updateOrInsert(
-                    ['kode' => 'HRG-' . $kode],
+                    ['kode' => 'HRG-'.$kode],
                     [
                         'nama' => $nama,
                         'min_belanja_12bulan' => 0,
@@ -324,6 +328,7 @@ class SidSeedMaster extends Command
             $this->stats['profil']++;
             if ($this->dryRun) {
                 $this->line(sprintf('  [DRY] %s = %s', $kunci, $nilai));
+
                 continue;
             }
             $now = now();

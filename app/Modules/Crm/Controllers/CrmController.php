@@ -353,7 +353,7 @@ class CrmController extends Controller
         ]);
 
         $data = $request->all();
-        $data['cabang_id'] = session('cabang_aktif_id');
+        $data['cabang_id'] = session('cabang_id');
 
         $lead = $this->leadService->create($data);
 

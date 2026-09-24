@@ -1,14 +1,57 @@
 <div class="space-y-6">
     <!-- Breadcrumbs -->
+    @php
+        // [P2] Crumb "current" harus = model yang datanya benar-benar tampil
+        // (currentModel), bukan crumb terakhir — anak di depan rantai belum dimuat
+        // sehingga dilabeli biasa dulu; jadi "current" setelah datanya termuat.
+        $currentCrumbIdx = null;
+        foreach ($breadcrumbs as $ci => $cb) {
+            if (($cb['model'] ?? null) === $currentModel) {
+                $currentCrumbIdx = $ci;
+                break;
+            }
+        }
+        if ($currentCrumbIdx === null && $breadcrumbs !== []) {
+            // Fallback: currentModel tak ada di rantai (breadcrumbs usang) → crumb terakhir
+            $currentCrumbIdx = count($breadcrumbs) - 1;
+        }
+
+        // [ADR 0011] Pemisah ribuan Indonesia (titik) — pola $fmt riwayat-aktivitas.
+        // id / *_id / kode / sku / barcode / no_* / *_persen tetap mentah (bukan nominal).
+        $fmtVal = function ($v, $key) {
+            if (is_bool($v)) {
+                return $v ? 'Ya' : 'Tidak';
+            }
+            $key = (string) $key;
+            $bukanNominal = $key === 'id'
+                || str_ends_with($key, '_id')
+                || $key === 'kode'
+                || str_ends_with($key, '_kode')
+                || $key === 'sku'
+                || $key === 'barcode'
+                || str_starts_with($key, 'no_')
+                || str_ends_with($key, '_persen');
+            if (! $bukanNominal && is_numeric($v)) {
+                return number_format((float) $v, 0, ',', '.');
+            }
+
+            return $v;
+        };
+    @endphp
     <nav class="flex items-center gap-2 text-xs">
         @foreach($breadcrumbs as $i => $crumb)
-            @if($i < count($breadcrumbs) - 1)
+            @if($i === $currentCrumbIdx)
+                <span class="text-white font-semibold" aria-current="page">{{ $crumb['label'] }}</span>
+            @elseif($i < count($breadcrumbs) - 1)
                 <button wire:click="drillDown('{{ $crumb['model'] }}')" class="text-up-primary hover:underline">
                     {{ $crumb['label'] }}
                 </button>
-                <span class="text-ink-500">/</span>
             @else
-                <span class="text-white font-semibold">{{ $crumb['label'] }}</span>
+                <!-- Anak berikutnya: tampil sebagai label, jadi current hanya setelah datanya dimuat -->
+                <span class="text-ink-400">{{ $crumb['label'] }}</span>
+            @endif
+            @if($i < count($breadcrumbs) - 1)
+                <span class="text-ink-500">/</span>
             @endif
         @endforeach
         @if(count($breadcrumbs) === 0)
@@ -24,7 +67,7 @@
                     @if(!is_array($value) && !is_object($value))
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
                             <p class="text-[10px] uppercase text-ink-400 font-bold">{{ str_replace('_', ' ', $key) }}</p>
-                            <p class="text-sm font-semibold text-white tabular-nums mt-1">{{ $value }}</p>
+                            <p class="text-sm font-semibold text-white tabular-nums mt-1">{{ $fmtVal($value, $key) }}</p>
                         </div>
                     @endif
                 @endforeach
@@ -59,7 +102,7 @@
                             @foreach($items as $item)
                                 <tr class="hover:bg-white/5 cursor-pointer transition" wire:click="drillDown('{{ $currentModel }}', {{ $item['id'] ?? 0 }})">
                                     @foreach($item as $key => $val)
-                                        <td class="py-1.5 px-3 tabular-nums">{{ is_array($val) || is_object($val) ? '-' : $val }}</td>
+                                        <td class="py-1.5 px-3 tabular-nums">{{ is_array($val) || is_object($val) ? '-' : $fmtVal($val, $key) }}</td>
                                     @endforeach
                                 </tr>
                             @endforeach

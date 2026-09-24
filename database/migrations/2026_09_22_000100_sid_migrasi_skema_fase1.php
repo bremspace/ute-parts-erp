@@ -263,7 +263,7 @@ return new class extends Migration
     /**
      * Tambah kolom hanya jika belum ada (hasColumn guard).
      *
-     * @param  array<int, array{0: string, 1: \Closure}>  $columns
+     * @param  array<int, array{0: string, 1: Closure}>  $columns
      */
     private function addColumns(string $table, array $columns): void
     {

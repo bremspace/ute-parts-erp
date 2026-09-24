@@ -38,7 +38,11 @@
                         </td>
                         <td class="py-3.5 px-4 font-mono text-ink-300 text-xs">{{ $skuPertama ?? '-' }}</td>
                         <td class="py-3.5 px-4 tabular-nums text-xs">
+                            @cansee('harga_beli')
                             <span class="text-ink-400">Beli</span> <span class="text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
+@cannotsee('harga_beli')
+                            <span class="text-ink-400">Beli</span> <span class="text-white font-semibold">—</span>
+@endcansee
                             <span class="block text-ink-400 mt-0.5">Jual</span> <span class="text-up-mint font-semibold">Rp {{ number_format($p->harga_jual_retail, 0, ',', '.') }}</span>
                         </td>
                         <td class="py-3.5 px-4">
@@ -196,6 +200,20 @@
                         </div>
                     </div>
 
+                    <!-- [F2-3] Serial Number (SN) Toggle -->
+                    <div class="p-3.5 rounded-xl bg-up-mint/10 border border-up-mint/30">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label class="block text-xs font-semibold text-ink-300 mb-0.5">Serial Number (SN)</label>
+                                <p class="text-[10px] text-up-mint/80">Wajib input SN saat GRN/stok masuk &amp; penjualan</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" wire:model.defer="produkForm.sn" class="sr-only peer" />
+                                <div class="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-up-mint/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-mint"></div>
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- [T-44] Harga Tier per tipe konsumen -->
                     <div class="p-3.5 rounded-xl bg-up-primary/[0.07] border border-up-primary/20">
                         <p class="text-xs font-bold text-up-primary mb-2">Harga Tier * (minimal 1 diisi — satu sumber harga pelanggan)</p>
@@ -299,6 +317,23 @@
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Keterangan</label>
                         <input type="text" wire:model="tambahStokForm.keterangan" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Pembelian dari supplier" />
                     </div>
+
+                    {{-- [F2-3] Input SN utk produk sn=true — jumlah wajib = jumlah --}}
+                    @if($stokProdukSn)
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-semibold text-up-accent">Nomor Seri (wajib)</label>
+                                <span class="text-[10px] text-ink-400 tabular-nums">Jumlah SN harus = Jumlah</span>
+                            </div>
+                            <textarea
+                                wire:model="tambahStokForm.sn"
+                                rows="3"
+                                placeholder="Satu SN per baris (boleh pisah koma) — scan/tempel di sini"
+                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono"
+                            ></textarea>
+                            @error('tambahStokForm.sn') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
+                    @endif
 
                     <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30 text-[11px] text-up-mint">
                         Pencatatan pembelian dari supplier — stok bertambah + StokLog + <strong>jurnal otomatis (Persediaan / Utang Usaha)</strong>.

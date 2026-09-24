@@ -56,6 +56,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'approve-workflow',
             // AUDIT TRAIL (F1-4)
             'lihat-audit-log',
+            // [F3-1] Field-level security permissions — baru untuk menghide harga_beli/margin dari role kasir/staff
+            'lihat.harga_beli',
+            'lihat.margin',
         ];
 
         foreach ($permissions as $permission) {
@@ -75,6 +78,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'laporan.cabang',
             'approve-workflow',
             'lihat-audit-log', // [F1-4] admin melihat riwayat audit cabangnya
+            // [F3-1] Field-level security: admin bisa lihat harga_beli/margin
+            'lihat.harga_beli',
+            'lihat.margin',
         ]);
 
         $kasir = Role::findOrCreate('kasir');
@@ -101,6 +107,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'laporan.cabang', 'laporan.konsolidasi',
             'approve-workflow',
             'lihat-audit-log', // [F1-4] finance melihat riwayat audit
+            // [F3-1] Field-level security: finance bisa lihat harga_beli/margin
+            'lihat.harga_beli',
+            'lihat.margin',
         ]);
 
         $marketing = Role::findOrCreate('marketing');

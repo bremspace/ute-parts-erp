@@ -13,7 +13,9 @@ use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
+use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\ProdukService;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -51,6 +53,8 @@ class ProdukTab extends Component
         'harga_tier_tier_id' => null,
         // [HARGA FLEKSIBEL]
         'harga_fleksibel' => false,
+        // [F2-3] Serial number tracking
+        'sn' => false,
     ];
 
     // Tambah Stok Modal (pembelian — sinkron Akunting)
@@ -58,8 +62,13 @@ class ProdukTab extends Component
 
     public ?int $stokProdukId = null;
 
+    // [F2-3] Flag sn produk target tambah stok — kontrol UI input SN di modal
+    public bool $stokProdukSn = false;
+
     public array $tambahStokForm = [
         'gudang_id' => null, 'rak_id' => null, 'qty' => 1, 'harga_beli' => 0, 'keterangan' => 'Pembelian dari supplier',
+        // [F2-3]
+        'sn' => '',
     ];
 
     // [T-43] Import master produk Excel
@@ -110,6 +119,8 @@ class ProdukTab extends Component
             'harga_tier_tier_id' => null,
             // [HARGA FLEKSIBEL]
             'harga_fleksibel' => false,
+            // [F2-3]
+            'sn' => false,
         ];
         $this->showProdukModal = true;
     }
@@ -135,6 +146,8 @@ class ProdukTab extends Component
             'produkForm.harga_tier.retail.nominal_tetap' => 'nullable|numeric|min:0',
             // [HARGA FLEKSIBEL]
             'produkForm.harga_fleksibel' => 'boolean',
+            // [F2-3]
+            'produkForm.sn' => 'boolean',
         ]);
 
         // [T-44] minimal 1 harga tier: retail (fallback ke harga_jual) atau salah satu tipe lain
@@ -161,6 +174,14 @@ class ProdukTab extends Component
             return;
         }
 
+        // [F2-3] Produk SN: stok awal tanpa input SN tidak diizinkan — stok masuk
+        // wajib lewat modal "+ Stok" (form-nya menyediakan input SN bila sn=true).
+        if ((bool) $this->produkForm['sn'] && (int) $this->produkForm['stok_awal'] > 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk SN — kosongkan stok awal, lalu tambah stok via "+ Stok" (wajib isi nomor seri)']);
+
+            return;
+        }
+
         try {
             app(ProdukService::class)->buatProduk(
                 nama: $this->produkForm['nama'],
@@ -181,6 +202,7 @@ class ProdukTab extends Component
                 tipeHpIds: $this->produkForm['tipe_hp_ids'] ?: [],
                 hargaTier: $this->produkForm['harga_tier'],
                 hargaFleksibel: (bool) $this->produkForm['harga_fleksibel'],
+                sn: (bool) $this->produkForm['sn'], // [F2-3]
             );
 
             $this->showProdukModal = false;
@@ -204,12 +226,16 @@ class ProdukTab extends Component
 
         $produk = Produk::with('skuVariants')->findOrFail($produkId);
         $this->stokProdukId = $produkId;
+        // [F2-3] UI: bila produk sn=true → tampilkan wajib isi SN di modal
+        $this->stokProdukSn = (bool) $produk->sn;
         $variant = $produk->skuVariants->first();
         $this->tambahStokForm = [
             'gudang_id' => $this->filterGudangId,
+            'rak_id' => null,
             'qty' => 1,
             'harga_beli' => $variant?->harga_beli ?? $produk->harga_beli ?? 0,
             'keterangan' => 'Pembelian stok '.$produk->nama,
+            'sn' => '',
         ];
         $this->showTambahStokModal = true;
     }
@@ -228,12 +254,26 @@ class ProdukTab extends Component
             'tambahStokForm.rak_id' => 'nullable|exists:rak,id', // [T-12]
             'tambahStokForm.qty' => 'required|integer|min:1',
             'tambahStokForm.harga_beli' => 'required|numeric|min:0',
+            'tambahStokForm.sn' => 'nullable|string', // [F2-3]
         ]);
 
-        try {
-            $produk = Produk::with('skuVariants')->findOrFail($this->stokProdukId);
-            $variant = $produk->skuVariants->first();
+        $produk = Produk::with('skuVariants')->findOrFail($this->stokProdukId);
+        $variant = $produk->skuVariants->first();
 
+        // [F2-3] Produk sn=true → SN wajib, jumlah SN = qty. Validasi SEBELUM
+        // transaksi stok → kegagalan tidak meninggalkan perubahan stok sebagian.
+        $snList = null;
+        if ($produk->sn) {
+            $snList = app(NomorSeriService::class)->parseList((string) ($this->tambahStokForm['sn'] ?? ''));
+            $qty = (int) $this->tambahStokForm['qty'];
+            if (count($snList) !== $qty) {
+                throw ValidationException::withMessages([
+                    'tambahStokForm.sn' => 'Jumlah nomor seri ('.count($snList).') harus sama dengan jumlah ('.$qty.') — satu SN per unit',
+                ]);
+            }
+        }
+
+        try {
             app(ProdukService::class)->tambahStokPembelian(
                 produkId: $produk->id,
                 variantId: $variant?->id,
@@ -242,7 +282,8 @@ class ProdukTab extends Component
                 hargaBeli: (float) $this->tambahStokForm['harga_beli'],
                 keterangan: $this->tambahStokForm['keterangan'] ?: 'Pembelian dari supplier',
                 userId: auth()->id(),
-                rakId: $this->tambahStokForm['rak_id'] ?? null // [T-12]
+                rakId: $this->tambahStokForm['rak_id'] ?? null, // [T-12]
+                snList: $snList // [F2-3] null utk produk non-SN
             );
 
             $this->showTambahStokModal = false;

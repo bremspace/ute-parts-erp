@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -34,8 +35,11 @@ class SidBackfillMaster2A extends Command
     ];
 
     private array $reportLines = [];
+
     private array $brandSkip = [];
+
     private array $memberUnmatched = [];
+
     private array $unmappedProduk = [];
 
     private const SENTINEL = ['1899-12-30', '0000-00-00', '1900-01-01', ''];
@@ -124,6 +128,7 @@ class SidBackfillMaster2A extends Command
                 $produkId = $skuId ? ($skuProduk[$skuId] ?? null) : null;
                 if (! $produkId) {
                     $this->counts['a02_unmapped']++;
+
                     continue;
                 }
                 $this->counts['a02_produk_diproses']++;
@@ -315,6 +320,7 @@ class SidBackfillMaster2A extends Command
                 $pelangganId = $map[$kode] ?? null;
                 if (! $pelangganId) {
                     $this->counts['a03_unmapped']++;
+
                     continue;
                 }
                 $this->counts['a03_pelanggan_diproses']++;
@@ -413,6 +419,7 @@ class SidBackfillMaster2A extends Command
                 if (! $pelanggan) {
                     $this->counts['a03_member_unmatched']++;
                     $this->memberUnmatched[] = sprintf('%s (id_kartu=%s, telp=%s)', $p['nama'] ?? '?', $idKartu, $telp ?: '-');
+
                     continue;
                 }
                 $this->counts['a03_member_merge']++;
@@ -468,6 +475,7 @@ class SidBackfillMaster2A extends Command
                 $supplierId = $map[$kode] ?? null;
                 if (! $supplierId) {
                     $this->counts['a04_unmapped']++;
+
                     continue;
                 }
                 $this->counts['a04_supplier_diproses']++;
@@ -536,6 +544,7 @@ class SidBackfillMaster2A extends Command
                     $sudah = DB::table('sku_variants')->where('id', $m->entity_id)->whereNotNull('kode_lama')->exists();
                     if ($sudah) {
                         $this->counts['a05_sku_sudah']++;
+
                         continue;
                     }
                     if (! $reportOnly) {
@@ -634,7 +643,7 @@ class SidBackfillMaster2A extends Command
         }
         $this->reportLines[] = '### A-05 — produk app tanpa map SID (6)';
         $this->reportLines[] = '';
-        $this->reportLines[] = "Jumlah produk ter-map via sid_import_map (sku_variant): **" . $mappedIds->count() . "**; unmapped: **" . $unmapped->count() . "**";
+        $this->reportLines[] = 'Jumlah produk ter-map via sid_import_map (sku_variant): **'.$mappedIds->count().'**; unmapped: **'.$unmapped->count().'**';
         $this->reportLines[] = '';
         $this->reportLines = array_merge($this->reportLines, $lines);
         $this->reportLines[] = '';
@@ -647,16 +656,16 @@ class SidBackfillMaster2A extends Command
             @mkdir($dir, 0775, true);
         }
         $file = $dir.'/A-02-A-05-laporan-'.date('Ymd-His').'.md';
-        $body = "# LAPORAN FASE 2A (A-02..A-05) — ".date('Y-m-d H:i:s')."\n\n"
-            . "Perintah: `php artisan sid:backfill-2a` (idempotent, non-destruktif)\n\n"
-            . "## Ringkasan\n\n"
-            . "- A-02 produk diproses: {$this->counts['a02_produk_diproses']} (unmapped: {$this->counts['a02_unmapped']})\n"
-            . "- A-02 kode_lama baru: {$this->counts['a02_kode_lama']}, barcode baru: {$this->counts['a02_barcode']}, barcode_alt baru: {$this->counts['a02_barcode_alt']}\n"
-            . "- A-02 brand_id baru: {$this->counts['a02_brand_baru']}, merk tanpa brand (skip): {$this->counts['a02_brand_skip']}\n"
-            . "- A-03 pelanggan diproses: {$this->counts['a03_pelanggan_diproses']} (unmapped: {$this->counts['a03_unmapped']})\n"
-            . "- A-03 member merge: {$this->counts['a03_member_merge']}, unmatched: {$this->counts['a03_member_unmatched']} (TIDAK dibuat buta)\n"
-            . "- A-04 supplier diproses: {$this->counts['a04_supplier_diproses']} (unmapped: {$this->counts['a04_unmapped']})\n"
-            . "- A-05 sku_variants kode_lama baru: {$this->counts['a05_sku_filled']}, sudah terisi: {$this->counts['a05_sku_sudah']}\n\n";
+        $body = '# LAPORAN FASE 2A (A-02..A-05) — '.date('Y-m-d H:i:s')."\n\n"
+            ."Perintah: `php artisan sid:backfill-2a` (idempotent, non-destruktif)\n\n"
+            ."## Ringkasan\n\n"
+            ."- A-02 produk diproses: {$this->counts['a02_produk_diproses']} (unmapped: {$this->counts['a02_unmapped']})\n"
+            ."- A-02 kode_lama baru: {$this->counts['a02_kode_lama']}, barcode baru: {$this->counts['a02_barcode']}, barcode_alt baru: {$this->counts['a02_barcode_alt']}\n"
+            ."- A-02 brand_id baru: {$this->counts['a02_brand_baru']}, merk tanpa brand (skip): {$this->counts['a02_brand_skip']}\n"
+            ."- A-03 pelanggan diproses: {$this->counts['a03_pelanggan_diproses']} (unmapped: {$this->counts['a03_unmapped']})\n"
+            ."- A-03 member merge: {$this->counts['a03_member_merge']}, unmatched: {$this->counts['a03_member_unmatched']} (TIDAK dibuat buta)\n"
+            ."- A-04 supplier diproses: {$this->counts['a04_supplier_diproses']} (unmapped: {$this->counts['a04_unmapped']})\n"
+            ."- A-05 sku_variants kode_lama baru: {$this->counts['a05_sku_filled']}, sudah terisi: {$this->counts['a05_sku_sudah']}\n\n";
 
         $body .= "## Member tanpa match pelanggan\n\n";
         if ($this->memberUnmatched) {
@@ -678,7 +687,7 @@ class SidBackfillMaster2A extends Command
         foreach ($this->unmappedProduk as $u) {
             $body .= "- {$u}\n";
         }
-        $body .= "\n" . implode("\n", $this->reportLines) . "\n";
+        $body .= "\n".implode("\n", $this->reportLines)."\n";
 
         file_put_contents($file, $body);
         $this->info("Laporan: {$file}");
@@ -692,12 +701,12 @@ class SidBackfillMaster2A extends Command
         }
 
         $this->info("\n=== VERIFIKASI (state DB) ===");
-        $this->line('  produk kode_lama: ' . DB::table('produk')->whereNotNull('kode_lama')->count());
-        $this->line('  produk barcode: ' . DB::table('produk')->whereNotNull('barcode')->count());
-        $this->line('  pelanggan kode_lama: ' . DB::table('pelanggan')->whereNotNull('kode_lama')->count());
-        $this->line('  pelanggan kode_member: ' . DB::table('pelanggan')->whereNotNull('kode_member')->count());
-        $this->line('  supplier kode_lama: ' . DB::table('supplier')->whereNotNull('kode_lama')->count());
-        $this->line('  sku_variants kode_lama: ' . DB::table('sku_variants')->whereNotNull('kode_lama')->count());
+        $this->line('  produk kode_lama: '.DB::table('produk')->whereNotNull('kode_lama')->count());
+        $this->line('  produk barcode: '.DB::table('produk')->whereNotNull('barcode')->count());
+        $this->line('  pelanggan kode_lama: '.DB::table('pelanggan')->whereNotNull('kode_lama')->count());
+        $this->line('  pelanggan kode_member: '.DB::table('pelanggan')->whereNotNull('kode_member')->count());
+        $this->line('  supplier kode_lama: '.DB::table('supplier')->whereNotNull('kode_lama')->count());
+        $this->line('  sku_variants kode_lama: '.DB::table('sku_variants')->whereNotNull('kode_lama')->count());
     }
 
     // ---------------- UTIL ----------------
@@ -725,7 +734,7 @@ class SidBackfillMaster2A extends Command
             return null;
         }
         try {
-            $d = \Carbon\Carbon::parse($s);
+            $d = Carbon::parse($s);
 
             return $d->format('Y-m-d');
         } catch (\Throwable) {

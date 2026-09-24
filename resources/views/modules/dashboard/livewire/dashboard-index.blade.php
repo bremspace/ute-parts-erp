@@ -306,4 +306,58 @@
             </div>
         </x-prism.glass-card>
     @endrole
+
+    <!-- F3-6 Treasury: Proyeksi Arus Kas 30 Hari (untuk role finance/super-admin) -->
+    @role('finance')
+        <x-prism.glass-card title="Proyeksi Arus Kas 30 Hari" subtitle="Kas + Piutang 30d − Utang 30d">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Saldo Kas Sekarang</p>
+                    <p class="text-xl font-black text-up-mint tabular-nums mt-1">Rp {{ number_format($treasuryProjection['saldo_kas'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/30">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Piutang Jatuh Tempo 30d</p>
+                    <p class="text-xl font-black text-up-primary tabular-nums mt-1">Rp {{ number_format($treasuryProjection['piutang_30d'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/30">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Utang Jatuh Tempo 30d</p>
+                    <p class="text-xl font-black text-up-red tabular-nums mt-1">Rp {{ number_format($treasuryProjection['utang_30d'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-up-accent/10 border border-up-accent/30">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Proyeksi 30 Hari</p>
+                    <p class="text-xl font-black {{ ($treasuryProjection['proyeksi_30d'] ?? 0) >= 0 ? 'text-up-mint' : 'text-up-red' }} tabular-nums mt-1">Rp {{ number_format(abs($treasuryProjection['proyeksi_30d'] ?? 0), 0, ',', '.') }}</p>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-4 flex-wrap">
+                <a href="{{ $treasuryProjection['drill_piutang'] ?? route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
+                <a href="{{ $treasuryProjection['drill_utang'] ?? route('laporan.drill', ['model' => 'Utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
+            </div>
+        </x-prism.glass-card>
+    @endrole
+    @role('super-admin')
+        <x-prism.glass-card title="Proyeksi Arus Kas 30 Hari" subtitle="Kas + Piutang 30d − Utang 30d">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Saldo Kas Sekarang</p>
+                    <p class="text-xl font-black text-up-mint tabular-nums mt-1">Rp {{ number_format($treasuryProjection['saldo_kas'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/30">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Piutang Jatuh Tempo 30d</p>
+                    <p class="text-xl font-black text-up-primary tabular-nums mt-1">Rp {{ number_format($treasuryProjection['piutang_30d'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/30">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Utang Jatuh Tempo 30d</p>
+                    <p class="text-xl font-black text-up-red tabular-nums mt-1">Rp {{ number_format($treasuryProjection['utang_30d'] ?? 0, 0, ',', '.') }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-up-accent/10 border border-up-accent/30">
+                    <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Proyeksi 30 Hari</p>
+                    <p class="text-xl font-black {{ ($treasuryProjection['proyeksi_30d'] ?? 0) >= 0 ? 'text-up-mint' : 'text-up-red' }} tabular-nums mt-1">Rp {{ number_format(abs($treasuryProjection['proyeksi_30d'] ?? 0), 0, ',', '.') }}</p>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-4 flex-wrap">
+                <a href="{{ $treasuryProjection['drill_piutang'] ?? route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
+                <a href="{{ $treasuryProjection['drill_utang'] ?? route('laporan.drill', ['model' => 'Utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
+            </div>
+        </x-prism.glass-card>
+    @endrole
 </div>

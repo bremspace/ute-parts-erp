@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -49,25 +50,35 @@ class SidMigrateFase2B extends Command
     ];
 
     private array $unmappedPelanggan = [];
+
     private array $unmappedSupplier = [];
+
     private array $unmappedProduk = [];
+
     private array $kasUnmapped = [];
+
     private array $gudangFallback = [];
 
     private const SENTINEL = ['1899-12-30', '0000-00-00', '1900-01-01', ''];
 
     /** @var array<string,int> kode_lama pelanggan → id */
     private array $pelangganMap = [];
+
     /** @var array<string,int> kode_lama supplier → id */
     private array $supplierMap = [];
+
     /** @var array<string,int> kode_lama produk → id */
     private array $produkMap = [];
+
     /** @var array<string,int> kode_lama sku_variants → id */
     private array $skuMap = [];
+
     /** @var array<string,int> master_kas.kode → id */
     private array $kasMap = [];
+
     /** @var array<string,int> gudang kode/nama → id */
     private array $gudangMap = [];
+
     /** @var array<string,int> gudang id by nama-lower */
     private array $gudangByNama = [];
 
@@ -120,6 +131,7 @@ class SidMigrateFase2B extends Command
                     // pelanggan_id NOT NULL → skip, catat
                     $this->counts['b01_skipped_pelanggan']++;
                     $this->unmappedPelanggan[] = sprintf('piutang %s → pelanggan kode `%s`', $kode, $pelangganKode ?: '(kosong)');
+
                     continue;
                 }
 
@@ -196,6 +208,7 @@ class SidMigrateFase2B extends Command
                     // supplier_id NOT NULL → skip PO + item, catat
                     $this->counts['b02_po_skip_supplier']++;
                     $this->unmappedSupplier[] = sprintf('PO %s → supplier kode `%s`', $kode, $supplierKode ?: '(kosong)');
+
                     continue;
                 }
 
@@ -285,6 +298,7 @@ class SidMigrateFase2B extends Command
                         if (! in_array($kodeBarang, $this->unmappedProduk, true)) {
                             $this->unmappedProduk[] = $kodeBarang;
                         }
+
                         continue;
                     }
                     $this->counts['b02_item_staging']++;
@@ -304,6 +318,7 @@ class SidMigrateFase2B extends Command
                         if (! $exists) {
                             $this->counts['b02_item_inserted']++;
                         }
+
                         continue;
                     }
                     $row = DB::table('purchase_order_item')->where('kode_lama', $itemKode)->first();
@@ -553,37 +568,37 @@ class SidMigrateFase2B extends Command
         }
         $file = $dir.'/B-fase2B-laporan-'.date('Ymd-His').'.md';
 
-        $body = "# LAPORAN FASE 2B (B-01, B-02, B-04) — ".date('Y-m-d H:i:s')."\n\n"
-            . 'Perintah: `php artisan sid:migrate-2b'.($dry ? ' --dry-run' : '')."` (idempotent, non-destruktif, chunked)\n\n"
-            . "## Ringkasan\n\n"
-            . "- B-01 piutang staging: {$this->counts['b01_staging']}, inserted: {$this->counts['b01_inserted']}, skip (pelanggan unmapped): {$this->counts['b01_skipped_pelanggan']}, kas unmapped: {$this->counts['b01_kas_unmapped']}\n"
-            . "- B-02 PO staging: {$this->counts['b02_po_staging']}, inserted: {$this->counts['b02_po_inserted']}, skip (supplier unmapped): {$this->counts['b02_po_skip_supplier']}\n"
-            . "- B-02 item staging: {$this->counts['b02_item_staging']}, inserted: {$this->counts['b02_item_inserted']}, dummy produk baru: {$this->counts['b02_dummy_produk_baru']}, produk unmapped (skip item): {$this->counts['b02_produk_unmapped']}\n"
-            . "- B-04 return penjualan staging: {$this->counts['b04_retjual_staging']}, inserted: {$this->counts['b04_retjual_inserted']}, pelanggan unmapped: {$this->counts['b04_retjual_pelanggan_unmapped']}\n"
-            . "- B-04 return pembelian staging: {$this->counts['b04_retbeli_staging']}, inserted: {$this->counts['b04_retbeli_inserted']}, supplier unmapped: {$this->counts['b04_retbeli_supplier_unmapped']}\n\n"
-            . "## B-02 catatan (utang & skema)\n\n"
-            . "- hutang staging = 0 baris → UTANG DI-SKIP (B-02 utang tidak ada data).\n"
-            . "- piutang.status enum app = `belum_lunas/sebagian/lunas` (TIDAK ada 'terbuka') → pakai `belum_lunas`.\n"
-            . "- piutang.pelanggan_id / purchase_order.supplier_id / purchase_order_item.produk_id = NOT NULL di DB → unmapped: piutang/PO di-skip, item pakai produk dummy `[ARSIP-SID] …` (pola §4.4, is_active=false, backfill via kode_lama setelah A-02 complete).\n"
-            . "- purchase_order.status enum app = `draft/dikirim/diterima/dibatalkan` (tanpa 'lunas') → `diterima` (lunas=true), `dikirim` (lunas=false).\n"
-            . "- purchase_order.gudang_tujuan_id NOT NULL → dari payload.lokasistok (semua `TOKO` → gudang nama TOKO = TOKO1).\n"
-            . "- item.kode_lama = kode_sumber `<kode pembelian>|<nourut>` (payload.kode = kode header, tidak unik per item).\n"
-            . "- piutang/purchase_order/purchase_order_item TIDAK punya kolom `is_migrasi_sid` (M-01..M-03) → flag tidak diset.\n"
-            . "- total_dibayar = jumlah - hutang; jatuh_tempo = null (payload.jt = int hari → dicatat di catatan).\n\n"
-            . "## Unmapped pelanggan (NULL / skip)\n\n"
-            . $this->listLines($this->unmappedPelanggan)
-            . "## Unmapped supplier (skip / null)\n\n"
-            . $this->listLines($this->unmappedSupplier)
-            . "## Produk tidak ada di produk.kode_lama (dummy dibuat bila item diproses)\n\n"
-            . $this->listLines($this->unmappedProduk)
-            . "## Kas unmapped (kode_kas tanpa master_kas)\n\n"
-            . $this->listLines($this->kasUnmapped)
-            . "## Gudang fallback (lokasistok → GUDANG)\n\n"
-            . $this->listLines(array_map(fn ($k, $v) => "`{$k}` ×{$v}", array_keys($this->gudangFallback), array_values($this->gudangFallback)))
-            . "## Skipped (per instruksi, TIDAK dieksekusi)\n\n"
-            . "- B-03 nomor_seri_produk ← nomor_seri (staging = 0 baris)\n"
-            . "- B-05 expired_barang → batch expiry (app tak punya batch; produk.expired_at sudah diisi @A-02)\n"
-            . "- B-06 koreksi (1 baris, historis → snapshot stok_opname, bukan prioritas)\n\n";
+        $body = '# LAPORAN FASE 2B (B-01, B-02, B-04) — '.date('Y-m-d H:i:s')."\n\n"
+            .'Perintah: `php artisan sid:migrate-2b'.($dry ? ' --dry-run' : '')."` (idempotent, non-destruktif, chunked)\n\n"
+            ."## Ringkasan\n\n"
+            ."- B-01 piutang staging: {$this->counts['b01_staging']}, inserted: {$this->counts['b01_inserted']}, skip (pelanggan unmapped): {$this->counts['b01_skipped_pelanggan']}, kas unmapped: {$this->counts['b01_kas_unmapped']}\n"
+            ."- B-02 PO staging: {$this->counts['b02_po_staging']}, inserted: {$this->counts['b02_po_inserted']}, skip (supplier unmapped): {$this->counts['b02_po_skip_supplier']}\n"
+            ."- B-02 item staging: {$this->counts['b02_item_staging']}, inserted: {$this->counts['b02_item_inserted']}, dummy produk baru: {$this->counts['b02_dummy_produk_baru']}, produk unmapped (skip item): {$this->counts['b02_produk_unmapped']}\n"
+            ."- B-04 return penjualan staging: {$this->counts['b04_retjual_staging']}, inserted: {$this->counts['b04_retjual_inserted']}, pelanggan unmapped: {$this->counts['b04_retjual_pelanggan_unmapped']}\n"
+            ."- B-04 return pembelian staging: {$this->counts['b04_retbeli_staging']}, inserted: {$this->counts['b04_retbeli_inserted']}, supplier unmapped: {$this->counts['b04_retbeli_supplier_unmapped']}\n\n"
+            ."## B-02 catatan (utang & skema)\n\n"
+            ."- hutang staging = 0 baris → UTANG DI-SKIP (B-02 utang tidak ada data).\n"
+            ."- piutang.status enum app = `belum_lunas/sebagian/lunas` (TIDAK ada 'terbuka') → pakai `belum_lunas`.\n"
+            ."- piutang.pelanggan_id / purchase_order.supplier_id / purchase_order_item.produk_id = NOT NULL di DB → unmapped: piutang/PO di-skip, item pakai produk dummy `[ARSIP-SID] …` (pola §4.4, is_active=false, backfill via kode_lama setelah A-02 complete).\n"
+            ."- purchase_order.status enum app = `draft/dikirim/diterima/dibatalkan` (tanpa 'lunas') → `diterima` (lunas=true), `dikirim` (lunas=false).\n"
+            ."- purchase_order.gudang_tujuan_id NOT NULL → dari payload.lokasistok (semua `TOKO` → gudang nama TOKO = TOKO1).\n"
+            ."- item.kode_lama = kode_sumber `<kode pembelian>|<nourut>` (payload.kode = kode header, tidak unik per item).\n"
+            ."- piutang/purchase_order/purchase_order_item TIDAK punya kolom `is_migrasi_sid` (M-01..M-03) → flag tidak diset.\n"
+            ."- total_dibayar = jumlah - hutang; jatuh_tempo = null (payload.jt = int hari → dicatat di catatan).\n\n"
+            ."## Unmapped pelanggan (NULL / skip)\n\n"
+            .$this->listLines($this->unmappedPelanggan)
+            ."## Unmapped supplier (skip / null)\n\n"
+            .$this->listLines($this->unmappedSupplier)
+            ."## Produk tidak ada di produk.kode_lama (dummy dibuat bila item diproses)\n\n"
+            .$this->listLines($this->unmappedProduk)
+            ."## Kas unmapped (kode_kas tanpa master_kas)\n\n"
+            .$this->listLines($this->kasUnmapped)
+            ."## Gudang fallback (lokasistok → GUDANG)\n\n"
+            .$this->listLines(array_map(fn ($k, $v) => "`{$k}` ×{$v}", array_keys($this->gudangFallback), array_values($this->gudangFallback)))
+            ."## Skipped (per instruksi, TIDAK dieksekusi)\n\n"
+            ."- B-03 nomor_seri_produk ← nomor_seri (staging = 0 baris)\n"
+            ."- B-05 expired_barang → batch expiry (app tak punya batch; produk.expired_at sudah diisi @A-02)\n"
+            ."- B-06 koreksi (1 baris, historis → snapshot stok_opname, bukan prioritas)\n\n";
 
         file_put_contents($file, $body);
         $this->info("Laporan: {$file}");
@@ -628,7 +643,7 @@ class SidMigrateFase2B extends Command
             return null;
         }
         try {
-            return \Carbon\Carbon::parse($s)->format('Y-m-d');
+            return Carbon::parse($s)->format('Y-m-d');
         } catch (\Throwable) {
             return null;
         }

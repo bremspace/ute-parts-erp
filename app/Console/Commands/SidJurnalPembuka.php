@@ -36,7 +36,9 @@ class SidJurnalPembuka extends Command
     protected $description = 'FASE 3 (C-08): hitung saldo pembuka SID + jurnal pembuka (default dry-run)';
 
     private const TANGGAL_OPENING = '2026-01-01';
+
     private const NO_JURNAL = 'SID-OPENING';
+
     private const CABANG_ID = 1;
 
     /** kode akun_coa → kelompok saldo. Semua sudah ada di seeder (26 akun, C-08 cek 09-22). */
@@ -214,25 +216,25 @@ class SidJurnalPembuka extends Command
 
         $fmt = fn (float $v) => number_format($v, 2, ',', '.');
 
-        $body = "# LAPORAN FASE 3 (C-08) — JURNAL PEMBUKA SID — ".date('Y-m-d H:i:s')."\n\n"
-            . "Mode: **{$mode}** — Perintah: `php artisan sid:jurnal-pembuka` (default dry-run; `--commit` = posting, idempotent by no_jurnal)\n"
-            . "Status: **command siap, dry-run selesai, keputusan commit di tangan orchestrator** (C-08 checkbox tetap `- [ ]`)\n\n"
-            . "## 1. Saldo pembuka per sumber\n\n"
-            . "| Komponen | Sumber | Nilai |\n|---|---|---|\n"
-            . "| Kas | `master_kas` tipe=kas (KT 99.818.660, KQ 0) | {$fmt((float) $saldo['kas'])} |\n"
-            . "| Bank | `master_kas` tipe=bank (BCA/BRI/BNI 0) | {$fmt((float) $saldo['bank'])} |\n"
-            . "| Piutang Usaha | `piutang` Σ(jumlah − jumlah_dibayar) — {$saldo['piutang_baris']} baris, {$saldo['piutang_belum_lunas']} belum_lunas | {$fmt((float) $saldo['piutang'])} |\n"
-            . "| Persediaan | Σ `stok_items.jumlah` × `produk.harga_beli` — {$saldo['stok_baris']} baris stok | {$fmt((float) $saldo['persediaan'])} |\n"
-            . "| Utang Usaha | `utang` Σ(jumlah − jumlah_dibayar) — {$saldo['utang_baris']} baris | {$fmt((float) $saldo['utang'])} |\n"
-            . "| **Modal (balancing)** | Kas + Bank + Piutang + Persediaan − Utang | **{$fmt((float) $saldo['modal'])}** |\n\n"
-            . ($saldo['modal_negatif'] ? "> ⚠️ **MODAL NEGATIF** — valid (balancing hasil = negatif), tetap dicatat sebagai kredit negatif/posisi defisit modal. Keputusan akuntansi di tangan orchestrator.\n\n" : '')
-            . "## 2. Entri jurnal pembuka\n\n"
-            . "- Tanggal: `".self::TANGGAL_OPENING."` (di pilih 2026-01-01 — sebelum transaksi historis min 2026-02-14; alternatif MIN(tanggal_transaksi) dicatat di catatan verifikasi)\n"
-            . "- no_jurnal: `".self::NO_JURNAL."` (deterministik → idempotent; rerun `--commit` ditolak guard duplikat)\n"
-            . "- sumber: `sid`, referensi_tipe: `SID-MIGRASI`, cabang_id: ".self::CABANG_ID."\n"
-            . "- deskripsi: `PEMBUKAAN SID — saldo awal migrasi retail SID (opening balance)` (kolom `is_migrasi_sid` TIDAK ada di jurnal_akuntansi → dicatat di deskripsi)\n"
-            . "- Baris nilai 0 (Bank 0, dst) TIDAK ditulis sebagai line jurnal (dilaporkan di sini saja)\n\n"
-            . "| Akun (kode) | Nama | Debit | Kredit |\n|---|---|---:|---:|\n";
+        $body = '# LAPORAN FASE 3 (C-08) — JURNAL PEMBUKA SID — '.date('Y-m-d H:i:s')."\n\n"
+            ."Mode: **{$mode}** — Perintah: `php artisan sid:jurnal-pembuka` (default dry-run; `--commit` = posting, idempotent by no_jurnal)\n"
+            ."Status: **command siap, dry-run selesai, keputusan commit di tangan orchestrator** (C-08 checkbox tetap `- [ ]`)\n\n"
+            ."## 1. Saldo pembuka per sumber\n\n"
+            ."| Komponen | Sumber | Nilai |\n|---|---|---|\n"
+            ."| Kas | `master_kas` tipe=kas (KT 99.818.660, KQ 0) | {$fmt((float) $saldo['kas'])} |\n"
+            ."| Bank | `master_kas` tipe=bank (BCA/BRI/BNI 0) | {$fmt((float) $saldo['bank'])} |\n"
+            ."| Piutang Usaha | `piutang` Σ(jumlah − jumlah_dibayar) — {$saldo['piutang_baris']} baris, {$saldo['piutang_belum_lunas']} belum_lunas | {$fmt((float) $saldo['piutang'])} |\n"
+            ."| Persediaan | Σ `stok_items.jumlah` × `produk.harga_beli` — {$saldo['stok_baris']} baris stok | {$fmt((float) $saldo['persediaan'])} |\n"
+            ."| Utang Usaha | `utang` Σ(jumlah − jumlah_dibayar) — {$saldo['utang_baris']} baris | {$fmt((float) $saldo['utang'])} |\n"
+            ."| **Modal (balancing)** | Kas + Bank + Piutang + Persediaan − Utang | **{$fmt((float) $saldo['modal'])}** |\n\n"
+            .($saldo['modal_negatif'] ? "> ⚠️ **MODAL NEGATIF** — valid (balancing hasil = negatif), tetap dicatat sebagai kredit negatif/posisi defisit modal. Keputusan akuntansi di tangan orchestrator.\n\n" : '')
+            ."## 2. Entri jurnal pembuka\n\n"
+            .'- Tanggal: `'.self::TANGGAL_OPENING."` (di pilih 2026-01-01 — sebelum transaksi historis min 2026-02-14; alternatif MIN(tanggal_transaksi) dicatat di catatan verifikasi)\n"
+            .'- no_jurnal: `'.self::NO_JURNAL."` (deterministik → idempotent; rerun `--commit` ditolak guard duplikat)\n"
+            .'- sumber: `sid`, referensi_tipe: `SID-MIGRASI`, cabang_id: '.self::CABANG_ID."\n"
+            ."- deskripsi: `PEMBUKAAN SID — saldo awal migrasi retail SID (opening balance)` (kolom `is_migrasi_sid` TIDAK ada di jurnal_akuntansi → dicatat di deskripsi)\n"
+            ."- Baris nilai 0 (Bank 0, dst) TIDAK ditulis sebagai line jurnal (dilaporkan di sini saja)\n\n"
+            ."| Akun (kode) | Nama | Debit | Kredit |\n|---|---|---:|---:|\n";
 
         foreach ($lines as $l) {
             $kode = $l['akun_kode'];
@@ -240,29 +242,29 @@ class SidJurnalPembuka extends Command
             $body .= "| {$kode} | {$nama} | ".($l['debit'] > 0 ? $fmt((float) $l['debit']).' | 0,00' : '0,00 | '.$fmt((float) $l['kredit']))." |\n";
         }
         $body .= "| **TOTAL** | | **{$fmt($totalDebit)}** | **{$fmt($totalKredit)}** |\n\n"
-            . "**Balancing check:** debit ".($balance ? '=' : '≠')." kredit → ".($balance ? '✅ BALANCE ('.round($totalDebit, 2).' = '.round($totalKredit, 2).')' : '❌ TIDAK BALANCE')."\n\n"
-            . "## 3. Akun COA — ketersediaan\n\n"
-            . "| Kode | Nama yang dibutuhkan | Status |\n|---|---|---|\n";
+            .'**Balancing check:** debit '.($balance ? '=' : '≠').' kredit → '.($balance ? '✅ BALANCE ('.round($totalDebit, 2).' = '.round($totalKredit, 2).')' : '❌ TIDAK BALANCE')."\n\n"
+            ."## 3. Akun COA — ketersediaan\n\n"
+            ."| Kode | Nama yang dibutuhkan | Status |\n|---|---|---|\n";
         foreach (self::AKUN_MAP as $kode => $nama) {
             $status = isset($akunAda[$kode]) ? "ADA (id {$akunAda[$kode]})" : '**TIDAK ADA — GAP (perlu dibuat, keputusan orchestrator)**';
             $body .= "| {$kode} | {$nama} | {$status} |\n";
         }
         $body .= "\nTotal akun_coa existing: **".AkunCOA::count()."**.\n\n"
-            . "## 4. Catatan / deviasi\n\n"
-            . "- Stok: {$saldo['stok_baris']} baris stok_items; per gudang:\n";
+            ."## 4. Catatan / deviasi\n\n"
+            ."- Stok: {$saldo['stok_baris']} baris stok_items; per gudang:\n";
         foreach ($saldo['stok_per_gudang'] as $g) {
             $body .= "  - gudang_id {$g['gudang_id']}: {$g['baris']} baris, qty {$g['qty']}\n";
         }
         $body .= "- **produk.harga_beli NULL** (dihitung 0): **{$saldo['persediaan_harga_beli_null']}** baris stok_items\n"
-            . "- Piutang: 11 baris semua belum_lunas, jumlah_dibayar 0 (B-01 laporan 0 pelunasan di dump) — Σ 3.001.000,00\n"
-            . "- Utang: {$saldo['utang_baris']} baris (staging hutang = 0, B-02 SKIP) → 0,00\n"
-            . "- Deviasi skema: `jurnal_akuntansi` tidak punya kolom `is_migrasi_sid` → identitas migrasi dicatat di `deskripsi`\n"
-            . "- Alternatif tanggal: MIN(tanggal_transaksi) transaksi = 2026-02-14 09:17:05; dipilih 2026-01-01 agar entri pembuka mendahului seluruh transaksi historis\n\n";
+            ."- Piutang: 11 baris semua belum_lunas, jumlah_dibayar 0 (B-01 laporan 0 pelunasan di dump) — Σ 3.001.000,00\n"
+            ."- Utang: {$saldo['utang_baris']} baris (staging hutang = 0, B-02 SKIP) → 0,00\n"
+            ."- Deviasi skema: `jurnal_akuntansi` tidak punya kolom `is_migrasi_sid` → identitas migrasi dicatat di `deskripsi`\n"
+            ."- Alternatif tanggal: MIN(tanggal_transaksi) transaksi = 2026-02-14 09:17:05; dipilih 2026-01-01 agar entri pembuka mendahului seluruh transaksi historis\n\n";
 
         if ($commit) {
             $body .= "## 5. Status commit\n\n";
             if ($commitResult) {
-                $body .= "- ✅ POSTED: `{$commitResult[0]->no_jurnal}`, ".count($commitResult)." baris (id ".implode(',', array_column($commitResult, 'id')).")\n";
+                $body .= "- ✅ POSTED: `{$commitResult[0]->no_jurnal}`, ".count($commitResult).' baris (id '.implode(',', array_column($commitResult, 'id')).")\n";
             } else {
                 $body .= "- ❌ GAGAL / tidak diposting (lihat output console)\n";
             }

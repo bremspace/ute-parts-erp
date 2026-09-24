@@ -2,15 +2,16 @@
 
 namespace Tests\Unit;
 
+use App\Models\User;
 use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Produk;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class HargaFleksibelTest extends TestCase
@@ -27,7 +28,7 @@ class HargaFleksibelTest extends TestCase
         Permission::firstOrCreate(['name' => 'atur-harga-fleksibel', 'guard_name' => 'web']);
         $superRole = Role::where('name', 'super-admin')->first();
         $superRole->givePermissionTo('atur-harga-fleksibel');
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     protected function createCabang(): Cabang
@@ -44,6 +45,7 @@ class HargaFleksibelTest extends TestCase
     protected function createProduk(array $attrs = []): Produk
     {
         $cabang = $this->createCabang();
+
         return Produk::create(array_merge([
             'nama' => 'Produk Test',
             'slug' => 'produk-test-'.Str::random(4),
@@ -65,6 +67,7 @@ class HargaFleksibelTest extends TestCase
             'password' => bcrypt('password'),
         ]);
         $user->assignRole($roleName);
+
         return $user;
     }
 
@@ -72,7 +75,7 @@ class HargaFleksibelTest extends TestCase
     {
         $produk = $this->createProduk(['harga_fleksibel' => false, 'harga_beli' => 50000]);
         $kasir = $this->createUser('kasir');
-        $service = new HargaFleksibelService();
+        $service = new HargaFleksibelService;
 
         // Harga di atas HPP - lolos
         $service->validasi($produk, 100000, $kasir);
@@ -90,7 +93,7 @@ class HargaFleksibelTest extends TestCase
     {
         $produk = $this->createProduk(['harga_fleksibel' => true, 'harga_beli' => 50000]);
         $kasir = $this->createUser('kasir');
-        $service = new HargaFleksibelService();
+        $service = new HargaFleksibelService;
 
         $this->expectException(ValidationException::class);
         $service->validasi($produk, 100000, $kasir);
@@ -100,7 +103,7 @@ class HargaFleksibelTest extends TestCase
     {
         $produk = $this->createProduk(['harga_fleksibel' => true, 'harga_beli' => 50000]);
         $super = $this->createUser('super-admin');
-        $service = new HargaFleksibelService();
+        $service = new HargaFleksibelService;
 
         $service->validasi($produk, 100000, $super); // di atas HPP
         $service->validasi($produk, 50000, $super); // sama dengan HPP
@@ -112,7 +115,7 @@ class HargaFleksibelTest extends TestCase
     {
         $produk = $this->createProduk(['harga_fleksibel' => true, 'harga_beli' => 50000]);
         $super = $this->createUser('super-admin');
-        $service = new HargaFleksibelService();
+        $service = new HargaFleksibelService;
 
         $this->expectException(ValidationException::class);
         $service->validasi($produk, 10000, $super); // di bawah HPP
@@ -122,7 +125,7 @@ class HargaFleksibelTest extends TestCase
     {
         $produk = $this->createProduk(['harga_fleksibel' => true, 'harga_beli' => 0]);
         $super = $this->createUser('super-admin');
-        $service = new HargaFleksibelService();
+        $service = new HargaFleksibelService;
 
         // HPP = 0, harga 0 harus lolos
         $service->validasi($produk, 0, $super);
@@ -138,7 +141,7 @@ class HargaFleksibelTest extends TestCase
         // DB has NOT NULL default 0, so null not allowed - test with 0
         $produkHppNull = $this->createProduk(['harga_beli' => 0]);
 
-        $service = new HargaFleksibelService();
+        $service = new HargaFleksibelService;
 
         $this->assertEquals(50000, $service->hargaMinimum($produkHppPositif));
         $this->assertEquals(0, $service->hargaMinimum($produkHppNol));
@@ -148,7 +151,7 @@ class HargaFleksibelTest extends TestCase
     public function test_user_null_throw(): void
     {
         $produk = $this->createProduk(['harga_fleksibel' => true, 'harga_beli' => 50000]);
-        $service = new HargaFleksibelService();
+        $service = new HargaFleksibelService;
 
         $this->expectException(ValidationException::class);
         $service->validasi($produk, 100000, null);

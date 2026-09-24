@@ -5,6 +5,7 @@ namespace App\Modules\Wms\Services;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
@@ -24,7 +25,8 @@ use Illuminate\Support\Str;
 class ProdukService
 {
     public function __construct(
-        protected JurnalService $jurnalService
+        protected JurnalService $jurnalService,
+        protected NomorSeriService $nomorSeriService // [F2-3]
     ) {}
 
     /**
@@ -34,6 +36,7 @@ class ProdukService
      * [T-44] Parameter tambahan: brandId, kualitasId, satuanKode, tipeHpIds,
      * hargaTier (per tipe_konsumen: nominal_tetap / persen_diskon / tier_membership_id opsional).
      * [HARGA FLEKSIBEL] Parameter hargaFleksibel untuk produk jasa/harga manual.
+     * [F2-3] Parameter sn: flag serial number per produk (default false).
      */
     public function buatProduk(
         string $nama,
@@ -53,9 +56,10 @@ class ProdukService
         ?string $satuanKode = null,
         array $tipeHpIds = [],
         array $hargaTier = [],
-        bool $hargaFleksibel = false
+        bool $hargaFleksibel = false,
+        bool $sn = false // [F2-3]
     ): Produk {
-        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel) {
+        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn) {
             $satuan = $satuanKode ?: 'pcs';
             $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
             if ($satuanKode && ! $satuanRef) {
@@ -77,6 +81,7 @@ class ProdukService
                 'harga_jual_retail' => $hargaJual,
                 'is_active' => true,
                 'harga_fleksibel' => $hargaFleksibel,
+                'sn' => $sn, // [F2-3]
             ]);
 
             $variant = SkuVariant::create([
@@ -169,6 +174,13 @@ class ProdukService
 
     /**
      * Tambah stok (pembelian ke supplier) → stok + StokLog + jurnal akunting.
+     *
+     * [F2-3] snList: daftar SN utk produk sn=true (null = tanpa SN).
+     * Bila diisi → validasi (jumlah=qty, dobel, sudah terdaftar) + persist SN
+     * status 'tersedia' cabang-scoped DALAM transaksi yg sama — gagal validasi
+     * → rollback penuh, tanpa perubahan stok sebagian.
+     *
+     * @param  array<int, string>|null  $snList
      */
     public function tambahStokPembelian(
         int $produkId,
@@ -182,13 +194,21 @@ class ProdukService
         bool $postJurnal = true,
         ?string $smlSumber = null,
         ?string $smlReferensiTipe = null,
-        ?int $smlReferensiId = null
+        ?int $smlReferensiId = null,
+        ?array $snList = null // [F2-3]
     ): StokItem {
         if ($qty <= 0) {
             throw new \Exception('Kuantitas harus > 0');
         }
 
-        return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId, $rakId, $postJurnal, $smlSumber, $smlReferensiTipe, $smlReferensiId) {
+        return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId, $rakId, $postJurnal, $smlSumber, $smlReferensiTipe, $smlReferensiId, $snList) {
+            $cabangId = Gudang::find($gudangId)?->cabang_id;
+
+            // [F2-3] Validasi SN dulu — Exception di sini → rollback, stok tidak berubah
+            if ($snList !== null) {
+                $this->nomorSeriService->validasiUntukGrn($produkId, $snList, $qty);
+            }
+
             $stok = StokItem::firstOrCreate(
                 ['produk_id' => $produkId, 'sku_variant_id' => $variantId, 'gudang_id' => $gudangId],
                 ['jumlah' => 0, 'jumlah_minimum' => 0, 'rak_id' => $rakId]
@@ -234,7 +254,6 @@ class ProdukService
             // (postJurnal=false) agar tidak dobel-posting per item.
             $total = round($hargaBeli * $qty, 2);
             if ($postJurnal && $total > 0) {
-                $cabangId = Gudang::find($gudangId)?->cabang_id;
                 $this->jurnalService->post(
                     $this->jurnalService->generateNoJurnal('beli', $cabangId),
                     now(),
@@ -247,6 +266,20 @@ class ProdukService
                     $cabangId,
                     $userId
                 );
+            }
+
+            // [F2-3] Persist SN sebagai 'tersedia' + tautan cabang (dalam transaksi)
+            if ($snList !== null) {
+                foreach ($snList as $sn) {
+                    NomorSeri::create([
+                        'cabang_id' => $cabangId,
+                        'produk_id' => $produkId,
+                        'sku_variant_id' => $variantId,
+                        'nomor_seri' => $sn,
+                        'status' => NomorSeri::STATUS_TERSEDIA,
+                        'keterangan' => $keterangan,
+                    ]);
+                }
             }
 
             return $stok;

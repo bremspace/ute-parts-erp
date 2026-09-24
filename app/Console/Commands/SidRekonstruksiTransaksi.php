@@ -54,24 +54,33 @@ class SidRekonstruksiTransaksi extends Command
     ];
 
     private array $reportLines = [];
+
     private array $pelangganNamaUnmatched = [];
+
     private array $deviasiSamples = [];
+
     private array $sampleTransaksi = [];
 
     private const SENTINEL = ['1899-12-30', '0000-00-00', '1900-01-01', ''];
 
     /** @var array<string,int> */
     private array $pelangganMap = [];
+
     /** @var array<string,int> nama UPPER(TRIM) → id (first wins) */
     private array $pelangganNamaMap = [];
+
     /** @var array<string,int> gudang kode → id */
     private array $gudangMap = [];
+
     /** @var array<string,string> faktur kode → lokasistok item pertama */
     private array $lokasiPerFaktur = [];
+
     /** @var array<string,int> kode_lama produk → id */
     private array $produkMap = [];
+
     /** @var array<string,int> kode_lama sku_variants → id */
     private array $skuMap = [];
+
     /** @var array<string,array{id:int,tanggal:?string,has_items:bool}> no_transaksi → info */
     private array $transaksiMap = [];
 
@@ -128,7 +137,7 @@ class SidRekonstruksiTransaksi extends Command
         $this->reportLines[] = "- transaksi_item (transaksi R43-* artefak): **{$this->counts['c02_ti_ada']}**";
         $this->reportLines[] = "- transaksi R43-* artefak: **{$this->counts['c02_t_ada']}**";
         $this->reportLines[] = "- sid_import_map entity_type='transaksi': **{$this->counts['c02_map_ada']}** (hapus hanya yang stale → entity_id tidak ada di transaksi)";
-        $this->reportLines[] = "- stok_log total: **{$this->counts['c02_stok_ada']}** (max created_at: `{$this->counts['c02_stok_max']}`; guard < 2026-09-21 12:00:00 → " . ($guard ? 'GAGAL — JANGAN HAPUS' : 'AMAN') . ')';
+        $this->reportLines[] = "- stok_log total: **{$this->counts['c02_stok_ada']}** (max created_at: `{$this->counts['c02_stok_max']}`; guard < 2026-09-21 12:00:00 → ".($guard ? 'GAGAL — JANGAN HAPUS' : 'AMAN').')';
         $this->reportLines[] = '';
 
         if ($dry) {
@@ -190,6 +199,7 @@ class SidRekonstruksiTransaksi extends Command
                 $kode = trim((string) ($p['kode'] ?? $raw->kode_sumber));
                 if (isset($this->transaksiMap[$kode])) {
                     $this->counts['c03_skipped']++;
+
                     continue;
                 }
 
@@ -256,6 +266,7 @@ class SidRekonstruksiTransaksi extends Command
                 if ($dry) {
                     $this->counts['c03_inserted']++;
                     $this->transaksiMap[$kode] = ['id' => 0, 'tanggal' => $tanggal, 'has_items' => false];
+
                     continue;
                 }
 
@@ -290,10 +301,12 @@ class SidRekonstruksiTransaksi extends Command
                 $info = $this->transaksiMap[$kode] ?? null;
                 if (! $info) {
                     $this->counts['c04_orphan_faktur']++;
+
                     continue;
                 }
                 if ($info['has_items']) {
                     $this->counts['c04_skipped_faktur']++;
+
                     continue;
                 }
 
@@ -325,6 +338,7 @@ class SidRekonstruksiTransaksi extends Command
 
                 if ($dry) {
                     $this->counts['c04_inserted']++;
+
                     continue;
                 }
                 DB::table('transaksi_item')->insert($data);
@@ -351,6 +365,7 @@ class SidRekonstruksiTransaksi extends Command
             $sum = (float) ($r->item_sum ?? 0);
             if ($r->item_cnt === null) {
                 $tanpaItem++;
+
                 continue;
             }
             if (abs($sum - (float) $r->total_akhir) > 0.01) {
@@ -556,28 +571,28 @@ class SidRekonstruksiTransaksi extends Command
         $file = $dir.'/C1-rekonstruksi-laporan-'.date('Ymd-His').'.md';
         $mode = $dry ? 'DRY-RUN (tidak ada perubahan DB)' : 'EKSEKUSI';
 
-        $body = "# LAPORAN FASE 3 (C-02..C-04) — REKONSTRUKSI TRANSAKSI — ".date('Y-m-d H:i:s')."\n\n"
-            . "Mode: **{$mode}** — Perintah: `php artisan sid:rekonstruksi-transaksi` (idempotent, 2× run = sama)\n\n"
-            . "## C-02 Cleanup artefak\n\n"
-            . "- transaksi_item (transaksi R43-*): ada **{$this->counts['c02_ti_ada']}** → dihapus **{$this->counts['c02_ti_delete']}**\n"
-            . "- transaksi R43-*: ada **{$this->counts['c02_t_ada']}** → dihapus **{$this->counts['c02_t_delete']}**\n"
-            . "- sid_import_map entity_type='transaksi': ada **{$this->counts['c02_map_ada']}** → dihapus **{$this->counts['c02_map_delete']}**\n"
-            . "- stok_log: ada **{$this->counts['c02_stok_ada']}** (max created_at `{$this->counts['c02_stok_max']}`) → dihapus **{$this->counts['c02_stok_delete']}**"
-            . ($this->counts['c02_stok_blocked'] ? ' ⚠️ **BLOKIR (ada baris >= 2026-09-21 12:00:00), tidak dihapus**' : '')."\n"
-            . "- harga_tier: **TIDAK disentuh** — 19.104 = 6.368 produk × 3 tier (harga_toko/partai/cabang), BUKAN artefak arus-stok (§2.0 item 6 diverifikasi). Rekonstruksi dari `hrgpergroup` = fase lanjutan terpisah.\n\n"
-            . "## C-03 Transaksi\n\n"
-            . "- staging diproses: **{$this->counts['c03_staging']}**, inserted: **{$this->counts['c03_inserted']}**, skip (sudah ada): **{$this->counts['c03_skipped']}**\n"
-            . "- pelanggan by kode_lama: **{$this->counts['c03_pelanggan_kode']}**, by nama: **{$this->counts['c03_pelanggan_nama']}**, NULL: **{$this->counts['c03_pelanggan_null']}**, nama unmatched (NULL): **{$this->counts['c03_pelanggan_nama_unmatched']}**\n"
-            . "- tanggal_transaksi NULL (tanggal sentinel/kosong): **{$this->counts['c03_tanggal_null']}**\n"
-            . "- gudang_id NULL (lokasistok tidak dikenal): **{$this->counts['c03_gudang_null']}** (source lokasistok = item pertama faktur — header penjualan tidak punya kolom lokasistok)\n"
-            . "- sid_import_map upsert: **{$this->counts['c03_map_upsert']}**\n"
-            . "- **DEVIASI CATATAN metode_bayar:** SEMUA 6.262 header punya `visa='UANG PAS'` (non-kosong) → mapping spec memberikan `metode_bayar='kartu'` untuk semua transaksi. Bila seharusnya 'tunai', ganti mapping di `metodeBayar()` lalu jalankan UPDATE massal (bukan rerun — rerun hanya skip).\n\n"
-            . "## C-04 transaksi_item\n\n"
-            . "- staging diproses: **{$this->counts['c04_staging']}**, inserted: **{$this->counts['c04_inserted']}**, skip (faktur sudah ber-item): **{$this->counts['c04_skipped_faktur']}**, orphan faktur (header tidak ada): **{$this->counts['c04_orphan_faktur']}**\n"
-            . "- dummy produk baru `[ARSIP-SID]`: **{$this->counts['c04_dummy_produk_baru']}** (produk_id NOT NULL di DB → kode_barang tanpa match produk dibuat dummy, pola §4.4), sku_variant_id NULL: **{$this->counts['c04_sku_null']}**\n\n"
-            . "## Rekonsiliasi per faktur (Σ item.subtotal vs header.jumlah)\n\n"
-            . "- faktur dicek: **{$this->counts['rek_faktur']}**, menyimpang (>0.01): **{$this->counts['rek_deviasi']}**, tanpa item: **{$this->counts['rek_tanpa_item']}**\n"
-            . "- katalog deviasi (wajib — TIDAK diperbaiki otomatis, catatan untuk fase verifikasi):\n\n";
+        $body = '# LAPORAN FASE 3 (C-02..C-04) — REKONSTRUKSI TRANSAKSI — '.date('Y-m-d H:i:s')."\n\n"
+            ."Mode: **{$mode}** — Perintah: `php artisan sid:rekonstruksi-transaksi` (idempotent, 2× run = sama)\n\n"
+            ."## C-02 Cleanup artefak\n\n"
+            ."- transaksi_item (transaksi R43-*): ada **{$this->counts['c02_ti_ada']}** → dihapus **{$this->counts['c02_ti_delete']}**\n"
+            ."- transaksi R43-*: ada **{$this->counts['c02_t_ada']}** → dihapus **{$this->counts['c02_t_delete']}**\n"
+            ."- sid_import_map entity_type='transaksi': ada **{$this->counts['c02_map_ada']}** → dihapus **{$this->counts['c02_map_delete']}**\n"
+            ."- stok_log: ada **{$this->counts['c02_stok_ada']}** (max created_at `{$this->counts['c02_stok_max']}`) → dihapus **{$this->counts['c02_stok_delete']}**"
+            .($this->counts['c02_stok_blocked'] ? ' ⚠️ **BLOKIR (ada baris >= 2026-09-21 12:00:00), tidak dihapus**' : '')."\n"
+            ."- harga_tier: **TIDAK disentuh** — 19.104 = 6.368 produk × 3 tier (harga_toko/partai/cabang), BUKAN artefak arus-stok (§2.0 item 6 diverifikasi). Rekonstruksi dari `hrgpergroup` = fase lanjutan terpisah.\n\n"
+            ."## C-03 Transaksi\n\n"
+            ."- staging diproses: **{$this->counts['c03_staging']}**, inserted: **{$this->counts['c03_inserted']}**, skip (sudah ada): **{$this->counts['c03_skipped']}**\n"
+            ."- pelanggan by kode_lama: **{$this->counts['c03_pelanggan_kode']}**, by nama: **{$this->counts['c03_pelanggan_nama']}**, NULL: **{$this->counts['c03_pelanggan_null']}**, nama unmatched (NULL): **{$this->counts['c03_pelanggan_nama_unmatched']}**\n"
+            ."- tanggal_transaksi NULL (tanggal sentinel/kosong): **{$this->counts['c03_tanggal_null']}**\n"
+            ."- gudang_id NULL (lokasistok tidak dikenal): **{$this->counts['c03_gudang_null']}** (source lokasistok = item pertama faktur — header penjualan tidak punya kolom lokasistok)\n"
+            ."- sid_import_map upsert: **{$this->counts['c03_map_upsert']}**\n"
+            ."- **DEVIASI CATATAN metode_bayar:** SEMUA 6.262 header punya `visa='UANG PAS'` (non-kosong) → mapping spec memberikan `metode_bayar='kartu'` untuk semua transaksi. Bila seharusnya 'tunai', ganti mapping di `metodeBayar()` lalu jalankan UPDATE massal (bukan rerun — rerun hanya skip).\n\n"
+            ."## C-04 transaksi_item\n\n"
+            ."- staging diproses: **{$this->counts['c04_staging']}**, inserted: **{$this->counts['c04_inserted']}**, skip (faktur sudah ber-item): **{$this->counts['c04_skipped_faktur']}**, orphan faktur (header tidak ada): **{$this->counts['c04_orphan_faktur']}**\n"
+            ."- dummy produk baru `[ARSIP-SID]`: **{$this->counts['c04_dummy_produk_baru']}** (produk_id NOT NULL di DB → kode_barang tanpa match produk dibuat dummy, pola §4.4), sku_variant_id NULL: **{$this->counts['c04_sku_null']}**\n\n"
+            ."## Rekonsiliasi per faktur (Σ item.subtotal vs header.jumlah)\n\n"
+            ."- faktur dicek: **{$this->counts['rek_faktur']}**, menyimpang (>0.01): **{$this->counts['rek_deviasi']}**, tanpa item: **{$this->counts['rek_tanpa_item']}**\n"
+            ."- katalog deviasi (wajib — TIDAK diperbaiki otomatis, catatan untuk fase verifikasi):\n\n";
 
         if ($this->deviasiSamples) {
             $samples = array_slice($this->deviasiSamples, 0, 50);
@@ -593,18 +608,18 @@ class SidRekonstruksiTransaksi extends Command
         foreach ($this->sampleTransaksi as $s) {
             $body .= "- **{$s['no_transaksi']}** — tanggal: `{$s['tanggal_transaksi']}`, pelanggan_id: ".($s['pelanggan_id'] ?? 'NULL')
                 .", status: `{$s['status']}`, metode_bayar: `{$s['metode_bayar']}`, total: {$s['total_akhir']}\n"
-                ."  - sid_detail: `".json_encode($s['sid_detail'], JSON_UNESCAPED_UNICODE)."`\n"
-                ."  - items: ".json_encode($s['items'], JSON_UNESCAPED_UNICODE)."\n";
+                .'  - sid_detail: `'.json_encode($s['sid_detail'], JSON_UNESCAPED_UNICODE)."`\n"
+                .'  - items: '.json_encode($s['items'], JSON_UNESCAPED_UNICODE)."\n";
         }
         if (! $this->sampleTransaksi) {
             $body .= "_(tidak ada — belum ada transaksi migrasi)_\n";
         }
 
         $body .= "\n## State DB akhir\n\n"
-            . "- transaksi total: **".DB::table('transaksi')->count()."** (target 6.262 + 1 operasional = 6.263)\n"
-            . "- transaksi R43-* (migrasi): **".DB::table('transaksi')->where('no_transaksi', 'like', 'R43-%')->count()."**\n"
-            . "- transaksi item total: **".DB::table('transaksi_item')->count()."** (target 10.273 + 1 operasional = 10.274)\n"
-            . "- produk dummy `[ARSIP-SID]` total: **".DB::table('produk')->where('nama', 'like', '[ARSIP-SID] %')->count()."**\n";
+            .'- transaksi total: **'.DB::table('transaksi')->count()."** (target 6.262 + 1 operasional = 6.263)\n"
+            .'- transaksi R43-* (migrasi): **'.DB::table('transaksi')->where('no_transaksi', 'like', 'R43-%')->count()."**\n"
+            .'- transaksi item total: **'.DB::table('transaksi_item')->count()."** (target 10.273 + 1 operasional = 10.274)\n"
+            .'- produk dummy `[ARSIP-SID]` total: **'.DB::table('produk')->where('nama', 'like', '[ARSIP-SID] %')->count()."**\n";
 
         $body .= "\n".implode("\n", $this->reportLines)."\n";
 

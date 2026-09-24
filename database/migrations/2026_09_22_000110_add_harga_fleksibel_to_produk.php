@@ -3,6 +3,9 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 return new class extends Migration
 {
@@ -16,19 +19,19 @@ return new class extends Migration
         }
 
         // Permission atur-harga-fleksibel (idempotent)
-        $permission = \Spatie\Permission\Models\Permission::firstOrCreate([
+        $permission = Permission::firstOrCreate([
             'name' => 'atur-harga-fleksibel',
             'guard_name' => 'web',
         ]);
 
         // Assign ke role super-admin
-        $superAdminRole = \Spatie\Permission\Models\Role::where('name', 'super-admin')->first();
+        $superAdminRole = Role::where('name', 'super-admin')->first();
         if ($superAdminRole && ! $superAdminRole->hasPermissionTo($permission)) {
             $superAdminRole->givePermissionTo($permission);
         }
 
         // Clear permission cache
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     public function down(): void

@@ -4,10 +4,17 @@ namespace App\Modules\Crm\Models;
 
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * [F2-1] Lead pipeline. Model kritis — wajib activity log (PRD §5.4):
+ * create/update + konversi won→pelanggan (update pelanggan_id) ter-log otomatis.
+ */
 #[Fillable([
     'cabang_id', 'sumber', 'stage', 'nama', 'telepon', 'email',
     'nilai_estimasi', 'assigned_to', 'catatan', 'lost_reason', 'pelanggan_id',
@@ -15,7 +22,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Lead extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
     protected $table = 'leads';
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('Lead');
+    }
 
     protected $casts = [
         'nilai_estimasi' => 'decimal:2',
@@ -43,7 +58,8 @@ class Lead extends Model
      */
     public function scopeForCabang($query, ?int $cabangId = null)
     {
-        $cabangId = $cabangId ?? session('cabang_aktif_id');
+        // Kunci kanonik session cabang (routes/web.php switchCabang menulis 'cabang_id').
+        $cabangId = $cabangId ?? session('cabang_id');
 
         return $query->where('cabang_id', $cabangId);
     }

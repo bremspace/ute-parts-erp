@@ -36,7 +36,9 @@ class ExportLaporanJob implements ShouldQueue
     public function handle(ExportLaporanService $service, NotificationService $notif): void
     {
         try {
-            $path = $service->export($this->jenis, $this->periodeDari, $this->periodeSampai, $this->cabangId, $this->akunId, $this->format);
+            // [P0] Forward userId eksplisit — di queue worker auth() = null, tanpa
+            // ini filename prefix jatuh ke "0_" dan download 403 (ownership ACC-11b).
+            $path = $service->export($this->jenis, $this->periodeDari, $this->periodeSampai, $this->cabangId, $this->akunId, $this->format, $this->userId);
 
             // Notifikasi persist + queue (inapp = catat di database, tanpa outbound)
             $notif->kirim(
