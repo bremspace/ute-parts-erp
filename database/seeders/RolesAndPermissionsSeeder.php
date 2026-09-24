@@ -59,6 +59,13 @@ class RolesAndPermissionsSeeder extends Seeder
             // [F3-1] Field-level security permissions — baru untuk menghide harga_beli/margin dari role kasir/staff
             'lihat.harga_beli',
             'lihat.margin',
+            // [F3-8] HR & Payroll permissions — pakai di givePermissionTo role kelola-hr
+            'kelola-hr',
+            'payroll.view',
+            'payroll.create',
+            'payroll.approve',
+            // [F3-8b] HR Absensi & KPI — karyawan boleh lihat absensi/KPI sendiri
+            'hr.lihat-sendiri',
         ];
 
         foreach ($permissions as $permission) {
@@ -118,6 +125,20 @@ class RolesAndPermissionsSeeder extends Seeder
             'tier.manage',
             'reseller.view',
         ]);
+
+        // [F3-8] HR & Payroll permissions
+        $hr = Role::findOrCreate('kelola-hr');
+        $hr->givePermissionTo([
+            'kelola-hr', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri',
+        ]);
+        $superAdmin->givePermissionTo(['kelola-hr', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
+        $finance->givePermissionTo(['kelola-hr', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
+        $adminToko->givePermissionTo(['kelola-hr', 'payroll.view', 'hr.lihat-sendiri']);
+
+        // [F3-8b] Karyawan (kasir/teknisi/marketing/staff) lihat absensi & KPI sendiri
+        foreach ([$kasir, $teknisi, $marketing, $staffGudang] as $roleKaryawan) {
+            $roleKaryawan->givePermissionTo('hr.lihat-sendiri');
+        }
 
         // Refresh cache after all roles/permissions created
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

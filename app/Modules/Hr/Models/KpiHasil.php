@@ -8,18 +8,32 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['karyawan_id', 'tipe', 'nama', 'nominal_bulanan', 'is_aktif'])]
-class KaryawanKomponenGaji extends Model
+/**
+ * [F3-8b] KPI Hasil — dihitung service dari data real (bukan input manual),
+ * idempotent per karyawan+metric+periode.
+ */
+#[Fillable([
+    'karyawan_id', 'kpi_metric_id', 'periode', 'nilai_aktual', 'persen_capaian',
+])]
+class KpiHasil extends Model
 {
     use LogsActivity;
 
-    protected $table = 'karyawan_komponen_gaji';
+    protected $table = 'kpi_hasil';
 
-    protected $casts = ['nominal_bulanan' => 'decimal:2', 'is_aktif' => 'boolean'];
+    protected $casts = [
+        'nilai_aktual' => 'decimal:2',
+        'persen_capaian' => 'decimal:2',
+    ];
 
     public function karyawan(): BelongsTo
     {
         return $this->belongsTo(Karyawan::class);
+    }
+
+    public function metric(): BelongsTo
+    {
+        return $this->belongsTo(KpiMetric::class, 'kpi_metric_id');
     }
 
     public function getActivitylogOptions(): LogOptions

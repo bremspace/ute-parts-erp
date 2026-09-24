@@ -393,13 +393,8 @@ class PosController extends Controller
                 ]);
             }
 
-            // Komisi reseller (PRD §4.5): jika pembeli reseller, hitung komisi pending
-            if ($request->pelanggan_id) {
-                $pelanggan = Pelanggan::find($request->pelanggan_id);
-                if ($pelanggan && $pelanggan->is_reseller) {
-                    app(KomisiService::class)->hitungKomisi($transaksi, $pelanggan);
-                }
-            }
+            // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif
+            app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
 
             return $this->success(
                 $transaksi->load(['items.produk', 'items.skuVariant', 'pelanggan', 'cabang']),

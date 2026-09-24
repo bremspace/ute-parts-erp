@@ -9,6 +9,10 @@ use App\Modules\Crm\Livewire\CrmDashboard;
 use App\Modules\Crm\Livewire\LeadKanban;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Dashboard\Livewire\DashboardIndex;
+use App\Modules\Hr\Livewire\HrAbsensiKpiPage;
+use App\Modules\Hr\Livewire\HrSayaPage;
+use App\Modules\Hr\Livewire\KomisiSkemaPage;
+use App\Modules\Hr\Livewire\PayrollPage;
 use App\Modules\Marketplace\Controllers\PaymentController;
 use App\Modules\Marketplace\Livewire\CartCheckout;
 use App\Modules\Marketplace\Livewire\CustomerAccount;
@@ -272,6 +276,26 @@ Route::prefix('app')->middleware('auth')->group(function () {
     Route::get('/laporan/nomor-seri', LaporanNomorSeri::class)
         ->name('laporan.nomor-seri')
         ->middleware('permission:laporan.cabang');
+
+    // [F3-8] HR & Payroll Screen
+    Route::get('/hr/payroll', PayrollPage::class)
+        ->name('hr.payroll')
+        ->middleware('permission:kelola-hr');
+
+    // [F3-8b] HR Absensi, Shift & KPI — admin/finance (kelola-hr)
+    Route::get('/hr/absensi', HrAbsensiKpiPage::class)
+        ->name('hr.absensi')
+        ->middleware('permission:kelola-hr');
+
+    // [F3-8b] Absensi & KPI karyawan (lihat milik sendiri)
+    Route::get('/hr/saya', HrSayaPage::class)
+        ->name('hr.saya')
+        ->middleware('permission:hr.lihat-sendiri');
+
+    // [F3-8c] Rule builder komisi multi-aktor — admin/finance (kelola-hr)
+    Route::get('/hr/komisi-skema', KomisiSkemaPage::class)
+        ->name('hr.komisi-skema')
+        ->middleware('permission:kelola-hr');
 
     // [F1-1] Workflow Approval Inbox — RBAC: permission approve-workflow (spatie middleware)
     Route::get('/approvals', ApprovalInbox::class)

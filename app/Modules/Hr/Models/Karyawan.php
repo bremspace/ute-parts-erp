@@ -2,6 +2,8 @@
 
 namespace App\Modules\Hr\Models;
 
+use App\Models\User;
+use App\Modules\Rbac\Models\Cabang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,12 +31,12 @@ class Karyawan extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class);
+        return $this->belongsTo(User::class);
     }
 
     public function cabang(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\Rbac\Models\Cabang::class);
+        return $this->belongsTo(Cabang::class);
     }
 
     public function payrollSlips(): HasMany

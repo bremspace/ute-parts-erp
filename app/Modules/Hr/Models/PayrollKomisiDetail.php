@@ -2,6 +2,7 @@
 
 namespace App\Modules\Hr\Models;
 
+use App\Modules\Servis\Models\TiketServis;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,7 +25,7 @@ class PayrollKomisiDetail extends Model
 
     public function tiketServis(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\Servis\Models\TiketServis::class);
+        return $this->belongsTo(TiketServis::class);
     }
 
     public function getActivitylogOptions(): LogOptions

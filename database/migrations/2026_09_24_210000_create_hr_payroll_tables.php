@@ -29,7 +29,7 @@ return new class extends Migration
         if (! Schema::hasTable('karyawan_komponen_gaji')) {
             Schema::create('karyawan_komponen_gaji', function (Blueprint $table) {
                 $table->bigIncrements('id');
-                $table->foreignId('karyawan_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('karyawan_id')->constrained('karyawan')->cascadeOnDelete();
                 $table->enum('tipe', ['tunjangan', 'potongan', 'bonus']);
                 $table->string('nama');
                 $table->decimal('nominal_bulanan', 15, 2)->default(0);
@@ -71,15 +71,15 @@ return new class extends Migration
         if (! Schema::hasTable('payroll_slip')) {
             Schema::create('payroll_slip', function (Blueprint $table) {
                 $table->bigIncrements('id');
-                $table->foreignId('payroll_periode_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('karyawan_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('payroll_periode_id')->constrained('payroll_periode')->cascadeOnDelete();
+                $table->foreignId('karyawan_id')->constrained('karyawan')->cascadeOnDelete();
                 $table->decimal('gaji_pokok', 15, 2)->default(0);
                 $table->decimal('total_tunjangan', 15, 2)->default(0);
                 $table->decimal('total_potongan', 15, 2)->default(0);
                 $table->decimal('total_komisi', 15, 2)->default(0);
                 $table->decimal('total_gaji', 15, 2)->default(0);
                 $table->json('rincian')->nullable();
-                $table->foreignId('jurnal_id')->nullable()->constrained()->nullOnDelete();
+                $table->foreignId('jurnal_id')->nullable()->constrained('jurnal_akuntansi')->nullOnDelete();
                 $table->string('status')->default('draft');
                 $table->timestamps();
             });
@@ -89,9 +89,9 @@ return new class extends Migration
         if (! Schema::hasTable('payroll_komisi_detail')) {
             Schema::create('payroll_komisi_detail', function (Blueprint $table) {
                 $table->bigIncrements('id');
-                $table->foreignId('slip_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('tiket_servis_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('teknisi_id')->constrained('users')->nullOnDelete();
+                $table->foreignId('slip_id')->constrained('payroll_slip')->cascadeOnDelete();
+                $table->foreignId('tiket_servis_id')->constrained('tiket_servis')->cascadeOnDelete();
+                $table->foreignId('teknisi_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->string('jenis');
                 $table->decimal('nominal', 15, 2)->default(0);
                 $table->timestamps();

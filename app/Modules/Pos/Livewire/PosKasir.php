@@ -792,13 +792,8 @@ class PosKasir extends Component
                     $transaksi->id
                 );
 
-                // Komisi reseller (PRD §4.5)
-                if ($this->selectedCustomerId) {
-                    $pelanggan = Pelanggan::find($this->selectedCustomerId);
-                    if ($pelanggan && $pelanggan->is_reseller) {
-                        app(KomisiService::class)->hitungKomisi($transaksi, $pelanggan);
-                    }
-                }
+                // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif
+                app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
 
                 // Kasbon → catat Piutang (AR)
                 if ($kasbon && $this->selectedCustomerId) {

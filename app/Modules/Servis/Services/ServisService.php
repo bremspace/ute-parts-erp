@@ -542,6 +542,10 @@ class ServisService
                         ]
                     );
                 }
+
+                // [F3-8c] Komisi multi-aktor trigger tiket_servis (teknisi via
+                // engine baru; reseller servis tetap alur lama di atas — idempotent)
+                app(KomisiService::class)->hitungKomisiMultiAktor('tiket_servis', ['tiket_servis_id' => $tiket->id]);
             }
         } catch (\Exception $e) {
             // Jangan blokir selesai servis jika jurnal gagal — log & lanjut

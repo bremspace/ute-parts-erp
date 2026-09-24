@@ -182,10 +182,8 @@ class PaymentController extends Controller
                         $transaksi->id
                     );
 
-                    // d. Komisi reseller (jika pembeli reseller)
-                    if ($transaksi->pelanggan?->is_reseller) {
-                        $this->komisiService->hitungKomisi($transaksi, $transaksi->pelanggan);
-                    }
+                    // d. Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing
+                    $this->komisiService->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
 
                     // e. Notifikasi pelanggan (via queue)
                     $this->notifService->kirim(

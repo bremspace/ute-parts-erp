@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Services;
 use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Reseller\Services\KomisiService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -72,6 +73,12 @@ class LeadService
         }
 
         $lead->update($validated);
+
+        // [F3-8c] Trigger komisi lead_won (PRD §4.3) — setelah stage tersimpan,
+        // match rule karyawan/reseller/agen; idempotent per trigger+rule+aktor
+        if ($oldStage !== 'won' && ($validated['stage'] ?? null) === 'won') {
+            app(KomisiService::class)->hitungKomisiMultiAktor('lead_won', ['lead_id' => $lead->id]);
+        }
 
         return $lead->fresh();
     }

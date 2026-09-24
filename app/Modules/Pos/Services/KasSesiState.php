@@ -90,6 +90,9 @@ class KasSesiState
             throw new \Exception('Masih ada kas sesi terbuka untuk kasir ini');
         }
 
+        // [F3-8b] Gate absensi: open kas wajib clock-in aktif (fallback bila modul HR belum migrasi)
+        $this->pastikanClockInAktif($userId);
+
         $id = DB::table($this->sesiTable)->insertGetId([
             'cabang_id' => $cabangId,
             'user_id' => $userId,
@@ -151,6 +154,9 @@ class KasSesiState
         if (abs($selisih) > 0.01) {
             $this->postJurnalSelisih($sesi->cabang_id, $selisih, "Tutup kas sesi #{$sesi->id}");
         }
+
+        // [F3-8b] Saran clock-out: catat jam_keluar otomatis bila kasir sudah clock-in
+        $this->saranClockOut($sesi->user_id);
 
         return [
             'saldo_sistem' => $saldoSistem,
@@ -234,6 +240,84 @@ class KasSesiState
             );
         } catch (\Throwable $e) {
             Log::warning('Jurnal selisih kas gagal: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * [F3-8b] Gate absensi: buka kas wajib clock-in aktif hari ini.
+     * Hanya berlaku utk user yang terdaftar sebagai karyawan aktif;
+     * fallback lembut bila modul HR belum dimigrasi (jangan blokir POS).
+     */
+    private function pastikanClockInAktif(?int $userId): void
+    {
+        if (! $userId) {
+            return;
+        }
+
+        if (! $this->tableExists('absensi_log') || ! $this->tableExists('karyawan')) {
+            return;
+        }
+
+        $karyawanId = DB::table('karyawan')
+            ->where('user_id', $userId)
+            ->where('status_aktif', true)
+            ->value('id');
+
+        if (! $karyawanId) {
+            return; // bukan karyawan → tidak diblokir
+        }
+
+        $sudahClockIn = DB::table('absensi_log')
+            ->where('karyawan_id', $karyawanId)
+            ->where('tanggal', now()->toDateString())
+            ->whereNotNull('jam_masuk')
+            ->exists();
+
+        if (! $sudahClockIn) {
+            throw new \Exception('Wajib clock-in absensi sebelum membuka kas');
+        }
+    }
+
+    /**
+     * [F3-8b] Saran clock-out: isi jam_keluar otomatis saat tutup kas bila
+     * kasir belum clock-out (non-blocking).
+     */
+    private function saranClockOut(?int $userId): void
+    {
+        try {
+            if (! $userId) {
+                return;
+            }
+
+            if (! $this->tableExists('absensi_log') || ! $this->tableExists('karyawan')) {
+                return;
+            }
+
+            $karyawanId = DB::table('karyawan')
+                ->where('user_id', $userId)
+                ->where('status_aktif', true)
+                ->value('id');
+
+            if (! $karyawanId) {
+                return;
+            }
+
+            $log = DB::table('absensi_log')
+                ->where('karyawan_id', $karyawanId)
+                ->where('tanggal', now()->toDateString())
+                ->whereNotNull('jam_masuk')
+                ->whereNull('jam_keluar')
+                ->first();
+
+            if ($log) {
+                DB::table('absensi_log')->where('id', $log->id)->update([
+                    'jam_keluar' => now()->format('H:i:s'),
+                    'catatan' => trim(($log->catatan ?? '').' | Clock-out otomatis saat tutup kas', ' |'),
+                    'updated_at' => now(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Saran clock-out gagal: '.$e->getMessage());
         }
     }
 }

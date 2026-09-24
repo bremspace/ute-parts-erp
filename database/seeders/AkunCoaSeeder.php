@@ -53,6 +53,7 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '520-05', 'nama' => 'Beban Lain-lain',              'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'],
             ['kode' => '520-06', 'nama' => 'Beban Biaya Admin Marketplace', 'tipe' => 'beban', 'kelompok' => 'biaya_marketplace', 'saldo_normal' => 'debit'], // [T-26]
             ['kode' => '520-07', 'nama' => 'Selisih Kas',                 'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'], // [T-09]
+            ['kode' => '520-08', 'nama' => 'Beban Komisi',                'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'], // [F3-8] komisi teknisi
         ];
 
         foreach ($coa as $data) {

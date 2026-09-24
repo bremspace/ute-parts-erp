@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             KomisiSkemaSeeder::class,
             TransaksiDemoSeeder::class,
             ReportSeeder::class,
+            HrSeeder::class,
         ]);
     }
 }
