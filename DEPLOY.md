@@ -105,15 +105,18 @@ SANCTUM_STATEFUL_DOMAINS=domain.com
 
 BCRYPT_ROUNDS=10             # hemat CPU di 1GB
 
-# Integrasi eksternal (sandbox dulu!)
-DUITKU_SANDBOX=true
-DUITKU_MERCHANT_CODE=
-DUITKU_API_KEY=
-DUITKU_MERCHANT_KEY=
-BITESHIP_API_KEY=
+# Integrasi eksternal
+# WAJIB: flip ke false + key ASLI sebelum go-live menerima pembayaran nyata.
+# Kalau masih true, semua transaksi production dialihkan ke Duitku sandbox
+# (uang fictional, webhook tidak diteruskan ke sistem live).
+DUITKU_SANDBOX=false
+DUITKU_MERCHANT_CODE=<kode merchant asli>
+DUITKU_API_KEY=<api key asli>
+DUITKU_MERCHANT_KEY=<merchant key asli>
+BITESHIP_API_KEY=<api key biteship asli>
 ```
 
-> ⚠️ **Jangan tinggalkan `DB_CONNECTION=sqlite`** default dari .env.example — server harus MySQL.
+> **Jangan tinggalkan `DB_CONNECTION=sqlite`** default dari .env.example — server harus MySQL.
 
 ---
 
@@ -126,14 +129,50 @@ cd /home/<USER>/<website_dir>
 php -r "new PDO('mysql:host=127.0.0.1;port=3306;dbname=<DB>','<USER>','<PASS>'); echo 'DB OK'.PHP_EOL;"
 # kalau error: cek user/password/host — lihat Troubleshooting §10
 
-# 4b. Migrations + seed
+# 4b. Migration — INI YANG AMAN, selalu boleh jalan
 php artisan migrate --force
-php artisan db:seed --force
 
-# 4c. Cache produksi (config + route + view)
+# 4c. Seed HANYA permission/role (WAJIB di go-live pertama).
+#     Tabel permission kosong = semua route RBAC akan 403.
+php artisan db:seed --class=RolesAndPermissionsSeeder --force
+
+# 4d. Cache produksi (config + route + view)
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+```
+
+> **JANGAN pernah `php artisan db:seed --force` (tanpa `--class`) di production.**
+>
+> Perintah itu menjalankan `DatabaseSeeder` → `IntegrationSeeder`, yang mengisi
+> **data demo/fiktif**: produk, pelanggan, transaksi POS, tiket servis, PO, payroll,
+> dan **9 user demo** (super-admin@uteparts.test s/d kelola-hr@uteparts.test,
+> password `password123`). Database asli akan tercemar data palsu yang tampak realistis.
+>
+> Seeder demo hanya untuk development & review di server staging.
+
+### Membuat user admin pertama (production)
+
+Setelah permission di-seed, buat satu user super-admin manual:
+
+```bash
+php artisan tinker
+```
+
+```php
+$u = App\Models\User::create([
+    'name'      => 'Super Admin',
+    'email'     => 'admin@uteparts.id',
+    'password'  => bcrypt('password-yang-kuat'),
+    'is_active' => true,
+]);
+$u->assignRole('super-admin');
+```
+
+Bila sempat terlanjur ter-seed user demo, bersihkan:
+
+```php
+App\Models\User::where('email', 'like', '%@uteparts.test')->delete();
 ```
 
 ---
