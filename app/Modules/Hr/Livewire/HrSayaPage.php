@@ -34,7 +34,7 @@ class HrSayaPage extends Component
                 'rekap' => [],
                 'logs' => collect(),
                 'kpi' => collect(),
-            ]);
+            ])->layout('layouts.backoffice', ['header' => 'Absensi & KPI Saya', 'title' => 'Absensi & KPI Saya']);
         }
 
         $rekap = app(AbsensiService::class)->rekapBulanan($this->karyawan->id, $this->periode);
@@ -55,6 +55,6 @@ class HrSayaPage extends Component
             'rekap' => $rekap,
             'logs' => $logs,
             'kpi' => $kpi,
-        ]);
+        ])->layout('layouts.backoffice', ['header' => 'Absensi & KPI Saya', 'title' => 'Absensi & KPI Saya']);
     }
 }

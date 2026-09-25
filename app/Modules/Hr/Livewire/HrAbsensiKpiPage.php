@@ -211,6 +211,6 @@ class HrAbsensiKpiPage extends Component
             'kpiHasil' => $kpiHasil,
             'karyawans' => Karyawan::where('status_aktif', true)->orderBy('nama')->get(),
             'metrics' => KpiMetric::where('is_aktif', true)->orderBy('kode')->get(),
-        ]);
+        ])->layout('layouts.backoffice', ['header' => 'HR & Absensi', 'title' => 'Absensi, Shift & KPI']);
     }
 }

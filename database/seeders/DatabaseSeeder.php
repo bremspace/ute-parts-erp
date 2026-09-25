@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             TransaksiDemoSeeder::class,
             ReportSeeder::class,
             HrSeeder::class,
+            IntegrationSeeder::class,
         ]);
     }
 }

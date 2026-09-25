@@ -135,6 +135,6 @@ class KomisiSkemaPage extends Component
                 ->orderByDesc('is_aktif')
                 ->orderByDesc('id')
                 ->get(),
-        ]);
+        ])->layout('layouts.backoffice', ['header' => 'Komisi Multi-Aktor', 'title' => 'Rule Komisi Multi-Aktor']);
     }
 }
