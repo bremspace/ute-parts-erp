@@ -5,9 +5,12 @@
 # site kembali ke versi sebelumnya (rollback) — "live" selalu terjaga.
 #
 # Env yang dibutuhkan (dipass oleh workflow):
-#   DEPLOY_PATH  = docroot project (mis. /home/ute/ute-parts)
-#   PHP_BIN      = path PHP CLI (mis. /usr/local/lsws/lsphp85/bin/php)
+#   DEPLOY_PATH  = docroot project (mis. /var/www/ute-parts)
+#   PHP_BIN      = path PHP CLI (mis. /usr/bin/php8.4)
 #   QUEUE_NAME   = nama supervisor program queue (ute-parts-queue)
+#   WEB_USER     = user pemilik file yang boleh ditulis PHP.
+#                  Kosong = auto-detect (www-data di VPS Nginx/Apache,
+#                  lsadm di CyberPanel/OpenLiteSpeed).
 # ============================================================
 set -euo pipefail
 
@@ -15,6 +18,17 @@ DEPLOY_PATH="${DEPLOY_PATH:?DEPLOY_PATH tidak diset}"
 PHP_BIN="${PHP_BIN:-php}"
 QUEUE_NAME="${QUEUE_NAME:-ute-parts-queue}"
 LOG="/tmp/ute-deploy.log"
+
+# --- Deteksi user web (agar jalan di VPS biasa maupun CyberPanel) ---
+if [ -z "${WEB_USER:-}" ]; then
+    if id -u lsadm >/dev/null 2>&1; then
+        WEB_USER="lsadm"          # CyberPanel / OpenLiteSpeed
+    elif id -u www-data >/dev/null 2>&1; then
+        WEB_USER="www-data"       # VPS standar (nginx / apache2)
+    else
+        WEB_USER="$(id -un)"      # fallback: user SSH ini
+    fi
+fi
 
 log()  { echo "$(date '+%F %T') | $*" | tee -a "$LOG"; }
 
@@ -48,7 +62,7 @@ rollback() {
     if [ -d vendor ]; then
         composer install --no-interaction --prefer-dist --no-dev --quiet >>"$LOG" 2>&1
     fi
-    chown -R lsadm:lsadm storage bootstrap/cache public/build 2>>"$LOG" || true
+    chown -R "$WEB_USER":"$WEB_USER" storage bootstrap/cache public/build 2>>"$LOG" || true
     set -e
     log "ROLLBACK SELESAI -> $OLD_REV. Site tetap live."
     exit 1
@@ -100,9 +114,9 @@ log "config/route/view cache..."
 "$PHP_BIN" artisan route:cache >>"$LOG" 2>&1 || rollback "route:cache"
 "$PHP_BIN" artisan view:cache >>"$LOG" 2>&1 || rollback "view:cache"
 
-# --- 6. Permission (OpenLiteSpeed = lsadm) ---
-log "chown lsadm..."
-chown -R lsadm:lsadm storage bootstrap/cache public/build 2>>"$LOG" || true
+# --- 6. Permission (user dideteksi otomatis di atas) ---
+log "chown $WEB_USER..."
+chown -R "$WEB_USER":"$WEB_USER" storage bootstrap/cache public/build 2>>"$LOG" || true
 chmod -R 775 storage bootstrap/cache 2>>"$LOG" || true
 
 # --- 7. Restart queue worker (biar job baru terpakai) ---
