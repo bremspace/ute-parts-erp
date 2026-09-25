@@ -1,159 +1,219 @@
-# Deploy Production — Ute Parts (CyberPanel + OpenLiteSpeed, RAM 1GB)
+# Deploy Production — Ute Parts ERP (VPS Mandiri: Ubuntu + Nginx + PHP-FPM)
 
-Panduan deploy end-to-end sesuai PRD §7 (constraint: **1GB RAM**) & §6 (keamanan).
-Urut eksekusi — jangan loncat. Kalau suatu langkah error, berhenti dan cek Troubleshooting §10.
+Panduan deploy end-to-end untuk **VPS yang dikelola sendiri, tanpa panel** (tanpa CyberPanel/cPanel).
+Sesuai PRD §7 (constraint RAM 1GB) & §6 (keamanan).
+
+> **Kamu sedang di server ini?** Yang perlu diketahui: server ini adalah **staging**, bukan production.
+> Production = VPS baru yang kamu setup sendiri lewat panduan ini.
+
+Urut eksekusi — **jangan loncat**. Kalau suatu langkah error, berhenti dan cek [Troubleshooting](#12-troubleshooting).
+
+---
+
+## Daftar Isi
+
+| # | Bagian |
+|---|--------|
+| 0 | [Prasyarat Server](#0-prasyarat-server) |
+| 1 | [Install Paket](#1-install-paket) |
+| 2 | [Setup Database](#2-setup-database) |
+| 3 | [Clone Project & Permission](#3-clone-project--permission) |
+| 4 | [Konfigurasi `.env`](#4-konfigurasi-env-production) |
+| 5 | [Migration & User Admin](#5-migration--user-admin) |
+| 6 | [Config Nginx](#6-config-nginx) |
+| 7 | [SSL Let's Encrypt](#7-ssl-lets-encrypt) |
+| 8 | [Queue Worker (Supervisor)](#8-queue-worker-supervisor) |
+| 9 | [Cron Scheduler](#9-cron-scheduler) |
+| 10 | [Auto-Deploy GitHub Actions](#10-auto-deploy-github-actions) |
+| 11 | [Smoke Test](#11-smoke-test-setelah-go-live) |
+| 12 | [Troubleshooting](#12-troubleshooting) |
+| 13 | [Optimasi RAM 1GB](#13-optimasi-ram-1gb) |
+| 14 | [Backup Harian](#14-backup-harian-wajib) |
 
 ---
 
 ## 0. Prasyarat Server
 
-| Requirement | Nilai | Cek |
+| Requirement | Nilai | Cara cek |
 |---|---|---|
-| OS | Ubuntu 22.04 LTS / AlmaLinux | `cat /etc/os-release` |
+| OS | Ubuntu 22.04 / 24.04 LTS | `cat /etc/os-release` |
 | RAM | ≥ 1GB + **swap 2GB** | `free -h` |
-| PHP via CyberPanel | **lsphp85+** (Laravel 13 butuh PHP 8.5+) | Websites → PHP Version |
-| Ekstensi PHP wajib | `pdo_mysql, gd, zip, fileinfo, mbstring, openssl, intl, sqlite3` | pakai tombol "PHP Extensions" di CyberPanel |
-| MySQL/MariaDB | 10.6+ (bawaan CyberPanel) | `mysql --version` |
-| Node 20+ (untuk build asset) | sekali saja di server | `node -v` |
-| Git / rsync | untuk upload source | `git --version` |
+| PHP | **8.4** (FPM + CLI) | `php -v` |
+| Ekstensi PHP | `pdo_mysql gd zip fileinfo mbstring openssl intl sqlite3 bcmath` | `php -m` |
+| MySQL/MariaDB | 10.6+ | `mysql --version` |
+| Node | 20+ (build asset frontend) | `node -v` |
+| Git | upload source | `git --version` |
 
-> ⚠️ **Hanya punya PHP 8.2?** Turunkan ke Laravel 12 (fallback resmi PRD §1) — jangan deploy Laravel 13 di PHP 8.2.
+> **Kenapa PHP 8.4, bukan 8.5?** `composer.json` mensyaratkan `^8.3`, jadi 8.5 boleh. Tapi 8.4 adalah
+> yang paling proven dan paling hemat resource — aman untuk production. Naik ke 8.5 nanti kalau sudah mantap.
 
----
-
-## 1. Siapkan Website di CyberPanel (PANEL UI — bukan SSH)
-
-1. **CyberPanel → Websites → Create Website**
-   - Domain: `domain.com` (subdomain/dedicated)
-   - PHP: **8.5**
-   - Package: Home (RAM 1GB)
-   - Centang **Create Database** → catat nama DB, user, password yang ditampilkan.
-
-2. **Pastikan PHP extensions** aktif: Website → Manage PHP Extensions → centang semua dari §0.
-
-3. **Buat SSL dulu** (biar APP_URL langsung https): Websites → SSL → **Let's Encrypt** (domain + www).
-
-> ⚠️ **JANGAN pakai user `root` untuk koneksi aplikasi.**
-> CyberPanel menampilkan error `access denied for user 'root'` karena root MySQL di server panel **tidak boleh dipakai lewat aplikasi** — kredensial root di CyberPanel biasanya terpisah/hanya via socket.
-> → Selalu pakai user database khusus yang dibuat CyberPanel (step 1).
+> **Swap itu wajib, bukan opsional.** Tanpa swap, `composer install` dan `npm run build` akan
+> kena OOM kill di RAM 1GB. Ini penyebab paling umum deploy gagal.
 
 ---
 
-## 2. Upload Source Code (SSH)
+## 1. Install Paket
+
+Sekali saja, di VPS baru:
 
 ```bash
-# Perbesar RAM untuk composer/npm (1GB ketat)
+sudo apt update && sudo apt upgrade -y
+
+sudo apt install -y \
+    nginx mysql-server \
+    php8.4-fpm php8.4-cli php8.4-mysql php8.4-mbstring \
+    php8.4-xml php8.4-curl php8.4-zip php8.4-gd php8.4-bcmath \
+    git unzip curl certbot python3-certbot-nginx \
+    supervisor logrotate
+
+# Composer
+curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+
+# Node 20+ (butuh untuk build CSS/JS)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Swap 2GB — WAJIB untuk RAM 1GB
 sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
 sudo mkswap /swapfile && sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fetc
+```
 
-# Lokasi: di dalam Website folder CyberPanel, docroot-nya folder `public`
-cd /home/<USER>/<website_dir>     # contoh: /home/ute/ute-parts
-
-# Upload via git
-git clone https://github.com/bremspace/ute-parts-erp.git .
-# ATAU upload manual via rsync dari lokal:
-#   rsync -avz --exclude vendor --exclude node_modules --exclude .env --exclude storage/framework/cache/* ./ user@server:/home/ute/ute-parts/
-
-# 2a. Dependency PHP (tanpa dev)
-composer install --no-dev --optimize-autoloader
-
-# 2b. Dependency + BUILD asset frontend (WAJIB — tanpa ini halaman tampil polos tak ber-CSS)
-npm install --ignore-scripts
-npm run build          # menghasilkan public/build/*
-
-# 2c. Storage link utk upload (produk/foto)
-php artisan storage:link
+Verifikasi:
+```bash
+php -v && node -v && composer -V && swapon --show
 ```
 
 ---
 
-## 3. Konfigurasi `.env` production (SSH)
+## 2. Setup Database
+
+```bash
+sudo mysql
+```
+
+```sql
+CREATE DATABASE ute_parts_prod CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'uteparts'@'localhost' IDENTIFIED BY 'PASSWORD_YANG_KUAT';
+GRANT ALL PRIVILEGES ON ute_parts_prod.* TO 'uteparts'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+> **Jangan pakai user `root` MySQL untuk aplikasi.** Buat user khusus seperti di atas.
+> User `root` sering tidak bisa diakses dari aplikasi web (setting socket/host terpisah).
+
+---
+
+## 3. Clone Project & Permission
+
+```bash
+sudo mkdir -p /var/www/ute-parts
+sudo chown -R $USER:$USER /var/www/ute-parts
+cd /var/www/ute-parts
+
+git clone https://github.com/bremspace/ute-parts-erp.git .
+
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build          # WAJIB — tanpa ini halaman tanpa CSS
+php artisan storage:link         # symlink upload foto produk/unit
+
+# Permission: PHP-FPM jalan sebagai www-data
+sudo chown -R www-data:www-data storage bootstrap/cache public/build
+sudo chmod -R 775 storage bootstrap/cache
+```
+
+> **`npm run build` itu wajib.** Layout memakai `@vite([...])` yang butuh file hashed di
+> `public/build`. Kalau dilewatkan, halaman terbuka tapi **tapi tanpa CSS sama sekali**.
+
+### Struktur folder
+
+```
+/var/www/ute-parts              ← folder project
+/var/www/ute-parts/public       ← DOCUMENT ROOT Nginx (HANYA folder ini terekspos web)
+```
+
+---
+
+## 4. Konfigurasi `.env` Production
 
 ```bash
 cp .env.example .env
 php artisan key:generate
+nano .env
 ```
 
-Isi minimal (sesuaikan nilai dari CyberPanel step 1):
-
-```env
+```dotenv
 APP_NAME="Ute Parts"
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://domain.com
+APP_URL=https://uteparts.id
 APP_LOCALE=id
+APP_FALLBACK_LOCALE=en
 
 LOG_LEVEL=error
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=<NAMA_DB_DARI_CYBERPANEL>
-DB_USERNAME=<USER_DB_DARI_CYBERPANEL>
-DB_PASSWORD=<PASSWORD_DB_DARI_CYBERPANEL>
+DB_DATABASE=ute_parts_prod
+DB_USERNAME=uteparts
+DB_PASSWORD=PASSWORD_YANG_KUAT
 
 BROADCAST_CONNECTION=log
-QUEUE_CONNECTION=database    # RAM 1GB
+QUEUE_CONNECTION=database    # RAM kecil — jangan Redis dulu
 CACHE_STORE=database
 SESSION_DRIVER=database
-SESSION_SECURE_COOKIE=true   # WAJIB utk HTTPS — kalau false, cookie login ditolak browser
-SESSION_DOMAIN=.domain.com   # samakan dgn APP_URL (dot di depan utk subdomain)
+SESSION_SECURE_COOKIE=true   # WAJIB utk HTTPS, kalau false cookie login ditolak browser
+SESSION_DOMAIN=.uteparts.id
+SANCTUM_STATEFUL_DOMAINS=uteparts.id
 
-# Sanctum SPA (cookie session)
-SANCTUM_STATEFUL_DOMAINS=domain.com
+BCRYPT_ROUNDS=10             # hemat CPU di RAM 1GB
 
-BCRYPT_ROUNDS=10             # hemat CPU di 1GB
-
-# Integrasi eksternal
+# ─── Integrasi Eksternal ───────────────────────────────────────────
 # WAJIB: flip ke false + key ASLI sebelum go-live menerima pembayaran nyata.
 # Kalau masih true, semua transaksi production dialihkan ke Duitku sandbox
-# (uang fictional, webhook tidak diteruskan ke sistem live).
+# (uang fiktif, webhook tidak diteruskan ke sistem live).
 DUITKU_SANDBOX=false
 DUITKU_MERCHANT_CODE=<kode merchant asli>
 DUITKU_API_KEY=<api key asli>
-DUITKU_MERCHANT_KEY=<merchant key asli>
+DUITKU_MERCHANT_KEY=<key asli>
 BITESHIP_API_KEY=<api key biteship asli>
 ```
 
-> **Jangan tinggalkan `DB_CONNECTION=sqlite`** default dari .env.example — server harus MySQL.
+> **Jangan tinggalkan `DB_CONNECTION=sqlite`** — itu default `.env.example` untuk development.
 
 ---
 
-## 4. Migrasi & Seed database (SSH)
+## 5. Migration & User Admin
 
 ```bash
-cd /home/<USER>/<website_dir>
+cd /var/www/ute-parts
 
-# 4a. Cek koneksi DB DULU (dengan kredensial dari .env):
-php -r "new PDO('mysql:host=127.0.0.1;port=3306;dbname=<DB>','<USER>','<PASS>'); echo 'DB OK'.PHP_EOL;"
-# kalau error: cek user/password/host — lihat Troubleshooting §10
+# 5a. Cek koneksi DB DULU (dengan kredensial dari .env):
+php -r "new PDO('mysql:host=127.0.0.1;port=3306;dbname=ute_parts_prod','uteparts','PASSWORD'); echo 'DB OK\n';"
+# error? cek user/password/host — lihat Troubleshooting §12
 
-# 4b. Migration — INI YANG AMAN, selalu boleh jalan
+# 5b. Migration — INI YANG AMAN, selalu boleh jalan
 php artisan migrate --force
 
-# 4c. Seed HANYA permission/role (WAJIB di go-live pertama).
+# 5c. Seed HANYA permission/role (WAJIB di go-live pertama).
 #     Tabel permission kosong = semua route RBAC akan 403.
 php artisan db:seed --class=RolesAndPermissionsSeeder --force
-
-# 4d. Cache produksi (config + route + view)
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
 ```
 
 > **JANGAN pernah `php artisan db:seed --force` (tanpa `--class`) di production.**
 >
-> Perintah itu menjalankan `DatabaseSeeder` → `IntegrationSeeder`, yang mengisi
-> **data demo/fiktif**: produk, pelanggan, transaksi POS, tiket servis, PO, payroll,
-> dan **9 user demo** (super-admin@uteparts.test s/d kelola-hr@uteparts.test,
+> Perintah itu menjalankan `DatabaseSeeder` → `IntegrationSeeder`, yang mengisi **data
+> demo/fiktif**: produk, pelanggan, transaksi POS, tiket servis, PO, payroll, dan
+> **9 user demo** (`super-admin@uteparts.test` s/d `kelola-hr@uteparts.test`,
 > password `password123`). Database asli akan tercemar data palsu yang tampak realistis.
 >
 > Seeder demo hanya untuk development & review di server staging.
 
-### Membuat user admin pertama (production)
+### Buat user admin pertama
 
-Setelah permission di-seed, buat satu user super-admin manual:
+Setelah permission di-seed, buat satu user super-admin:
 
 ```bash
 php artisan tinker
@@ -163,7 +223,7 @@ php artisan tinker
 $u = App\Models\User::create([
     'name'      => 'Super Admin',
     'email'     => 'admin@uteparts.id',
-    'password'  => bcrypt('password-yang-kuat'),
+    'password'  => bcrypt('PASSWORD_YANG_KUAT'),
     'is_active' => true,
 ]);
 $u->assignRole('super-admin');
@@ -177,183 +237,264 @@ App\Models\User::where('email', 'like', '%@uteparts.test')->delete();
 
 ---
 
-## 5. Set Pemilik & Permission (KRITIS)
-
-OpenLiteSpeed menjalankan PHP sebagai user `lsadm`. Semua yang perlu ditulis PHP wajib dirubah pemilik.
+## 6. Config Nginx
 
 ```bash
-cd /home/<USER>/<website_dir>
+sudo nano /etc/nginx/sites-available/uteparts
+```
 
-chown -R lsadm:lsadm storage bootstrap/cache public/build
-chmod -R 775 storage bootstrap/cache
-chmod -R 755 public/build
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name uteparts.id www.uteparts.id;
 
-# Seluruh project boleh lsadm (paling sederhana):
-chown -R lsadm:lsadm .
+    root /var/www/ute-parts/public;
+    index index.php;
+    charset utf-8;
+
+    # WAJIB: upload foto unit servis & import produk bisa berukuran besar
+    client_max_body_size 64m;
+    server_tokens off;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_param HTTPS on;
+        fastcgi_read_timeout 300;   # QA tools & import bisa lama
+    }
+
+    # Proteksi file sensitif
+    location ~ /\.(?!well-known).* { deny all; }
+    location ~* \.(env|log|sql|md)$ { deny all; }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/uteparts /etc/nginx/sites-enabled/
+sudo nginx -t                      # harus "syntax is ok / test is successful"
+sudo systemctl reload nginx
+```
+
+> **Penting:** document root WAJIB `<project>/public`, **bukan** folder project.
+> Kalau docroot = folder project, file `.env` bisa diakses langsung via browser — kebocoran
+> password database & API key.
+
+---
+
+## 7. SSL Let's Encrypt
+
+```bash
+sudo certbot --nginx -d uteparts.id -d www.uteparts.id
+```
+
+Certbot otomatis meng-edit config Nginx + renewal via cron.
+
+Test renewal:
+```bash
+sudo certbot renew --dry-run
 ```
 
 ---
 
-## 6. OpenLiteSpeed — Virtual Host (CyberPanel UI)
+## 8. Queue Worker (Supervisor)
 
-Website → **Manajemen VHost** → pastikan:
-
-```
-docRoot = /home/<USER>/<website_dir>/public
-index  = index.php
-enableLSCache = 1 (Web Cache → Dynamic)
-```
-
-- **PHP Handler**: set ke `lsphp85` (Websites → PHP → PHP 8.5), LSAPI mode.
-- **Symlink di luar docroot**: aktifkan "Follow SymLink" di vhost (utk `public/storage` yang menunjuk ke `storage/app/public`).
-- **HTTP → HTTPS redirect**: Website → SSL → "Force HTTPS" / Rewrite ke https.
-
----
-
-## 7. Queue Worker (Supervisor) — WAJIB (PRD §4.9)
+**Wajib.** Tanpa ini, transaksi POS tetap jalan tapi notifikasi & outbound webhook tidak terkirim.
 
 ```bash
-sudo apt install -y supervisor
+sudo nano /etc/supervisor/conf.d/ute-parts-queue.conf
 ```
-
-> ⚠️ **Pakai PHP CLI yang SAMA dengan lsphp85.** CyberPanel menyediakan `lsphp85` di `PATH`; jika `which php` menunjuk versi lain (mis. 8.1 default OS), artisan/queue bisa error versi. Pastikan:
-> ```bash
-> /usr/local/lsws/lsphp85/bin/php -v   # harus PHP 8.5.x
-> # lalu gunakan path itu di semua perintah artisan & supervisor
-> ```
-
-File `/etc/supervisor/conf.d/ute-parts.conf`:
 
 ```ini
 [program:ute-parts-queue]
-process_name=%(program_name)s_%(process_num)02d
-command=/usr/local/lsws/lsphp85/bin/php /home/<USER>/<website_dir>/artisan queue:work database --sleep=3 --tries=3 --max-time=3600
+command=/usr/bin/php8.4 /var/www/ute-parts/artisan queue:work --sleep=3 --tries=3
+directory=/var/www/ute-parts
 autostart=true
 autorestart=true
-stopasgroup=true
+user=www-data
 numprocs=1
-user=lsadm
 redirect_stderr=true
-stdout_logfile=/home/<USER>/<website_dir>/storage/logs/queue.log
+stdout_logfile=/var/www/ute-parts/storage/logs/worker.log
 stopwaitsecs=3600
+killasgroup=true
 ```
 
 ```bash
 sudo supervisorctl reread
 sudo supervisorctl update
-sudo supervisorctl status
+sudo supervisorctl status ute-parts-queue      # harus RUNNING
+```
+
+Atau pakai file yang sudah disediakan repo:
+
+```bash
+cp deploy/supervisor/ute-parts-queue.conf /etc/supervisor/conf.d/
+
+# PENTING: bila lokasi project-mu BEDA dari /var/www/ute-parts, sesuaikan DULU:
+sed -i 's#/var/www/ute-parts#/path/kamu#g; s#/usr/bin/php8.4#/usr/bin/php#g' \
+  /etc/supervisor/conf.d/ute-parts-queue.conf
+
+sudo supervisorctl reread && sudo supervisorctl update
+sudo supervisorctl status ute-parts-queue      # harus RUNNING
 ```
 
 ---
 
-## 8. Scheduler (tier:recalc harian)
+## 9. Cron Scheduler
 
 ```bash
-crontab -e
-# tambah (gunakan path PHP CLI lsphp85 yang sama):
-* * * * * /usr/local/lsws/lsphp85/bin/php /home/<USER>/<website_dir>/artisan schedule:run >> /dev/null 2>&1
+sudo crontab -e
+```
+
+```cron
+* * * * * cd /var/www/ute-parts && /usr/bin/php8.4 artisan schedule:run >> /dev/null 2>&1
+```
+
+Dipakai untuk job terjadwal (recalc tier harian, dll). Cek daftar jadwal:
+```bash
+cd /var/www/ute-parts && php artisan schedule:list
 ```
 
 ---
 
-## 10 Auto-Deploy Otomatis (GitHub → VPS) — DIREKOMENDASIKAN
+## 10. Auto-Deploy (GitHub Actions)
 
-Setiap push ke `main` → VPS otomatis pull + update + restart queue. **Wajib aman**: script `deploy.sh` melakukan **auto-rollback** ke versi sebelumnya jika ada langkah gagal — site tidak pernah mati lama di VPS.
+Setiap push ke `main` → VPS otomatis pull, update, restart queue.
+`deploy.sh` melakukan **auto-rollback** ke versi sebelumnya bila ada langkah gagal — site tidak pernah mati lama.
 
-### Fitur
-- Trigger: push/main + tombol manual di GitHub Actions.
-- Langkah: pull → composer → migrate → npm build → cache → chown lsadm → restart queue.
-- **Rollback otomatis**: bila composer/migrate/build/cache gagal → `git reset --hard` ke commit lama + restore build lama + cache clear → site live lagi.
-- Log di `/tmp/ute-deploy.log`, status tampil di tab Actions.
+### 10.1 Fitur
+- Trigger: push ke `main` + tombol manual di tab Actions
+- Urutan: pull → composer → migrate → npm build → cache → chown → restart queue
+- **Rollback otomatis**: bila composer/migrate/build/cache gagal → `git reset --hard` ke commit lama + restore build lama + cache clear
+- Log di `/tmp/ute-deploy.log` + status di tab Actions
+- `deploy.sh` **mendeteksi user web otomatis** (`www-data` untuk VPS Nginx/Apache, `lsadm` untuk CyberPanel) — jadi script yang sama jalan di keduanya
 
-### Setup sekali (VPS — SSH)
+### 10.2 Setup SSH key (sekali, di VPS)
 ```bash
-# 1. Pastikan project sudah ada & environment production OK (bagian 2-8 di bawah)
-# 2. Siapkan SSH key khusus deploy di VPS
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 ssh-keygen -t ed25519 -f ~/.ssh/ute_deploy -N "" -C "github-actions"
 cat ~/.ssh/ute_deploy.pub >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
 
-# 3. Tampilkan private key (salin ke GitHub secret nanti):
+# Tampilkan private key (salin ke GitHub secret)
 cat ~/.ssh/ute_deploy
 ```
 
-### Setup GitHub (sekali — tab Settings → Secrets and variables → Actions)
-| Secret | Isi |
-|---|---|
-| `VPS_HOST` | IP/domain VPS (mis. `203.0.113.10`) |
-| `VPS_USER` | user SSH (mis. `root`) |
-| `VPS_SSH_PRIVATE_KEY` | isi private key dari `cat ~/.ssh/ute_deploy` |
-| `VPS_PORT` | opsional, default 22 |
-| `VPS_PATH` | path project di VPS (mis. `/home/ute/ute-parts`) |
-| `PHP_BIN` | opsional; default `/usr/local/lsws/lsphp85/bin/php` |
-| `QUEUE_NAME` | opsional; default `ute-parts-queue` |
+### 10.3 GitHub Secrets (Settings → Secrets and variables → Actions)
 
-### Cara kerja
-1. Unduh `deploy.sh` dari repo ini ke `/tmp/ute-deploy.sh`, lalu eksekusi di VPS.
-2. Script menyimpan hash commit lama & **backup `public/build`** sebelum bekerja.
-3. Bila ada kegagalan → fungsi `rollback()` mengembalikan semuanya ke commit lama.
+| Secret | Isi | Wajib? |
+|--------|-----|--------|
+| `VPS_HOST` | IP/domain VPS | ✅ |
+| `VPS_USER` | user SSH (mis. `root` atau `ubuntu`) | ✅ |
+| `VPS_SSH_PRIVATE_KEY` | isi private key dari `cat ~/.ssh/ute_deploy` | ✅ |
+| `VPS_PORT` | port SSH, default 22 | opsional |
+| `VPS_PATH` | path project, mis. `/var/www/ute-parts` | ✅ |
+| `PHP_BIN` | path PHP CLI, mis. `/usr/bin/php8.4` | ✅ |
+| `QUEUE_NAME` | nama program supervisor, default `ute-parts-queue` | opsional |
 
-> 🔒 **Keamanan**: private key hanya di GitHub secrets, tidak pernah masuk repo. `deploy.sh` hanya update kode — `.env` (ada di VPS) **tidak pernah tersentuh** karena di-`.gitignore`.
+> **`VPS_PATH` dan `PHP_BIN` WAJIB diisi.** Nilai default di workflow masih menunjuk path
+> CyberPanel (`/home/ute/ute-parts`, `lsphp85`) — kalau tidak di-override, deploy ke VPS
+> biasa akan gagal dengan "folder deploy tidak ditemukan".
+
+### 10.4 Cara kerja
+1. Workflow mengunduh `deploy.sh` dari repo ke `/tmp/ute-deploy.sh`, lalu eksekusi di VPS via SSH
+2. Script menyimpan hash commit lama + **backup `public/build`** sebelum bekerja
+3. Bila gagal → fungsi `rollback()` kembalikan semuanya ke commit lama
+4. `.env` **tidak pernah tersentuh** (ada di `.gitignore`, tidak pulled dari GitHub)
+
+> **Keamanan**: private key hanya di GitHub Secrets, tidak pernah masuk repo.
+
+### 10.5 Deploy manual (tanpa GitHub Actions)
+```bash
+cd /var/www/ute-parts
+DEPLOY_PATH=/var/www/ute-parts PHP_BIN=/usr/bin/php8.4 bash deploy.sh
+```
+
+### 10.6 Update manual paling sederhana
+```bash
+cd /var/www/ute-parts
+git pull origin main
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build
+php artisan migrate --force
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo supervisorctl restart ute-parts-queue
+```
 
 ---
 
-## 11 Smoke Test Setelah Go-Live
+## 11. Smoke Test Setelah Go-Live
 
 ```bash
-BASE=https://domain.com
+BASE=https://uteparts.id
 
 # 1. Health route
-curl -s $BASE/up -o /dev/null -w "health=%{http_code}\n"          # 200
+curl -s $BASE/up -o /dev/null -w "health=%{http_code}\n"           # harus 200
 
-# 2. Marketplace (tanpa login)
-curl -s $BASE/shop -o /dev/null -w "shop=%{http_code}\n"          # 200
-curl -s $BASE/app/login -o /dev/null -w "login-page=%{http_code}\n"# 200
+# 2. Halaman tanpa login
+curl -s $BASE/shop -o /dev/null -w "shop=%{http_code}\n"           # harus 200
+curl -s $BASE/app/login -o /dev/null -w "login-page=%{http_code}\n" # harus 200
 
-# 3. Login post (harus 302 → /app/pos); 419 = CSRF/cookie https bermasalah
+# 3. Asset benar-benar ada? (kalau 0 = belum npm run build)
+curl -s $BASE/app/login -H "Accept: text/html" | grep -c "/build/assets"   # harus > 0
+
+# 4. Login post (harus 302; 419 = CSRF/cookie HTTPS bermasalah)
 curl -s -c c.txt -b c.txt -X POST $BASE/app/login \
-  -d "email=admin@test.uteparts.id&password=password" \
+  -d "email=admin@uteparts.id&password=PASSWORD" \
   -o /dev/null -w "login-post=%{http_code}\n" -L
 
-# 4. Beta user yang tidak diblock:
-curl -s $BASE/shop -H "Accept: text/html" | grep -c "/build/assets"   # asset CSS ada?
-curl -s $BASE/app/login -H "Accept: text/html" | grep -c "glass-panel"# layout muncul?
-
 # 5. Queue
-supervisorctl status ute-parts-queue        # RUNNING
+sudo supervisorctl status ute-parts-queue     # harus RUNNING
 
 # 6. Round-trip data
-cd /home/<USER>/<website_dir>
+cd /var/www/ute-parts
 php artisan tinker --execute="echo App\\Modules\\Rbac\\Models\\Cabang::count().' cabang';"
 ```
 
 ---
 
-## 12 Troubleshooting Produksi
+## 12. Troubleshooting
 
 | Gejala | Penyebab | Solusi |
 |---|---|---|
-| **`Access denied for user 'root'@'localhost'`** | memakai user root; atau user DB di .env tidak match | (a) buat DB+user khusus via CyberPanel; (b) cek `.env` di **server** (`cat .env \| grep DB`); (c) `php artisan config:clear` (cadangan config lama); (d) test PDO §4a |
-| Halaman tampil tanpa CSS | `public/build` tidak ada / belum `npm run build` | `npm install && npm run build`; `chown -R lsadm:lsadm public/build` |
-| Login post → 419 | cookie HTTPS mati / SESSION_DOMAIN salah / cache config lama | `SESSION_SECURE_COOKIE=true`; `SESSION_DOMAIN=.domain.com`; `php artisan optimize:clear` |
-| 500 semua halaman | permission storage / cache stale | `chown -R lsadm:lsadm storage bootstrap/cache`; `php artisan optimize:clear` |
-| 404 Asset `build/xxx` | vhost docroot tidak mengarah ke `public` | pastikan docRoot = .../public |
-| Login berhasil tapi redirect muter | APP_URL tanpa https / `SESSION_DOMAIN` beda | samakan APP_URL `https://domain.com`; tolong reload cookie |
-| Migrate: table exists | seeder/upgrade | pastikan `.env` benar; jangan drop tabel tak sengaja |
-| `SQLSTATE[HY000] [2000]` (mysqlnd old auth) | MariaDB lama pakai password hash lawas | `ALTER USER '<user>'@'localhost' IDENTIFIED WITH mysql_native_password BY '<pass>';` |
-| `SQLSTATE[42000] 1115 Unknown character set utf8mb4` | MySQL/MariaDB lawas tanpa utf8mb4 | tambah di `.env`: `DB_CHARSET=utf8` + `DB_COLLATION=utf8_unicode_ci` |
-| Artisan/queue error `PHP version ... does not satisfy` | CLI `php` beda dari lsphp85 | gunakan `/usr/local/lsws/lsphp85/bin/php` untuk semua perintah |
-| Queue tidak jalan | Supervisor gagal/OOM | `supervisorctl status`; tambah `memory_limit=-1` utk CLI; periksa swap |
-| Webhook Duitku 419 | CSRF tidak dikecualikan (seharusnya sudah default) | cek `routes/web.php` `withoutMiddleware(ValidateCsrfToken)` |
-| Export Excel error | ekstensi `gd`/`zip` off | aktivkan PHP Extensions di CyberPanel |
-| Lambat / OOM | OPcache off / MySQL buffer besar | §11 + PRD §7 |
+| `Access denied for user 'uteparts'@'localhost'` | kredensial di `.env` tidak match | cek `cat .env \| grep DB_`; `php artisan config:clear`; test PDO §5a |
+| Halaman tanpa CSS | `public/build` tidak ada / belum `npm run build` | `npm ci && npm run build`; `sudo chown -R www-data:www-data public/build` |
+| Login post → 419 | cookie HTTPS mati / `SESSION_DOMAIN` salah | `SESSION_SECURE_COOKIE=true`; `SESSION_DOMAIN=.uteparts.id`; `php artisan optimize:clear` |
+| 500 semua halaman | permission storage / cache stale | `sudo chown -R www-data:www-data storage bootstrap/cache`; `php artisan optimize:clear` |
+| 404 asset `build/xxx` | docroot Nginx tidak ke `public` | pastikan `root /var/www/ute-parts/public;` |
+| 502 Bad Gateway | PHP-FPM mati | `sudo systemctl status php8.4-fpm && sudo systemctl restart php8.4-fpm` |
+| 403 di semua route | tabel permission kosong | `php artisan db:seed --class=RolesAndPermissionsSeeder --force` |
+| Upload produk/foto gagal | body size Nginx kurang | `client_max_body_size 64m;` → `sudo nginx -t && sudo systemctl reload nginx` |
+| Notifikasi/webhook tidak jalan | queue worker mati | `sudo supervisorctl status ute-parts-queue`; `journalctl -u supervisor` |
+| Session logout terus | `SESSION_SECURE_COOKIE=true` tapi belum HTTPS, atau domain tidak sama | samakan `APP_URL` & `SESSION_DOMAIN` |
+| `Migrate: table already exists` | seeder/upgrade sebelumnya | pastikan `.env` benar; jangan drop tabel tak sengaja |
+| `SQLSTATE[HY000] [2002]` timeout | MySQL tidak jalan | `sudo systemctl status mysql && sudo systemctl start mysql` |
+| `SQLSTATE[HY000] [2000]` mysqlnd old auth | MariaDB lama, password hash lawas | `ALTER USER 'uteparts'@'localhost' IDENTIFIED WITH mysql_native_password BY '...';` |
+| Composer/npm OOM atau "Killed" | swap belum aktif | `swapon --show`; kalau kosong: `sudo swapon /swapfile` |
+| Artisan/queue `PHP version ... does not satisfy` | CLI PHP beda dengan FPM | pastikan `PHP_BIN=/usr/bin/php8.4` konsisten di semua tempat |
+| Export Excel error | ekstensi `gd`/`zip` belum ada | `sudo apt install php8.4-gd php8.4-zip && sudo systemctl restart php8.4-fpm` |
+| Slow / timeout | OPcache off / MySQL buffer terlalu besar | lihat [§13](#13-optimasi-ram-1gb) |
+| Auto-deploy: "Folder deploy tidak ditemukan" | `VPS_PATH` secret masih default CyberPanel | set `VPS_PATH=/var/www/ute-parts` di GitHub Secrets |
+| Auto-deploy: `chown` gagal | user web tidak terdeteksi | set `WEB_USER=www-data` |
 
 ---
 
-## 13 Optimasi RAM 1GB (PRD §7)
+## 13. Optimasi RAM 1GB
 
-### OPcache (CyberPanel → PHP 8.5 → PHP.ini)
+### OPcache
+
+```bash
+sudo nano /etc/php/8.4/fpm/conf.d/99-ute-opcache.ini
+```
 
 ```ini
 opcache.enable=1
@@ -363,7 +504,29 @@ opcache.max_accelerated_files=10000
 opcache.validate_timestamps=0      # production; set 1 saat deploy lalu kembali 0
 ```
 
-### MySQL tuning (`/etc/mysql/mysql.conf.d/ute-parts.cnf` lalu `sudo systemctl restart mysql`)
+CLI PHP juga perlu (dipakai artisan/queue):
+```bash
+sudo nano /etc/php/8.4/cli/conf.d/99-ute-opcache.ini
+```
+
+```ini
+opcache.enable=1
+opcache.enable_cli=1
+opcache.memory_consumption=96
+```
+
+```bash
+sudo systemctl restart php8.4-fpm
+```
+
+> Kalau deploy webhook/queue gagal dengan error opcode, set `opcache.validate_timestamps=1` sementara,
+> deploy, lalu kembalikan ke `0`.
+
+### MySQL tuning
+
+```bash
+sudo nano /etc/mysql/mysql.conf.d/ute-parts.cnf
+```
 
 ```ini
 [mysqld]
@@ -372,34 +535,139 @@ innodb_log_file_size=64M
 max_connections=50
 ```
 
----
+```bash
+sudo systemctl restart mysql
+```
 
-## 14 Backup Harian (wajib sebelum go-live, §6)
-
-CyberPanel → **Backup** > Website Backup (engine bawaan). Tambah dump DB khusus (bukan root):
+### Batasi memori PHP-FPM
 
 ```bash
-# /etc/cron.daily/ute-parts-backup
-#!/bin/bash
-mkdir -p /home/backups
-mysqldump --single-transaction -u <USER_DB> -p'<PASS_DB>' <NAMA_DB> | gzip > /home/backups/db-$(date +\%F).sql.gz
-find /home/backups -name 'db-*.sql.gz' -mtime +7 -delete
-chmod +x /etc/cron.daily/ute-parts-backup
+sudo nano /etc/php/8.4/fpm/pool.d/ute-parts.conf
+```
+
+```ini
+[ute-parts]
+user = www-data
+group = www-data
+listen = /run/php/php8.4-fpm.sock
+pm = dynamic
+pm.max_children = 4
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+pm.max_requests = 500
+php_admin_value[memory_limit] = 256M
+```
+
+```bash
+sudo systemctl restart php8.4-fpm
 ```
 
 ---
 
-## 15 Checklist Go-Live (PRD §11 DoD)
+## 14. Backup Harian (Wajib)
 
-- [ ] HTTPS Let's Encrypt aktif, HTTP di-redirect
-- [ ] `APP_DEBUG=false`, `APP_URL=https://...`
-- [ ] DB user khusus (BUKAN root) aktif & migrasi sukses
-- [ ] `public/build` ter-build, layout ber-CSS di browser
-- [ ] OPcache 96MB, `validate_timestamps=0`
-- [ ] Supervisor queue 1 worker RUNNING
-- [ ] Scheduler cron berjalan (`schedule:run` tiap menit)
-- [ ] Backup DB harian + retensi 7 hari telah diuji-restore
-- [ ] Session cookie HTTPS (`SESSION_SECURE_COOKIE=true`) dan login web dgn CSRF sukses
-- [ ] Duitku sandbox lolos UAT → baru key produksi
-- [ ] Test responsif 375 / 768 / 1440 di domain live
-- [ ] Rate limit login teruji (10x/menit)
+### Backup database + file upload
+
+```bash
+sudo nano /etc/cron.daily/ute-parts-backup
+```
+
+```bash
+#!/bin/bash
+set -e
+STAMP=$(date +%F)
+DEST=/var/backups/ute-parts
+mkdir -p "$DEST"
+
+# Dump database
+mysqldump -u uteparts -p'PASSWORD' ute_parts_prod | gzip > "$DEST/db-$STAMP.sql.gz"
+
+# File upload (foto produk, foto unit servis)
+tar czf "$DEST/storage-$STAMP.tar.gz" -C /var/www/ute-parts storage/app/public
+
+# Simpan 14 hari
+find "$DEST" -type f -mtime +14 -delete
+```
+
+```bash
+sudo chmod +x /etc/cron.daily/ute-parts-backup
+```
+
+### Rotasi log Laravel
+
+```bash
+cp deploy/logrotate/ute-parts.conf /etc/logrotate.d/ute-parts
+
+# Bila lokasi project-mu berbeda:
+sed -i 's#/var/www/ute-parts#/path/kamu#g' /etc/logrotate.d/ute-parts
+
+logrotate -d /etc/logrotate.d/ute-parts   # dry-run verifikasi
+```
+
+### Restore (kalau perlu)
+```bash
+gunzip -c /var/backups/ute-parts/db-2026-09-25.sql.gz | sudo mysql -u uteparts -p ute_parts_prod
+tar xzf /var/backups/ute-parts/storage-2026-09-25.tar.gz -C /var/www/ute-parts
+```
+
+---
+
+## Ringkasan Urutan Eksekusi
+
+Sekali jalan, berurutan:
+
+```bash
+# 1. Paket + swap
+sudo apt install -y nginx mysql-server php8.4-fpm php8.4-{cli,mysql,mbstring,xml,curl,zip,gd,bcmath} git certbot python3-certbot-nginx supervisor
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fetc
+
+# 2. Database
+sudo mysql -e "CREATE DATABASE ute_parts_prod CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'uteparts'@'localhost' IDENTIFIED BY 'PASSWORD';
+GRANT ALL ON ute_parts_prod.* TO 'uteparts'@'localhost';"
+
+# 3. Project
+sudo mkdir -p /var/www/ute-parts && cd /var/www/ute-parts
+git clone https://github.com/bremspace/ute-parts-erp.git .
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build && php artisan storage:link
+
+# 4. Env + database
+cp .env.example .env && php artisan key:generate        # lalu edit .env
+php artisan migrate --force
+php artisan db:seed --class=RolesAndPermissionsSeeder --force
+# + buat user admin pertama via tinker (§5)
+
+# 5. Permission + cache
+sudo chown -R www-data:www-data storage bootstrap/cache public/build
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+
+# 6. Nginx + SSL
+sudo ln -s /etc/nginx/sites-available/uteparts /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d uteparts.id -d www.uteparts.id
+
+# 7. Queue + cron
+cp deploy/supervisor/ute-parts-queue.conf /etc/supervisor/conf.d/
+sudo supervisorctl reread && sudo supervisorctl update
+(sudo crontab) * * * * * cd /var/www/ute-parts && /usr/bin/php8.4 artisan schedule:run >> /dev/null 2>&1
+
+# 8. Smoke test
+curl -s https://uteparts.id/up -o /dev/null -w "%{http_code}\n"   # 200
+```
+
+---
+
+## TL;DR
+
+| Kebutuhan | Nilai |
+|---|---|
+| Folder project | `/var/www/ute-parts` |
+| Document root Nginx | `/var/www/ute-parts/public` |
+| User PHP-FPM | `www-data` |
+| PHP | 8.4 |
+| Node | 20+ |
+| Perintah QA lokal | `php scripts/qa-auto.php` (tidak perlu di production) |
+| Update berikutnya | `bash deploy.sh` atau `git pull && composer install && npm run build` |
