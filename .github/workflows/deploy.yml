@@ -31,14 +31,28 @@ jobs:
           script: |
             set -euo pipefail
 
-            # Path project & PHP CLI — samakan dengan konfigurasi VPS mu
-            DEPLOY_PATH="${VPS_PATH:-/home/ute/ute-parts}"
-            PHP_BIN="${PHP_BIN:-/usr/local/lsws/lsphp85/bin/php}"
+            # Path project & PHP CLI — default untuk VPS mandiri (Ubuntu + Nginx + PHP-FPM).
+            # Kalau lokasi/panel-mu berbeda, isi VPS_PATH & PHP_BIN lewat GitHub Secrets.
+            DEPLOY_PATH="${VPS_PATH:-/var/www/ute-parts}"
+            PHP_BIN="${PHP_BIN:-/usr/bin/php8.4}"
             QUEUE_NAME="${QUEUE_NAME:-ute-parts-queue}"
+
+            # User pemilik file web — auto-detect, bisa di-override lewat WEB_USER
+            if [ -z "${WEB_USER:-}" ]; then
+              if id -u lsadm >/dev/null 2>&1; then
+                WEB_USER="lsadm"       # CyberPanel / OpenLiteSpeed
+              elif id -u www-data >/dev/null 2>&1; then
+                WEB_USER="www-data"    # VPS standar (nginx / apache2)
+              else
+                WEB_USER="$(id -un)"
+              fi
+            fi
+            echo "Deploy ke $DEPLOY_PATH (web user: $WEB_USER, php: $PHP_BIN)"
 
             # Cek folder project ada
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
               echo "❌ Folder deploy tidak ditemukan: $DEPLOY_PATH"
+              echo "   Set VPS_PATH di GitHub Secrets bila lokasi project berbeda."
               exit 1
             fi
 
@@ -50,11 +64,11 @@ jobs:
               -o /tmp/ute-deploy.sh
             chmod +x /tmp/ute-deploy.sh
             cp /tmp/ute-deploy.sh "$DEPLOY_PATH/deploy.sh"
-            chown lsadm:lsadm "$DEPLOY_PATH/deploy.sh" || true
+            chown "$WEB_USER":"$WEB_USER" "$DEPLOY_PATH/deploy.sh" || true
 
             # Eksekusi deploy (script ini aman: auto-rollback bila gagal)
             echo "🚀 Menjalankan deploy ..."
-            DEPLOY_PATH="$DEPLOY_PATH" PHP_BIN="$PHP_BIN" QUEUE_NAME="$QUEUE_NAME" \
+            DEPLOY_PATH="$DEPLOY_PATH" PHP_BIN="$PHP_BIN" QUEUE_NAME="$QUEUE_NAME" WEB_USER="$WEB_USER" \
               bash "$DEPLOY_PATH/deploy.sh"
             echo "✅ Deploy selesai"
 
