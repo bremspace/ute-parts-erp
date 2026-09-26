@@ -129,6 +129,84 @@ class StokDeductionService
     }
 
     /**
+     * [T-03] Kembalikan stok (pembalikan part) — cermin simetris dari `kurangi()`.
+     *
+     * Dipakai saat tiket servis `ditolak`: part yang sudah terpotong harus kembali
+     * PERSIS ke baris gudang asal (gudang + varian yang tercatat di StokLog
+     * dediksi / di baris sparepart), bukan ke gudang lain. Pola ini disengaja
+     * identik dengan `kurangi()` supaya jejak audit dua arah sama:
+     * `lockForUpdate()` → validasi baris stok → `StokLog` (sebelum/perubahan/
+     * sesudah) + `StockMutationLog` (SOT) → caller bisa memakai StokLog pembalik
+     * utk trace pembalikan.
+     *
+     * Berbeda dari `kurangi()`: TIDAK ada Parameter `izinkanNegatif` — pengembalian
+     * selalu sah (qty > 0) dan TIDAK boleh membuat baris stok baru dari nol.
+     * Baris stok yang hilang (mis. gudang dihapus) = exception, bukan JIT create,
+     * supaya pembalikan tidak pernah mengarang saldo.
+     *
+     * Tidak dibungkus `DB::transaction` di sini — pemanggil (ServisService lewat
+     * `updateStatus()` / `restoreStokPartDitolak()`) sudah berada dalam satu
+     * transaction; `kurangi()` juga begitu (konsistensi).
+     *
+     * @throws \Exception jika qty <= 0 atau baris stok tidak ditemukan
+     */
+    public function kembalikan(
+        int $produkId,
+        ?int $skuVariantId,
+        int $gudangId,
+        int $qty,
+        string $jenis,
+        string $referensiTipe,
+        ?int $referensiId,
+        ?int $userId,
+        ?string $catatan = null
+    ): StokItem {
+        if ($qty <= 0) {
+            throw new \Exception('Kuantitas stok harus > 0');
+        }
+
+        $stok = $this->cariBarisStok($produkId, $skuVariantId, $gudangId, lock: true);
+
+        if (! $stok) {
+            throw new \Exception(
+                "Pengembalian stok gagal: baris stok tidak ditemukan (produk ID {$produkId}, gudang ID {$gudangId})"
+            );
+        }
+
+        $sebelum = $stok->jumlah;
+        $setelah = $sebelum + $qty;
+        $stok->update(['jumlah' => $setelah]);
+
+        StokLog::create([
+            'gudang_id' => $gudangId,
+            'produk_id' => $produkId,
+            'sku_variant_id' => $stok->sku_variant_id,
+            'user_id' => $userId,
+            'jenis' => $jenis,
+            'referensi_tipe' => $referensiTipe,
+            'referensi_id' => $referensiId,
+            'jumlah_sebelum' => $sebelum,
+            'perubahan' => $qty,
+            'jumlah_setelah' => $setelah,
+            'catatan' => $catatan,
+        ]);
+
+        StockMutationLog::create([
+            'produk_id' => $produkId,
+            'sku_variant_id' => $stok->sku_variant_id,
+            'gudang_id' => $gudangId,
+            'user_id' => $userId,
+            'delta' => $qty,
+            'sumber' => $jenis,
+            'referensi_tipe' => $referensiTipe,
+            'referensi_id' => $referensiId,
+            'terjadi_at' => now(),
+        ]);
+
+        return $stok;
+    }
+
+    /**
      * [B-03/P1-3] Satu kriteria resolusi baris stok utk seluruh jalur deduksi.
      *
      * - varian terisi → baris varian eksak;

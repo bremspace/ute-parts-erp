@@ -206,10 +206,18 @@ class ShopController extends Controller
             return $this->error('Silakan login', 401);
         }
 
-        $servis = TiketServis::with('garansi', 'jenisServis')
+        $servis = TiketServis::with(['garansi', 'jenisServis'])
+            ->select([
+                'id', 'no_tiket', 'pelanggan_id', 'cabang_id', 'jenis_servis_id', 'teknisi_id',
+                'jenis_hp', 'seri_hp', 'keluhan', 'status', 'estimasi_biaya', 'status_pembayaran',
+                'tanggal_bayar', 'metode_pembayaran', 'token_approval', 'tanggal_terima',
+                'tanggal_selesai', 'tanggal_diambil', 'created_at',
+            ])
             ->where('pelanggan_id', $customer->id)
             ->latest()
-            ->get();
+            ->paginate($request->integer('per_page', 20));
+
+        $servis->getCollection()->makeHidden(['kunci_terenkripsi', 'tipe_kunci', 'pola_kunci', 'pin_kunci']);
 
         return $this->success($servis, 'Riwayat servis berhasil dimuat');
     }

@@ -46,8 +46,8 @@ class CustomerAccount extends Component
             ->where('pelanggan_id', $customer->id)
             ->select([
                 'id', 'no_tiket', 'pelanggan_id', 'cabang_id', 'jenis_servis_id', 'teknisi_id',
-                'jenis_hp', 'keluhan', 'status', 'token_approval', 'tanggal_terima',
-                'tanggal_selesai', 'tanggal_diambil', 'created_at',
+                'jenis_hp', 'keluhan', 'status', 'token_approval', 'estimasi_biaya', 'status_pembayaran',
+                'tanggal_terima', 'tanggal_selesai', 'tanggal_diambil', 'created_at',
             ])
             ->latest()
             ->get();

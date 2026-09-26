@@ -313,13 +313,21 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Akses Cabang</label>
-                        <div class="space-y-1.5">
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Akses Cabang &amp; Cabang Utama</label>
+                        <div class="space-y-2">
                             @foreach($cabangs as $c)
-                                <label class="flex items-center gap-2 text-xs text-ink-200 cursor-pointer">
-                                    <input type="checkbox" wire:model="userForm.cabang_ids" value="{{ $c->id }}" class="accent-up-mint w-4 h-4" />
-                                    {{ $c->nama }}
-                                </label>
+                                <div class="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] border border-white/5">
+                                    <label class="flex items-center gap-2 text-xs text-ink-200 cursor-pointer">
+                                        <input type="checkbox" wire:model.live="userForm.cabang_ids" value="{{ $c->id }}" class="accent-up-mint w-4 h-4" />
+                                        {{ $c->nama }}
+                                    </label>
+                                    @if(in_array($c->id, array_map('intval', $userForm['cabang_ids'] ?? [])))
+                                        <label class="flex items-center gap-1.5 text-[11px] text-ink-400 cursor-pointer">
+                                            <input type="radio" wire:model="userForm.cabang_default_id" value="{{ $c->id }}" name="user_default_cabang" class="accent-up-primary w-3.5 h-3.5" />
+                                            Utama (Default)
+                                        </label>
+                                    @endif
+                                </div>
                             @endforeach
                         </div>
                     </div>

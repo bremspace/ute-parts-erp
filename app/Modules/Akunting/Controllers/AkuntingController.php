@@ -42,6 +42,27 @@ class AkuntingController extends Controller
     }
 
     /**
+     * Tentukan scope cabang untuk laporan.
+     * Jika param `konsolidasi=1` atau `cabang_id=all`, verifikasi hak akses `laporan.konsolidasi` (fail-closed jika tidak diizinkan).
+     * Jika konsolidasi sah, return null (tidak ada filter cabang = gabungan semua cabang).
+     * Jika tidak, kembalikan cabang aktif di session.
+     */
+    private function resolveCabangScope(Request $request): ?int
+    {
+        $konsolidasi = $request->boolean('konsolidasi') || $request->query('cabang_id') === 'all';
+
+        if ($konsolidasi) {
+            if (! $request->user()?->can('laporan.konsolidasi')) {
+                abort(403, 'Anda tidak memiliki hak akses laporan konsolidasi.');
+            }
+
+            return null;
+        }
+
+        return $this->cabangScopeId();
+    }
+
+    /**
      * [B-10a / P0-2] Mutasi wajib punya cabang aktif (fail-closed, 403).
      */
     private function cabangAktif(): int
@@ -210,14 +231,19 @@ class AkuntingController extends Controller
     {
         $dari = $request->query('dari', now()->startOfMonth()->toDateString());
         $sampai = $request->query('sampai', now()->toDateString());
-        $cabangId = $this->cabangScopeId();
+        $cabangId = $this->resolveCabangScope($request);
 
-        $cacheKey = "laporan-labarugi-{$cabangId}-{$dari}-{$sampai}";
+        $cacheKey = $cabangId !== null
+            ? "laporan-labarugi-{$cabangId}-{$dari}-{$sampai}"
+            : "laporan-labarugi-konsolidasi-{$dari}-{$sampai}";
 
         $laporan = Cache::remember($cacheKey, 900, function () use ($dari, $sampai, $cabangId) {
             $query = JurnalAkuntansi::whereDate('tanggal', '>=', $dari)
-                ->whereDate('tanggal', '<=', $sampai)
-                ->where('cabang_id', $cabangId);
+                ->whereDate('tanggal', '<=', $sampai);
+
+            if ($cabangId !== null) {
+                $query->where('cabang_id', $cabangId);
+            }
 
             $jurnals = $query->with('akun')->get();
 
@@ -239,6 +265,8 @@ class AkuntingController extends Controller
             return [
                 'dari' => $dari,
                 'sampai' => $sampai,
+                'cakupan' => $cabangId !== null ? 'cabang' : 'konsolidasi',
+                'cabang_id' => $cabangId,
                 'pendapatan' => $pendapatan,
                 'beban' => $beban,
                 'total_pendapatan' => $totalPendapatan,
@@ -253,10 +281,12 @@ class AkuntingController extends Controller
     // [API: ACC-06] Laporan Neraca
     public function neraca(Request $request)
     {
-        $cabangId = $this->cabangScopeId();
+        $cabangId = $this->resolveCabangScope($request);
         $sampai = $request->query('sampai', now()->toDateString());
 
-        $cacheKey = "laporan-neraca-{$cabangId}-{$sampai}";
+        $cacheKey = $cabangId !== null
+            ? "laporan-neraca-{$cabangId}-{$sampai}"
+            : "laporan-neraca-konsolidasi-{$sampai}";
 
         // [B-10e / P1-7] Sumber tunggal dgn export Excel:
         // ExportLaporanService::neracaSaldo() → SALDO KUMULATIF s/d $sampai
@@ -265,7 +295,13 @@ class AkuntingController extends Controller
         $neraca = Cache::remember(
             $cacheKey,
             900,
-            fn () => app(ExportLaporanService::class)->neracaSaldo($cabangId, (string) $sampai)
+            function () use ($cabangId, $sampai) {
+                $hasil = app(ExportLaporanService::class)->neracaSaldo($cabangId, (string) $sampai);
+                $hasil['cakupan'] = $cabangId !== null ? 'cabang' : 'konsolidasi';
+                $hasil['cabang_id'] = $cabangId;
+
+                return $hasil;
+            }
         );
 
         return $this->success($neraca, 'Laporan Neraca berhasil diambil (cache 15 menit)');
@@ -324,7 +360,19 @@ class AkuntingController extends Controller
             'periode_sampai' => 'nullable|date',
             'akun_id' => 'nullable|exists:akun_coa,id',
             'format' => 'nullable|in:xlsx,csv', // [F2-5]
+            'konsolidasi' => 'nullable|boolean',
         ]);
+
+        $isKonsolidasi = $request->boolean('konsolidasi') || $request->input('cabang_id') === 'all';
+
+        if ($isKonsolidasi) {
+            if (! $request->user()?->can('laporan.konsolidasi')) {
+                abort(403, 'Anda tidak memiliki hak akses laporan konsolidasi.');
+            }
+            $cabangId = null;
+        } else {
+            $cabangId = $this->cabangAktif();
+        }
 
         // [P2-10b] Opportunistic prune berkas exports/ usia >7 hari — tidak boleh menggagalkan dispatch
         ExportLaporanService::pruneOldExports();
@@ -333,7 +381,7 @@ class AkuntingController extends Controller
             jenis: $request->input('jenis'),
             periodeDari: $request->input('periode_dari'),
             periodeSampai: $request->input('periode_sampai'),
-            cabangId: $this->cabangAktif(),
+            cabangId: $cabangId,
             akunId: $request->input('akun_id'),
             userId: auth()->id(),
             format: $request->input('format', 'xlsx')
@@ -511,11 +559,14 @@ class AkuntingController extends Controller
     {
         $dari = $request->query('dari', now()->startOfMonth()->toDateString());
         $sampai = $request->query('sampai', now()->toDateString());
-        $cabangId = $this->cabangScopeId();
+        $cabangId = $this->resolveCabangScope($request);
 
         $query = JurnalAkuntansi::whereDate('tanggal', '>=', $dari)
-            ->whereDate('tanggal', '<=', $sampai)
-            ->where('cabang_id', $cabangId);
+            ->whereDate('tanggal', '<=', $sampai);
+
+        if ($cabangId !== null) {
+            $query->where('cabang_id', $cabangId);
+        }
 
         $jurnals = $query->with('akun')->get();
 
@@ -553,6 +604,8 @@ class AkuntingController extends Controller
         return $this->success([
             'dari' => $dari,
             'sampai' => $sampai,
+            'cakupan' => $cabangId !== null ? 'cabang' : 'konsolidasi',
+            'cabang_id' => $cabangId,
             'laba_bersih' => $labaBersih,
             'penyesuaian' => [
                 'kenaikan_piutang' => -$piutangDelta,

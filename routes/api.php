@@ -30,11 +30,13 @@ Route::middleware(['throttle:60,1'])->group(function () {
 
     // [API: SERVICE-06b] Approve/reject estimasi publik (token, tanpa login)
     // [API: SERVICE-07] Booking servis online publik (marketplace)
+    // [API: SERVICE-08] Tracking servis publik (token, tanpa login) (T-22)
     Route::post('/servis/public/approve/{token}', [ServisController::class, 'publicApprove']);
     Route::post('/servis/booking-online', [ServisController::class, 'bookingOnline']);
+    Route::get('/servis/tracking/{token}', [ServisController::class, 'trackingPublik']);
 
     // Authenticated routes
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'cabang.selected'])->group(function () {
         // [API: AUTH-02] Select branch
         Route::post('/select-branch', [AuthController::class, 'selectBranch']);
         // [API: AUTH-03] Theme preference (T-32)
@@ -113,6 +115,7 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::post('/', [ServisController::class, 'store'])->middleware('permission:servis.create');
             Route::get('/{id}', [ServisController::class, 'show'])->middleware('permission:servis.view');
             Route::put('/{id}/status', [ServisController::class, 'updateStatus'])->middleware('permission:servis.update-status');
+            Route::post('/{id}/bayar', [ServisController::class, 'bayar'])->middleware('permission:servis.update-status'); // [T-12]
             Route::post('/{id}/estimasi', [ServisController::class, 'setEstimasi'])->middleware('permission:servis.update-status');
             Route::post('/{id}/sparepart', [ServisController::class, 'inputSparepart'])->middleware('permission:servis.input-sparepart');
             Route::post('/{id}/pekerjaan', [ServisController::class, 'inputPekerjaan'])->middleware('permission:servis.input-sparepart'); // [T-17]
@@ -225,8 +228,7 @@ Route::middleware(['throttle:60,1'])->group(function () {
         Route::get('/omnichannel/orders', [OmnichannelController::class, 'orders'])->middleware('permission:omnichannel.view');
         Route::post('/omnichannel/sync-stock', [OmnichannelController::class, 'syncStock'])->middleware('permission:omnichannel.manage');
 
-        // [API: SERVICE-08] Tracking servis publik
-        Route::get('/servis/tracking/{token}', [ServisController::class, 'trackingPublik']);
+        // [API: SERVICE-08] Tracking servis publik — dipindah ke group publik (T-22)
     });
 
 }); // End global throttle:60,1 group (T-28)

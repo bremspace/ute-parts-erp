@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\SidImportRaw;
+use App\Http\Middleware\EnsureCabangSelected;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetAssetUrl;
@@ -50,6 +51,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // Dynamic asset URL (T-30/T-31)
             'set.asset.url' => SetAssetUrl::class,
+
+            // Enforce context cabang aktif di session (RBAC Multi-Cabang)
+            'cabang.selected' => EnsureCabangSelected::class,
         ]);
 
         // Sanctum SPA cookie-session auth on /api/* (T-32) — without this all

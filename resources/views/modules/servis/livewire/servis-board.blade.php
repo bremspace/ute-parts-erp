@@ -36,6 +36,52 @@
         </div>
     </div>
 
+    <!-- ===== ANTREAN BOOKING ONLINE ===== -->
+    @if(count($bookingOnline ?? []) > 0)
+        <div class="mb-4 flex-shrink-0 p-4 rounded-2xl bg-up-amber/10 border border-up-amber/30">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-up-amber animate-pulse"></span>
+                    <h3 class="text-sm font-bold text-up-amber">
+                        Ada {{ count($bookingOnline) }} Pengajuan Servis Online Menunggu Konfirmasi
+                    </h3>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                @foreach($bookingOnline as $b)
+                    <div class="p-3 rounded-xl bg-ink-900/60 border border-white/5 flex flex-col justify-between gap-2">
+                        <div>
+                            <div class="flex items-center justify-between text-xs mb-1">
+                                <span class="font-mono font-bold text-up-primary">{{ $b->no_tiket }}</span>
+                                <span class="text-ink-400">{{ $b->created_at?->diffForHumans() }}</span>
+                            </div>
+                            <div class="text-xs font-semibold text-white">
+                                {{ $b->nama_pelanggan ?? $b->pelanggan?->nama ?? 'Anonim' }}
+                                @if($b->telepon_pelanggan)
+                                    <span class="text-ink-400 font-normal">({{ $b->telepon_pelanggan }})</span>
+                                @endif
+                            </div>
+                            <div class="text-xs font-medium text-up-accent mt-0.5">{{ $b->jenis_hp }}</div>
+                            <p class="text-xs text-ink-300 mt-1 line-clamp-2">{{ $b->keluhan }}</p>
+                        </div>
+                        <div class="pt-2 border-t border-white/5 flex justify-end">
+                            <button
+                                type="button"
+                                wire:click="konfirmasiBookingOnline({{ $b->id }})"
+                                class="px-3 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-sm shadow-up-primary/30"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Konfirmasi & Terima Unit
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- ===== KANBAN BOARD ===== -->
     <div class="flex-1 overflow-x-auto overflow-y-hidden pb-2">
         <div class="flex gap-4 h-full min-w-max">
@@ -84,9 +130,20 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center justify-between gap-1">
                                             <span class="font-mono text-[10px] text-up-primary font-bold truncate">{{ $tiket->no_tiket }}</span>
-                                            @if($tiket->garansi && $tiket->garansi->active)
-                                                <span class="text-[9px] font-bold text-up-mint bg-up-mint/10 border border-up-mint/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">Dalam Garansi</span>
-                                            @endif
+                                            <div class="flex items-center gap-1">
+                                                @if($tiket->status_pembayaran === 'lunas')
+                                                    <span class="bg-up-mint/20 text-up-mint text-[9px] font-bold px-1.5 py-0.5 rounded">LUNAS</span>
+                                                @elseif($tiket->status === 'selesai')
+                                                    <button
+                                                        type="button"
+                                                        wire:click.stop="openBayarModal({{ $tiket->id }})"
+                                                        class="bg-up-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-lg hover:bg-up-primary/80 cursor-pointer"
+                                                    >Bayar</button>
+                                                @endif
+                                                @if($tiket->garansi && $tiket->garansi->active)
+                                                    <span class="text-[9px] font-bold text-up-mint bg-up-mint/10 border border-up-mint/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">Dalam Garansi</span>
+                                                @endif
+                                            </div>
                                         </div>
                                         <h4 class="font-bold text-white text-xs truncate">{{ $tiket->jenis_hp }}</h4>
                                         <p class="text-[10px] text-ink-400 truncate">{{ $tiket->nama_pelanggan ?? $tiket->pelanggan?->nama ?? 'Guest' }}</p>
@@ -244,29 +301,50 @@
                         </select>
 
                         @if(($terimaForm['tipe_kunci'] ?? '') === 'pola')
-                            <div class="mt-2">
+                            <div class="mt-2" x-data="{
+                                resetPola() {
+                                    $wire.set('terimaForm.kunci_terenkripsi', '');
+                                }
+                            }">
                                 <p class="text-[10px] text-ink-400 mb-1.5">Klik urutan titik pola (1-9):</p>
-                                <div class="grid grid-cols-3 gap-2 w-40" x-data="{}">
+                                <div class="grid grid-cols-3 gap-2 w-40">
                                     @for($i = 1; $i <= 9; $i++)
                                         <button
                                             type="button"
-                                            class="aspect-square rounded-full border border-white/15 bg-white/5 text-xs font-bold text-ink-300 hover:bg-up-primary/30 hover:border-up-primary cursor-pointer"
+                                            class="aspect-square rounded-full border border-white/15 bg-white/5 text-xs font-bold text-ink-300 hover:bg-up-primary/30 hover:border-up-primary cursor-pointer transition-colors"
                                             wire:click="$set('terimaForm.kunci_terenkripsi.{{ $i - 1 }}', {{ $i }})"
-                                            @click="$el.classList.toggle('bg-up-primary')"
                                         >{{ $i }}</button>
                                     @endfor
                                 </div>
-                                <p class="text-[10px] text-up-primary mt-1 font-mono tabular-nums">
-                                    {{ is_array($terimaForm['kunci_terenkripsi'] ?? null) ? implode('-', $terimaForm['kunci_terenkripsi']) : ($terimaForm['kunci_terenkripsi'] ?? '') }}
-                                </p>
+                                <div class="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
+                                    <p class="text-[11px] text-up-primary font-mono tabular-nums">
+                                        Urutan: <span class="font-bold">{{ is_array($terimaForm['kunci_terenkripsi'] ?? null) ? implode('-', array_filter($terimaForm['kunci_terenkripsi'])) : ($terimaForm['kunci_terenkripsi'] ?? '-') }}</span>
+                                    </p>
+                                    <button
+                                        type="button"
+                                        wire:click="$set('terimaForm.kunci_terenkripsi', '')"
+                                        class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-up-red hover:bg-up-red/10 border border-white/10 cursor-pointer"
+                                    >Reset Pola</button>
+                                </div>
                             </div>
                         @else
-                            <input
-                                type="password"
-                                wire:model="terimaForm.kunci_terenkripsi"
-                                placeholder="Masukkan PIN / password / pola (angka) — aman terenkripsi"
-                                class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium mt-2"
-                            />
+                            <div class="mt-2 relative" x-data="{ showPassword: false }">
+                                <input
+                                    :type="showPassword ? 'text' : 'password'"
+                                    wire:model="terimaForm.kunci_terenkripsi"
+                                    placeholder="Masukkan PIN / password — aman terenkripsi"
+                                    class="w-full pl-3 pr-10 py-2.5 rounded-xl glass-input text-xs font-medium"
+                                />
+                                <button
+                                    type="button"
+                                    @click="showPassword = !showPassword"
+                                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white p-1 text-sm focus:outline-none cursor-pointer"
+                                    :title="showPassword ? 'Sembunyikan' : 'Lihat karakter'"
+                                >
+                                    <span x-show="!showPassword">👁️</span>
+                                    <span x-show="showPassword" style="display: none;">🔒</span>
+                                </button>
+                            </div>
                         @endif
                     </div>
 
@@ -414,20 +492,150 @@
     <!-- ===== MODAL: ESTIMASI ===== -->
     @if($showEstimasiModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-md glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Input Estimasi Biaya</h3>
+            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10 flex-shrink-0">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Input Rincian Estimasi Biaya</h3>
+                        <p class="text-xs text-ink-400">Rincian item jasa & sparepart yang diajukan ke konsumen</p>
+                    </div>
                     <button wire:click="$set('showEstimasiModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
 
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Estimasi Biaya (Rp) <span class="text-up-red">*</span></label>
-                        <input type="number" wire:model.live="estimasiBiaya" min="0" step="500" placeholder="0" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                <div class="overflow-y-auto pr-1 flex-1 space-y-4">
+                    <!-- Tabel Item Estimasi -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-ink-200 uppercase tracking-wider">Daftar Item Estimasi</span>
+                            <div class="flex gap-2">
+                                <button
+                                    type="button"
+                                    wire:click="addEstimasiRow('jasa')"
+                                    class="px-2.5 py-1 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 text-up-mint text-[11px] font-semibold border border-up-mint/30 cursor-pointer"
+                                >+ Tambah Jasa</button>
+                                <button
+                                    type="button"
+                                    wire:click="addEstimasiRow('part')"
+                                    class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary text-[11px] font-semibold border border-up-primary/30 cursor-pointer"
+                                >+ Tambah Part</button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2.5">
+                            @forelse($estimasiItems as $idx => $row)
+                                <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2">
+                                    <div class="grid grid-cols-12 gap-2 items-center">
+                                        <!-- Tipe Badge -->
+                                        <div class="col-span-2">
+                                            <span @class([
+                                                'inline-block w-full text-center py-1 text-[10px] font-bold rounded-lg border uppercase',
+                                                'bg-up-mint/10 text-up-mint border-up-mint/30' => ($row['tipe'] ?? '') === 'jasa',
+                                                'bg-up-primary/10 text-up-primary border-up-primary/30' => ($row['tipe'] ?? '') === 'part',
+                                            ])>
+                                                {{ $row['tipe'] ?? 'jasa' }}
+                                            </span>
+                                        </div>
+
+                                        <!-- Dropdown Pemilih Jasa / Part -->
+                                        <div class="col-span-4">
+                                            @if(($row['tipe'] ?? '') === 'part')
+                                                <select
+                                                    wire:model.live="estimasiItems.{{ $idx }}.produk_id"
+                                                    class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-medium"
+                                                >
+                                                    <option value="" class="bg-ink-900">— Pilih Produk Toko —</option>
+                                                    @foreach($produkEstimasiList as $p)
+                                                        @php
+                                                            $stokAda = (int) $p->stokItems->sum('jumlah');
+                                                        @endphp
+                                                        <option value="{{ $p->id }}" class="bg-ink-900">
+                                                            {{ $p->nama }} (Stok: {{ $stokAda }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            @else
+                                                <select
+                                                    wire:model.live="estimasiItems.{{ $idx }}.jenis_servis_id"
+                                                    class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-medium"
+                                                >
+                                                    <option value="" class="bg-ink-900">— Template Jasa (Opsional) —</option>
+                                                    @foreach($jenisServisList as $j)
+                                                        <option value="{{ $j->id }}" class="bg-ink-900">
+                                                            {{ $j->nama }} (Rp {{ number_format($j->biaya_jasa ?? 0, 0, ',', '.') }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            @endif
+                                        </div>
+
+                                        <!-- Nama Item -->
+                                        <div class="col-span-5">
+                                            <input
+                                                type="text"
+                                                wire:model.live="estimasiItems.{{ $idx }}.nama_item"
+                                                placeholder="Deskripsi item..."
+                                                class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium"
+                                            />
+                                        </div>
+
+                                        <!-- Hapus Row -->
+                                        <div class="col-span-1 text-right">
+                                            <button
+                                                type="button"
+                                                wire:click="removeEstimasiRow({{ $idx }})"
+                                                class="text-up-red hover:text-white text-sm cursor-pointer p-1"
+                                                title="Hapus baris"
+                                            >✕</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Baris Qty, Harga, Subtotal -->
+                                    <div class="grid grid-cols-12 gap-2 items-center pl-2 border-t border-white/5 pt-1.5 text-xs">
+                                        <div class="col-span-3 flex items-center gap-1.5">
+                                            <span class="text-[10px] text-ink-400">Qty:</span>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                wire:model.live="estimasiItems.{{ $idx }}.qty"
+                                                class="w-16 px-2 py-1 rounded-lg glass-input text-xs font-bold text-center"
+                                            />
+                                        </div>
+                                        <div class="col-span-4 flex items-center gap-1.5">
+                                            <span class="text-[10px] text-ink-400">Harga:</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="500"
+                                                wire:model.live="estimasiItems.{{ $idx }}.harga"
+                                                class="w-full px-2 py-1 rounded-lg glass-input text-xs font-bold tabular-nums"
+                                            />
+                                        </div>
+                                        <div class="col-span-5 text-right font-bold text-white tabular-nums">
+                                            <span class="text-[10px] text-ink-400 font-normal mr-1">Subtotal:</span>
+                                            Rp {{ number_format(($row['qty'] ?? 1) * ($row['harga'] ?? 0), 0, ',', '.') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="text-center py-4 text-xs text-ink-400">
+                                    Belum ada baris item estimasi. Silakan tambah Jasa atau Part di atas.
+                                </div>
+                            @endforelse
+                        </div>
+
+                        <!-- Total Ringkasan -->
+                        <div class="flex items-center justify-between pt-3 border-t border-white/10">
+                            <span class="text-xs font-bold text-ink-300">Total Estimasi Biaya</span>
+                            <div class="text-right">
+                                <span class="text-base font-bold text-up-mint tabular-nums">
+                                    Rp {{ number_format($estimasiBiaya, 0, ',', '.') }}
+                                </span>
+                            </div>
+                        </div>
                     </div>
+
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alasan / Rincian Estimasi <span class="text-up-red">*</span></label>
-                        <textarea wire:model="estimasiAlasan" rows="3" placeholder="Ex: Ganti LCD Rp 350.000 + jasa Rp 50.000..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"></textarea>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alasan / Rincian Tambahan Estimasi <span class="text-up-red">*</span></label>
+                        <textarea wire:model="estimasiAlasan" rows="2" placeholder="Catatan estimasi untuk konsumen (misal: pengerjaan 1-2 hari setelah part tiba)..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"></textarea>
                     </div>
 
                     <div class="p-3 rounded-xl bg-up-amber/10 border border-up-amber/30 text-[11px] text-up-amber flex items-start gap-2">
@@ -438,7 +646,7 @@
                     </div>
                 </div>
 
-                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-4 flex-shrink-0">
                     <button wire:click="$set('showEstimasiModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button wire:click="simpanEstimasi" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px]">Simpan Estimasi</button>
                 </div>
@@ -529,6 +737,39 @@
                         </div>
                     </div>
 
+                    <!-- Status Pembayaran -->
+                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <p class="text-[10px] text-ink-400 uppercase mb-1">Status Pembayaran</p>
+                            <div class="flex items-center gap-2">
+                                @if($selectedTiket->status_pembayaran === 'lunas')
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-up-mint/10 text-up-mint border border-up-mint/30">
+                                        LUNAS
+                                    </span>
+                                    <span class="text-xs text-ink-300">
+                                        {{ $selectedTiket->tanggal_bayar?->format('d/m/Y H:i') }} • {{ strtoupper($selectedTiket->metode_pembayaran ?? '-') }}
+                                        @if($selectedTiket->no_jurnal_bayar)
+                                            <span class="font-mono text-[11px] text-ink-400">({{ $selectedTiket->no_jurnal_bayar }})</span>
+                                        @endif
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-up-red/10 text-up-red border border-up-red/30">
+                                        BELUM BAYAR
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                        @if($selectedTiket->status_pembayaran !== 'lunas' && in_array($selectedTiket->status, ['selesai', 'diambil'], true))
+                            <button
+                                type="button"
+                                wire:click="openBayarModal({{ $selectedTiket->id }})"
+                                class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-all cursor-pointer self-start sm:self-auto"
+                            >
+                                Bayar Sekarang
+                            </button>
+                        @endif
+                    </div>
+
                     <!-- [B-06] Kunci Gadget — terlihat utk semua role yg berhak buka tiket, default ter-mask -->
                     <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
                         <div class="flex items-center justify-between gap-2 mb-1.5">
@@ -557,6 +798,34 @@
                             <p class="text-sm font-mono {{ $bukaKunciGadget ? 'text-up-amber' : 'text-ink-500 tracking-[0.3em]' }}">
                                 {{ $bukaKunciGadget ? $selectedTiket->kunci_terenkripsi : '••••••••' }}
                             </p>
+
+                            @if($bukaKunciGadget && $selectedTiket->tipe_kunci === 'pola')
+                                @php
+                                    $polaRaw = explode('-', str_replace(' ', '', (string) $selectedTiket->kunci_terenkripsi));
+                                    $polaOrder = [];
+                                    foreach ($polaRaw as $urutan => $titik) {
+                                        $t = (int) $titik;
+                                        if ($t >= 1 && $t <= 9 && !isset($polaOrder[$t])) {
+                                            $polaOrder[$t] = $urutan + 1;
+                                        }
+                                    }
+                                @endphp
+                                <div class="mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/10 inline-block">
+                                    <p class="text-[10px] text-ink-400 mb-2 font-medium">Visual Pola (Urutan Sentuh):</p>
+                                    <div class="grid grid-cols-3 gap-2 w-36">
+                                        @for($i = 1; $i <= 9; $i++)
+                                            @php $urutan = $polaOrder[$i] ?? null; @endphp
+                                            <div @class([
+                                                'aspect-square rounded-full flex items-center justify-center font-bold text-xs border transition-colors',
+                                                'bg-up-primary text-white border-up-primary shadow-md shadow-up-primary/30 ring-2 ring-up-primary/40' => $urutan !== null,
+                                                'bg-white/5 text-ink-500 border-white/10' => $urutan === null,
+                                            ])>
+                                                {{ $urutan ?? $i }}
+                                            </div>
+                                        @endfor
+                                    </div>
+                                </div>
+                            @endif
                         @elseif($labelTipeKunci)
                             <p class="text-sm text-ink-500">Tidak ada nilai kunci yang tersimpan</p>
                         @endif
@@ -700,6 +969,81 @@
                                 </div>
                             @endforeach
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- ===== MODAL: PEMBAYARAN KASIR SERVIS ===== -->
+    @if($showBayarModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Pembayaran Servis - #{{ $bayarTiketId }}</h3>
+                        <p class="text-xs text-ink-400">Pencatatan kas masuk & pelunasan piutang servis</p>
+                    </div>
+                    <button wire:click="$set('showBayarModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Ringkasan Total Tagihan -->
+                    <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                        <span class="text-xs font-semibold text-ink-300">Total Tagihan Servis</span>
+                        <span class="tabular-nums font-bold text-xl text-up-mint">
+                            Rp {{ number_format($bayarTotalTagihan, 0, ',', '.') }}
+                        </span>
+                    </div>
+
+                    <!-- Pemilihan Metode Pembayaran -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-2">Metode Pembayaran</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            @foreach([
+                                'tunai' => 'Tunai (Kas)',
+                                'transfer' => 'Transfer Bank',
+                                'qris' => 'QRIS',
+                                'kartu' => 'Kartu Debit/Kredit'
+                            ] as $metode => $label)
+                                <button
+                                    type="button"
+                                    wire:click="$set('bayarMetode', '{{ $metode }}')"
+                                    class="p-3 rounded-xl border text-left transition-all cursor-pointer {{ $bayarMetode === $metode ? 'bg-up-primary/20 border-up-primary text-white font-bold' : 'bg-white/[0.02] border-white/5 text-ink-300 hover:bg-white/[0.05]' }}"
+                                >
+                                    <div class="text-xs">{{ $label }}</div>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Catatan Opsional -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Catatan (opsional)</label>
+                        <textarea
+                            wire:model="bayarCatatan"
+                            rows="2"
+                            placeholder="Contoh: No referensi transfer / catatan kasir..."
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                        ></textarea>
+                    </div>
+
+                    <!-- Tombol Aksi -->
+                    <div class="flex gap-2 pt-2">
+                        <button
+                            type="button"
+                            wire:click="$set('showBayarModal', false)"
+                            class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs transition-all cursor-pointer"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="prosesBayar"
+                            class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-all cursor-pointer"
+                        >
+                            Konfirmasi Pembayaran Lunas
+                        </button>
                     </div>
                 </div>
             </div>

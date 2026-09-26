@@ -54,6 +54,9 @@ class AkuntingDashboard extends Component
 
     public string $activeTab = 'laporan'; // laporan, jurnal, coa, piutang, utang
 
+    /** Cakupan laporan keuangan: 'cabang' (cabang aktif) atau 'konsolidasi' (gabungan seluruh cabang) */
+    public string $cakupanLaporan = 'cabang';
+
     public string $periodeDari = '';
 
     public string $periodeSampai = '';
@@ -118,12 +121,27 @@ class AkuntingDashboard extends Component
     }
 
     /**
-     * Scope cabang aktif untuk query baca.
-     * Session null = 0 = tidak match baris mana pun (bukan "semua cabang").
+     * Scope cabang aktif untuk query baca laporan / subledger.
+     * Jika cakupan laporan = 'konsolidasi' dan user punya izin laporan.konsolidasi,
+     * kembalikan null (mengagregasi data seluruh cabang aktif).
+     * Jika cabang, return cabang_id dari session (session null = 0 = fail-closed).
      */
-    private function cabangScopeId(): int
+    private function cabangScopeId(): ?int
     {
+        if ($this->cakupanLaporan === 'konsolidasi' && auth()->user()?->can('laporan.konsolidasi')) {
+            return null;
+        }
+
         return (int) (session('cabang_id') ?? 0);
+    }
+
+    public function setCakupanLaporan(string $cakupan): void
+    {
+        if ($cakupan === 'konsolidasi') {
+            $this->izin('laporan.konsolidasi');
+        }
+
+        $this->cakupanLaporan = in_array($cakupan, ['cabang', 'konsolidasi'], true) ? $cakupan : 'cabang';
     }
 
     /**
@@ -150,25 +168,37 @@ class AkuntingDashboard extends Component
 
             return;
         }
-        if (! auth()->user()?->can('laporan.cabang')) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
 
-            return;
+        if ($this->cakupanLaporan === 'konsolidasi') {
+            if (! auth()->user()?->can('laporan.konsolidasi')) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin laporan konsolidasi']);
+
+                return;
+            }
+            $exportCabangId = null;
+        } else {
+            if (! auth()->user()?->can('laporan.cabang')) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
+
+                return;
+            }
+            $exportCabangId = session('cabang_id');
         }
 
         dispatch(new ExportLaporanJob(
             jenis: $jenis,
             periodeDari: $this->periodeDari ?: null,
             periodeSampai: $this->periodeSampai ?: null,
-            cabangId: session('cabang_id'),
+            cabangId: $exportCabangId,
             akunId: null,
             userId: auth()->id(),
             format: $format === 'csv' ? 'csv' : 'xlsx',
         ));
 
+        $cakupanText = $this->cakupanLaporan === 'konsolidasi' ? ' konsolidasi' : '';
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Export '.str_replace('_', ' ', $jenis).' diantre — notifikasi + link unduh muncul setelah selesai.',
+            'message' => 'Export '.str_replace('_', ' ', $jenis).$cakupanText.' diantre — notifikasi + link unduh muncul setelah selesai.',
         ]);
     }
 
@@ -192,9 +222,12 @@ class AkuntingDashboard extends Component
         $dari = $this->periodeDari;
         $sampai = $this->periodeSampai;
         $cabangId = $this->cabangScopeId();
+        $cacheKey = $cabangId !== null
+            ? 'laporan-labarugi-'.$cabangId.'-'.$dari.'-'.$sampai
+            : 'laporan-labarugi-konsolidasi-'.$dari.'-'.$sampai;
 
         return Cache::remember(
-            'laporan-labarugi-'.$cabangId.'-'.$dari.'-'.$sampai,
+            $cacheKey,
             self::LAPORAN_PERIODE_CACHE_TTL,
             function () use ($dari, $sampai, $cabangId): array {
                 $perAkun = $this->agregatJurnalPeriode($dari, $sampai, $cabangId);
@@ -235,13 +268,17 @@ class AkuntingDashboard extends Component
      *
      * @return Collection<int,array{akun_coa_id:int,kode:string,nama:string,tipe:string,kelompok:string,saldo_normal:string,total_debit:float,total_kredit:float}>
      */
-    private function agregatJurnalPeriode(string $dari, string $sampai, int $cabangId): Collection
+    private function agregatJurnalPeriode(string $dari, string $sampai, ?int $cabangId): Collection
     {
-        return JurnalAkuntansi::query()
-            ->join('akun_coa', 'akun_coa.id', '=', 'jurnal_akuntansi.akun_coa_id')
-            // [B-10a / P0-2] scope cabang aktif (session null = 0 = tidak match)
-            ->where('jurnal_akuntansi.cabang_id', $cabangId)
-            ->whereDate('jurnal_akuntansi.tanggal', '>=', $dari)
+        $query = JurnalAkuntansi::query()
+            ->join('akun_coa', 'akun_coa.id', '=', 'jurnal_akuntansi.akun_coa_id');
+
+        // [B-10a / P0-2] scope cabang aktif (jika null = konsolidasi seluruh cabang)
+        if ($cabangId !== null) {
+            $query->where('jurnal_akuntansi.cabang_id', $cabangId);
+        }
+
+        return $query->whereDate('jurnal_akuntansi.tanggal', '>=', $dari)
             ->whereDate('jurnal_akuntansi.tanggal', '<=', $sampai)
             ->select('jurnal_akuntansi.akun_coa_id')
             ->selectRaw('akun_coa.kode, akun_coa.nama, akun_coa.tipe, akun_coa.kelompok, akun_coa.saldo_normal')
@@ -288,9 +325,12 @@ class AkuntingDashboard extends Component
     {
         $cabangId = $this->cabangScopeId();
         $sampai = $this->periodeSampai ?: now()->toDateString();
+        $cacheKey = $cabangId !== null
+            ? 'laporan-neraca-'.$cabangId.'-'.$sampai
+            : 'laporan-neraca-konsolidasi-'.$sampai;
 
         return Cache::remember(
-            'laporan-neraca-'.$cabangId.'-'.$sampai,
+            $cacheKey,
             self::NERACA_CACHE_TTL,
             fn (): array => app(ExportLaporanService::class)->neracaSaldo($cabangId, $sampai)
         );
@@ -299,11 +339,15 @@ class AkuntingDashboard extends Component
     // ===== JURNAL =====
     public function getJurnalsProperty()
     {
-        // [B-10a / P0-2] list jurnal wajib scoped cabang aktif
-        return JurnalAkuntansi::with(['akun', 'cabang'])
-            ->where('cabang_id', $this->cabangScopeId())
-            ->latest('tanggal')
-            ->paginate(25);
+        // [B-10a / P0-2] list jurnal scoped cabang aktif (atau seluruh cabang jika konsolidasi)
+        $cabangId = $this->cabangScopeId();
+        $query = JurnalAkuntansi::with(['akun', 'cabang']);
+
+        if ($cabangId !== null) {
+            $query->where('cabang_id', $cabangId);
+        }
+
+        return $query->latest('tanggal')->paginate(25);
     }
 
     public function openJurnalManualModal(): void
@@ -638,10 +682,15 @@ class AkuntingDashboard extends Component
      */
     public function getPiutangsProperty()
     {
-        // [B-10a / P0-2] AR scoped cabang aktif
-        return Piutang::with('pelanggan')
-            ->where('cabang_id', $this->cabangScopeId())
-            ->latest()
+        // [B-10a / P0-2] AR scoped cabang aktif (atau seluruh cabang bila konsolidasi)
+        $cabangId = $this->cabangScopeId();
+        $query = Piutang::with('pelanggan');
+
+        if ($cabangId !== null) {
+            $query->where('cabang_id', $cabangId);
+        }
+
+        return $query->latest()
             ->simplePaginate(self::PER_HALAMAN_SUBLEDGER, ['*'], 'pagePiutang');
     }
 
@@ -660,9 +709,12 @@ class AkuntingDashboard extends Component
         $dari = $this->periodeDari;
         $sampai = $this->periodeSampai;
         $cabangId = $this->cabangScopeId();
+        $cacheKey = $cabangId !== null
+            ? 'laporan-aruskas-'.$cabangId.'-'.$dari.'-'.$sampai
+            : 'laporan-aruskas-konsolidasi-'.$dari.'-'.$sampai;
 
         return Cache::remember(
-            'laporan-aruskas-'.$cabangId.'-'.$dari.'-'.$sampai,
+            $cacheKey,
             self::LAPORAN_PERIODE_CACHE_TTL,
             function () use ($dari, $sampai, $cabangId): array {
                 $akun = $this->agregatJurnalPeriode($dari, $sampai, $cabangId);
@@ -774,9 +826,15 @@ class AkuntingDashboard extends Component
     /** [B-15b] Daftar utang = paginasi (lihat `getPiutangsProperty()`). */
     public function getUtangsProperty()
     {
-        // [B-10a / P0-2] AP scoped cabang aktif
-        return Utang::where('cabang_id', $this->cabangScopeId())
-            ->latest()
+        // [B-10a / P0-2] AP scoped cabang aktif (atau seluruh cabang bila konsolidasi)
+        $cabangId = $this->cabangScopeId();
+        $query = Utang::query();
+
+        if ($cabangId !== null) {
+            $query->where('cabang_id', $cabangId);
+        }
+
+        return $query->latest()
             ->simplePaginate(self::PER_HALAMAN_SUBLEDGER, ['*'], 'pageUtang');
     }
 

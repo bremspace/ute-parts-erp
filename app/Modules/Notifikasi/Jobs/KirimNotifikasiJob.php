@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -101,15 +102,19 @@ class KirimNotifikasiJob implements ShouldQueue
             return false;
         }
 
-        Log::channel('stack')->info('WA GATEWAY DISPATCH (placeholder)', [
-            'tujuan' => $log->tujuan,
-            'judul' => $log->judul,
-            'konten' => $log->konten,
-            'status' => 'akan_dikirim_ketika_provider_dikonfigurasi',
+        $response = Http::timeout(10)->withHeaders([
+            'Authorization' => $wa['token'],
+        ])->post($wa['url'], [
+            'target' => $log->tujuan,
+            'message' => $log->konten,
         ]);
 
-        // Swap dengan HTTP client saat provider aktif:
-        // Http::withHeaders([...])->post(config('services.wa.url'), [...]);
+        if (! $response->successful()) {
+            $this->tandaiGagal($log, "Gateway WA error: HTTP {$response->status()} - {$response->body()}");
+
+            return false;
+        }
+
         return true;
     }
 

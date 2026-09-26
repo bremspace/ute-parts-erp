@@ -95,7 +95,7 @@ class SettingsRbac extends Component
 
     public array $userForm = [
         'id' => null, 'name' => '', 'email' => '', 'password' => '', 'phone' => '',
-        'role' => '', 'cabang_ids' => [], 'is_active' => true,
+        'role' => '', 'cabang_ids' => [], 'cabang_default_id' => null, 'is_active' => true,
     ];
 
     // Cabang CRUD
@@ -254,15 +254,18 @@ class SettingsRbac extends Component
     {
         if ($id) {
             $u = User::with('roles', 'cabangs')->findOrFail($id);
+            $defaultCabang = $u->cabangs->first(fn ($c) => (bool) $c->pivot->is_default);
             $this->userForm = [
                 'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'password' => '',
                 'phone' => $u->phone ?? '', 'role' => $u->roles->first()?->name ?? '',
-                'cabang_ids' => $u->cabangs->pluck('id')->toArray(), 'is_active' => (bool) $u->is_active,
+                'cabang_ids' => $u->cabangs->pluck('id')->toArray(),
+                'cabang_default_id' => $defaultCabang?->id ?? $u->cabangs->first()?->id,
+                'is_active' => (bool) $u->is_active,
             ];
         } else {
             $this->userForm = [
                 'id' => null, 'name' => '', 'email' => '', 'password' => '', 'phone' => '',
-                'role' => 'kasir', 'cabang_ids' => [], 'is_active' => true,
+                'role' => 'kasir', 'cabang_ids' => [], 'cabang_default_id' => null, 'is_active' => true,
             ];
         }
         $this->showUserModal = true;
@@ -303,7 +306,19 @@ class SettingsRbac extends Component
         if ($this->userForm['role']) {
             $user->syncRoles([$this->userForm['role']]);
         }
-        $user->cabangs()->sync($this->userForm['cabang_ids'] ?? []);
+
+        $cabangIds = array_map('intval', $this->userForm['cabang_ids'] ?? []);
+        $defaultId = ! empty($this->userForm['cabang_default_id']) ? (int) $this->userForm['cabang_default_id'] : null;
+
+        if (! in_array($defaultId, $cabangIds, true) && ! empty($cabangIds)) {
+            $defaultId = $cabangIds[0];
+        }
+
+        $syncData = [];
+        foreach ($cabangIds as $cid) {
+            $syncData[$cid] = ['is_default' => ($cid === $defaultId)];
+        }
+        $user->cabangs()->sync($syncData);
 
         app(AuditService::class)->catat('User', $aksi, $user->id, "User {$user->name} dikelola ({$this->userForm['role']})");
 

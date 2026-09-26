@@ -28,6 +28,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class JurnalService
 {
+    public const SUMBER_VALID = ['pos', 'servis', 'servis-bayar', 'pembelian', 'beli', 'komisi', 'opname', 'manual', 'kas', 'channel', 'pembayaran', 'payroll', 'asset', 'grn'];
+
     /**
      * Cache status keberadaan tabel per request (server 1GB RAM: hindari
      * query schema berulang di loop seeder).
@@ -72,6 +74,10 @@ class JurnalService
         ?int $referensiId = null,
         ?string $idempotencyKey = null
     ): array {
+        if (! in_array($sumber, self::SUMBER_VALID, true)) {
+            throw new \InvalidArgumentException("Sumber jurnal '{$sumber}' tidak valid");
+        }
+
         if (empty($lines)) {
             throw new \Exception('Jurnal membutuhkan minimal 1 baris entri');
         }

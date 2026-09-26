@@ -8,107 +8,323 @@
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-up-ink-50 text-ink-900 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-up-primary/20 rounded-full blur-[128px] pointer-events-none"></div>
-    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-up-accent/15 rounded-full blur-[128px] pointer-events-none"></div>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col items-center justify-start p-4 md:p-8 relative selection:bg-indigo-600 selection:text-white">
+    <div class="fixed -top-40 -left-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-[128px] pointer-events-none"></div>
+    <div class="fixed -bottom-40 -right-40 w-96 h-96 bg-orange-500/10 rounded-full blur-[128px] pointer-events-none"></div>
 
-    <div class="w-full max-w-md relative z-10">
-        <div class="text-center mb-8">
+    <div class="w-full max-w-2xl relative z-10 my-auto">
+        <!-- Brand Header -->
+        <div class="text-center mb-6">
             <a href="{{ route('shop') }}" class="inline-flex">
-                <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-up-primary via-indigo-500 to-up-accent items-center justify-center shadow-xl shadow-up-primary/30 mb-4 border border-white/20">
-                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-orange-500 items-center justify-center shadow-lg shadow-indigo-500/20 mb-3 border border-white/20">
+                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     </svg>
                 </div>
             </a>
-            <h1 class="text-2xl font-bold text-ink-900 tracking-wide">Tracking Servis HP</h1>
-            <p class="text-sm text-ink-500 mt-1">Pantau status perbaikan unit Anda secara real-time</p>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Status Servis & Perbaikan</h1>
+            <p class="text-sm text-slate-500 mt-1">Pantau perkembangan perbaikan gadget Anda secara transparan</p>
         </div>
 
-        <div class="bg-white rounded-3xl shadow-xl shadow-ink-100/50 border border-ink-100 p-6 relative overflow-hidden">
-            <div class="circuit-line absolute top-0 left-0 w-full h-[2px]"></div>
+        <!-- Flash Messages -->
+        @if(session('success'))
+            <div class="mb-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-start gap-3 shadow-sm">
+                <svg class="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <div class="text-sm font-medium">{{ session('success') }}</div>
+            </div>
+        @endif
 
-            @if($tiket)
-                <div class="text-center">
-                    <span class="font-mono text-up-primary font-bold text-sm">{{ $tiket['no_tiket'] }}</span>
-                    <h3 class="font-black text-ink-900 text-lg mt-1">{{ $tiket['jenis_hp'] }}</h3>
-                    <p class="text-xs text-ink-400 mt-0.5">{{ $tiket['cabang'] }}</p>
+        @if(session('info'))
+            <div class="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 flex items-start gap-3 shadow-sm">
+                <svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div class="text-sm font-medium">{{ session('info') }}</div>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="mb-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-start gap-3 shadow-sm">
+                <svg class="w-5 h-5 text-rose-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <div class="text-sm font-medium">{{ session('error') }}</div>
+            </div>
+        @endif
+
+        @if($tiket)
+            <!-- Main Tracking Card -->
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 md:p-8 space-y-6">
+                <!-- Header Info -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-5">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono text-indigo-600 font-bold text-sm bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
+                                {{ $tiket['no_tiket'] }}
+                            </span>
+                            @if(($tiket['status_pembayaran'] ?? '') === 'lunas')
+                                <span class="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                                    LUNAS
+                                </span>
+                            @else
+                                <span class="text-xs font-medium text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                                    Belum Bayar
+                                </span>
+                            @endif
+                        </div>
+                        <h2 class="font-bold text-slate-900 text-xl mt-2">
+                            {{ $tiket['jenis_hp'] }}
+                            @if(!empty($tiket['seri_hp']))
+                                <span class="text-slate-500 font-normal text-base">({{ $tiket['seri_hp'] }})</span>
+                            @endif
+                        </h2>
+                        @if($tiket['keluhan'])
+                            <p class="text-xs text-slate-500 mt-1 italic">Keluhan: "{{ $tiket['keluhan'] }}"</p>
+                        @endif
+                    </div>
+
+                    @if(!empty($tiket['cabang']))
+                        <div class="sm:text-right text-xs text-slate-500">
+                            <p class="font-bold text-slate-800">{{ $tiket['cabang']['nama'] ?? $tiket['cabang'] }}</p>
+                            @if(is_array($tiket['cabang']) && !empty($tiket['cabang']['telepon']))
+                                <p class="mt-0.5">Telp: {{ $tiket['cabang']['telepon'] }}</p>
+                            @endif
+                        </div>
+                    @endif
                 </div>
 
-                <!-- Status Stepper -->
-                <div class="mt-6 space-y-0">
+                <!-- Status Ditolak Banner -->
+                @if($tiket['status'] === 'ditolak')
+                    <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800">
+                        <div class="flex items-center gap-2 font-bold text-sm">
+                            <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            Estimasi Ditolak
+                        </div>
+                        <p class="text-xs text-rose-700 mt-1">
+                            Pengerjaan perbaikan dihentikan karena estimasi biaya ditolak. Silakan hubungi cabang untuk informasi pengambilan unit.
+                        </p>
+                    </div>
+                @endif
+
+                <!-- Stepper Progres -->
+                <div class="py-2">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Progres Pengerjaan</h3>
                     @php
-                        $flow = ['diterima', 'diagnosa', 'menunggu_approval', 'disetujui', 'dikerjakan', 'qc', 'selesai', 'diambil'];
+                        $flow = ['diajukan_online', 'diterima', 'diagnosa', 'menunggu_approval', 'disetujui', 'dikerjakan', 'qc', 'selesai', 'diambil'];
+                        $labels = [
+                            'diajukan_online' => 'Diajukan',
+                            'diterima' => 'Diterima',
+                            'diagnosa' => 'Diagnosa',
+                            'menunggu_approval' => 'Estimasi',
+                            'disetujui' => 'Disetujui',
+                            'dikerjakan' => 'Dikerjakan',
+                            'qc' => 'QC',
+                            'selesai' => 'Selesai',
+                            'diambil' => 'Diambil',
+                        ];
+
                         $currentIdx = array_search($tiket['status'], $flow, true);
                         $currentIdx = $currentIdx === false ? -1 : $currentIdx;
-                        $labels = ['Diterima', 'Diagnosa', 'Menunggu Approval', 'Disetujui', 'Dikerjakan', 'QC', 'Selesai', 'Diambil'];
                     @endphp
 
-                    <div class="space-y-0">
-                        @foreach($flow as $i => $status)
-                            <div class="flex items-center gap-3 py-1.5">
-                                <div class="flex flex-col items-center">
-                                    <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2
-                                        {{ $i < $currentIdx ? 'bg-up-mint border-up-mint text-white' : ($i === $currentIdx ? 'bg-up-primary border-up-primary text-white shadow-lg shadow-up-primary/30' : 'border-ink-200 text-ink-300 bg-white') }}">
-                                        {{ $i < $currentIdx ? '✓' : $i + 1 }}
-                                    </div>
-                                    @if($i < count($flow) - 1)
-                                        <div class="w-0.5 h-5 {{ $i < $currentIdx ? 'bg-up-mint' : 'bg-ink-100' }}"></div>
+                    <div class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+                        @foreach($flow as $i => $step)
+                            @php
+                                $isCompleted = $currentIdx >= 0 && $i < $currentIdx;
+                                $isCurrent = $i === $currentIdx;
+                            @endphp
+                            <div class="flex flex-col items-center text-center">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                                    {{ $isCurrent ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40 ring-4 ring-indigo-100' :
+                                       ($isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400 border border-slate-200') }}">
+                                    @if($isCompleted)
+                                        ✓
+                                    @else
+                                        {{ $i + 1 }}
                                     @endif
                                 </div>
-                                <span class="text-sm font-medium {{ $i <= $currentIdx ? 'text-ink-900 font-bold' : 'text-ink-400' }}">
-                                    {{ $labels[$i] }}
+                                <span class="text-[11px] mt-1.5 font-medium {{ $isCurrent ? 'text-indigo-600 font-bold' : ($isCompleted ? 'text-slate-700' : 'text-slate-400') }}">
+                                    {{ $labels[$step] }}
                                 </span>
-                                @if($i === $currentIdx)
-                                    <span class="ml-auto text-[10px] font-bold text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-full">SAAT INI</span>
-                                @endif
                             </div>
                         @endforeach
                     </div>
                 </div>
 
-                <!-- Info -->
-                <div class="mt-5 grid grid-cols-2 gap-3 text-center">
-                    <div class="p-3 rounded-xl bg-up-ink-50 border border-ink-100">
-                        <p class="text-[10px] text-ink-400 uppercase font-semibold">Estimasi Biaya</p>
-                        <p class="font-black text-ink-900 tabular-nums mt-0.5">
-                            {{ $tiket['estimasi_biaya'] ? 'Rp '.number_format($tiket['estimasi_biaya'], 0, ',', '.') : 'Belum ada' }}
-                        </p>
-                    </div>
-                    <div class="p-3 rounded-xl bg-up-ink-50 border border-ink-100">
-                        <p class="text-[10px] text-ink-400 uppercase font-semibold">Diterima</p>
-                        <p class="font-bold text-ink-900 tabular-nums mt-0.5 text-sm">{{ $tiket['tanggal_terima'] ?? '-' }}</p>
-                    </div>
-                </div>
-
-                @if($tiket['garansi'])
-                    <div class="mt-3 p-3 rounded-xl {{ $tiket['garansi']['aktif'] ? 'bg-up-mint/10 border border-up-mint/30' : 'bg-ink-50 border border-ink-100' }}">
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm">🛡️</span>
+                <!-- Card Approval Estimasi (Jika menunggu_approval) -->
+                @if($tiket['status'] === 'menunggu_approval')
+                    <div class="rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 p-5 md:p-6 space-y-4">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
                             <div>
-                                <p class="text-xs font-bold {{ $tiket['garansi']['aktif'] ? 'text-up-mint' : 'text-ink-400' }}">
-                                    {{ $tiket['garansi']['aktif'] ? 'Dalam Garansi' : 'Garansi Berakhir' }}
+                                <span class="text-xs font-bold text-indigo-700 uppercase tracking-wider bg-indigo-100 px-2 py-0.5 rounded-full">
+                                    Memerlukan Persetujuan Anda
+                                </span>
+                                <h3 class="text-lg font-bold text-slate-900 mt-1">Persetujuan Estimasi Biaya</h3>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-500 block">Total Estimasi</span>
+                                <span class="text-2xl font-black text-indigo-700 tabular-nums">
+                                    Rp {{ number_format((float) ($tiket['estimasi_biaya'] ?? 0), 0, ',', '.') }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Rincian Part & Jasa Penawaran -->
+                        @if(!empty($tiket['estimasi_items']))
+                            <div class="overflow-x-auto rounded-xl border border-indigo-100 bg-white shadow-sm">
+                                <table class="w-full text-left text-xs">
+                                    <thead class="bg-indigo-50/70 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-b border-indigo-100">
+                                        <tr>
+                                            <th class="p-3">Item / Layanan</th>
+                                            <th class="p-3 text-center">Tipe</th>
+                                            <th class="p-3 text-center">Qty</th>
+                                            <th class="p-3 text-right">Harga</th>
+                                            <th class="p-3 text-right">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-indigo-50 text-slate-700">
+                                        @foreach($tiket['estimasi_items'] as $item)
+                                            <tr>
+                                                <td class="p-3 font-medium text-slate-900">{{ $item['nama_item'] }}</td>
+                                                <td class="p-3 text-center">
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $item['tipe'] === 'part' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700' }}">
+                                                        {{ strtoupper($item['tipe']) }}
+                                                    </span>
+                                                </td>
+                                                <td class="p-3 text-center tabular-nums">{{ $item['qty'] }}</td>
+                                                <td class="p-3 text-right tabular-nums">Rp {{ number_format((float)$item['harga'], 0, ',', '.') }}</td>
+                                                <td class="p-3 text-right font-bold tabular-nums text-slate-900">Rp {{ number_format((float)$item['subtotal'], 0, ',', '.') }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+
+                        <!-- Tombol Aksi Persetujuan -->
+                        <div class="pt-2 flex flex-col sm:flex-row gap-3">
+                            <form action="{{ route('servis.tracking.approve', $tiket['token_approval']) }}" method="POST" class="flex-1">
+                                @csrf
+                                <input type="hidden" name="alasan" value="Disetujui oleh pelanggan via web tracking">
+                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all cursor-pointer">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Setujui Estimasi & Lanjutkan Perbaikan
+                                </button>
+                            </form>
+
+                            <form action="{{ route('servis.tracking.reject', $tiket['token_approval']) }}" method="POST" class="sm:w-auto" onsubmit="return confirm('Apakah Anda yakin ingin menolak estimasi perbaikan ini?')">
+                                @csrf
+                                <input type="hidden" name="alasan" value="Ditolak oleh pelanggan via web tracking">
+                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-semibold text-sm transition-all cursor-pointer">
+                                    Tolak Estimasi
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Rincian Pekerjaan & Sparepart (Disetujui / Dikerjakan / QC / Selesai) -->
+                @if(in_array($tiket['status'], ['disetujui', 'dikerjakan', 'qc', 'selesai', 'diambil']) && !empty($tiket['items']))
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Rincian Komponen & Jasa Terpasang</h3>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-50 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
+                                    <tr>
+                                        <th class="p-3">Nama Pekerjaan / Part</th>
+                                        <th class="p-3 text-center">Tipe</th>
+                                        <th class="p-3 text-center">Qty</th>
+                                        <th class="p-3 text-right">Harga</th>
+                                        <th class="p-3 text-right">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-slate-700">
+                                    @foreach($tiket['items'] as $item)
+                                        <tr>
+                                            <td class="p-3 font-medium text-slate-900">{{ $item['nama_item'] }}</td>
+                                            <td class="p-3 text-center">
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $item['tipe'] === 'part' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700' }}">
+                                                    {{ strtoupper($item['tipe']) }}
+                                                </span>
+                                            </td>
+                                            <td class="p-3 text-center tabular-nums">{{ $item['qty'] }}</td>
+                                            <td class="p-3 text-right tabular-nums">Rp {{ number_format((float)$item['harga'], 0, ',', '.') }}</td>
+                                            <td class="p-3 text-right font-bold tabular-nums text-slate-900">Rp {{ number_format((float)$item['subtotal'], 0, ',', '.') }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Garansi Info -->
+                @if($tiket['garansi'])
+                    <div class="p-4 rounded-2xl {{ $tiket['garansi']['aktif'] ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200' }}">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center {{ $tiket['garansi']['aktif'] ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500' }}">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-bold {{ $tiket['garansi']['aktif'] ? 'text-emerald-900' : 'text-slate-700' }}">
+                                    {{ $tiket['garansi']['aktif'] ? 'Unit dalam Masa Garansi Resmi' : 'Garansi Servis Telah Berakhir' }}
                                 </p>
-                                <p class="text-[11px] text-ink-400 tabular-nums">
-                                    {{ $tiket['garansi']['mulai'] }} — {{ $tiket['garansi']['berakhir'] }}
+                                <p class="text-xs text-slate-500 tabular-nums mt-0.5">
+                                    Periode: {{ $tiket['garansi']['mulai'] }} s.d. {{ $tiket['garansi']['berakhir'] }}
                                 </p>
                             </div>
                         </div>
                     </div>
                 @endif
-            @else
-                <div class="text-center py-6">
-                    <svg class="w-12 h-12 mx-auto mb-3 text-ink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p class="font-semibold text-ink-700">Tiket servis tidak ditemukan</p>
-                    <p class="text-sm text-ink-400 mt-1">Periksa kembali link tracking yang Anda terima.</p>
-                </div>
-            @endif
-        </div>
 
-        <p class="text-center text-xs text-ink-400 mt-6">
-            <a href="{{ route('shop') }}" class="hover:text-up-primary">← Kembali ke Ute Parts</a>
+                <!-- Timeline Riwayat Status -->
+                @if(!empty($tiket['timeline']))
+                    <div class="space-y-3 pt-2">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Riwayat Status Perbaikan</h3>
+                        <div class="relative pl-6 space-y-4 before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                            @foreach($tiket['timeline'] as $log)
+                                <div class="relative">
+                                    <div class="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-indigo-600 ring-4 ring-white"></div>
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="font-bold text-slate-800 capitalize">
+                                            {{ str_replace('_', ' ', $log['status_ke']) }}
+                                        </span>
+                                        <span class="text-slate-400 tabular-nums">{{ $log['created_at'] }}</span>
+                                    </div>
+                                    @if(!empty($log['catatan']))
+                                        <p class="text-xs text-slate-500 mt-0.5">{{ $log['catatan'] }}</p>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
+        @else
+            <!-- Tiket Tidak Ditemukan -->
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-8 text-center">
+                <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg">Tiket Servis Tidak Ditemukan</h3>
+                <p class="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+                    Mohon periksa kembali link atau token tracking servis yang Anda buka. Hubungi customer service kami bila membutuhkan bantuan.
+                </p>
+            </div>
+        @endif
+
+        <p class="text-center text-xs text-slate-400 mt-6">
+            <a href="{{ route('shop') }}" class="hover:text-indigo-600 transition-colors">← Kembali ke Halaman Utama</a>
         </p>
     </div>
 </body>

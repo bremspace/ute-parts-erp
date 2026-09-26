@@ -7,11 +7,26 @@
             @endforeach
         </div>
 
-        <div class="flex items-center gap-2">
-            <label class="text-[11px] text-ink-400 font-medium">Periode</label>
-            <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
-            <span class="text-ink-400 text-xs">—</span>
-            <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
+        <div class="flex items-center gap-3 flex-wrap">
+            @if(auth()->user()?->can('laporan.konsolidasi'))
+                <div class="flex items-center bg-white/5 p-1 rounded-xl border border-white/5 text-xs font-semibold">
+                    <button type="button" wire:click="setCakupanLaporan('cabang')"
+                            class="px-3 py-1.5 rounded-lg transition-all cursor-pointer {{ $cakupanLaporan === 'cabang' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-ink-200' }}">
+                        {{ session('cabang_nama', 'Cabang Ini') }}
+                    </button>
+                    <button type="button" wire:click="setCakupanLaporan('konsolidasi')"
+                            class="px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 {{ $cakupanLaporan === 'konsolidasi' ? 'bg-up-accent text-white shadow-sm' : 'text-ink-400 hover:text-ink-200' }}">
+                        <span>Konsolidasi Nasional</span>
+                    </button>
+                </div>
+            @endif
+
+            <div class="flex items-center gap-2">
+                <label class="text-[11px] text-ink-400 font-medium">Periode</label>
+                <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
+                <span class="text-ink-400 text-xs">—</span>
+                <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
+            </div>
         </div>
     </div>
 
@@ -19,7 +34,7 @@
     @if($activeTab === 'laporan')
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Laba Rugi -->
-            <x-prism.glass-card title="Laba Rugi" :subtitle="'Periode ' . $periodeDari . ' — ' . $periodeSampai" circuit="true">
+            <x-prism.glass-card title="Laba Rugi" :subtitle="($cakupanLaporan === 'konsolidasi' ? '[Konsolidasi Seluruh Cabang] ' : '') . 'Periode ' . $periodeDari . ' — ' . $periodeSampai" circuit="true">
                 <div class="space-y-3">
                     <div>
                         <p class="text-[10px] text-up-mint uppercase font-bold mb-1.5">Pendapatan</p>
@@ -63,7 +78,7 @@
             </x-prism.glass-card>
 
             <!-- Neraca -->
-            <x-prism.glass-card title="Neraca" :subtitle="'Saldo kumulatif s/d ' . $neraca['sampai_tanggal']" circuit="true">
+            <x-prism.glass-card title="Neraca" :subtitle="($cakupanLaporan === 'konsolidasi' ? '[Konsolidasi Seluruh Cabang] ' : '') . 'Saldo kumulatif s/d ' . $neraca['sampai_tanggal']" circuit="true">
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                         <p class="text-[10px] text-ink-400 uppercase font-bold mb-2">Aset</p>
@@ -137,7 +152,7 @@
             </x-prism.glass-card>
 
             <!-- Arus Kas (metode tidak langsung) -->
-            <x-prism.glass-card title="Laporan Arus Kas" :subtitle="'Metode Tidak Langsung — ' . $periodeDari . ' s.d. ' . $periodeSampai" circuit="true" class="lg:col-span-2">
+            <x-prism.glass-card title="Laporan Arus Kas" :subtitle="($cakupanLaporan === 'konsolidasi' ? '[Konsolidasi Seluruh Cabang] ' : '') . 'Metode Tidak Langsung — ' . $periodeDari . ' s.d. ' . $periodeSampai" circuit="true" class="lg:col-span-2">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Operasi -->
                     <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5">

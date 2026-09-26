@@ -31,6 +31,7 @@
 | 9 | Dashboard & Analitik | T-27 |
 | 10 | Keamanan & Optimasi UI | T-28, T-29, T-30, T-31, T-32, T-33, T-34, T-35, T-36, T-37 |
 | 11 | Migrasi SID Retail, Optimasi Stok & UX Perbaikan | T-38, T-39, T-40, T-41, T-42, T-43, T-44, T-45, T-46, T-47 |
+| 12 | Redesain & Refinement UI/UX Komprehensif (Ute Prism & Emil) | T-48, T-49, T-50, T-51, T-52, T-53, T-54, T-55, T-56, T-57 |
 
 ---
 
@@ -612,6 +613,159 @@
   - [x] Kolom `sisa` ada di tabel `piutang` ATAU accessor model berfungsi di query builder
   - [x] Data piutang aging akurat (grup by umur: 0-30, 31-60, 61-90, 90+ hari)
   - [x] Tidak ada error serupa di modul Akunting lain (laporan piutang, jurnal)
+
+---
+
+## FASE 12 — Redesain & Refinement UI/UX Komprehensif (Ute Prism & Emil Design Engineering)
+
+### T-48 — Design System & Token Foundation (CSS Variables, Easing, Responsive Breakpoints, Tactile Micro-interactions, Safe Area, Mobile Meta) & Dokumentasi DESIGN.md
+**Modul:** Frontend Foundation — `resources/css/app.css`, `resources/css/prism-tokens.css`, `DESIGN.md`
+**Perubahan:**
+- Perbaiki fondasi token CSS: hapus `transition: all`, gunakan kurva easing kuat (`--ease-out: cubic-bezier(0.23, 1, 0.32, 1)`, `--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1)`), durasi < 300ms untuk micro-interactions.
+- Terapkan tactile button `:active` scale (`transform: scale(0.97)`), hilangkan scale(0) pada animasi enter (ganti dengan scale(0.95) + opacity).
+- Lindungi hover states dengan `@media (hover: hover) and (pointer: fine)` agar tidak sticky di layar sentuh mobile.
+- Pastikan token warna Ute Prism konsisten di seluruh tema: Electric Indigo (`#5B4FE9`), Solder Copper (`#E8873B`), Signal Mint (`#1FBF8F`), Amber (`#F5A623`), Red (`#EF4444`), Ink Dark (`#0B1020`), Ink Light (`#F6F7FB`).
+- Susun `DESIGN.md` mengikuti standar Impeccable spec (frontmatter tokens + 8 canonical sections).
+- **Acceptance Criteria:**
+  - [ ] File `DESIGN.md` dibuat dan valid secara spesifikasi schema Impeccable.
+  - [ ] Easing custom dan tactile `:active` state aktif tanpa `transition: all`.
+  - [ ] Layar mobile tidak memiliki sticky hover state pasca-tap.
+  - [ ] Build asset `npm run build` sukses tanpa warning CSS.
+
+### T-49 — Layout Core & Navigation Architecture (Backoffice Shell & Marketplace Shell)
+**Modul:** Shell & Layouts — `resources/views/layouts/backoffice.blade.php`, `resources/views/layouts/marketplace.blade.php`
+**Perubahan:**
+- **Backoffice Shell:**
+  - Desktop (≥1024px): high-density sidebar tetap dengan visual hierarchy jelas, breadcrumb context, dan branch selector cepat.
+  - Tablet (768px-1023px): icon rail dengan toggle collapse/expand dan tooltips origin-aware.
+  - Mobile (<768px): slide-over drawer halus dengan backdrop blur + bottom quick navigation bar untuk aksi kasir, antrean servis, dan notifikasi.
+  - Safe-area insets (`env(safe-area-inset-top)`, `env(safe-area-inset-bottom)`) diterapkan penuh di seluruh wrapper.
+- **Marketplace Shell:**
+  - Perbaiki duplikasi link "Booking Servis" di header desktop/tablet.
+  - Tambahkan bottom navigation bar mobile yang ergonomis (Katalog, Booking, Tracking Servis, Keranjang, Akun Saya) dengan indikator badge cart & notification.
+  - PWA meta tags dan mobile status bar styling konsisten.
+- **Acceptance Criteria:**
+  - [ ] Navigasi backoffice responsif tanpa layout shift di desktop, tablet, dan mobile.
+  - [ ] Tidak ada duplikasi link di header marketplace.
+  - [ ] Mobile bottom bar marketplace berfungsi mulus dengan touch target ≥ 44px.
+  - [ ] Safe area insets terakomodasi di iOS Safari dan Android Chrome.
+
+### T-50 — Reusable UI Components Enhancement (Ute Prism UI Kit)
+**Modul:** Components — `resources/views/components/prism/*` (`glass-card`, `prism-button`, `data-table`, `status-pill`, `tier-badge`, `barcode-scan-input`, `stock-gauge`, modal & toast)
+**Perubahan:**
+- `GlassCard`: refactor varian (default, elevated, interactive, flat) dengan backdrop-filter terukur (blur 12-16px), border kontras WCAG AA, dan fallback solid untuk perangkat low-end.
+- `PrismButton`: varian tactile (primary, accent, mint, ghost, pos-keypad) dengan `:active:scale-[0.97]` dan loading spinner non-blocking.
+- `DataTable`: responsive table wrapper dengan horizontal scroll indicator halus di mobile, sticky column opsi untuk aksi, dan tabular-nums untuk angka keuangan.
+- `StatusPill`: pill status dengan kontras warna tegas untuk servis, order, dan stok, bebas dari kesan AI-slop.
+- `TierBadge`: gradasi signature halus untuk Silver, Gold, Platinum.
+- `BarcodeScanInput`: visual feedback saat barcode discan atau fokus keyboard (F2 shortcut).
+- `StockGauge`: visual SVG gauge minimalis dengan warna dinamis (merah/kuning/hijau) berdasarkan safety stock.
+- Modal & Toast System: animasi popover/modal origin-aware (scale 0.95 → 1, opacity 0 → 1), auto-dismiss toast dengan pause saat tab tidak aktif.
+- **Acceptance Criteria:**
+  - [ ] Seluruh komponen di `resources/views/components/prism/` lulus uji kontras WCAG AA.
+  - [ ] Semua tombol dan kartu interaktif memiliki tactile feedback saat ditekan.
+  - [ ] DataTable nyaman dibaca di mobile (horizontal scroll bersih, tanpa overflow layar).
+
+### T-51 — POS & Kasir UI/UX Overhaul (High-Speed Kasir Screen)
+**Modul:** POS — `resources/views/modules/pos/livewire/pos-kasir.blade.php`, `cart-content.blade.php`, `sn-control.blade.php`
+**Perubahan:**
+- Desktop: layout split 2 kolom proporsional (katalog produk di kiri dengan grid dinamis 3-4 kolom, keranjang kasir di kanan dengan ringkasan pembayaran tabular).
+- Mobile/Tablet Kasir: toggle responsif antara Tab Katalog dan Tab Keranjang dengan floating cart bar di bawah (total harga + tombol bayar langsung).
+- Keyboard shortcuts visual hint (F2 Cari, F4 Bayar, F6 Tahan, ESC Batal) terintegrasi rapi tanpa mengotori layar.
+- Keypad sentuh nominal cepat (pecahan Rp 50k, 100k, Uang Pas) dengan tactile button feedback.
+- Autocomplete search combobox dan Barcode scan input dengan highlight hasil instan.
+- **Acceptance Criteria:**
+  - [ ] Kasir POS bisa dioperasikan nyaman di ponsel (tabbed/drawer) maupun layar tablet/desktop (split).
+  - [ ] Seluruh angka transaksi POS menggunakan format rupiah dan `tabular-nums`.
+  - [ ] Keypad dan tombol POS responsif terhadap sentuhan tanpa delay.
+
+### T-52 — Servis HP & Public Tracking UI/UX (Kanban & Customer Experience)
+**Modul:** Servis — `resources/views/modules/servis/livewire/servis-board.blade.php`, `resources/views/servis/tracking-publik.blade.php`
+**Perubahan:**
+- **Kanban Board Backoffice:**
+  - Scroll horizontal halus dengan snap-scrolling di mobile/tablet; kartu tiket kompak dengan info kritis (no tiket, nama pelanggan, tipe HP, estimasi, teknisi).
+  - Modal penerimaan unit & form estimasi dengan upload foto inspeksi minimal 2 yang responsif di kamera HP.
+- **Halaman Tracking Publik (`tracking-publik.blade.php`):**
+  - Mobile-first consumer experience: kartu status modern dengan timeline tahapan servis progresif.
+  - Card rincian biaya estimasi (part + jasa) yang transparan dan mudah dipahami pelanggan awam.
+  - Tombol persetujuan/penolakan (Setujui Estimasi / Tolak) yang besar, jelas, dan tactile, dengan dialog konfirmasi yang ramah.
+- **Acceptance Criteria:**
+  - [ ] Kanban servis bisa digeser dengan lancar di layar sentuh mobile/tablet.
+  - [ ] Halaman tracking publik terlihat premium dan terpercaya di layar smartphone pelanggan.
+  - [ ] Aksi Setujui/Tolak estimasi via token bekerja mulus tanpa bug layout.
+
+### T-53 — WMS & Inventory Screens (Master Produk, Stok, Transfer, PO & Opname)
+**Modul:** WMS — `resources/views/modules/wms/livewire/*.blade.php`
+**Perubahan:**
+- Tab bar WMS dibuat horizontal scrollable di layar ponsel dengan indikator aktif yang jelas.
+- Tabel Master Produk, Stok per Gudang, PO, GRN, Transfer, dan Stock Opname dilengkapi card view adaptif untuk mobile.
+- Form transfer antar-gudang dan form PO ditata dengan grid form bersih, touch-friendly select, dan auto-suggestion produk.
+- Modal print label barcode disesuaikan dengan preview visual rapi sebelum cetak thermal.
+- **Acceptance Criteria:**
+  - [ ] Navigasi 8 tab WMS tidak patah atau bertumpuk di layar sempit (< 640px).
+  - [ ] Tabel master produk dan stok mudah difilter dan dicari di mobile.
+  - [ ] Preview cetak barcode presisi dan tidak overflow.
+
+### T-54 — Marketplace Storefront, Cart & Checkout Experience
+**Modul:** Marketplace — `resources/views/modules/marketplace/livewire/*.blade.php`
+**Perubahan:**
+- **Katalog Produk (`shop-catalog.blade.php`):**
+  - Grid produk responsif (2 kolom di mobile, 3-4 kolom di tablet/desktop) dengan kartu produk bersih, badge ketersediaan stok cabang, dan tier price tag.
+  - Filter kategori dan pencarian instan dengan drawer filter di mobile.
+- **Detail Produk (`shop-detail.blade.php`):**
+  - Galeri foto produk, selector varian kompatibilitas HP, dan floating bottom bar aksi cepat (Beli Sekarang / +Keranjang) di mobile.
+- **Keranjang & Checkout (`cart-checkout.blade.php`):**
+  - Alur checkout bertahap yang bersih (alamat penerima, pilihan kurir Biteship, metode pembayaran Duitku).
+  - Ringkasan biaya transparan (subtotal, ongkir, diskon tier, total) dengan tabular-nums.
+- **Booking Servis Publik (`booking-servis.blade.php`):**
+  - Formulir pendaftaran unit servis online yang intuitif dengan panduan foto kerusakan.
+- **Akun Pelanggan (`customer-account.blade.php`):**
+  - Dashboard profil member, riwayat pesanan, status servis aktif, dan komisi reseller dengan visual modern.
+- **Acceptance Criteria:**
+  - [ ] Storefront marketplace nyaman dan cepat diakses via smartphone.
+  - [ ] Alur checkout mulai dari pilih item hingga pembayaran Duitku tidak ada tombol terpotong atau form sempit.
+  - [ ] Booking servis publik mudah diisi dari kamera HP pelanggan.
+
+### T-55 — Backoffice Business Modules (Dashboard, Akunting, CRM, HR, Reseller, Omnichannel, Workflow, Reports)
+**Modul:** Business Modules — `resources/views/modules/{dashboard,akunting,crm,hr,reseller,omnichannel,workflow,report}/**/*.blade.php`
+**Perubahan:**
+- **Dashboard Index:** grid widget role responsif dengan card KPI modern, visual sparkline/trend chart adaptif.
+- **Akunting:** tampilan Buku Besar, Jurnal Umum, Register Aset, dan Laporan Pajak dengan densitas data rapi, padding simetris, dan perataan angka kanan (`text-right tabular-nums`).
+- **CRM & Reseller:** Lead Kanban dengan kolom responsif, profil pelanggan dengan badge tier, dan tabel rincian komisi transparan.
+- **HR & Payroll:** formulir absensi mobile-friendly, kalender shift, dan slip gaji dengan layout print/PDF rapi.
+- **Omnichannel & Workflow:** Command center Shopee sync dan Inbox Approval dengan badge status real-time.
+- **Acceptance Criteria:**
+  - [ ] Seluruh widget dashboard tertata proporsional di resolusi laptop, tablet, dan smartphone.
+  - [ ] Laporan keuangan mudah dibaca tanpa salah tafsir angka debit/kredit.
+  - [ ] Approval inbox dan lead kanban dapat dioperasikan via tablet/mobile touch.
+
+### T-56 — Auth, Settings & Empty/Error/Loading States
+**Modul:** Auth & System UI — `resources/views/auth/*.blade.php`, `resources/views/errors/*.blade.php`, empty states
+**Perubahan:**
+- Layar Login Staff & Login Pelanggan ditata dengan glass-card terpusat di atas background signature subtle, input field nyaman dengan auto-focus dan tombol submit tactile.
+- Layar 2FA Challenge & QR Setup yang jelas dan aman.
+- Ganti semua empty state teks generik ("No data", "Data kosong") dengan visual empty state khas Ute Parts (aksen motif garis sirkuit halus + copy bersahabat berbahasa Indonesia).
+- Skeleton loading state saat Livewire memuat data (menggantikan spinner kaku), mencegah layout shift.
+- **Acceptance Criteria:**
+  - [ ] Layar login dan 2FA responsif, nyaman di keyboard fisik maupun virtual keyboard mobile.
+  - [ ] Seluruh empty state memiliki identitas visual Ute Prism dan copy Bahasa Indonesia yang jelas.
+  - [ ] Tidak terjadi layout shift signifikan saat data dimuat (skeleton loader bekerja).
+
+### T-57 — Audit, Polish & Mechanical Verification (Impeccable Detect, Emil Checklist & Test Pass)
+**Modul:** System-wide Verification — run mechanical detector, build assets, run unit/feature tests
+**Perubahan:**
+- Jalankan mechanical detector `/root/.agents/skills/impeccable/scripts/impeccable detect --json` ke seluruh view yang dimodifikasi dan perbaiki semua pelanggaran craft floor.
+- Lakukan pengecekan checklist Emil Kowalski: tidak ada `transition: all`, durasi micro-animation < 300ms, touch target ≥ 44px, tidak ada scale(0).
+- Jalankan `./vendor/bin/pint` untuk memformat kode Blade/PHP.
+- Jalankan `npm run build` dan verifikasi bundle asset production bebas error.
+- Jalankan test suite regresi utama untuk memastikan fungsionalitas logika bisnis tetap 100% utuh.
+- **Acceptance Criteria:**
+  - [ ] Impeccable detector bersih dari defect fatal.
+  - [ ] `npm run build` berhasil tanpa error.
+  - [ ] `./vendor/bin/pint --test` lulus.
+  - [ ] Seluruh test modul terkait tetap lulus (green).
+
+---
 
 ---
 

@@ -44,7 +44,7 @@
 <body class="bg-ink-950 text-ink-100 font-sans antialiased min-h-screen flex flex-col overflow-x-clip selection:bg-up-primary selection:text-white"
       x-data="sidebarManager()"
       @keydown.escape.window="sidebarOpen = false"
-      data-cabang-count="{{ auth()->user()?->cabangs->count() ?? 0 }}"
+      data-cabang-count="{{ auth()->user()?->daftarCabangAkses()->count() ?? 0 }}"
       data-cabang-id="{{ session('cabang_id') ?? '' }}"
       style="padding-bottom: env(safe-area-inset-bottom, 0);">
     <div class="flex-1 flex overflow-hidden relative">
@@ -94,13 +94,15 @@
                             {{ session('cabang_nama', 'Cabang Pusat (CBG-01)') }}
                         </span>
                     </div>
-                    <button
-                        type="button"
-                        class="sidebar-branch-ganti text-[11px] text-up-primary hover:text-indigo-400 font-medium cursor-pointer"
-                        onclick="window.dispatchEvent(new CustomEvent('open-branch-modal'))"
-                    >
-                        Ganti
-                    </button>
+                    @if(auth()->check() && auth()->user()->daftarCabangAkses()->count() > 1)
+                        <button
+                            type="button"
+                            class="sidebar-branch-ganti text-[11px] text-up-primary hover:text-indigo-400 font-medium cursor-pointer"
+                            onclick="window.dispatchEvent(new CustomEvent('open-branch-modal'))"
+                        >
+                            Ganti
+                        </button>
+                    @endif
                 </div>
             </div>
 
@@ -344,7 +346,7 @@
             <p class="text-xs text-ink-400 mb-3">Cabang aktif akan dipakai Dashboard, POS, WMS, dan modul lain.</p>
 
             <div class="space-y-2">
-                @foreach(auth()->user()->cabangs as $cb)
+                @foreach(auth()->user()->daftarCabangAkses() as $cb)
                     <button type="button"
                             @click="switchBranch({{ $cb->id }})"
                             class="w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer

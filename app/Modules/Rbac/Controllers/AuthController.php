@@ -34,7 +34,7 @@ class AuthController extends Controller
         }
 
         $permissions = $user->getAllPermissions()->pluck('name');
-        $cabangs = $user->cabangs;
+        $cabangs = $user->daftarCabangAkses();
 
         $data = [
             'user' => $user,
@@ -42,13 +42,15 @@ class AuthController extends Controller
             'cabangs' => $cabangs,
         ];
 
-        // If user has exactly 1 cabang, auto-set in session
-        if ($cabangs->count() === 1) {
+        // Auto-set session ke cabang default atau cabang aktif pertama
+        $defaultCabang = $user->cabangDefault();
+        if ($defaultCabang) {
             session([
-                'cabang_id' => $cabangs->first()->id,
-                'cabang_nama' => $cabangs->first()->nama,
+                'cabang_id' => $defaultCabang->id,
+                'cabang_nama' => $defaultCabang->nama,
             ]);
-            $data['cabang_id'] = $cabangs->first()->id;
+            $data['cabang_id'] = $defaultCabang->id;
+            $data['cabang_nama'] = $defaultCabang->nama;
         }
 
         return $this->success($data, 'Login berhasil');
@@ -81,7 +83,7 @@ class AuthController extends Controller
         $cabang = Cabang::findOrFail($request->cabang_id);
 
         // Verify user has access to this cabang
-        $hasAccess = $user->cabangs()->where('cabang_id', $request->cabang_id)->exists();
+        $hasAccess = $user->bisaAksesCabang((int) $request->cabang_id);
 
         if (! $hasAccess) {
             return $this->error('Anda tidak memiliki akses ke cabang ini', 403);

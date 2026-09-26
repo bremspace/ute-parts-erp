@@ -95,14 +95,36 @@ class ServisController extends Controller
         return $this->success($tikets, 'Daftar tiket servis berhasil diambil');
     }
 
+    /**
+     * [T-06 / P0-10] Ambil tiket servis yang WAJIB milik cabang aktif sesi.
+     *
+     * Semua endpoint yang memuat `/servis/{id}...` memakai helper ini supaya tidak ada jalur
+     * baca/ubah yang bocor silang-cabang. Pola filter disamakan dengan
+     * `index()` di atas: `session('cabang_id')` null → filter dilewati.
+     * Tiket milik cabang lain diperlakukan "tidak ada" → `findOrFail` → 404.
+     */
+    private function tiketScoped(int|string $id): TiketServis
+    {
+        $query = TiketServis::query();
+
+        $cabangId = session('cabang_id');
+
+        if ($cabangId) {
+            $query->where('cabang_id', $cabangId);
+        }
+
+        return $query->findOrFail($id);
+    }
+
     // [API: SERVICE-03] Detail tiket servis
     public function show(Request $request, $id)
     {
-        $tiket = TiketServis::with([
+        // [T-06 / P0-10] Scoped cabang — tiket cabang lain → 404 (bukan bocor).
+        $tiket = $this->tiketScoped($id)->load([
             'jenisServis', 'pelanggan.tierMembership', 'teknisi', 'garansi',
             'statusLogs.user', 'spareparts.produk', 'spareparts.skuVariant', 'cabang',
             'items', // [T-17]
-        ])->findOrFail($id);
+        ]);
 
         // [B-06] Kunci gadget tampil utk SEMUA role yg berhak membuka tiket servis.
         // Pintu akses = middleware route `permission:servis.view` (teknisi, admin-toko,
@@ -120,7 +142,7 @@ class ServisController extends Controller
             'alasan' => 'nullable|string',
         ]);
 
-        $tiket = TiketServis::findOrFail($id);
+        $tiket = $this->tiketScoped($id);
 
         try {
             $tiket = $this->servisService->updateStatus(
@@ -140,21 +162,30 @@ class ServisController extends Controller
     public function setEstimasi(Request $request, $id)
     {
         $request->validate([
-            'estimasi_biaya' => 'required|numeric|min:0',
+            'estimasi_biaya' => 'nullable|numeric|min:0',
             'alasan' => 'required|string',
+            'items' => 'nullable|array',
+            'items.*.tipe' => 'required_with:items|in:part,jasa',
+            'items.*.nama_item' => 'nullable|string',
+            'items.*.produk_id' => 'nullable|exists:produk,id',
+            'items.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
+            'items.*.jenis_servis_id' => 'nullable|exists:jenis_servis,id',
+            'items.*.qty' => 'nullable|integer|min:1',
+            'items.*.harga' => 'nullable|numeric|min:0',
         ]);
 
-        $tiket = TiketServis::findOrFail($id);
+        $tiket = $this->tiketScoped($id);
 
         try {
             $tiket = $this->servisService->setEstimasi(
                 $tiket,
-                (float) $request->estimasi_biaya,
+                (float) ($request->estimasi_biaya ?? 0),
                 $request->alasan,
-                $request->user()
+                $request->user(),
+                $request->items ?? []
             );
 
-            return $this->success($tiket, 'Estimasi biaya tersimpan, menunggu approval pelanggan');
+            return $this->success($tiket->load('estimasiItems'), 'Estimasi biaya tersimpan, menunggu approval pelanggan');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
         }
@@ -172,7 +203,7 @@ class ServisController extends Controller
             'items.*.harga_satuan' => 'nullable|numeric|min:0',
         ]);
 
-        $tiket = TiketServis::findOrFail($id);
+        $tiket = $this->tiketScoped($id);
 
         try {
             $parts = $this->servisService->inputSparepart(
@@ -201,12 +232,36 @@ class ServisController extends Controller
             'items.*.gudang_id' => 'required_if:items.*.tipe,part|exists:gudang,id',
         ]);
 
-        $tiket = TiketServis::findOrFail($id);
+        $tiket = $this->tiketScoped($id);
 
         try {
             $rows = $this->servisService->inputPekerjaan($tiket, $request->items, $request->user());
 
             return $this->success($rows, 'Pekerjaan servis dicatat (part & jasa terpisah)');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 400);
+        }
+    }
+
+    // [API: SERVICE-09][T-12] Pelunasan pembayaran servis
+    public function bayar(Request $request, $id)
+    {
+        $request->validate([
+            'metode_pembayaran' => 'required|string|in:tunai,transfer,qris,kartu',
+            'catatan' => 'nullable|string',
+        ]);
+
+        $tiket = $this->tiketScoped($id);
+
+        try {
+            $tiket = $this->servisService->bayar(
+                $tiket,
+                $request->metode_pembayaran,
+                $request->user(),
+                $request->catatan
+            );
+
+            return $this->success($tiket, 'Pembayaran servis berhasil dicatat');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 400);
         }

@@ -3,6 +3,47 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-09-26 — Servis End-to-End: Estimasi Part & Jasa, Kunci HP, Jurnal Piutang & Bayar, Tracking Publik, Booking Online, Guard RBAC & Integritas ✅
+
+Perbaikan menyeluruh alur modul Servis end-to-end (Fase A, A.2, B, C, D) sesuai `docs/review-servis-plan-perbaikan.md`:
+
+**Perubahan per modul & fitur:**
+
+- **Estimasi Terperinci & Manajemen Kunci HP (Fase A.2):**
+  - Migrasi `biaya_jasa` di `jenis_servis` dan tabel baru `tiket_servis_estimasi_item`. Model `TiketServisEstimasiItem` dengan relasi `estimasiItems()` di `TiketServis`.
+  - Formulir modal estimasi di `ServisBoard` multi-baris part (katalog cabang, info stok, resolusi harga tier pelanggan via `PricingService`) dan template jasa (`jenis_servis.biaya_jasa` atau custom).
+  - Pre-fill otomatis baris estimasi ke form `inputPekerjaan` saat status `disetujui` / `dikerjakan`.
+  - UX Kunci HP: toggle intip PIN/Password (`👁️`), visual grid interaktif 3x3 pola titik + reset pola di modal terima unit, dan visual urutan node aktif 3x3 di modal detail teknisi.
+- **Integritas Transaksi & Stok (Fase A):**
+  - Kunci idempotensi jurnal `onSelesai` (`servis:{id}`) mencegah double posting saat paralel request atau retry.
+  - Penanganan tiket ditolak (`onDitolak`): soft-delete `dibatalkan_at` pada item part & kembalikan stok fisik net-outflow tanpa menimbulkan stok hantu.
+  - Fail-closed penambahan item setelah tiket diselesaikan (`tanggal_selesai !== null`).
+  - Scoping gudang cabang: `inputSparepart` dan `inputPekerjaan` memvalidasi gudang milik cabang tiket servis.
+- **Pembayaran & Buku Besar (Fase B):**
+  - Migrasi kolom pembayaran pada `tiket_servis`: `status_pembayaran`, `tanggal_bayar`, `metode_pembayaran`, `no_jurnal_bayar`.
+  - Jurnal `onSelesai`: Debit **`120-01` (Piutang Usaha)**, Kredit Pendapatan Jasa (`420-01`), Pendapatan Penjualan Part (`410-01`), dan HPP (`510-02` D / `130-01` K). Kas toko tidak digelembungkan sebelum pembayaran fisik.
+  - Method & endpoint `POST /api/servis/{id}/bayar` (`ServisService::bayar`): Debit **`110-01` (Kas)** / Kredit **`120-01` (Piutang Usaha)** dengan idempotency key `servis-bayar:{id}`.
+  - Guard transisi `diambil`: unit dilarang diserahkan sebelum `status_pembayaran === 'lunas'`.
+  - Modal kasir pembayaran di `ServisBoard` & pembaruan kolom export laporan servis (`REALISASI`, `STATUS BAYAR`, `METODE`, `NO JURNAL BAYAR`).
+- **Sisi Konsumen, Tracking & Booking Online (Fase C):**
+  - Token tracking unik (`token_approval`) dibuat otomatis sejak checkin (`terimaUnit`) dan booking online.
+  - Halaman tracking publik `/tracking/{token}`: stepper status lengkap (termasuk banner tiket ditolak), card rincian biaya estimasi dengan tabel penawaran part & jasa, tombol persetujuan web (`POST /tracking/{token}/approve` dan `reject`), rincian pekerjaan fisik, status pembayaran badge, dan timeline riwayat perbaikan (`statusLogs`).
+  - Formulir Booking Servis Online publik (`BookingServis.php` Livewire) di `/booking-servis` dengan link navigasi di header marketplace.
+  - Antrean konfirmasi booking online di Kanban staf (`ServisBoard`) dengan card alert dan tombol "Konfirmasi & Terima Unit".
+  - Endpoint API tracking publik `/api/servis/tracking/{token}` dipindahkan ke grup throttle publik tanpa middleware `auth:sanctum`.
+  - Integrasi HTTP client gateway WA (Fonnte/Wablas) di `KirimNotifikasiJob` dan pengiriman notifikasi status ramah manusia ke nomor HP pelanggan.
+- **RBAC, Lapis Kualitas & Pengamanan Data (Fase D):**
+  - Guard `servis.approve-estimasi` di `ServisBoard::prosesApprove` untuk mencegah self-approval teknisi.
+  - Wajibkan `alasan` saat melakukan override status.
+  - Larangan `inputPekerjaan` saat tiket berstatus `qc`.
+  - Pengamanan `ShopController::accountServis`: paginasi, select eksplisit, dan sembunyikan `kunci_terenkripsi` serta `foto_unit`.
+  - Allow-list `SUMBER_VALID` pada `JurnalService::post`.
+
+**Verifikasi:**
+- 83 test suite modul servis & integritas lulus 100% (390 assertions).
+- `./vendor/bin/pint --test` lulus (436 file clean).
+- `npm run build` sukses tanpa warning/error.
+
 ## 2026-09-26 — B-15c: N+1 WMS + Servis (foto kanban, transfer, PO, opname, lead, depresiasi) ✅
 
 Tujuh titik N+1 / pemuatan-seluruh-baris ditutup. Angka sebelum → sesudah **diukur langsung di fixture yang sama** (bukan estimasi): payload baris kanban 30 tiket berfoto **12.020.425 byte → 10.790 byte** (±1.100×), query `stok_items` form transfer **6 → 1** untuk M=3 (2 per baris × M), validasi `[WMS-02]` **N → 1**, guard jurnal depresiasi **A → 1** (8 aset: 8 → 1), baris `stok_opname_item` ter-fetch per render **2.000–10.000 → 0** (count jadi subquery), daftar PO siap diterima **tak terbatas → 50** (dengan pesan Indonesia), dropdown produk **tak terbatas (500–2.000) → 300 + scope cabang**.

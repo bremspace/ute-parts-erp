@@ -11,9 +11,29 @@ use Illuminate\Database\Seeder;
  *  110-01 Kas, 130-01 Persediaan, 210-03 Utang Komisi,
  *  410-01 Pendapatan Penjualan, 420-01 Pendapatan Jasa Servis,
  *  510-01 Beban Komisi, 510-02 HPP.
+ *
+ * [T-02 / P0-4] Seeder WAJIB untuk instalasi fresh: `composer setup` menjalankan
+ * `db:seed --class=Database\Seeders\AkunCoaSeeder` tepat setelah `migrate --force`
+ * (BUKAN `DatabaseSeeder` penuh — seeding penuh itu urusan dev) karena jurnal
+ * servis `onSelesai` fail-closed: akun COA yang tidak ada / nonaktif membuat
+ * SETIAP tiket gagal masuk status `selesai` (lihat `JurnalService` →
+ * `ValidasiBarisJurnal::cariAktif()`).
+ *
+ * IDEMPOTEN: aman dijalankan berulang (`firstOrCreate` + `updateOrCreate` pada
+ * daftar akun wajib). Akun wajib servis dipaksa `is_active = true` supaya
+ * instalasi fresh / seed ulang tidak lagi menghasilkan jurnal yang ditolak.
+ * Akun NON-wajib tidak disentuh `is_active`-nya (memPERTIHANKAN keputusan admin
+ * menonaktifkan akun).
  */
 class AkunCoaSeeder extends Seeder
 {
+    /**
+     * [T-02] Akun yang WAJIB ada & aktif agar jurnal modul Servis bisa diposting
+     * (`ServisService::onSelesai`: Piutang D / Pendapatan K / HPP D / Persediaan K;
+     *  `ServisService::bayar`: Kas D / Piutang K).
+     */
+    public const AKUN_WAJIB_SERVIS = ['110-01', '120-01', '130-01', '410-01', '420-01', '510-02'];
+
     public function run(): void
     {
         $coa = [
@@ -60,6 +80,30 @@ class AkunCoaSeeder extends Seeder
             AkunCOA::firstOrCreate(
                 ['kode' => $data['kode']],
                 ['nama' => $data['nama'], 'tipe' => $data['tipe'], 'kelompok' => $data['kelompok'], 'saldo_normal' => $data['saldo_normal']]
+            );
+        }
+
+        // [T-02] Guard akun WAJIB servis: harus ADA + AKTIF (jurnal `onSelesai`
+        // fail-closed bila akun hilang / nonaktif). `updateOrCreate` → idempoten,
+        // aman dijalankan ulang (setup ulang, instalasi baru).
+        $definisi = collect($coa)->keyBy('kode');
+
+        foreach (self::AKUN_WAJIB_SERVIS as $kode) {
+            $data = $definisi->get($kode);
+
+            if (! is_array($data)) {
+                continue; // tidak mungkin — kode hardcoded di atas — tapi jangan sampai fatal
+            }
+
+            AkunCOA::updateOrCreate(
+                ['kode' => $kode],
+                [
+                    'nama' => $data['nama'],
+                    'tipe' => $data['tipe'],
+                    'kelompok' => $data['kelompok'],
+                    'saldo_normal' => $data['saldo_normal'],
+                    'is_active' => true,
+                ]
             );
         }
     }

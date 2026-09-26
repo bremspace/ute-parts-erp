@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'keluhan', 'kondisi_fisik', 'foto_unit', 'status', 'sumber', 'estimasi_biaya',
     'alasan_estimasi', 'token_approval', 'tanggal_terima', 'tanggal_selesai',
     'tanggal_diambil', 'catatan_admin',
+    'status_pembayaran', 'tanggal_bayar', 'metode_pembayaran', 'no_jurnal_bayar',
 ])]
 class TiketServis extends Model
 {
@@ -29,6 +30,7 @@ class TiketServis extends Model
         'tanggal_terima' => 'datetime',
         'tanggal_selesai' => 'datetime',
         'tanggal_diambil' => 'datetime',
+        'tanggal_bayar' => 'datetime',
         'kunci_terenkripsi' => 'encrypted', // [T-19] terenkripsi at-rest
     ];
 
@@ -70,5 +72,10 @@ class TiketServis extends Model
     public function items(): HasMany
     {
         return $this->hasMany(TiketServisItem::class); // [T-17] split part & jasa
+    }
+
+    public function estimasiItems(): HasMany
+    {
+        return $this->hasMany(TiketServisEstimasiItem::class);
     }
 }

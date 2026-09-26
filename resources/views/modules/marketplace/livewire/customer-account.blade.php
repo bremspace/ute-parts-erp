@@ -93,11 +93,27 @@
                             <x-prism.status-pill :status="$sv->status" />
                         </div>
                         <p class="text-xs text-ink-500 mt-2">{{ $sv->keluhan }}</p>
+                        @if($sv->estimasi_biaya !== null || $sv->status_pembayaran)
+                            <div class="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-ink-50 text-xs">
+                                @if($sv->estimasi_biaya !== null)
+                                    <span class="text-ink-500">
+                                        Estimasi Biaya: <strong class="text-ink-900 tabular-nums">Rp {{ number_format($sv->estimasi_biaya, 0, ',', '.') }}</strong>
+                                    </span>
+                                @endif
+                                @if($sv->status_pembayaran)
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $sv->status_pembayaran === 'lunas' ? 'bg-up-mint/10 text-up-mint' : 'bg-up-amber/10 text-up-amber' }}">
+                                        {{ $sv->status_pembayaran === 'lunas' ? 'Lunas' : 'Belum Bayar' }}
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
                         <div class="flex items-center justify-between mt-3 pt-3 border-t border-ink-100">
                             <span class="text-xs {{ $sv->garansi && $sv->garansi->active ? 'text-up-mint font-bold' : 'text-ink-400' }}">
                                 {{ $sv->garansi && $sv->garansi->active ? '🛡️ Dalam Garansi s.d ' . $sv->garansi->tanggal_berakhir->format('d/m/Y') : 'Garansi ' . ($sv->garansi ? 'habis' : 'belum ada') }}
                             </span>
-                            <a href="{{ url('/tracking/' . $sv->token_approval) }}" target="_blank" class="text-up-primary font-bold text-xs hover:underline">Lihat Tracking →</a>
+                            @if($sv->token_approval)
+                                <a href="{{ url('/tracking/' . $sv->token_approval) }}" target="_blank" class="text-up-primary font-bold text-xs hover:underline">Lihat Tracking & Persetujuan →</a>
+                            @endif
                         </div>
                     </div>
                 @empty

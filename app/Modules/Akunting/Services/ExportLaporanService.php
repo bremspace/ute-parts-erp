@@ -347,14 +347,41 @@ class ExportLaporanService
     private function dataServis(string $dari, string $sampai, ?int $cabangId): array
     {
         $rows = [['LAPORAN SERVIS'], []];
-        $rows[] = ['NO TIKET', 'JENIS HP', 'STATUS', 'ESTIMASI', 'TANGGAL TERIMA'];
+        $rows[] = ['NO TIKET', 'JENIS HP', 'STATUS', 'STATUS BAYAR', 'METODE', 'ESTIMASI', 'REALISASI', 'NO JURNAL BAYAR', 'TGL TERIMA', 'TGL SELESAI', 'TGL BAYAR'];
 
-        $q = TiketServis::whereDate('created_at', '>=', $dari)->whereDate('created_at', '<=', $sampai);
+        $q = TiketServis::with(['items', 'spareparts'])
+            ->whereDate('created_at', '>=', $dari)
+            ->whereDate('created_at', '<=', $sampai);
+
         if ($cabangId) {
             $q->where('cabang_id', $cabangId);
         }
+
         foreach ($q->get() as $t) {
-            $rows[] = [$t->no_tiket, $t->jenis_hp, $t->status, $t->estimasi_biaya, $t->tanggal_terima?->format('d/m/Y')];
+            $activeItems = $t->items->whereNull('dibatalkan_at');
+            $activeSpareparts = $t->spareparts->whereNull('dibatalkan_at');
+
+            if ($activeItems->isNotEmpty() || $activeSpareparts->isNotEmpty()) {
+                $totalItem = $activeItems->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
+                $totalSparepart = $activeSpareparts->sum(fn ($sp) => (float) $sp->harga_satuan * (int) $sp->jumlah);
+                $realisasi = $totalItem + $totalSparepart;
+            } else {
+                $realisasi = $t->estimasi_biaya;
+            }
+
+            $rows[] = [
+                $t->no_tiket,
+                $t->jenis_hp,
+                $t->status,
+                $t->status_pembayaran ?? 'belum_bayar',
+                $t->metode_pembayaran ?? '-',
+                $t->estimasi_biaya,
+                $realisasi,
+                $t->no_jurnal_bayar ?? '-',
+                $t->tanggal_terima?->format('d/m/Y'),
+                $t->tanggal_selesai?->format('d/m/Y'),
+                $t->tanggal_bayar?->format('d/m/Y'),
+            ];
         }
 
         return $rows;

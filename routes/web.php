@@ -15,6 +15,7 @@ use App\Modules\Hr\Livewire\HrSayaPage;
 use App\Modules\Hr\Livewire\KomisiSkemaPage;
 use App\Modules\Hr\Livewire\PayrollPage;
 use App\Modules\Marketplace\Controllers\PaymentController;
+use App\Modules\Marketplace\Livewire\BookingServis;
 use App\Modules\Marketplace\Livewire\CartCheckout;
 use App\Modules\Marketplace\Livewire\CustomerAccount;
 use App\Modules\Marketplace\Livewire\ShopPage;
@@ -28,6 +29,7 @@ use App\Modules\Report\Livewire\ReportBuilder;
 use App\Modules\Reseller\Livewire\ResellerDashboard;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Livewire\CycleCountPage;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
 use App\Modules\Wms\Livewire\WmsDashboard;
@@ -44,7 +46,14 @@ Route::get('/shop/{slug}', ShopPage::class)->name('shop.detail');
 
 // Tracking servis publik (PRD §4.3: link status via token, tanpa login)
 Route::get('/tracking/{token}', function ($token) {
-    $tiket = TiketServis::with('garansi')
+    $tiket = TiketServis::with([
+        'garansi',
+        'cabang',
+        'jenisServis',
+        'estimasiItems',
+        'statusLogs' => fn ($q) => $q->orderBy('created_at', 'asc'),
+        'items',
+    ])
         ->where('token_approval', $token)
         ->first();
 
@@ -52,19 +61,83 @@ Route::get('/tracking/{token}', function ($token) {
         'tiket' => $tiket ? [
             'no_tiket' => $tiket->no_tiket,
             'jenis_hp' => $tiket->jenis_hp,
+            'seri_hp' => $tiket->seri_hp,
             'status' => $tiket->status,
+            'keluhan' => $tiket->keluhan,
             'estimasi_biaya' => $tiket->estimasi_biaya,
-            'tanggal_terima' => $tiket->tanggal_terima?->format('d/m/Y'),
-            'tanggal_selesai' => $tiket->tanggal_selesai?->format('d/m/Y'),
-            'cabang' => $tiket->cabang?->nama,
+            'token_approval' => $tiket->token_approval,
+            'status_pembayaran' => $tiket->status_pembayaran,
+            'tanggal_terima' => $tiket->tanggal_terima?->format('d/m/Y H:i'),
+            'tanggal_selesai' => $tiket->tanggal_selesai?->format('d/m/Y H:i'),
+            'tanggal_bayar' => $tiket->tanggal_bayar?->format('d/m/Y H:i'),
+            'cabang' => $tiket->cabang ? [
+                'nama' => $tiket->cabang->nama,
+                'telepon' => $tiket->cabang->telepon ?? null,
+                'alamat' => $tiket->cabang->alamat ?? null,
+            ] : null,
             'garansi' => $tiket->garansi ? [
-                'mulai' => $tiket->garansi->tanggal_mulai->format('d/m/Y'),
-                'berakhir' => $tiket->garansi->tanggal_berakhir->format('d/m/Y'),
+                'mulai' => $tiket->garansi->tanggal_mulai?->format('d/m/Y'),
+                'berakhir' => $tiket->garansi->tanggal_berakhir?->format('d/m/Y'),
                 'aktif' => $tiket->garansi->active,
             ] : null,
+            'estimasi_items' => $tiket->estimasiItems->map(fn ($item) => [
+                'nama_item' => $item->nama_item,
+                'tipe' => $item->tipe,
+                'qty' => $item->qty,
+                'harga' => $item->harga,
+                'subtotal' => $item->subtotal,
+            ])->toArray(),
+            'items' => $tiket->items->map(fn ($item) => [
+                'nama_item' => $item->nama_item,
+                'tipe' => $item->tipe,
+                'qty' => $item->qty,
+                'harga' => $item->harga,
+                'subtotal' => (float) ($item->harga * $item->qty),
+            ])->toArray(),
+            'timeline' => $tiket->statusLogs->map(fn ($log) => [
+                'status_dari' => $log->status_dari,
+                'status_ke' => $log->status_ke,
+                'aksi' => $log->aksi,
+                'catatan' => $log->catatan,
+                'created_at' => $log->created_at?->format('d/m/Y H:i'),
+            ])->toArray(),
         ] : null,
     ]);
 })->name('servis.tracking');
+
+Route::post('/tracking/{token}/approve', function (Request $request, $token) {
+    try {
+        app(ServisService::class)->approveByToken(
+            $token,
+            'approve',
+            $request->input('alasan', 'Disetujui oleh pelanggan via web tracking')
+        );
+
+        return redirect()->back()->with('success', 'Terima kasih! Estimasi telah Anda setujui. Teknisi kami akan segera memulai perbaikan.');
+    } catch (Exception $e) {
+        return redirect()->back()->with('error', $e->getMessage());
+    }
+})->name('servis.tracking.approve');
+
+Route::post('/tracking/{token}/reject', function (Request $request, $token) {
+    try {
+        app(ServisService::class)->approveByToken(
+            $token,
+            'reject',
+            $request->input('alasan', 'Ditolak oleh pelanggan via web tracking')
+        );
+
+        return redirect()->back()->with('info', 'Estimasi perbaikan telah Anda tolak.');
+    } catch (Exception $e) {
+        return redirect()->back()->with('error', $e->getMessage());
+    }
+})->name('servis.tracking.reject');
+
+if (class_exists(BookingServis::class)) {
+    Route::get('/booking-servis', BookingServis::class)->name('servis.booking');
+} else {
+    Route::get('/booking-servis', fn () => 'Booking Servis')->name('servis.booking');
+}
 
 // ===== [API: PAY-02] Webhook Duitku — path tanpa prefix /api (PRD §5) =====
 // Duitku menembak POST /webhook/duitku dengan json body — bebaskan dari CSRF.
@@ -186,12 +259,12 @@ Route::post('/app/login', function (Request $request) {
         session(['two_factor_setup_required' => true]);
     }
 
-    // [T-42] Set active cabang sesi secara otomatis (pertama akses)
-    $firstCabang = auth()->user()->cabangs()->orderBy('id')->first();
-    if ($firstCabang) {
+    // [T-42] Set active cabang sesi secara otomatis (berdasarkan cabang default/pertama aktif)
+    $defaultCabang = auth()->user()->cabangDefault();
+    if ($defaultCabang) {
         session([
-            'cabang_id' => $firstCabang->id,
-            'cabang_nama' => $firstCabang->nama,
+            'cabang_id' => $defaultCabang->id,
+            'cabang_nama' => $defaultCabang->nama,
         ]);
     }
 
@@ -204,7 +277,7 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-Route::prefix('app')->middleware('auth')->group(function () {
+Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function () {
     Route::get('/', fn () => redirect('/app/dashboard'));
 
     // [T-02] Ganti cabang aktif — perbarui session + kembali ke halaman asal (full reload supaya semua modul re-query)
@@ -214,7 +287,7 @@ Route::prefix('app')->middleware('auth')->group(function () {
         $cabang = Cabang::findOrFail($request->cabang_id);
         $user = auth()->user();
 
-        if (! $user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+        if (! $user->bisaAksesCabang($cabang->id)) {
             abort(403, 'Anda tidak memiliki akses ke cabang ini');
         }
 

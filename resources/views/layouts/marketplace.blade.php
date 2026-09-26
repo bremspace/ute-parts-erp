@@ -63,6 +63,8 @@
             <!-- Nav -->
             <nav class="flex items-center gap-1 sm:gap-2">
                 <a href="{{ route('shop') }}" class="min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->is('shop') || request()->is('shop/*') ? 'bg-up-primary text-white' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors inline-flex items-center">Katalog</a>
+                <a href="{{ route('servis.booking') }}" class="min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->routeIs('servis.booking') ? 'bg-up-primary text-white' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors inline-flex items-center">Booking Servis</a>
+                <a href="{{ route('servis.booking') }}" class="min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->routeIs('servis.booking') ? 'bg-up-primary text-white' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors inline-flex items-center">Booking Servis</a>
 
                 <!-- Cart -->
                 <a href="{{ route('cart') }}" class="relative min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->is('cart') || request()->is('checkout') ? 'bg-up-primary text-white' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors flex items-center gap-1.5" aria-label="Keranjang belanja">

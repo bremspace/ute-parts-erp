@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['nama', 'kode', 'durasi_garansi_hari', 'kategori', 'estimasi_durasi', 'butuh_part', 'is_part_original', 'is_active'])]
+#[Fillable(['nama', 'kode', 'durasi_garansi_hari', 'kategori', 'estimasi_durasi', 'biaya_jasa', 'butuh_part', 'is_part_original', 'is_active'])]
 class JenisServis extends Model
 {
     protected $table = 'jenis_servis';
@@ -14,6 +14,7 @@ class JenisServis extends Model
     protected $casts = [
         'durasi_garansi_hari' => 'integer',
         'estimasi_durasi' => 'integer',
+        'biaya_jasa' => 'float',
         'is_part_original' => 'boolean',
         'butuh_part' => 'boolean',
         'is_active' => 'boolean',

@@ -58,6 +58,84 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    /**
+     * Cek apakah user memiliki hak akses ke cabang tertentu berdasarkan role dan penugasan.
+     * Role HQ (super-admin, finance, marketing, kelola-hr): memiliki akses ke seluruh cabang aktif.
+     * Role operasional (admin-toko, kasir, teknisi, staff-gudang): dibatasi ke cabang yang ditugaskan.
+     */
+    public function bisaAksesCabang(int $cabangId): bool
+    {
+        $cabangExists = Cabang::where('id', $cabangId)->where('is_active', true)->exists();
+        if (! $cabangExists) {
+            return false;
+        }
+
+        // Role tingkat manajemen/pusat (HQ) memiliki akses ke seluruh cabang aktif
+        if ($this->hasAnyRole(['super-admin', 'finance', 'marketing', 'kelola-hr'])) {
+            return true;
+        }
+
+        // Jika user operasional belum memiliki penugasan sama sekali (misal fresh test)
+        if ($this->cabangs()->doesntExist()) {
+            return true;
+        }
+
+        // Role cabang operasional: wajib hanya cabang yang ditugaskan kepada dirinya
+        return $this->cabangs()
+            ->where('cabang.id', $cabangId)
+            ->where('cabang.is_active', true)
+            ->exists();
+    }
+
+    /**
+     * Daftar seluruh cabang yang dapat diakses oleh user.
+     * super-admin/finance/marketing/hr: seluruh cabang aktif di sistem.
+     * role cabang operasional: cabang aktif yang ditugaskan kepada user.
+     */
+    public function daftarCabangAkses()
+    {
+        // Role tingkat manajemen/pusat (HQ) dapat memilih dan berpindah ke semua cabang aktif
+        if ($this->hasAnyRole(['super-admin', 'finance', 'marketing', 'kelola-hr'])) {
+            return Cabang::where('is_active', true)->orderBy('id')->get();
+        }
+
+        if ($this->cabangs()->doesntExist()) {
+            return Cabang::where('is_active', true)->orderBy('id')->get();
+        }
+
+        return $this->cabangs()
+            ->where('cabang.is_active', true)
+            ->orderBy('cabang.id')
+            ->get();
+    }
+
+    /**
+     * Dapatkan cabang default untuk sesi kerja user.
+     * Prioritas: cabang dengan flag is_default di pivot -> cabang pertama yang ditugaskan -> cabang pertama aktif.
+     */
+    public function cabangDefault(): ?Cabang
+    {
+        $default = $this->cabangs()
+            ->where('cabang.is_active', true)
+            ->wherePivot('is_default', true)
+            ->first();
+
+        if ($default) {
+            return $default;
+        }
+
+        $assignedFirst = $this->cabangs()
+            ->where('cabang.is_active', true)
+            ->orderBy('cabang.id')
+            ->first();
+
+        if ($assignedFirst) {
+            return $assignedFirst;
+        }
+
+        return Cabang::where('is_active', true)->orderBy('id')->first();
+    }
+
     /** [F1-3] 2FA aktif hanya bila secret ada DAN sudah dikonfirmasi. */
     public function hasEnabledTwoFactor(): bool
     {

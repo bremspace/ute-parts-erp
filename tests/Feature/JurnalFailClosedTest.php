@@ -74,8 +74,8 @@ class JurnalFailClosedTest extends TestCase
     {
         $tiket = $this->buatTiketSiapSelesai();
 
-        // Hapus akun Kas → jurnal onSelesai pasti gagal
-        AkunCOA::where('kode', '110-01')->delete();
+        // Hapus akun Piutang Usaha → jurnal onSelesai pasti gagal
+        AkunCOA::where('kode', '120-01')->delete();
 
         $gagal = false;
         try {
@@ -84,7 +84,7 @@ class JurnalFailClosedTest extends TestCase
             $gagal = true;
         }
 
-        $this->assertTrue($gagal, 'Jurnal gagal harus dilemmas sebagai exception (fail-closed)');
+        $this->assertTrue($gagal, 'Jurnal gagal harus dilempar sebagai exception (fail-closed)');
 
         $tiket->refresh();
         $this->assertSame('qc', $tiket->status, 'Status tidak boleh final bila jurnal gagal');
@@ -101,10 +101,10 @@ class JurnalFailClosedTest extends TestCase
         $this->assertSame('selesai', $tiket->fresh()->status);
         $this->assertSame(2, JurnalAkuntansi::where('sumber', 'servis')->count(), 'Jurnal servis 2 baris (jasa saja)');
 
-        $kas = AkunCOA::where('kode', '110-01')->first();
+        $piutang = AkunCOA::where('kode', '120-01')->first();
         $pendapatan = AkunCOA::where('kode', '420-01')->first();
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'akun_coa_id' => $kas->id, 'debit' => 150000, 'kredit' => 0,
+            'akun_coa_id' => $piutang->id, 'debit' => 150000, 'kredit' => 0,
         ]);
         $this->assertDatabaseHas('jurnal_akuntansi', [
             'akun_coa_id' => $pendapatan->id, 'debit' => 0, 'kredit' => 150000,

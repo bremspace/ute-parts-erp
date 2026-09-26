@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
+use App\Modules\Pos\Services\PricingService;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
@@ -13,6 +14,8 @@ use App\Modules\Servis\Services\ServisStateMachine;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Services\NomorSeriService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -45,6 +48,7 @@ class ServisBoard extends Component
         'jenis_hp',
         'keluhan',
         'status',
+        'status_pembayaran',
         'estimasi_biaya',
         'created_at',
     ];
@@ -116,6 +120,20 @@ class ServisBoard extends Component
     // [T-17] Form pekerjaan teknisi (item part/jasa) di modal detail
     public array $pekerjaanItems = [];
 
+    // [T-09d] Form estimasi multi-baris (part & jasa)
+    public array $estimasiItems = [];
+
+    // Modal Pembayaran Servis
+    public bool $showBayarModal = false;
+
+    public ?int $bayarTiketId = null;
+
+    public string $bayarMetode = 'tunai'; // tunai, transfer, qris, kartu
+
+    public string $bayarCatatan = '';
+
+    public float $bayarTotalTagihan = 0;
+
     public ?int $pekerjaanGudangId = null;
 
     public function mount()
@@ -153,6 +171,57 @@ class ServisBoard extends Component
         return ServisStateMachine::kanbanColumns();
     }
 
+    /**
+     * [T-06 / P0-10] Query `TiketServis` yang WAJIB dibatasi ke cabang aktif sesi.
+     *
+     * Constraint proyek: semua query wajib scope `cabang_id` (cabang aktif di
+     * session) — tanpa ini papan kanban & modal detail membocorkan tiket cabang
+     * lain (bukti: review P0-10, `docs/review-servis-plan-perbaikan.md:53`).
+     * Polanya sama dengan `ServisController::index()`: `session('cabang_id')`
+     * null → filter dilewati (super-admin belum memilih cabang).
+     * Konsisten dengan `exportLaporan()` yang mengirim `cabangId: session('cabang_id')`.
+     *
+     * Helper ini MENEMPELKAN `where cabang_id` ke query yang sudah ada — urutan
+     * kondisi SQL pun penting: query hydrate tahap-2 di bawah harus tetap
+     * diawali `where "id" in (...)` supaya regression test N+1/B-07
+     * (`WmsServisNplus1Test`) terus mengenali query tersebut.
+     *
+     * @param  Builder<TiketServis>  $query
+     * @return Builder<TiketServis>
+     */
+    private function scopeTiket(Builder $query): Builder
+    {
+        $cabangId = session('cabang_id');
+
+        return $cabangId ? $query->where('cabang_id', $cabangId) : $query;
+    }
+
+    /**
+     * Query dasar `TiketServis` yang sudah ter-scope cabang aktif.
+     *
+     * @return Builder<TiketServis>
+     */
+    private function queryTiketScoped(): Builder
+    {
+        return $this->scopeTiket(TiketServis::query());
+    }
+
+    /**
+     * TiketScoped + `findOrFail` — tiket cabang lain TIDAK ditemukan (lempar 404).
+     *
+     * @throws ModelNotFoundException
+     */
+    private function tiketScoped(?int $id): TiketServis
+    {
+        return $this->queryTiketScoped()->findOrFail($id);
+    }
+
+    /** Versi nullable (dipakai detail modal agar tidak melempar exception ke UI). */
+    private function tiketScopedOrNull(?int $id): ?TiketServis
+    {
+        return $id ? $this->queryTiketScoped()->find($id) : null;
+    }
+
     public function getGroupedTiketsProperty(): array
     {
         // [B-07] Dua tahap — ORDER BY + LIMIT hanya boleh menyentuh kolom SEMPIT.
@@ -162,7 +231,9 @@ class ServisBoard extends Component
         // → satu baris saja sudah melebihi sort buffer → SEMUA varian query list
         // (tanpa filter / status / search) gagal walau index sudah ada, karena
         // optimizer memilih table scan + filesort saat SELECT menyertakan kolom lebar.
-        $base = TiketServis::query();
+        // [T-06 / P0-10] Scope cabang aktif sesi — WAJIB, papan kanban tidak boleh
+        // menampilkan tiket cabang lain (pola `ServisController::index()`).
+        $base = $this->queryTiketScoped();
 
         if ($this->filterStatus) {
             $base->where('status', $this->filterStatus);
@@ -187,10 +258,17 @@ class ServisBoard extends Component
         // WAJIB `select()` SEBELUM `withCount()`: withCount menambahkan subquery ke
         // daftar kolom yang sudah ada (kalau select dipanggil belakangan, subquery-nya
         // tertimpa → `spareparts_count` hilang).
-        $semua = TiketServis::with(['jenisServis', 'pelanggan', 'teknisi', 'garansi'])
+        $hydrate = TiketServis::with(['jenisServis', 'pelanggan', 'teknisi', 'garansi'])
             ->select(self::KOLOM_KANBAN)
             ->withCount('spareparts')
-            ->whereIn('id', $ids)
+            ->whereIn('id', $ids);
+
+        // [T-06 / P0-10] Scope cabang juga dipasang di tahap-2 (defense in depth:
+        // `whereIn` sudah berisi id dari query scoped, tapi tidak boleh jadi
+        // satu-satunya penjaga). Ditambahkan SESUDAH `whereIn` agar bentuk SQL
+        // query hydrate tetap `... where "id" in (...) ...` (kontrak regression
+        // test B-07 / N+1).
+        $semua = $this->scopeTiket($hydrate)
             ->get()
             ->sortByDesc('created_at')
             ->values();
@@ -202,6 +280,44 @@ class ServisBoard extends Component
         }
 
         return $grouped;
+    }
+
+    /**
+     * Antrean booking servis online yang menunggu konfirmasi cabang.
+     */
+    public function getBookingOnlineProperty()
+    {
+        // Dua tahap seperti kanban (B-07): ORDER BY created_at hanya di query id sempit
+        $ids = $this->scopeTiket(
+            TiketServis::where('status', 'diajukan_online')
+        )->latest()->limit(50)->pluck('id');
+
+        return TiketServis::with('pelanggan')
+            ->select(self::KOLOM_KANBAN)
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortByDesc('created_at')
+            ->values();
+    }
+
+    /**
+     * Konfirmasi tiket dari booking online ke diterima.
+     */
+    public function konfirmasiBookingOnline(int $tiketId)
+    {
+        $tiket = $this->tiketScoped($tiketId);
+
+        app(ServisService::class)->updateStatus(
+            $tiket,
+            'diterima',
+            auth()->user(),
+            'Dikonfirmasi staf dari booking online'
+        );
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Tiket {$tiket->no_tiket} berhasil dikonfirmasi dan masuk ke status Diterima.",
+        ]);
     }
 
     // --- Foto handling (base64, opsional — [B-06] tanpa batas minimum) ---
@@ -365,7 +481,7 @@ class ServisBoard extends Component
             return;
         }
 
-        $tiket = TiketServis::findOrFail($tiketId);
+        $tiket = $this->tiketScoped($tiketId);
 
         try {
             $tiket = app(ServisService::class)->updateStatus($tiket, $statusBaru, auth()->user(), $alasan);
@@ -376,12 +492,116 @@ class ServisBoard extends Component
     }
 
     // --- Estimasi ---
+    public function estimasiRowBaru(string $tipe = 'jasa'): array
+    {
+        return [
+            'tipe' => $tipe,
+            'jenis_servis_id' => null,
+            'produk_id' => null,
+            'nama_item' => '',
+            'qty' => 1,
+            'harga' => 0,
+            'subtotal' => 0,
+        ];
+    }
+
+    public function addEstimasiRow(string $tipe = 'jasa'): void
+    {
+        $this->estimasiItems[] = $this->estimasiRowBaru($tipe);
+        $this->recalculateEstimasiTotal();
+    }
+
+    public function removeEstimasiRow(int $idx): void
+    {
+        unset($this->estimasiItems[$idx]);
+        $this->estimasiItems = array_values($this->estimasiItems);
+        $this->recalculateEstimasiTotal();
+    }
+
+    public function updatedEstimasiItems($value, $key): void
+    {
+        $parts = explode('.', (string) $key);
+        $idx = (int) ($parts[0] ?? 0);
+        $field = $parts[1] ?? '';
+
+        if (! isset($this->estimasiItems[$idx])) {
+            return;
+        }
+
+        $row = &$this->estimasiItems[$idx];
+
+        if ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
+            if ($value) {
+                $produk = Produk::find($value);
+                if ($produk) {
+                    $row['nama_item'] = $produk->nama;
+                    $tiket = $this->estimasiTiketId ? $this->tiketScopedOrNull($this->estimasiTiketId) : null;
+                    $pelanggan = $tiket?->pelanggan;
+                    $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual ?? 0);
+                }
+            } else {
+                $row['nama_item'] = '';
+                $row['harga'] = 0;
+            }
+        } elseif ($field === 'jenis_servis_id' && ($row['tipe'] ?? '') === 'jasa') {
+            if ($value) {
+                $jenis = JenisServis::find($value);
+                if ($jenis) {
+                    $row['nama_item'] = $jenis->nama;
+                    $row['harga'] = (float) ($jenis->biaya_jasa ?? 0);
+                }
+            } else {
+                $row['nama_item'] = '';
+                $row['harga'] = 0;
+            }
+        }
+
+        $qty = max(1, (int) ($row['qty'] ?? 1));
+        $harga = (float) ($row['harga'] ?? 0);
+        $row['qty'] = $qty;
+        $row['harga'] = $harga;
+        $row['subtotal'] = $qty * $harga;
+
+        $this->recalculateEstimasiTotal();
+    }
+
+    private function recalculateEstimasiTotal(): void
+    {
+        foreach ($this->estimasiItems as $i => $row) {
+            $qty = max(1, (int) ($row['qty'] ?? 1));
+            $harga = (float) ($row['harga'] ?? 0);
+            $this->estimasiItems[$i]['qty'] = $qty;
+            $this->estimasiItems[$i]['harga'] = $harga;
+            $this->estimasiItems[$i]['subtotal'] = $qty * $harga;
+        }
+
+        $this->estimasiBiaya = (float) array_sum(array_column($this->estimasiItems, 'subtotal'));
+    }
+
     public function openEstimasiModal(int $tiketId)
     {
-        $tiket = TiketServis::findOrFail($tiketId);
+        $tiket = $this->tiketScoped($tiketId);
         $this->estimasiTiketId = $tiketId;
-        $this->estimasiBiaya = (float) ($tiket->estimasi_biaya ?? 0);
         $this->estimasiAlasan = '';
+
+        $existingItems = $tiket->estimasiItems()->get();
+        if ($existingItems->isNotEmpty()) {
+            $this->estimasiItems = $existingItems->map(fn ($it) => [
+                'tipe' => $it->tipe,
+                'jenis_servis_id' => $it->jenis_servis_id,
+                'produk_id' => $it->produk_id,
+                'nama_item' => $it->nama_item,
+                'qty' => $it->qty,
+                'harga' => (float) $it->harga,
+                'subtotal' => (float) $it->subtotal,
+            ])->toArray();
+            $this->estimasiBiaya = (float) array_sum(array_column($this->estimasiItems, 'subtotal'));
+        } else {
+            $this->estimasiItems = [$this->estimasiRowBaru('jasa')];
+            $this->estimasiBiaya = (float) ($tiket->estimasi_biaya ?? 0);
+        }
+
         $this->showEstimasiModal = true;
     }
 
@@ -397,14 +617,15 @@ class ServisBoard extends Component
             'estimasiAlasan' => 'required|string|min:5',
         ]);
 
-        $tiket = TiketServis::findOrFail($this->estimasiTiketId);
+        $tiket = $this->tiketScoped($this->estimasiTiketId);
 
         try {
             app(ServisService::class)->setEstimasi(
                 $tiket,
                 (float) $this->estimasiBiaya,
                 $this->estimasiAlasan,
-                auth()->user()
+                auth()->user(),
+                $this->estimasiItems
             );
             $this->showEstimasiModal = false;
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Estimasi tersimpan, menunggu approval pelanggan']);
@@ -423,15 +644,65 @@ class ServisBoard extends Component
 
     public function prosesApprove(string $action)
     {
-        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin menyetujui/menolak estimasi servis')) {
+        if (! $this->boleh('servis.approve-estimasi', 'Anda tidak punya izin menyetujui/menolak estimasi servis')) {
             return;
         }
 
-        $tiket = TiketServis::findOrFail($this->approveTiketId);
+        $tiket = $this->tiketScoped($this->approveTiketId);
         $statusBaru = $action === 'approve' ? 'disetujui' : 'ditolak';
 
         $this->updateStatus($tiket->id, $statusBaru, $this->approveAlasan ?: ($action === 'approve' ? 'Pelanggan menyetujui estimasi' : 'Estimasi ditolak'));
         $this->showApproveModal = false;
+    }
+
+    // --- Pembayaran Servis ---
+    public function openBayarModal(int $tiketId): void
+    {
+        $tiket = $this->tiketScoped($tiketId);
+
+        if (! in_array($tiket->status, ['selesai', 'diambil'], true)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pembayaran hanya dapat dilakukan saat unit sudah selesai atau diambil']);
+
+            return;
+        }
+
+        if ($tiket->status_pembayaran === 'lunas') {
+            $this->dispatch('alert', ['type' => 'info', 'message' => 'Tiket servis ini sudah lunas']);
+
+            return;
+        }
+
+        $items = $tiket->items()->whereNull('dibatalkan_at')->get();
+        $jasa = (float) $items->where('tipe', 'jasa')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
+        $part = (float) $items->where('tipe', 'part')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
+        $legacy = (float) $tiket->spareparts()->whereNull('dibatalkan_at')->get()->sum(fn ($sp) => (float) $sp->harga_satuan * (int) $sp->jumlah);
+
+        if ($items->isEmpty()) {
+            $jasa = (float) ($tiket->estimasi_biaya ?? 0);
+        }
+
+        $this->bayarTotalTagihan = $jasa + $part + $legacy;
+        $this->bayarTiketId = $tiketId;
+        $this->bayarMetode = 'tunai';
+        $this->bayarCatatan = '';
+        $this->showBayarModal = true;
+    }
+
+    public function prosesBayar(): void
+    {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin memproses pembayaran servis')) {
+            return;
+        }
+
+        $tiket = $this->tiketScoped($this->bayarTiketId);
+
+        try {
+            app(ServisService::class)->bayar($tiket, $this->bayarMetode, auth()->user(), $this->bayarCatatan);
+            $this->showBayarModal = false;
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Pembayaran servis {$tiket->no_tiket} berhasil dicatat (Lunas)."]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     // --- Drag & drop ---
@@ -444,11 +715,37 @@ class ServisBoard extends Component
     // --- Detail ---
     public function openDetail(int $tiketId)
     {
+        // [T-06 / P0-10] Tiket harus milik cabang aktif sesi — kalau tidak, detail
+        // (termasuk kunci gadget terenkripsi) tidak boleh dibuka sama sekali.
+        if (! $this->tiketScopedOrNull($tiketId)) {
+            $this->selectedTiketId = null;
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tiket servis tidak ditemukan di cabang aktif']);
+
+            return;
+        }
+
         $this->selectedTiketId = $tiketId;
         $this->bukaKunciGadget = false; // [B-06] selalu mulai ter-mask
 
-        // [T-17] init satu baris kosong + gudang default cabang sesi
-        $this->pekerjaanItems = [$this->pekerjaanRowBaru()];
+        $tiket = $this->tiketScopedOrNull($tiketId);
+
+        // [T-09d] Prefill ke input pekerjaan teknisi dari estimasiItems jika ada
+        $estimasiItems = $tiket?->estimasiItems()->get();
+        if ($estimasiItems && $estimasiItems->isNotEmpty()) {
+            $this->pekerjaanItems = $estimasiItems->map(fn ($it) => [
+                'tipe' => $it->tipe,
+                'produk_id' => $it->produk_id,
+                'nama_item' => $it->nama_item,
+                'qty' => $it->qty,
+                'harga' => (float) $it->harga,
+                'gudang_id' => null,
+                'sn' => '',
+            ])->toArray();
+        } else {
+            // [T-17] init satu baris kosong
+            $this->pekerjaanItems = [$this->pekerjaanRowBaru()];
+        }
+
         if (! $this->pekerjaanGudangId) {
             $cabangId = session('cabang_id');
             $this->pekerjaanGudangId = $cabangId
@@ -490,7 +787,7 @@ class ServisBoard extends Component
     /** [T-17] Simpan item pekerjaan → ServisService::inputPekerjaan (part: stok 1x, jasa: tagihan) */
     public function simpanPekerjaan()
     {
-        $tiket = TiketServis::findOrFail($this->selectedTiketId);
+        $tiket = $this->tiketScoped($this->selectedTiketId);
 
         if (! $this->boleh('servis.input-sparepart', 'Anda tidak punya izin input sparepart/pekerjaan')) {
             return;
@@ -538,12 +835,14 @@ class ServisBoard extends Component
 
     public function getSelectedTiketProperty(): ?TiketServis
     {
+        // [T-06 / P0-10] Scope cabang aktif sesi (bukan `TiketServis::find()` polos).
         return $this->selectedTiketId
-            ? TiketServis::with([
-                'jenisServis', 'pelanggan.tierMembership', 'teknisi', 'garansi',
-                'statusLogs.user', 'spareparts.produk', 'spareparts.skuVariant', 'cabang',
-                'items', // [T-17]
-            ])->find($this->selectedTiketId)
+            ? $this->queryTiketScoped()
+                ->with([
+                    'jenisServis', 'pelanggan.tierMembership', 'teknisi', 'garansi',
+                    'statusLogs.user', 'spareparts.produk', 'spareparts.skuVariant', 'cabang',
+                    'items', // [T-17]
+                ])->find($this->selectedTiketId)
             : null;
     }
 
@@ -567,6 +866,21 @@ class ServisBoard extends Component
         return false;
     }
 
+    public function getProdukEstimasiListProperty()
+    {
+        $cabangId = session('cabang_id');
+
+        return Produk::where('is_active', true)
+            ->with(['stokItems' => function ($q) use ($cabangId) {
+                if ($cabangId) {
+                    $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId));
+                }
+            }])
+            ->orderBy('nama')
+            ->limit(100)
+            ->get();
+    }
+
     public function render()
     {
         return view('modules.servis.livewire.servis-board', [
@@ -575,11 +889,13 @@ class ServisBoard extends Component
             'teknisiList' => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(),
             'gudangList' => Gudang::where('is_active', true)->get(),
             'produkList' => Produk::where('is_active', true)->orderBy('nama')->limit(50)->get(),
+            'produkEstimasiList' => $this->produkEstimasiList,
             'stateMachineColumns' => $this->stateMachineColumns,
             'groupedTikets' => $this->groupedTikets,
             'selectedTiket' => $this->selectedTiket,
             'fotoCount' => $this->fotoCount,
             'pelangganCariServis' => $this->pelangganCariServis,
+            'bookingOnline' => $this->bookingOnline,
         ])->layout('layouts.backoffice', ['header' => 'Servis HP — Papan Kanban']);
     }
 }
