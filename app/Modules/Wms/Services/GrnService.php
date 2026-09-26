@@ -25,6 +25,9 @@ use Illuminate\Validation\ValidationException;
  * - Qty partial/tolak → status draft + approval F1-1 (rule entity_type 'grn');
  *   setujui via ApprovalService::proses (hook) atau tab GRN → jurnal AP + stok masuk.
  * - Idempoten: transisi hanya dari status 'draft'; JurnalService::post menjaga no_jurnal unik.
+ * - [B-10b/P1-6] Finalisasi (auto & approval) mengunci baris GRN dgn lockForUpdate()
+ *   di dalam DB::transaction — approve/finalize bersamaan tidak menggandakan
+ *   jurnal + stok masuk (subledger Utang ikut terlindungi).
  * - Subledger Utang (AP): finalisasi membuat 1 baris Utang per PO (kunci
  *   referensi_tipe=PurchaseOrder + referensi_id) dengan jumlah = jurnal 210-01
  *   yang diposting — dipakai Laporan Utang & dikurangi PurchaseOrderService::bayarPO.
@@ -175,11 +178,18 @@ class GrnService
         });
     }
 
+    /**
+     * [B-10b/P1-6] Approve/finalize memakai lockForUpdate() pada baris GRN.
+     * `findOrFail` di luar transaksi dulu membaca status basi — dua approver
+     * bersamaan (tab + inbox) bisa dua-duanya melihat 'draft' lalu
+     * menggandakan jurnal + stok masuk. Lock + re-check status di dalam
+     * transaksi membuat yang kedua melihat 'terima' → no-op.
+     */
     public function setujuiGrn(int $grnId, ?int $actionedBy): Grn
     {
-        $grn = Grn::findOrFail($grnId);
+        return DB::transaction(function () use ($grnId, $actionedBy) {
+            $grn = Grn::whereKey($grnId)->lockForUpdate()->firstOrFail();
 
-        return DB::transaction(function () use ($grn, $actionedBy) {
             $this->selesaikanGrn(
                 $grn,
                 $actionedBy ?? ApprovalService::pemohon(),
@@ -192,27 +202,43 @@ class GrnService
 
     public function tolakGrn(int $grnId, ?int $actionedBy, string $catatan): Grn
     {
-        $grn = Grn::findOrFail($grnId);
+        return DB::transaction(function () use ($grnId, $catatan) {
+            $grn = Grn::whereKey($grnId)->lockForUpdate()->firstOrFail();
 
-        if ($grn->status !== 'draft') {
-            return $grn; // idempoten — sudah diproses
-        }
+            if ($grn->status !== 'draft') {
+                return $grn; // idempoten — sudah diproses
+            }
 
-        $grn->update([
-            'status' => 'ditolak',
-            'catatan' => trim(($grn->catatan ? $grn->catatan.' | ' : '').$catatan),
-        ]);
+            $grn->update([
+                'status' => 'ditolak',
+                'catatan' => trim(($grn->catatan ? $grn->catatan.' | ' : '').$catatan),
+            ]);
 
-        return $grn;
+            return $grn;
+        });
     }
 
     /**
      * Finalisasi GRN: jurnal AP (130-01/210-01) + stok masuk + status 'terima'.
      * Hanya bertransisi dari 'draft' — aman terhadap approve ganda (tab + inbox).
+     *
+     * [B-10b/P1-6] Selalu dipanggil dari dalam DB::transaction; baris GRN
+     * di-lock di sini (bukan cuma di setujuiGrn) supaya jalur auto-finalize
+     * inputGudang pun ikut terlindungi.
      */
     protected function selesaikanGrn(Grn $grn, ?int $actionedBy, string $keterangan): void
     {
+        // Instance yang dipanggil caller (dikembalikan inputGudang) — status di
+        // sana bisa basi, jadi semua operasi memakai salinan hasil lockForUpdate.
+        $instancePemanggil = $grn;
+
+        // [B-10b/P1-6] Baris GRN di-lock di sini (bukan cuma di setujuiGrn) supaya
+        // jalur auto-finalize inputGudang pun terlindungi dari finalize bersamaan.
+        $grn = Grn::whereKey($grn->id)->lockForUpdate()->firstOrFail();
+
         if ($grn->status !== 'draft') {
+            $instancePemanggil->setRawAttributes($grn->getAttributes(), true);
+
             return;
         }
 
@@ -289,6 +315,10 @@ class GrnService
         if ($po && $po->status !== 'diterima') {
             $po->update(['status' => 'diterima']);
         }
+
+        // [B-10b/P1-6] Sinkronkan instance milik caller (inputGudang mengembalikannya)
+        // supaya status di memori = status di DB.
+        $instancePemanggil->setRawAttributes($grn->getAttributes(), true);
     }
 
     /**
@@ -394,10 +424,14 @@ class GrnService
             'catatan' => "GRN {$grn->no_grn} — {$qty} x Rp ".number_format($harga, 0, ',', '.')." (PO {$noPo})",
         ]);
 
+        // [B-10i] user_id = petugas yang mem-finalize GRN ($actionedBy, sama dgn
+        // StokLog.user_id & jurnal 130-01/210-01 di atas) — mutasi stok harus
+        // bisa dibuktikan pelakunya.
         StockMutationLog::create([
             'produk_id' => $item['produk_id'],
             'sku_variant_id' => $item['sku_variant_id'] ?? null,
             'gudang_id' => $grn->gudang_id,
+            'user_id' => $actionedBy,
             'delta' => $qty,
             'sumber' => 'grn',
             'referensi_tipe' => Grn::class,

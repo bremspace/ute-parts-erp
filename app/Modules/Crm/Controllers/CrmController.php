@@ -11,14 +11,16 @@ use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\LeadService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
-use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Traits\ApiResponse;
+use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class CrmController extends Controller
 {
@@ -26,7 +28,6 @@ class CrmController extends Controller
 
     public function __construct(
         protected TierService $tierService,
-        protected NotificationService $notifService,
         protected LeadService $leadService
     ) {}
 
@@ -84,9 +85,13 @@ class CrmController extends Controller
         if ($request->isMethod('get')) {
             // [T-22] GET harus membaca nilai TERSIMPAN (bukan hardcode defaults()):
             // tiap kunci: nilai DB bila ada, fallback default bila belum pernah disimpan.
+            // [B-15d] 1 query `whereIn` utk 5 kunci (sebelumnya 1 query per kunci).
+            $defaults = $config->defaults();
+            $terimpan = $config->getMany(array_keys($defaults));
+
             $stored = [];
-            foreach (array_keys($config->defaults()) as $kunci) {
-                $stored[$kunci] = $config->get($kunci) ?? $config->defaults()[$kunci];
+            foreach ($defaults as $kunci => $default) {
+                $stored[$kunci] = $terimpan[$kunci] ?? $default;
             }
             $stored['skema_komisi_default'] = SkemaKomisi::orderBy('id')->get();
 
@@ -116,25 +121,92 @@ class CrmController extends Controller
     // [API: CRM-08][T-23] Buat & kirim broadcast kampanye
     public function broadcastKampanye(Request $request)
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'judul' => 'required|string|max:255',
             'pesan' => 'required|string',
             'channel' => 'required|in:wa,email,inapp',
             'segment' => 'nullable|array',
-            'jadiwalkan_at' => 'nullable|date',
+            'segment.*.tipe' => ['required', 'string', Rule::in(BroadcastService::SEGMENT_TYPES)],
+            'segment.*.nilai' => 'nullable',
+            'dijadwalkan_at' => 'nullable|date|after_or_equal:now',
+            // Alias typo lama; tetap diterima untuk backward-compat.
+            'jadiwalkan_at' => 'nullable|date|after_or_equal:now',
+        ], [
+            'segment.*.tipe.required' => 'Tipe segmen wajib diisi.',
+            'segment.*.tipe.string' => 'Tipe segmen harus berupa teks.',
+            'segment.*.tipe.in' => 'Tipe segmen tidak dikenal.',
+            'dijadwalkan_at.date' => 'Format tanggal jadwal tidak valid.',
+            'dijadwalkan_at.after_or_equal' => 'Jadwal tidak boleh berada di masa lalu.',
+            'jadiwalkan_at.date' => 'Format tanggal jadwal tidak valid.',
+            'jadiwalkan_at.after_or_equal' => 'Jadwal tidak boleh berada di masa lalu.',
         ]);
 
+        $validator->after(function (ValidatorContract $validator) use ($request): void {
+            $segments = $request->input('segment');
+            if (! is_array($segments)) {
+                return;
+            }
+
+            $hasBirthdayMonth = false;
+            $hasBirthdayDay = false;
+
+            foreach ($segments as $index => $segment) {
+                if (! is_array($segment)) {
+                    continue;
+                }
+
+                $tipe = $segment['tipe'] ?? null;
+                $nilai = $segment['nilai'] ?? null;
+                $hasBirthdayMonth = $hasBirthdayMonth || $tipe === 'birthday_month';
+                $hasBirthdayDay = $hasBirthdayDay || $tipe === 'birthday_day';
+
+                if (in_array($tipe, ['tier', 'belum_belanja_hari', 'birthday_month', 'birthday_day'], true)
+                    && ($nilai === null || $nilai === '')) {
+                    $validator->errors()->add("segment.{$index}.nilai", 'Nilai segmen wajib diisi.');
+                }
+
+                if ($tipe === 'belum_belanja_hari'
+                    && ($nilai === null || $nilai === '' || (int) $nilai < 1)) {
+                    $validator->errors()->add("segment.{$index}.nilai", 'Jumlah hari untuk segmen belum belanja harus minimal 1.');
+                }
+
+                if ($tipe === 'birthday_month'
+                    && ($nilai === null || $nilai === '' || (int) $nilai < 1 || (int) $nilai > 12)) {
+                    $validator->errors()->add("segment.{$index}.nilai", 'Bulan ulang tahun harus berada di antara 1 sampai 12.');
+                }
+
+                if ($tipe === 'birthday_day'
+                    && ($nilai === null || $nilai === '' || (int) $nilai < 1 || (int) $nilai > 31)) {
+                    $validator->errors()->add("segment.{$index}.nilai", 'Hari ulang tahun harus berada di antara 1 sampai 31.');
+                }
+            }
+
+            if ($hasBirthdayDay && ! $hasBirthdayMonth) {
+                $validator->errors()->add(
+                    'segment',
+                    'Segmen birthday_day wajib menyertakan birthday_month.'
+                );
+            }
+        });
+
+        $validated = $validator->validate();
+
+        $jadwal = $validated['dijadwalkan_at'] ?? null;
+        if ($jadwal === null || $jadwal === '') {
+            $jadwal = $validated['jadiwalkan_at'] ?? null;
+        }
+
         $kampanye = KampanyeBroadcast::create([
-            'judul' => $request->judul,
-            'pesan' => $request->pesan,
-            'channel' => $request->channel,
-            'segment' => $request->segment ?? [],
-            'status' => $request->jadiwalkan_at ? 'terjadwal' : 'draft',
-            'dijadwalkan_at' => $request->jadiwalkan_at,
+            'judul' => $validated['judul'],
+            'pesan' => $validated['pesan'],
+            'channel' => $validated['channel'],
+            'segment' => $validated['segment'] ?? [],
+            'status' => $jadwal ? 'terjadwal' : 'draft',
+            'dijadwalkan_at' => $jadwal,
             'user_id' => auth()->id(),
         ]);
 
-        if (! $request->jadiwalkan_at) {
+        if (! $jadwal) {
             app(BroadcastService::class)->kirimSekarang($kampanye);
         }
 
@@ -231,39 +303,44 @@ class CrmController extends Controller
         return $this->success(['diperbarui' => $updated], "Rekalkulasi tier selesai, {$updated} pelanggan diperbarui");
     }
 
-    // [API: CRM-05] Broadcast promo ke pelanggan (via queue)
+    // [API: CRM-05] Broadcast promo ke pelanggan (legacy; tetap membuat campaign)
     public function broadcast(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'tier_id' => 'nullable|exists:tier_memberships,id',
             'is_reseller' => 'nullable|boolean',
             'judul' => 'required|string|max:255',
             'pesan' => 'required|string',
         ]);
 
-        $query = Pelanggan::query();
-        if ($request->tier_id) {
-            $query->where('tier_membership_id', $request->tier_id);
+        $segment = [];
+        if ($request->filled('tier_id')) {
+            $segment[] = ['tipe' => 'tier', 'nilai' => (int) $validated['tier_id']];
         }
-        if ($request->has('is_reseller') && $request->is_reseller !== null) {
-            $query->where('is_reseller', filter_var($request->is_reseller, FILTER_VALIDATE_BOOLEAN));
+        if ($request->has('is_reseller') && $request->input('is_reseller') !== null) {
+            $segment[] = [
+                'tipe' => 'reseller',
+                'nilai' => filter_var($validated['is_reseller'], FILTER_VALIDATE_BOOLEAN),
+            ];
         }
 
-        $targetCount = $query->count();
+        // CRM-05 tetap dipertahankan, tetapi memakai satu alur BroadcastService
+        // supaya setiap request legacy juga menghasilkan KampanyeBroadcast + log outbox.
+        $kampanye = KampanyeBroadcast::create([
+            'judul' => $validated['judul'],
+            'pesan' => "[Broadcast] {$validated['pesan']}",
+            'channel' => 'inapp',
+            'segment' => $segment,
+            'status' => 'draft',
+            'user_id' => auth()->id(),
+        ]);
 
-        // Broadcast via queue (PRD §4.9) — batch dari semua pelanggan
-        $query->chunkById(100, function ($pelangganList) use ($request) {
-            foreach ($pelangganList as $p) {
-                $this->notifService->kirim(
-                    'inapp', null,
-                    $request->judul,
-                    "[Broadcast] {$request->pesan}",
-                    ['pelanggan_id' => $p->id]
-                );
-            }
-        });
+        $kampanye = app(BroadcastService::class)->kirimSekarang($kampanye);
 
-        return $this->success(['target_pelanggan' => $targetCount], "Broadcast promo dikirim ke {$targetCount} pelanggan via antrian");
+        return $this->success([
+            'target_pelanggan' => (int) $kampanye->total_target,
+            'kampanye_id' => $kampanye->id,
+        ], "Broadcast promo dikirim ke {$kampanye->total_target} pelanggan via antrian");
     }
 
     // [API: PRICING-support] Progress tier berikutnya

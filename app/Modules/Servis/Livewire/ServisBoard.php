@@ -20,6 +20,35 @@ class ServisBoard extends Component
 {
     use WithPagination;
 
+    /**
+     * [B-15c] Kolom yang dipakai KARTU kanban (lihat servis-board.blade.php: card loop).
+     *
+     * P0: `select *` ikut menarik kolom JSON `foto_unit` — base64 foto 431.406 byte/baris
+     * terukur di db_staging → 100 tiket ≈ 43MB JSON per render kanban (1GB RAM, 2-3
+     * LSAPI worker → GC pressure + risk OOM). `foto_unit` TIDAK boleh masuk select kartu.
+     * Foto tetap tampil saat detail dibuka: `getSelectedTiketProperty()` (:479) query
+     * terpisah `select *` + eager load, jadi galeri foto tidak berubah.
+     *
+     * Kolom relasi (jenis_servis_id / pelanggan_id / teknisi_id / cabang_id) wajib ikut
+     * agar eager load `jenisServis` / `pelanggan` / `teknisi` tetap jalan; `created_at`
+     * dipakai `sortByDesc()` tahap-2 (B-07: TIDAK boleh `order by` kolom lebar).
+     */
+    public const KOLOM_KANBAN = [
+        'id',
+        'no_tiket',
+        'cabang_id',
+        'jenis_servis_id',
+        'pelanggan_id',
+        'teknisi_id',
+        'nama_pelanggan',
+        'telepon_pelanggan',
+        'jenis_hp',
+        'keluhan',
+        'status',
+        'estimasi_biaya',
+        'created_at',
+    ];
+
     // Search & filter
     public string $search = '';
 
@@ -48,7 +77,7 @@ class ServisBoard extends Component
         'kunci_terenkripsi' => '',
         'keluhan' => '',
         'kondisi_fisik' => [],
-        'foto_unit' => [], // BASE64 data URLs (min 2)
+        'foto_unit' => [], // BASE64 data URLs — [B-06] opsional (0-3 foto)
     ];
 
     // Foto preview (base64)
@@ -58,6 +87,10 @@ class ServisBoard extends Component
 
     // Detail Modal
     public ?int $selectedTiketId = null;
+
+    // [B-06] Toggle "Tampilkan" kunci gadget di modal detail — default false,
+    // plaintext baru dirender (masuk DOM) setelah user menekan tombol.
+    public bool $bukaKunciGadget = false;
 
     // Estimasi Modal
     public bool $showEstimasiModal = false;
@@ -122,16 +155,21 @@ class ServisBoard extends Component
 
     public function getGroupedTiketsProperty(): array
     {
-        $query = TiketServis::with(['jenisServis', 'pelanggan', 'teknisi', 'garansi'])
-            ->withCount('spareparts')
-            ->latest();
+        // [B-07] Dua tahap — ORDER BY + LIMIT hanya boleh menyentuh kolom SEMPIT.
+        // Root cause QueryException 1038 "Out of sort memory": MySQL mem-packing
+        // seluruh baris yang di-sort ke dalam `sort_buffer_size` (256KB), sedangkan
+        // `foto_unit` berisi base64 foto (terukur 431.406 byte/baris di db_staging)
+        // → satu baris saja sudah melebihi sort buffer → SEMUA varian query list
+        // (tanpa filter / status / search) gagal walau index sudah ada, karena
+        // optimizer memilih table scan + filesort saat SELECT menyertakan kolom lebar.
+        $base = TiketServis::query();
 
         if ($this->filterStatus) {
-            $query->where('status', $this->filterStatus);
+            $base->where('status', $this->filterStatus);
         }
 
         if ($this->search) {
-            $query->where(function ($q) {
+            $base->where(function ($q) {
                 $q->where('no_tiket', 'like', "%{$this->search}%")
                     ->orWhere('jenis_hp', 'like', "%{$this->search}%")
                     ->orWhere('nama_pelanggan', 'like', "%{$this->search}%")
@@ -139,7 +177,23 @@ class ServisBoard extends Component
             });
         }
 
-        $semua = $query->limit(100)->get();
+        // Tahap 1: hanya `id` (baris sempit) → sort muat di sort buffer,
+        // dan dengan index `created_at` jadi covering index scan (tanpa filesort).
+        $ids = (clone $base)->latest()->limit(100)->pluck('id');
+
+        // Tahap 2: hydrate row SEMPIT + eager load + withCount TANPA ORDER BY
+        // (`whereIn` tidak memicu filesort), urutan dikembalikan di PHP.
+        // [B-15c] select eksplisit → `foto_unit` (JSON 431KB/baris) TIDAK ikut ter-fetch.
+        // WAJIB `select()` SEBELUM `withCount()`: withCount menambahkan subquery ke
+        // daftar kolom yang sudah ada (kalau select dipanggil belakangan, subquery-nya
+        // tertimpa → `spareparts_count` hilang).
+        $semua = TiketServis::with(['jenisServis', 'pelanggan', 'teknisi', 'garansi'])
+            ->select(self::KOLOM_KANBAN)
+            ->withCount('spareparts')
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortByDesc('created_at')
+            ->values();
 
         // Group per column status
         $grouped = [];
@@ -150,7 +204,7 @@ class ServisBoard extends Component
         return $grouped;
     }
 
-    // --- Foto handling (base64, min 2, wajib) ---
+    // --- Foto handling (base64, opsional — [B-06] tanpa batas minimum) ---
     public function handleFotoUpload(int $index, $content)
     {
         if (! $content) {
@@ -184,6 +238,14 @@ class ServisBoard extends Component
     // --- Terima Unit ---
     public function openTerimaModal()
     {
+        // [B-14] Route `/app/servis` hanya dijaga `permission:servis.view`; sejak
+        // role non-teknisi (kasir/marketing) boleh punya permission itu, aksi
+        // yang mengubah data WAJIB diguard sendiri di sini (paralel dengan
+        // middleware API `permission:servis.create`).
+        if (! $this->boleh('servis.create', 'Anda tidak punya izin menerima unit servis')) {
+            return;
+        }
+
         $this->terimaForm = [
             'pelanggan_id' => null,
             'nama_pelanggan' => '',
@@ -261,6 +323,10 @@ class ServisBoard extends Component
 
     public function simpanTerima()
     {
+        if (! $this->boleh('servis.create', 'Anda tidak punya izin menerima unit servis')) {
+            return;
+        }
+
         $this->validate([
             'terimaForm.jenis_hp' => 'required|string|max:255',
             'terimaForm.keluhan' => 'required|string',
@@ -270,14 +336,9 @@ class ServisBoard extends Component
 
         $foto = array_values(array_filter($this->photoInputs));
 
-        if (count($foto) < 2) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Foto unit wajib minimal 2']);
-
-            return;
-        }
-
         $data = $this->terimaForm;
-        $data['foto_unit'] = $foto;
+        // [B-06] foto unit opsional — boleh 0, submit tidak bergantung pada foto
+        $data['foto_unit'] = $foto ?: null;
 
         // [T-19] pola kunci → simpan urutan angka, bukan objek
         if (is_array($data['kunci_terenkripsi'])) {
@@ -297,6 +358,13 @@ class ServisBoard extends Component
     // --- Status update (state machine) ---
     public function updateStatus(int $tiketId, string $statusBaru, string $alasan = '')
     {
+        // [B-14] Guard permission level Livewire (route hanya `servis.view`).
+        // Override Mundur tetap butuh `servis.override-status` (dicek di
+        // ServisService::updateStatus).
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin mengubah status tiket servis')) {
+            return;
+        }
+
         $tiket = TiketServis::findOrFail($tiketId);
 
         try {
@@ -319,6 +387,11 @@ class ServisBoard extends Component
 
     public function simpanEstimasi()
     {
+        // [B-14] Sama dgn API [SERVICE-05] → `permission:servis.update-status`.
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin/input estimasi biaya servis')) {
+            return;
+        }
+
         $this->validate([
             'estimasiBiaya' => 'required|numeric|min:0',
             'estimasiAlasan' => 'required|string|min:5',
@@ -350,6 +423,10 @@ class ServisBoard extends Component
 
     public function prosesApprove(string $action)
     {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin menyetujui/menolak estimasi servis')) {
+            return;
+        }
+
         $tiket = TiketServis::findOrFail($this->approveTiketId);
         $statusBaru = $action === 'approve' ? 'disetujui' : 'ditolak';
 
@@ -368,6 +445,7 @@ class ServisBoard extends Component
     public function openDetail(int $tiketId)
     {
         $this->selectedTiketId = $tiketId;
+        $this->bukaKunciGadget = false; // [B-06] selalu mulai ter-mask
 
         // [T-17] init satu baris kosong + gudang default cabang sesi
         $this->pekerjaanItems = [$this->pekerjaanRowBaru()];
@@ -377,6 +455,12 @@ class ServisBoard extends Component
                 ? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
                 : Gudang::where('is_active', true)->value('id');
         }
+    }
+
+    /** [B-06] Toggle tampil/sembunyi kunci gadget (sensitif) di modal detail */
+    public function toggleKunciGadget(): void
+    {
+        $this->bukaKunciGadget = ! $this->bukaKunciGadget;
     }
 
     private function pekerjaanRowBaru(): array
@@ -408,9 +492,7 @@ class ServisBoard extends Component
     {
         $tiket = TiketServis::findOrFail($this->selectedTiketId);
 
-        if (! auth()->user()->can('servis.input-sparepart')) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin input sparepart/pekerjaan']);
-
+        if (! $this->boleh('servis.input-sparepart', 'Anda tidak punya izin input sparepart/pekerjaan')) {
             return;
         }
 
@@ -463,6 +545,26 @@ class ServisBoard extends Component
                 'items', // [T-17]
             ])->find($this->selectedTiketId)
             : null;
+    }
+
+    /**
+     * [B-14] Guard permission server-side utk aksi mutasi di papan kanban.
+     * Route `/app/servis` hanya dijaga `permission:servis.view`; sekarang role
+     * non-teknisi (kasir/marketing) juga punya permission itu → tanpa guard ini
+     * mereka bisa membuat tiket / ubah status lewat Livewire, padahal hak tsb
+     * (servis.create, servis.update-status) memang TIDAK diberikan.
+     *
+     * @return bool true = boleh lanjut; false = sudah dispatch alert ke user.
+     */
+    private function boleh(string $permission, string $pesan): bool
+    {
+        if (auth()->user()?->can($permission)) {
+            return true;
+        }
+
+        $this->dispatch('alert', ['type' => 'error', 'message' => $pesan]);
+
+        return false;
     }
 
     public function render()

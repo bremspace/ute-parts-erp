@@ -30,7 +30,13 @@ class DepresiasiAsetJob implements ShouldQueue
     public int $timeout = 300;
 
     public function __construct(
-        public ?string $periode = null
+        public ?string $periode = null,
+        /**
+         * [B-15c] Scope cabang opsional. null = semua cabang (jadwal bulanan, default
+         * lama). Diisi dari tombol "Jalankan Depresiasi" (AsetRegister) supaya jurnal
+         * TIDAK pernah bocor ke cabang lain.
+         */
+        public ?int $cabangId = null
     ) {}
 
     /**
@@ -41,7 +47,7 @@ class DepresiasiAsetJob implements ShouldQueue
         // Default: bulan sebelumnya (jadwal monthlyOn tgl 1 → proses bulan lalu)
         $periode = $this->periode ?? now()->startOfMonth()->subMonth()->format('Y-m');
 
-        $hasil = $service->prosesPeriode($periode);
+        $hasil = $service->prosesPeriode($periode, $this->cabangId);
 
         if ($hasil['diproses'] > 0) {
             $notifikasi->kirim(
@@ -61,5 +67,28 @@ class DepresiasiAsetJob implements ShouldQueue
         }
 
         return $hasil;
+    }
+
+    /**
+     * [B-10d] Notifikasi bila job gagal total (tries habis) — depresiasi yang
+     * gagal diam-diam berarti aset tidak disusut & laporan aset menyesatkan.
+     */
+    public function failed(?\Throwable $e): void
+    {
+        $periode = $this->periode ?? now()->startOfMonth()->subMonth()->format('Y-m');
+
+        report($e);
+
+        app(NotificationService::class)->kirim(
+            'inapp',
+            null,
+            'Depresiasi Aset Bulanan Gagal',
+            "Depresiasi aset periode {$periode} gagal: ".($e?->getMessage() ?: 'penyebab tidak diketahui').
+            '. Jurnal depresiasi belum diposting — perlu diperiksa manual.',
+            [
+                'type' => 'error',
+                'periode' => $periode,
+            ]
+        );
     }
 }

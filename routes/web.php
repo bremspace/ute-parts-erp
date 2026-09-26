@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
 use App\Modules\Akunting\Livewire\AkuntingDashboard;
+use App\Modules\Akunting\Livewire\AsetRegister;
 use App\Modules\Akunting\Livewire\LaporanPajak;
 use App\Modules\Crm\Livewire\CrmDashboard;
 use App\Modules\Crm\Livewire\LeadKanban;
@@ -228,8 +229,11 @@ Route::prefix('app')->middleware('auth')->group(function () {
     // Dashboard (DASH-01 widget per role)
     Route::get('/dashboard', DashboardIndex::class)->name('dashboard');
 
-    // POS Kasir Screen
-    Route::get('/pos', PosKasir::class)->name('pos');
+    // POS Kasir Screen — RBAC: permission pos.view (admin-toko/super-admin) ATAU
+    // pos.view-own (role kasir) — pola pipe spatie, sama dgn permission:role|role
+    Route::get('/pos', PosKasir::class)
+        ->name('pos')
+        ->middleware('permission:pos.view|pos.view-own');
 
     // WMS Gudang & Stok Screen — [F2-2] RBAC: permission wms.view (pola servis.view/crm.view)
     Route::get('/wms', WmsDashboard::class)
@@ -255,7 +259,21 @@ Route::prefix('app')->middleware('auth')->group(function () {
     Route::get('/reseller', ResellerDashboard::class)->name('reseller');
 
     // Akunting & Keuangan Screen
-    Route::get('/akunting', AkuntingDashboard::class)->name('akunting');
+    // [B-10a / P0-2] sebelumnya hanya `auth` (grup parent) → Livewire bisa post
+    // jurnal manual, buat COA, dan bayar AR/AP tanpa permission. Permission WAJIB
+    // pakai yang sudah ada di RolesAndPermissionsSeeder (tidak ada permission baru).
+    Route::get('/akunting', AkuntingDashboard::class)
+        ->name('akunting')
+        ->middleware('permission:akunting.view');
+
+    // [F3-3] Register Aset Tetap & Depresiasi — halaman terpisah dari dashboard
+    // akunting (sebelumnya komponennya ada tapi tanpa view & tanpa route → tidak
+    // bisa diakses user sama sekali, audit B-10).
+    // RBAC: permission akunting.view. Mutasi di-gate di komponen AsetRegister:
+    // akunting.create (tambah aset), akunting.approve (depresiasi + disposal).
+    Route::get('/akunting/aset', AsetRegister::class)
+        ->name('aset.register')
+        ->middleware('permission:akunting.view');
 
     // [F1-2] Laporan Pajak Bulanan — RBAC: permission laporan.cabang (finance + admin-toko)
     Route::get('/laporan-pajak', LaporanPajak::class)

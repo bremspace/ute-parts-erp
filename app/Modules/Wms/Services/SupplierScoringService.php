@@ -5,6 +5,8 @@ namespace App\Modules\Wms\Services;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\SupplierScore;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * [F3-2 / G-11] Supplier Scoring Service.
@@ -17,19 +19,27 @@ class SupplierScoringService
     /**
      * Hitung skor untuk semua supplier aktif dalam periode.
      *
+     * [B-15d] Batching: PO periode di-fetch SATU kali untuk seluruh supplier
+     * (`with('items')` eager-load — sebelumnya `hitungAvgHarga` lazy-load
+     * `->items` per PO = N+1 di dalam N supplier). `Supplier::findOrFail()`
+     * yang redundan per supplier (supplier sudah ada di loop) dihapus.
+     * Rumus skor & angka TIDAK berubah.
+     *
      * @param  string  $periode  format YYYY-MM
      * @return array{diproses: int, periode: string}
      */
     public function hitungSemua(string $periode, ?int $cabangId = null): array
     {
-        $query = Supplier::query()
+        $suppliers = Supplier::query()
             ->where('is_active', true)
-            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId));
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->get();
+
+        $poPerSupplier = $this->poPeriodeGrouped($periode, $cabangId, $suppliers->modelKeys());
 
         $diproses = 0;
-
-        foreach ($query->get() as $supplier) {
-            $this->hitungSkor($supplier->id, $periode, $cabangId);
+        foreach ($suppliers as $supplier) {
+            $this->hitungSkorDari($supplier, $periode, $cabangId, $poPerSupplier[(int) $supplier->id] ?? collect());
             $diproses++;
         }
 
@@ -43,16 +53,34 @@ class SupplierScoringService
      */
     public function hitungSkor(int $supplierId, string $periode, ?int $cabangId = null): array
     {
+        // Kontrak publik: supplier tidak ada → tetap 404 (tidak diubah).
         $supplier = Supplier::findOrFail($supplierId);
 
+        $po = $this->poPeriodeGrouped($periode, $cabangId, [$supplierId])[$supplierId] ?? collect();
+
+        return $this->hitungSkorDari($supplier, $periode, $cabangId, $po);
+    }
+
+    /**
+     * Hitung + upsert skor dari sekumpulan PO (sudah ter-scope supplier+periode).
+     * Ekstraksi ini yang dipakai hitungSkor() maupun hitungSemua() supaya
+     * angka keduanya dijamin identik.
+     *
+     * @param  Collection<int, PurchaseOrder>  $po
+     * @return array{on_time_percent: float, quality_return_percent: float, avg_harga: float, total_score: float}
+     */
+    protected function hitungSkorDari(Supplier $supplier, string $periode, ?int $cabangId, Collection $po): array
+    {
+        $supplierId = (int) $supplier->id;
+
         // On-time: PO yang diterima tepat waktu vs jatuh tempo
-        $onTimeStats = $this->hitungOnTime($supplierId, $periode, $cabangId);
+        $onTimeStats = $this->hitungOnTimeDari($po);
 
         // Quality return: % PO dengan return
-        $qualityStats = $this->hitungQualityReturn($supplierId, $periode, $cabangId);
+        $qualityStats = $this->hitungQualityReturnDari($po);
 
         // Average price
-        $avgHarga = $this->hitungAvgHarga($supplierId, $periode, $cabangId);
+        $avgHarga = $this->hitungAvgHargaDari($po);
 
         // Normalisasi harga: perlu rata-rata harga semua supplier
         $normalisasiHarga = 0;
@@ -100,74 +128,112 @@ class SupplierScoringService
     }
 
     /**
-     * Hitung on-time percentage.
+     * [B-15d] PO satu periode untuk N supplier, di-group per supplier_id.
+     *
+     * Jendela tanggal SAMA persis dgn tiga helper lama (awal bulan 00:00:00 →
+     * akhir bulan 23:59:59) dan `with('items')` eager-load supaya tidak ada
+     * lazy-load per PO. Tanpa filter status/status di SQL: ketiga metrik
+     * (on-time, quality, harga) punya filter berbeda dan digabung di PHP —
+     * hasil identik (lihat catatan paritas di tiap helper "Dari").
+     *
+     * @param  array<int, int>  $supplierIds
+     * @return Collection<int, Collection<int, PurchaseOrder>>
      */
-    protected function hitungOnTime(int $supplierId, string $periode, ?int $cabangId = null): array
+    protected function poPeriodeGrouped(string $periode, ?int $cabangId, array $supplierIds): Collection
     {
-        $startDate = $periode.'-01';
-        $endDate = date('Y-m-t', strtotime($startDate));
-
-        $query = PurchaseOrder::query()
-            ->where('supplier_id', $supplierId)
-            ->where('status', 'selesai')
-            ->whereBetween('created_at', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
-
-        if ($cabangId) {
-            $query->where('cabang_id', $cabangId);
+        if ($supplierIds === []) {
+            return collect();
         }
 
-        $pors = $query->get();
-        $total = $pors->count();
-        $onTime = $pors->where('jatuh_tempo', '>=', now()->subDays(30))->count();
+        /** @var Collection<int, PurchaseOrder> $po */
+        $po = $this->poPeriodeQuery($periode, $cabangId, $supplierIds)->get();
 
-        return ['total' => $total, 'on_time' => $onTime];
+        /** @var Collection<int, Collection<int, PurchaseOrder>> $grouped */
+        $grouped = $po->groupBy(fn (PurchaseOrder $p): int => (int) $p->supplier_id);
+
+        return $grouped;
     }
 
     /**
-     * Hitum quality return percentage.
+     * Query PO periode (created_at) utk daftar supplier. `with('items')` eager-load.
+     *
+     * @param  array<int, int>  $supplierIds
      */
-    protected function hitungQualityReturn(int $supplierId, string $periode, ?int $cabangId = null): array
-    {
-        $startDate = $periode.'-01';
-        $endDate = date('Y-m-t', strtotime($startDate));
-
-        $query = PurchaseOrder::query()
-            ->where('supplier_id', $supplierId)
-            ->where('status', '!=', 'draft')
-            ->whereBetween('created_at', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
-
-        if ($cabangId) {
-            $query->where('cabang_id', $cabangId);
-        }
-
-        $pors = $query->get();
-        $total = $pors->count();
-        $returned = $pors->where('status', 'ditolak')->count();
-
-        return ['total' => $total, 'returned' => $returned];
-    }
-
-    /**
-     * Hitung rata-rata harga per item supplier.
-     */
-    protected function hitungAvgHarga(int $supplierId, string $periode, ?int $cabangId = null): float
+    protected function poPeriodeQuery(string $periode, ?int $cabangId, array $supplierIds): Builder
     {
         $startDate = $periode.'-01 00:00:00';
         $endDate = date('Y-m-t 23:59:59', strtotime($startDate));
 
-        $query = PurchaseOrder::query()
-            ->where('supplier_id', $supplierId)
+        return PurchaseOrder::query()
+            ->whereIn('supplier_id', $supplierIds)
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->whereHas('items');
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->with('items');
+    }
 
-        if ($cabangId) {
-            $query->where('cabang_id', $cabangId);
-        }
+    /**
+     * Hitung on-time percentage dari PO yg SUDAH ter-scope (varian in-memory).
+     *
+     * PARITAS: SQL lama `where('status','selesai')` → `=== 'selesai'` (kolom
+     * enum NOT NULL, jadi NULL tidak mungkin). Filter jatuh tempo tetap
+     * operator native `>=` atas dua objek Carbon persis seperti
+     * `Collection::where('jatuh_tempo', '>=', now()->subDays(30))` — batasnya
+     * dihitung SEKALI di luar loop, sama seperti argumen Collection::where.
+     *
+     * @param  Collection<int, PurchaseOrder>  $po
+     * @return array{total: int, on_time: int}
+     */
+    protected function hitungOnTimeDari(Collection $po): array
+    {
+        $selesai = $po->filter(fn (PurchaseOrder $p): bool => $p->getAttribute('status') === 'selesai');
+        $batas = now()->subDays(30);
 
-        // Average harga_beli dari semua item PO supplier dalam periode
-        $avg = 0;
-        $pors = $query->get();
-        $hargas = $pors->flatMap(fn ($po) => $po->items->pluck('harga_beli'))->filter();
+        return [
+            'total' => $selesai->count(),
+            'on_time' => $selesai->filter(fn (PurchaseOrder $p): bool => $p->jatuh_tempo >= $batas)->count(),
+        ];
+    }
+
+    /**
+     * Hitung quality return percentage dari PO yg SUDAH ter-scope.
+     *
+     * PARITAS: SQL lama `where('status','!=','draft')` → PHP `!== null && !== 'draft'`
+     * (SQL `!=` juga membuang NULL, kolom enum NOT NULL). `ditolak` = `=== 'ditolak'`.
+     *
+     * @param  Collection<int, PurchaseOrder>  $po
+     * @return array{total: int, returned: int}
+     */
+    protected function hitungQualityReturnDari(Collection $po): array
+    {
+        // `getAttribute()` (bukan properti) supaya guard NULL tetap dievaluasi:
+        // SQL `!=` membuang NULL, jadi NULL harus ikut terbuang di PHP.
+        $bukanDraft = $po->filter(function (PurchaseOrder $p): bool {
+            $status = $p->getAttribute('status');
+
+            return $status !== null && $status !== 'draft';
+        });
+
+        return [
+            'total' => $bukanDraft->count(),
+            'returned' => $bukanDraft->filter(fn (PurchaseOrder $p): bool => $p->getAttribute('status') === 'ditolak')->count(),
+        ];
+    }
+
+    /**
+     * Rata-rata harga_beli item dari PO yg SUDAH ter-scope.
+     *
+     * PARITAS: SQL lama `whereHas('items')` → filter PHP `$po->items->isNotEmpty()`
+     * (ekuivalen: relasi items kosong = tidak lolos EXISTS), `->filter()` buang
+     * nilai falsy, `round(avg(), 2)` sama.
+     *
+     * @param  Collection<int, PurchaseOrder>  $po
+     */
+    protected function hitungAvgHargaDari(Collection $po): float
+    {
+        $hargas = $po
+            ->filter(fn (PurchaseOrder $p) => $p->items->isNotEmpty())
+            ->flatMap(fn (PurchaseOrder $p) => $p->items->pluck('harga_beli'))
+            ->filter();
 
         return $hargas->count() > 0 ? round($hargas->avg(), 2) : 0;
     }

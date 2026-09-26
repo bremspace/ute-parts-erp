@@ -6,6 +6,7 @@ use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Reseller\Services\KomisiService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -191,19 +192,35 @@ class LeadService
 
     /**
      * Get funnel data for dashboard.
+     *
+     * [B-15d] 1 query `GROUP BY stage` (sebelumnya 2 query × 6 tahap = 12 query).
+     * Angka WAJIB identik: SUM(nilai_estimasi) per stage sama dgn `sum()` per
+     * tahap, dan `count` per tahap sama dgn COUNT(*) per grup. `COALESCE(…,0)`
+     * menjaga hasil `value` tetap numerik (tidak null) seperti `sum()` lama.
      */
     public function getFunnelData(?int $cabangId = null): array
     {
         $stages = ['baru', 'kontak', 'kualifikasi', 'negosiasi', 'won', 'lost'];
+
+        /** @var Collection<string, \stdClass> $agregat hasil GROUP BY (bukan model) */
+        $agregat = Lead::forCabang($cabangId)
+            ->selectRaw('stage, COUNT(*) as jml, COALESCE(SUM(nilai_estimasi), 0) as nilai')
+            ->groupBy('stage')
+            ->get()
+            ->toBase()
+            ->keyBy('stage');
+
         $data = [];
 
         foreach ($stages as $stage) {
-            $count = Lead::forCabang($cabangId)->where('stage', $stage)->count();
-            $value = Lead::forCabang($cabangId)->where('stage', $stage)->sum('nilai_estimasi');
+            $baris = $agregat[$stage] ?? null;
+
             $data[$stage] = [
                 'label' => Lead::getStageLabelFromStageStatic($stage),
-                'count' => $count,
-                'value' => $value,
+                'count' => (int) ($baris->jml ?? 0),
+                // Tanpa cast float: nilai balik dibiarkan apa adanya (string decimal
+                // di MySQL / int|float di SQLite) — identik dgn hasil `sum()` lama.
+                'value' => $baris !== null ? $baris->nilai : 0,
             ];
         }
 

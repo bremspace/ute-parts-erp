@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -11,17 +12,57 @@ use Illuminate\Support\Facades\DB;
  */
 class KonfigurasiService
 {
+    /**
+     * [B-15d] TTL cache konfigurasi. Nilai konfigurasi jarang berubah (di-set dari
+     * halaman Pengaturan / API CRM), jadi 5 menit aman; setiap `set()` wajib
+     * forget key terkait (lihat set()) supaya perubahan tetap langsung berlaku.
+     */
+    private const CACHE_TTL = 300;
+
+    private const CACHE_PREFIX = 'crm-konfigurasi:';
+
     public function get(string $kunci, mixed $default = null): mixed
     {
-        $row = DB::table('konfigurasi')->where('kunci', $kunci)->first();
-        if (! $row) {
-            return $default;
+        // [B-15d] Cache per-kunci (invalidasi di set()) — 1 query per kunci hilang.
+        //
+        // Nilai dibungkus array `['nilai' => …]`: `Cache::remember()` memakai
+        // `! is_null($value)` sebagai penanda hit, jadi nilai NULL (kunci yang
+        // belum pernah disimpan) akan MISS terus-menerus dan query terus kena.
+        $hit = Cache::remember(
+            self::CACHE_PREFIX.$kunci,
+            self::CACHE_TTL,
+            fn (): array => ['nilai' => $this->ambilNilai($kunci) ?? $default]
+        );
+
+        return $hit['nilai'];
+    }
+
+    /**
+     * [B-15d] Ambil banyak kunci dalam SATU query (`whereIn`).
+     * Dipakai CrmController::config() GET yang butuh 5 kunci sekaligus —
+     * sebelumnya 5 query (1 per kunci), sekarang 1.
+     *
+     * @param  array<int, string>  $kunci
+     * @return array<string, mixed> hanya kunci yang ADA di tabel konfigurasi
+     */
+    public function getMany(array $kunci): array
+    {
+        $kunci = array_values(array_unique($kunci));
+        if ($kunci === []) {
+            return [];
         }
 
-        $val = $row->nilai;
-        $decoded = json_decode((string) $val, true);
+        $rows = DB::table('konfigurasi')->whereIn('kunci', $kunci)->get();
+        if ($rows->isEmpty()) {
+            return [];
+        }
 
-        return json_last_error() === JSON_ERROR_NONE ? $decoded : $val;
+        $hasil = [];
+        foreach ($rows as $row) {
+            $hasil[$row->kunci] = $this->decode((string) $row->nilai);
+        }
+
+        return $hasil;
     }
 
     public function set(string $kunci, mixed $nilai, ?string $deskripsi = null): void
@@ -44,6 +85,33 @@ class KonfigurasiService
                 'updated_at' => $now,
             ]);
         }
+
+        // [B-15d] Invalidasi cache WAJIB di titik tulis (satu-satunya jalur tulis).
+        Cache::forget(self::CACHE_PREFIX.$kunci);
+    }
+
+    /**
+     * [B-15d] Baca 1 kunci langsung dari DB (tanpa cache) — dipakai `get()`.
+     */
+    private function ambilNilai(string $kunci): mixed
+    {
+        $row = DB::table('konfigurasi')->where('kunci', $kunci)->first();
+        if (! $row) {
+            return null;
+        }
+
+        return $this->decode((string) $row->nilai);
+    }
+
+    /**
+     * Nilai konfigurasi disimpan sebagai string; string JSON → decode, selain itu
+     * dikembalikan apa adanya (paritas dgn perilaku lama).
+     */
+    private function decode(string $val): mixed
+    {
+        $decoded = json_decode($val, true);
+
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : $val;
     }
 
     /**

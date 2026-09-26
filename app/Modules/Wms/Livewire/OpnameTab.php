@@ -147,10 +147,13 @@ class OpnameTab extends Component
                 $stok->update(['jumlah' => $item->stok_fisik]);
 
                 if ($item->selisih !== 0) {
+                    // [B-10i] user_id = approver opname (sama dgn StokLog & approver_id
+                    // di bawah) — mutasi stok harus bisa dibuktikan pelakunya.
                     StockMutationLog::create([
                         'produk_id' => $item->produk_id,
                         'sku_variant_id' => $item->sku_variant_id,
                         'gudang_id' => $opname->gudang_id,
+                        'user_id' => auth()->id(),
                         'delta' => $item->selisih,
                         'sumber' => 'opname',
                         'referensi_tipe' => StokOpname::class,
@@ -189,7 +192,11 @@ class OpnameTab extends Component
         $gudangs = Gudang::where('is_active', true)->get();
 
         // Opname Query
-        $opnames = StokOpname::with(['gudang', 'pembuat', 'approver', 'items.produk'])
+        // [B-15c] Blade hanya butuh JUMLAH item per opname → `withCount('items')`
+        // (1 subquery COUNT) menggantikan `with('items.produk')` yang menarik
+        // 2.000-10.000 baris `stok_opname_item` + satu query produk per item sia-sia.
+        $opnames = StokOpname::with(['gudang', 'pembuat', 'approver'])
+            ->withCount('items')
             ->latest()
             ->take(20)
             ->get();

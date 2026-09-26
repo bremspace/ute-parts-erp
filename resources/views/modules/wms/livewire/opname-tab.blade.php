@@ -7,7 +7,7 @@
                         <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $opn->no_opname }}</td>
                         <td class="py-3.5 px-4 text-ink-300 font-medium">{{ $opn->gudang?->nama }}</td>
                         <td class="py-3.5 px-4 text-ink-400">{{ $opn->pembuat?->name }}</td>
-                        <td class="py-3.5 px-4 text-white font-bold tabular-nums">{{ $opn->items->count() }} sparepart</td>
+                        <td class="py-3.5 px-4 text-white font-bold tabular-nums">{{ $opn->items_count }} sparepart</td>
                         <td class="py-3.5 px-4 text-ink-400">{{ $opn->created_at->format('d/m/Y H:i') }}</td>
                         <td class="py-3.5 px-4">
                             <x-prism.status-pill :status="$opn->status" />

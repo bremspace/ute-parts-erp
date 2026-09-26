@@ -48,6 +48,15 @@ return [
      * Model-specific exclusions via logExcept() are merged with these.
      *
      * [F1-4] Field sensitif tidak pernah ikut tersimpan di before/after JSON.
+     *
+     * [B-10d / P1-3] Daftar diperluas sebagai defense-in-depth: walaupun ada
+     * model yang kelalaian `logAll()`, isi field berikut tetap tidak pernah
+     * masuk snapshot activity log.
+     * - kunci_terenkripsi: pola/tipe kunci HP pelanggan (sudah encrypted-at-rest)
+     * - payload_json: snapshot entitas workflow approval (bisa berisi gaji/komisi)
+     * - pesan / segment: isi & filter kampanye broadcast (data pelanggan)
+     * - password_hash: cukup `password` saja; hash pun tidak pernah diaudit
+     * - kode_verifikasi: OTP login
      */
     'default_except_attributes' => [
         'password',
@@ -57,7 +66,14 @@ return [
         'secret',
         'two_factor_secret',
         'two_factor_recovery_codes',
+        'two_factor_backup_codes',
         'backup_codes',
+        'password_hash',
+        'kunci_terenkripsi',
+        'payload_json',
+        'pesan',
+        'segment',
+        'kode_verifikasi',
     ],
 
     /*

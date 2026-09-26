@@ -18,6 +18,7 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\TipeHp;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -30,6 +31,13 @@ use Maatwebsite\Excel\Facades\Excel;
  * - Idempoten: SKU yang sudah ada di DB → baris error (tidak dobel insert).
  * - Brand & kualitas dibuat otomatis bila nama baru (natural-key firstOrCreate);
  *   satuan WAJIB sudah terdaftar di satuan_unit (referensi terkontrol).
+ *
+ * [B-10f/P1-5] Aturan import:
+ * - SATU file = SATU cabang. File yang menunjuk gudang dari >1 cabang ditolak
+ *   (pesan Indonesia) di preview() DAN commit() sebelum ada mutasi apa pun.
+ * - Jurnal agregat stok awal diposting DI DALAM transaksi chunk yang sama
+ *   dengan mutasi stok chunk tersebut → tidak mungkin jurnal tanpa mutasi atau
+ *   sebaliknya. Chunk 100 baris (bukan 1 transaksi raksasa) demi RAM 1GB.
  */
 class ImportProdukService
 {
@@ -139,12 +147,22 @@ class ImportProdukService
 
         // Deteksi delimiter dari sampel isi (bukan header) — template & Laplikasi pakai ';'
         $sampel = '';
+        $headerLine = '';
         $nomor = 0;
         while ($nomor < 25 && ($baris = fgets($handle)) !== false) {
+            if ($nomor === 0) {
+                $headerLine = $baris;
+            }
             if ($nomor >= 2) {
                 $sampel .= $baris;
             }
             $nomor++;
+        }
+        // [B-10f] File cuma 1-2 baris data → sampel kosong → kedua hitungan 0 dan
+        // delimiter selalu jatuh ke ';' (padahal penulis file bisa pakai ',').
+        // Fallback ke baris header (selalu ada & zawali nama kolom koma/titik koma).
+        if (substr_count($sampel, ';') + substr_count($sampel, ',') === 0) {
+            $sampel = $headerLine;
         }
         $titikKoma = substr_count($sampel, ';');
         $koma = substr_count($sampel, ',');
@@ -271,10 +289,15 @@ class ImportProdukService
 
     /**
      * Preview (dry-run): validasi seluruh baris, tanpa mengubah data.
+     *
+     * [B-10f/P1-5] Validasi lintas cabang dijalankan di preview (fail fast)
+     * supaya user tahu SEBELUM commit.
      */
     public function preview(string $filePath): array
     {
         $rows = $this->parseRows($filePath);
+        // [B-10f] File lintas cabang ditolak (tidak ada mutasi stok/jurnal yg bisa dicocokkan)
+        $this->cabangTunggalDariRows($rows);
         // Konteks duplikat diakumulasi per baris SETELAH validasi (prebuild file-penuh
         // menandai baris itu sendiri → semua baris dianggap duplikat).
         $konteks = ['skuDalamFile' => [], 'barcodeDalamFile' => []];
@@ -312,20 +335,34 @@ class ImportProdukService
     /**
      * Commit: proses seluruh baris valid dalam chunk 100 (per-chunk DB transaction),
      * catat stok awal + StockMutationLog 'import:excel' + jurnal agregat 130-01/310-01.
+     *
+     * [B-10f/P1-5] Perbaikan atomik & lintas cabang:
+     * - (a) file yang menunjuk gudang dari >1 cabang DITOLAK (pesan Indonesia),
+     *   checked sebelum mutasi apa pun → tidak ada impor setengah jadi lintas cabang;
+     * - (c) jurnal agregat stok awal diposting DI DALAM transaksi chunk yang sama
+     *   dengan mutasi stoknya → mustahil ada jurnal tanpa mutasi atau sebaliknya
+     *   (rollback chunk mengembalikan keduanya);
+     * - branches:chunk dipakai karena RAM 1GB — satu file besar tidak boleh jadi
+     *   satu transaksi raksasa yang menahan lock (/tmp) lama.
      */
     public function commit(string $filePath, int $importLogId, ?int $userId = null): array
     {
         $rows = $this->parseRows($filePath);
+        // [B-10f] Validasi lintas cabang (fail fast, SEBELUM ada mutasi apa pun)
+        $cabangId = $this->cabangTunggalDariRows($rows);
         $konteks = ['skuDalamFile' => [], 'barcodeDalamFile' => []];
 
         $sukses = 0;
         $gagal = 0;
         $detail = [];
         $totalStokNilai = 0.0;
-        $cabangId = null;
 
-        foreach (array_chunk($rows, 100) as $chunk) {
-            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$detail, &$totalStokNilai, &$cabangId, $userId) {
+        foreach (array_chunk($rows, 100) as $indexChunk => $chunk) {
+            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk) {
+                // Akumulator NILAI per chunk: jurnal di-post dalam transaksi yang
+                // SAMA dengan mutasi stok baris-baris chunk ini.
+                $nilaiChunk = 0.0;
+
                 foreach ($chunk as $i => $row) {
                     $errors = $this->validateRow($row, $konteks);
                     $this->catatKonteks($row, $konteks);
@@ -334,10 +371,13 @@ class ImportProdukService
                         if ($errors) {
                             throw new \Exception(implode('; ', $errors));
                         }
-                        $result = $this->prosesSatuBaris($row, $importLogId, $userId);
+                        // [B-10f] Savepoint per baris (nested transaction): baris gagal
+                        // tidak boleh meninggalkan produk/sku setengah tertulis di dalam
+                        // chunk yang sama — nilai jurnal chunk tetap = mutasi utuh.
+                        $result = DB::transaction(fn () => $this->prosesSatuBaris($row, $importLogId, $userId));
                         $sukses++;
+                        $nilaiChunk += $result['stok_nilai'];
                         $totalStokNilai += $result['stok_nilai'];
-                        $cabangId = $cabangId ?: $result['cabang_id'];
                         $detail[] = ['baris' => $nomorBaris, 'sku' => $row['sku'] ?? '', 'status' => 'ok'];
                     } catch (\Throwable $e) {
                         $gagal++;
@@ -350,18 +390,25 @@ class ImportProdukService
                         ];
                     }
                 }
+
+                // Jurnal agregat stok awal chunk ini: Debit 130-01 / Kredit 310-01
+                // (modal stok awal) — balance, DI DALAM transaksi yang sama dgn
+                // mutasi stok chunk ini (lihat noJurnalChunk).
+                if ($nilaiChunk > 0) {
+                    $this->postJurnalStokAwal(
+                        $importLogId,
+                        $cabangId,
+                        $nilaiChunk,
+                        $userId,
+                        $this->noJurnalChunk($importLogId, $indexChunk)
+                    );
+                }
             });
         }
 
         // Baris number di detail diisi pasca-transaksi (nomor baris = index + 2)
         foreach ($detail as $d => $item) {
             $detail[$d]['baris'] = $d + 2;
-        }
-
-        // Jurnal agregat stok awal: Debit 130-01 / Kredit 310-01 (modal stok awal) — balance.
-        // no_jurnal deterministik per import_log → idempoten (JurnalService guard duplikat).
-        if ($totalStokNilai > 0) {
-            $this->postJurnalStokAwal($importLogId, $cabangId, $totalStokNilai, $userId);
         }
 
         return [
@@ -371,6 +418,60 @@ class ImportProdukService
             'detail' => $detail,
             'jurnal_nilai' => round($totalStokNilai, 2),
         ];
+    }
+
+    /**
+     * [B-10f/P1-5] Resolvi cabang dari gudang-gudang yang dipakai file.
+     *
+     * Import bukan partisi per cabang (sederhana & aman utk RAM 1GB: satu file =
+     * satu cabang), jadi file yang mencampur >1 cabang DITOLAK. Jurnal stok awal
+     * hanya punya satu kolom cabang_id — memaksanya ke baris pertama akan salah
+     * membebankan persediaan antar cabang.
+     *
+     * @return int|null cabang tunggal, atau null bila file tidak menyentuh stok
+     *
+     * @throws \Exception pesan Indonesia bila file lintas cabang
+     */
+    protected function cabangTunggalDariRows(array $rows): ?int
+    {
+        $gudangIds = [];
+        foreach ($rows as $row) {
+            $g = trim((string) ($row['gudang_id'] ?? ''));
+            if ($g !== '') {
+                $gudangIds[(int) $g] = true;
+            }
+        }
+
+        if ($gudangIds === []) {
+            return null;
+        }
+
+        // Satu query (bukan N) — RAM 1GB.
+        $gudang = Gudang::with('cabang')
+            ->whereIn('id', array_keys($gudangIds))
+            ->get(['id', 'cabang_id']);
+
+        $perCabang = [];
+        foreach ($gudang as $g) {
+            if ($g->cabang_id) {
+                $perCabang[(int) $g->cabang_id] = true;
+            }
+        }
+
+        if (count($perCabang) <= 1) {
+            return $perCabang ? (int) array_key_first($perCabang) : null;
+        }
+
+        $namaCabang = collect($perCabang)
+            ->map(fn ($_, $id) => optional($gudang->firstWhere('cabang_id', $id)?->cabang)->nama ?? "Cabang #{$id}")
+            ->values()
+            ->implode(', ');
+
+        throw new \Exception(
+            'Import lintas cabang tidak didukung: file ini menunjuk gudang dari '.count($perCabang)
+            .' cabang ('.$namaCabang.'). Pisahkan file per cabang lalu import satu per satu '
+            .'agar jurnal stok awal tetap ter-posting ke cabang yang benar.'
+        );
     }
 
     /**
@@ -513,6 +614,8 @@ class ImportProdukService
                 'produk_id' => $produk->id,
                 'sku_variant_id' => $variant->id,
                 'gudang_id' => $gudangId,
+                // [B-10f] Jejak pelaku import (kolom nullable, diisi bila ada)
+                'user_id' => $userId,
                 'delta' => $stokAwal,
                 'sumber' => 'import:excel',
                 'referensi_tipe' => ImportLog::class,
@@ -528,13 +631,39 @@ class ImportProdukService
     }
 
     /**
-     * Jurnal stok awal agregat (balance): Debit 130-01 Persediaan / Kredit 310-01 Modal (stok awal).
-     * no_jurnal deterministik per import_log → idempoten (tidak dobel bila job retry).
+     * [B-10f/P1-5] no_jurnal agregat stok awal per import_log + chunk.
+     *
+     * Chunk PERTAMA memakai format lama (tanpa suffix) supaya laporan/assert
+     * yang sudah ada tetap cocok; chunk berikutnya diberi suffix -C{n}.
+     * Deterministik → idempoten (tidak dobel bila job di-retry).
      */
-    protected function postJurnalStokAwal(int $importLogId, ?int $cabangId, float $totalNilai, ?int $userId): void
+    protected function noJurnalChunk(int $importLogId, int $indexChunk): string
     {
-        $noJurnal = 'JRL-IMP-'.now()->format('Ymd').'-IL'.str_pad((string) $importLogId, 4, '0', STR_PAD_LEFT);
+        $dasar = 'JRL-IMP-'.now()->format('Ymd').'-IL'.str_pad((string) $importLogId, 4, '0', STR_PAD_LEFT);
+
+        return $indexChunk > 0
+            ? $dasar.'-C'.($indexChunk + 1)
+            : $dasar;
+    }
+
+    /**
+     * Jurnal stok awal agregat (balance): Debit 130-01 Persediaan / Kredit 310-01 Modal (stok awal).
+     * no_jurnal deterministik per import_log (+chunk) → idempoten (tidak dobel bila job retry).
+     *
+     * [B-10f/P1-5] Dipanggil DI DALAM transaksi chunk yang sama dengan mutasi stoknya.
+     */
+    protected function postJurnalStokAwal(int $importLogId, ?int $cabangId, float $totalNilai, ?int $userId, ?string $noJurnal = null): void
+    {
+        $noJurnal = $noJurnal ?: $this->noJurnalChunk($importLogId, 0);
         if (JurnalAkuntansi::where('no_jurnal', $noJurnal)->exists()) {
+            // [B-10f] Retry parsial: ada mutasi stok baru untuk chunk yang sama.
+            // Jurnal idempoten tidak boleh dobel → tandai agar bisa direkonsiliasi.
+            Log::warning('Jurnal stok awal import sudah pernah diposting — mutasi baru tidak dijurnalkan', [
+                'no_jurnal' => $noJurnal,
+                'import_log_id' => $importLogId,
+                'nilai_baru' => $totalNilai,
+            ]);
+
             return; // sudah diposting (idempotency)
         }
 

@@ -6,6 +6,7 @@ use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Pos\Exceptions\StokTidakCukupException;
 use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
@@ -16,7 +17,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
-use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -199,209 +200,216 @@ class PosController extends Controller
             $gudangId = $firstGudang?->id;
         }
 
-        return DB::transaction(function () use ($request, $cabangId, $gudangId) {
-            // Generate nomor transaksi unik
-            $today = now()->format('Ymd');
-            $countToday = Transaksi::whereDate('created_at', now()->toDateString())
-                ->where('cabang_id', $cabangId)
-                ->count() + 1;
-            $noTransaksi = sprintf('TRX-C%02d-%s-%04d', $cabangId, $today, $countToday);
+        try {
+            return DB::transaction(function () use ($request, $cabangId, $gudangId) {
+                // Generate nomor transaksi unik
+                $today = now()->format('Ymd');
+                $countToday = Transaksi::whereDate('created_at', now()->toDateString())
+                    ->where('cabang_id', $cabangId)
+                    ->count() + 1;
+                $noTransaksi = sprintf('TRX-C%02d-%s-%04d', $cabangId, $today, $countToday);
 
-            $subtotal = 0;
-            $itemsData = [];
+                $subtotal = 0;
+                $itemsData = [];
 
-            // Validasi & siapkan stok
-            foreach ($request->items as $item) {
-                $produk = Produk::findOrFail($item['produk_id']);
-                $qty = (int) $item['jumlah'];
-                $hargaSatuan = (float) $item['harga_satuan'];
-                $diskonItem = (float) ($item['diskon_nominal'] ?? 0);
-                $lineSubtotal = max(0, ($hargaSatuan * $qty) - $diskonItem);
-                $subtotal += $lineSubtotal;
+                // Validasi & siapkan stok
+                foreach ($request->items as $item) {
+                    $produk = Produk::findOrFail($item['produk_id']);
+                    $qty = (int) $item['jumlah'];
+                    $hargaSatuan = (float) $item['harga_satuan'];
+                    $diskonItem = (float) ($item['diskon_nominal'] ?? 0);
+                    $lineSubtotal = max(0, ($hargaSatuan * $qty) - $diskonItem);
+                    $subtotal += $lineSubtotal;
 
-                // Cek ketersediaan stok di gudang jika gudang ditentukan
-                if ($gudangId) {
-                    $stokItem = StokItem::firstOrCreate(
-                        [
-                            'produk_id' => $produk->id,
-                            'sku_variant_id' => $item['sku_variant_id'] ?? null,
-                            'gudang_id' => $gudangId,
-                        ],
-                        ['jumlah' => 0, 'jumlah_minimum' => 0]
-                    );
+                    // Cek ketersediaan stok di gudang jika gudang ditentukan
+                    if ($gudangId) {
+                        $stokItem = StokItem::firstOrCreate(
+                            [
+                                'produk_id' => $produk->id,
+                                'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                                'gudang_id' => $gudangId,
+                            ],
+                            ['jumlah' => 0, 'jumlah_minimum' => 0]
+                        );
 
-                    if ($stokItem->jumlah < $qty) {
-                        throw new \Exception("Stok tidak mencukupi untuk {$produk->nama}. Tersedia: {$stokItem->jumlah}, diminta: {$qty}");
+                        if ($stokItem->jumlah < $qty) {
+                            // [B-02 revisi] Exception domain → controller mengembalikan 422
+                            // + pesan Indonesia (bukan 500 lewat \Exception generik).
+                            throw new StokTidakCukupException(
+                                "Stok tidak mencukupi untuk {$produk->nama}. Tersedia: {$stokItem->jumlah}, diminta: {$qty}",
+                                (int) $produk->id,
+                                (int) $stokItem->jumlah,
+                                (int) $qty,
+                            );
+                        }
                     }
+
+                    $itemsData[] = [
+                        'produk' => $produk,
+                        'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                        'jumlah' => $qty,
+                        'harga_satuan' => $hargaSatuan,
+                        'diskon_nominal' => $diskonItem,
+                        'subtotal' => $lineSubtotal,
+                        'hpp' => (float) $produk->harga_beli,
+                    ];
                 }
 
-                $itemsData[] = [
-                    'produk' => $produk,
-                    'sku_variant_id' => $item['sku_variant_id'] ?? null,
-                    'jumlah' => $qty,
-                    'harga_satuan' => $hargaSatuan,
-                    'diskon_nominal' => $diskonItem,
-                    'subtotal' => $lineSubtotal,
-                    'hpp' => (float) $produk->harga_beli,
-                ];
-            }
+                $diskonHeader = (float) ($request->diskon_nominal ?? 0);
+                if ($request->diskon_persen > 0) {
+                    $diskonHeader += round(($subtotal * (float) $request->diskon_persen) / 100, 2);
+                }
 
-            $diskonHeader = (float) ($request->diskon_nominal ?? 0);
-            if ($request->diskon_persen > 0) {
-                $diskonHeader += round(($subtotal * (float) $request->diskon_persen) / 100, 2);
-            }
+                // [F1-2] PPN per cabang: DPP = subtotal - diskon; totalAkhir = DPP + PPN
+                $dpp = max(0, $subtotal - $diskonHeader);
+                $pajak = app(PajakService::class)->hitung($cabangId, $dpp);
+                $ppnNominal = (float) $pajak['ppn_nominal'];
 
-            // [F1-2] PPN per cabang: DPP = subtotal - diskon; totalAkhir = DPP + PPN
-            $dpp = max(0, $subtotal - $diskonHeader);
-            $pajak = app(PajakService::class)->hitung($cabangId, $dpp);
-            $ppnNominal = (float) $pajak['ppn_nominal'];
+                $totalAkhir = $dpp + $ppnNominal;
+                $jumlahBayar = (float) $request->jumlah_bayar;
+                $kembalian = max(0, $jumlahBayar - $totalAkhir);
 
-            $totalAkhir = $dpp + $ppnNominal;
-            $jumlahBayar = (float) $request->jumlah_bayar;
-            $kembalian = max(0, $jumlahBayar - $totalAkhir);
-
-            $transaksi = Transaksi::create([
-                'no_transaksi' => $noTransaksi,
-                'cabang_id' => $cabangId,
-                'kasir_id' => auth()->id(),
-                'pelanggan_id' => $request->pelanggan_id,
-                'gudang_id' => $gudangId,
-                'sumber' => 'pos',
-                'subtotal' => $subtotal,
-                'diskon_persen' => (float) ($request->diskon_persen ?? 0),
-                'diskon_nominal' => $diskonHeader,
-                'dpp' => $dpp,
-                'pajak_nominal' => $ppnNominal,
-                'ppn_nominal' => $ppnNominal,
-                'total_akhir' => $totalAkhir,
-                'metode_bayar' => $request->metode_bayar,
-                'jumlah_bayar' => $jumlahBayar,
-                'kembalian' => $kembalian,
-                'split_detail' => $request->split_detail,
-                'status' => 'selesai',
-                'catatan' => $request->catatan,
-            ]);
-
-            // Buat item transaksi & kurangi stok
-            foreach ($itemsData as $row) {
-                TransaksiItem::create([
-                    'transaksi_id' => $transaksi->id,
-                    'produk_id' => $row['produk']->id,
-                    'sku_variant_id' => $row['sku_variant_id'],
-                    'jumlah' => $row['jumlah'],
-                    'harga_satuan' => $row['harga_satuan'],
-                    'diskon_nominal' => $row['diskon_nominal'],
-                    'subtotal' => $row['subtotal'],
-                    'hpp' => $row['hpp'],
+                $transaksi = Transaksi::create([
+                    'no_transaksi' => $noTransaksi,
+                    'cabang_id' => $cabangId,
+                    'kasir_id' => auth()->id(),
+                    'pelanggan_id' => $request->pelanggan_id,
+                    'gudang_id' => $gudangId,
+                    'sumber' => 'pos',
+                    'subtotal' => $subtotal,
+                    'diskon_persen' => (float) ($request->diskon_persen ?? 0),
+                    'diskon_nominal' => $diskonHeader,
+                    'dpp' => $dpp,
+                    'pajak_nominal' => $ppnNominal,
+                    'ppn_nominal' => $ppnNominal,
+                    'total_akhir' => $totalAkhir,
+                    'metode_bayar' => $request->metode_bayar,
+                    'jumlah_bayar' => $jumlahBayar,
+                    'kembalian' => $kembalian,
+                    'split_detail' => $request->split_detail,
+                    'status' => 'selesai',
+                    'catatan' => $request->catatan,
                 ]);
 
-                if ($gudangId) {
-                    $stok = StokItem::where('produk_id', $row['produk']->id)
-                        ->where('sku_variant_id', $row['sku_variant_id'])
-                        ->where('gudang_id', $gudangId)
-                        ->first();
-
-                    $sebelum = $stok ? $stok->jumlah : 0;
-                    $setelah = $sebelum - $row['jumlah'];
-
-                    if ($stok) {
-                        $stok->update(['jumlah' => $setelah]);
-                    }
-
-                    StokLog::create([
-                        'gudang_id' => $gudangId,
+                // Buat item transaksi & kurangi stok
+                foreach ($itemsData as $row) {
+                    TransaksiItem::create([
+                        'transaksi_id' => $transaksi->id,
                         'produk_id' => $row['produk']->id,
                         'sku_variant_id' => $row['sku_variant_id'],
-                        'user_id' => auth()->id(),
-                        'jenis' => 'penjualan',
-                        'referensi_tipe' => Transaksi::class,
-                        'referensi_id' => $transaksi->id,
-                        'jumlah_sebelum' => $sebelum,
-                        'perubahan' => -$row['jumlah'],
-                        'jumlah_setelah' => $setelah,
-                        'catatan' => "POS Penjualan {$transaksi->no_transaksi}",
+                        'jumlah' => $row['jumlah'],
+                        'harga_satuan' => $row['harga_satuan'],
+                        'diskon_nominal' => $row['diskon_nominal'],
+                        'subtotal' => $row['subtotal'],
+                        'hpp' => $row['hpp'],
                     ]);
-                }
-            }
 
-            // Jika pelanggan terdaftar, update akumulasi belanja & poin loyalty
-            if ($request->pelanggan_id) {
-                $pelanggan = Pelanggan::find($request->pelanggan_id);
-                if ($pelanggan) {
-                    $pelanggan->increment('total_belanja_12bulan', $totalAkhir);
-                    // Poin: 1% nominal belanja dikali multiplier tier
-                    $multiplier = $pelanggan->tierMembership ? (float) $pelanggan->tierMembership->poin_multiplier : 1.0;
-                    $poinTambahan = (int) floor(($totalAkhir / 1000) * $multiplier);
-                    if ($poinTambahan > 0) {
-                        $pelanggan->increment('poin_loyalty', $poinTambahan);
+                    if ($gudangId) {
+                        // [B-10b/P1-2] Delegasi ke StokDeductionService (satu-satunya
+                        // jalur kanonik): lockForUpdate, kriteria resolusi baris stok
+                        // yang sama dgn gauge kasir, StokLog + StockMutationLog (sinkron
+                        // channel). Sebelumnya API ini menulis StokLog saja sehingga
+                        // stock_mutation_log tidak terisi (P1-2: 12 stok_log vs 3 mutasi).
+                        // [B-02 revisi] izinkanNegatif TIDAK lagi diaktifkan — stok kurang
+                        // ditolak, sama dgn PosKasir (Livewire). Default `false` = tolak.
+                        app(StokDeductionService::class)->kurangi(
+                            produkId: (int) $row['produk']->id,
+                            skuVariantId: $row['sku_variant_id'] ?: null,
+                            gudangId: (int) $gudangId,
+                            qty: (int) $row['jumlah'],
+                            jenis: 'penjualan',
+                            referensiTipe: Transaksi::class,
+                            referensiId: $transaksi->id,
+                            userId: auth()->id(),
+                            catatan: "POS Penjualan {$transaksi->no_transaksi}",
+                        );
                     }
                 }
-            }
 
-            // Jurnal akuntansi otomatis (PRD §4.6): Kas masuk, Pendapatan, HPP, Persediaan turun
-            $jurnalService = app(JurnalService::class);
-            $totalHpp = 0.0;
-            foreach ($itemsData as $row) {
-                $totalHpp += (float) $row['hpp'] * $row['jumlah'];
-            }
+                // Jika pelanggan terdaftar, update akumulasi belanja & poin loyalty
+                if ($request->pelanggan_id) {
+                    $pelanggan = Pelanggan::find($request->pelanggan_id);
+                    if ($pelanggan) {
+                        $pelanggan->increment('total_belanja_12bulan', $totalAkhir);
+                        // Poin: 1% nominal belanja dikali multiplier tier
+                        $multiplier = $pelanggan->tierMembership ? (float) $pelanggan->tierMembership->poin_multiplier : 1.0;
+                        $poinTambahan = (int) floor(($totalAkhir / 1000) * $multiplier);
+                        if ($poinTambahan > 0) {
+                            $pelanggan->increment('poin_loyalty', $poinTambahan);
+                        }
+                    }
+                }
 
-            $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
-            $kasbon = $request->metode_bayar === 'piutang';
+                // Jurnal akuntansi otomatis (PRD §4.6): Kas masuk, Pendapatan, HPP, Persediaan turun
+                $jurnalService = app(JurnalService::class);
+                $totalHpp = 0.0;
+                foreach ($itemsData as $row) {
+                    $totalHpp += (float) $row['hpp'] * $row['jumlah'];
+                }
 
-            // Kasbon (piutang): debit Piutang Usaha 120-01, bukan Kas 110-01
-            // [F1-2] Balance: debit totalAkhir = kredit (DPP 410-01 + PPN 220-01)
-            $lines = [
-                ['akun_kode' => $kasbon ? '120-01' : '110-01', 'debit' => (float) $totalAkhir, 'kredit' => 0],
-                ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? (float) $dpp : (float) $totalAkhir],  // Pendapatan = DPP
-            ];
-            // PPN Keluaran → akun 220-01 (kontrak AC F1-2)
-            foreach (app(PajakService::class)->jurnalLines($ppnNominal, $noJurnal, $cabangId, auth()->id() ?? 0) as $ppnLine) {
-                $lines[] = $ppnLine;
-            }
-            if ($totalHpp > 0) {
-                $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0]; // HPP
-                $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp]; // Persediaan turun
-            }
+                $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
+                $kasbon = $request->metode_bayar === 'piutang';
 
-            $jurnalService->post(
-                $noJurnal,
-                now(),
-                'pos',
-                $lines,
-                "Jurnal POS {$noTransaksi}",
-                $cabangId,
-                auth()->id(),
-                Transaksi::class,
-                $transaksi->id
-            );
+                // Kasbon (piutang): debit Piutang Usaha 120-01, bukan Kas 110-01
+                // [F1-2] Balance: debit totalAkhir = kredit (DPP 410-01 + PPN 220-01)
+                $lines = [
+                    ['akun_kode' => $kasbon ? '120-01' : '110-01', 'debit' => (float) $totalAkhir, 'kredit' => 0],
+                    ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? (float) $dpp : (float) $totalAkhir],  // Pendapatan = DPP
+                ];
+                // PPN Keluaran → akun 220-01 (kontrak AC F1-2)
+                foreach (app(PajakService::class)->jurnalLines($ppnNominal, $noJurnal, $cabangId, auth()->id() ?? 0) as $ppnLine) {
+                    $lines[] = $ppnLine;
+                }
+                if ($totalHpp > 0) {
+                    $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0]; // HPP
+                    $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp]; // Persediaan turun
+                }
 
-            // Kasbon → catat Piutang (AR)
-            if ($kasbon && $request->pelanggan_id) {
-                $countPiutang = Piutang::where('cabang_id', $cabangId)
-                    ->whereDate('created_at', now()->toDateString())
-                    ->count() + 1;
-                Piutang::create([
-                    'no_piutang' => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
-                    'pelanggan_id' => $request->pelanggan_id,
-                    'transaksi_id' => $transaksi->id,
-                    'cabang_id' => $cabangId,
-                    'jumlah' => $totalAkhir,
-                    'jumlah_dibayar' => 0,
-                    'jatuh_tempo' => now()->addDays(30)->toDateString(),
-                    'status' => 'belum_lunas',
-                    'keterangan' => 'Kasbon POS '.$noTransaksi,
-                ]);
-            }
+                $jurnalService->post(
+                    $noJurnal,
+                    now(),
+                    'pos',
+                    $lines,
+                    "Jurnal POS {$noTransaksi}",
+                    $cabangId,
+                    auth()->id(),
+                    Transaksi::class,
+                    $transaksi->id
+                );
 
-            // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif
-            app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
+                // Kasbon → catat Piutang (AR)
+                if ($kasbon && $request->pelanggan_id) {
+                    $countPiutang = Piutang::where('cabang_id', $cabangId)
+                        ->whereDate('created_at', now()->toDateString())
+                        ->count() + 1;
+                    Piutang::create([
+                        'no_piutang' => sprintf('AR-%s-%04d', now()->format('Ymd'), $countPiutang),
+                        'pelanggan_id' => $request->pelanggan_id,
+                        'transaksi_id' => $transaksi->id,
+                        'cabang_id' => $cabangId,
+                        'jumlah' => $totalAkhir,
+                        'jumlah_dibayar' => 0,
+                        'jatuh_tempo' => now()->addDays(30)->toDateString(),
+                        'status' => 'belum_lunas',
+                        'keterangan' => 'Kasbon POS '.$noTransaksi,
+                    ]);
+                }
 
-            return $this->success(
-                $transaksi->load(['items.produk', 'items.skuVariant', 'pelanggan', 'cabang']),
-                'Transaksi berhasil diproses',
-                201
-            );
-        });
+                // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif
+                app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
+
+                return $this->success(
+                    $transaksi->load(['items.produk', 'items.skuVariant', 'pelanggan', 'cabang']),
+                    'Transaksi berhasil diproses',
+                    201
+                );
+            });
+        } catch (StokTidakCukupException $e) {
+            // [B-02 revisi] Stok kurang → 422 + pesan Indonesia. Transaksi sudah
+            // rollback oleh DB::transaction, jadi tidak ada transaksi/jurnal/stok
+            // yang tertinggal. Error lain tetap naik sebagai 500 (tidak ditutupi).
+            return $this->error($e->getMessage(), 422);
+        }
     }
 
     // [API: POS-05] Daftar transaksi (filter status, di-scope cabang; default cabang aktif)

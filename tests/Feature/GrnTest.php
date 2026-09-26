@@ -9,6 +9,7 @@ use App\Modules\Akunting\Models\Utang;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Livewire\GrnTab;
 use App\Modules\Wms\Livewire\PoTab;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
@@ -622,5 +623,104 @@ class GrnTest extends TestCase
 
         // Jurnal GRN tetap hanya 2 baris (tidak dobel / tidak ada jurnal kedua)
         $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', $grn->no_grn)->count());
+    }
+
+    // ===== [B-10b/P1-6] Row lock GRN/PO + referensi jurnal + cabang_id Utang =====
+
+    /** PO draft (belum dikirim) → jalur legacy terimaBarang boleh jalan. */
+    private function buatPoDraft(int $qtyItem, float $harga, string $metodeBayar = 'kredit'): PurchaseOrder
+    {
+        $po = PurchaseOrder::create([
+            'no_po' => 'PO-DRAFT-'.Str::random(6),
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'status' => 'draft',
+            'metode_bayar' => $metodeBayar,
+            'total' => $qtyItem * $harga,
+            'total_dibayar' => 0,
+        ]);
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'produk_id' => $this->produk->id,
+            'harga_beli' => $harga,
+            'jumlah' => $qtyItem,
+            'subtotal' => $qtyItem * $harga,
+        ]);
+
+        return $po->load('items');
+    }
+
+    /**
+     * Jurnal penerimaan PO & jurnal pembayaran PO harus bisa ditelusuri balik ke
+     * PO (referensi_tipe/referensi_id) — tanpa ini rekonsiliasi AP & drill-down
+     * audit tidak bisa jalan.
+     */
+    public function test_jurnal_terima_dan_bayar_po_di_stamp_referensi_purchase_order(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDraft(10, 50000, 'kredit'); // total 500.000
+
+        app(PurchaseOrderService::class)->terimaBarang($po, $this->user->id);
+
+        // Jurnal penerimaan (130-01 debit / 210-01 kredit) ter-stamp referensi PO
+        $jurnalTerima = JurnalAkuntansi::where('sumber', 'pembelian')->get();
+        $this->assertCount(2, $jurnalTerima);
+        foreach ($jurnalTerima as $baris) {
+            $this->assertEquals(PurchaseOrder::class, $baris->referensi_tipe);
+            $this->assertEquals($po->id, (int) $baris->referensi_id);
+        }
+
+        // Utang subledger WAJIB punya cabang_id (scoping Laporan Utang per cabang)
+        $utang = Utang::where('referensi_tipe', PurchaseOrder::class)
+            ->where('referensi_id', $po->id)->firstOrFail();
+        $this->assertEquals(
+            (int) $this->cabang->id,
+            (int) $utang->cabang_id,
+            'Utang dari PurchaseOrderService wajib stamp cabang_id gudang tujuan PO'
+        );
+        $this->assertEquals(500000, (float) $utang->jumlah);
+
+        // Jurnal pembayaran (210-01 debit / 110-01 kredit) juga ter-stamp referensi PO
+        app(PurchaseOrderService::class)->bayarPO($po->fresh(), 200000, $this->user->id);
+
+        $jurnalBayar = JurnalAkuntansi::where('sumber', 'manual')->get();
+        $this->assertCount(2, $jurnalBayar);
+        foreach ($jurnalBayar as $baris) {
+            $this->assertEquals(PurchaseOrder::class, $baris->referensi_tipe);
+            $this->assertEquals($po->id, (int) $baris->referensi_id);
+        }
+    }
+
+    /**
+     * [B-10b/P1-6] GrnService mengunci baris GRN dgn lockForUpdate di dalam
+     * transaksi → approve/finalize bersamaan (tab + inbox) tidak menggandakan
+     * jurnal, stok, maupun subledger Utang. Dip modeling sequential pada kode
+     * yang sama: panggilan kedua membaca status 'terima' di bawah lock.
+     */
+    public function test_finalisasi_grn_ganda_tetap_satu_jurnal_satu_stok_satu_utang(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(10, 50000);
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 6], $this->user->id); // partial → draft
+
+        $req = $this->requestGrn($grn->id);
+        $approver = $this->approver();
+
+        // 3 jalur finalisasi "bersamaan" (inbox approve + tab approve + auto path)
+        $req->proses('approved', $approver->id, 'Selisih wajar');
+        $this->service()->setujuiGrn($grn->id, $approver->id);
+        $this->service()->setujuiGrn($grn->id, $approver->id);
+
+        $this->assertEquals('terima', $grn->fresh()->status);
+        $this->assertSame(2, JurnalAkuntansi::where('no_jurnal', $grn->no_grn)->count(), 'Jurnal tidak boleh dobel');
+        $this->assertSame(1, Utang::count(), 'Subledger Utang tidak boleh dobel');
+        $this->assertEquals(
+            6,
+            (int) StokItem::where('produk_id', $this->produk->id)->where('gudang_id', $this->gudang->id)->value('jumlah'),
+            'Stok masuk tidak boleh dobel'
+        );
+        $this->assertSame(1, StockMutationLog::where('referensi_tipe', Grn::class)->count());
+        $this->assertSame(1, StokLog::where('jenis', 'GRN')->count());
     }
 }

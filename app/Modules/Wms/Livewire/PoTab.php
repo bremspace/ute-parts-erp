@@ -22,6 +22,16 @@ class PoTab extends Component
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
+    /**
+     * [B-15c] Batas dropdown produk PO. Master produk global bisa 500-2.000 baris;
+     * dropdown tanpa paginasi menarik semuanya tiap render. Dipotong → user diberi
+     * tahu (lihat peringatanProdukDipotong()).
+     */
+    public const PRODUK_DROPDOWN_LIMIT = 300;
+
+    /** [B-15c] Pengaman jumlah gudang per cabang (normally < 10). */
+    public const GUDANG_DROPDOWN_LIMIT = 100;
+
     // [T-10] PO dan Supplier
     public bool $showPoModal = false;
 
@@ -47,6 +57,48 @@ class PoTab extends Component
             'items' => [['produk_id' => null, 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1]],
         ];
         $this->showPoModal = true;
+
+        // [B-15c] Beri tahu user kalau daftar produk dipotong (bukan diam-diam).
+        $this->peringatanProdukDipotong();
+    }
+
+    /** [B-15c] Toast sekali-buka-modal bila daftar produk di dropdown memang dipotong. */
+    private function peringatanProdukDipotong(): void
+    {
+        if ($this->totalProdukCabang() > self::PRODUK_DROPDOWN_LIMIT) {
+            $this->dispatch('alert', [
+                'type' => 'info',
+                'message' => 'Daftar produk pada dropdown dibatasi '.self::PRODUK_DROPDOWN_LIMIT.
+                    ' produk (urutan nama). Produk lain masih bisa dipilih lewat pencarian produk di halaman Master Produk.',
+            ]);
+        }
+    }
+
+    /** [B-15c] Jumlah produk yang lolos filter dropdown — 1 query, hanya saat modal dibuka. */
+    private function totalProdukCabang(): int
+    {
+        return Produk::where('is_active', true)
+            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
+            ->count();
+    }
+
+    /**
+     * [B-15c] Scope cabang untuk query produk: produk yang punya stok di gudang cabang
+     * aktif, atau produk yang belum punya stok sama sekali (produk baru — supaya PO
+     * tidak menyembunyikan kandidat restock). Produk yang HANYA ada di gudang cabang
+     * lain tidak boleh bocor ke dropdown.
+     */
+    private function scopeStokCabangAktif($query)
+    {
+        $cabangId = session('cabang_id');
+
+        return $query->where(function ($q) use ($cabangId) {
+            $q->whereDoesntHave('stokItems')
+                ->when($cabangId, fn ($q2) => $q2->orWhereHas(
+                    'stokItems.gudang',
+                    fn ($q3) => $q3->where('cabang_id', $cabangId)
+                ));
+        });
     }
 
     // Quick action header "+ Supplier" (dari shell WmsDashboard via $dispatch)
@@ -215,8 +267,22 @@ class PoTab extends Component
 
     public function render()
     {
-        $gudangs = Gudang::where('is_active', true)->get();
-        $allProducts = Produk::where('is_active', true)->orderBy('nama')->get();
+        $cabangId = session('cabang_id');
+
+        // [B-15c] Gudang: WAJIB scope cabang (sebelumnya `where is_active` saja →
+        // gudang cabang lain bocor ke dropdown tujuan PO) + batas pengaman.
+        $gudangs = Gudang::where('is_active', true)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->orderBy('nama')
+            ->limit(self::GUDANG_DROPDOWN_LIMIT)
+            ->get();
+
+        // [B-15c] Produk: scope stok cabang aktif + limit dropdown (bukan 500-2.000 baris).
+        $allProducts = Produk::where('is_active', true)
+            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
+            ->orderBy('nama')
+            ->limit(self::PRODUK_DROPDOWN_LIMIT)
+            ->get(['id', 'nama']); // blade cuma pakai id + nama (harga_beli di-set poProdukDipilih)
 
         return view('modules.wms.livewire.po-tab', [
             'gudangs' => $gudangs,

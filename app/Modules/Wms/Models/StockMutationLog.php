@@ -2,12 +2,13 @@
 
 namespace App\Modules\Wms\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'produk_id', 'sku_variant_id', 'gudang_id', 'delta', 'sumber',
+    'produk_id', 'sku_variant_id', 'gudang_id', 'user_id', 'delta', 'sumber',
     'referensi_tipe', 'referensi_id', 'terjadi_at',
 ])]
 class StockMutationLog extends Model
@@ -22,5 +23,11 @@ class StockMutationLog extends Model
     public function produk(): BelongsTo
     {
         return $this->belongsTo(Produk::class);
+    }
+
+    /** [B-10b/P1-2]_nullable — writer yang belum menyetelkannya (mis. StokDeductionService) tetap NULL. */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

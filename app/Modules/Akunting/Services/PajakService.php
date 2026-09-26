@@ -35,6 +35,40 @@ class PajakService
     }
 
     /**
+     * [B-14] Ringkasan penjualan (DPP / PPN / total akhir) — definisi KANONIK
+     * yang sama persis dgn POS (`PosController::store()`):
+     *
+     *   DPP   = subtotal - diskon   (harga di luar pajak / nilai transaksi bruto)
+     *   PPN   = DPP × persen        (0 bila pajak nonaktif utk cabang tsb)
+     *   Total = DPP + PPN           (nilai yang benar-benar ditagihkan/dibayar)
+     *
+     * Sifatnya tax-exclusive: `total_akhir` MEMASUKKAN PPN, sedangkan akun
+     * pendapatan (410-01) hanya menerima DPP. Tanpa ini, penjualan marketplace
+     * membukukan seluruh `total_akhir` ke pendapatan → laporan penjualan
+     * marketplace ≠ POS dan PPN tak pernah masuk akun pajak 220-01 (F1-2).
+     *
+     * Perbedaan konfigurasi tidak retroaktif: nilai dihitung SATU KALI saat
+     * order dibuat, lalu disimpan (dpp / pajak_nominal / ppn_nominal) — webhook
+     * cukup memisahkannya, tidak menghitung ulang.
+     *
+     * @return array{dpp:float, ppn_nominal:float, ppn_percent:float, enabled:bool, total_akhir:float}
+     */
+    public function hitungPenjualan(?int $cabangId, float $subtotal, float $diskon = 0.0): array
+    {
+        $dpp = max(0.0, round($subtotal - max(0.0, $diskon), 2));
+        $hitung = $this->hitung($cabangId, $dpp);
+        $ppnNominal = (float) $hitung['ppn_nominal'];
+
+        return [
+            'dpp' => $dpp,
+            'ppn_nominal' => $ppnNominal,
+            'ppn_percent' => (float) $hitung['ppn_percent'],
+            'enabled' => (bool) $hitung['enabled'],
+            'total_akhir' => round($dpp + $ppnNominal, 2),
+        ];
+    }
+
+    /**
      * Apakah fitur Pajak Otomatis diaktifkan utk cabang ini?
      * Kunci utama: pajak_enabled.{cabang} / pajak_enabled (kontrak AC F1-2).
      * Fallback: ppn_enabled.{cabang} / ppn_enabled (konfigurasi lama — backward compat).

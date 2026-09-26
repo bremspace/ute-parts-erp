@@ -2,11 +2,12 @@
 
 namespace App\Modules\Crm\Livewire;
 
+use App\Modules\Crm\Models\KampanyeBroadcast;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Crm\Services\BroadcastService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
-use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
 use Livewire\Component;
@@ -189,34 +190,39 @@ class CrmDashboard extends Component
     // ===== BROADCAST =====
     public function kirimBroadcast()
     {
+        abort_unless(auth()->user()?->can('crm.broadcast'), 403, 'Anda tidak memiliki izin untuk broadcast.');
+
         $this->validate([
             'broadcastJudul' => 'required|string|max:255',
             'broadcastPesan' => 'required|string',
         ]);
 
-        $query = Pelanggan::query();
+        $segment = [];
         if ($this->broadcastTierId) {
-            $query->where('tier_membership_id', $this->broadcastTierId);
+            $segment[] = ['tipe' => 'tier', 'nilai' => $this->broadcastTierId];
         }
         if ($this->broadcastReseller) {
-            $query->where('is_reseller', true);
+            $segment[] = ['tipe' => 'reseller'];
         }
 
-        $count = 0;
-        $query->chunkById(100, function ($pelangganList) use (&$count) {
-            foreach ($pelangganList as $p) {
-                app(NotificationService::class)->kirim(
-                    'inapp', null,
-                    $this->broadcastJudul,
-                    "[Broadcast] {$this->broadcastPesan}",
-                    ['pelanggan_id' => $p->id]
-                );
-                $count++;
-            }
-        });
+        // UI memakai channel inapp yang lama, tetapi tetap melewati BroadcastService
+        // supaya campaign, relasi log, segmentasi, dan idempotensi tidak terpisah.
+        $kampanye = KampanyeBroadcast::create([
+            'judul' => $this->broadcastJudul,
+            'pesan' => "[Broadcast] {$this->broadcastPesan}",
+            'channel' => 'inapp',
+            'segment' => $segment,
+            'status' => 'draft',
+            'user_id' => auth()->id(),
+        ]);
+
+        $kampanye = app(BroadcastService::class)->kirimSekarang($kampanye);
 
         $this->showBroadcastModal = false;
-        $this->dispatch('alert', ['type' => 'success', 'message' => "Broadcast dikirim ke {$count} pelanggan via antrian"]);
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Broadcast dikirim ke {$kampanye->total_target} pelanggan via antrian",
+        ]);
     }
 
     public function render()

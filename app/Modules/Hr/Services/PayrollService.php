@@ -12,6 +12,7 @@ use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
+use Illuminate\Support\Facades\DB;
 
 /**
  * [F3-8] Payroll Service — hitung gaji, komisi teknisi, posting jurnal.
@@ -113,11 +114,18 @@ class PayrollService
             }
         }
 
-        // Update status periode
-        $periodeRecord->update(['status' => PayrollPeriode::STATUS_SELESAI]);
+        // [B-10a / P0-4] Fail-closed: jurnal dulu, status periode SETELAH jurnal
+        // commit. Sebelumnya status di-update ke 'selesai' DULU lalu approvePayroll()
+        // mem-post jurnal → bila jurnal gagal, periode tetap 'selesai' tanpa akun.
+        // Satu DB::transaction dipakai agar keduanya commit/rollback bersama.
+        return DB::transaction(function () use ($periode, $periodeRecord) {
+            // Post jurnal via approvePayroll
+            $hasil = $this->approvePayroll($periode);
 
-        // Post jurnal via approvePayroll
-        return $this->approvePayroll($periode);
+            $periodeRecord->update(['status' => PayrollPeriode::STATUS_SELESAI]);
+
+            return $hasil;
+        }, 3);
     }
 
     /**
@@ -161,39 +169,47 @@ class PayrollService
 
     /**
      * Bayar payroll → update status dan post jurnal pembayaran.
+     *
+     * [B-10a / P0-4] Fail-closed: jurnal pembayaran diposting DULU dalam satu
+     * DB::transaction, baru slip/perioda ditandai 'dibayar'. Jurnal gagal →
+     * status tidak final (rollback total).
      */
     public function bayarPayroll(string $periode): array
     {
         $periodeId = $this->getOrCreatePeriode($periode);
-        PayrollSlip::where('payroll_periode_id', $periodeId)
-            ->where('status', 'approved')
-            ->update(['status' => 'dibayar']);
 
-        PayrollPeriode::where('periode', $periode)->update(['status' => 'dibayar']);
+        return DB::transaction(function () use ($periode, $periodeId) {
+            // Jurnal pembayaran: debit Utang Gaji (210-02) / kredit Kas (110-01)
+            $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
+            $total = $slips->sum('total_gaji');
 
-        // Jurnal pembayaran: debit Utang Gaji (210-02) / kredit Kas (110-01)
-        $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
-        $total = $slips->sum('total_gaji');
+            $lines = [
+                ['akun_kode' => '210-02', 'debit' => $total, 'kredit' => 0],
+                ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => $total],
+            ];
 
-        $lines = [
-            ['akun_kode' => '210-02', 'debit' => $total, 'kredit' => 0],
-            ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => $total],
-        ];
+            $noJurnal = sprintf('JRL-PR-BAYAR-%s', $periode);
+            $this->jurnalService->post(
+                $noJurnal,
+                now(),
+                'payroll-bayar',
+                $lines,
+                "Pembayaran payroll periode {$periode}",
+                session('cabang_id'),
+                auth()->id(),
+                PayrollPeriode::class,
+                $periodeId
+            );
 
-        $noJurnal = sprintf('JRL-PR-BAYAR-%s', $periode);
-        $this->jurnalService->post(
-            $noJurnal,
-            now(),
-            'payroll-bayar',
-            $lines,
-            "Pembayaran payroll periode {$periode}",
-            session('cabang_id'),
-            auth()->id(),
-            PayrollPeriode::class,
-            $periodeId
-        );
+            // Status baru final setelah jurnal sukses
+            PayrollSlip::where('payroll_periode_id', $periodeId)
+                ->where('status', 'approved')
+                ->update(['status' => 'dibayar']);
 
-        return ['no_jurnal' => $noJurnal, 'total' => $total];
+            PayrollPeriode::where('periode', $periode)->update(['status' => 'dibayar']);
+
+            return ['no_jurnal' => $noJurnal, 'total' => $total];
+        }, 3);
     }
 
     /**

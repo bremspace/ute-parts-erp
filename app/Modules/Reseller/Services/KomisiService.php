@@ -44,24 +44,32 @@ class KomisiService
         $totalKomisi = 0.0;
         $skemaTerpakai = null;
 
+        // [B-15d] Eager-load skema SEKALI (bukan 2 query per kategori).
+        // Dahulu: foreach kategori → `SkemaKomisiReseller::…->first()` + fallback
+        // `SkemaKomisi::…->first()` = 2 query × K kategori, jalan sinkron di dalam
+        // write POS (K=3-10 → 6-20 query ekstra per transaksi).
+        // SEKARANG: 2 query total, pemilihan first() dilakukan in-memory.
+        //
+        // PARITAS ANGKA (wajib): pemilihan baris tetap "baris pertama yang cocok"
+        // persis seperti `->first()` lama. Urutan diurutkan `id` ASC supaya
+        // deterministik (PK = urutan insert, sama dgn hasil scan InnoDB tanpa
+        // ORDER BY) dan bisa diaudit. Rumus nominal TIDAK disentuh sama sekali.
+        $skemaReseller = SkemaKomisiReseller::where('pelanggan_id', $pelanggan->id)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get();
+
+        $skemaDefault = SkemaKomisi::where('is_active', true)
+            ->orderBy('id')
+            ->get();
+
         foreach ($itemsAgregat as $agregat) {
             $kategori = $agregat['kategori'] ?? 'umum';
 
             // [T-21] Cek override skema PER RESELLER terlebih dahulu; fallback ke skema default
-            $skema = SkemaKomisiReseller::where('pelanggan_id', $pelanggan->id)
-                ->where('is_active', true)
-                ->where(function ($q) use ($kategori) {
-                    $q->whereNull('kategori')->orWhere('kategori', $kategori);
-                })
-                ->first();
+            $cocok = fn ($s) => $s->kategori === null || $s->kategori === $kategori;
 
-            if (! $skema) {
-                $skema = SkemaKomisi::where('is_active', true)
-                    ->where(function ($q) use ($kategori) {
-                        $q->whereNull('kategori')->orWhere('kategori', $kategori);
-                    })
-                    ->first();
-            }
+            $skema = $skemaReseller->first($cocok) ?? $skemaDefault->first($cocok);
 
             if ($skema) {
                 $totalKomisi += $skema->tipe === 'persen'

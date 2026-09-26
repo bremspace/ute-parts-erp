@@ -32,7 +32,7 @@ class ServisController extends Controller
             'kunci_terenkripsi' => 'required_with:tipe_kunci|nullable|string',
             'keluhan' => 'required|string',
             'kondisi_fisik' => 'nullable|array',
-            'foto_unit' => 'required|array|min:2', // wajib minimal 2 foto
+            'foto_unit' => 'nullable|array', // [B-06] foto terima unit OPSIONAL (min 2 dihapus)
             'foto_unit.*' => 'string',
             'cabang_id' => 'nullable|exists:cabang,id',
         ]);
@@ -53,20 +53,23 @@ class ServisController extends Controller
         $search = $request->query('search');
         $cabangId = session('cabang_id');
 
-        $query = TiketServis::with(['jenisServis', 'pelanggan', 'teknisi', 'garansi'])
-            ->withCount('spareparts')
-            ->latest();
+        // [B-07] Urut & paginasi dulu di kolom SEMPIT (`id`), baru hydrate row penuh.
+        // Alasan: `foto_unit` (base64, bisa >400KB/baris) membuat filesort
+        // `ORDER BY created_at` melebihi sort_buffer_size → SQLSTATE[HY001] 1038
+        // "Out of sort memory". Kolom sempit sort-nya muat di buffer; query hydrate
+        // (`whereIn id`) tidak punya ORDER BY sehingga tidak memicu filesort sama sekali.
+        $base = TiketServis::query();
 
         if ($cabangId) {
-            $query->where('cabang_id', $cabangId);
+            $base->where('cabang_id', $cabangId);
         }
 
         if ($status) {
-            $query->where('status', $status);
+            $base->where('status', $status);
         }
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
+            $base->where(function ($q) use ($search) {
                 $q->where('no_tiket', 'like', "%{$search}%")
                     ->orWhere('jenis_hp', 'like', "%{$search}%")
                     ->orWhere('nama_pelanggan', 'like', "%{$search}%")
@@ -74,7 +77,20 @@ class ServisController extends Controller
             });
         }
 
-        $tikets = $query->paginate(20);
+        $tikets = $base->select('id')->latest()->paginate(20);
+
+        // Ganti koleksi ID dgn model penuh (eager load + spareparts_count),
+        // urutan terbaru-dulu dipertahankan spt query lama (`latest()`).
+        $ids = $tikets->getCollection()->pluck('id');
+
+        $tikets->setCollection(
+            TiketServis::with(['jenisServis', 'pelanggan', 'teknisi', 'garansi'])
+                ->withCount('spareparts')
+                ->whereIn('id', $ids)
+                ->get()
+                ->sortByDesc('created_at')
+                ->values()
+        );
 
         return $this->success($tikets, 'Daftar tiket servis berhasil diambil');
     }
@@ -88,17 +104,11 @@ class ServisController extends Controller
             'items', // [T-17]
         ])->findOrFail($id);
 
-        // [T-19] Kunci gadget hanya utk teknisi yang ditugaskan / admin-toko / super-admin
-        $user = $request->user();
-        $bolehLihatKunci = $user
-            && ($user->hasRole(['super-admin', 'admin-toko'])
-                || ($user->hasRole('teknisi') && $tiket->teknisi_id === $user->id));
-
-        if (! $bolehLihatKunci) {
-            $tiket->makeHidden(['kunci_terenkripsi']);
-            $tiket->setAttribute('kunci_terenkripsi', null);
-        }
-
+        // [B-06] Kunci gadget tampil utk SEMUA role yg berhak membuka tiket servis.
+        // Pintu akses = middleware route `permission:servis.view` (teknisi, admin-toko,
+        // super-admin) — bukan lagi pembatasan role teknisi-yang-ditugaskan saja.
+        // Nilai tetap terenkripsi at-rest (cast `encrypted`) & tampil ter-mask di UI
+        // sampai user menekan tombol "Tampilkan" (lihat servis-board.blade).
         return $this->success($tiket, 'Detail tiket servis berhasil diambil');
     }
 

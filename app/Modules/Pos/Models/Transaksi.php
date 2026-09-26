@@ -19,6 +19,13 @@ use Spatie\Activitylog\Support\LogOptions;
     'sumber', 'subtotal', 'diskon_persen', 'diskon_nominal', 'dpp', 'pajak_nominal', 'ppn_nominal',
     'total_akhir', 'metode_bayar', 'jumlah_bayar', 'kembalian', 'split_detail',
     'status', 'catatan',
+    // [B-10f] Kolom payment Duitku (migrasi 2026_09_16_000027) TIDAK ADA di
+    // tabel payment terpisah — semuanya langsung di tabel `transaksi`. Ketiganya
+    // sebelumnya tertinggal dari daftar fillable sehingga Eloquent SILENTLY
+    // membuang nilainya (webhook PaymentController + seeder demo): paid_at hilang
+    // diam-diam, payment_reference/payment_url juga. Sumber kebenaran paid_at
+    // tetap `transaksi.paid_at` (tidak ada duplikasi ke tabel lain).
+    'payment_reference', 'payment_url', 'paid_at',
 ])]
 class Transaksi extends Model
 {
@@ -43,6 +50,8 @@ class Transaksi extends Model
         'jumlah_bayar' => 'decimal:2',
         'kembalian' => 'decimal:2',
         'split_detail' => 'array',
+        // [B-10f] paid_at kini benar-benar tersimpan (sebelumnya dibuang fillable)
+        'paid_at' => 'datetime',
     ];
 
     public function cabang(): BelongsTo

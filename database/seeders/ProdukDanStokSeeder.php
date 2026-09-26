@@ -156,11 +156,14 @@ class ProdukDanStokSeeder extends Seeder
             );
 
             // Sku Variant Default
+            // [B-02/P2-1] Idempoten: key = produk_id + nama_varian, SKU deterministik
+            // (SKU-{produk_id}-{slug nama}) — seeder bisa dijalankan berulang tanpa
+            // menggandakan varian (pola lama firstOrCreate(['sku' => 'SKU-'.random()])
+            // selalu membuat baris baru → 36× duplikat).
             $sku = SkuVariant::firstOrCreate(
-                ['sku' => 'SKU-'.strtoupper(Str::random(6))],
+                ['produk_id' => $produk->id, 'nama_varian' => 'Standar'],
                 [
-                    'produk_id' => $produk->id,
-                    'nama_varian' => 'Standar',
+                    'sku' => 'SKU-'.$produk->id.'-'.Str::upper(Str::limit(Str::slug($data['nama']), 40, '')),
                     'harga_beli' => $data['harga_beli'],
                     'harga_jual_retail' => $data['harga_jual_retail'],
                     'is_active' => true,

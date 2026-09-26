@@ -225,6 +225,11 @@ class CycleCountService
         }
 
         $hasil = [];
+
+        // [B-15d] 1 query untuk SEMUA baris stok sample (sebelumnya 1 query per
+        // item sample — 10-500 item). Scoping gudang cabang task SAMA persis.
+        $stokPerItem = $this->stokItemTerScoped($gudangIds, $this->idSample($task->sample_items ?? []));
+
         foreach ($task->sample_items ?? [] as $item) {
             $stokItemId = (int) ($item['stok_item_id'] ?? 0);
 
@@ -237,7 +242,7 @@ class CycleCountService
             }
 
             // Stok sistem saat ini — hanya baris yang masih berada di cabang task
-            $stok = StokItem::whereKey($stokItemId)->whereIn('gudang_id', $gudangIds)->first();
+            $stok = $stokPerItem[$stokItemId] ?? null;
             $stokSistem = $stok ? (int) $stok->jumlah : (int) ($item['stok_sistem'] ?? 0);
             $fisik = $fisikNorm[$stokItemId];
             $selisih = $fisik - $stokSistem;
@@ -318,6 +323,54 @@ class CycleCountService
     }
 
     /**
+     * [B-15d] Ambil baris StokItem untuk sekumpulan id, di-scope ke gudang cabang
+     * task — 1 query (`whereIn` + `keyBy`) menggantikan N query
+     * `whereKey($id)->first()`. Baris di luar gudang Simply tidak ada di hasil
+     * (parity dgn `->first()` = null).
+     *
+     * @param  Collection<int, int>|\Illuminate\Database\Eloquent\Collection<int, int>  $gudangIds
+     * @param  array<int, int>  $stokItemIds
+     * @return Collection<int, StokItem>
+     */
+    protected function stokItemTerScoped($gudangIds, array $stokItemIds): Collection
+    {
+        $ids = array_values(array_unique(array_filter($stokItemIds, fn ($id) => (int) $id > 0)));
+        if ($ids === []) {
+            return collect();
+        }
+
+        return StokItem::whereIn('id', $ids)->whereIn('gudang_id', $gudangIds)->get()->keyBy('id');
+    }
+
+    /**
+     * [B-15d] Kumpulan stok_item_id dari `sample_items` task.
+     *
+     * @param  array<int, array<string, mixed>>  $sampleItems
+     * @return array<int, int>
+     */
+    protected function idSample(array $sampleItems): array
+    {
+        return array_map(
+            fn (array $item): int => (int) ($item['stok_item_id'] ?? 0),
+            $sampleItems
+        );
+    }
+
+    /**
+     * [B-15d] Kumpulan stok_item_id dari baris `hasil` task.
+     *
+     * @param  array<int, array<string, mixed>>  $hasil
+     * @return array<int, int>
+     */
+    protected function idStokDariHasil(array $hasil): array
+    {
+        return array_map(
+            fn (array $h): int => (int) ($h['stok_item_id'] ?? 0),
+            $hasil
+        );
+    }
+
+    /**
      * Nilai rupiah estimasi total selisih (|selisih| × harga_beli) — payload amount utk rule approval.
      *
      * @param  array<int, array<string, mixed>>  $hasil
@@ -390,6 +443,12 @@ class CycleCountService
             $jurnalLines = [];
             $jumlahDikoreksi = 0;
 
+            // [B-15d] 1 query untuk semua baris hasil (sebelumnya 1 query per baris
+            // hasil). Guard scoping ke gudang cabang task SAMA persis, dan alur
+            // state machine (F3-7: hitung → minor=koreksi / major=approval)
+            // tidak disentuh.
+            $stokPerItem = $this->stokItemTerScoped($gudangIds, $this->idStokDariHasil($task->hasil ?? []));
+
             foreach ($task->hasil ?? [] as $h) {
                 $selisih = (int) ($h['selisih'] ?? 0);
                 if ($selisih === 0) {
@@ -397,7 +456,7 @@ class CycleCountService
                 }
 
                 // Guard scoping: hanya baris stok yang masih di gudang cabang task
-                $stok = StokItem::whereKey((int) $h['stok_item_id'])->whereIn('gudang_id', $gudangIds)->first();
+                $stok = $stokPerItem[(int) $h['stok_item_id']] ?? null;
                 if (! $stok) {
                     continue;
                 }
@@ -408,10 +467,14 @@ class CycleCountService
                     $stok->update(['jumlah' => $setelah]);
                 }
 
+                // [B-10i] user_id = pelaku koreksi ($userId, sama dgn StokLog.user_id
+                // & jurnal penyesuaian 130-01/520-08 di bawah) — mutasi stok harus
+                // bisa dibuktikan pelakunya.
                 StockMutationLog::create([
                     'produk_id' => (int) $h['produk_id'],
                     'sku_variant_id' => $h['sku_variant_id'] ?? null,
                     'gudang_id' => (int) $h['gudang_id'],
+                    'user_id' => $userId,
                     'delta' => $selisih,
                     'sumber' => 'cycle_count',
                     'referensi_tipe' => CycleCountTask::class,

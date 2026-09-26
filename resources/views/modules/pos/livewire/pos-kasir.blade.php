@@ -28,7 +28,8 @@
                     class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-medium"
                 >
                     <option value="" class="bg-ink-900">Pilih Gudang...</option>
-                    @foreach(\App\Modules\Wms\Models\Gudang::all() as $g)
+                    {{-- [B-02/P1-2] Hanya gudang milik cabang aktif (session cabang_id) --}}
+                    @foreach($gudangs as $g)
                         <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->kode }})</option>
                     @endforeach
                 </select>
@@ -40,27 +41,55 @@
             <div class="grid grid-cols-1 xxs:grid-cols-2 xl:grid-cols-3 gap-3">
                 @forelse($products as $prod)
                     @php
-                        $stokTotal = $selectedGudangId
-                            ? \App\Modules\Wms\Models\StokItem::where('produk_id', $prod->id)->where('gudang_id', $selectedGudangId)->sum('jumlah')
-                            : 99;
+                        // [B-02/P0-2] Stok kartu = kriteria SAMA dgn addToCart (agregat produk+gudang)
+                        $stokTotal = $stokPerProduk[$prod->id] ?? (\App\Modules\Pos\Livewire\PosKasir::STOK_TANPA_GUDANG);
+                        $stokKosong = $stokTotal <= 0;
+                        $gudangDipilih = (bool) $selectedGudangId;
+                        // [B-02/P0-1] Keterangan jelas utk kasir: kenapa tak bisa dipilih
+                        $alasanTidakBisaDipilih = ! $gudangDipilih
+                            ? 'Pilih gudang terlebih dahulu untuk melihat stok & memilih produk ini.'
+                            : "Stok {$prod->nama} habis di gudang ini — tidak bisa dipilih. Pilih gudang lain yang punya stok.";
                         $pricing = app(\App\Modules\Pos\Services\PricingService::class)->resolve($prod, $this->customer);
                     @endphp
                     <div
                         wire:key="product-{{ $prod->id }}"
-                        wire:click="addToCart({{ $prod->id }})"
-                        class="glass-panel glass-panel-hover p-3.5 rounded-2xl flex flex-col justify-between cursor-pointer border border-white/5 transition-all select-none group"
+                        @if($stokKosong)
+                            {{-- [B-02/P0-1] Stok 0 = TIDAK BISA DIPILIH (kebijakan owner final).
+                                 Server tetap menolak (addToCart) — ini hanya tampilan
+                                 supaya kasir melihat & paham produknya tidak bisa dipakai. --}}
+                            role="button"
+                            aria-disabled="true"
+                            title="{{ $alasanTidakBisaDipilih }}"
+                            class="glass-panel p-3.5 rounded-2xl flex flex-col justify-between border border-white/5 select-none opacity-55 grayscale cursor-not-allowed"
+                        @else
+                            role="button"
+                            wire:click="addToCart({{ $prod->id }})"
+                            title="{{ $prod->nama }} — stok {{ $stokTotal }} unit. Klik untuk menambah ke keranjang."
+                            class="glass-panel glass-panel-hover p-3.5 rounded-2xl flex flex-col justify-between cursor-pointer border border-white/5 transition-all select-none group"
+                        @endif
                     >
                         <div>
                             <!-- Header: Category & Stock -->
-                            <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center justify-between mb-2 gap-1">
                                 <span class="text-[10px] uppercase font-semibold text-ink-400 truncate max-w-[80px]">
                                     {{ $prod->kategori ?? 'Sparepart' }}
                                 </span>
-                                <x-prism.stock-gauge :stok="$stokTotal" :min="5" />
+                                @if($stokKosong)
+                                    {{-- [B-02/P0-1] Keterangan stok kosong — produk dikunci (tidak bisa dipilih) --}}
+                                    <x-prism.status-pill status="batal">
+                                        {{ $gudangDipilih ? 'Stok kosong' : 'Pilih gudang dulu' }}
+                                    </x-prism.status-pill>
+                                @else
+                                    <x-prism.stock-gauge :stok="$stokTotal" :min="5" />
+                                @endif
                             </div>
 
                             <!-- Product Name & Compatibility -->
-                            <h4 class="font-semibold text-white text-xs sm:text-sm line-clamp-2 leading-snug group-hover:text-up-primary transition-colors">
+                            <h4 @class([
+                                'font-semibold text-xs sm:text-sm line-clamp-2 leading-snug transition-colors',
+                                'text-ink-400' => $stokKosong,
+                                'text-white group-hover:text-up-primary' => ! $stokKosong,
+                            ])>
                                 {{ $prod->nama }}
                             </h4>
 
@@ -84,9 +113,19 @@
                                 </span>
                             </div>
 
-                            <span class="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-ink-300 group-hover:bg-up-primary group-hover:text-white transition-all text-xs">
-                                +
-                            </span>
+                            @if($stokKosong)
+                                {{-- [B-02/P0-1] Ikon kunci, bukan "+" — produk stok kosong tidak bisa dipilih --}}
+                                <span class="w-6 h-6 rounded-lg bg-up-red/10 flex items-center justify-center text-up-red/70 text-xs"
+                                      aria-hidden="true" title="{{ $alasanTidakBisaDipilih }}">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 11V7a6 6 0 1112 0v4m-13 0h14a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1v-8a1 1 0 011-1z" />
+                                    </svg>
+                                </span>
+                            @else
+                                <span class="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-ink-300 group-hover:bg-up-primary group-hover:text-white transition-all text-xs">
+                                    +
+                                </span>
+                            @endif
                         </div>
                     </div>
                 @empty
@@ -97,6 +136,22 @@
                         <p class="text-sm">Tidak ada produk ditemukan untuk pencarian "{{ $search }}"</p>
                     </div>
                 @endforelse
+
+                {{-- [B-02/P1-5] Load-more — seluruh produk aktif bisa diakses (bukan hard-stop 16) --}}
+                @if($adaLebihBanyak)
+                    <div class="col-span-full flex justify-center pt-2 pb-4">
+                        <button
+                            type="button"
+                            wire:click="muatLebihBanyak"
+                            wire:loading.attr="disabled"
+                            wire:target="muatLebihBanyak"
+                            class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-ink-200 cursor-pointer disabled:opacity-50 min-h-[44px]"
+                        >
+                            <span wire:loading.remove wire:target="muatLebihBanyak">Muat lebih banyak ({{ count($products) }} dimuat)</span>
+                            <span wire:loading wire:target="muatLebihBanyak" class="text-ink-400">Memuat…</span>
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -234,6 +289,12 @@
 
         <!-- Cart Items List (Scrollable) -->
         <div class="flex-1 overflow-y-auto pr-1 space-y-2.5 mb-4">
+            {{-- [B-02/P0-1] Banner backorder DIHAPUS (kebijakan owner final: stok 0
+                 tidak bisa dipilih). Tidak ada lagi jalur keranjang berisi stok kosong
+                 dari addToCart()/updateQty() — keduanya hard-block. Badge "Stok habis"
+                 per item tetap dipertahankan sebagai penanda kalau stok berubah habis
+                 setelah item masuk keranjang (mis. stok habis di gudang lain / resume
+                 transaksi ditahan). --}}
             @forelse($cart as $key => $item)
                 <div
                     x-data="{
@@ -274,6 +335,10 @@
                             @endif
                             @if($item['varian'] !== 'Standar')
                                 <span class="px-1.5 py-0.2 rounded bg-white/5 text-ink-300 text-[10px]">{{ $item['varian'] }}</span>
+                            @endif
+                            {{-- [B-02/P0-1] Badge stok habis per item (bukan backorder) --}}
+                            @if(($item['stok_max'] ?? 1) <= 0)
+                                <x-prism.status-pill status="batal">Stok habis</x-prism.status-pill>
                             @endif
                         </div>
                         <!-- Price & Flex Control -->

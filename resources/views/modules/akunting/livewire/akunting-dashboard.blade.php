@@ -63,7 +63,7 @@
             </x-prism.glass-card>
 
             <!-- Neraca -->
-            <x-prism.glass-card title="Neraca" :subtitle="'Sampai ' . $periodeSampai" circuit="true">
+            <x-prism.glass-card title="Neraca" :subtitle="'Saldo kumulatif s/d ' . $neraca['sampai_tanggal']" circuit="true">
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                         <p class="text-[10px] text-ink-400 uppercase font-bold mb-2">Aset</p>
@@ -107,20 +107,33 @@
                         @empty
                             <p class="text-[11px] text-ink-500">Kosong</p>
                         @endforelse
+                        {{-- [B-10g] Akun pendapatan & beban belum ditutup ke Laba Ditahan, jadi
+                             laba kumulatif ikut dihitung sebagai bagian ekuitas (sumber:
+                             ExportLaporanService::neracaSaldo / API ACC-06). --}}
+                        <div class="flex justify-between text-[11px] py-0.5">
+                            <span class="text-ink-300">Laba Periode Berjalan</span>
+                            <span class="text-white tabular-nums">{{ number_format($neraca['laba_periode_berjalan'], 0, ',', '.') }}</span>
+                        </div>
                         <div class="border-t border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
                             <span class="text-ink-200">Total</span>
-                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_ekuitas'], 0, ',', '.') }}</span>
+                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_ekuitas_bersama_laba'], 0, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
 
-                @php $balanceOk = abs($neraca['total_aset'] - ($neraca['total_kewajiban'] + $neraca['total_ekuitas'])) < 1; @endphp
-                <div class="mt-4 p-3 rounded-xl {{ $balanceOk ? 'bg-up-mint/10 border border-up-mint/30' : 'bg-up-red/10 border border-up-red/30' }} flex items-center gap-2 text-xs">
+                @php $balanceOk = (bool) $neraca['balance']; $selisihNeraca = (float) $neraca['selisih']; @endphp
+                <div class="mt-4 p-3 rounded-xl {{ $balanceOk ? 'bg-up-mint/10 border border-up-mint/30' : 'bg-up-red/10 border border-up-red/30' }} flex flex-wrap items-center gap-2 text-xs">
                     <span class="w-2 h-2 rounded-full {{ $balanceOk ? 'bg-up-mint' : 'bg-up-red' }}"></span>
                     <span class="{{ $balanceOk ? 'text-up-mint' : 'text-up-red' }} font-semibold">
-                        {{ $balanceOk ? 'Neraca Balance — Aset = Kewajiban + Ekuitas' : 'Neraca tidak balance! Periksa jurnal.' }}
+                        {{ $balanceOk ? 'SEIMBANG — Aset = Kewajiban + Ekuitas + Laba Periode Berjalan' : 'TIDAK SEIMBANG — Aset ≠ Kewajiban + Ekuitas + Laba Periode Berjalan' }}
+                    </span>
+                    <span class="ml-auto tabular-nums {{ $balanceOk ? 'text-up-mint' : 'text-up-red' }} font-semibold">
+                        Selisih: {{ $selisihNeraca > 0 ? '+' : ($selisihNeraca < 0 ? '−' : '') }} Rp {{ number_format(abs($selisihNeraca), 0, ',', '.') }}
                     </span>
                 </div>
+                <p class="mt-2 text-[11px] text-ink-400">
+                    Angka saldo kumulatif sejak awal pembukuan s/d {{ $neraca['sampai_tanggal'] }} — bukan perubahan periode.
+                </p>
             </x-prism.glass-card>
 
             <!-- Arus Kas (metode tidak langsung) -->
@@ -227,7 +240,9 @@
                     <button type="button" wire:click="exportLaporan('jurnal', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
                 </div>
             @endcan
-            <button wire:click="openJurnalManualModal" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer">+ Jurnal Manual</button>
+            <x-prism.prism-button wire:click="openJurnalManualModal" size="sm" class="min-h-11">
+                + Jurnal Manual
+            </x-prism.prism-button>
         </div>
 
         <x-prism.data-table :headers="['No. Jurnal', 'Akun', 'Sumber', 'Deskripsi', 'Debit', 'Kredit', '']">
@@ -360,70 +375,348 @@
 
     <!-- MODAL: JURNAL MANUAL -->
     @if($showJurnalManual)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-xl glass-panel p-6 rounded-3xl relative max-h-[90vh] flex flex-col">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Jurnal Manual</h3>
-                    <button wire:click="$set('showJurnalManual', false)" class="text-ink-400 hover:text-white">✕</button>
-                </div>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <x-prism.glass-card
+                title="Jurnal Manual"
+                subtitle="Pilih akun COA aktif, tentukan sisi, lalu cocokkan nominal debit dan kredit."
+                class="w-full max-w-5xl max-h-[92vh] flex flex-col"
+            >
+                <x-slot:action>
+                    <x-prism.prism-button
+                        wire:click="tutupJurnalManual"
+                        variant="ghost"
+                        size="sm"
+                        class="min-h-11 min-w-11"
+                        aria-label="Tutup formulir jurnal manual"
+                        title="Tutup"
+                    >
+                        ✕
+                    </x-prism.prism-button>
+                </x-slot:action>
 
-                <div class="overflow-y-auto pr-1 flex-1 space-y-4">
-                    <div class="grid grid-cols-2 gap-3">
+                @php
+                    $errorTanggal = $manualValidation['errors']['tanggal'][0] ?? null;
+                    $errorDeskripsi = $manualValidation['errors']['deskripsi'][0] ?? null;
+                @endphp
+
+                <div class="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal *</label>
-                            <input type="date" wire:model="manualTanggal" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            <label for="jurnal-tanggal" class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal *</label>
+                            <input
+                                id="jurnal-tanggal"
+                                type="date"
+                                wire:model.live="manualTanggal"
+                                aria-describedby="jurnal-error-tanggal"
+                                @class(['glass-input w-full rounded-xl px-3 py-3 text-xs font-medium', 'border-up-red/60' => $errorTanggal])
+                            />
+                            @if($errorTanggal)
+                                <p id="jurnal-error-tanggal" class="mt-1.5 text-[11px] font-medium text-up-red">{{ $errorTanggal }}</p>
+                            @endif
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Deskripsi *</label>
-                            <input type="text" wire:model="manualDeskripsi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Penyesuaian..." />
+                            <label for="jurnal-deskripsi" class="block text-xs font-semibold text-ink-300 mb-1.5">Deskripsi *</label>
+                            <input
+                                id="jurnal-deskripsi"
+                                type="text"
+                                wire:model.live.debounce.300ms="manualDeskripsi"
+                                placeholder="Contoh: Penyesuaian biaya operasional"
+                                aria-describedby="jurnal-error-deskripsi"
+                                @class(['glass-input w-full rounded-xl px-3 py-3 text-xs font-medium', 'border-up-red/60' => $errorDeskripsi])
+                            />
+                            @if($errorDeskripsi)
+                                <p id="jurnal-error-deskripsi" class="mt-1.5 text-[11px] font-medium text-up-red">{{ $errorDeskripsi }}</p>
+                            @endif
                         </div>
                     </div>
 
                     <div>
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="text-xs font-semibold text-ink-300">Baris Entri (debit = kredit)</label>
-                            <button wire:click="addManualLine" class="text-up-primary hover:text-indigo-400 text-xs font-bold cursor-pointer">+ Tambah Baris</button>
+                        <div class="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <p class="text-xs font-bold text-ink-200">Baris Entri</p>
+                                <p class="mt-0.5 text-[11px] text-ink-400">Akun debit hanya menampilkan akun bersaldo normal debit; sebaliknya untuk kredit.</p>
+                            </div>
+                            <x-prism.prism-button wire:click="addManualLine" size="sm" class="min-h-11 shrink-0">
+                                + Tambah Baris
+                            </x-prism.prism-button>
                         </div>
 
-                        @php
-                            $totalDebitManual = collect($manualLines)->sum('debit');
-                            $totalKreditManual = collect($manualLines)->sum('kredit');
-                        @endphp
-
-                        <div class="space-y-2">
+                        <div class="space-y-3">
                             @foreach($manualLines as $idx => $line)
-                                <div class="flex gap-2 items-center">
-                                    <div class="flex-1">
-                                        <input type="text" wire:model="manualLines.{{ $idx }}.akun_kode" placeholder="Kode akun (ex: 110-01)" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono font-medium" />
+                                @php
+                                    $line = is_array($line) ? $line : [];
+                                    $sisi = $line['sisi'] ?? 'debit';
+                                    $akunPilihan = $akunJurnalOptions->where('saldo_normal', $sisi);
+                                    $errorAkun = $manualValidation['errors']['baris'][$idx]['akun_kode'][0] ?? null;
+                                    $errorJumlah = $manualValidation['errors']['baris'][$idx]['jumlah'][0] ?? null;
+                                @endphp
+
+                                <div
+                                    wire:key="jurnal-line-{{ $line['uid'] ?? $idx }}"
+                                    class="rounded-2xl border border-white/10 bg-white/[0.025] p-3 sm:p-4"
+                                >
+                                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-[150px_minmax(240px,1fr)_180px_44px] lg:items-end">
+                                        <div>
+                                            <div class="mb-1.5 flex items-center justify-between gap-2">
+                                                <span class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Baris {{ $idx + 1 }}</span>
+                                                <x-prism.status-pill :status="$sisi === 'debit' ? 'pending' : 'aktif'">
+                                                    {{ ucfirst($sisi) }}
+                                                </x-prism.status-pill>
+                                            </div>
+                                            <div class="inline-flex w-full rounded-xl border border-white/10 bg-black/20 p-1" role="group" aria-label="Sisi baris {{ $idx + 1 }}">
+                                                <x-prism.prism-button
+                                                    wire:click="setManualLineSide({{ $idx }}, 'debit')"
+                                                    size="sm"
+                                                    :aria-pressed="$sisi === 'debit' ? 'true' : 'false'"
+                                                    class="min-h-11 flex-1"
+                                                    @class([
+                                                        '!border-up-amber/30 !bg-up-amber/15 !text-up-amber' => $sisi === 'debit',
+                                                        '!border-transparent !bg-transparent !text-ink-400' => $sisi !== 'debit',
+                                                    ])
+                                                >
+                                                    Debit
+                                                </x-prism.prism-button>
+                                                <x-prism.prism-button
+                                                    wire:click="setManualLineSide({{ $idx }}, 'kredit')"
+                                                    size="sm"
+                                                    :aria-pressed="$sisi === 'kredit' ? 'true' : 'false'"
+                                                    class="min-h-11 flex-1"
+                                                    @class([
+                                                        '!border-up-mint/30 !bg-up-mint/15 !text-up-mint' => $sisi === 'kredit',
+                                                        '!border-transparent !bg-transparent !text-ink-400' => $sisi !== 'kredit',
+                                                    ])
+                                                >
+                                                    Kredit
+                                                </x-prism.prism-button>
+                                            </div>
+                                        </div>
+
+                                        <div class="min-w-0">
+                                            <label for="jurnal-akun-{{ $idx }}" class="block text-[11px] font-semibold text-ink-300 mb-1.5">Akun COA *</label>
+                                            <select
+                                                id="jurnal-akun-{{ $idx }}"
+                                                wire:model.live="manualLines.{{ $idx }}.akun_kode"
+                                                aria-describedby="jurnal-error-akun-{{ $idx }}"
+                                                @class(['glass-input w-full rounded-xl px-3 py-3 text-xs font-medium', 'border-up-red/60' => $errorAkun])
+                                            >
+                                                <option value="" class="bg-ink-900">Pilih kode — nama akun</option>
+                                                @foreach($akunPilihan as $akun)
+                                                    <option value="{{ $akun->kode }}" class="bg-ink-900">
+                                                        {{ $akun->kode }} — {{ $akun->nama }} ({{ ucfirst($akun->tipe) }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @if($errorAkun)
+                                                <p id="jurnal-error-akun-{{ $idx }}" class="mt-1.5 text-[11px] font-medium text-up-red">{{ $errorAkun }}</p>
+                                            @endif
+                                        </div>
+
+                                        <div>
+                                            <label for="jurnal-jumlah-{{ $idx }}" class="block text-[11px] font-semibold text-ink-300 mb-1.5">
+                                                Nominal {{ ucfirst($sisi) }} (Rp) *
+                                            </label>
+                                            <input
+                                                id="jurnal-jumlah-{{ $idx }}"
+                                                type="text"
+                                                inputmode="numeric"
+                                                x-format-number
+                                                wire:model.live="manualLines.{{ $idx }}.jumlah"
+                                                placeholder="0"
+                                                aria-describedby="jurnal-error-jumlah-{{ $idx }}"
+                                                @class([
+                                                    'glass-input w-full rounded-xl px-3 py-3 text-sm font-bold tabular-nums',
+                                                    'text-up-amber' => $sisi === 'debit',
+                                                    'text-up-mint' => $sisi === 'kredit',
+                                                    'border-up-red/60' => $errorJumlah,
+                                                ])
+                                            />
+                                            @if($errorJumlah)
+                                                <p id="jurnal-error-jumlah-{{ $idx }}" class="mt-1.5 text-[11px] font-medium text-up-red">{{ $errorJumlah }}</p>
+                                            @endif
+                                        </div>
+
+                                        <x-prism.prism-button
+                                            wire:click="removeManualLine({{ $idx }})"
+                                            variant="danger"
+                                            size="sm"
+                                            :disabled="count($manualLines) <= 2"
+                                            class="min-h-11 min-w-11 lg:mb-0"
+                                            aria-label="Hapus baris {{ $idx + 1 }}"
+                                            title="{{ count($manualLines) > 2 ? 'Hapus baris' : 'Minimal dua baris' }}"
+                                        >
+                                            Hapus
+                                        </x-prism.prism-button>
                                     </div>
-                                    <div class="w-28">
-                                        <input type="text" inputmode="numeric" x-format-number wire:model.live="manualLines.{{ $idx }}.debit" step="500" min="0" placeholder="Debit" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold tabular-nums text-up-amber" />
-                                    </div>
-                                    <div class="w-28">
-                                        <input type="text" inputmode="numeric" x-format-number wire:model.live="manualLines.{{ $idx }}.kredit" step="500" min="0" placeholder="Kredit" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold tabular-nums text-up-mint" />
-                                    </div>
-                                    <button wire:click="removeManualLine({{ $idx }})" class="p-2 text-up-red hover:bg-white/5 rounded-lg text-xs cursor-pointer">✕</button>
                                 </div>
                             @endforeach
                         </div>
-
-                        <div class="flex justify-between mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs font-bold {{ $totalDebitManual === $totalKreditManual && $totalDebitManual > 0 ? 'text-up-mint' : (round($totalDebitManual,2) !== round($totalKreditManual,2) && ($totalDebitManual + $totalKreditManual) > 0 ? 'text-up-red' : 'text-ink-400') }}">
-                            <span>Debit: Rp {{ number_format($totalDebitManual, 0, ',', '.') }}</span>
-                            <span>Kredit: Rp {{ number_format($totalKreditManual, 0, ',', '.') }}</span>
-                            @if(round($totalDebitManual,2) === round($totalKreditManual,2) && $totalDebitManual > 0)
-                                <span>✓ Balance</span>
-                            @elseif(($totalDebitManual + $totalKreditManual) > 0)
-                                <span>✗ Belum balance</span>
-                            @endif
-                        </div>
                     </div>
+
+                    @php
+                        $totalDebit = $manualValidation['debit'];
+                        $totalKredit = $manualValidation['kredit'];
+                        $selisih = $manualValidation['selisih'];
+                        $statusValidasi = $manualValidation['balanced'] ? 'aktif' : (($totalDebit + $totalKredit) > 0 ? 'ditolak' : 'pending');
+                        $labelValidasi = $manualValidation['balanced']
+                            ? 'Seimbang'
+                            : (($totalDebit + $totalKredit) > 0
+                                ? ($selisih > 0 ? 'Kurang Kredit' : 'Kurang Debit')
+                                : 'Belum Ada Nominal');
+                    @endphp
+
+                    <x-prism.glass-card
+                        title="Verifikasi Otomatis"
+                        subtitle="Diperbarui setiap tanggal, akun, sisi, atau nominal berubah."
+                        circuit="true"
+                        padding="p-4"
+                        class="border-white/10"
+                    >
+                        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <x-prism.status-pill :status="$statusValidasi" size="md">
+                                {{ $labelValidasi }}
+                            </x-prism.status-pill>
+                            <p class="text-[11px] text-ink-400">
+                                @if($manualValidation['can_submit'])
+                                    Semua baris valid. Jurnal siap ditinjau dan diposting.
+                                @else
+                                    Selesaikan peringatan berikut sebelum jurnal dapat diposting.
+                                @endif
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="rounded-xl border border-up-amber/20 bg-up-amber/10 p-3">
+                                <p class="text-[10px] font-bold uppercase tracking-wider text-up-amber">Total Debit</p>
+                                <p class="mt-1 text-lg font-black tabular-nums text-up-amber">Rp {{ number_format($totalDebit, 0, ',', '.') }}</p>
+                            </div>
+                            <div class="rounded-xl border border-up-mint/20 bg-up-mint/10 p-3">
+                                <p class="text-[10px] font-bold uppercase tracking-wider text-up-mint">Total Kredit</p>
+                                <p class="mt-1 text-lg font-black tabular-nums text-up-mint">Rp {{ number_format($totalKredit, 0, ',', '.') }}</p>
+                            </div>
+                            <div @class([
+                                'rounded-xl border p-3',
+                                'border-up-mint/20 bg-up-mint/10' => $manualValidation['balanced'],
+                                'border-up-red/20 bg-up-red/10' => ! $manualValidation['balanced'] && ($totalDebit + $totalKredit) > 0,
+                                'border-white/10 bg-white/[0.02]' => ! $manualValidation['balanced'] && ($totalDebit + $totalKredit) === 0,
+                            ])>
+                                <p @class([
+                                    'text-[10px] font-bold uppercase tracking-wider',
+                                    'text-up-mint' => $manualValidation['balanced'],
+                                    'text-up-red' => ! $manualValidation['balanced'] && ($totalDebit + $totalKredit) > 0,
+                                    'text-ink-400' => ! $manualValidation['balanced'] && ($totalDebit + $totalKredit) === 0,
+                                ])>Selisih Debit − Kredit</p>
+                                <p @class([
+                                    'mt-1 text-lg font-black tabular-nums',
+                                    'text-up-mint' => $manualValidation['balanced'],
+                                    'text-up-red' => ! $manualValidation['balanced'] && ($totalDebit + $totalKredit) > 0,
+                                    'text-ink-300' => ! $manualValidation['balanced'] && ($totalDebit + $totalKredit) === 0,
+                                ])>
+                                    {{ $selisih > 0 ? '+' : ($selisih < 0 ? '−' : '') }} Rp {{ number_format(abs($selisih), 0, ',', '.') }}
+                                </p>
+                            </div>
+                        </div>
+
+                        @if($manualValidation['messages'])
+                            <div class="mt-4 rounded-xl border border-up-red/25 bg-up-red/10 p-3" role="alert" aria-live="polite">
+                                <p class="text-[10px] font-bold uppercase tracking-wider text-up-red">Yang perlu diperbaiki</p>
+                                <ul class="mt-2 space-y-1.5 text-[11px] text-up-red">
+                                    @foreach($manualValidation['messages'] as $message)
+                                        <li class="flex gap-2">
+                                            <span aria-hidden="true">•</span>
+                                            <span>{{ $message }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                    </x-prism.glass-card>
                 </div>
 
-                <div class="flex gap-3 pt-4 border-t border-white/5 mt-4">
-                    <button wire:click="$set('showJurnalManual', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanJurnalManual" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Posting Jurnal</button>
+                <div class="mt-5 flex flex-col-reverse gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center">
+                    <x-prism.prism-button wire:click="tutupJurnalManual" variant="ghost" size="lg" class="sm:flex-1">
+                        Batal
+                    </x-prism.prism-button>
+                    <x-prism.prism-button
+                        wire:click="tinjauJurnalManual"
+                        variant="mint"
+                        size="lg"
+                        class="sm:flex-[2]"
+                        :disabled="! $manualValidation['can_submit']"
+                        x-bind:disabled="!{{ $manualValidation['can_submit'] ? 'true' : 'false' }}"
+                        wire:loading.attr="disabled"
+                        wire:target="tinjauJurnalManual,simpanJurnalManual"
+                    >
+                        <span wire:loading.remove wire:target="tinjauJurnalManual,simpanJurnalManual">Tinjau &amp; Posting</span>
+                        <span wire:loading wire:target="tinjauJurnalManual,simpanJurnalManual">Memeriksa…</span>
+                    </x-prism.prism-button>
                 </div>
-            </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    {{-- ConfirmDialog Ute Prism untuk mencegah posting tak sengaja. --}}
+    @if($showJurnalConfirmation)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+            <x-prism.glass-card
+                title="Konfirmasi Posting Jurnal"
+                subtitle="Periksa ringkasan terakhir sebelum jurnal masuk ke buku besar."
+                class="w-full max-w-lg"
+            >
+                <div class="rounded-2xl border border-up-mint/25 bg-up-mint/10 p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-xs font-semibold text-ink-300">Total Jurnal</span>
+                        <x-prism.status-pill status="aktif">Siap Diposting</x-prism.status-pill>
+                    </div>
+                    <p class="mt-3 text-2xl font-black tabular-nums text-up-mint">
+                        Rp {{ number_format($manualValidation['debit'], 0, ',', '.') }}
+                    </p>
+                    <p class="mt-1 text-[11px] text-ink-400">
+                        Debit = Kredit · {{ count($manualLines) }} baris entri · {{ $manualTanggal ? \Carbon\Carbon::parse($manualTanggal)->format('d/m/Y') : '-' }}
+                    </p>
+                </div>
+
+                <div class="mt-4 space-y-2">
+                    @foreach($manualLines as $idx => $line)
+                        @php
+                            $line = is_array($line) ? $line : [];
+                            $akunTerpilih = $akunJurnalOptions->firstWhere('kode', $line['akun_kode'] ?? '');
+                            $sisi = $line['sisi'] ?? 'debit';
+                        @endphp
+                        <div class="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2.5">
+                            <div class="min-w-0">
+                                <p class="truncate text-xs font-semibold text-ink-100">{{ $akunTerpilih?->nama ?? 'Akun tidak ditemukan' }}</p>
+                                <p class="font-mono text-[10px] text-ink-400">{{ $akunTerpilih?->kode ?? '-' }}</p>
+                            </div>
+                            <div class="text-right">
+                                <x-prism.status-pill :status="$sisi === 'debit' ? 'pending' : 'aktif'">{{ ucfirst($sisi) }}</x-prism.status-pill>
+                                <p class="mt-1 text-xs font-bold tabular-nums {{ $sisi === 'debit' ? 'text-up-amber' : 'text-up-mint' }}">
+                                    Rp {{ number_format((float) ($line['jumlah'] ?? 0), 0, ',', '.') }}
+                                </p>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <p class="mt-4 text-[11px] leading-relaxed text-ink-400">
+                    Setelah diposting, jurnal ini menjadi bagian dari buku besar cabang aktif dan tidak dapat diubah dari halaman ini.
+                </p>
+
+                <div class="mt-5 flex flex-col-reverse gap-3 sm:flex-row">
+                    <x-prism.prism-button wire:click="batalTinjauJurnalManual" variant="ghost" size="lg" class="sm:flex-1">
+                        Batal, Periksa Lagi
+                    </x-prism.prism-button>
+                    <x-prism.prism-button
+                        wire:click="simpanJurnalManual"
+                        variant="mint"
+                        size="lg"
+                        class="sm:flex-[2]"
+                        wire:loading.attr="disabled"
+                        wire:target="simpanJurnalManual"
+                    >
+                        Ya, Posting Sekarang
+                    </x-prism.prism-button>
+                </div>
+            </x-prism.glass-card>
         </div>
     @endif
 

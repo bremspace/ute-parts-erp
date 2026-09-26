@@ -28,9 +28,11 @@
             <x-prism.prism-button variant="ghost" size="sm" wire:click="recalcTier">
                 ⟳ Rekalkulasi Tier
             </x-prism.prism-button>
-            <x-prism.prism-button variant="accent" size="sm" wire:click="$set('showBroadcastModal', true)">
-                📢 Broadcast Promo
-            </x-prism.prism-button>
+            @can('crm.broadcast')
+                <x-prism.prism-button variant="accent" size="sm" wire:click="$set('showBroadcastModal', true)">
+                    📢 Broadcast Promo
+                </x-prism.prism-button>
+            @endcan
         </div>
     </div>
 

@@ -391,6 +391,12 @@ parameters:
 			path: app/Modules/Akunting/Controllers/AkuntingController.php
 
 		-
+			message: '#^Access to an undefined property App\\Modules\\Akunting\\Livewire\\AkuntingDashboard\:\:\$akunJurnalOptions\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Modules/Akunting/Livewire/AkuntingDashboard.php
+
+		-
 			message: '#^Access to an undefined property App\\Modules\\Akunting\\Livewire\\AkuntingDashboard\:\:\$arusKas\.$#'
 			identifier: property.notFound
 			count: 1
@@ -416,6 +422,12 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property App\\Modules\\Akunting\\Livewire\\AkuntingDashboard\:\:\$labaRugi\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Modules/Akunting/Livewire/AkuntingDashboard.php
+
+		-
+			message: '#^Access to an undefined property App\\Modules\\Akunting\\Livewire\\AkuntingDashboard\:\:\$manualValidation\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Modules/Akunting/Livewire/AkuntingDashboard.php
@@ -447,13 +459,13 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$kode\.$#'
 			identifier: property.notFound
-			count: 3
+			count: 2
 			path: app/Modules/Akunting/Livewire/AkuntingDashboard.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$nama\.$#'
 			identifier: property.notFound
-			count: 3
+			count: 2
 			path: app/Modules/Akunting/Livewire/AkuntingDashboard.php
 
 		-
@@ -579,7 +591,7 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Modules\\Akunting\\Models\\JurnalAkuntansi\>\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
-			count: 3
+			count: 2
 			path: app/Modules/Akunting/Livewire/AkuntingDashboard.php
 
 		-
@@ -591,7 +603,7 @@ parameters:
 		-
 			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Modules\\Akunting\\Models\\JurnalAkuntansi\>\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: method.unresolvableReturnType
-			count: 3
+			count: 2
 			path: app/Modules/Akunting/Livewire/AkuntingDashboard.php
 
 		-
@@ -3055,7 +3067,7 @@ parameters:
 			path: app/Modules/Rbac/Livewire/RiwayatAktivitas.php
 
 		-
-			message: '#^Access to an undefined property App\\Modules\\Rbac\\Livewire\\SessionManagementPage\:\:\$devicesProperty\.$#'
+			message: '#^Access to an undefined property App\\Modules\\Rbac\\Livewire\\SessionManagementPage\:\:\$devices\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Modules/Rbac/Livewire/SessionManagementPage.php
@@ -4501,19 +4513,19 @@ parameters:
 			path: app/Modules/Wms/Controllers/WmsController.php
 
 		-
-			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\CycleCountPage\:\:\$raksProperty\.$#'
+			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\CycleCountPage\:\:\$raks\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Modules/Wms/Livewire/CycleCountPage.php
 
 		-
-			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\CycleCountPage\:\:\$schedulesProperty\.$#'
+			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\CycleCountPage\:\:\$schedules\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Modules/Wms/Livewire/CycleCountPage.php
 
 		-
-			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\CycleCountPage\:\:\$tasksProperty\.$#'
+			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\CycleCountPage\:\:\$tasks\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Modules/Wms/Livewire/CycleCountPage.php
@@ -4891,13 +4903,13 @@ parameters:
 			path: app/Modules/Wms/Livewire/StokTab.php
 
 		-
-			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\SupplierScoreTable\:\:\$scoresProperty\.$#'
+			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\SupplierScoreTable\:\:\$scores\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Modules/Wms/Livewire/SupplierScoreTable.php
 
 		-
-			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\SupplierScoreTable\:\:\$suppliersProperty\.$#'
+			message: '#^Access to an undefined property App\\Modules\\Wms\\Livewire\\SupplierScoreTable\:\:\$suppliers\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Modules/Wms/Livewire/SupplierScoreTable.php

@@ -95,11 +95,22 @@ class RolesAndPermissionsSeeder extends Seeder
         $kasir = Role::findOrCreate('kasir');
         $kasir->givePermissionTo([
             'pos.create', 'pos.view-own', 'wms.view',
+            // [B-14] Keputusan owner atas B-06 tertunda: kasir (meja kasir /
+            // loket terima unit) perlu membuka tiket servis — termasuk kunci
+            // gadget saat unit diserahkan / diambil. READ-ONLY: `servis.create` &
+            // `servis.update-status` TIDAK diberikan (tetap admin-toko/teknisi),
+            // dan aksi mutasi di Livewire ServisBoard diguard server-side.
+            'servis.view',
         ]);
 
         $teknisi = Role::findOrCreate('teknisi');
         $teknisi->givePermissionTo([
-            'servis.view', 'servis.update-status', 'servis.input-sparepart',
+            // [B-14] `servis.create` ditambahkan utk teknisi karena guard
+            // server-side di `ServisBoard::simpanTerima()` kini sama dgn API
+            // `POST /api/servis` (`permission:servis.create`). Sebelum ini teknisi
+            // sudah bisa menerima unit lewat papan kanban (route hanya
+            // `servis.view`) — jadi ini KONSISTENSI, bukan perluasan akses.
+            'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart',
         ]);
 
         $staffGudang = Role::findOrCreate('staff-gudang');
@@ -126,7 +137,17 @@ class RolesAndPermissionsSeeder extends Seeder
             'crm.view', 'crm.create', 'crm.edit', 'crm.delete', 'crm.broadcast',
             'tier.manage',
             'reseller.view',
+            // [B-14] B-06 tertunda: marketing perlu melihat status perbaikan +
+            // kunci gadget untuk menjawab pertanyaan pelanggan.
+            // READ-ONLY — tanpa `servis.create` / `servis.update-status`.
+            'servis.view',
         ]);
+
+        // [B-14] Yang TIDAK diberi `servis.view` (minimum privilege):
+        // - `finance`    → fokusnya akunting/piutang/pajak; kunci gadget,
+        //                  data unit pelanggan tidak perlu untuk tugasnya.
+        // - `staff-gudang` → fokusnya stok/opname/transfer, bukan alur servis.
+        // Halaman & API servis tetap 403 untuk keduanya (middleware servis.view).
 
         // [F3-8] HR & Payroll permissions
         $hr = Role::findOrCreate('kelola-hr');

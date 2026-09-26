@@ -69,7 +69,9 @@ class SessionManagementPage extends Component
     public function render()
     {
         return view('modules.rbac.livewire.session-management', [
-            'devices' => $this->devicesProperty,
+            // Legacy computed (`getDevicesProperty()`) diakses sebagai `$this->devices`,
+            // bukan `$this->devicesProperty` — nama property literal tidak ada di komponen.
+            'devices' => $this->devices,
         ])->layout('layouts.backoffice', ['header' => 'Session Management']);
     }
 }

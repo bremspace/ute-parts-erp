@@ -19,8 +19,9 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
-use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Services\NomorSeriService;
+use App\Modules\Wms\Services\StokDeductionService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -29,11 +30,27 @@ class PosKasir extends Component
 {
     use PunyaRiwayatAktivitas;
 
+    /** [B-02/P1-5] Jumlah produk per muat katalog (load-more). */
+    public const BATAS_PRODUK_AWAL = 16;
+
+    /**
+     * [B-02] Stok saat belum ada gudang aktif = 0 (bukan batas longgar).
+     * Kebijakan owner final: stok 0 = produk TIDAK BISA DIPILIH (hard-block,
+     * backorder dibatalkan). Nilai 0 ikut Testosterone "satu kriteria stok"
+     * supaya kartu katalog & addToCart() tidak punya jalan bypass lewat
+     * "gudang belum dipilih" — pemanggil wajib pesan "Pilih gudang terlebih
+     * dahulu".
+     */
+    public const STOK_TANPA_GUDANG = 0;
+
     // [T-09] state sesi kas
     public $kasAktif = null;
 
     // Search & Filter state
     public string $search = '';
+
+    // [B-02/P1-5] Batas katalog yang dimuat (load-more "Muat lebih banyak")
+    public int $batasProduk = self::BATAS_PRODUK_AWAL;
 
     public ?int $selectedCustomerId = null;
 
@@ -133,6 +150,77 @@ class PosKasir extends Component
 
         // Harga fleksibel permission
         $this->canHargaFleksibel = auth()->user()?->hasPermissionTo('atur-harga-fleksibel') ?? false;
+    }
+
+    /**
+     * [B-02/P1-2] Gudang wajib milik cabang aktif (session cabang_id).
+     * selectedGudangId adalah prop publik Livewire → bisa di-tamper lintas cabang;
+     * bila tidak valid → reset ke gudang cabang ini + pesan Indonesia.
+     */
+    private function validasiGudangCabang(): void
+    {
+        $cabangId = session('cabang_id');
+        if (! $cabangId) {
+            return;
+        }
+
+        if ($this->selectedGudangId
+            && Gudang::where('id', $this->selectedGudangId)->where('cabang_id', $cabangId)->exists()) {
+            return;
+        }
+
+        $gudangCabang = Gudang::where('cabang_id', $cabangId)->orderByDesc('is_active')->orderBy('id')->value('id');
+
+        if ($this->selectedGudangId !== $gudangCabang) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => 'Gudang tidak sesuai cabang aktif — diganti ke gudang cabang ini',
+            ]);
+        }
+
+        $this->selectedGudangId = $gudangCabang;
+    }
+
+    /**
+     * [B-02/P0-1] SATU kriteria stok utk gauge kartu, addToCart() & updateQty():
+     * - varian terisi (scan barcode) → baris varian eksak;
+     * - tanpa varian (klik kartu) → agregat produk+gudang (SUM seluruh baris varian),
+     *   sama persis dgn angka yang dilihat kasir di kartu.
+     *
+     * Tanpa gudang → 0 (STOK_TANPA_GUDANG): produk tidak boleh dipilih sebelum
+     * kasir memilih gudang.
+     */
+    private function hitungStokTersedia(int $produkId, ?int $variantId, ?int $gudangId): int
+    {
+        if (! $gudangId) {
+            return self::STOK_TANPA_GUDANG;
+        }
+
+        return (int) StokItem::where('produk_id', $produkId)
+            ->where('gudang_id', $gudangId)
+            ->when($variantId, fn ($q) => $q->where('sku_variant_id', $variantId))
+            ->sum('jumlah');
+    }
+
+    /**
+     * [B-02/P1-5] Peta stok per produk utk katalog (sekali query — hindari N+1
+     * saat load-more), kriteria sama dgn hitungStokTersedia().
+     *
+     * @return array<int, int>
+     */
+    private function petaStokKatalog(Collection $products): array
+    {
+        if (! $this->selectedGudangId || $products->isEmpty()) {
+            return [];
+        }
+
+        return StokItem::whereIn('produk_id', $products->pluck('id'))
+            ->where('gudang_id', $this->selectedGudangId)
+            ->groupBy('produk_id')
+            ->selectRaw('produk_id, SUM(jumlah) AS total')
+            ->pluck('total', 'produk_id')
+            ->map(fn ($total) => (int) $total)
+            ->all();
     }
 
     public function checkKasSesi(): void
@@ -263,29 +351,43 @@ class PosKasir extends Component
         }
     }
 
+    /**
+     * [B-02/P0-1] Hard-block stok kosong (kebijakan owner final — backorder
+     * dibatalkan): produk dgn stok 0 di gudang aktif TIDAK BOLEH masuk keranjang.
+     * Pesan berbahasa Indonesia; kalau masalahnya gudang belum dipilih, kasir
+     * diberi tahu untuk memilih gudang lebih dulu.
+     */
+    private function blokirStokKosong(Produk $produk): void
+    {
+        $this->dispatch('alert', [
+            'type' => 'error',
+            'message' => $this->selectedGudangId
+                ? "Stok {$produk->nama} habis di gudang ini — pilih gudang lain yang punya stok."
+                : "Pilih gudang terlebih dahulu untuk melihat & memakai stok {$produk->nama}.",
+        ]);
+    }
+
     public function addToCart(int $produkId, ?int $variantId = null)
     {
         $produk = Produk::findOrFail($produkId);
         $variant = $variantId ? SkuVariant::find($variantId) : null;
         $itemKey = $variantId ? "{$produkId}-{$variantId}" : "{$produkId}-0";
 
+        // [B-02/P1-2] Gudang terpilih wajib milik cabang aktif (anti tamper lintas cabang)
+        $this->validasiGudangCabang();
+
+        // [B-02/P0-1] Hard-block stok kosong — dicek SEBELUM ada efek apa pun
+        // (tidak ada item, tidak ada PPN yang bergeser). Stok dgn kriteria yg
+        // sama persis dgn gauge di kartu produk.
+        $stokTersedia = $this->hitungStokTersedia($produkId, $variantId, $this->selectedGudangId);
+        if ($stokTersedia <= 0) {
+            $this->blokirStokKosong($produk);
+
+            return;
+        }
+
         // Hitung ulang PPN setelah perubahan keranjang
         $this->recalcPajak();
-
-        // Cek stok tersedia
-        $stokTersedia = 999;
-        if ($this->selectedGudangId) {
-            $stokTersedia = StokItem::where('produk_id', $produkId)
-                ->where('sku_variant_id', $variantId)
-                ->where('gudang_id', $this->selectedGudangId)
-                ->value('jumlah') ?? 0;
-
-            if ($stokTersedia <= 0) {
-                $this->dispatch('alert', ['type' => 'error', 'message' => "Stok produk {$produk->nama} habis"]);
-
-                return;
-            }
-        }
 
         // Resolusi harga
         $pricingService = app(PricingService::class);
@@ -309,13 +411,18 @@ class PosKasir extends Component
         }
 
         if (isset($this->cart[$itemKey])) {
+            // Batas keras = stok tersedia riil di gudang aktif
             if ($this->cart[$itemKey]['qty'] + 1 > $stokTersedia) {
-                $this->dispatch('alert', ['type' => 'warning', 'message' => 'Stok maksimal tercapai']);
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => "Stok {$produk->nama} maksimal {$stokTersedia} unit di gudang ini",
+                ]);
 
                 return;
             }
             $this->cart[$itemKey]['qty'] += 1;
             $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $harga;
+            $this->cart[$itemKey]['stok_max'] = $stokTersedia;
         } else {
             $this->cart[$itemKey] = [
                 'produk_id' => $produkId,
@@ -333,6 +440,18 @@ class PosKasir extends Component
                 'sn_list' => [],
             ];
         }
+    }
+
+    /** [B-02/P1-5] Load-more katalog (seluruh produk aktif bisa diakses). */
+    public function muatLebihBanyak(): void
+    {
+        $this->batasProduk += self::BATAS_PRODUK_AWAL;
+    }
+
+    /** Pencarian berubah → muat ulang katalog dari awal (batas default). */
+    public function updatingSearch(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
     }
 
     // ==================== [F2-3] NOMOR SERI ====================
@@ -441,25 +560,57 @@ class PosKasir extends Component
         return null;
     }
 
+    /**
+     * [B-02/P0-1] Batas keras qty = stok RIIL di gudang aktif (kriteria sama
+     * dgn addToCart). `stok_max` di keranjang adalah prop publik Livewire yang
+     * bisa di-tamper client → selalu dihitung ulang dari database, bukan
+     * dipercaya. Stok 0 = item tidak boleh ada → item dibuang dari keranjang
+     * (mis. setelah pindah gudang / resume transaksi ditahan).
+     */
     public function updateQty(string $itemKey, int $delta)
     {
         if (! isset($this->cart[$itemKey])) {
             return;
         }
 
-        $newQty = $this->cart[$itemKey]['qty'] + $delta;
+        $newQty = (int) $this->cart[$itemKey]['qty'] + $delta;
         if ($newQty <= 0) {
             $this->removeFromCart($itemKey);
 
             return;
         }
 
-        if ($newQty > $this->cart[$itemKey]['stok_max']) {
-            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Maksimal stok tercapai']);
+        $item = $this->cart[$itemKey];
+        $stokMax = $this->hitungStokTersedia(
+            (int) $item['produk_id'],
+            $item['sku_variant_id'] ?: null,
+            $this->selectedGudangId
+        );
+
+        // Stok habis (atau gudang belum dipilih) → tidak boleh ada item sama sekali
+        if ($stokMax <= 0) {
+            $this->removeFromCart($itemKey);
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => $this->selectedGudangId
+                    ? "Stok {$item['nama']} habis di gudang ini — item dihapus dari keranjang. Pilih gudang lain yang punya stok."
+                    : 'Pilih gudang terlebih dahulu — item dihapus dari keranjang.',
+            ]);
 
             return;
         }
 
+        if ($newQty > $stokMax) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Stok {$item['nama']} maksimal {$stokMax} unit di gudang ini",
+            ]);
+
+            return;
+        }
+
+        // Sinkronkan batas keras di keranjang (dipakai cart-content & resume)
+        $this->cart[$itemKey]['stok_max'] = $stokMax;
         $this->cart[$itemKey]['qty'] = $newQty;
         $this->cart[$itemKey]['subtotal'] = $newQty * $this->cart[$itemKey]['harga'];
 
@@ -612,9 +763,51 @@ class PosKasir extends Component
         $this->jumlahBayar = $nominal;
     }
 
+    /**
+     * [B-02/P0-1] Gate stok sebelum potong: seluruh item keranjang harus punya
+     * stok >= qty di gudang aktif. Tanpa gate ini, kegagalan baru ketahuan
+     * setelah transaksi dibuat lalu di-rollback (pesan teknis "Stok tidak
+     * mencukupi (produk ID …)"). Stok selalu dihitung ulang dari database —
+     * `stok_max` di keranjang adalah prop publik Livewire yang bisa di-tamper.
+     */
+    private function validasiStokKeranjang(): ?string
+    {
+        foreach ($this->cart as $item) {
+            $stokTersedia = $this->hitungStokTersedia(
+                (int) $item['produk_id'],
+                $item['sku_variant_id'] ?: null,
+                $this->selectedGudangId
+            );
+            $qty = (int) $item['qty'];
+
+            if ($stokTersedia <= 0) {
+                return $this->selectedGudangId
+                    ? "Stok {$item['nama']} habis di gudang ini — hapus dari keranjang atau pilih gudang lain."
+                    : 'Pilih gudang terlebih dahulu sebelum membayar.';
+            }
+
+            if ($qty > $stokTersedia) {
+                return "Stok {$item['nama']} tidak cukup — tersedia {$stokTersedia} unit, keranjang {$qty} unit.";
+            }
+        }
+
+        return null;
+    }
+
     public function processTransaction()
     {
         $cabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
+
+        // [B-02/P1-2] Gudang wajib milik cabang aktif — validasi ulang sebelum potong stok
+        $this->validasiGudangCabang();
+
+        // [B-02/P0-1] Hard-block stok: tidak ada lagi jalur backorder di POS
+        $stokError = $this->validasiStokKeranjang();
+        if ($stokError) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $stokError]);
+
+            return;
+        }
 
         // Validasi harga fleksibel di keranjang
         $flexError = $this->validasiCartHargaFleksibel();
@@ -711,31 +904,24 @@ class PosKasir extends Component
                     }
 
                     if ($this->selectedGudangId) {
-                        $stok = StokItem::where('produk_id', $item['produk_id'])
-                            ->where('sku_variant_id', $item['sku_variant_id'])
-                            ->where('gudang_id', $this->selectedGudangId)
-                            ->first();
-
-                        $sebelum = $stok ? $stok->jumlah : 0;
-                        $setelah = $sebelum - $item['qty'];
-
-                        if ($stok) {
-                            $stok->update(['jumlah' => $setelah]);
-                        }
-
-                        StokLog::create([
-                            'gudang_id' => $this->selectedGudangId,
-                            'produk_id' => $item['produk_id'],
-                            'sku_variant_id' => $item['sku_variant_id'],
-                            'user_id' => auth()->id(),
-                            'jenis' => 'penjualan',
-                            'referensi_tipe' => Transaksi::class,
-                            'referensi_id' => $transaksi->id,
-                            'jumlah_sebelum' => $sebelum,
-                            'perubahan' => -$item['qty'],
-                            'jumlah_setelah' => $setelah,
-                            'catatan' => "POS Kasir {$transaksi->no_transaksi}",
-                        ]);
+                        // [B-02/P1-1] Delegasi ke StokDeductionService: lockForUpdate,
+                        // satu kriteria resolusi baris stok, StokLog + StockMutationLog
+                        // (untuk sinkron channel).
+                        // [B-02/P0-1] izinkanNegatif TIDAK lagi diaktifkan (backorder
+                        // dibatalkan owner) → default false = stok kurang DITOLAK.
+                        // Garis pertahanan kedua: validasiStokKeranjang() di atas
+                        // sudah menolak stok 0/kurang sebelum transaksi dibuat.
+                        app(StokDeductionService::class)->kurangi(
+                            produkId: (int) $item['produk_id'],
+                            skuVariantId: $item['sku_variant_id'] ?: null,
+                            gudangId: (int) $this->selectedGudangId,
+                            qty: (int) $item['qty'],
+                            jenis: 'penjualan',
+                            referensiTipe: Transaksi::class,
+                            referensiId: $transaksi->id,
+                            userId: auth()->id(),
+                            catatan: "POS Kasir {$transaksi->no_transaksi}",
+                        );
                     }
                 }
 
@@ -855,6 +1041,9 @@ class PosKasir extends Component
         }
 
         $cabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
+
+        // [B-02/P1-2] Simpan keranjang tertahan dgn gudang cabang aktif
+        $this->validasiGudangCabang();
 
         try {
             DB::transaction(function () use ($cabangId) {
@@ -1168,12 +1357,29 @@ class PosKasir extends Component
             });
         }
 
-        $products = $productsQuery->take(16)->get();
+        // [B-02/P1-5] Load-more: ambil batas+1 utk tahu masih ada sisanya
+        $products = $productsQuery->take($this->batasProduk + 1)->get();
+        $adaLebihBanyak = $products->count() > $this->batasProduk;
+        $products = $products->take($this->batasProduk)->values();
+
         $customers = Pelanggan::with('tierMembership')->take(10)->get();
+
+        // [B-02/P1-2] Dropdown gudang HANYA milik cabang aktif
+        $gudangs = Gudang::where('cabang_id', session('cabang_id'))
+            ->orderByDesc('is_active')
+            ->orderBy('id')
+            ->get();
+
+        // [B-02/P0-2] Peta stok katalog — kriteria sama dgn addToCart (satu query)
+        $stokPerProduk = $this->petaStokKatalog($products);
 
         // Explicitly pass all data needed by the view
         return view('modules.pos.livewire.pos-kasir', [
             'products' => $products,
+            'gudangs' => $gudangs,
+            'stokPerProduk' => $stokPerProduk,
+            'adaLebihBanyak' => $adaLebihBanyak,
+            'batasProduk' => $this->batasProduk,
             'customers' => $customers,
             'pelangganCari' => $this->pelangganCari,
             'ditahanList' => $this->ditahanList,

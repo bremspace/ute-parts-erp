@@ -19,6 +19,16 @@ use Livewire\Component;
  */
 class TransferTab extends Component
 {
+    /**
+     * [B-15c] Batas dropdown produk (transfer antar gudang). Master produk global
+     * bisa 500-2.000 baris; dropdown tanpa paginasi menarik semuanya tiap render.
+     * Dipotong → user diberi tahu (lihat pesanPotongDropdownProduk()).
+     */
+    public const PRODUK_DROPDOWN_LIMIT = 300;
+
+    /** [B-15c] Pengaman jumlah gudang per cabang (normally < 10). */
+    public const GUDANG_DROPDOWN_LIMIT = 100;
+
     public ?int $filterGudangId = null;
 
     // New Transfer Modal state
@@ -51,6 +61,51 @@ class TransferTab extends Component
             ['produk_id' => null, 'sku_variant_id' => null, 'rak_id' => null, 'jumlah' => 1],
         ];
         $this->showTransferModal = true;
+
+        // [B-15c] Beri tahu user kalau daftar produk dipotong (bukan diam-diam).
+        $this->peringatanProdukDipotong();
+    }
+
+    /** [B-15c] Toast sekali-buka-modal bila daftar produk di dropdown memang dipotong. */
+    private function peringatanProdukDipotong(): void
+    {
+        if ($this->totalProdukCabang() > self::PRODUK_DROPDOWN_LIMIT) {
+            $this->dispatch('alert', [
+                'type' => 'info',
+                'message' => 'Daftar produk pada dropdown dibatasi '.self::PRODUK_DROPDOWN_LIMIT.
+                    ' produk (urutan nama). Produk lain masih bisa dipilih lewat pencarian produk di halaman Master Produk.',
+            ]);
+        }
+    }
+
+    /**
+     * [B-15c] Jumlah produk yang lolos filter dropdown (gudang asal/tujuan cabang
+     * aktif). 1 query `count()` — hanya saat modal dibuka.
+     */
+    private function totalProdukCabang(): int
+    {
+        return Produk::where('is_active', true)
+            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
+            ->count();
+    }
+
+    /**
+     * [B-15c] Scope cabang untuk query produk: produk yang punya stok di gudang cabang
+     * aktif, atau produk yang belum punya stok sama sekali (produk baru — supaya PO
+     * & transfer tidak menyembunyikan kandidat restock). Produk yang HANYA ada di gudang
+     * cabang lain tidak boleh bocor ke dropdown.
+     */
+    private function scopeStokCabangAktif($query)
+    {
+        $cabangId = session('cabang_id');
+
+        return $query->where(function ($q) use ($cabangId) {
+            $q->whereDoesntHave('stokItems')
+                ->when($cabangId, fn ($q2) => $q2->orWhereHas(
+                    'stokItems.gudang',
+                    fn ($q3) => $q3->where('cabang_id', $cabangId)
+                ));
+        });
     }
 
     public function addTransferRow()
@@ -82,6 +137,11 @@ class TransferTab extends Component
      * [T-41] Info stok per baris form transfer: stok sumber (fisik + terkunci draft
      * pending) & estimasi stok tujuan setelah transfer — dipakai kolom UI + validasi
      * client (Alpine) + server.
+     *
+     * [B-15c] 1 query batch untuk SEMUA baris (sebelumnya 1-2 query `stok_items` per
+     * baris draft → 2M query per render, M = 1-30 baris). `stok_items` punya unique
+     * (produk_id, sku_variant_id, gudang_id) jadi map "gudang:produk:varian" bersifat
+     * 1:1 — angka & tampilan identik dengan `->first()` per baris.
      */
     protected function transferStokRows(): array
     {
@@ -99,22 +159,15 @@ class TransferTab extends Component
         // [T-13] pola pendingLockedByGudang: qty draft transfer lain yg mengunci stok asal
         $lockedByKey = StokTransfer::pendingLockedByGudang($gudangAsalId);
 
+        $stokMap = $this->petaStokBatch($this->transferItems, $gudangAsalId, $gudangTujuanId);
+
         foreach ($this->transferItems as $idx => $row) {
             $produkId = (int) ($row['produk_id'] ?? 0);
             $variantId = $row['sku_variant_id'] ?? null;
             $key = $produkId.':'.($variantId ?? 'null');
 
-            $stokSumber = StokItem::where('gudang_id', $gudangAsalId)
-                ->where('produk_id', $produkId)
-                ->where('sku_variant_id', $variantId)
-                ->first();
-
-            $stokTujuan = $gudangTujuanId
-                ? StokItem::where('gudang_id', $gudangTujuanId)
-                    ->where('produk_id', $produkId)
-                    ->where('sku_variant_id', $variantId)
-                    ->first()
-                : null;
+            $stokSumber = $produkId ? $stokMap[$gudangAsalId.':'.$key] ?? null : null;
+            $stokTujuan = ($gudangTujuanId && $produkId) ? $stokMap[$gudangTujuanId.':'.$key] ?? null : null;
 
             $stokSumberQty = $stokSumber?->jumlah ?? 0;
             $stokDikunci = ($lockedByKey[$key] ?? 0);
@@ -133,6 +186,36 @@ class TransferTab extends Component
         return $rows;
     }
 
+    /**
+     * [B-15c] 1 query `stok_items` untuk seluruh baris form transfer.
+     *
+     * @param  array<int, array<string, mixed>>  $items  baris draft transfer
+     * @return array<string, StokItem> map "gudang:produk:varian" => model
+     */
+    private function petaStokBatch(array $items, int $gudangAsalId, int $gudangTujuanId): array
+    {
+        $produkIds = [];
+        foreach ($items as $row) {
+            $produkId = (int) ($row['produk_id'] ?? 0);
+            if ($produkId) {
+                $produkIds[$produkId] = $produkId;
+            }
+        }
+
+        if ($produkIds === []) {
+            return [];
+        }
+
+        $gudangIds = array_values(array_unique(array_filter([$gudangAsalId, $gudangTujuanId])));
+
+        return StokItem::whereIn('produk_id', array_values($produkIds))
+            ->whereIn('gudang_id', $gudangIds)
+            ->orderBy('id') // stabil: `->first()` lama = baris id terkecil
+            ->get(['gudang_id', 'produk_id', 'sku_variant_id', 'jumlah'])
+            ->keyBy(fn (StokItem $s) => $s->gudang_id.':'.$s->produk_id.':'.($s->sku_variant_id ?? 'null'))
+            ->all();
+    }
+
     public function saveTransfer()
     {
         $this->validate([
@@ -146,14 +229,15 @@ class TransferTab extends Component
 
         // [T-41] Validasi server per item: qty ≤ stok tersedia gudang sumber
         // (stok_fisik − stok_dikunci transfer draft pending).
+        // [B-15c] 1 query batch (sebelumnya 1 query stok_items per item).
         $lockedByKey = StokTransfer::pendingLockedByGudang((int) $this->transferGudangAsalId);
+        $stokMap = $this->petaStokBatch($this->transferItems, (int) $this->transferGudangAsalId, 0);
+
         $adaError = false;
         foreach ($this->transferItems as $idx => $row) {
-            $stok = StokItem::where('gudang_id', $this->transferGudangAsalId)
-                ->where('produk_id', $row['produk_id'])
-                ->where('sku_variant_id', $row['sku_variant_id'] ?? null)
-                ->first();
-            $key = $row['produk_id'].':'.($row['sku_variant_id'] ?? 'null');
+            $produkId = (int) ($row['produk_id'] ?? 0);
+            $key = $produkId.':'.($row['sku_variant_id'] ?? 'null');
+            $stok = $produkId ? $stokMap[(int) $this->transferGudangAsalId.':'.$key] ?? null : null;
             $tersedia = ($stok?->jumlah ?? 0) - (int) ($lockedByKey[$key] ?? 0);
             if ($tersedia < (int) $row['jumlah']) {
                 $this->addError(
@@ -221,10 +305,12 @@ class TransferTab extends Component
                     $stokAsal->update(['jumlah' => $setelah]);
 
                     // [T-41] SOT mutasi ke luar — wajib utk kirim transfer
+                    // [B-10i] user_id = pelaku kirim (sama dgn StokLog & approved_by).
                     StockMutationLog::create([
                         'produk_id' => $item->produk_id,
                         'sku_variant_id' => $item->sku_variant_id,
                         'gudang_id' => $transfer->gudang_asal_id,
+                        'user_id' => auth()->id(),
                         'delta' => -$item->jumlah,
                         'sumber' => 'transfer:out',
                         'referensi_tipe' => StokTransfer::class,
@@ -282,10 +368,12 @@ class TransferTab extends Component
                     $stokTujuan->update(['jumlah' => $setelah]);
 
                     // [T-41] SOT mutasi ke dalam — wajib utk terima transfer
+                    // [B-10i] user_id = penerima transfer (sama dgn StokLog & user_penerima_id).
                     StockMutationLog::create([
                         'produk_id' => $item->produk_id,
                         'sku_variant_id' => $item->sku_variant_id,
                         'gudang_id' => $transfer->gudang_tujuan_id,
+                        'user_id' => auth()->id(),
                         'delta' => $item->jumlah,
                         'sumber' => 'transfer:in',
                         'referensi_tipe' => StokTransfer::class,
@@ -323,8 +411,22 @@ class TransferTab extends Component
 
     public function render()
     {
-        $gudangs = Gudang::where('is_active', true)->get();
-        $allProducts = Produk::where('is_active', true)->orderBy('nama')->get();
+        $cabangId = session('cabang_id');
+
+        // [B-15c] Gudang: WAJIB scope cabang (sebelumnya `where is_active` saja →
+        // gudang cabang lain bocor ke dropdown asal/tujuan) + batas pengaman.
+        $gudangs = Gudang::where('is_active', true)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->orderBy('nama')
+            ->limit(self::GUDANG_DROPDOWN_LIMIT)
+            ->get();
+
+        // [B-15c] Produk: scope stok cabang aktif + limit dropdown (bukan 500-2.000 baris).
+        $allProducts = Produk::where('is_active', true)
+            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
+            ->orderBy('nama')
+            ->limit(self::PRODUK_DROPDOWN_LIMIT)
+            ->get(['id', 'nama']);
 
         // Transfer Query
         $transfers = StokTransfer::with(['gudangAsal', 'gudangTujuan', 'pengirim', 'penerima', 'items.produk'])

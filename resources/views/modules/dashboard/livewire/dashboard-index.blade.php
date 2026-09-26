@@ -1,8 +1,11 @@
-<div class="space-y-6">
+<div class="space-y-6" wire:poll.60s>
     @php
         // helper warna chart (HSL) — palet Prism
-        function colorHsl(int $hue, int $saturation = 70): string {
-            return "hsl({$hue} {$saturation}% 55%)";
+        // Guard: view boleh dirender >1x dalam 1 process (test / wire:poll) tanpa fatal redeclare.
+        if (! function_exists('colorHsl')) {
+            function colorHsl(int $hue, int $saturation = 70): string {
+                return "hsl({$hue} {$saturation}% 55%)";
+            }
         }
     @endphp
     <!-- Greeting -->
@@ -15,9 +18,11 @@
                 {{ now()->format('l, d F Y') }} — ringkasan operasional di seluruh cabang.
             </p>
         </div>
-        <span class="text-[10px] font-mono text-ink-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
-            env:{{ $serverStatus['env'] }} · cache:{{ $serverStatus['cache'] }} · queue:{{ $serverStatus['queue'] }}
-        </span>
+        @role('super-admin')
+            <span class="text-[10px] font-mono text-ink-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                env:{{ $serverStatus['env'] }} · cache:{{ $serverStatus['cache'] }} · queue:{{ $serverStatus['queue'] }}
+            </span>
+        @endrole
     </div>
 
     <!-- KPI Cards -->
@@ -33,7 +38,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
             </div>
-            <p class="text-[11px] text-ink-500 mt-2">{{ $omzetHariIni['jumlah_transaksi'] }} transaksi selesai hari ini</p>
+            <p class="text-[11px] text-ink-500 mt-2">{{ $omzetHariIni['jumlah_transaksi'] }} transaksi selesai hari ini <span class="text-ink-500">(semua cabang)</span></p>
         </x-prism.glass-card>
 
         <x-prism.glass-card class="p-5">
@@ -55,7 +60,7 @@
                 <div>
                     <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Stok Kritis</p>
                     <p class="text-2xl font-black text-up-amber tabular-nums mt-1">{{ $stokKritis['total'] }} <span class="text-xs font-semibold text-ink-400">item</span></p>
-                    <p class="text-[11px] text-up-red mt-0.5">Dibawah / sama dengan minimum</p>
+                    <p class="text-[11px] text-up-red mt-0.5">Di bawah minimum</p>
                 </div>
                 <div class="w-10 h-10 rounded-xl bg-up-amber/10 border border-up-amber/30 flex items-center justify-center text-up-amber">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -69,7 +74,7 @@
                 <div>
                     <p class="text-[10px] uppercase tracking-wider text-ink-400 font-bold">Komisi Pending</p>
                     <p class="text-2xl font-black text-up-accent tabular-nums mt-1">Rp {{ number_format($komisiPending, 0, ',', '.') }}</p>
-                    <p class="text-[11px] text-ink-500 mt-0.5">Menunggu approval finance</p>
+                    <p class="text-[11px] text-ink-500 mt-0.5">Menunggu approval finance · semua cabang</p>
                 </div>
                 <div class="w-10 h-10 rounded-xl bg-up-accent/10 border border-up-accent/30 flex items-center justify-center text-up-accent">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
@@ -166,7 +171,9 @@
             </div>
             <div class="mt-3 flex gap-2">
                 <a href="/app/akunting" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Buka Modul Akunting →</a>
-                <a href="{{ route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Piutang →</a>
+                @can('laporan.cabang')
+                    <a href="{{ route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Piutang →</a>
+                @endcan
             </div>
         </x-prism.glass-card>
 
@@ -189,14 +196,16 @@
                     <p class="text-xs text-ink-500 py-4 text-center">Belum ada transaksi tercatat.</p>
                 @endforelse
             <div class="mt-2">
-                <a href="{{ route('laporan.drill', ['model' => 'Transaksi']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Transaksi →</a>
+                @can('laporan.cabang')
+                    <a href="{{ route('laporan.drill', ['model' => 'Transaksi']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Transaksi →</a>
+                @endcan
             </div>
         </x-prism.glass-card>
     </div>
 
     <!-- Stok kritis detail -->
     @if($stokKritis['items']->isNotEmpty())
-        <x-prism.glass-card title="Item Stok Menipis" :subtitle="$stokKritis['total'] . ' item di bawah/equal minimum'">
+        <x-prism.glass-card title="Item Stok Menipis" :subtitle="$stokKritis['total'] . ' item di bawah minimum'">
             <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                 @foreach($stokKritis['items'] as $s)
                     <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
@@ -210,7 +219,9 @@
                 @endforeach
             </div>
             <div class="mt-2">
-                <a href="{{ route('laporan.drill', ['model' => 'StokItem']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Stok Item →</a>
+                @can('laporan.cabang')
+                    <a href="{{ route('laporan.drill', ['model' => 'StokItem']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down ke Stok Item →</a>
+                @endcan
             </div>
         </x-prism.glass-card>
     @endif
@@ -268,18 +279,26 @@
                 @endforeach
             </div>
         </x-prism.glass-card>
-        <x-prism.glass-card title="Performa Broadcast" subtitle="{{$marketInsight['broadcast']['total_kampanye'] ?? 0}} kampanye total">
-            <div class="flex items-center gap-6 text-sm">
-                <div class="text-center flex-1">
-                    <p class="text-2xl font-black text-up-mint tabular-nums">{{ $marketInsight['broadcast']['terkirim'] ?? 0 }}</p>
+        <x-prism.glass-card title="Performa Broadcast" subtitle="{{$marketInsight['broadcast']['total_kampanye'] ?? 0}} kampanye · status lifecycle">
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                <div>
+                    <p class="text-xl font-black text-ink-300 tabular-nums">{{ $marketInsight['broadcast']['draft'] ?? 0 }}</p>
+                    <p class="text-[10px] text-ink-500">Draft</p>
+                </div>
+                <div>
+                    <p class="text-xl font-black text-up-amber tabular-nums">{{ $marketInsight['broadcast']['terjadwal'] ?? 0 }}</p>
+                    <p class="text-[10px] text-ink-500">Terjadwal</p>
+                </div>
+                <div>
+                    <p class="text-xl font-black text-up-mint tabular-nums">{{ $marketInsight['broadcast']['terkirim'] ?? 0 }}</p>
                     <p class="text-[10px] text-ink-500">Terkirim</p>
                 </div>
-                <div class="text-center flex-1">
-                    <p class="text-2xl font-black text-up-amber tabular-nums">{{ $marketInsight['broadcast']['pending'] ?? 0 }}</p>
-                    <p class="text-[10px] text-ink-500">Pending</p>
+                <div>
+                    <p class="text-xl font-black text-up-accent tabular-nums">{{ $marketInsight['broadcast']['terkirim_sebagian'] ?? 0 }}</p>
+                    <p class="text-[10px] text-ink-500">Sebagian</p>
                 </div>
-                <div class="text-center flex-1">
-                    <p class="text-2xl font-black text-up-red tabular-nums">{{ $marketInsight['broadcast']['gagal'] ?? 0 }}</p>
+                <div>
+                    <p class="text-xl font-black text-up-red tabular-nums">{{ $marketInsight['broadcast']['gagal'] ?? 0 }}</p>
                     <p class="text-[10px] text-ink-500">Gagal</p>
                 </div>
             </div>
@@ -287,7 +306,7 @@
     @endrole
 
     @role('staff-gudang')
-        <x-prism.glass-card title="PO Pending (Draft/Disetujui)" subtitle="Total nilai: Rp {{ number_format($poPending['total_nilai'] ?? 0, 0, ',', '.') }} ({{ $poPending['total'] ?? 0 }} PO)">
+        <x-prism.glass-card title="PO Pending (Usulan/Draft/Dikirim)" subtitle="Total nilai: Rp {{ number_format($poPending['total_nilai'] ?? 0, 0, ',', '.') }} ({{ $poPending['total'] ?? 0 }} PO)">
             <div class="space-y-2 max-h-48 overflow-y-auto">
                 @forelse($poPending['items'] as $po)
                     <div class="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
@@ -329,8 +348,10 @@
                 </div>
             </div>
             <div class="flex gap-3 mt-4 flex-wrap">
-                <a href="{{ $treasuryProjection['drill_piutang'] ?? route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
-                <a href="{{ $treasuryProjection['drill_utang'] ?? route('laporan.drill', ['model' => 'Utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
+                @can('laporan.cabang')
+                    <a href="{{ $treasuryProjection['drill_piutang'] ?? route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
+                    <a href="{{ $treasuryProjection['drill_utang'] ?? route('laporan.drill', ['model' => 'Utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
+                @endcan
             </div>
         </x-prism.glass-card>
     @endrole
@@ -355,8 +376,10 @@
                 </div>
             </div>
             <div class="flex gap-3 mt-4 flex-wrap">
-                <a href="{{ $treasuryProjection['drill_piutang'] ?? route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
-                <a href="{{ $treasuryProjection['drill_utang'] ?? route('laporan.drill', ['model' => 'Utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
+                @can('laporan.cabang')
+                    <a href="{{ $treasuryProjection['drill_piutang'] ?? route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
+                    <a href="{{ $treasuryProjection['drill_utang'] ?? route('laporan.drill', ['model' => 'Utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
+                @endcan
             </div>
         </x-prism.glass-card>
     @endrole

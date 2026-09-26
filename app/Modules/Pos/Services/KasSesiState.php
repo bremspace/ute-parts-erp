@@ -12,6 +12,17 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * [T-09] Kas Sesi — buka/tutup kas shift, sinkron jurnal akunting.
+ *
+ * [B-10f/P0-4] Fail-closed: sesi kas TIDAK boleh final tanpa jurnal.
+ * - bukaKas  : insert sesi + jurnal buka kas dalam SATU DB::transaction;
+ * - tutupKas : update status 'tutup' + jurnal selisih dalam SATU DB::transaction;
+ * - kegagalan jurnal dilempar (Indonesia) — Log::error, bukan Log::warning —
+ *   sehingga rollback mengembalikan sesi ke kondisi sebelum (tidak ada sesi /
+ *   status tetap 'buka').
+ *
+ * Kontrak API (dipakai PosController, PosKasir, Dashboard, Akunting):
+ * bukaKas() / tutupKas() tetap melempar \Exception (kedua consumer sudah
+ * try-catch), dan sesiKasAktif() tidak berubah.
  */
 class KasSesiState
 {
@@ -93,19 +104,25 @@ class KasSesiState
         // [F3-8b] Gate absensi: open kas wajib clock-in aktif (fallback bila modul HR belum migrasi)
         $this->pastikanClockInAktif($userId);
 
-        $id = DB::table($this->sesiTable)->insertGetId([
-            'cabang_id' => $cabangId,
-            'user_id' => $userId,
-            'saldo_awal' => $saldoAwal,
-            'sumber' => $sumber,
-            'status' => 'buka',
-            'dibuka_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // [B-10f/P0-4] Fail-closed: baris sesi + jurnal buka kas dalam SATU transaksi.
+        // Jurnal gagal → seluruh rollback, sesi tidak pernah ada tanpa jurnal.
+        $id = DB::transaction(function () use ($cabangId, $userId, $saldoAwal, $sumber) {
+            $id = DB::table($this->sesiTable)->insertGetId([
+                'cabang_id' => $cabangId,
+                'user_id' => $userId,
+                'saldo_awal' => $saldoAwal,
+                'sumber' => $sumber,
+                'status' => 'buka',
+                'dibuka_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-        // Jurnal: Debit Kas = saldo awal utk shift (kontra akun Modal Kas di-tracking via saldo sesi)
-        $this->postJurnalKas($cabangId, $saldoAwal, "Buka kas sesi #{$id}");
+            // Jurnal: Debit Kas = saldo awal utk shift (kontra akun Modal Kas di-tracking via saldo sesi)
+            $this->postJurnalKas($cabangId, $saldoAwal, "Buka kas sesi #{$id}");
+
+            return $id;
+        });
 
         return ['id' => $id, 'cabang_id' => $cabangId, 'saldo_awal' => $saldoAwal];
     }
@@ -139,23 +156,29 @@ class KasSesiState
         $saldoSistem = round((float) $sesi->saldo_awal + $akumulasi, 2);
         $selisih = round($saldoFisik - $saldoSistem, 2);
 
-        DB::table($this->sesiTable)
-            ->where('id', $sesi->id)
-            ->update([
-                'saldo_akhir_sistem' => $saldoSistem,
-                'saldo_akhir_fisik' => $saldoFisik,
-                'selisih' => $selisih,
-                'status' => 'tutup',
-                'ditutup_at' => now(),
-                'updated_at' => now(),
-            ]);
+        // [B-10f/P0-4] Fail-closed: status 'tutup' + jurnal penyesuaian selisih
+        // dalam SATU transaksi. Jurnal gagal → rollback → sesi TETAP 'buka'
+        // (kas tidak pernah "tertutup" tanpa jurnal).
+        DB::transaction(function () use ($sesi, $saldoSistem, $saldoFisik, $selisih) {
+            DB::table($this->sesiTable)
+                ->where('id', $sesi->id)
+                ->update([
+                    'saldo_akhir_sistem' => $saldoSistem,
+                    'saldo_akhir_fisik' => $saldoFisik,
+                    'selisih' => $selisih,
+                    'status' => 'tutup',
+                    'ditutup_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-        // Jurnal penyesuaian selisih → akun Selisih Kas (debit/kredit)
-        if (abs($selisih) > 0.01) {
-            $this->postJurnalSelisih($sesi->cabang_id, $selisih, "Tutup kas sesi #{$sesi->id}");
-        }
+            // Jurnal penyesuaian selisih → akun Selisih Kas (debit/kredit)
+            if (abs($selisih) > 0.01) {
+                $this->postJurnalSelisih($sesi->cabang_id, $selisih, "Tutup kas sesi #{$sesi->id}");
+            }
+        });
 
         // [F3-8b] Saran clock-out: catat jam_keluar otomatis bila kasir sudah clock-in
+        // (di luar transaksi — non-blocking, tidak boleh menggagalkan tutup kas)
         $this->saranClockOut($sesi->user_id);
 
         return [
@@ -178,15 +201,32 @@ class KasSesiState
             ->get();
     }
 
-    // Jurnal debit kas masuk (shift) — pakai active NO-op jikalau COA tidak lengkap, tdk memblokir POS
+    /**
+     * [B-10f/P0-4] Fail-closed. Jurnal debit kas masuk (shift) TIDAK lagi ditelan:
+     * kegagalan dilempar (Indonesia) supaya transaksi pemanggil rollback.
+     * Dua kondisi yang BUKAN kegagalan (tidak melempar):
+     * - saldo awal 0 → tidak ada jurnal sama sekali (bukan 0,2 baris);
+     * - modul akunting belum dimigrasi → environment check, sama seperti
+     *   tableExists($sesiTable) di atas (tetap fail-closed setelah migrasi jalan).
+     */
     private function postJurnalKas(int $cabangId, float $nominal, string $deskripsi): void
     {
+        if ($nominal <= 0) {
+            return; // saldo awal 0 → tidak ada nilai untuk diposting
+        }
+
+        if (! $this->tableExists($this->jurnalTable)) {
+            return; // modul akunting belum dimigrasi — jangan blokir POS
+        }
+
         try {
-            $debitAkun = AkunCOA::where('kode', '110-01')->first();
-            if (! $debitAkun) {
-                return;
-            }
-            // [T-33] Kontra akun: Modal Pemilik (310-01) — sudah exists, firstOrCreate fallback bila hilang
+            // [B-10f/P0-4] Akun Kas (110-01) & Modal Pemilik (310-01) firstOrCreate
+            // (pola 520-07 di postJurnalSelisih) supaya jurnal tetap bisa balance
+            // walau COA belum di-seed lengkap.
+            AkunCOA::firstOrCreate(
+                ['kode' => '110-01'],
+                ['nama' => 'Kas', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit', 'is_active' => true]
+            );
             AkunCOA::firstOrCreate(
                 ['kode' => '310-01'],
                 ['nama' => 'Modal Pemilik', 'tipe' => 'ekuitas', 'kelompok' => 'modal', 'saldo_normal' => 'kredit', 'is_active' => true]
@@ -205,16 +245,27 @@ class KasSesiState
                 auth()->id()
             );
         } catch (\Throwable $e) {
-            Log::warning('Jurnal kas sesi gagal: '.$e->getMessage());
+            Log::error('Jurnal kas sesi gagal — sesi kas dibatalkan (fail-closed)', [
+                'cabang_id' => $cabangId,
+                'nominal' => $nominal,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \Exception('Gagal memposting jurnal buka kas: '.$e->getMessage(), 0, $e);
         }
     }
 
+    /**
+     * [B-10f/P0-4] Fail-closed. Jurnal selisih kas TIDAK lagi ditelan (lihat
+     * postJurnalKas). Exception dilempar supaya status sesi tidak final.
+     */
     private function postJurnalSelisih(int $cabangId, float $selisih, string $deskripsi): void
     {
+        if (! $this->tableExists($this->jurnalTable)) {
+            return; // modul akunting belum dimigrasi — jangan blokir tutup kas
+        }
+
         try {
-            if (! $this->tableExists($this->jurnalTable)) {
-                return;
-            }
             // [T-33] akun Selisih Kas (520-07, beban, saldo normal debit) — sudah exists, firstOrCreate fallback
             AkunCOA::firstOrCreate(
                 ['kode' => '520-07'],
@@ -239,7 +290,13 @@ class KasSesiState
                 auth()->id()
             );
         } catch (\Throwable $e) {
-            Log::warning('Jurnal selisih kas gagal: '.$e->getMessage());
+            Log::error('Jurnal selisih kas gagal — sesi kas TIDAK ditutup (fail-closed)', [
+                'cabang_id' => $cabangId,
+                'selisih' => $selisih,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \Exception('Gagal memposting jurnal selisih kas: '.$e->getMessage(), 0, $e);
         }
     }
 

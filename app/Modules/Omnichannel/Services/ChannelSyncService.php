@@ -12,6 +12,7 @@ use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Wms\Models\StockMutationLog;
+use App\Modules\Wms\Models\StokItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -56,12 +57,19 @@ class ChannelSyncService
                 // [T-26] SOT: stok = delta kumulatif StockMutationLog (urut terjadi_at) per produk+gudang.
                 // BUKAN StokItem::sum — mutasi yang tidak tercatat log (lihat laporan "PERLU StockMutationLog di")
                 // tidak ikut terhitung, jadi saldo channel konsisten dengan buku mutasi.
+                // [B-03/P1-4] Fallback: log masih kosong (mutasi lama / POS-pra-perbaikan yang
+                // tidak pernah menulis StockMutationLog) → pakai saldo StokItem, jangan push 0.
                 // ponytail: untuk incremental push, tambah watermark last_sync pada mapping lalu filter terjadi_at > watermark.
-                $stok = (int) StockMutationLog::where('produk_id', $produkId)
+                $mutasi = StockMutationLog::where('produk_id', $produkId)
                     ->where('gudang_id', $mapping->gudang_id)
                     ->orderBy('terjadi_at')
-                    ->get()
-                    ->sum('delta');
+                    ->get();
+
+                $stok = $mutasi->isEmpty()
+                    ? (int) StokItem::where('produk_id', $produkId)
+                        ->where('gudang_id', $mapping->gudang_id)
+                        ->sum('jumlah')
+                    : (int) $mutasi->sum('delta');
             }
 
             $adapter = $this->adapterFor($mapping->channel->platform);
@@ -108,6 +116,13 @@ class ChannelSyncService
         $created = 0;
 
         DB::transaction(function () use ($channel, $orders, &$created) {
+            // [B-15d] Idempotency guard: 1 query `whereIn` utk semua order_id hasil
+            // pull (sebelumnya 1 query `exists()` per order). Order yang SUDAH ada
+            // sowie yang baru dibuat di batch ini ikut masuk set → duplikat di dalam
+            // 1 batch tetap ter-skip, persis seperti yang terjadi ketika insert
+            // pertama terlihat oleh query berikutnya.
+            $guard = $this->orderIdTerproses($channel, $orders);
+
             foreach ($orders as $order) {
                 $orderId = $order['order_sn'] ?? $order['order_id'] ?? null;
                 if (! $orderId) {
@@ -115,8 +130,7 @@ class ChannelSyncService
                 }
 
                 // Idempotent: order_id channel unik
-                if (ChannelOrder::where('channel_id', $channel->id)
-                    ->where('channel_order_id', $orderId)->exists()) {
+                if (isset($guard[(string) $orderId])) {
                     continue;
                 }
 
@@ -129,6 +143,8 @@ class ChannelSyncService
                     // [T-26] Estimasi biaya admin marketplace (configurable per channel — fallback 5%)
                     'estimasi_biaya_platform' => round(((float) ($order['total_amount'] ?? 0)) * ($channel->kredensial['biaya_persen'] ?? 5) / 100, 2),
                 ]);
+
+                $guard[(string) $orderId] = true;
 
                 // Buat Transaksi lokal (validasi produk mapping di phase 2 — MVP catat saja)
                 $jenisStatus = match ($order['order_status'] ?? null) {
@@ -150,6 +166,44 @@ class ChannelSyncService
         $channel->update(['last_sync_at' => now(), 'last_sync_status' => 'sukses']);
 
         return $created;
+    }
+
+    /**
+     * [B-15d] Set order_id channel yang SUDAH pernah diproses (landmine idempotensi).
+     * Satu query `whereIn` (di-chunk 500 supaya aman untuk pull besar) alih-alih
+     * 1 query `exists()` per order. Kunci distring-kan karena order_id dari API
+     * bisa bertipe int/string.
+     *
+     * @param  array<int, array<string, mixed>>  $orders
+     * @return array<string, true>
+     */
+    protected function orderIdTerproses(Channel $channel, array $orders): array
+    {
+        $ids = [];
+        foreach ($orders as $order) {
+            $orderId = $order['order_sn'] ?? $order['order_id'] ?? null;
+            if ($orderId === null || $orderId === '') {
+                continue;
+            }
+            $ids[(string) $orderId] = true;
+        }
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $sudah = [];
+        foreach (array_chunk(array_keys($ids), 500) as $chunk) {
+            $terdaftar = ChannelOrder::where('channel_id', $channel->id)
+                ->whereIn('channel_order_id', $chunk)
+                ->pluck('channel_order_id');
+
+            foreach ($terdaftar as $s) {
+                $sudah[(string) $s] = true;
+            }
+        }
+
+        return $sudah;
     }
 
     /**

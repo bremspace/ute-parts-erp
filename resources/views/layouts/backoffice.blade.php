@@ -175,6 +175,14 @@
                     <span class="sidebar-label">Akunting & Laporan</span>
                 </a>
 
+                <!-- [F3-3] Register Aset Tetap & Depresiasi — sub-menu Akunting, RBAC: akunting.view -->
+                @can('akunting.view')
+                    <a href="/app/akunting/aset" title="Aset Tetap & Depresiasi" class="sidebar-nav-link flex items-center gap-3 pl-9 pr-3.5 py-2 rounded-xl text-xs font-medium {{ request()->is('app/akunting/aset*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30' : 'text-ink-500 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }} transition-all">
+                        <span class="w-1.5 h-1.5 rounded-full bg-up-accent flex-shrink-0" aria-hidden="true"></span>
+                        <span class="sidebar-label">Aset Tetap &amp; Depresiasi</span>
+                    </a>
+                @endcan
+
                 <!-- Omnichannel -->
                 <a href="/app/omnichannel" title="Omnichannel" class="sidebar-nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium {{ request()->is('app/omnichannel*') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }} transition-all">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,10 +195,19 @@
                 <!-- [F1-1] Approval Inbox + badge pending (cabang-aware) -->
                 @can('approve-workflow')
                     @php
-                        $pendingApprovalCount = \App\Modules\Workflow\Models\ApprovalRequest::query()
-                            ->where('status', 'pending')
-                            ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', session('cabang_id')))
-                            ->count();
+                        // [B-15d] Badge ini di-query di SETIAP halaman backoffice
+                        // (hit-rate ~100%) tanpa cache. Cache 60 detik per cabang
+                        // aktif; gate `approve-workflow` itu per-role (bukan
+                        // per-user) jadi key cukup cabang — semua user dgn role
+                        // yg sama melihat angka sama.
+                        $pendingApprovalCount = \Illuminate\Support\Facades\Cache::remember(
+                            'backoffice-approval-badge-'.(session('cabang_id') ?? 'all'),
+                            60,
+                            fn (): int => \App\Modules\Workflow\Models\ApprovalRequest::query()
+                                ->where('status', 'pending')
+                                ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', session('cabang_id')))
+                                ->count()
+                        );
                     @endphp
                     <a href="/app/approvals" title="Approval Inbox" class="sidebar-nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium {{ request()->is('app/approvals*') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }} transition-all">
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

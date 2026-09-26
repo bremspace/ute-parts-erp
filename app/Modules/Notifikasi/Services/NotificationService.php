@@ -14,13 +14,15 @@ class NotificationService
      *
      * @param  string  $tipe  wa | email | inapp
      * @param  string|null  $tujuan  nomor HP / email
+     * @param  int|null  $kampanyeBroadcastId  campaign log relationship, when applicable
      */
     public function kirim(
         string $tipe,
         ?string $tujuan,
         string $judul,
         string $konten,
-        array $payload = []
+        array $payload = [],
+        ?int $kampanyeBroadcastId = null
     ): NotifikasiKeluar {
         $log = NotifikasiKeluar::create([
             'tipe' => $tipe,
@@ -29,6 +31,7 @@ class NotificationService
             'konten' => $konten,
             'payload' => $payload,
             'status' => 'pending',
+            'kampanye_broadcast_id' => $kampanyeBroadcastId,
         ]);
 
         // Dispatch via queue — database driver + Supervisor (PRD §4.9 §7)

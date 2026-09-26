@@ -14,10 +14,8 @@ use App\Modules\Servis\Models\ServisStatusLog;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Wms\Models\Produk;
-use App\Modules\Wms\Models\StockMutationLog;
-use App\Modules\Wms\Models\StokItem;
-use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Services\NomorSeriService;
+use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -111,6 +109,14 @@ class ServisService
     /**
      * [SERVICE-03] Update status tiket (state machine enforced).
      * $user nullable — untuk approval publik via token (tanpa login).
+     *
+     * [B-10a / P0-4] Fail-closed: perubahan status + side effect (termasuk
+     * jurnal `onSelesai`) dibungkus SATU DB::transaction. Sebelumnya status
+     * di-commit duluan lalu jurnal otomatis di-try/catch `Log::warning()` →
+     * tiket bisa "selesai" tanpa jurnal sama sekali. Sekarang jurnal gagal =
+     * seluruh transaksi rollback, status TIDAK final.
+     *
+     * State machine TIDAK berubah: himpunan & aturan transisi tetap sama.
      */
     public function updateStatus(TiketServis $tiket, string $statusBaru, ?User $user = null, string $alasan = ''): TiketServis
     {
@@ -128,28 +134,30 @@ class ServisService
             $aksi = 'transisi';
         }
 
-        $tiket->update(['status' => $statusBaru]);
-        $this->logStatus($tiket, $statusLama, $statusBaru, $user, $aksi, $alasan);
+        DB::transaction(function () use ($tiket, $statusLama, $statusBaru, $user, $aksi, $alasan) {
+            $tiket->update(['status' => $statusBaru]);
+            $this->logStatus($tiket, $statusLama, $statusBaru, $user, $aksi, $alasan);
 
-        // Side effects per status
-        match ($statusBaru) {
-            'menunggu_approval' => $this->onMenungguApproval($tiket),
-            'diterima' => $this->onDiterima($tiket),
-            'selesai' => $this->onSelesai($tiket),
-            'diambil' => $this->onDiambil($tiket),
-            default => null,
-        };
+            // Side effects per status
+            match ($statusBaru) {
+                'menunggu_approval' => $this->onMenungguApproval($tiket),
+                'diterima' => $this->onDiterima($tiket),
+                'selesai' => $this->onSelesai($tiket),
+                'diambil' => $this->onDiambil($tiket),
+                default => null,
+            };
 
-        // [P1-5] Lepas klaim SN: saat transisi ke 'ditolak' (valid maupun
-        // override), atau override mundur melewati 'disetujui' — tanpa ini SN
-        // macet status 'servis' selamanya (tidak bisa dijual, tak terlihat di
-        // 'tersedia'). lepasServis TIDAK meng-clear tautan riwayat
-        // (tiket_servis_id & tiket_servis_item_id tetap utk trace garansi).
-        if ($this->perluLepasSn($statusBaru, $aksi)) {
-            app(NomorSeriService::class)->lepasServis((int) $tiket->id);
-        }
+            // [P1-5] Lepas klaim SN: saat transisi ke 'ditolak' (valid maupun
+            // override), atau override mundur melewati 'disetujui' — tanpa ini SN
+            // macet status 'servis' selamanya (tidak bisa dijual, tak terlihat di
+            // 'tersedia'). lepasServis TIDAK meng-clear tautan riwayat
+            // (tiket_servis_id & tiket_servis_item_id tetap utk trace garansi).
+            if ($this->perluLepasSn($statusBaru, $aksi)) {
+                app(NomorSeriService::class)->lepasServis((int) $tiket->id);
+            }
+        }, 3);
 
-        // Notifikasi ke pelanggan
+        // Notifikasi ke pelanggan — SETELAH commit ( jangan kirim bila rollback)
         $this->notifService->kirim('inapp', null,
             'Status Servis Diperbarui',
             "Tiket {$tiket->no_tiket} berubah status ke: {$statusBaru}",
@@ -231,34 +239,29 @@ class ServisService
                 $produk = Produk::findOrFail($item['produk_id']);
                 $qty = (int) $item['jumlah'];
 
-                // Deduct stock
-                $stok = StokItem::where('produk_id', $produk->id)
-                    ->where('gudang_id', $gudangId)
-                    ->where('sku_variant_id', $item['sku_variant_id'] ?? null)
-                    ->first();
+                // [B-03/P1-3] Deduksi via StokDeductionService — kriteria resolusi baris
+                // stok sama dgn jalur lain (varian eksak / fallback kanonik tanpa varian),
+                // dilengkapi lockForUpdate + StokLog + StockMutationLog (sinkron channel).
+                try {
+                    app(StokDeductionService::class)->kurangi(
+                        produkId: $produk->id,
+                        skuVariantId: $item['sku_variant_id'] ?? null,
+                        gudangId: $gudangId,
+                        qty: $qty,
+                        jenis: 'servis',
+                        referensiTipe: TiketServis::class,
+                        referensiId: $tiket->id,
+                        userId: $user->id,
+                        catatan: "Servis {$tiket->no_tiket} — sparepart terpakai",
+                    );
+                } catch (\Exception $e) {
+                    // Pesan lama dipertahankan (format yg dikenali teknisi/UI)
+                    if (preg_match('/tersedia: (\d+)/', $e->getMessage(), $m)) {
+                        throw new \Exception("Stok sparepart {$produk->nama} tidak mencukupi (tersedia: {$m[1]})");
+                    }
 
-                if (! $stok || $stok->jumlah < $qty) {
-                    $tersedia = $stok ? $stok->jumlah : 0;
-                    throw new \Exception("Stok sparepart {$produk->nama} tidak mencukupi (tersedia: {$tersedia})");
+                    throw $e;
                 }
-
-                $sebelum = $stok->jumlah;
-                $setelah = $sebelum - $qty;
-                $stok->update(['jumlah' => $setelah]);
-
-                StokLog::create([
-                    'gudang_id' => $gudangId,
-                    'produk_id' => $produk->id,
-                    'sku_variant_id' => $item['sku_variant_id'] ?? null,
-                    'user_id' => $user->id,
-                    'jenis' => 'servis',
-                    'referensi_tipe' => TiketServis::class,
-                    'referensi_id' => $tiket->id,
-                    'jumlah_sebelum' => $sebelum,
-                    'perubahan' => -$qty,
-                    'jumlah_setelah' => $setelah,
-                    'catatan' => "Servis {$tiket->no_tiket} — sparepart terpakai",
-                ]);
 
                 $sparepart = ServisSparepart::create([
                     'tiket_servis_id' => $tiket->id,
@@ -350,45 +353,27 @@ class ServisService
 
     private function kurangiStokServis(int $produkId, ?int $variantId, int $gudangId, int $qty, TiketServis $tiket, User $user): void
     {
-        $stok = StokItem::where('produk_id', $produkId)
-            ->where('sku_variant_id', $variantId)
-            ->where('gudang_id', $gudangId)
-            ->lockForUpdate()
-            ->first();
+        // [B-03/P1-3] Delegasi ke StokDeductionService — lockForUpdate, kriteria
+        // resolusi baris stok konsisten dgn praseleksi, StokLog + StockMutationLog.
+        try {
+            app(StokDeductionService::class)->kurangi(
+                produkId: $produkId,
+                skuVariantId: $variantId,
+                gudangId: $gudangId,
+                qty: $qty,
+                jenis: 'servis',
+                referensiTipe: TiketServis::class,
+                referensiId: $tiket->id,
+                userId: $user->id,
+                catatan: "Servis {$tiket->no_tiket} — item part",
+            );
+        } catch (\Exception $e) {
+            if (preg_match('/tersedia: (\d+)/', $e->getMessage(), $m)) {
+                throw new \Exception("Stok sparepart tidak mencukupi di gudang terpilih (tersedia: {$m[1]})");
+            }
 
-        if (! $stok || $stok->jumlah < $qty) {
-            $tersedia = $stok ? $stok->jumlah : 0;
-            throw new \Exception("Stok sparepart tidak mencukupi di gudang terpilih (tersedia: {$tersedia})");
+            throw $e;
         }
-
-        $sebelum = $stok->jumlah;
-        $stok->update(['jumlah' => $sebelum - $qty]);
-
-        // [T-26] SOT mutation log
-        StockMutationLog::create([
-            'produk_id' => $produkId,
-            'sku_variant_id' => $variantId,
-            'gudang_id' => $gudangId,
-            'delta' => -$qty,
-            'sumber' => 'servis',
-            'referensi_tipe' => TiketServis::class,
-            'referensi_id' => $tiket->id,
-            'terjadi_at' => now(),
-        ]);
-
-        StokLog::create([
-            'gudang_id' => $gudangId,
-            'produk_id' => $produkId,
-            'sku_variant_id' => $variantId,
-            'user_id' => $user->id,
-            'jenis' => 'servis',
-            'referensi_tipe' => TiketServis::class,
-            'referensi_id' => $tiket->id,
-            'jumlah_sebelum' => $sebelum,
-            'perubahan' => -$qty,
-            'jumlah_setelah' => $sebelum - $qty,
-            'catatan' => "Servis {$tiket->no_tiket} — item part",
-        ]);
     }
 
     /**
@@ -464,6 +449,11 @@ class ServisService
         // - Pendapatan Jasa Servis (420-01) kredit = estimasi biaya
         // - HPP sparepart terpakai (510-02) debit, Persediaan (130-01) kredit
         // - Kas (110-01) debit = total tagihan (jasa + sparepart)
+        //
+        // [B-10a / P0-4] 4 baris jurnal TIDAK diubah. Yang berubah: kegagalan
+        // jurnal tidak lagi ditelan `Log::warning()` — exception dilempar lagi
+        // supaya transaction `updateStatus()` rollback dan status 'selesai'
+        // tidak pernah final tanpa jurnal (fail-closed).
         try {
             $jurnalService = app(JurnalService::class);
 
@@ -547,12 +537,19 @@ class ServisService
                 // engine baru; reseller servis tetap alur lama di atas — idempotent)
                 app(KomisiService::class)->hitungKomisiMultiAktor('tiket_servis', ['tiket_servis_id' => $tiket->id]);
             }
-        } catch (\Exception $e) {
-            // Jangan blokir selesai servis jika jurnal gagal — log & lanjut
-            // (COA harus ter-seed; kegagalan dicatat agar bisa diperbaiki)
-            Log::warning("Jurnal otomatis servis gagal: {$e->getMessage()}", [
+        } catch (\Throwable $e) {
+            // [B-10a / P0-4] Fail-closed: catat untuk investigasi, lalu lempar
+            // lagi. `updateStatus()` membungkus status + side effect dalam satu
+            // DB::transaction sehingga jurnal gagal = status TIDAK berubah.
+            Log::error("Jurnal otomatis servis gagal: {$e->getMessage()}", [
                 'tiket' => $tiket->no_tiket,
             ]);
+
+            throw new \RuntimeException(
+                "Jurnal servis {$tiket->no_tiket} gagal diposting ({$e->getMessage()}). Status tidak diubah.",
+                0,
+                $e
+            );
         }
     }
 

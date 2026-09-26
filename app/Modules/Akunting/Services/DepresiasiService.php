@@ -66,25 +66,37 @@ class DepresiasiService
 
         $hasil = ['diproses' => 0, 'dilewati' => 0, 'total' => 0.0, 'periode' => $periode];
 
-        foreach ($query->get() as $aset) {
+        // [B-15c] 2 tahap — journal-exists di-BATCH (1 query `whereIn`), bukan 1
+        // `exists()` per aset (±5 query/aset, A = 20-200 aset). Kandidat = aset yang
+        // lolos kedua guard murah dulu (sudah diproses / belum dimiliki saat periode).
+        $semua = $query->get();
+
+        $kandidat = $semua->filter(function (AsetTetap $aset) use ($periode, $akhirPeriode) {
             // Guard 1: sudah diproses periode ini (atau periode lebih baru)
             if ($aset->depresiasi_terakhir_bulan !== null && $aset->depresiasi_terakhir_bulan >= $periode) {
-                $hasil['dilewati']++;
-
-                continue;
+                return false;
             }
 
             // Aset belum dimiliki pada periode ini
-            if ($aset->tanggal_perolehan->copy()->startOfMonth()->gt($akhirPeriode)) {
-                $hasil['dilewati']++;
+            return ! $aset->tanggal_perolehan->copy()->startOfMonth()->gt($akhirPeriode);
+        })->values();
 
-                continue;
-            }
+        // Guard-1 / "belum dimiliki" = dilewati (sama seperti sebelumnya, 1x per aset).
+        $dilewatiLebihAwal = $semua->count() - $kandidat->count();
 
+        // Guard 2 batch: jurnal existing no_jurnal deterministik per aset+periode.
+        $sudahTerposting = $kandidat->isEmpty()
+            ? []
+            : JurnalAkuntansi::whereIn(
+                'no_jurnal',
+                $kandidat->map(fn (AsetTetap $a) => $this->noJurnalDepresiasi($a, $periode))->all()
+            )->pluck('no_jurnal')->flip()->all();
+
+        foreach ($kandidat as $aset) {
             $noJurnal = $this->noJurnalDepresiasi($aset, $periode);
 
             // Guard 2: jurnal existing sumber aset + periode (belt & braces)
-            if (JurnalAkuntansi::where('no_jurnal', $noJurnal)->exists()) {
+            if (isset($sudahTerposting[$noJurnal])) {
                 $aset->update(['depresiasi_terakhir_bulan' => $periode]);
                 $hasil['dilewati']++;
 
@@ -132,6 +144,9 @@ class DepresiasiService
             $hasil['diproses']++;
             $hasil['total'] = round($hasil['total'] + $nominal, 2);
         }
+
+        // Aset yang lolos filterWHERE tapi gagal guard 1 / belum dimiliki = dilewati.
+        $hasil['dilewati'] += $dilewatiLebihAwal;
 
         return $hasil;
     }

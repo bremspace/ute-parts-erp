@@ -57,7 +57,8 @@
                         <label class="block text-xs font-bold text-ink-700 uppercase tracking-wider mb-2">Varian</label>
                         <div class="flex flex-wrap gap-2">
                             @foreach($produk->skuVariants as $v)
-                                @php $vStok = (int) \App\Modules\Wms\Models\StokItem::where('produk_id', $produk->id)->where('sku_variant_id', $v->id)->sum('jumlah'); @endphp
+                                {{-- [B-15a] Stok per varian dari 1 query agregat (ShopPage::stokSummary) — bukan query per varian. --}}
+                                @php $vStok = (int) ($stokPerVariant[$v->id] ?? 0); @endphp
                                 <button
                                     wire:click="$set('selectedVariantId', {{ $v->id }})"
                                     class="px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all {{ $selectedVariantId === $v->id ? 'border-up-primary bg-up-primary text-white' : 'border-ink-200 hover:border-up-primary text-ink-700' }}"

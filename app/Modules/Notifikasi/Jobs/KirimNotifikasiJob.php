@@ -38,13 +38,17 @@ class KirimNotifikasiJob implements ShouldQueue
         }
 
         try {
-            match ($log->tipe) {
+            $sent = match ($log->tipe) {
                 'email' => $this->kirimEmail($log),
                 'wa' => $this->kirimWhatsApp($log),
-                default => null, // inapp — handled by database notification, no outbound
+                default => true, // inapp — handled by database notification, no outbound
             };
 
-            $log->update(['status' => 'terkirim']);
+            // Metode channel yang gagal sudah menandai status failed. Jangan
+            // menimpanya menjadi terkirim hanya karena match selesai.
+            if ($sent) {
+                $log->update(['status' => 'terkirim', 'error' => null]);
+            }
         } catch (\Exception $e) {
             $log->update([
                 'status' => 'gagal',
@@ -60,10 +64,12 @@ class KirimNotifikasiJob implements ShouldQueue
         }
     }
 
-    protected function kirimEmail(NotifikasiKeluar $log): void
+    protected function kirimEmail(NotifikasiKeluar $log): bool
     {
-        if (! $log->tujuan) {
-            return;
+        if (! filled($log->tujuan)) {
+            $this->tandaiGagal($log, 'Tujuan email belum tersedia.');
+
+            return false;
         }
 
         // Menggunakan mail driver dari config (log di local, SMTP di production)
@@ -71,22 +77,30 @@ class KirimNotifikasiJob implements ShouldQueue
             $message->to($log->tujuan)
                 ->subject($log->judul ?? 'Notifikasi Ute Parts');
         });
+
+        return true;
     }
 
-    protected function kirimWhatsApp(NotifikasiKeluar $log): void
+    protected function kirimWhatsApp(NotifikasiKeluar $log): bool
     {
         /**
          * Placeholder untuk integrasi WA gateway.
          * User akan memilih provider: Fonnte / Wablas / WA Business API.
-         * Konfigurasi via .env: WA_GATEWAY_URL, WA_GATEWAY_TOKEN, WA_GATEWAY_DEVICE_ID
+         * Konfigurasi minimal disimpan di config/services.php dan .env.
          *
-         * Saat provider belum dikonfigurasi, hanya log output.
-         * Struktur request siap, tinggal swap HTTP client + auth:
-         *
-         * POST https://{WA_GATEWAY_URL}/api/v1/messages
-         * Headers: Authorization: Bearer {WA_GATEWAY_TOKEN}
-         * Body: { phone: $log->tujuan, message: $log->konten, device_id: env('WA_GATEWAY_DEVICE_ID') }
+         * Tanpa kredensial, job HARUS gagal; status terkirim hanya boleh
+         * ditetapkan setelah provider benar-benar dikonfigurasi.
          */
+        $wa = config('services.wa', []);
+        if (! is_array($wa) || blank($wa['url'] ?? null) || blank($wa['token'] ?? null)) {
+            $this->tandaiGagal(
+                $log,
+                'gateway WA belum dikonfigurasi. Atur kredensial gateway WA sebelum mengirim.'
+            );
+
+            return false;
+        }
+
         Log::channel('stack')->info('WA GATEWAY DISPATCH (placeholder)', [
             'tujuan' => $log->tujuan,
             'judul' => $log->judul,
@@ -95,7 +109,21 @@ class KirimNotifikasiJob implements ShouldQueue
         ]);
 
         // Swap dengan HTTP client saat provider aktif:
-        // Http::withHeaders([...])->post(env('WA_GATEWAY_URL') . '/api/v1/messages', [...]);
+        // Http::withHeaders([...])->post(config('services.wa.url'), [...]);
+        return true;
+    }
+
+    protected function tandaiGagal(NotifikasiKeluar $log, string $error): void
+    {
+        $log->update([
+            'status' => 'gagal',
+            'error' => $error,
+        ]);
+
+        Log::warning("Notifikasi {$log->tipe} gagal: {$error}", [
+            'notifikasi_id' => $log->id,
+            'tujuan' => $log->tujuan,
+        ]);
     }
 
     public function failed(\Throwable $exception): void

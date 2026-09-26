@@ -4,6 +4,7 @@ use App\Console\Commands\SidImportRaw;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetAssetUrl;
+use App\Modules\Akunting\Jobs\DepresiasiAsetJob;
 use App\Modules\Crm\Console\Commands\EksekusiBroadcastTerjadwal;
 use App\Modules\Crm\Console\Commands\RecalcTierCommand;
 use App\Modules\Hr\Jobs\HitungKpiBulananJob;
@@ -79,8 +80,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Rekalkulasi tier membership harian (PRD §4.4)
         $schedule->command('tier:recalc')->dailyAt('01:00');
 
-        // [T-23] Eksekusi broadcast terjadwal tiap menit
-        $schedule->command('crm:broadcast-terjadwal')->everyMinute();
+        // [T-23] Eksekusi broadcast terjadwal tiap menit (satu registrasi saja;
+        // cache lock mencegah invocation paralel antar scheduler).
+        $schedule->command('crm:broadcast-terjadwal')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->onOneServer();
 
         // [F1-6] Backup database harian 02:00 (mysqldump gzip, rotasi 7 hari)
         $schedule->command('ute:backup')->dailyAt('02:00');
@@ -94,6 +99,16 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // [F3-8b] KPI karyawan bulanan — hitung ulang tiap awal bulan 00:30
         $schedule->job(HitungKpiBulananJob::class)->monthlyOn(1, '00:30');
+
+        // [B-10d / P1-4] Depresiasi aset tetap bulanan — job-nya sudah ada sejak
+        // F3-3 tapi BELUM terdaftar di scheduler sehingga tidak pernah jalan.
+        // Jalankan tgl 1 jam 01:30 (sepi, setelah KPI 00:30) untuk periode bulan
+        // sebelumnya. Idempoten per periode (depresiasi_terakhir_bulan + cek
+        // jurnal existing) jadi aman dijalankan dobel.
+        // withoutOverlapping(): cegah 2 invocation tumpang tindih di server 1GB.
+        $schedule->job(DepresiasiAsetJob::class)
+            ->monthlyOn(1, '01:30')
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

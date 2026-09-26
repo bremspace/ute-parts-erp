@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Gateway (stub)
+    |--------------------------------------------------------------------------
+    |
+    | Provider WA belum dipilih. Nilai-nilai ini hanya placeholder sehingga
+    | job dapat membedakan konfigurasi yang belum tersedia tanpa memilih
+    | Fonnte/Wablas/WA Business API di task ini.
+    |
+    */
+    'wa' => [
+        'url' => env('WA_GATEWAY_URL'),
+        'token' => env('WA_GATEWAY_TOKEN'),
+        'device_id' => env('WA_GATEWAY_DEVICE_ID'),
+    ],
+
 ];

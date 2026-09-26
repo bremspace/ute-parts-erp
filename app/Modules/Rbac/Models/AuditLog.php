@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'user_id', 'entitas', 'aksi', 'entitas_id', 'deskripsi', 'sebelum', 'sesudah', 'ip',
+    // [B-10d] jejak audit log kini membawa cabang (migrasi 2026_09_25_040000)
+    'cabang_id',
 ])]
 class AuditLog extends Model
 {

@@ -3,6 +3,8 @@
 namespace App\Modules\Wms\Exports;
 
 use App\Modules\Wms\Services\ImportProdukService;
+use Illuminate\Support\Enumerable;
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
@@ -11,8 +13,12 @@ use Maatwebsite\Excel\Concerns\WithTitle;
 /**
  * [T-43] Template Excel import master produk.
  * Sheet 1: header + 2 contoh baris. Sheet 2: petunjuk pengisian.
+ *
+ * [B-04] Wajib implement Export (marker interface) — Excel::download() mengetik
+ * argumen #1 sebagai Maatwebsite\Excel\Concerns\Export; WithMultipleSheets saja
+ * menyebabkan TypeError → download gagal.
  */
-class ImportProdukTemplateExport implements WithMultipleSheets
+class ImportProdukTemplateExport implements Export, WithMultipleSheets
 {
     public function sheets(): array
     {
@@ -29,7 +35,7 @@ class ImportProdukTemplateExport implements WithMultipleSheets
                     return app(ImportProdukService::class)->templateColumns();
                 }
 
-                public function collection()
+                public function collection(): Enumerable
                 {
                     return collect(app(ImportProdukService::class)->contohBaris());
                 }
@@ -41,7 +47,7 @@ class ImportProdukTemplateExport implements WithMultipleSheets
                     return 'Petunjuk';
                 }
 
-                public function collection()
+                public function collection(): Enumerable
                 {
                     return collect([
                         ['Petunjuk Import Master Produk (Ute Parts)'],

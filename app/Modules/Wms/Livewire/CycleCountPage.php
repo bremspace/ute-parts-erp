@@ -224,9 +224,11 @@ class CycleCountPage extends Component
     public function render()
     {
         return view('modules.wms.livewire.cycle-count', [
-            'schedules' => $this->schedulesProperty,
-            'tasks' => $this->tasksProperty,
-            'raks' => $this->raksProperty,
+            // Legacy computed (`getSchedulesProperty()`) diakses sebagai `$this->schedules`,
+            // bukan `$this->schedulesProperty` — nama property literal tidak ada di komponen.
+            'schedules' => $this->schedules,
+            'tasks' => $this->tasks,
+            'raks' => $this->raks,
         ])->layout('layouts.backoffice', ['header' => 'Cycle Count Otomatis']);
     }
 }

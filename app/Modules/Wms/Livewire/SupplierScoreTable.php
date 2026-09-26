@@ -62,8 +62,10 @@ class SupplierScoreTable extends Component
     public function render()
     {
         return view('modules.wms.livewire.supplier-score-table', [
-            'scores' => $this->scoresProperty,
-            'suppliers' => $this->suppliersProperty,
+            // Legacy computed (`getScoresProperty()`) diakses sebagai `$this->scores`,
+            // bukan `$this->scoresProperty` — nama property literal tidak ada di komponen.
+            'scores' => $this->scores,
+            'suppliers' => $this->suppliers,
         ])->layout('layouts.backoffice', ['header' => 'Skor Supplier']);
     }
 }

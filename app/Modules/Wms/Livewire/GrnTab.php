@@ -23,6 +23,16 @@ class GrnTab extends Component
 {
     use PunyaRiwayatAktivitas;
 
+    /**
+     * [B-15c] Batas tabel "PO Siap Diterima". Tanpa batas, daftar PO 'dikirim'
+     * menarik seluruh riwayat tiap render (ratusan baris) padahal tabel ini bukan
+     * paginator. Dipotong → user diberi tahu sekali per halaman (properti di bawah).
+     */
+    public const PO_SIAP_DITERIMA_LIMIT = 50;
+
+    /** [B-15c] Supaya toast "dipotong" tidak diulang tiap re-render. */
+    public bool $sudahPeringatPoDipotong = false;
+
     public bool $showGrnModal = false;
 
     public array $grnForm = [
@@ -278,6 +288,8 @@ class GrnTab extends Component
         $cabangId = session('cabang_id');
 
         // [P0-4] Hanya PO 'dikirim' siap diterima + [P1-1] scope cabang aktif
+        // [B-15c] Dipotong 50 baris terbaru (tabel ini bukan paginator) + toast
+        // Indonesia sekali per halaman kalau memang ada yang tidak ditampilkan.
         $poList = PurchaseOrder::whereHas('gudangTujuan', function ($q) use ($cabangId) {
             $q->where('is_active', true)
                 ->when($cabangId, fn ($qq) => $qq->where('cabang_id', $cabangId));
@@ -285,7 +297,21 @@ class GrnTab extends Component
             ->with(['supplier', 'gudangTujuan'])
             ->where('status', 'dikirim')
             ->latest()
+            ->limit(self::PO_SIAP_DITERIMA_LIMIT + 1)
             ->get();
+
+        $poDipotong = $poList->count() > self::PO_SIAP_DITERIMA_LIMIT;
+        $poList = $poList->take(self::PO_SIAP_DITERIMA_LIMIT);
+
+        if ($poDipotong && ! $this->sudahPeringatPoDipotong) {
+            $this->sudahPeringatPoDipotong = true;
+
+            $this->dispatch('alert', [
+                'type' => 'info',
+                'message' => 'Daftar PO siap diterima dibatasi '.self::PO_SIAP_DITERIMA_LIMIT.
+                    ' PO terbaru. Saring dulu dengan filter status di bawah bila perlu melihat PO lama.',
+            ]);
+        }
 
         // [P1-1] GRN dibatasi cabang aktif session
         $grnList = Grn::with(['purchaseOrder.supplier', 'gudang', 'user'])

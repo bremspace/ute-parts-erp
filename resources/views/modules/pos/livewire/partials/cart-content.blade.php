@@ -3,6 +3,9 @@
 
     <!-- Cart Items List (Scrollable) -->
     <div class="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
+        {{-- [B-02/P0-1] Banner backorder DIHAPUS (kebijakan owner final: stok 0
+             tidak bisa dipilih) — addToCart()/updateQty() sudah hard-block, jadi
+             tidak mungkin ada item stok kosong dari jalur UI. --}}
         @forelse($cart as $key => $item)
             <div
                 x-data="{
@@ -36,6 +39,10 @@
                         @endif
                         @if($item['varian'] !== 'Standar')
                             <span class="px-1.5 py-0.2 rounded bg-white/5 text-ink-300 text-[10px]">{{ $item['varian'] }}</span>
+                        @endif
+                        {{-- [B-02/P0-1] Badge stok habis per item (bukan backorder) --}}
+                        @if(($item['stok_max'] ?? 1) <= 0)
+                            <x-prism.status-pill status="batal">Stok habis</x-prism.status-pill>
                         @endif
                     </div>
                     <!-- Price & Flex Control -->

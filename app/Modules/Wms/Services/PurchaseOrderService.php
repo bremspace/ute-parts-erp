@@ -14,6 +14,11 @@ use Illuminate\Validation\ValidationException;
  * [T-10] Manajemen PO + pembayaran (kredit/tunai), sinkron Akunting & Stok.
  * Saat PO diterima → stok bertambah + jurnal (Persediaan debit / Kas atau Utang kredit).
  * Pembayaran PO kredit → utang menurun + jurnal (Utang debit / Kas kredit).
+ *
+ * [B-10b/P1-6] Semua operasi mengunci baris PO dgn lockForUpdate() di dalam
+ * DB::transaction (re-check status/sisa di bawah lock), jurnal selalu di-stamp
+ * referensi_tipe/referensi_id = PurchaseOrder, dan Utang subledger di-stamp
+ * cabang_id dari gudang tujuan PO (scoping Laporan Utang).
  */
 class PurchaseOrderService
 {
@@ -46,6 +51,19 @@ class PurchaseOrderService
         }
 
         return DB::transaction(function () use ($po, $userId) {
+            // [B-10b/P1-6] Kunci baris PO lalu cek ulang status — pemanggilan
+            // bersamaan (mis. double-submit) tidak bisa dua-duanya lolos guard
+            // di atas dan menggandakan stok masuk + jurnal.
+            $po = PurchaseOrder::whereKey($po->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($po->status, ['draft', 'dikirim'], true)) {
+                throw new \Exception('PO ini tidak bisa diterima dalam status saat ini');
+            }
+            if (Grn::where('po_id', $po->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'msg' => 'PO ini sudah memiliki GRN — penerimaan barang wajib lewat GRN (tidak boleh diterima dua kali)',
+                ]);
+            }
+
             $totalHpp = 0;
 
             foreach ($po->items as $item) {
@@ -89,7 +107,11 @@ class PurchaseOrderService
                 $jurnalLines,
                 "PO {$po->no_po} diterima ({$po->metode_bayar})",
                 $po->gudangTujuan?->cabang_id,
-                $userId
+                $userId,
+                // [B-10b/P1-6] Jurnal tanpa referensi tidak bisa ditelusuri balik ke
+                // PO (drill-down audit & rekonsiliasi AP) — stamp PurchaseOrder.
+                PurchaseOrder::class,
+                $po->id
             );
 
             // Jika kredit → catat Utang (AP) modul Akunting (T-10 point 3)
@@ -104,6 +126,9 @@ class PurchaseOrderService
                         'no_utang' => sprintf('UTG-%s-%04d', now()->format('Ymd'), $count),
                         'referensi_tipe' => PurchaseOrder::class,
                         'referensi_id' => $po->id,
+                        // [B-10b/P1-6] Utang tanpa cabang_id tidak muncul di Laporan
+                        // Utang per cabang (scoping wajib cabang_id).
+                        'cabang_id' => $po->gudangTujuan?->cabang_id,
                         'kreditor_nama' => $po->supplier?->nama,
                         'jumlah' => $totalHpp,
                         'jumlah_dibayar' => 0,
@@ -131,6 +156,18 @@ class PurchaseOrderService
         }
 
         return DB::transaction(function () use ($po, $jumlah, $userId) {
+            // [B-10b/P1-6] Kunci baris PO + cek ulang sisa — pembayaran paralel
+            // (double-submit / kasir lain) tidak boleh melebihi sisa utang.
+            $po = PurchaseOrder::whereKey($po->id)->lockForUpdate()->firstOrFail();
+
+            if ($po->status !== 'diterima' || $po->sisa <= 0.01) {
+                throw new \Exception('PO ini tidak memiliki sisa utang untuk dibayar');
+            }
+
+            if ($jumlah > $po->sisa) {
+                throw new \Exception('Pembayaran melebihi sisa utang PO');
+            }
+
             PembayaranSupplier::create([
                 'po_id' => $po->id,
                 'jumlah' => $jumlah,
@@ -164,7 +201,11 @@ class PurchaseOrderService
                 ],
                 "Bayar PO {$po->no_po} — Rp ".number_format($jumlah, 0, ',', '.'),
                 $po->gudangTujuan?->cabang_id,
-                $userId
+                $userId,
+                // [B-10b/P1-6] Jurnal pembayaran tanpa referensi → tidak bisa
+                // ditelusuri ke PO (rekonsiliasi AP). Samakan dgn jurnal penerimaan.
+                PurchaseOrder::class,
+                $po->id
             );
 
             return $po;

@@ -91,8 +91,21 @@ class LeadKanban extends Component
 
     public function getKanbanDataProperty(): array
     {
+        // [B-15c] Select eksplisit: kartu kanban + rekap + modal konversi hanya
+        // memakai kolom ini. `catatan` (text bebas, bisa panjang) tidak pernah
+        // dirender di board — form edit me-load lead ulang sendiri
+        // (`openEditModal` → `Lead::forCabang()->findOrFail`), jadi tidak terpotong.
+        //
+        // CATATAN: baris TIDAK dipotong dengan limit. `$summary` (total lead, total
+        // nilai, conversion rate) dan funnel di blade diturunkan dari koleksi yang
+        // sama → limit akan diam-diam mengubah angka KPI penjualan. Ruang lingkup
+        // cabang tetap lewat `forCabang()`.
         $query = Lead::with(['assignedTo', 'pelanggan'])
             ->forCabang()
+            ->select([
+                'id', 'cabang_id', 'nama', 'telepon', 'email', 'sumber', 'stage',
+                'nilai_estimasi', 'assigned_to', 'lost_reason', 'pelanggan_id', 'created_at',
+            ])
             ->orderBy('stage')
             ->orderBy('created_at', 'desc');
 

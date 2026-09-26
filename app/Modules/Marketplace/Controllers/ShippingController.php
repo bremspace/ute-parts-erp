@@ -47,8 +47,13 @@ class ShippingController extends Controller
             }
 
             // Items format Biteship: [{name, description, value, length, width, height, weight, quantity}]
-            $items = collect($request->items)->map(function ($it) {
-                $produk = Produk::find($it['produk_id']);
+            // [B-15a] Ambil produk sekali via whereIn (1 query), bukan `Produk::find()` per item.
+            $produkById = Produk::whereIn('id', collect($request->items)->pluck('produk_id')->unique()->all())
+                ->get()
+                ->keyBy('id');
+
+            $items = collect($request->items)->map(function ($it) use ($produkById) {
+                $produk = $produkById->get($it['produk_id']);
 
                 return [
                     'name' => $produk?->nama ?? 'Sparepart',
@@ -149,18 +154,46 @@ class ShippingController extends Controller
     /**
      * Resolusi origin (cabang-coordinate) yang punya semua item stok.
      * Koordinat dummy per cabang — siap konsumsi mapping lat/lon real dari tabel cabang (kolom belum tersedia, pakai indeks).
+     *
+     * [B-15a] Sebelumnya C × I query (`foreach cabang { foreach item { StokItem::…->sum() } }`).
+     * Sekarang stok per (cabang, produk) diambil dengan SATU agregat
+     * `groupBy(gudang.cabang_id, stok_items.produk_id)`, kecukupan dinilai di PHP.
+     * Join ke `gudang` tetap effectively-INNER (setara `whereHas('gudang', …)`) dan
+     * urutan iterasi cabang tetap urutan `Cabang::where('is_active', true)`, sehingga
+     * daftar origin & koordinatnya identik dengan perilaku lama.
      */
     private function resolveOrigins(array $items): array
     {
         $cabangs = Cabang::where('is_active', true)->get();
+        if ($cabangs->isEmpty() || empty($items)) {
+            return [];
+        }
+
+        $produkIds = collect($items)
+            ->pluck('produk_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        // Map "cabangId:produkId" => total stok
+        $stokPerCabangProduk = StokItem::query()
+            ->selectRaw('gudang.cabang_id as cabang_id, stok_items.produk_id as produk_id, SUM(stok_items.jumlah) as total')
+            ->join('gudang', 'gudang.id', '=', 'stok_items.gudang_id')
+            ->whereIn('gudang.cabang_id', $cabangs->pluck('id')->all())
+            ->whereIn('stok_items.produk_id', $produkIds)
+            ->groupBy('gudang.cabang_id', 'stok_items.produk_id')
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                $row->cabang_id.':'.$row->produk_id => (int) $row->total,
+            ]);
+
         $origins = [];
 
         foreach ($cabangs as $cabang) {
             $stokCukup = true;
             foreach ($items as $item) {
-                $total = StokItem::where('produk_id', $item['produk_id'])
-                    ->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabang->id))
-                    ->sum('jumlah');
+                $total = $stokPerCabangProduk[$cabang->id.':'.(int) $item['produk_id']] ?? 0;
 
                 if ($total < (int) $item['jumlah']) {
                     $stokCukup = false;

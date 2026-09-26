@@ -9,13 +9,15 @@ use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Akunting\Services\PembayaranSubledgerService;
+use App\Modules\Akunting\Services\ValidasiBarisJurnal;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Rbac\Services\AuditService;
 use App\Traits\ApiResponse;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class AkuntingController extends Controller
@@ -23,8 +25,35 @@ class AkuntingController extends Controller
     use ApiResponse;
 
     public function __construct(
-        protected JurnalService $jurnalService
+        protected JurnalService $jurnalService,
+        protected PembayaranSubledgerService $pembayaranService
     ) {}
+
+    /**
+     * [B-10a / P0-2] Scope cabang aktif untuk query baca.
+     *
+     * WAJIB dipakai setiap query jurnal/AR/AP/laporan. `session('cabang_id')`
+     * null berarti "tidak boleh melihat apa pun" — sebelumnya filter hanya
+     * dipasang bila session truthy sehingga null = bocor ke SEMUA cabang.
+     */
+    private function cabangScopeId(): int
+    {
+        return (int) (session('cabang_id') ?? 0);
+    }
+
+    /**
+     * [B-10a / P0-2] Mutasi wajib punya cabang aktif (fail-closed, 403).
+     */
+    private function cabangAktif(): int
+    {
+        $cabangId = (int) (session('cabang_id') ?? 0);
+
+        if ($cabangId <= 0) {
+            abort(403, 'Cabang aktif belum dipilih.');
+        }
+
+        return $cabangId;
+    }
 
     // [API: ACC-01] Daftar COA (editable terbatas: super-admin/finance)
     public function indexCoa(Request $request)
@@ -87,14 +116,11 @@ class AkuntingController extends Controller
         $akunId = $request->query('akun_id');
         $dari = $request->query('dari');
         $sampai = $request->query('sampai');
-        $cabangId = session('cabang_id');
+        $cabangId = $this->cabangScopeId();
 
         $query = JurnalAkuntansi::with(['akun', 'cabang', 'user'])
-            ->latest('tanggal');
-
-        if ($cabangId) {
-            $query->where('cabang_id', $cabangId);
-        }
+            ->latest('tanggal')
+            ->where('cabang_id', $cabangId);
 
         if ($sumber) {
             $query->where('sumber', $sumber);
@@ -134,27 +160,47 @@ class AkuntingController extends Controller
     {
         $request->validate([
             'tanggal' => 'required|date',
-            'deskripsi' => 'required|string',
+            'deskripsi' => 'required|string|max:255',
             'lines' => 'required|array|min:2',
-            'lines.*.akun_kode' => 'required|exists:akun_coa,kode',
+            // [B-10e / P2-1] `exists:akun_coa,kode` dihapus: pesan default Laravel
+            // berbahasa Inggris. Existence + is_active + sisi vs saldo_normal
+            // kini dicek ValidasiBarisJurnal (sumber aturan yang sama dgn UI).
+            'lines.*.akun_kode' => 'required|string|max:20',
             'lines.*.debit' => 'nullable|numeric|min:0',
             'lines.*.kredit' => 'nullable|numeric|min:0',
         ]);
 
+        // [B-10e / P2-1] Aturan yang sama dgn form UI jurnal manual: akun aktif,
+        // nominal > 0, satu sisi, sisi sesuai saldo_normal akun.
+        $lines = collect($request->input('lines', []))
+            ->map(fn ($line) => [
+                'akun_kode' => is_array($line) ? (string) ($line['akun_kode'] ?? '') : '',
+                'debit' => is_array($line) ? (float) ($line['debit'] ?? 0) : 0.0,
+                'kredit' => is_array($line) ? (float) ($line['kredit'] ?? 0) : 0.0,
+            ])
+            ->values()
+            ->all();
+
+        $galat = ValidasiBarisJurnal::cekBaris($lines);
+        if ($galat !== []) {
+            return $this->error(implode(' ', $galat), 422, ['errors' => $galat]);
+        }
+
         try {
-            $noJurnal = $this->jurnalService->generateNoJurnal('manual', session('cabang_id'));
+            $noJurnal = $this->jurnalService->generateNoJurnal('manual', $this->cabangAktif());
             $this->jurnalService->post(
                 $noJurnal,
                 $request->tanggal,
                 'manual',
                 $request->lines,
                 $request->deskripsi,
-                session('cabang_id'),
+                $this->cabangAktif(),
                 auth()->id()
             );
 
             return $this->success(['no_jurnal' => $noJurnal], 'Jurnal manual berhasil diposting', 201);
         } catch (\Exception $e) {
+            // Termasuk "Jurnal tidak balance" — wajib balance sebelum disimpan.
             return $this->error($e->getMessage(), 400);
         }
     }
@@ -164,17 +210,14 @@ class AkuntingController extends Controller
     {
         $dari = $request->query('dari', now()->startOfMonth()->toDateString());
         $sampai = $request->query('sampai', now()->toDateString());
-        $cabangId = session('cabang_id');
+        $cabangId = $this->cabangScopeId();
 
         $cacheKey = "laporan-labarugi-{$cabangId}-{$dari}-{$sampai}";
 
         $laporan = Cache::remember($cacheKey, 900, function () use ($dari, $sampai, $cabangId) {
             $query = JurnalAkuntansi::whereDate('tanggal', '>=', $dari)
-                ->whereDate('tanggal', '<=', $sampai);
-
-            if ($cabangId) {
-                $query->where('cabang_id', $cabangId);
-            }
+                ->whereDate('tanggal', '<=', $sampai)
+                ->where('cabang_id', $cabangId);
 
             $jurnals = $query->with('akun')->get();
 
@@ -210,48 +253,20 @@ class AkuntingController extends Controller
     // [API: ACC-06] Laporan Neraca
     public function neraca(Request $request)
     {
-        $cabangId = session('cabang_id');
+        $cabangId = $this->cabangScopeId();
         $sampai = $request->query('sampai', now()->toDateString());
 
         $cacheKey = "laporan-neraca-{$cabangId}-{$sampai}";
 
-        $neraca = Cache::remember($cacheKey, 900, function () use ($sampai, $cabangId) {
-            $query = JurnalAkuntansi::whereDate('tanggal', '<=', $sampai);
-            if ($cabangId) {
-                $query->where('cabang_id', $cabangId);
-            }
-
-            $jurnals = $query->with('akun')->get();
-
-            $grouped = $jurnals->groupBy('akun_coa_id')->map(function ($rows) {
-                $akun = $rows->first()->akun;
-                if (! $akun) {
-                    return null;
-                }
-
-                $saldo = $akun->saldo_normal === 'debit'
-                    ? $rows->sum('debit') - $rows->sum('kredit')
-                    : $rows->sum('kredit') - $rows->sum('debit');
-
-                return [
-                    'tipe' => $akun->tipe,
-                    'kelompok' => $akun->kelompok,
-                    'kode' => $akun->kode,
-                    'nama' => $akun->nama,
-                    'saldo' => round($saldo, 2),
-                ];
-            })->filter()->values();
-
-            return [
-                'sampai_tanggal' => $sampai,
-                'aset' => $grouped->where('tipe', 'aset')->values(),
-                'kewajiban' => $grouped->where('tipe', 'kewajiban')->values(),
-                'ekuitas' => $grouped->where('tipe', 'ekuitas')->values(),
-                'total_aset' => round($grouped->where('tipe', 'aset')->sum('saldo'), 2),
-                'total_kewajiban' => round($grouped->where('tipe', 'kewajiban')->sum('saldo'), 2),
-                'total_ekuitas' => round($grouped->where('tipe', 'ekuitas')->sum('saldo'), 2),
-            ];
-        });
+        // [B-10e / P1-7] Sumber tunggal dgn export Excel:
+        // ExportLaporanService::neracaSaldo() → SALDO KUMULATIF s/d $sampai
+        // (bukan perubahan periode) + Laba Periode Berjalan sebagai bagian
+        // ekuitas supaya Total Aset = Total Kewajiban + Ekuitas.
+        $neraca = Cache::remember(
+            $cacheKey,
+            900,
+            fn () => app(ExportLaporanService::class)->neracaSaldo($cabangId, (string) $sampai)
+        );
 
         return $this->success($neraca, 'Laporan Neraca berhasil diambil (cache 15 menit)');
     }
@@ -263,8 +278,10 @@ class AkuntingController extends Controller
         $sampai = $request->query('sampai', now()->toDateString());
 
         $akun = AkunCOA::findOrFail($akunId);
+        // [B-10a / P0-2] buku besar WAJIB scoped cabang (sebelumnya tanpa filter sama sekali)
         $jurnals = JurnalAkuntansi::with(['cabang', 'user'])
             ->where('akun_coa_id', $akunId)
+            ->where('cabang_id', $this->cabangScopeId())
             ->whereDate('tanggal', '>=', $dari)
             ->whereDate('tanggal', '<=', $sampai)
             ->orderBy('tanggal')
@@ -316,7 +333,7 @@ class AkuntingController extends Controller
             jenis: $request->input('jenis'),
             periodeDari: $request->input('periode_dari'),
             periodeSampai: $request->input('periode_sampai'),
-            cabangId: session('cabang_id'),
+            cabangId: $this->cabangAktif(),
             akunId: $request->input('akun_id'),
             userId: auth()->id(),
             format: $request->input('format', 'xlsx')
@@ -355,7 +372,9 @@ class AkuntingController extends Controller
     {
         $status = $request->query('status');
 
+        // [B-10a / P0-2] AR selalu scoped cabang aktif
         $query = Piutang::with('pelanggan')
+            ->where('cabang_id', $this->cabangScopeId())
             ->latest();
 
         if ($status) {
@@ -384,7 +403,8 @@ class AkuntingController extends Controller
     {
         $status = $request->query('status');
 
-        $query = Utang::latest();
+        // [B-10a / P0-2] AP selalu scoped cabang aktif
+        $query = Utang::where('cabang_id', $this->cabangScopeId())->latest();
 
         if ($status) {
             $query->where('status', $status);
@@ -408,98 +428,80 @@ class AkuntingController extends Controller
     }
 
     // [API: ACC-10] Bayar utang (pencatatan pembayaran)
+    // [B-10a / P0-1] Delegasikan ke PembayaranSubledgerService: subledger + jurnal
+    // dalam SATU transaksi. Exception jurnal TIDAK lagi ditelan jadi 200 sukses.
     public function bayarUtang(Request $request, $id)
     {
         $request->validate([
             'jumlah' => 'required|numeric|min:1',
         ]);
 
-        $utang = Utang::findOrFail($id);
-        $dibayar = (float) $utang->jumlah_dibayar + (float) $request->jumlah;
-
-        if ($dibayar > (float) $utang->jumlah) {
-            return $this->error('Pembayaran melebihi sisa utang', 422);
-        }
-
-        $utang->update([
-            'jumlah_dibayar' => $dibayar,
-            'status' => $dibayar >= (float) $utang->jumlah ? 'lunas' : 'sebagian',
-        ]);
-
-        // Jurnal pembayaran utang: Debit Utang (210-03/210-01), Kredit Kas (110-01)
         try {
-            $akunUtang = match ($utang->referensi_tipe) {
-                'komisi' => '210-03',
-                default => '210-01',
-            };
-
-            $noJurnal = $this->jurnalService->generateNoJurnal('pembayaran', session('cabang_id'));
-            $this->jurnalService->post(
-                $noJurnal,
-                now(),
-                'manual',
-                [
-                    ['akun_kode' => $akunUtang, 'debit' => (float) $request->jumlah, 'kredit' => 0],
-                    ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => (float) $request->jumlah],
-                ],
-                "Pembayaran utang {$utang->no_utang}",
-                session('cabang_id'),
-                auth()->id()
+            $hasil = $this->pembayaranService->bayarUtang(
+                (int) $id,
+                (float) $request->jumlah,
+                $this->cabangAktif(),
+                auth()->id(),
+                $this->kunciIdempotensi($request)
             );
+        } catch (ModelNotFoundException) {
+            return $this->error('Data utang tidak ditemukan.', 404);
         } catch (\Exception $e) {
-            // Jurnal gagal jangan blokir pembayaran — log
-            Log::warning("Jurnal bayar utang gagal: {$e->getMessage()}");
+            return $this->error($e->getMessage(), 422);
         }
 
-        return $this->success($utang->fresh(), 'Pembayaran utang berhasil dicatat');
+        return $this->success([
+            'utang' => $hasil['model'],
+            'no_jurnal' => $hasil['no_jurnal'],
+        ], 'Pembayaran utang berhasil dicatat');
     }
 
     // [API: ACC-08b] Bayar piutang (pencatatan penerimaan AR)
+    // [B-10a / P0-1] Sama seperti bayarUtang — satu transaksi, fail-closed.
     public function bayarPiutang(Request $request, $id)
     {
         $request->validate([
             'jumlah' => 'required|numeric|min:1',
         ]);
 
-        $piutang = Piutang::findOrFail($id);
-        $dibayar = (float) $piutang->jumlah_dibayar + (float) $request->jumlah;
-
-        if ($dibayar > (float) $piutang->jumlah) {
-            return $this->error('Pembayaran melebihi sisa piutang', 422);
-        }
-
-        $piutang->update([
-            'jumlah_dibayar' => $dibayar,
-            'status' => $dibayar >= (float) $piutang->jumlah ? 'lunas' : 'sebagian',
-        ]);
-
-        // Jurnal penerimaan piutang: Debit Kas (110-01), Kredit Piutang Usaha (120-01)
         try {
-            $noJurnal = $this->jurnalService->generateNoJurnal('pembayaran', session('cabang_id'));
-            $this->jurnalService->post(
-                $noJurnal,
-                now(),
-                'manual',
-                [
-                    ['akun_kode' => '110-01', 'debit' => (float) $request->jumlah, 'kredit' => 0],   // Kas masuk
-                    ['akun_kode' => '120-01', 'debit' => 0, 'kredit' => (float) $request->jumlah],  // Piutang turun
-                ],
-                "Penerimaan piutang {$piutang->no_piutang}",
-                session('cabang_id'),
-                auth()->id()
+            $hasil = $this->pembayaranService->bayarPiutang(
+                (int) $id,
+                (float) $request->jumlah,
+                $this->cabangAktif(),
+                auth()->id(),
+                $this->kunciIdempotensi($request)
             );
+        } catch (ModelNotFoundException) {
+            return $this->error('Data piutang tidak ditemukan.', 404);
         } catch (\Exception $e) {
-            Log::warning("Jurnal bayar piutang gagal: {$e->getMessage()}");
+            return $this->error($e->getMessage(), 422);
         }
 
-        return $this->success($piutang->fresh(), 'Pembayaran piutang berhasil dicatat');
+        return $this->success([
+            'piutang' => $hasil['model'],
+            'no_jurnal' => $hasil['no_jurnal'],
+        ], 'Pembayaran piutang berhasil dicatat');
+    }
+
+    /**
+     * [B-10a / P0-1] Kunci idempotensi opsional dari header `Idempotency-Key`
+     * agar retry/double-submit pembayaran tidak menghasilkan jurnal ganda.
+     */
+    private function kunciIdempotensi(Request $request): ?string
+    {
+        $kunci = trim((string) $request->header('Idempotency-Key', ''));
+
+        return $kunci === '' ? null : mb_substr($kunci, 0, 120);
     }
 
     // [T-33] Riwayat sesi kas per cabang (untuk laporan Akunting)
     public function kasSesi(Request $request)
     {
+        // [B-10a / P0-2] query param `cabang_id` sebelumnya bisa meminta sesi kas
+        // cabang lain → riwayat hanya untuk cabang aktif.
         $sesi = app(KasSesiState::class)
-            ->riwayat($request->query('cabang_id') ?? session('cabang_id'), 50);
+            ->riwayat($this->cabangScopeId() ?: null, 50);
 
         return $this->success(['sesi' => $sesi], 'Riwayat kas sesi');
     }
@@ -509,13 +511,11 @@ class AkuntingController extends Controller
     {
         $dari = $request->query('dari', now()->startOfMonth()->toDateString());
         $sampai = $request->query('sampai', now()->toDateString());
-        $cabangId = session('cabang_id');
+        $cabangId = $this->cabangScopeId();
 
         $query = JurnalAkuntansi::whereDate('tanggal', '>=', $dari)
-            ->whereDate('tanggal', '<=', $sampai);
-        if ($cabangId) {
-            $query->where('cabang_id', $cabangId);
-        }
+            ->whereDate('tanggal', '<=', $sampai)
+            ->where('cabang_id', $cabangId);
 
         $jurnals = $query->with('akun')->get();
 

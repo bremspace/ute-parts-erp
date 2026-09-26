@@ -44,6 +44,27 @@ class StokTab extends Component
         $this->resetPage();
     }
 
+    /** [B-03/P1-6] Gudang filter wajib milik cabang aktif (payload klien bisa lintas cabang). */
+    public function updatedFilterGudangId(): void
+    {
+        if (! $this->filterGudangId) {
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $sah = Gudang::where('id', $this->filterGudangId)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->exists();
+
+        if (! $sah) {
+            $this->filterGudangId = null;
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => 'Gudang tidak sesuai cabang aktif — filter stok direset',
+            ]);
+        }
+    }
+
     // Quick action header "Atur Rak" (dari shell WmsDashboard via $dispatch)
     #[On('wms-rak-modal')]
     public function openRakModal(): void
@@ -92,12 +113,28 @@ class StokTab extends Component
 
     public function render()
     {
-        $gudangs = Gudang::where('is_active', true)->get();
+        $cabangId = session('cabang_id');
+
+        // [B-03/P1-6] Dropdown gudang scoped ke cabang aktif — jangan tampilkan
+        // (apalagi pakai) gudang cabang lain.
+        $gudangs = Gudang::where('is_active', true)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->orderBy('nama')
+            ->get();
+
+        // Filter gudang wajib milik cabang aktif (prop publik bisa di-tamper)
+        $filterGudangId = $this->filterGudangId && $gudangs->contains('id', $this->filterGudangId)
+            ? $this->filterGudangId
+            : null;
 
         // Stok Query
         $stokQuery = StokItem::with(['produk', 'skuVariant', 'gudang.cabang']);
-        if ($this->filterGudangId) {
-            $stokQuery->where('gudang_id', $this->filterGudangId);
+        if ($filterGudangId) {
+            $stokQuery->where('gudang_id', $filterGudangId);
+        } elseif ($cabangId) {
+            // [B-03/P1-6] Fallback scoping: tanpa gudang terpilih → tetap batasi
+            // stok ke gudang-gudang cabang aktif (jangan bocor lintas cabang)
+            $stokQuery->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId));
         }
         if (! empty($this->search)) {
             $s = $this->search;

@@ -120,7 +120,10 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             @forelse($products as $p)
                 @php
-                    $stok = (int) \App\Modules\Wms\Models\StokItem::where('produk_id', $p->id)->sum('jumlah');
+                    // [B-15a] Total stok dari subquery withSum() di ShopPage
+                    // (alias stok_items_sum_jumlah) — tidak ada query per produk
+                    // di dalam loop.
+                    $stok = (int) ($p->stok_items_sum_jumlah ?? 0);
                     $customer = auth('customer')->user();
                     $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
                 @endphp

@@ -11,7 +11,9 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\StokItem;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Facades\Excel;
@@ -43,7 +45,7 @@ class ExportLaporanService
 
         $data = match ($jenis) {
             'laba_rugi' => $this->dataLabaRugi($dari, $sampai, $cabangId),
-            'neraca' => $this->dataNeraca($cabangId),
+            'neraca' => $this->dataNeraca($cabangId, $sampai),
             'buku_besar' => $this->dataBukuBesar($akunId, $dari, $sampai, $cabangId),
             'arus_kas' => $this->dataArusKas($dari, $sampai, $cabangId),
             'stok' => $this->dataStok($cabangId),
@@ -151,15 +153,115 @@ class ExportLaporanService
         return $rows;
     }
 
-    private function dataNeraca(?int $cabangId): array
+    /**
+     * [B-10e / P1-7] Neraca = SALDO KUMULATIF s/d $sampai (bukan perubahan periode).
+     *
+     * DASAR LAPORAN (WAJIB sama dgn API ACC-06 & dashboard):
+     *  - Neraca adalah foto posisi pada satu tanggal, jadi menjumlah SELURUH jurnal
+     *    dari awal pembukuan s/d tanggal tersebut. Versi lama hanya menghitung
+     *    mulai awal bulan berjalan sehingga saldo historis (dan akun yang tak
+     *    pernah bergerak di bulan ini) hilang, sehingga neraca tidak balance.
+     *  - Laporan PERUBAHAN periode (laba rugi, arus kas, jurnal umum) tetap
+     *    memakai rentang $dari..$sampai; dua basis ini jangan tertukar.
+     *  - Laba periode berjalan (pendapatan - beban kumulatif) dilaporkan di sisi
+     *    ekuitas sebagai "LABA PERIODE BERJALAN" karena akun pendapatan & beban
+     *    belum ditutup ke Laba Ditahan (310-02). Tanpa baris ini neraca tidak
+     *    akan balance meski seluruh jurnal double-entry benar.
+     *
+     * @return array<string,mixed> akun per tipe + total + selisih + penanda balance
+     */
+    public function neracaSaldo(?int $cabangId, string $sampai): array
     {
-        $j = $this->jurnals(now()->startOfMonth()->toDateString(), now()->toDateString(), $cabangId);
-        $rows = [['NERACA'], []];
-        $rows[] = ['AKUN', 'SALDO (Rp)'];
+        $akunSaldo = $this->saldoKumulatifPerAkun($cabangId, $sampai)
+            ->map(function ($row) {
+                // [B-15b] angka & pembulatan identik dgn versi lama (jumlahkan
+                // seluruh baris jurnal per akun, lalu bulatkan 2 desimal) —
+                // hanya sumber datanya yang berubah (agregat SQL, bukan get()).
+                $debit = (float) $row->total_debit;
+                $kredit = (float) $row->total_kredit;
 
-        foreach ($this->groupAkun($j) as $g) {
-            $rows[] = [$g['nama'].' ['.$g['tipe'].']', $g['saldo']];
+                $saldo = (string) $row->saldo_normal === 'debit'
+                    ? $debit - $kredit
+                    : $kredit - $debit;
+
+                return [
+                    'kode' => (string) $row->kode,
+                    'nama' => (string) $row->nama,
+                    'tipe' => (string) $row->tipe,
+                    'kelompok' => (string) $row->kelompok,
+                    'saldo' => round($saldo, 2),
+                ];
+            })
+            ->sortBy('kode')
+            ->values();
+
+        $aset = $akunSaldo->where('tipe', 'aset')->values();
+        $kewajiban = $akunSaldo->where('tipe', 'kewajiban')->values();
+        $ekuitas = $akunSaldo->where('tipe', 'ekuitas')->values();
+        $pendapatan = $akunSaldo->where('tipe', 'pendapatan')->values();
+        $beban = $akunSaldo->where('tipe', 'beban')->values();
+
+        $labaPeriodeBerjalan = round($pendapatan->sum('saldo') - $beban->sum('saldo'), 2);
+        $totalAset = round($aset->sum('saldo'), 2);
+        $totalKewajiban = round($kewajiban->sum('saldo'), 2);
+        $totalEkuitas = round($ekuitas->sum('saldo'), 2);
+        $totalEkuitasLaba = round($totalEkuitas + $labaPeriodeBerjalan, 2);
+        $selisih = round($totalAset - ($totalKewajiban + $totalEkuitasLaba), 2);
+
+        return [
+            'sampai_tanggal' => $sampai,
+            'basis' => 'saldo_kumulatif',
+            'aset' => $aset,
+            'kewajiban' => $kewajiban,
+            'ekuitas' => $ekuitas,
+            'pendapatan' => $pendapatan,
+            'beban' => $beban,
+            'laba_periode_berjalan' => $labaPeriodeBerjalan,
+            'total_aset' => $totalAset,
+            'total_kewajiban' => $totalKewajiban,
+            'total_ekuitas' => $totalEkuitas,
+            'total_ekuitas_bersama_laba' => $totalEkuitasLaba,
+            'selisih' => $selisih,
+            'balance' => abs($selisih) < 0.01,
+        ];
+    }
+
+    /**
+     * [B-10e / P1-7] Baris export neraca. Judul menyebut "saldo kumulatif"
+     * supaya tidak disalahbaca sebagai laporan perubahan periode.
+     */
+    private function dataNeraca(?int $cabangId, string $sampai): array
+    {
+        $neraca = $this->neracaSaldo($cabangId, $sampai);
+
+        $rows = [
+            ['NERACA (SALDO KUMULATIF s/d '.$sampai.')'],
+            ['Seluruh jurnal sejak awal pembukuan s/d tanggal di atas - bukan perubahan periode.'],
+            [],
+            ['KELOMPOK', 'KODE', 'SALDO (Rp)'],
+            ['ASET'],
+        ];
+
+        foreach ($neraca['aset'] as $a) {
+            $rows[] = [$a['nama'], $a['kode'], $a['saldo']];
         }
+        $rows[] = ['TOTAL ASET', '', $neraca['total_aset']];
+        $rows[] = [];
+        $rows[] = ['KEWAJIBAN'];
+        foreach ($neraca['kewajiban'] as $k) {
+            $rows[] = [$k['nama'], $k['kode'], $k['saldo']];
+        }
+        $rows[] = ['TOTAL KEWAJIBAN', '', $neraca['total_kewajiban']];
+        $rows[] = [];
+        $rows[] = ['EKUITAS'];
+        foreach ($neraca['ekuitas'] as $e) {
+            $rows[] = [$e['nama'], $e['kode'], $e['saldo']];
+        }
+        $rows[] = ['LABA PERIODE BERJALAN (kumulatif s/d '.$sampai.')', '', $neraca['laba_periode_berjalan']];
+        $rows[] = ['TOTAL EKUITAS + LABA BERJALAN', '', $neraca['total_ekuitas_bersama_laba']];
+        $rows[] = [];
+        $rows[] = ['SELISIH (ASET - KEWAJIBAN - EKUITAS)', '', $neraca['selisih']];
+        $rows[] = ['STATUS', '', $neraca['balance'] ? 'SEIMBANG' : 'TIDAK SEIMBANG'];
 
         return $rows;
     }
@@ -357,12 +459,61 @@ class ExportLaporanService
 
     private function jurnals(string $dari, string $sampai, ?int $cabangId): Collection
     {
-        $q = JurnalAkuntansi::with('akun')->whereDate('tanggal', '>=', $dari)->whereDate('tanggal', '<=', $sampai);
+        return $this->queryJurnal($cabangId)
+            ->whereDate('tanggal', '>=', $dari)
+            ->whereDate('tanggal', '<=', $sampai)
+            ->get();
+    }
+
+    /**
+     * [B-10e / P1-7] SALDO KUMULATIF per akun s/d $sampai (tanpa batas bawah) —
+     * dipakai neraca. Laporan perubahan periode tetap pakai jurnals($dari, ...).
+     *
+     * [B-15b] SEBELUMNYA ini menarik SELURUH baris jurnal sejak awal pembukuan
+     * (`with('akun')->get()`, produksi 150.000-300.000 baris/tahun) hanya
+     * untuk menjumlah per akun. Sekarang `GROUP BY akun` di SQL: satu query,
+     * hasil = jumlah akun COA yang bergerak. Join `akun_coa` membaca
+     * kode/nama/tipe/kelompok/saldo_normal tanpa query per akun. Baris jurnal
+     * yang akunnya sudah tidak ada tetap TIDAK ikut (versi lama membuangnya
+     * lewat `filter()`; sekarang inner join tidak memunculkan baris itu).
+     *
+     * @return Collection<int,object>
+     */
+    private function saldoKumulatifPerAkun(?int $cabangId, string $sampai): Collection
+    {
+        $query = DB::table('jurnal_akuntansi')
+            ->join('akun_coa', 'akun_coa.id', '=', 'jurnal_akuntansi.akun_coa_id')
+            ->whereDate('jurnal_akuntansi.tanggal', '<=', $sampai)
+            ->select('jurnal_akuntansi.akun_coa_id')
+            ->selectRaw('akun_coa.kode, akun_coa.nama, akun_coa.tipe, akun_coa.kelompok, akun_coa.saldo_normal')
+            ->selectRaw('SUM(jurnal_akuntansi.debit) as total_debit, SUM(jurnal_akuntansi.kredit) as total_kredit')
+            ->groupBy(
+                'jurnal_akuntansi.akun_coa_id',
+                'akun_coa.kode',
+                'akun_coa.nama',
+                'akun_coa.tipe',
+                'akun_coa.kelompok',
+                'akun_coa.saldo_normal',
+            );
+
+        // [F2-5] cabang scoping — jangan bocorkan jurnal cabang lain
+        if ($cabangId) {
+            $query->where('jurnal_akuntansi.cabang_id', $cabangId);
+        }
+
+        return $query->get();
+    }
+
+    private function queryJurnal(?int $cabangId): Builder
+    {
+        $q = JurnalAkuntansi::with('akun');
+
+        // [F2-5] cabang scoping — jangan bocorkan jurnal cabang lain
         if ($cabangId) {
             $q->where('cabang_id', $cabangId);
         }
 
-        return $q->get();
+        return $q;
     }
 
     private function groupAkun(Collection $j): Collection

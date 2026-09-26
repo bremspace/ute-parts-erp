@@ -5,6 +5,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Activitylog\Support\ActivityLogger;
 
 return new class extends Migration
 {
@@ -32,39 +33,46 @@ return new class extends Migration
         DB::table('transaksi')->whereNull('dpp')->update(['dpp' => 0]);
 
         // 2. COA 220-01 = PPN Keluaran (AC F1-2). Bila masih "Pajak Dibayar Dimuka" → rename (kontrak PRD).
-        $akun22001 = AkunCOA::where('kode', '220-01')->first();
-        if (! $akun22001) {
+        // 2b. 220-02 (legacy) → rename bila duplikat nama dgn 220-01.
+        // 3. COA 110-03 = PPN Masukan (aset, debit) — sumber rekap masukan e-Faktur.
+        //
+        // [B-10f]-activity-log: AkunCOA memakai LogsActivity, sedangkan tabel
+        // `activity_log` baru dibuat di migrasi 2026_09_23_010150 (LEBIH LAMBAT
+        // dari migrasi ini) → tanpa penonaktifan, `migrate`/`migrate:fresh`
+        // gagal "no such table: activity_log". Migrasi tidak menulis activity log.
+        app(ActivityLogger::class)->withoutLogging(function () {
+            $akun22001 = AkunCOA::where('kode', '220-01')->first();
+            if (! $akun22001) {
+                AkunCOA::firstOrCreate(
+                    ['kode' => '220-01'],
+                    [
+                        'nama' => 'PPN Keluaran',
+                        'tipe' => 'kewajiban',
+                        'kelompok' => 'pajak',
+                        'saldo_normal' => 'kredit',
+                        'is_active' => true,
+                    ]
+                );
+            } elseif ($akun22001->nama === 'Pajak Dibayar Dimuka') {
+                $akun22001->update(['nama' => 'PPN Keluaran']);
+            }
+
+            $akun22002 = AkunCOA::where('kode', '220-02')->first();
+            if ($akun22002 && $akun22002->nama === 'PPN Keluaran') {
+                $akun22002->update(['nama' => 'PPN Keluaran (Legacy 220-02)']);
+            }
+
             AkunCOA::firstOrCreate(
-                ['kode' => '220-01'],
+                ['kode' => '110-03'],
                 [
-                    'nama' => 'PPN Keluaran',
-                    'tipe' => 'kewajiban',
+                    'nama' => 'PPN Masukan',
+                    'tipe' => 'aset',
                     'kelompok' => 'pajak',
-                    'saldo_normal' => 'kredit',
+                    'saldo_normal' => 'debit',
                     'is_active' => true,
                 ]
             );
-        } elseif ($akun22001->nama === 'Pajak Dibayar Dimuka') {
-            $akun22001->update(['nama' => 'PPN Keluaran']);
-        }
-
-        // 2b. 220-02 (legacy, dibuat migrasi 2026_09_17_0100) — rename bila duplikat nama dgn 220-01
-        $akun22002 = AkunCOA::where('kode', '220-02')->first();
-        if ($akun22002 && $akun22002->nama === 'PPN Keluaran') {
-            $akun22002->update(['nama' => 'PPN Keluaran (Legacy 220-02)']);
-        }
-
-        // 3. COA 110-03 = PPN Masukan (aset, debit) — sumber rekap masukan e-Faktur
-        AkunCOA::firstOrCreate(
-            ['kode' => '110-03'],
-            [
-                'nama' => 'PPN Masukan',
-                'tipe' => 'aset',
-                'kelompok' => 'pajak',
-                'saldo_normal' => 'debit',
-                'is_active' => true,
-            ]
-        );
+        });
 
         // 4. konfigurasi: key global pajak_enabled (kontrak AC; ppn_enabled lama tetap dipakai sbg fallback)
         $now = now();
@@ -88,6 +96,8 @@ return new class extends Migration
         }
 
         DB::table('konfigurasi')->where('kunci', 'pajak_enabled')->delete();
-        AkunCOA::where('kode', '110-03')->delete();
+        app(ActivityLogger::class)->withoutLogging(
+            fn () => AkunCOA::where('kode', '110-03')->delete()
+        );
     }
 };

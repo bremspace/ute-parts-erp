@@ -773,10 +773,15 @@ class SidMigrateToUteParts extends Command
             'created_at' => $this->parseDateTime($p['tanggal'] ?? now(), $p['jam'] ?? '00:00:00'),
         ]);
 
+        // [B-10i] CLI tidak punya sesi → tidak ada user pelakunya. Memakai sistem
+        // actor yang SAMA dengan StokLog di atas (user_id = 1, akun admin hasil
+        // AdminUserSeeder) supaya StokLog & StockMutationLog satu pelaku dan
+        // jejak mutasi hasil migrasi tetap bisa dibaca — bukan user fiktif.
         StockMutationLog::create([
             'produk_id' => $produkId,
             'sku_variant_id' => $variantId,
             'gudang_id' => $gudangId ?? 1,
+            'user_id' => 1,
             'delta' => $delta,
             'sumber' => 'sid_migration',
             'referensi_tipe' => $referensiTipe,

@@ -13,7 +13,7 @@ use Livewire\Component;
 /**
  * [F1-2] Laporan Pajak Bulanan — rekap PPN keluaran/masukan → e-Faktur-ready.
  * RBAC: permission laporan.cabang (route middleware). Scope: cabang aktif (session).
- * Rekap berat di-cache 15 menit; export via queue (ExportLaporanJob) — RAM 1GB.
+ * Rekap + detail baris di-cache 15 menit; export via queue (ExportLaporanJob) — RAM 1GB.
  */
 class LaporanPajak extends Component
 {
@@ -90,34 +90,47 @@ class LaporanPajak extends Component
         });
     }
 
-    /** Detail baris keluaran utk DataTable (scope cabang, periode). */
+    /**
+     * Detail baris keluaran utk DataTable (scope cabang, periode).
+     *
+     * [B-15b] Di-cache 15 menit memakai pola yang sama dengan
+     * `getRekapProperty()` (TTL 15 menit, key berawalan `laporan-pajak:`).
+     * SEBELUMNYA `foreach ($q->get())` menarik SELURUH transaksi periode ke
+     * memori tiap render halaman, padahal isinya sama persis dengan yang
+     * sudah dipakai `getRekapProperty()`. Kolom baris (DPP/PPN/percent) dan
+     * scope cabang tidak berubah — hanya sumber datanya.
+     */
     public function getKeluaranRowsProperty(): array
     {
         $cabangId = session('cabang_id');
-        $q = Transaksi::whereDate('created_at', '>=', $this->periodeDari)
-            ->whereDate('created_at', '<=', $this->periodeSampai)
-            ->orderBy('created_at');
-        if ($cabangId) {
-            $q->where('cabang_id', $cabangId);
-        }
+        $cacheKey = sprintf('laporan-pajak-rows:%s:%s:%s', $cabangId ?? 'all', $this->periodeDari, $this->periodeSampai);
 
-        $rows = [];
-        foreach ($q->get() as $t) {
-            $ppn = (float) ($t->ppn_nominal ?? 0) > 0 ? (float) $t->ppn_nominal : (float) $t->pajak_nominal;
-            if ($ppn <= 0) {
-                continue;
+        return Cache::remember($cacheKey, now()->addMinutes(15), function () use ($cabangId) {
+            $q = Transaksi::whereDate('created_at', '>=', $this->periodeDari)
+                ->whereDate('created_at', '<=', $this->periodeSampai)
+                ->orderBy('created_at');
+            if ($cabangId) {
+                $q->where('cabang_id', $cabangId);
             }
-            $dpp = (float) ($t->dpp ?? 0) > 0 ? (float) $t->dpp : max(0, (float) $t->subtotal - (float) $t->diskon_nominal);
-            $rows[] = [
-                'tanggal' => $t->created_at->format('d/m/Y'),
-                'no_transaksi' => $t->no_transaksi,
-                'dpp' => $dpp,
-                'percent' => $dpp > 0 ? round(($ppn / $dpp) * 100, 2) : 0,
-                'ppn' => $ppn,
-            ];
-        }
 
-        return $rows;
+            $rows = [];
+            foreach ($q->get() as $t) {
+                $ppn = (float) ($t->ppn_nominal ?? 0) > 0 ? (float) $t->ppn_nominal : (float) $t->pajak_nominal;
+                if ($ppn <= 0) {
+                    continue;
+                }
+                $dpp = (float) ($t->dpp ?? 0) > 0 ? (float) $t->dpp : max(0, (float) $t->subtotal - (float) $t->diskon_nominal);
+                $rows[] = [
+                    'tanggal' => $t->created_at->format('d/m/Y'),
+                    'no_transaksi' => $t->no_transaksi,
+                    'dpp' => $dpp,
+                    'percent' => $dpp > 0 ? round(($ppn / $dpp) * 100, 2) : 0,
+                    'ppn' => $ppn,
+                ];
+            }
+
+            return $rows;
+        });
     }
 
     /** [F1-2] Export e-Faktur-ready via queue (async — jangan sinkron di request). */

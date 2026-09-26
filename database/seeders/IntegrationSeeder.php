@@ -4,9 +4,10 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Models\Pelanggan;
-use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Hr\Models\AbsensiLog;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KpiHasil;
@@ -21,15 +22,15 @@ use App\Modules\Hr\Services\PayrollService;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Omnichannel\Models\Channel;
 use App\Modules\Omnichannel\Models\ChannelOrder;
-use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
+use App\Modules\Rbac\Models\AktivitasLog;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\KomisiSkema;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\Garansi;
-use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
@@ -37,7 +38,6 @@ use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\CycleCountSchedule;
 use App\Modules\Wms\Models\CycleCountTask;
 use App\Modules\Wms\Models\Gudang;
-use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\PembayaranSupplier;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
@@ -45,8 +45,6 @@ use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Wms\Models\SatuanUnit;
-use App\Modules\Wms\Models\SkuVariant;
-use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\StokOpname;
@@ -58,11 +56,10 @@ use App\Modules\Wms\Models\SupplierScore;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Models\ApprovalRule;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 /**
  * IntegrationSeeder — Data end-to-end realistis untuk review semua modul & role.
@@ -90,16 +87,25 @@ class IntegrationSeeder extends Seeder
     ];
 
     private JurnalService $jurnal;
+
     private AbsensiService $absensiService;
+
     private KpiService $kpiService;
+
     private PayrollService $payrollService;
+
     private ServisService $servisService;
+
     private KomisiService $komisiService;
 
-    private ?\App\Modules\Rbac\Models\Cabang $cabang1;
-    private ?\App\Modules\Rbac\Models\Cabang $cabang2;
+    private ?Cabang $cabang1;
+
+    private ?Cabang $cabang2;
+
     private ?Gudang $gudangUtama;
+
     private ?Gudang $gudangToko;
+
     private ?Gudang $gudangCabang2;
 
     /** User per role */
@@ -182,8 +188,8 @@ class IntegrationSeeder extends Seeder
 
     private function initReferences(): void
     {
-        $this->cabang1 = \App\Modules\Rbac\Models\Cabang::where('kode', 'CBG-01')->first() ?? \App\Modules\Rbac\Models\Cabang::first();
-        $this->cabang2 = \App\Modules\Rbac\Models\Cabang::where('kode', 'CBG-02')->first();
+        $this->cabang1 = Cabang::where('kode', 'CBG-01')->first() ?? Cabang::first();
+        $this->cabang2 = Cabang::where('kode', 'CBG-02')->first();
 
         $this->gudangUtama = Gudang::where('kode', 'GDG-01')->first();
         $this->gudangToko = Gudang::where('kode', 'GDG-02')->first();
@@ -191,6 +197,7 @@ class IntegrationSeeder extends Seeder
 
         if (! $this->cabang1 || ! $this->gudangUtama) {
             Log::warning('IntegrationSeeder: cabang/gudang utama tidak ditemukan, abort');
+
             return;
         }
     }
@@ -234,7 +241,7 @@ class IntegrationSeeder extends Seeder
                         'jabatan' => $jabatanEnum,
                         'cabang_id' => $this->cabang1?->id ?? 1,
                         'tgl_masuk' => '2024-01-15',
-                        'gaji_pokok' => match($roleName) {
+                        'gaji_pokok' => match ($roleName) {
                             'teknisi' => 5500000,
                             'kasir' => 4500000,
                             'staff-gudang' => 4800000,
@@ -348,7 +355,9 @@ class IntegrationSeeder extends Seeder
         ];
 
         foreach ($rules as $r) {
-            if (! $r['cabang_id']) continue;
+            if (! $r['cabang_id']) {
+                continue;
+            }
             ApprovalRule::updateOrCreate(
                 ['entity_type' => $r['entity_type'], 'level' => $r['level'], 'cabang_id' => $r['cabang_id']],
                 $r
@@ -358,7 +367,9 @@ class IntegrationSeeder extends Seeder
 
     private function seedPurchaseToSalesFlow(): void
     {
-        if (! $this->cabang1 || ! $this->gudangUtama) return;
+        if (! $this->cabang1 || ! $this->gudangUtama) {
+            return;
+        }
 
         $supplier = Supplier::firstOrCreate(
             ['nama' => 'Supplier Integration Utama'],
@@ -366,7 +377,9 @@ class IntegrationSeeder extends Seeder
         );
 
         $produk = Produk::first();
-        if (! $produk) return;
+        if (! $produk) {
+            return;
+        }
 
         // PO Kredit baru (berbeda dari TransaksiDemoSeeder)
         $noPo = 'INT-PO-'.now()->format('Ymd').'-0001';
@@ -528,7 +541,9 @@ class IntegrationSeeder extends Seeder
     {
         $teknisiUser = $this->users['teknisi'] ?? $this->users['admin-toko'];
         $member = Pelanggan::where('telepon', 'demo-member-gold')->first();
-        if (! $teknisiUser || ! $this->cabang1) return;
+        if (! $teknisiUser || ! $this->cabang1) {
+            return;
+        }
 
         $servisService = $this->servisService;
         $teknisiKaryawan = $this->karyawans['teknisi'] ?? Karyawan::where('user_id', $teknisiUser->id)->first();
@@ -547,7 +562,9 @@ class IntegrationSeeder extends Seeder
         foreach ($statusFlow as $from => $to) {
             // Simulasi sampai status $to
             $no = 'INT-SRV-'.now()->format('Ymd').'-'.Str::upper(Str::substr($to, 0, 3)).rand(10, 99);
-            if (TiketServis::where('no_tiket', $no)->exists()) continue;
+            if (TiketServis::where('no_tiket', $no)->exists()) {
+                continue;
+            }
 
             $tiket = TiketServis::create([
                 'no_tiket' => $no,
@@ -618,7 +635,9 @@ class IntegrationSeeder extends Seeder
 
     private function seedInventoryOps(): void
     {
-        if (! $this->cabang1 || ! $this->gudangUtama) return;
+        if (! $this->cabang1 || ! $this->gudangUtama) {
+            return;
+        }
 
         // Cycle Count Schedule
         $schedule = CycleCountSchedule::firstOrCreate(
@@ -642,7 +661,7 @@ class IntegrationSeeder extends Seeder
             $produk = Produk::take(5)->get();
             $sampleItems = [];
             foreach ($produk as $p) {
-                $stokItem = \App\Modules\Wms\Models\StokItem::where('produk_id', $p->id)->where('gudang_id', $this->gudangUtama->id)->first();
+                $stokItem = StokItem::where('produk_id', $p->id)->where('gudang_id', $this->gudangUtama->id)->first();
                 if ($stokItem) {
                     $sampleItems[] = [
                         'stok_item_id' => $stokItem->id,
@@ -754,7 +773,9 @@ class IntegrationSeeder extends Seeder
 
     private function seedReturns(): void
     {
-        if (! $this->cabang1 || ! $this->gudangUtama) return;
+        if (! $this->cabang1 || ! $this->gudangUtama) {
+            return;
+        }
 
         // Return Penjualan
         $trx = Transaksi::where('sumber', 'pos')->where('status', 'selesai')->first();
@@ -829,11 +850,15 @@ class IntegrationSeeder extends Seeder
 
     private function seedHrFull(): void
     {
-        if (! $this->cabang1) return;
+        if (! $this->cabang1) {
+            return;
+        }
 
         // Absensi per karyawan (30 hari terakhir)
         foreach ($this->karyawans as $role => $karyawan) {
-            if (! $karyawan) continue;
+            if (! $karyawan) {
+                continue;
+            }
 
             for ($d = 29; $d >= 0; $d--) {
                 $tanggal = Carbon::now()->subDays($d)->format('Y-m-d');
@@ -865,7 +890,9 @@ class IntegrationSeeder extends Seeder
         $periode = now()->format('Y-m');
         $metricTiket = KpiMetric::where('kode', 'tiket_selesai')->first();
         foreach ($this->karyawans as $role => $karyawan) {
-            if (! $karyawan || ! $metricTiket) continue;
+            if (! $karyawan || ! $metricTiket) {
+                continue;
+            }
             KpiHasil::updateOrCreate(
                 ['karyawan_id' => $karyawan->id, 'kpi_metric_id' => $metricTiket->id, 'periode' => $periode],
                 [
@@ -887,7 +914,9 @@ class IntegrationSeeder extends Seeder
         );
 
         foreach ($this->karyawans as $role => $karyawan) {
-            if (! $karyawan) continue;
+            if (! $karyawan) {
+                continue;
+            }
 
             $komisi = $role === 'teknisi' ? 500000 : ($role === 'kasir' ? 300000 : ($role === 'marketing' ? 400000 : 0));
             $tunjangan = 500000;
@@ -964,7 +993,7 @@ class IntegrationSeeder extends Seeder
         }
 
         // Komisi internal (marketing lead won)
-        $leads = \App\Modules\Crm\Models\Lead::where('stage', 'won')->get();
+        $leads = Lead::where('stage', 'won')->get();
         foreach ($leads as $lead) {
             if ($lead->assigned_to) {
                 Komisi::firstOrCreate(
@@ -987,7 +1016,9 @@ class IntegrationSeeder extends Seeder
 
     private function seedPiutangUtang(): void
     {
-        if (! $this->cabang1) return;
+        if (! $this->cabang1) {
+            return;
+        }
 
         // Piutang - kolom: jumlah, jumlah_dibayar, status enum: belum_lunas|sebagian|lunas (no tanggal column)
         $pelanggans = Pelanggan::take(5)->get();
@@ -999,10 +1030,13 @@ class IntegrationSeeder extends Seeder
             Piutang::firstOrCreate(
                 [
                     'pelanggan_id' => $p->id,
-                    'no_piutang' => 'INT-PIU-'.now()->format('Ymd').'-'.sprintf('%03d', $i+1),
+                    'no_piutang' => 'INT-PIU-'.now()->format('Ymd').'-'.sprintf('%03d', $i + 1),
                 ],
                 [
                     'transaksi_id' => null,
+                    // Wajib: tanpa cabang_id, piutang disembunyikan oleh widget dashboard
+                    // yang scoped cabang (P0-B) — selalu isi cabang aktif seeder.
+                    'cabang_id' => $this->cabang1->id,
                     'jumlah' => $jumlah,
                     'jumlah_dibayar' => $dibayar,
                     'jatuh_tempo' => now()->addDays(rand(7, 60)),
@@ -1019,13 +1053,14 @@ class IntegrationSeeder extends Seeder
             $dibayar = rand(0, min(5000000, $jumlah));
             $status = $dibayar == 0 ? 'belum_lunas' : ($dibayar >= $jumlah ? 'lunas' : 'sebagian');
 
-            \App\Modules\Akunting\Models\Utang::firstOrCreate(
+            Utang::firstOrCreate(
                 [
-                    'no_utang' => 'INT-UTG-'.now()->format('Ymd').'-'.sprintf('%03d', $i+1),
+                    'no_utang' => 'INT-UTG-'.now()->format('Ymd').'-'.sprintf('%03d', $i + 1),
                 ],
                 [
                     'referensi_tipe' => 'pembelian',
                     'referensi_id' => 0,
+                    'cabang_id' => $this->cabang1->id,
                     'pelanggan_id' => null,
                     'kreditor_nama' => $s->nama,
                     'jumlah' => $jumlah,
@@ -1089,7 +1124,7 @@ class IntegrationSeeder extends Seeder
         ];
 
         foreach ($activities as $a) {
-            \App\Modules\Rbac\Models\AktivitasLog::create([
+            AktivitasLog::create([
                 'log_name' => 'integration',
                 'description' => $a['description'],
                 'subject_type' => $a['subject_type'],

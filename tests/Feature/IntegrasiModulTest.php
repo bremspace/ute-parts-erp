@@ -11,6 +11,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Models\Komisi;
+use App\Modules\Reseller\Models\KomisiSkema;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Gudang;
@@ -58,8 +59,28 @@ class IntegrasiModulTest extends TestCase
             ]);
         }
 
-        // Skema komisi: 5% semua produk
+        // Skema komisi LEGACY (single-aktor): dipertahankan utk paritas tabel
+        // `skema_komisi` — sudah tidak dipakai mesin komisi produksi.
         SkemaKomisi::create(['nama' => 'Standar', 'kategori' => null, 'tipe' => 'persen', 'nilai' => 5]);
+
+        // [B-10e / P1-8] Rule komisi multi-aktor yang BENAR-BENAR dipakai produksi:
+        // `KomisiService::hitungKomisiMultiAktor()` (dipanggil PosController/POS API)
+        // hanya membaca `komisi_skema` (aktor_tipe × trigger_tipe + is_aktif).
+        // Fixture lama hanya seed `skema_komisi` sehingga tabel `komisi` kosong.
+        // Rule umum reseller (aktor_id null = semua reseller), kategori null = semua
+        // kategori produk, 5% dari subtotal item.
+        KomisiSkema::create([
+            'nama' => 'Reseller 5% semua kategori',
+            'aktor_tipe' => 'reseller',
+            'aktor_id' => null,
+            'trigger_tipe' => 'penjualan',
+            'kategori' => null,
+            'tipe' => 'persen',
+            'nilai' => 5,
+            'min_amount' => 0,
+            'cabang_id' => null,
+            'is_aktif' => true,
+        ]);
 
         $this->cabang = Cabang::create(['nama' => 'Pusat', 'kode' => 'CBG-01', 'is_active' => true]);
         $gudang = Gudang::create(['cabang_id' => $this->cabang->id, 'nama' => 'Gudang 1', 'kode' => 'GDG-01', 'is_active' => true]);
@@ -267,6 +288,24 @@ class IntegrasiModulTest extends TestCase
         ]);
 
         // ===== 8. KESEIMBANGAN JURNAL GLOBAL (double-entry integrity) =====
+        // [B-10e] Nama test = "berseimbang" → WAJIB cek tiap nomor jurnal
+        // (bukan hanya akumulasi total; jurnal tidak balance bisa saling
+        // meniadakan di total).
+        $perJurnal = DB::table('jurnal_akuntansi')
+            ->selectRaw('no_jurnal, SUM(debit) AS total_debit, SUM(kredit) AS total_kredit')
+            ->groupBy('no_jurnal')
+            ->get();
+        $this->assertNotEmpty($perJurnal, 'minimal harus ada satu jurnal hasil integrasi');
+
+        foreach ($perJurnal as $j) {
+            $this->assertEqualsWithDelta(
+                (float) $j->total_debit,
+                (float) $j->total_kredit,
+                0.01,
+                "Jurnal {$j->no_jurnal} tidak balance (debit {$j->total_debit} ≠ kredit {$j->total_kredit})"
+            );
+        }
+
         $debitTotal = DB::table('jurnal_akuntansi')->sum('debit');
         $kreditTotal = DB::table('jurnal_akuntansi')->sum('kredit');
         $this->assertEqualsWithDelta($debitTotal, $kreditTotal, 0.01, 'Total debit harus = total kredit (double-entry)');

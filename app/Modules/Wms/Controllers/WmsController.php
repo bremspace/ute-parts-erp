@@ -98,13 +98,28 @@ class WmsController extends Controller
 
         // [T-41] Validasi server: qty_transfer ≤ stok tersedia gudang sumber
         // (stok_fisik − stok_dikunci draft transfer pending) — per item, blokir submit.
+        //
+        // [B-15c] 1 query batch (sebelumnya 1 query `stok_items` per item → N+1).
+        // `stok_items` punya unique (produk_id, sku_variant_id, gudang_id) → map 1:1,
+        // angka identik dengan `->first()` per item. Write path (kirim/terima transfer
+        // dgn `lockForUpdate()`) SENGAJA tidak diubah.
         $lockedByKey = StokTransfer::pendingLockedByGudang((int) $request->gudang_asal_id);
+
+        $produkIds = [];
         foreach ($request->items as $item) {
-            $stok = StokItem::where('gudang_id', $request->gudang_asal_id)
-                ->where('produk_id', $item['produk_id'])
-                ->where('sku_variant_id', $item['sku_variant_id'] ?? null)
-                ->first();
+            $produkIds[(int) $item['produk_id']] = (int) $item['produk_id'];
+        }
+
+        $stokMap = StokItem::where('gudang_id', $request->gudang_asal_id)
+            ->whereIn('produk_id', array_values($produkIds))
+            ->orderBy('id')
+            ->get(['produk_id', 'sku_variant_id', 'jumlah'])
+            ->keyBy(fn (StokItem $s) => $s->produk_id.':'.($s->sku_variant_id ?? 'null'))
+            ->all();
+
+        foreach ($request->items as $item) {
             $key = $item['produk_id'].':'.($item['sku_variant_id'] ?? 'null');
+            $stok = $stokMap[$key] ?? null;
             $tersedia = ($stok?->jumlah ?? 0) - (int) ($lockedByKey[$key] ?? 0);
             if ($tersedia < (int) $item['jumlah']) {
                 return $this->error(
@@ -172,9 +187,12 @@ class WmsController extends Controller
                 $stokAsal->update(['jumlah' => $setelah]);
 
                 // [T-26] SOT — [T-41] sumber 'transfer:out' (mutasi keluar dari gudang asal)
+                // [B-10i] user_id = pelaku yang menekan "kirim transfer" (sama dgn StokLog
+                // di bawahnya) — mutasi stok harus bisa dibuktikan pelakunya.
                 StockMutationLog::create([
                     'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
-                    'gudang_id' => $transfer->gudang_asal_id, 'delta' => -$item->jumlah,
+                    'gudang_id' => $transfer->gudang_asal_id, 'user_id' => auth()->id(),
+                    'delta' => -$item->jumlah,
                     'sumber' => 'transfer:out', 'referensi_tipe' => StokTransfer::class,
                     'referensi_id' => $transfer->id, 'terjadi_at' => now(),
                 ]);
@@ -235,9 +253,11 @@ class WmsController extends Controller
                 $stokTujuan->update($update);
 
                 // [T-26] SOT — [T-41] sumber 'transfer:in' (mutasi masuk ke gudang tujuan)
+                // [B-10i] user_id = penerima transfer (sama dgn StokLog di bawahnya).
                 StockMutationLog::create([
                     'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
-                    'gudang_id' => $transfer->gudang_tujuan_id, 'delta' => $item->jumlah,
+                    'gudang_id' => $transfer->gudang_tujuan_id, 'user_id' => auth()->id(),
+                    'delta' => $item->jumlah,
                     'sumber' => 'transfer:in', 'referensi_tipe' => StokTransfer::class,
                     'referensi_id' => $transfer->id, 'terjadi_at' => now(),
                 ]);
@@ -391,10 +411,11 @@ class WmsController extends Controller
                 $stok->update(['jumlah' => $item->stok_fisik]);
 
                 if ($item->selisih !== 0) {
-                    // [T-26] SOT
+                    // [T-26] SOT — [B-10i] user_id = supervisor yang menyetujui opname.
                     StockMutationLog::create([
                         'produk_id' => $item->produk_id, 'sku_variant_id' => $item->sku_variant_id,
-                        'gudang_id' => $opname->gudang_id, 'delta' => $item->selisih,
+                        'gudang_id' => $opname->gudang_id, 'user_id' => auth()->id(),
+                        'delta' => $item->selisih,
                         'sumber' => 'opname', 'referensi_tipe' => StokOpname::class,
                         'referensi_id' => $opname->id, 'terjadi_at' => now(),
                     ]);

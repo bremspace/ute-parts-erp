@@ -238,10 +238,13 @@ class ProdukService
 
             // [T-26] SOT mutation log — [T-40] sumber 'po:receive' + referensi PO saat
             // dipanggil dari PurchaseOrderService::terimaBarang (override via sml* params).
+            // [B-10i] user_id = pelaku yang menambah stok (sama dgn StokLog & jurnal di bawah);
+            // pemanggil yang tidak punya konteks user (mis. impor/CLI) → NULL (kolom nullable).
             StockMutationLog::create([
                 'produk_id' => $produkId,
                 'sku_variant_id' => $variantId,
                 'gudang_id' => $gudangId,
+                'user_id' => $userId,
                 'delta' => $qty,
                 'sumber' => $smlSumber ?? 'po',
                 'referensi_tipe' => $smlReferensiTipe ?? Produk::class,

@@ -80,7 +80,10 @@ class SemuaHalamanTest extends TestCase
         $this->get('/daftar-pelanggan')->assertSuccessful();
     }
 
-    // [T-06] Kanban internal wajib permission servis.view — user tanpa akses dapat 403
+    // [T-06][B-14] Kanban internal wajib permission servis.view — user tanpa akses dapat 403.
+    // Fixture role `staff-gudang` (bukan `kasir`): sejak B-14 role kasir + marketing
+    // diberi `servis.view` read-only (keputusan owner atas B-06 tertunda), jadi
+    // role yang TIDAK entitled harus dipakai utk uji 403 ini.
     public function test_kanban_servis_diblokir_tanpa_permission_servis_view(): void
     {
         $this->withoutMiddleware(VerifyCsrfToken::class);
@@ -89,18 +92,18 @@ class SemuaHalamanTest extends TestCase
 
         $cabang = Cabang::create(['nama' => 'Pusat', 'kode' => 'CBG-01', 'is_active' => true]);
 
-        $kasir = User::create([
-            'name' => 'Kasir Tanpa Servis',
-            'email' => 'kasir-noservis@test.com',
+        $staf = User::create([
+            'name' => 'Staff Gudang Tanpa Servis',
+            'email' => 'staffgudang-noservis@test.com',
             'password' => Hash::make('password'),
             'is_active' => true,
         ]);
-        $role = Role::findByName('kasir'); // role kasir: tanpa servis.view
-        $kasir->assignRole($role);
-        $kasir->cabangs()->attach($cabang->id);
+        $role = Role::findByName('staff-gudang'); // role staff-gudang: tanpa servis.view
+        $staf->assignRole($role);
+        $staf->cabangs()->attach($cabang->id);
         session(['cabang_id' => $cabang->id]);
 
-        $this->actingAs($kasir, 'web');
+        $this->actingAs($staf, 'web');
 
         $this->get('/app/servis')->assertForbidden(); // 403: permission servis.view
     }

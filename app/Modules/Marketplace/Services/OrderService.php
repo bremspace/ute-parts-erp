@@ -2,6 +2,7 @@
 
 namespace App\Modules\Marketplace\Services;
 
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
@@ -14,11 +15,17 @@ use Illuminate\Support\Facades\DB;
  * OrderService — checkout marketplace.
  * Alur PRD §4.7 (tanpa payment dulu, payment Duitku di Hari 6):
  * order dibuat status 'menunggu_pembayaran', stok TIDAK dikurangi sampai lunas.
+ *
+ * [B-14] PPN: definisi total & pemisahan DPP/PPN SAMA dengan POS (lihat
+ * `PajakService::hitungPenjualan()`): DPP = subtotal - diskon, PPN = DPP × %,
+ * `total_akhir` = DPP + PPN. Nominal inilah yang ditagihkan ke pelanggan
+ * (relevan dengan Duitku) dan yang jadi dasar jurnal di webhook.
  */
 class OrderService
 {
     public function __construct(
-        protected PricingService $pricingService
+        protected PricingService $pricingService,
+        protected PajakService $pajakService
     ) {}
 
     public function buatOrder(
@@ -58,6 +65,12 @@ class OrderService
                 ];
             }
 
+            // [B-14] PPN per cabang — definisi identik POS: DPP = subtotal - diskon,
+            // PPN = DPP × persen, total_akhir = DPP + PPN. Nonaktif → PPN 0 dan
+            // total_akhir = subtotal (perilaku lama, tidak berubah).
+            $diskon = 0.0; // marketplace belum mendukung diskon header
+            $pajak = $this->pajakService->hitungPenjualan($cabangId, $subtotal, $diskon);
+
             $transaksi = Transaksi::create([
                 'no_transaksi' => $noTransaksi,
                 'cabang_id' => $cabangId,
@@ -66,9 +79,11 @@ class OrderService
                 'sumber' => 'marketplace',
                 'subtotal' => $subtotal,
                 'diskon_persen' => 0,
-                'diskon_nominal' => 0,
-                'pajak_nominal' => 0,
-                'total_akhir' => $subtotal,
+                'diskon_nominal' => $diskon,
+                'dpp' => $pajak['dpp'],
+                'pajak_nominal' => $pajak['ppn_nominal'],
+                'ppn_nominal' => $pajak['ppn_nominal'],
+                'total_akhir' => $pajak['total_akhir'],
                 'metode_bayar' => 'menunggu', // payment Duitku Hari 6
                 'jumlah_bayar' => 0,
                 'kembalian' => 0,
@@ -91,5 +106,17 @@ class OrderService
 
             return $transaksi;
         });
+    }
+
+    /**
+     * [B-14] Pratinjau DPP/PPN/total utk halaman cart & checkout (belum ada order).
+     * Memakai helper yang SAMA dgn `buatOrder()` supaya nominal yang ditampilkan
+     * tidak pernah berbeda dari nominal yang benar-benar ditagihkan.
+     *
+     * @return array{dpp:float, ppn_nominal:float, ppn_percent:float, enabled:bool, total_akhir:float}
+     */
+    public function previewPajak(int $cabangId, float $subtotal): array
+    {
+        return $this->pajakService->hitungPenjualan($cabangId, $subtotal);
     }
 }

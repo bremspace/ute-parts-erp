@@ -21,13 +21,18 @@
                 <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
             @endcan
 
-            <button
-                type="button"
-                wire:click="openTerimaModal"
-                class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
-            >
-                <span class="text-base leading-none">+</span> Terima Unit Servis
-            </button>
+            @can('servis.create')
+                <button
+                    type="button"
+                    wire:click="openTerimaModal"
+                    class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
+                >
+                    <span class="text-base leading-none">+</span> Terima Unit Servis
+                </button>
+            @endcan
+            {{-- [B-14] Role non-teknisi (kasir/marketing) sekarang punya `servis.view`
+                 (READ-ONLY) → tombol "Terima Unit" disembunyikan utk mereka; aksi
+                 tetap dijaga server-side di `ServisBoard::simpanTerima()`. --}}
         </div>
     </div>
 
@@ -229,7 +234,7 @@
 
                     <!-- [T-19] Kunci Gadget (terenkripsi) -->
                     <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kunci Gadget <span class="text-ink-500 font-normal">(opsional, terenkripsi — hanya teknisi/admin)</span></label>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kunci Gadget <span class="text-ink-500 font-normal">(opsional, terenkripsi — terlihat oleh semua staf yang berhak membuka tiket servis)</span></label>
                         <select wire:model="terimaForm.tipe_kunci" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                             <option value="" class="bg-ink-900">— Tidak ada / default —</option>
                             <option value="pola" class="bg-ink-900">Pola</option>
@@ -246,7 +251,7 @@
                                         <button
                                             type="button"
                                             class="aspect-square rounded-full border border-white/15 bg-white/5 text-xs font-bold text-ink-300 hover:bg-up-primary/30 hover:border-up-primary cursor-pointer"
-                                            wire:click="$set('terimaForm.kunci_terenkripsi.{{ $loop->index }}', {{ $i }})"
+                                            wire:click="$set('terimaForm.kunci_terenkripsi.{{ $i - 1 }}', {{ $i }})"
                                             @click="$el.classList.toggle('bg-up-primary')"
                                         >{{ $i }}</button>
                                     @endfor
@@ -270,9 +275,9 @@
                         <textarea wire:model="terimaForm.keluhan" rows="2" placeholder="Deskripsi keluhan unit..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"></textarea>
                     </div>
 
-                    <!-- Checklist Kondisi Fisik -->
+                    <!-- [B-06] Checklist Kondisi Fisik — langkah 1 catatan fisik saat terima unit -->
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Checklist Kondisi Fisik</label>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kondisi Fisik Unit <span class="text-ink-500 font-normal">(opsional)</span></label>
                         <div class="flex flex-wrap gap-2">
                             @php $fisikChecks = ['Layar', 'Body', 'Baterai', 'Kamera', 'Speaker', 'Watermark']; @endphp
                             @foreach($fisikChecks as $check)
@@ -287,14 +292,13 @@
                                 >{{ $check }}</button>
                             @endforeach
                         </div>
-                        <p class="text-[10px] text-ink-500 mt-1.5">Tandai kerusakan/kondisi yang terlihat pada unit.</p>
+                        <p class="text-[10px] text-ink-500 mt-1.5">Langkah 1 dari 2 — <strong class="text-ink-300">centang bagian yang bermasalah/bercacat</strong> (chip menyala = bermasalah). Tidak ada checklist = unit diterima tanpa catatan kerusakan.</p>
                     </div>
 
-                    <!-- Foto Unit (wajib min 2) -->
+                    <!-- [B-06] Foto Unit — OPSIONAL (tanpa foto pun submit tetap jalan) -->
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">
-                            Foto Unit <span class="text-up-red">*</span>
-                            <span class="text-ink-500 font-normal">— minimal 2 foto (depan, belakang, layar)</span>
+                            Foto Unit <span class="text-ink-500 font-normal">(opsional — depan, belakang, layar)</span>
                         </label>
                         <div class="grid grid-cols-3 gap-2" x-init="photoIndex = 0">
                             @foreach($photoInputs as $idx => $foto)
@@ -360,8 +364,8 @@
                                 </div>
                             @endforeach
                         </div>
-                        <p class="text-[10px] mt-1.5 {{ $fotoCount >= 2 ? 'text-up-mint' : 'text-up-amber' }}">
-                            {{ $fotoCount }} dari 2 foto minimum terisi
+                        <p class="text-[10px] mt-1.5 {{ $fotoCount > 0 ? 'text-up-mint' : 'text-ink-500' }}">
+                            {{ $fotoCount }}/3 foto terisi — <strong>Langkah 2 dari 2</strong>; boleh dikosongkan (foto opsional).
                         </p>
                     </div>
                 </div>
@@ -525,6 +529,40 @@
                         </div>
                     </div>
 
+                    <!-- [B-06] Kunci Gadget — terlihat utk semua role yg berhak buka tiket, default ter-mask -->
+                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                        <div class="flex items-center justify-between gap-2 mb-1.5">
+                            <p class="text-[10px] text-ink-400 uppercase">Kunci Gadget</p>
+                            @if($selectedTiket->kunci_terenkripsi)
+                                <button
+                                    type="button"
+                                    wire:click="toggleKunciGadget"
+                                    class="text-[10px] font-bold {{ $bukaKunciGadget ? 'text-up-red' : 'text-up-primary' }} hover:underline cursor-pointer"
+                                >{{ $bukaKunciGadget ? 'Sembunyikan' : 'Tampilkan' }}</button>
+                            @endif
+                        </div>
+                        @php
+                            $labelTipeKunci = match ($selectedTiket->tipe_kunci) {
+                                'pola' => 'Pola',
+                                'pin' => 'PIN (4-6 digit)',
+                                'password' => 'Password',
+                                'tidak_ada' => 'Tidak ada / default',
+                                default => null,
+                            };
+                        @endphp
+                        @if($labelTipeKunci)
+                            <p class="text-sm font-bold text-white">{{ $labelTipeKunci }}</p>
+                        @endif
+                        @if($selectedTiket->kunci_terenkripsi)
+                            <p class="text-sm font-mono {{ $bukaKunciGadget ? 'text-up-amber' : 'text-ink-500 tracking-[0.3em]' }}">
+                                {{ $bukaKunciGadget ? $selectedTiket->kunci_terenkripsi : '••••••••' }}
+                            </p>
+                        @elseif($labelTipeKunci)
+                            <p class="text-sm text-ink-500">Tidak ada nilai kunci yang tersimpan</p>
+                        @endif
+                        <p class="text-[10px] text-ink-500 mt-1.5">Data sensitif — hanya untuk keperluan servis di konter, jangan dibagikan ke pelanggan.</p>
+                    </div>
+
                     <!-- Keluhan -->
                     <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
                         <p class="text-[10px] text-ink-400 uppercase mb-1">Keluhan</p>
@@ -534,17 +572,20 @@
                         @endif
                     </div>
 
-                    <!-- Kondisi Fisik -->
-                    @if(count($selectedTiket->kondisi_fisik ?? []) > 0)
-                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                            <p class="text-[10px] text-ink-400 uppercase mb-1.5">Checklist Kondisi Fisik</p>
+                    <!-- [B-06] Kondisi Fisik — selalu tampil (ada empty-state) agar alur catatan jelas -->
+                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                        <p class="text-[10px] text-ink-400 uppercase mb-1.5">Kondisi Fisik (catatan saat terima unit)</p>
+                        @if(count($selectedTiket->kondisi_fisik ?? []) > 0)
                             <div class="flex flex-wrap gap-1.5">
                                 @foreach($selectedTiket->kondisi_fisik as $k)
                                     <span class="text-[10px] font-semibold text-up-amber bg-up-amber/10 border border-up-amber/30 px-2 py-0.5 rounded-full">{{ $k }}</span>
                                 @endforeach
                             </div>
-                        </div>
-                    @endif
+                            <p class="text-[10px] text-ink-500 mt-1.5">Chip = bagian yang bermasalah saat unit diterima.</p>
+                        @else
+                            <p class="text-[11px] text-ink-500">Belum ada catatan kondisi fisik — saat terima unit, centang bagian yang bermasalah pada checklist (Layar, Body, dst.).</p>
+                        @endif
+                    </div>
 
                     <!-- Sparepart Terpakai -->
                     @if($selectedTiket->spareparts->count() > 0)
