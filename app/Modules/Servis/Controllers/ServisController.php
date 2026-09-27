@@ -163,7 +163,7 @@ class ServisController extends Controller
     {
         $request->validate([
             'estimasi_biaya' => 'nullable|numeric|min:0',
-            'alasan' => 'required|string',
+            'alasan' => 'nullable|string',
             'items' => 'nullable|array',
             'items.*.tipe' => 'required_with:items|in:part,jasa',
             'items.*.nama_item' => 'nullable|string',
@@ -180,7 +180,7 @@ class ServisController extends Controller
             $tiket = $this->servisService->setEstimasi(
                 $tiket,
                 (float) ($request->estimasi_biaya ?? 0),
-                $request->alasan,
+                $request->alasan ?: 'Estimasi biaya perbaikan',
                 $request->user(),
                 $request->items ?? []
             );

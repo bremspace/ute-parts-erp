@@ -22,36 +22,49 @@ export default defineConfig({
             // Laravel tidak punya HTML build-time, jadi tidak ada <script> ter-inject;
             // registrasi runtime tetap SATU: import virtual:pwa-register di resources/js/app.js.
             injectRegister: 'script-defer',
-            includeAssets: ['favicon.ico', 'robots.txt', 'icons/icon.svg'],
+            includeAssets: ['favicon.ico', 'robots.txt', 'icons/icon.svg', 'icons/icon-maskable.svg', 'icons/icon-192x192.png', 'icons/icon-512x512.png'],
             manifest: {
-                name: 'Ute Parts',
+                id: '/',
+                name: 'Ute Parts — ERP, POS & Marketplace',
                 short_name: 'Ute Parts',
                 description: 'ERP, POS & Marketplace untuk sparepart & servis HP',
                 theme_color: '#5B4FE9',
                 background_color: '#070A14',
                 display: 'standalone',
-                orientation: 'portrait-primary',
+                orientation: 'any',
                 scope: '/',
-                start_url: '/app/dashboard',
+                start_url: '/',
                 lang: 'id',
                 icons: [
                     {
                         src: '/icons/icon.svg',
                         sizes: 'any',
                         type: 'image/svg+xml',
-                        purpose: 'any maskable'
+                        purpose: 'any'
+                    },
+                    {
+                        src: '/icons/icon-maskable.svg',
+                        sizes: 'any',
+                        type: 'image/svg+xml',
+                        purpose: 'maskable'
                     },
                     {
                         src: '/icons/icon-192x192.png',
                         sizes: '192x192',
                         type: 'image/png',
-                        purpose: 'any maskable'
+                        purpose: 'any'
                     },
                     {
                         src: '/icons/icon-512x512.png',
                         sizes: '512x512',
                         type: 'image/png',
-                        purpose: 'any maskable'
+                        purpose: 'any'
+                    },
+                    {
+                        src: '/icons/icon-512x512.png',
+                        sizes: '512x512',
+                        type: 'image/png',
+                        purpose: 'maskable'
                     }
                 ],
                 shortcuts: [

@@ -24,6 +24,13 @@
     --up-glass-border: rgba(255, 255, 255, 0.08);
     --up-glass-border-hover: rgba(91, 79, 233, 0.4);
     --up-glass-shadow: 0 12px 32px 0 rgba(0, 0, 0, 0.37);
+
+    /* [T-48] Emil Kowalski Easing & Motion tokens */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+    --duration-fast: 160ms;
+    --duration-normal: 240ms;
 }
 
 /* Glass surface classes */
@@ -33,18 +40,21 @@
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--up-glass-border);
     box-shadow: var(--up-glass-shadow);
+    transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
 }
 
-.glass-panel-hover:hover {
-    border-color: var(--up-glass-border-hover);
-    box-shadow: 0 16px 36px 0 rgba(91, 79, 233, 0.15);
+@media (hover: hover) and (pointer: fine) {
+    .glass-panel-hover:hover {
+        border-color: var(--up-glass-border-hover);
+        box-shadow: 0 16px 36px 0 rgba(91, 79, 233, 0.15);
+    }
 }
 
 .glass-input {
     background: rgba(11, 16, 32, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #F8FAFC;
-    transition: all 0.2s ease;
+    transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
     min-height: 44px; /* [T-30] Touch-friendly minimum height */
 }
 
@@ -53,6 +63,21 @@
     border-color: var(--up-primary);
     box-shadow: 0 0 0 2px rgba(91, 79, 233, 0.25);
     background: rgba(14, 21, 43, 0.95);
+}
+
+/* [T-48] Tactile press feedback on buttons and interactive elements */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active,
+.btn-tactile:not(:disabled):active {
+    transform: scale(0.97);
+    transition: transform 80ms var(--ease-out);
+}
+
+/* Transition for pressable elements */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+.btn-tactile:not(:disabled) {
+    transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
 }
 
 /* [T-30] Mobile touch-friendly form elements */

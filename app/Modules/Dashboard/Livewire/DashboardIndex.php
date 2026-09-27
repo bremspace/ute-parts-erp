@@ -118,7 +118,7 @@ class DashboardIndex extends Component
 
     public function getStokKritisProperty(): array
     {
-        return $this->cacheWidget('stok-kritis', self::TTL_LIVE, function (): array {
+        $cached = $this->cacheWidget('stok-kritis', self::TTL_LIVE, function (): array {
             $cabangId = session('cabang_id');
 
             // Definisi selaras dgn ReorderService::jalankan() — stok kritis = jumlah < minimum
@@ -131,13 +131,32 @@ class DashboardIndex extends Component
                 $query->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId));
             }
 
-            $items = $query->orderByRaw('(jumlah_minimum - jumlah) desc')->limit(10)->get();
+            $rawItems = $query->orderByRaw('(jumlah_minimum - jumlah) desc')->limit(10)->get();
 
             return [
                 'total' => (clone $query)->count(),
-                'items' => $items,
+                'items' => $rawItems->map(fn ($s) => [
+                    'id' => $s->id,
+                    'produk_nama' => $s->produk?->nama ?? '-',
+                    'gudang_nama' => $s->gudang?->nama ?? '-',
+                    'jumlah' => (int) $s->jumlah,
+                    'jumlah_minimum' => (int) $s->jumlah_minimum,
+                ])->all(),
             ];
         });
+
+        $items = collect($cached['items'] ?? [])->map(fn ($item) => (object) [
+            'id' => $item['id'] ?? null,
+            'produk' => (object) ['nama' => $item['produk_nama'] ?? '-'],
+            'gudang' => (object) ['nama' => $item['gudang_nama'] ?? '-'],
+            'jumlah' => $item['jumlah'] ?? 0,
+            'jumlah_minimum' => $item['jumlah_minimum'] ?? 0,
+        ]);
+
+        return [
+            'total' => $cached['total'] ?? 0,
+            'items' => $items,
+        ];
     }
 
     /**
@@ -146,14 +165,14 @@ class DashboardIndex extends Component
      */
     public function getPiutangJatuhTempoProperty(): array
     {
-        return $this->cacheWidget('piutang-jatuh-tempo', self::TTL_LIVE, function (): array {
+        $cached = $this->cacheWidget('piutang-jatuh-tempo', self::TTL_LIVE, function (): array {
             $cabangId = session('cabang_id');
 
             $dasar = fn () => Piutang::where('status', '!=', 'lunas')
                 ->whereDate('jatuh_tempo', '<=', now()->addDays(7)->toDateString())
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId));
 
-            $items = $dasar()
+            $rawItems = $dasar()
                 ->with('pelanggan')
                 ->orderBy('jatuh_tempo')
                 ->limit(8)
@@ -161,9 +180,38 @@ class DashboardIndex extends Component
 
             return [
                 'total' => $dasar()->count(),
-                'items' => $items,
+                'items' => $rawItems->map(fn ($p) => [
+                    'id' => $p->id,
+                    'pelanggan_nama' => $p->pelanggan?->nama ?? '-',
+                    'no_piutang' => $p->no_piutang,
+                    'sisa' => (float) $p->sisa,
+                    'jatuh_tempo' => $p->jatuh_tempo?->format('d/m/Y'),
+                    'jatuh_tempo_lewat' => (bool) $p->jatuh_tempo_lewat,
+                ])->all(),
             ];
         });
+
+        $items = collect($cached['items'] ?? [])->map(fn ($p) => (object) [
+            'id' => $p['id'] ?? null,
+            'pelanggan' => (object) ['nama' => $p['pelanggan_nama'] ?? '-'],
+            'no_piutang' => $p['no_piutang'] ?? '-',
+            'sisa' => $p['sisa'] ?? 0,
+            'jatuh_tempo' => $p['jatuh_tempo'] ? new class($p['jatuh_tempo'])
+            {
+                public function __construct(private string $val) {}
+
+                public function format(string $format): string
+                {
+                    return $this->val;
+                }
+            } : null,
+            'jatuh_tempo_lewat' => $p['jatuh_tempo_lewat'] ?? false,
+        ]);
+
+        return [
+            'total' => $cached['total'] ?? 0,
+            'items' => $items,
+        ];
     }
 
     /**
@@ -177,11 +225,39 @@ class DashboardIndex extends Component
 
     public function getTransaksiTerbaruProperty()
     {
-        return $this->cacheWidget('transaksi-terbaru', self::TTL_LIVE, fn () => Transaksi::with(['pelanggan', 'cabang'])
-            ->when(session('cabang_id'), fn ($q) => $q->where('cabang_id', session('cabang_id')))
-            ->latest()
-            ->limit(6)
-            ->get());
+        $cached = $this->cacheWidget('transaksi-terbaru', self::TTL_LIVE, function (): array {
+            $raw = Transaksi::with(['pelanggan', 'cabang'])
+                ->when(session('cabang_id'), fn ($q) => $q->where('cabang_id', session('cabang_id')))
+                ->latest()
+                ->limit(6)
+                ->get();
+
+            return $raw->map(fn ($t) => [
+                'no_transaksi' => $t->no_transaksi,
+                'sumber' => $t->sumber,
+                'cabang_nama' => $t->cabang?->nama ?? '-',
+                'created_at_fmt' => $t->created_at?->format('H:i d/m') ?? '-',
+                'total_akhir' => (float) $t->total_akhir,
+                'status' => $t->status,
+            ])->all();
+        });
+
+        return collect($cached ?? [])->map(fn ($t) => (object) [
+            'no_transaksi' => $t['no_transaksi'] ?? '-',
+            'sumber' => $t['sumber'] ?? '-',
+            'cabang' => (object) ['nama' => $t['cabang_nama'] ?? '-'],
+            'created_at' => new class($t['created_at_fmt'] ?? '-')
+            {
+                public function __construct(private string $val) {}
+
+                public function format(string $format): string
+                {
+                    return $this->val;
+                }
+            },
+            'total_akhir' => $t['total_akhir'] ?? 0,
+            'status' => $t['status'] ?? 'pending',
+        ]);
     }
 
     /** Generate drill-down URL for a given model + item id */
@@ -304,11 +380,11 @@ class DashboardIndex extends Component
     /** Stok kritis top-N (bar chart) */
     public function getChartStokKritisProperty(): array
     {
-        $items = $this->stokKritis['items']->take(10);
+        $items = collect($this->stokKritis['items'] ?? [])->take(10);
 
         return [
-            'labels' => $items->map(fn ($s) => $s->produk?->nama)->values()->all(),
-            'values' => $items->map(fn ($s) => $s->jumlah)->values()->all(),
+            'labels' => $items->map(fn ($s) => is_object($s) ? ($s->produk?->nama ?? '-') : ($s['produk_nama'] ?? '-'))->values()->all(),
+            'values' => $items->map(fn ($s) => is_object($s) ? ($s->jumlah ?? 0) : ($s['jumlah'] ?? 0))->values()->all(),
         ];
     }
 
@@ -456,18 +532,38 @@ class DashboardIndex extends Component
     /** Staff-gudang: PO pending (usulan reorder/draft/dikirim) selain stok kritis */
     public function getPoPendingProperty(): array
     {
-        return $this->cacheWidget('po-pending', self::TTL_OPERASIONAL, function (): array {
+        $cached = $this->cacheWidget('po-pending', self::TTL_OPERASIONAL, function (): array {
             $query = PurchaseOrder::with('supplier')->whereIn('status', ['usulan', 'draft', 'dikirim']);
             if (session('cabang_id')) {
                 $query->whereHas('gudangTujuan', fn ($q) => $q->where('cabang_id', session('cabang_id')));
             }
 
+            $rawItems = $query->orderByDesc('created_at')->limit(6)->get();
+
             return [
                 'total' => (clone $query)->count(),
                 'total_nilai' => round((float) (clone $query)->sum('total'), 2),
-                'items' => $query->orderByDesc('created_at')->limit(6)->get(),
+                'items' => $rawItems->map(fn ($po) => [
+                    'no_po' => $po->no_po,
+                    'supplier_nama' => $po->supplier?->nama ?? '-',
+                    'total' => (float) $po->total,
+                    'status' => $po->status,
+                ])->all(),
             ];
         });
+
+        $items = collect($cached['items'] ?? [])->map(fn ($po) => (object) [
+            'no_po' => $po['no_po'] ?? '-',
+            'supplier' => (object) ['nama' => $po['supplier_nama'] ?? '-'],
+            'total' => $po['total'] ?? 0,
+            'status' => $po['status'] ?? 'draft',
+        ]);
+
+        return [
+            'total' => $cached['total'] ?? 0,
+            'total_nilai' => $cached['total_nilai'] ?? 0,
+            'items' => $items,
+        ];
     }
 
     /**

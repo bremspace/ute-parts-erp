@@ -28,9 +28,11 @@
     <link rel="manifest" href="{{ asset('manifest.json') }}">
     <meta name="theme-color" content="#5B4FE9">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Ute Parts">
     <link rel="apple-touch-icon" href="{{ asset('icons/icon-192x192.png') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
 
     <title>{{ $title ?? 'Ute Parts' }} — Toko Sparepart & Servis HP</title>
 
@@ -48,26 +50,15 @@
         style="padding-top: env(safe-area-inset-top, 0);">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
             <!-- Brand -->
-            <a href="{{ route('shop') }}" class="flex items-center gap-2 flex-shrink-0 min-w-0">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-up-primary via-indigo-500 to-up-accent flex items-center justify-center shadow-lg shadow-up-primary/20 flex-shrink-0 min-h-[44px] min-w-[44px]">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </div>
-                <div class="hidden xs:block min-w-0">
-                    <span class="font-bold text-ink-100 tracking-wider text-base leading-none block truncate">UTE PARTS</span>
-                    <span class="text-[10px] text-up-accent tracking-widest uppercase font-semibold">Sparepart & Servis HP</span>
-                </div>
-            </a>
+            <x-prism.logo size="md" :with-text="true" mode="auto" subtitle="Sparepart & Servis HP" :href="route('shop')" text-class="hidden xs:block" />
 
             <!-- Nav -->
             <nav class="flex items-center gap-1 sm:gap-2">
-                <a href="{{ route('shop') }}" class="min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->is('shop') || request()->is('shop/*') ? 'bg-up-primary text-white' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors inline-flex items-center">Katalog</a>
-                <a href="{{ route('servis.booking') }}" class="min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->routeIs('servis.booking') ? 'bg-up-primary text-white' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors inline-flex items-center">Booking Servis</a>
-                <a href="{{ route('servis.booking') }}" class="min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->routeIs('servis.booking') ? 'bg-up-primary text-white' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors inline-flex items-center">Booking Servis</a>
+                <a href="{{ route('shop') }}" class="min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->is('shop') || request()->is('shop/*') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors inline-flex items-center">Katalog</a>
+                <a href="{{ route('servis.booking') }}" class="min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->routeIs('servis.booking') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors inline-flex items-center">Booking Servis</a>
 
                 <!-- Cart -->
-                <a href="{{ route('cart') }}" class="relative min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->is('cart') || request()->is('checkout') ? 'bg-up-primary text-white' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors flex items-center gap-1.5" aria-label="Keranjang belanja">
+                <a href="{{ route('cart') }}" class="relative min-h-11 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold {{ request()->is('cart') || request()->is('checkout') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900 dark:hover:bg-white/5 dark:hover:text-ink-100' }} transition-colors flex items-center gap-1.5" aria-label="Keranjang belanja">
                     <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
@@ -124,21 +115,63 @@
     </header>
 
     <!-- Content -->
-    <main class="flex-1">
+    <main class="flex-1 pb-20 md:pb-0">
         {{ $slot }}
     </main>
+
+    <!-- [T-49] Mobile Bottom Navigation Bar (md:hidden) -->
+    <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white/90 dark:bg-ink-900/90 backdrop-blur-xl border-t border-ink-500/20 dark:border-white/10 z-40 px-3 py-1 flex items-center justify-around"
+         style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);">
+        <a href="{{ route('shop') }}" class="flex flex-col items-center justify-center min-h-[44px] min-w-[56px] text-xs font-medium {{ request()->is('shop') || request()->is('shop/*') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+            <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            <span>Katalog</span>
+        </a>
+
+        <a href="{{ route('servis.booking') }}" class="flex flex-col items-center justify-center min-h-[44px] min-w-[56px] text-xs font-medium {{ request()->routeIs('servis.booking') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+            <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Booking</span>
+        </a>
+
+        <a href="{{ route('cart') }}" class="relative flex flex-col items-center justify-center min-h-[44px] min-w-[56px] text-xs font-medium {{ request()->is('cart') || request()->is('checkout') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+            <div class="relative">
+                <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                @if(session('shop.cart'))
+                    <span class="absolute -top-1 -right-2 w-4 h-4 rounded-full bg-up-accent text-white text-[9px] font-bold flex items-center justify-center shadow">
+                        {{ array_sum(array_column(session('shop.cart'), 'qty')) }}
+                    </span>
+                @endif
+            </div>
+            <span>Keranjang</span>
+        </a>
+
+        @auth('customer')
+            <a href="{{ route('customer.account') }}" class="flex flex-col items-center justify-center min-h-[44px] min-w-[56px] text-xs font-medium {{ request()->routeIs('customer.account') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+                <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>Akun</span>
+            </a>
+        @else
+            <a href="{{ route('customer.login') }}" class="flex flex-col items-center justify-center min-h-[44px] min-w-[56px] text-xs font-medium {{ request()->routeIs('customer.login') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+                <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                <span>Masuk</span>
+            </a>
+        @endauth
+    </nav>
 
     <!-- Footer -->
     <footer class="border-t border-ink-500/25 bg-white dark:bg-ink-950 dark:border-white/10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-up-primary to-up-accent flex items-center justify-center">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-bold text-ink-100">Ute Parts</span>
-                <span class="text-xs text-ink-400">Pusat Sparepart & Servis HP, multi-cabang.</span>
+            <div class="flex items-center gap-3">
+                <x-prism.logo size="sm" :with-text="true" mode="auto" subtitle="Pusat Sparepart & Servis HP, multi-cabang." :href="route('shop')" />
             </div>
             <p class="text-xs text-ink-400">© {{ date('Y') }} Ute Parts. Semua hak dilindungi.</p>
         </div>

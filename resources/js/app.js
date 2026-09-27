@@ -75,5 +75,56 @@ document.addEventListener('livewire:init', () => {
     });
 });
 
+// PWA Installation Prompt Manager
+window.deferredPWAInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    window.deferredPWAInstallPrompt = e;
+    window.dispatchEvent(new CustomEvent('pwa-installable'));
+});
+
+window.pwaInstaller = function () {
+    return {
+        canInstall: false,
+        installed: false,
+        dismissed: false,
+        init() {
+            if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+                this.installed = true;
+                return;
+            }
+            if (sessionStorage.getItem('pwa-prompt-dismissed') === 'true') {
+                this.dismissed = true;
+            }
+            if (window.deferredPWAInstallPrompt) {
+                this.canInstall = true;
+            }
+            window.addEventListener('pwa-installable', () => {
+                this.canInstall = true;
+            });
+            window.addEventListener('appinstalled', () => {
+                this.installed = true;
+                this.canInstall = false;
+                window.deferredPWAInstallPrompt = null;
+                showToast('Ute Parts berhasil dipasang!', 'success');
+            });
+        },
+        async promptInstall() {
+            const promptEvent = window.deferredPWAInstallPrompt;
+            if (!promptEvent) return;
+            promptEvent.prompt();
+            const { outcome } = await promptEvent.userChoice;
+            if (outcome === 'accepted') {
+                this.canInstall = false;
+            }
+            window.deferredPWAInstallPrompt = null;
+        },
+        dismiss() {
+            this.dismissed = true;
+            sessionStorage.setItem('pwa-prompt-dismissed', 'true');
+        }
+    };
+};
+
 // Alpine.js components will be registered in their respective blade files
 console.log('[Ute Parts] App initialized');

@@ -133,5 +133,23 @@
                 @endif
             </div>
         </div>
+
+        <!-- [T-54] Mobile Floating Action Bar (md:hidden) -->
+        <div class="md:hidden fixed bottom-14 inset-x-0 bg-white/95 dark:bg-ink-900/95 backdrop-blur-xl border-t border-ink-100 dark:border-white/10 p-3 z-30 flex items-center justify-between gap-3 shadow-2xl">
+            <div>
+                <span class="text-[10px] text-ink-400 block uppercase font-medium">Total ({{ $qty }} unit)</span>
+                <span class="text-sm font-black text-up-primary tabular-nums">Rp {{ number_format($hargaInfo['harga'] * $qty, 0, ',', '.') }}</span>
+            </div>
+            <button
+                wire:click="addToCart"
+                {{ $stokTotal <= 0 ? 'disabled' : '' }}
+                class="flex-1 py-3 px-4 rounded-xl font-bold text-xs bg-gradient-to-r from-up-primary to-indigo-600 text-white shadow-lg shadow-up-primary/25 active:scale-[0.97] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                + Keranjang
+            </button>
+        </div>
     @endif
 </div>

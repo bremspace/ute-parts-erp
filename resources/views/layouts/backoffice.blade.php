@@ -31,6 +31,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Ute Parts">
     <link rel="apple-touch-icon" href="{{ asset('icons/icon-192x192.png') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
 
     <title>{{ $title ?? 'Backoffice ERP/POS' }} — Ute Parts</title>
 
@@ -73,16 +75,8 @@
                    lg:z-30"
             :class="[window.innerWidth < 768 ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : '']">
             <!-- Brand -->
-            <div class="sidebar-brand h-16 flex items-center px-6 border-b border-black/10 dark:border-white/5 gap-3">
-                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-up-primary via-indigo-500 to-up-accent flex items-center justify-center shadow-lg shadow-up-primary/30 flex-shrink-0">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </div>
-                <div class="sidebar-brand-text min-w-0">
-                    <h1 class="font-bold text-ink-50 dark:text-white tracking-wider text-base leading-none truncate">UTE PARTS</h1>
-                    <span class="text-[10px] text-up-accent tracking-widest uppercase font-semibold">Backoffice ERP</span>
-                </div>
+            <div class="sidebar-brand h-16 flex items-center px-6 border-b border-black/10 dark:border-white/5">
+                <x-prism.logo size="md" :with-text="true" mode="dark" subtitle="Backoffice ERP" text-class="sidebar-brand-text" href="/app/dashboard" />
             </div>
 
             <!-- Branch Context Badge -->
@@ -276,8 +270,10 @@
                     <h2 class="text-lg font-bold text-ink-50 dark:text-white tracking-wide lg:text-xl">{{ $header ?? 'Ute Parts ERP' }}</h2>
                 </div>
 
-                <!-- Shortcuts & Status Indicator -->
-                <div class="flex items-center gap-4">
+                <!-- Shortcuts, Install Button & Status Indicator -->
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <x-prism.pwa-install-prompt variant="button" />
+
                     <div class="hidden lg:flex items-center gap-2 text-xs text-ink-400">
                         <span class="px-1.5 py-0.5 rounded bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 font-mono text-[11px]">F2</span>
                         <span>Cari</span>
@@ -314,7 +310,7 @@
             </header>
 
             <!-- Page Content -->
-            <main class="flex-1 overflow-y-auto p-3 lg:p-6 bg-gradient-to-b from-ink-900/20 to-ink-950">
+            <main class="flex-1 overflow-y-auto p-3 lg:p-6 pb-20 md:pb-6 bg-gradient-to-b from-ink-900/20 to-ink-950">
                 {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out) --}}
                 @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
                     <div class="mb-4 p-3.5 rounded-xl bg-up-amber/15 border border-up-amber/30 text-up-amber text-sm font-medium flex items-center justify-between gap-3 flex-wrap">
@@ -327,6 +323,42 @@
 
                 {{ $slot }}
             </main>
+
+            <!-- [T-49] Backoffice Mobile Bottom Quick Nav (md:hidden) -->
+            <nav class="md:hidden fixed bottom-0 inset-x-0 bg-ink-900/95 dark:bg-ink-950/95 backdrop-blur-xl border-t border-black/10 dark:border-white/10 z-30 px-2 py-1 flex items-center justify-around"
+                 style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.35rem);">
+                <a href="/app/dashboard" class="flex flex-col items-center justify-center min-h-[44px] min-w-[50px] text-[11px] font-medium {{ request()->is('app/dashboard') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+                    <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    <span>Home</span>
+                </a>
+                <a href="/app/pos" class="flex flex-col items-center justify-center min-h-[44px] min-w-[50px] text-[11px] font-medium {{ request()->is('app/pos*') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+                    <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>Kasir</span>
+                </a>
+                <a href="/app/servis" class="flex flex-col items-center justify-center min-h-[44px] min-w-[50px] text-[11px] font-medium {{ request()->is('app/servis*') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+                    <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Servis</span>
+                </a>
+                <a href="/app/wms" class="flex flex-col items-center justify-center min-h-[44px] min-w-[50px] text-[11px] font-medium {{ request()->is('app/wms*') ? 'text-up-primary' : 'text-ink-400 hover:text-ink-100' }}">
+                    <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <span>WMS</span>
+                </a>
+                <button type="button" @click="sidebarOpen = true" class="flex flex-col items-center justify-center min-h-[44px] min-w-[50px] text-[11px] font-medium text-ink-400 hover:text-ink-100 cursor-pointer">
+                    <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <span>Menu</span>
+                </button>
+            </nav>
         </div>
     </div>
 

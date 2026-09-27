@@ -217,10 +217,11 @@ class SettingsRbac extends Component
         if ($id) {
             $j = JenisServis::findOrFail($id);
             $this->jenisServisForm = $j->toArray();
+            $this->jenisServisForm['biaya_jasa'] = (float) ($j->biaya_jasa ?? 0);
         } else {
             $this->jenisServisForm = [
                 'id' => null, 'nama' => '', 'kode' => '', 'kategori' => 'hardware',
-                'estimasi_durasi' => 120, 'durasi_garansi_hari' => 30, 'butuh_part' => true,
+                'estimasi_durasi' => 120, 'durasi_garansi_hari' => 30, 'biaya_jasa' => 0, 'butuh_part' => true,
                 'is_part_original' => false, 'is_active' => true,
             ];
         }
@@ -232,12 +233,16 @@ class SettingsRbac extends Component
         $this->validate([
             'jenisServisForm.nama' => 'required|string|max:255',
             'jenisServisForm.kode' => 'required|string|max:20|unique:jenis_servis,kode,'.($this->jenisServisForm['id'] ?? 'NULL'),
+            'jenisServisForm.biaya_jasa' => 'nullable|numeric|min:0',
         ]);
 
+        $data = $this->jenisServisForm;
+        $data['biaya_jasa'] = (float) ($data['biaya_jasa'] ?? 0);
+
         if ($this->jenisServisForm['id']) {
-            JenisServis::findOrFail($this->jenisServisForm['id'])->update($this->jenisServisForm);
+            JenisServis::findOrFail($this->jenisServisForm['id'])->update($data);
         } else {
-            JenisServis::create($this->jenisServisForm);
+            JenisServis::create($data);
         }
 
         $this->showJenisServisModal = false;

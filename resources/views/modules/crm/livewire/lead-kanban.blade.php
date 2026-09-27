@@ -112,8 +112,8 @@
     </div>
 
     <!-- ===== KANBAN BOARD ===== -->
-    <div class="overflow-x-auto pb-2" wire:loading.class="opacity-50 pointer-events-none" wire:target="search, filterSumber, filterAssignedTo, updateLead, createLead, deleteLead, convertLead">
-        <div class="flex gap-4 min-w-max items-start">
+    <div class="overflow-x-auto pb-2 snap-x snap-mandatory scroll-smooth touch-pan-x" wire:loading.class="opacity-50 pointer-events-none" wire:target="search, filterSumber, filterAssignedTo, updateLead, createLead, deleteLead, convertLead">
+        <div class="flex gap-4 min-w-max items-start px-0.5">
             @foreach($stages as $stageKey => $stageMeta)
                 @php($colLeads = $kanbanData[$stageKey] ?? collect())
                 @php($dotClass = match ($stageMeta['color']) {
@@ -123,7 +123,7 @@
                     'red' => 'bg-up-red',
                     default => 'bg-ink-400',
                 })
-                <div class="w-[280px] shrink-0 flex flex-col rounded-2xl glass-panel overflow-hidden max-h-[70vh]"
+                <div class="w-[82vw] sm:w-[300px] lg:w-[280px] snap-center shrink-0 flex flex-col rounded-2xl glass-panel overflow-hidden max-h-[70vh]"
                      wire:key="col-{{ $stageKey }}"
                      @dragover.prevent="overCol = '{{ $stageKey }}'"
                      @dragleave="overCol = null"

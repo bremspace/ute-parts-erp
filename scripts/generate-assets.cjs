@@ -1,0 +1,279 @@
+const fs = require('fs');
+const path = require('path');
+const { Resvg } = require('@resvg/resvg-js');
+
+// 1. Master icon.svg definition
+const iconSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E1224" />
+      <stop offset="50%" stop-color="#070A14" />
+      <stop offset="100%" stop-color="#030408" />
+    </linearGradient>
+
+    <!-- Radial Prism Glow -->
+    <radialGradient id="prismAura" cx="48%" cy="46%" r="58%">
+      <stop offset="0%" stop-color="#5B4FE9" stop-opacity="0.38" />
+      <stop offset="55%" stop-color="#E8873B" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#070A14" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- 'U' Channel Gradient (Electric Indigo to Violet) -->
+    <linearGradient id="uGrad" x1="0%" y1="0%" x2="70%" y2="100%">
+      <stop offset="0%" stop-color="#7B6EFF" />
+      <stop offset="40%" stop-color="#5B4FE9" />
+      <stop offset="100%" stop-color="#3C2ED2" />
+    </linearGradient>
+
+    <!-- 'P' Loop Gradient (Radiant Prism Orange to Deep Amber) -->
+    <linearGradient id="pGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFA057" />
+      <stop offset="50%" stop-color="#E8873B" />
+      <stop offset="100%" stop-color="#D45B17" />
+    </linearGradient>
+
+    <!-- Intersecting Facet Bridge -->
+    <linearGradient id="bridgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#E8873B" />
+    </linearGradient>
+
+    <!-- Hardware Precision Mint Core -->
+    <linearGradient id="mintGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#1FBF8F" />
+    </linearGradient>
+
+    <!-- Specular Highlight Sheens -->
+    <linearGradient id="specularU" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.65" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+
+    <linearGradient id="specularP" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Soft Depth Shadow -->
+    <filter id="prismShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.6" />
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#5B4FE9" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Canvas with Double Precision Border -->
+  <rect width="512" height="512" rx="124" fill="url(#bgGrad)" />
+  <rect width="512" height="512" rx="124" fill="url(#prismAura)" />
+  <rect x="2" y="2" width="508" height="508" rx="122" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="2" />
+  <rect x="12" y="12" width="488" height="488" rx="112" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+
+  <!-- Precision Microchip Optical Calibration Marks -->
+  <path d="M 68 256 L 86 256 M 426 256 L 444 256" stroke="rgba(255,255,255,0.18)" stroke-width="2" stroke-linecap="round" />
+  <path d="M 256 68 L 256 86 M 256 426 L 256 444" stroke="rgba(255,255,255,0.18)" stroke-width="2" stroke-linecap="round" />
+  <circle cx="256" cy="256" r="184" fill="none" stroke="rgba(91,79,233,0.14)" stroke-width="1.5" stroke-dasharray="6 10" />
+
+  <!-- Monogram Glyph Group -->
+  <g filter="url(#prismShadow)" transform="translate(64, 64) scale(3.84)">
+    <!-- 'U' Track -->
+    <path d="M 18 18
+             L 29 18
+             L 29 58
+             C 29 67 35 73 44 73
+             C 50 73 54 70 54 65
+             L 54 48
+             L 65 48
+             L 65 65
+             C 65 77 56 84 44 84
+             C 28 84 18 74 18 58
+             Z"
+          fill="url(#uGrad)" />
+
+    <!-- U Highlight Edge -->
+    <path d="M 18 18 L 29 18" stroke="url(#specularU)" stroke-width="1.5" stroke-linecap="round" />
+
+    <!-- 'P' Loop & Stem -->
+    <path d="M 36 18
+             L 66 18
+             C 77 18 84 25 84 35
+             C 84 45 77 52 66 52
+             L 47 52
+             L 47 74
+             L 36 74
+             Z
+             M 47 28.5
+             L 64 28.5
+             C 68.5 28.5 72.5 31 72.5 35
+             C 72.5 39 68.5 41.5 64 41.5
+             L 47 41.5
+             Z"
+          fill="url(#pGrad)" />
+
+    <!-- P Top Highlight Edge -->
+    <path d="M 36 18 L 66 18" stroke="url(#specularP)" stroke-width="1.5" stroke-linecap="round" />
+
+    <!-- Intersecting Facet / Refraction Split -->
+    <path d="M 47 48 L 54 48 L 54 52 L 47 52 Z" fill="url(#bridgeGrad)" opacity="0.95" />
+
+    <!-- Precision Hardware Chip Core (Refractive Diamond) -->
+    <polygon points="41.5,30 45.5,34.5 41.5,39 37.5,34.5" fill="url(#mintGrad)" />
+    <circle cx="41.5" cy="34.5" r="1.2" fill="#FFFFFF" />
+  </g>
+</svg>`;
+
+// 2. Master icon-maskable.svg definition (no rounded squircle, safe margin padding 15%)
+const iconMaskableSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient (full bleed edge-to-edge for adaptive mask) -->
+    <linearGradient id="bgMaskGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E1224" />
+      <stop offset="50%" stop-color="#070A14" />
+      <stop offset="100%" stop-color="#030408" />
+    </linearGradient>
+
+    <radialGradient id="prismAuraMask" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#5B4FE9" stop-opacity="0.4" />
+      <stop offset="55%" stop-color="#E8873B" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#070A14" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="uGradM" x1="0%" y1="0%" x2="70%" y2="100%">
+      <stop offset="0%" stop-color="#7B6EFF" />
+      <stop offset="40%" stop-color="#5B4FE9" />
+      <stop offset="100%" stop-color="#3C2ED2" />
+    </linearGradient>
+
+    <linearGradient id="pGradM" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFA057" />
+      <stop offset="50%" stop-color="#E8873B" />
+      <stop offset="100%" stop-color="#D45B17" />
+    </linearGradient>
+
+    <linearGradient id="bridgeGradM" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#E8873B" />
+    </linearGradient>
+
+    <linearGradient id="mintGradM" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#1FBF8F" />
+    </linearGradient>
+
+    <filter id="prismShadowM" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6" />
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#5B4FE9" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Full bleed background -->
+  <rect width="512" height="512" fill="url(#bgMaskGrad)" />
+  <rect width="512" height="512" fill="url(#prismAuraMask)" />
+
+  <!-- Subtle circuit ring within safe zone -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="rgba(91,79,233,0.18)" stroke-width="1.5" stroke-dasharray="6 8" />
+
+  <!-- Centered & Scaled to fit comfortably inside 80% safe zone circle (scale 3.2, offset 96) -->
+  <g filter="url(#prismShadowM)" transform="translate(96, 96) scale(3.2)">
+    <!-- 'U' Track -->
+    <path d="M 18 18
+             L 29 18
+             L 29 58
+             C 29 67 35 73 44 73
+             C 50 73 54 70 54 65
+             L 54 48
+             L 65 48
+             L 65 65
+             C 65 77 56 84 44 84
+             C 28 84 18 74 18 58
+             Z"
+          fill="url(#uGradM)" />
+
+    <!-- 'P' Loop & Stem -->
+    <path d="M 36 18
+             L 66 18
+             C 77 18 84 25 84 35
+             C 84 45 77 52 66 52
+             L 47 52
+             L 47 74
+             L 36 74
+             Z
+             M 47 28.5
+             L 64 28.5
+             C 68.5 28.5 72.5 31 72.5 35
+             C 72.5 39 68.5 41.5 64 41.5
+             L 47 41.5
+             Z"
+          fill="url(#pGradM)" />
+
+    <!-- Intersecting Facet / Refraction Split -->
+    <path d="M 47 48 L 54 48 L 54 52 L 47 52 Z" fill="url(#bridgeGradM)" opacity="0.95" />
+
+    <!-- Precision Hardware Chip Core (Refractive Diamond) -->
+    <polygon points="41.5,30 45.5,34.5 41.5,39 37.5,34.5" fill="url(#mintGradM)" />
+    <circle cx="41.5" cy="34.5" r="1.2" fill="#FFFFFF" />
+  </g>
+</svg>`;
+
+// Write SVGs
+fs.writeFileSync('public/icons/icon.svg', iconSvgContent.trim());
+fs.writeFileSync('public/icons/icon-maskable.svg', iconMaskableSvgContent.trim());
+console.log('SVGs written successfully');
+
+// Render 192x192 & 512x512 PNGs
+const resvg192 = new Resvg(iconSvgContent, { fitTo: { mode: 'width', value: 192 } });
+const png192 = resvg192.render().asPng();
+fs.writeFileSync('public/icons/icon-192x192.png', png192);
+
+const resvg512 = new Resvg(iconSvgContent, { fitTo: { mode: 'width', value: 512 } });
+const png512 = resvg512.render().asPng();
+fs.writeFileSync('public/icons/icon-512x512.png', png512);
+console.log('PNG 192 and 512 rendered successfully');
+
+// Render favicon frames (16, 32, 48)
+const resvg16 = new Resvg(iconSvgContent, { fitTo: { mode: 'width', value: 16 } });
+const png16 = resvg16.render().asPng();
+
+const resvg32 = new Resvg(iconSvgContent, { fitTo: { mode: 'width', value: 32 } });
+const png32 = resvg32.render().asPng();
+
+const resvg48 = new Resvg(iconSvgContent, { fitTo: { mode: 'width', value: 48 } });
+const png48 = resvg48.render().asPng();
+
+function buildIco(frames) {
+  const count = frames.length;
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(count, 4);
+
+  let offset = 6 + (16 * count);
+  const dirBuffers = [];
+  const imageBuffers = [];
+
+  for (const f of frames) {
+    const dir = Buffer.alloc(16);
+    dir.writeUInt8(f.width >= 256 ? 0 : f.width, 0);
+    dir.writeUInt8(f.height >= 256 ? 0 : f.height, 1);
+    dir.writeUInt8(0, 2);
+    dir.writeUInt8(0, 3);
+    dir.writeUInt16LE(1, 4);
+    dir.writeUInt16LE(32, 6);
+    dir.writeUInt32LE(f.buffer.length, 8);
+    dir.writeUInt32LE(offset, 12);
+
+    dirBuffers.push(dir);
+    imageBuffers.push(f.buffer);
+    offset += f.buffer.length;
+  }
+
+  return Buffer.concat([header, ...dirBuffers, ...imageBuffers]);
+}
+
+const icoBuffer = buildIco([
+  { width: 16, height: 16, buffer: png16 },
+  { width: 32, height: 32, buffer: png32 },
+  { width: 48, height: 48, buffer: png48 }
+]);
+fs.writeFileSync('public/favicon.ico', icoBuffer);
+console.log('favicon.ico generated successfully');

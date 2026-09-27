@@ -243,7 +243,7 @@
                             <div>
                                 <p class="text-xs font-bold text-white">{{ $j->nama }}</p>
                                 <p class="text-[10px] text-ink-400 font-mono">
-                                    {{ $j->kode }} · {{ $j->kategori }} · est. {{ $j->estimasi_durasi }} mnt
+                                    {{ $j->kode }} · {{ $j->kategori }} · est. {{ $j->estimasi_durasi }} mnt · Rp {{ number_format($j->biaya_jasa ?? 0, 0, ',', '.') }}
                                 </p>
                             </div>
                             <div class="flex items-center gap-2">
@@ -450,6 +450,11 @@
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Durasi Garansi (hari)</label>
                             <input type="number" wire:model="jenisServisForm.durasi_garansi_hari" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tarif Biaya Jasa Standar (Rp)</label>
+                        <input type="number" min="0" step="500" wire:model="jenisServisForm.biaya_jasa" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                        <p class="text-[10px] text-ink-400 mt-1">Tarif acuan otomatis saat memilih jasa ini pada estimasi servis.</p>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">

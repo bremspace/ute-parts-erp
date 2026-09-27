@@ -12,13 +12,10 @@ use App\Modules\Hr\Jobs\HitungKpiBulananJob;
 use App\Modules\Wms\Jobs\CycleCountJob;
 use App\Modules\Wms\Jobs\ReorderOtomatisJob;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
-use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
-use Illuminate\Session\Middleware\StartSession;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
@@ -56,18 +53,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'cabang.selected' => EnsureCabangSelected::class,
         ]);
 
-        // Sanctum SPA cookie-session auth on /api/* (T-32) — without this all
-        // authenticated /api/* calls from the SPA return 401 "Unauthenticated."
+        // Sanctum SPA cookie-session auth on /api/* (T-32)
         $middleware->statefulApi();
-
-        // api group also needs session lifecycle so the web guard can read the
-        // session cookie on /api/* (statefulApi alone only swaps Sanctum's
-        // domain check; without StartSession the guard sees an empty session)
-        $middleware->api(prepend: [
-            EncryptCookies::class,
-            AddQueuedCookiesToResponse::class,
-            StartSession::class,
-        ]);
 
         // Set dynamic asset URL based on request host (IP vs domain)
         $middleware->web(prepend: [SetAssetUrl::class]);

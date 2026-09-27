@@ -3,6 +3,67 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-09-27 — Fix & Integrasi Alur Estimasi Biaya Modul Servis ✅
+
+Perbaikan bug input rincian estimasi biaya, integrasi tarif standar master data servis, dan kelancaran submit estimasi:
+- **Master Data Servis (Pengaturan RBAC/Master):**
+  - Kolom `biaya_jasa` ditambahkan ke form master data `JenisServis` di `SettingsRbac.php` & modal `settings-rbac.blade.php`.
+  - Admin/manajemen dapat mengatur tarif standar acuan jasa servis langsung dari master data pengaturan.
+  - Seeder `JenisServisSeeder` diperbarui dengan tarif standar acuan untuk seluruh jenis servis bawaan.
+- **Input Nominal & Perhitungan Subtotal/Total Estimasi:**
+  - Perbaikan parsing nominal di `ServisBoard.php` dengan parser `parseNominal` yang mengenali pemisah ribuan titik khas Indonesia (`150.000` tetap terbaca `150000`, bukan `150`).
+  - Ganti input harga dari `type="number" step="500"` ke `type="text" inputmode="numeric" x-format-number` dengan `wire:model.live.debounce.350ms`, mencegah DOM clobbering / cursor jumping saat mengetik angka nominal.
+  - Nilai default harga pada baris jasa otomatis terisi dari tarif standar `biaya_jasa` master data servis saat memilih template jasa.
+- **Kelancaran Submit & Validasi Estimasi:**
+  - Validasi `estimasiAlasan` dijadikan `nullable` dengan fallback default `'Estimasi perbaikan unit'`, mencegah form terblokir tanpa feedback saat pengguna mengosongkan catatan alasan.
+  - Penambahan pesan error eksplisit `@error('estimasiAlasan')` dan `@error('estimasiBiaya')` di modal estimasi blade.
+  - Tombol simpan estimasi dilengkapi state `wire:loading` ("Menyimpan...") dan auto-disable untuk mencegah double submit.
+  - Perbaikan `transisiEstimasiValid` dan `setEstimasi` di `ServisService.php` agar mendukung pengeditan ulang (re-estimasi) pada tiket berstatus `menunggu_approval` tanpa melempar exception status di luar allowlist.
+- **Integrasi Tampilan Detail Kanban:**
+  - Modal detail tiket servis kini menampilkan rincian item estimasi biaya konsumen beserta tombol langsung `+ Input Estimasi` / `Ubah Estimasi`.
+  - Input pekerjaan teknisi disempurnakan dengan auto-fill produk dan parsing nominal harga yang aman dari string format titik.
+- **Pengujian:**
+  - Ditambahkan test suite `Tests\Feature\ServisEstimasiNominalMasterTest` (3 tests, 22 assertions) yang mencakup manajemen tarif master data, input nominal ribuan bertitik, dan re-estimasi status `menunggu_approval`. Seluruh 51 test fitur servis berhasil lolos (`PASS`).
+
+## 2026-09-26 — Fase 12: Redesain & Refinement UI/UX Komprehensif (Ute Prism & Emil Design Engineering) ✅
+
+Redesain dan perbaikan total antarmuka (UI/UX) di seluruh modul Ute Parts (Backoffice ERP/POS, Marketplace Publik, Servis HP, WMS, Akunting, CRM, Auth):
+
+**Perubahan per modul & task:**
+- **[T-48] Design System & Token Foundation:**
+  - Token CSS di `prism-tokens.css` dan `app.css` dimigrasikan dari `transition: all` ke kurva kustom Emil Kowalski (`--ease-out: cubic-bezier(0.23, 1, 0.32, 1)`, durasi < 240ms).
+  - Tactile micro-interactions: tombol dan kartu interaktif memiliki `:active:scale-[0.97]` dengan transisi kilat 80ms.
+  - Sticky hover state di perangkat sentuh dieliminasi dengan `@media (hover: hover) and (pointer: fine)`.
+  - Spesifikasi sistem desain formal didokumentasikan di `DESIGN.md` mengikuti standar Impeccable (frontmatter token YAML + 8 kanonikal section).
+- **[T-49] Layout Core & Navigation Architecture:**
+  - `backoffice.blade.php`: Integrasi bottom quick navigation bar mobile (Home, Kasir, Servis, WMS, Menu) dengan touch targets ≥ 44px dan dukungan `safe-area-inset-bottom`.
+  - `marketplace.blade.php`: Hapus duplikasi tautan "Booking Servis" di header navigasi; tambahkan bottom navigation bar mobile (Katalog, Booking, Keranjang dengan badge, Akun).
+- **[T-50] Reusable UI Components Enhancement:**
+  - `GlassCard`: Peningkatan border kontras WCAG AA, transisi terisolasi, padding adaptif (`p-4 sm:p-6`).
+  - `PrismButton`: Standardisasi touch target ≥ 44px di mobile, tactile `:active:scale-[0.97]`, dan `touch-manipulation`.
+  - `DataTable`: Dukungan mode mobile ganda (responsive horizontal-scrollable table dan dedicated `mobileCards` slot).
+  - `BarcodeScanInput`: Penyesuaian ukuran teks base di mobile untuk mencegah auto-zoom iOS Safari.
+- **[T-51] POS Kasir Screen Overhaul:**
+  - Penataan responsif antara katalog dan keranjang: floating cart bar di mobile dengan total harga instan dan tombol bayar langsung; bottom sheet drawer untuk keranjang dan pemilihan pelanggan.
+  - Shortcut keyboard visual hint bar (F2 Cari, F4 Bayar, F6 Tahan, ESC Reset).
+  - Tombol pecahan cepat (Uang Pas, 50k, 100k, 200k) dengan tactile feedback dan `tabular-nums`.
+- **[T-52] Servis HP & Public Tracking:**
+  - Smooth snap-scrolling pada Kanban board servis (`snap-x snap-mandatory touch-pan-x`).
+  - Peningkatan halaman tracking publik `/tracking/{token}` dengan tombol persetujuan dan penolakan berstandar ergonomis mobile.
+- **[T-53] WMS & Inventory Screens:**
+  - Tab navigation bar WMS (8 tab) horizontal-scrollable di mobile tanpa layout shift atau teks terpotong.
+  - Tabel master produk dan stok adaptif di layar sentuh.
+- **[T-54] Marketplace Storefront & Detail Produk:**
+  - Floating action bar belanja di mobile detail produk (`shop-detail.blade.php`) dengan kalkulasi total harga dinamis dan tombol tambah ke keranjang instan.
+- **[T-55] Business Modules Consistency:**
+  - Standardisasi format keuangan rata kanan `tabular-nums` dan warna status pill di seluruh modul Dashboard, Akunting, CRM Lead Kanban, Reseller, dan Omnichannel.
+- **[T-56] Auth, Settings & Error States:**
+  - Halaman login backoffice, login pelanggan, register pelanggan, dan tantangan 2FA dengan tactile button scale dan touch-safe input fields.
+  - Halaman error khusus (`404.blade.php`, `403.blade.php`, `500.blade.php`) berdesain Ute Prism dengan motif garis sirkuit halus dan copy berbahasa Indonesia.
+- **[T-57] Quality, Performance & Polish Verification:**
+  - Build Vite 8 bersih dengan total bundle CSS + JS gzip ~28.4 kB (jauh di bawah batas 250 kB).
+  - PWA service worker dan register script terkompilasi optimal.
+
 ## 2026-09-26 — Servis End-to-End: Estimasi Part & Jasa, Kunci HP, Jurnal Piutang & Bayar, Tracking Publik, Booking Online, Guard RBAC & Integritas ✅
 
 Perbaikan menyeluruh alur modul Servis end-to-end (Fase A, A.2, B, C, D) sesuai `docs/review-servis-plan-perbaikan.md`:

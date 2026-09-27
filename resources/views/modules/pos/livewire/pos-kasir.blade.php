@@ -7,8 +7,11 @@
 >
     <!-- LEFT COLUMN: Product Catalog & Search -->
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        <!-- PWA Install Prompt Micro-Banner (POS) -->
+        <x-prism.pwa-install-prompt variant="banner" class="mb-2 flex-shrink-0" />
+
         <!-- Top Toolbar: Search & Gudang Selector -->
-        <div class="flex items-center gap-3 mb-3 flex-shrink-0 flex-wrap">
+        <div class="flex items-center gap-3 mb-2 flex-shrink-0 flex-wrap">
             <div class="flex-1 min-w-0">
                 <div class="relative">
                     <x-prism.barcode-scan-input
@@ -17,12 +20,12 @@
                         wire:keydown.enter="scanEnter"
                     />
                     <button wire:click="scanEnter"
-                            class="absolute right-12 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-up-primary/20 hover:bg-up-primary/40 text-up-primary text-xs font-bold cursor-pointer"
+                            class="absolute right-12 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-up-primary/20 hover:bg-up-primary/40 text-up-primary text-xs font-bold cursor-pointer active:scale-[0.97]"
                             title="Tambah dari barcode/SKU (Enter)">ADD</button>
                 </div>
             </div>
 
-            <div class="w-full lg:w-48">
+            <div class="w-full sm:w-48">
                 <select
                     wire:model.live="selectedGudangId"
                     class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-medium"
@@ -34,6 +37,22 @@
                     @endforeach
                 </select>
             </div>
+        </div>
+
+        <!-- [T-51] Desktop Keyboard Shortcuts Visual Hint Bar (hidden on mobile) -->
+        <div class="hidden lg:flex items-center gap-2 mb-3 text-[11px] text-ink-400">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
+                <kbd class="text-up-primary font-bold">F2</kbd> Cari/Scan
+            </span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
+                <kbd class="text-up-mint font-bold">F4</kbd> Bayar
+            </span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
+                <kbd class="text-up-amber font-bold">F6</kbd> Tahan
+            </span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
+                <kbd class="text-up-red font-bold">ESC</kbd> Reset Keranjang
+            </span>
         </div>
 
         <!-- Product Grid -->
@@ -161,26 +180,41 @@
     <div x-data="{ cartPanelOpen: false }"
          x-init="cartPanelOpen = window.innerWidth >= 1024"
          @resize.window.debounce.100ms="cartPanelOpen = window.innerWidth >= 1024"
-         class="lg:w-[420px] lg:flex-shrink-0 lg:flex lg:flex-col lg:h-full lg:bg-ink-900 lg:border lg:border-white/5 lg:rounded-3xl lg:p-5 lg:overflow-hidden lg:shadow-2xl">
+         class="lg:w-[420px] lg:flex-shrink-0 lg:flex lg:flex-col lg:h-full">
 
-        <!-- Mobile: Cart Toggle Button (44px touch target) -->
-        <button @click="cartPanelOpen = !cartPanelOpen"
-                class="lg:hidden w-full px-4 py-3 rounded-xl bg-ink-900 border border-white/5 flex items-center justify-between text-sm font-medium shadow-lg sticky bottom-0 z-10 min-h-[44px]"
-                :aria-expanded="cartPanelOpen"
-                :aria-label="cartPanelOpen ? 'Tutup keranjang' : 'Buka keranjang'">
-            <span class="flex items-center gap-2 min-h-[44px]">
-                <svg class="w-5 h-5 text-up-mint flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                <span>Keranjang</span>
-            </span>
-            <span class="px-2 py-0.5 rounded-full bg-up-mint/20 text-up-mint text-xs font-bold tabular-nums flex items-center min-h-[44px]">
-                {{ count($cart) ?? 0 }}
-            </span>
-            <svg class="w-5 h-5 text-ink-400 transition-transform flex-shrink-0" :class="{ 'rotate-180': cartPanelOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-        </button>
+        <!-- Mobile: Floating Cart Bar (Sticky Bottom, 44px+ touch targets) -->
+        <div class="lg:hidden fixed bottom-14 inset-x-2 z-30 flex items-center gap-2 p-2 rounded-2xl bg-ink-900/95 dark:bg-ink-950/95 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl">
+            <button @click="cartPanelOpen = !cartPanelOpen"
+                    type="button"
+                    class="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-50 dark:text-white min-h-[44px] cursor-pointer"
+                    :aria-expanded="cartPanelOpen"
+                    aria-label="Buka ringkasan keranjang">
+                <div class="flex items-center gap-2.5">
+                    <div class="relative">
+                        <svg class="w-5 h-5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                        <span class="absolute -top-1.5 -right-2 px-1.5 py-0.2 rounded-full bg-up-primary text-white text-[10px] font-bold tabular-nums">
+                            {{ count($cart) }}
+                        </span>
+                    </div>
+                    <span class="text-xs font-semibold">Keranjang</span>
+                </div>
+                <span class="text-xs font-bold text-up-mint tabular-nums">
+                    Rp {{ number_format($this->totalAkhir, 0, ',', '.') }}
+                </span>
+            </button>
+            @if(count($cart) > 0)
+                <button wire:click="openPaymentModal"
+                        type="button"
+                        class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer">
+                    <span>Bayar</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            @endif
+        </div>
 
         <!-- Mobile: Bottom Sheet Overlay + Panel -->
         <div x-show="cartPanelOpen && window.innerWidth < 1024"
@@ -201,20 +235,39 @@
                x-transition:leave="transition-transform ease-in duration-150"
                x-transition:leave-start="translate-y-0"
                x-transition:leave-end="translate-y-full"
-               class="fixed bottom-0 left-0 right-0 z-50 max-h-[80vh] lg:hidden"
+               class="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] lg:hidden"
                @click.outside="cartPanelOpen = false"
                style="padding-bottom: env(safe-area-inset-bottom, 0);">
-            <div class="bg-ink-900 border-t border-white/5 rounded-t-3xl p-4 shadow-2xl max-h-[80vh] flex flex-col">
+            <div class="bg-ink-900 border-t border-black/10 dark:border-white/10 rounded-t-3xl p-4 shadow-2xl max-h-[85vh] flex flex-col">
                 <!-- Drag Handle -->
-                <div class="w-10 h-1.5 bg-white/10 rounded-full mx-auto mb-3"></div>
-                <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
-                    <h3 class="text-lg font-bold text-white">Keranjang</h3>
+                <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-3"></div>
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-black/10 dark:border-white/10">
+                    <h3 class="text-base font-bold text-ink-50 dark:text-white">Keranjang & Pelanggan</h3>
                     <button @click="cartPanelOpen = false"
-                            class="p-2 text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">
+                            class="p-2 text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
+                </div>
+                <!-- Customer Picker in Mobile Sheet -->
+                <div class="mb-3 pb-3 border-b border-white/5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="text-[11px] font-semibold text-ink-300 uppercase">Pelanggan</label>
+                        @if($this->customer)
+                            <x-prism.tier-badge :tier="$this->customer->tierMembership?->nama ?? ($this->customer->is_reseller ? 'Reseller' : 'Retail')" />
+                        @endif
+                    </div>
+                    <select
+                        wire:model.live="selectedCustomerId"
+                        wire:change="setPelanggan($event.target.value)"
+                        class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
+                    >
+                        <option value="" class="bg-ink-900">Pelanggan Umum (Tanpa Member)</option>
+                        @foreach($customers as $c)
+                            <option value="{{ $c->id }}" class="bg-ink-900">{{ $c->nama }} ({{ $c->telepon ?? '-' }})</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="flex-1 overflow-y-auto space-y-3">
                     @include('modules.pos.livewire.partials.cart-content', [
@@ -602,10 +655,10 @@
 
                         <!-- Quick Cash Shortcuts -->
                         <div class="flex gap-2 pt-1 flex-wrap">
-                            <button type="button" wire:click="setQuickCash({{ $this->totalAkhir }})" class="px-3 py-1.5 rounded-lg bg-white/5 text-xs text-ink-200 hover:bg-white/10 border border-white/5 font-semibold">Uang Pas</button>
-                            <button type="button" wire:click="setQuickCash(50000)" class="px-3 py-1.5 rounded-lg bg-white/5 text-xs text-ink-200 hover:bg-white/10 border border-white/5 font-semibold">50.000</button>
-                            <button type="button" wire:click="setQuickCash(100000)" class="px-3 py-1.5 rounded-lg bg-white/5 text-xs text-ink-200 hover:bg-white/10 border border-white/5 font-semibold">100.000</button>
-                            <button type="button" wire:click="setQuickCash(200000)" class="px-3 py-1.5 rounded-lg bg-white/5 text-xs text-ink-200 hover:bg-white/10 border border-white/5 font-semibold">200.000</button>
+                            <button type="button" wire:click="setQuickCash({{ $this->totalAkhir }})" class="px-3.5 py-2 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold min-h-[40px] cursor-pointer">Uang Pas</button>
+                            <button type="button" wire:click="setQuickCash(50000)" class="px-3.5 py-2 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[40px] cursor-pointer">Rp 50.000</button>
+                            <button type="button" wire:click="setQuickCash(100000)" class="px-3.5 py-2 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[40px] cursor-pointer">Rp 100.000</button>
+                            <button type="button" wire:click="setQuickCash(200000)" class="px-3.5 py-2 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[40px] cursor-pointer">Rp 200.000</button>
                         </div>
 
                         <!-- Kembalian Display -->

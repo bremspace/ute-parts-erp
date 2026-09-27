@@ -39,32 +39,42 @@
                     <div>
                         <p class="text-[10px] text-up-mint uppercase font-bold mb-1.5">Pendapatan</p>
                         @forelse($labaRugi['pendapatan'] as $p)
+                            @php
+                                $pNama = is_array($p) ? ($p['nama'] ?? $p['akun'] ?? '') : (is_object($p) ? ($p->nama ?? $p->akun ?? '') : (string) $p);
+                                $pKode = is_array($p) ? ($p['kode'] ?? '') : (is_object($p) ? ($p->kode ?? '') : '');
+                                $pTotal = is_array($p) ? ($p['total'] ?? 0) : (is_object($p) ? ($p->total ?? 0) : 0);
+                            @endphp
                             <div class="flex justify-between text-xs py-1 border-b border-white/5">
-                                <span class="text-ink-200">{{ $p['nama'] }} <span class="text-ink-500 font-mono">({{ $p['kode'] }})</span></span>
-                                <span class="font-bold text-white tabular-nums">Rp {{ number_format($p['total'], 0, ',', '.') }}</span>
+                                <span class="text-ink-200">{{ $pNama }} @if($pKode)<span class="text-ink-500 font-mono">({{ $pKode }})</span>@endif</span>
+                                <span class="font-bold text-white tabular-nums">Rp {{ number_format($pTotal, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500 py-1">Belum ada pendapatan di periode ini.</p>
                         @endforelse
                         <div class="flex justify-between text-xs font-bold pt-1.5 mt-1">
                             <span class="text-up-mint">Total Pendapatan</span>
-                            <span class="text-up-mint tabular-nums">Rp {{ number_format($labaRugi['total_pendapatan'], 0, ',', '.') }}</span>
+                            <span class="text-up-mint tabular-nums">Rp {{ number_format($labaRugi['total_pendapatan'] ?? 0, 0, ',', '.') }}</span>
                         </div>
                     </div>
 
                     <div>
                         <p class="text-[10px] text-up-red uppercase font-bold mb-1.5">Beban</p>
                         @forelse($labaRugi['beban'] as $b)
+                            @php
+                                $bNama = is_array($b) ? ($b['nama'] ?? $b['akun'] ?? '') : (is_object($b) ? ($b->nama ?? $b->akun ?? '') : (string) $b);
+                                $bKode = is_array($b) ? ($b['kode'] ?? '') : (is_object($b) ? ($b->kode ?? '') : '');
+                                $bTotal = is_array($b) ? ($b['total'] ?? 0) : (is_object($b) ? ($b->total ?? 0) : 0);
+                            @endphp
                             <div class="flex justify-between text-xs py-1 border-b border-white/5">
-                                <span class="text-ink-200">{{ $b['nama'] }} <span class="text-ink-500 font-mono">({{ $b['kode'] }})</span></span>
-                                <span class="font-bold text-white tabular-nums">Rp {{ number_format($b['total'], 0, ',', '.') }}</span>
+                                <span class="text-ink-200">{{ $bNama }} @if($bKode)<span class="text-ink-500 font-mono">({{ $bKode }})</span>@endif</span>
+                                <span class="font-bold text-white tabular-nums">Rp {{ number_format($bTotal, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500 py-1">Belum ada beban di periode ini.</p>
                         @endforelse
                         <div class="flex justify-between text-xs font-bold pt-1.5 mt-1">
                             <span class="text-up-red">Total Beban</span>
-                            <span class="text-up-red tabular-nums">Rp {{ number_format($labaRugi['total_beban'], 0, ',', '.') }}</span>
+                            <span class="text-up-red tabular-nums">Rp {{ number_format($labaRugi['total_beban'] ?? 0, 0, ',', '.') }}</span>
                         </div>
                     </div>
 
@@ -83,41 +93,56 @@
                     <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                         <p class="text-[10px] text-ink-400 uppercase font-bold mb-2">Aset</p>
                         @forelse($neraca['aset'] as $a)
+                            @if(!is_array($a) && !is_object($a)) @continue @endif
+                            @php
+                                $aNama = is_array($a) ? ($a['nama'] ?? '') : ($a->nama ?? '');
+                                $aSaldo = is_array($a) ? ($a['saldo'] ?? 0) : ($a->saldo ?? 0);
+                            @endphp
                             <div class="flex justify-between text-[11px] py-0.5">
-                                <span class="text-ink-300">{{ $a['nama'] }}</span>
-                                <span class="text-white tabular-nums">{{ number_format($a['saldo'], 0, ',', '.') }}</span>
+                                <span class="text-ink-300">{{ $aNama }}</span>
+                                <span class="text-white tabular-nums">{{ number_format($aSaldo, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500">Kosong</p>
                         @endforelse
                         <div class="border-t border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
                             <span class="text-ink-200">Total</span>
-                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_aset'], 0, ',', '.') }}</span>
+                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_aset'] ?? 0, 0, ',', '.') }}</span>
                         </div>
                     </div>
 
                     <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                         <p class="text-[10px] text-ink-400 uppercase font-bold mb-2">Kewajiban</p>
                         @forelse($neraca['kewajiban'] as $kw)
+                            @if(!is_array($kw) && !is_object($kw)) @continue @endif
+                            @php
+                                $kwNama = is_array($kw) ? ($kw['nama'] ?? '') : ($kw->nama ?? '');
+                                $kwSaldo = is_array($kw) ? ($kw['saldo'] ?? 0) : ($kw->saldo ?? 0);
+                            @endphp
                             <div class="flex justify-between text-[11px] py-0.5">
-                                <span class="text-ink-300">{{ $kw['nama'] }}</span>
-                                <span class="text-white tabular-nums">{{ number_format($kw['saldo'], 0, ',', '.') }}</span>
+                                <span class="text-ink-300">{{ $kwNama }}</span>
+                                <span class="text-white tabular-nums">{{ number_format($kwSaldo, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500">Kosong</p>
                         @endforelse
                         <div class="border-t border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
                             <span class="text-ink-200">Total</span>
-                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_kewajiban'], 0, ',', '.') }}</span>
+                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_kewajiban'] ?? 0, 0, ',', '.') }}</span>
                         </div>
                     </div>
 
                     <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                         <p class="text-[10px] text-ink-400 uppercase font-bold mb-2">Ekuitas</p>
                         @forelse($neraca['ekuitas'] as $e)
+                            @if(!is_array($e) && !is_object($e)) @continue @endif
+                            @php
+                                $eNama = is_array($e) ? ($e['nama'] ?? '') : ($e->nama ?? '');
+                                $eSaldo = is_array($e) ? ($e['saldo'] ?? 0) : ($e->saldo ?? 0);
+                            @endphp
                             <div class="flex justify-between text-[11px] py-0.5">
-                                <span class="text-ink-300">{{ $e['nama'] }}</span>
-                                <span class="text-white tabular-nums">{{ number_format($e['saldo'], 0, ',', '.') }}</span>
+                                <span class="text-ink-300">{{ $eNama }}</span>
+                                <span class="text-white tabular-nums">{{ number_format($eSaldo, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500">Kosong</p>

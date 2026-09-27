@@ -14,7 +14,7 @@
         type="text"
         placeholder="{{ $placeholder }}"
         {{ $model ? "wire:model.live.debounce.250ms={$model}" : '' }}
-        {{ $attributes->merge(['class' => 'w-full pl-11 pr-10 py-2.5 rounded-xl glass-input text-sm font-medium placeholder-ink-400']) }}
+        {{ $attributes->merge(['class' => 'w-full pl-11 pr-10 py-2.5 rounded-xl glass-input text-base sm:text-sm font-medium placeholder-ink-400 focus:ring-2 focus:ring-up-primary/30']) }}
         x-ref="barcodeInput"
         @keydown.window.f2.prevent="$refs.barcodeInput.focus(); $refs.barcodeInput.select()"
     />

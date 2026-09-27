@@ -287,9 +287,9 @@ class ServisService
     {
         $statusLama = $tiket->status;
 
-        $validForEstimate = ['diagnosa', 'ditolak'];
+        $validForEstimate = ['diagnosa', 'menunggu_approval', 'ditolak'];
         if (! in_array($statusLama, $validForEstimate, true)) {
-            throw new \Exception("Hanya tiket berstatus 'diagnosa' atau 'ditolak' yang dapat diestimasi");
+            throw new \Exception("Hanya tiket berstatus 'diagnosa', 'menunggu_approval', atau 'ditolak' yang dapat diestimasi");
         }
 
         // [T-07] Transisi WAJIB sah menurut state machine (allowlist di atas
@@ -371,7 +371,8 @@ class ServisService
                 $tiket->update(['token_approval' => Str::random(64)]);
             }
 
-            $this->logStatus($tiket, $statusLama, 'menunggu_approval', $user, 'transisi', "Estimasi biaya: Rp {$biaya}");
+            $aksiLog = $statusLama === 'menunggu_approval' ? 'edit_estimasi' : 'transisi';
+            $this->logStatus($tiket, $statusLama, 'menunggu_approval', $user, $aksiLog, "Estimasi biaya: Rp {$biaya}");
         }, 3);
 
         // Notifikasi + link publik approval (SETELAH commit)
@@ -411,6 +412,10 @@ class ServisService
      */
     private function transisiEstimasiValid(string $statusLama): bool
     {
+        if ($statusLama === 'menunggu_approval') {
+            return true;
+        }
+
         if (ServisStateMachine::dapatTransisi($statusLama, 'menunggu_approval')) {
             return true;
         }

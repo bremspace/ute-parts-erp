@@ -1,19 +1,47 @@
 {
-  "name": "Ute Parts — ERP/POS Sparepart & Servis",
-  "short_name": "UteParts",
-  "description": "ERP/POS untuk toko sparepart & servis HP. Kelola pos, gudang, servis, akunting.",
+  "id": "/",
+  "name": "Ute Parts — ERP, POS & Marketplace",
+  "short_name": "Ute Parts",
+  "description": "ERP, POS & Marketplace untuk sparepart & servis HP",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0B0D17",
+  "background_color": "#070A14",
   "theme_color": "#5B4FE9",
   "lang": "id",
   "categories": ["business", "shopping"],
   "icons": [
-    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
     {
@@ -25,7 +53,7 @@
     },
     {
       "name": "Gudang (WMS)",
-      "short_name": "Gudang",
+      "short_name": "WMS",
       "description": "Kelola stok & mutasi gudang",
       "url": "/app/wms",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]

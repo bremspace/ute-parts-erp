@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login Backoffice — Ute Parts</title>
 
+    <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
+
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
 
@@ -18,14 +21,8 @@
     <!-- Login Card Container -->
     <div class="w-full max-w-md relative z-10">
         <!-- Logo & Title -->
-        <div class="text-center mb-8">
-            <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-up-primary via-indigo-500 to-up-accent items-center justify-center shadow-xl shadow-up-primary/30 mb-4 border border-white/20">
-                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-            </div>
-            <h1 class="text-2xl font-bold text-white tracking-wide">UTE PARTS</h1>
-            <p class="text-sm text-ink-400 mt-1">Sistem ERP, Kasir POS & Manajemen Multi-Gudang</p>
+        <div class="text-center mb-8 flex justify-center">
+            <x-prism.logo size="lg" layout="vertical" mode="dark" title="UTE PARTS" subtitle="Sistem ERP, Kasir POS & Manajemen Multi-Gudang" />
         </div>
 
         <!-- Glass Card -->
@@ -83,7 +80,7 @@
                 <div class="pt-2">
                     <button
                         type="submit"
-                        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark hover:to-indigo-700 text-white font-semibold text-sm shadow-lg shadow-up-primary/30 transition-all duration-200 cursor-pointer border border-white/10 active:scale-[0.99]"
+                        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark hover:to-indigo-700 text-white font-semibold text-sm shadow-lg shadow-up-primary/30 transition-[transform,background-color] duration-150 cursor-pointer border border-white/10 active:scale-[0.97] min-h-[44px]"
                     >
                         Masuk Sistem
                     </button>

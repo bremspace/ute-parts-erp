@@ -245,8 +245,8 @@ class AkuntingDashboard extends Component
                 ])->values();
 
                 return [
-                    'pendapatan' => $pendapatan,
-                    'beban' => $beban,
+                    'pendapatan' => $pendapatan->all(),
+                    'beban' => $beban->all(),
                     'total_pendapatan' => round($pendapatan->sum('total'), 2),
                     'total_beban' => round($beban->sum('total'), 2),
                     'laba_bersih' => round($pendapatan->sum('total') - $beban->sum('total'), 2),

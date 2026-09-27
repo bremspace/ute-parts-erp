@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tracking Servis — Ute Parts</title>
+    <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -14,16 +16,8 @@
 
     <div class="w-full max-w-2xl relative z-10 my-auto">
         <!-- Brand Header -->
-        <div class="text-center mb-6">
-            <a href="{{ route('shop') }}" class="inline-flex">
-                <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-orange-500 items-center justify-center shadow-lg shadow-indigo-500/20 mb-3 border border-white/20">
-                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    </svg>
-                </div>
-            </a>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Status Servis & Perbaikan</h1>
-            <p class="text-sm text-slate-500 mt-1">Pantau perkembangan perbaikan gadget Anda secara transparan</p>
+        <div class="text-center mb-6 flex justify-center">
+            <x-prism.logo size="lg" layout="vertical" mode="light" title="Status Servis & Perbaikan" subtitle="Pantau perkembangan perbaikan gadget Anda secara transparan" :href="route('shop')" />
         </div>
 
         <!-- Flash Messages -->
@@ -210,7 +204,7 @@
                             <form action="{{ route('servis.tracking.approve', $tiket['token_approval']) }}" method="POST" class="flex-1">
                                 @csrf
                                 <input type="hidden" name="alasan" value="Disetujui oleh pelanggan via web tracking">
-                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all cursor-pointer">
+                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-up-mint hover:bg-teal-600 text-ink-950 font-bold text-sm shadow-lg shadow-up-mint/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                                     </svg>
@@ -221,7 +215,7 @@
                             <form action="{{ route('servis.tracking.reject', $tiket['token_approval']) }}" method="POST" class="sm:w-auto" onsubmit="return confirm('Apakah Anda yakin ingin menolak estimasi perbaikan ini?')">
                                 @csrf
                                 <input type="hidden" name="alasan" value="Ditolak oleh pelanggan via web tracking">
-                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-semibold text-sm transition-all cursor-pointer">
+                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-semibold text-sm transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
                                     Tolak Estimasi
                                 </button>
                             </form>

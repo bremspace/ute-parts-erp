@@ -492,6 +492,33 @@ class ServisBoard extends Component
     }
 
     // --- Estimasi ---
+    private function parseNominal($val): float
+    {
+        if (is_int($val) || is_float($val)) {
+            return (float) $val;
+        }
+
+        if (is_string($val)) {
+            $val = trim($val);
+            if ($val === '') {
+                return 0.0;
+            }
+
+            if (str_contains($val, ',')) {
+                $val = str_replace('.', '', $val);
+                $val = str_replace(',', '.', $val);
+            } else {
+                $val = str_replace('.', '', $val);
+            }
+
+            $cleaned = preg_replace('/[^0-9.]/', '', $val);
+
+            return is_numeric($cleaned) ? (float) $cleaned : 0.0;
+        }
+
+        return (float) ($val ?? 0);
+    }
+
     public function estimasiRowBaru(string $tipe = 'jasa'): array
     {
         return [
@@ -557,12 +584,6 @@ class ServisBoard extends Component
             }
         }
 
-        $qty = max(1, (int) ($row['qty'] ?? 1));
-        $harga = (float) ($row['harga'] ?? 0);
-        $row['qty'] = $qty;
-        $row['harga'] = $harga;
-        $row['subtotal'] = $qty * $harga;
-
         $this->recalculateEstimasiTotal();
     }
 
@@ -570,9 +591,8 @@ class ServisBoard extends Component
     {
         foreach ($this->estimasiItems as $i => $row) {
             $qty = max(1, (int) ($row['qty'] ?? 1));
-            $harga = (float) ($row['harga'] ?? 0);
+            $harga = $this->parseNominal($row['harga'] ?? 0);
             $this->estimasiItems[$i]['qty'] = $qty;
-            $this->estimasiItems[$i]['harga'] = $harga;
             $this->estimasiItems[$i]['subtotal'] = $qty * $harga;
         }
 
@@ -583,7 +603,7 @@ class ServisBoard extends Component
     {
         $tiket = $this->tiketScoped($tiketId);
         $this->estimasiTiketId = $tiketId;
-        $this->estimasiAlasan = '';
+        $this->estimasiAlasan = $tiket->alasan_estimasi ?: '';
 
         $existingItems = $tiket->estimasiItems()->get();
         if ($existingItems->isNotEmpty()) {
@@ -598,8 +618,20 @@ class ServisBoard extends Component
             ])->toArray();
             $this->estimasiBiaya = (float) array_sum(array_column($this->estimasiItems, 'subtotal'));
         } else {
-            $this->estimasiItems = [$this->estimasiRowBaru('jasa')];
-            $this->estimasiBiaya = (float) ($tiket->estimasi_biaya ?? 0);
+            $defaultJenisId = $tiket->jenis_servis_id ?: JenisServis::where('is_active', true)->first()?->id;
+            $defaultJenis = $defaultJenisId ? JenisServis::find($defaultJenisId) : null;
+            $hargaDefault = (float) ($defaultJenis?->biaya_jasa ?? 0);
+
+            $this->estimasiItems = [[
+                'tipe' => 'jasa',
+                'jenis_servis_id' => $defaultJenis?->id,
+                'produk_id' => null,
+                'nama_item' => $defaultJenis?->nama ?? 'Jasa Servis',
+                'qty' => 1,
+                'harga' => $hargaDefault,
+                'subtotal' => $hargaDefault,
+            ]];
+            $this->estimasiBiaya = $hargaDefault ?: (float) ($tiket->estimasi_biaya ?? 0);
         }
 
         $this->showEstimasiModal = true;
@@ -608,26 +640,64 @@ class ServisBoard extends Component
     public function simpanEstimasi()
     {
         // [B-14] Sama dgn API [SERVICE-05] → `permission:servis.update-status`.
-        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin/input estimasi biaya servis')) {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin input estimasi biaya servis')) {
             return;
         }
 
-        $this->validate([
-            'estimasiBiaya' => 'required|numeric|min:0',
-            'estimasiAlasan' => 'required|string|min:5',
-        ]);
+        if (! $this->estimasiTiketId) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tiket servis tidak valid']);
+
+            return;
+        }
+
+        $this->recalculateEstimasiTotal();
+
+        $alasan = trim((string) $this->estimasiAlasan);
+        if ($alasan === '') {
+            $alasan = 'Estimasi perbaikan unit';
+        }
+
+        $cleanedItems = [];
+        foreach ($this->estimasiItems as $it) {
+            $tipe = ($it['tipe'] ?? 'jasa') === 'part' ? 'part' : 'jasa';
+            $qty = max(1, (int) ($it['qty'] ?? 1));
+            $harga = max(0, $this->parseNominal($it['harga'] ?? 0));
+            $nama = trim((string) ($it['nama_item'] ?? ''));
+
+            if ($nama === '' && empty($it['produk_id']) && empty($it['jenis_servis_id']) && $harga <= 0) {
+                continue;
+            }
+
+            $cleanedItems[] = [
+                'tipe' => $tipe,
+                'jenis_servis_id' => ! empty($it['jenis_servis_id']) ? (int) $it['jenis_servis_id'] : null,
+                'produk_id' => ! empty($it['produk_id']) ? (int) $it['produk_id'] : null,
+                'sku_variant_id' => ! empty($it['sku_variant_id']) ? (int) $it['sku_variant_id'] : null,
+                'nama_item' => $nama ?: ($tipe === 'part' ? 'Sparepart' : 'Jasa Servis'),
+                'qty' => $qty,
+                'harga' => $harga,
+                'subtotal' => $qty * $harga,
+            ];
+        }
+
+        if (empty($cleanedItems)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Minimal tambahkan 1 baris item estimasi']);
+
+            return;
+        }
 
         $tiket = $this->tiketScoped($this->estimasiTiketId);
 
         try {
-            app(ServisService::class)->setEstimasi(
+            $tiket = app(ServisService::class)->setEstimasi(
                 $tiket,
                 (float) $this->estimasiBiaya,
-                $this->estimasiAlasan,
+                $alasan,
                 auth()->user(),
-                $this->estimasiItems
+                $cleanedItems
             );
             $this->showEstimasiModal = false;
+            $this->selectedTiketId = $tiket->id;
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Estimasi tersimpan, menunggu approval pelanggan']);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
@@ -784,6 +854,32 @@ class ServisBoard extends Component
         $this->pekerjaanItems = array_values($this->pekerjaanItems);
     }
 
+    public function updatedPekerjaanItems($value, $key): void
+    {
+        $parts = explode('.', (string) $key);
+        $idx = (int) ($parts[0] ?? 0);
+        $field = $parts[1] ?? '';
+
+        if (! isset($this->pekerjaanItems[$idx])) {
+            return;
+        }
+
+        $row = &$this->pekerjaanItems[$idx];
+
+        if ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
+            if ($value) {
+                $produk = Produk::find($value);
+                if ($produk) {
+                    $row['nama_item'] = $produk->nama;
+                    $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
+                    $pelanggan = $tiket?->pelanggan;
+                    $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual ?? 0);
+                }
+            }
+        }
+    }
+
     /** [T-17] Simpan item pekerjaan → ServisService::inputPekerjaan (part: stok 1x, jasa: tagihan) */
     public function simpanPekerjaan()
     {
@@ -811,7 +907,7 @@ class ServisBoard extends Component
                 'produk_id' => $produkId,
                 'nama_item' => $namaItem,
                 'qty' => max(1, (int) ($row['qty'] ?? 1)),
-                'harga' => (float) ($row['harga'] ?? 0),
+                'harga' => max(0, $this->parseNominal($row['harga'] ?? 0)),
                 'gudang_id' => $tipe === 'part' ? ($row['gudang_id'] ?? $this->pekerjaanGudangId) : null,
                 // [F2-3] SN utk produk sn=true — divalidasi di ServisService::inputPekerjaan
                 'sn' => app(NomorSeriService::class)->parseList((string) ($row['sn'] ?? '')),
@@ -842,6 +938,7 @@ class ServisBoard extends Component
                     'jenisServis', 'pelanggan.tierMembership', 'teknisi', 'garansi',
                     'statusLogs.user', 'spareparts.produk', 'spareparts.skuVariant', 'cabang',
                     'items', // [T-17]
+                    'estimasiItems',
                 ])->find($this->selectedTiketId)
             : null;
     }

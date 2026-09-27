@@ -83,10 +83,10 @@
     @endif
 
     <!-- ===== KANBAN BOARD ===== -->
-    <div class="flex-1 overflow-x-auto overflow-y-hidden pb-2">
-        <div class="flex gap-4 h-full min-w-max">
+    <div class="flex-1 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory scroll-smooth touch-pan-x">
+        <div class="flex gap-3 sm:gap-4 h-full min-w-max px-0.5">
             @foreach($stateMachineColumns as $status => $col)
-                <div class="w-[280px] flex-shrink-0 flex flex-col rounded-2xl glass-panel overflow-hidden"
+                <div class="w-[82vw] sm:w-[320px] lg:w-[280px] snap-center flex-shrink-0 flex flex-col rounded-2xl glass-panel overflow-hidden"
                      @dragover.prevent="overCol = '{{ $status }}'"
                      @dragleave="overCol = null"
                      @drop.prevent="if (dragId) { $wire.dropTicket(dragId, '{{ $status }}'); dragId = null; overCol = null; }">
@@ -571,7 +571,7 @@
                                         <div class="col-span-5">
                                             <input
                                                 type="text"
-                                                wire:model.live="estimasiItems.{{ $idx }}.nama_item"
+                                                wire:model="estimasiItems.{{ $idx }}.nama_item"
                                                 placeholder="Deskripsi item..."
                                                 class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium"
                                             />
@@ -595,23 +595,24 @@
                                             <input
                                                 type="number"
                                                 min="1"
-                                                wire:model.live="estimasiItems.{{ $idx }}.qty"
+                                                wire:model.live.debounce.300ms="estimasiItems.{{ $idx }}.qty"
                                                 class="w-16 px-2 py-1 rounded-lg glass-input text-xs font-bold text-center"
                                             />
                                         </div>
                                         <div class="col-span-4 flex items-center gap-1.5">
                                             <span class="text-[10px] text-ink-400">Harga:</span>
                                             <input
-                                                type="number"
-                                                min="0"
-                                                step="500"
-                                                wire:model.live="estimasiItems.{{ $idx }}.harga"
+                                                type="text"
+                                                inputmode="numeric"
+                                                x-format-number
+                                                wire:model.live.debounce.350ms="estimasiItems.{{ $idx }}.harga"
+                                                placeholder="0"
                                                 class="w-full px-2 py-1 rounded-lg glass-input text-xs font-bold tabular-nums"
                                             />
                                         </div>
                                         <div class="col-span-5 text-right font-bold text-white tabular-nums">
                                             <span class="text-[10px] text-ink-400 font-normal mr-1">Subtotal:</span>
-                                            Rp {{ number_format(($row['qty'] ?? 1) * ($row['harga'] ?? 0), 0, ',', '.') }}
+                                            Rp {{ number_format($row['subtotal'] ?? 0, 0, ',', '.') }}
                                         </div>
                                     </div>
                                 </div>
@@ -634,8 +635,14 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alasan / Rincian Tambahan Estimasi <span class="text-up-red">*</span></label>
-                        <textarea wire:model="estimasiAlasan" rows="2" placeholder="Catatan estimasi untuk konsumen (misal: pengerjaan 1-2 hari setelah part tiba)..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"></textarea>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Catatan / Alasan Estimasi <span class="text-ink-500 font-normal">(opsional)</span></label>
+                        <textarea wire:model="estimasiAlasan" rows="2" placeholder="Catatan estimasi untuk konsumen (misal: estimasi pengerjaan 1-2 hari)..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"></textarea>
+                        @error('estimasiAlasan')
+                            <p class="text-[11px] text-up-red mt-1 font-medium">{{ $message }}</p>
+                        @enderror
+                        @error('estimasiBiaya')
+                            <p class="text-[11px] text-up-red mt-1 font-medium">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="p-3 rounded-xl bg-up-amber/10 border border-up-amber/30 text-[11px] text-up-amber flex items-start gap-2">
@@ -647,8 +654,19 @@
                 </div>
 
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-4 flex-shrink-0">
-                    <button wire:click="$set('showEstimasiModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanEstimasi" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px]">Simpan Estimasi</button>
+                    <button type="button" wire:click="$set('showEstimasiModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                    <button
+                        type="button"
+                        wire:click="simpanEstimasi"
+                        wire:loading.attr="disabled"
+                        class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px] flex items-center justify-center gap-2"
+                    >
+                        <span wire:loading.remove wire:target="simpanEstimasi">Simpan Estimasi</span>
+                        <span wire:loading wire:target="simpanEstimasi" class="inline-flex items-center gap-1.5">
+                            <svg class="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                            Menyimpan...
+                        </span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -718,7 +736,16 @@
                             <p class="text-[11px] text-ink-400">{{ $selectedTiket->telepon_pelanggan ?? $selectedTiket->pelanggan?->telepon }}</p>
                         </div>
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                            <p class="text-[10px] text-ink-400 uppercase">Estimasi</p>
+                            <div class="flex items-center justify-between">
+                                <p class="text-[10px] text-ink-400 uppercase">Estimasi</p>
+                                @if(in_array($selectedTiket->status, ['diagnosa', 'menunggu_approval', 'ditolak'], true))
+                                    <button
+                                        type="button"
+                                        wire:click="openEstimasiModal({{ $selectedTiket->id }})"
+                                        class="text-[10px] font-bold text-up-mint hover:underline cursor-pointer"
+                                    >{{ $selectedTiket->estimasi_biaya ? 'Ubah' : '+ Input' }}</button>
+                                @endif
+                            </div>
                             <p class="text-sm font-bold {{ $selectedTiket->estimasi_biaya ? 'text-up-mint' : 'text-ink-400' }} tabular-nums">
                                 {{ $selectedTiket->estimasi_biaya ? 'Rp ' . number_format($selectedTiket->estimasi_biaya, 0, ',', '.') : 'Belum ada' }}
                             </p>
@@ -871,6 +898,39 @@
                         </div>
                     @endif
 
+                    <!-- Rincian Estimasi Biaya Konsumen (jika ada) -->
+                    @if($selectedTiket->estimasiItems && $selectedTiket->estimasiItems->count() > 0)
+                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-[10px] text-ink-400 uppercase font-semibold">Rincian Estimasi Biaya ({{ $selectedTiket->estimasiItems->count() }} item)</p>
+                                @if(in_array($selectedTiket->status, ['diagnosa', 'menunggu_approval', 'ditolak'], true))
+                                    <button
+                                        type="button"
+                                        wire:click="openEstimasiModal({{ $selectedTiket->id }})"
+                                        class="text-[10px] font-bold text-up-mint hover:underline cursor-pointer"
+                                    >Edit Rincian</button>
+                                @endif
+                            </div>
+                            <div class="space-y-1.5">
+                                @foreach($selectedTiket->estimasiItems as $it)
+                                    <div class="flex justify-between text-xs">
+                                        <span class="text-ink-100">
+                                            <span class="text-[9px] font-bold {{ $it->tipe === 'part' ? 'text-up-amber bg-up-amber/10 border border-up-amber/30' : 'text-up-mint bg-up-mint/10 border border-up-mint/30' }} px-1.5 py-0.5 rounded-full mr-1.5">
+                                                {{ strtoupper($it->tipe) }}
+                                            </span>
+                                            {{ $it->nama_item }} × {{ $it->qty }}
+                                        </span>
+                                        <span class="font-bold text-white tabular-nums">Rp {{ number_format($it->subtotal ?: ($it->harga * $it->qty), 0, ',', '.') }}</span>
+                                    </div>
+                                @endforeach
+                                <div class="pt-2 border-t border-white/5 flex justify-between text-xs font-bold">
+                                    <span class="text-ink-300">Total Estimasi:</span>
+                                    <span class="text-up-mint tabular-nums">Rp {{ number_format($selectedTiket->estimasi_biaya ?? 0, 0, ',', '.') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- [T-17] Item Pekerjaan Teknisi (part/jasa) -->
                     @if($selectedTiket->items->count() > 0)
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
@@ -897,11 +957,11 @@
                             <p class="text-[10px] text-ink-400 uppercase mb-2">Input Pekerjaan Teknisi</p>
                             @foreach($pekerjaanItems as $idx => $row)
                                 <div class="grid grid-cols-12 gap-1.5 mb-2 items-center">
-                                    <select wire:model="pekerjaanItems.{{ $idx }}.tipe" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium">
+                                    <select wire:model.live="pekerjaanItems.{{ $idx }}.tipe" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium">
                                         <option value="jasa" class="bg-ink-900">Jasa</option>
                                         <option value="part" class="bg-ink-900">Part</option>
                                     </select>
-                                    <select wire:model="pekerjaanItems.{{ $idx }}.produk_id" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium">
+                                    <select wire:model.live="pekerjaanItems.{{ $idx }}.produk_id" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium">
                                         <option value="" class="bg-ink-900">— Produk (part) —</option>
                                         @foreach($produkList as $p)
                                             <option value="{{ $p->id }}" class="bg-ink-900">{{ $p->nama }}</option>
@@ -909,7 +969,7 @@
                                     </select>
                                     <input type="text" wire:model="pekerjaanItems.{{ $idx }}.nama_item" placeholder="Nama item" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
                                     <input type="number" wire:model="pekerjaanItems.{{ $idx }}.qty" min="1" placeholder="Qty" class="col-span-1 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
-                                    <input type="number" wire:model="pekerjaanItems.{{ $idx }}.harga" min="0" step="500" placeholder="Harga" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
+                                    <input type="text" inputmode="numeric" x-format-number wire:model="pekerjaanItems.{{ $idx }}.harga" placeholder="Harga" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium tabular-nums" />
                                     <button wire:click="removePekerjaanRow({{ $idx }})" class="col-span-1 text-up-red hover:text-white text-sm cursor-pointer" title="Hapus baris">✕</button>
                                 </div>
                                 {{-- [F2-3] SN utk produk sn=true — wajib, jumlah = qty --}}

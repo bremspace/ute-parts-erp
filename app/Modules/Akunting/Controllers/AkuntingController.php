@@ -248,12 +248,14 @@ class AkuntingController extends Controller
             $jurnals = $query->with('akun')->get();
 
             $pendapatan = $jurnals->where('akun.tipe', 'pendapatan')->groupBy('akun_coa_id')->map(fn ($rows) => [
+                'nama' => $rows->first()->akun?->nama,
                 'akun' => $rows->first()->akun?->nama,
                 'kode' => $rows->first()->akun?->kode,
                 'total' => round($rows->sum('kredit') - $rows->sum('debit'), 2),
             ])->values();
 
             $beban = $jurnals->where('akun.tipe', 'beban')->groupBy('akun_coa_id')->map(fn ($rows) => [
+                'nama' => $rows->first()->akun?->nama,
                 'akun' => $rows->first()->akun?->nama,
                 'kode' => $rows->first()->akun?->kode,
                 'total' => round($rows->sum('debit') - $rows->sum('kredit'), 2),
