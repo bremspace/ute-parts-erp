@@ -1,0 +1,16 @@
+[program:ute-parts-queue]
+process_name=%(program_name)s_%(process_num)02d
+; Ganti /path/ke/project dan path php sesuai lokasi di server production:
+directory=/var/www/test.uteparts.id
+command=/usr/bin/php /var/www/test.uteparts.id/artisan queue:work database --sleep=3 --tries=3 --max-time=3600 --timeout=60
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=2
+redirect_stderr=true
+stdout_logfile=/var/www/test.uteparts.id/storage/logs/queue.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
+environment=APP_ENV="production",APP_DEBUG="false"
