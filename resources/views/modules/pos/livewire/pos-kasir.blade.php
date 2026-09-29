@@ -68,7 +68,7 @@
                         $alasanTidakBisaDipilih = ! $gudangDipilih
                             ? 'Pilih gudang terlebih dahulu untuk melihat stok & memilih produk ini.'
                             : "Stok {$prod->nama} habis di gudang ini — tidak bisa dipilih. Pilih gudang lain yang punya stok.";
-                        $pricing = app(\App\Modules\Pos\Services\PricingService::class)->resolve($prod, $this->customer);
+                        $pricing = app(\App\Modules\Pos\Services\PricingService::class)->resolve($prod, $customer);
                     @endphp
                     <div
                         wire:key="product-{{ $prod->id }}"
@@ -90,8 +90,8 @@
                         <div>
                             <!-- Header: Category & Stock -->
                             <div class="flex items-center justify-between mb-2 gap-1">
-                                <span class="text-[10px] uppercase font-semibold text-ink-400 truncate max-w-[80px]">
-                                    {{ $prod->kategori ?? 'Sparepart' }}
+                                <span class="text-[10px] uppercase font-semibold text-ink-400 truncate max-w-[100px]">
+                                    {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
                                 </span>
                                 @if($stokKosong)
                                     {{-- [B-02/P0-1] Keterangan stok kosong — produk dikunci (tidak bisa dipilih) --}}
@@ -103,20 +103,35 @@
                                 @endif
                             </div>
 
-                            <!-- Product Name & Compatibility -->
-                            <h4 @class([
-                                'font-semibold text-xs sm:text-sm line-clamp-2 leading-snug transition-colors',
-                                'text-ink-400' => $stokKosong,
-                                'text-white group-hover:text-up-primary' => ! $stokKosong,
-                            ])>
-                                {{ $prod->nama }}
-                            </h4>
+                            <!-- Product Thumbnail & Details -->
+                            <div class="flex gap-2.5">
+                                <div class="w-12 h-12 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex-shrink-0 flex items-center justify-center">
+                                    @if($prod->thumbnail_url ?: $prod->gambar)
+                                        <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" loading="lazy" class="w-full h-full object-cover">
+                                    @else
+                                        <span class="text-[9px] font-bold text-ink-400">UTE</span>
+                                    @endif
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h4 @class([
+                                        'font-semibold text-xs sm:text-sm line-clamp-2 leading-snug transition-colors',
+                                        'text-ink-400' => $stokKosong,
+                                        'text-white group-hover:text-up-primary' => ! $stokKosong,
+                                    ])>
+                                        {{ $prod->nama }}
+                                    </h4>
 
-                            @if($prod->brand_kompatibel || $prod->model_kompatibel)
-                                <p class="text-[11px] text-ink-400 mt-1 truncate">
-                                    {{ $prod->brand_kompatibel }} {{ $prod->model_kompatibel }}
-                                </p>
-                            @endif
+                                    @if($prod->tipeHps->count() > 0)
+                                        <p class="text-[10px] text-up-primary font-medium mt-0.5 truncate">
+                                            📱 {{ $prod->tipeHps->pluck('model')->take(2)->join(', ') }}
+                                        </p>
+                                    @elseif($prod->brand_kompatibel || $prod->model_kompatibel)
+                                        <p class="text-[11px] text-ink-400 mt-0.5 truncate">
+                                            {{ $prod->brand_kompatibel }} {{ $prod->model_kompatibel }}
+                                        </p>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Price Section -->
@@ -183,7 +198,8 @@
          class="lg:w-[420px] lg:flex-shrink-0 lg:flex lg:flex-col lg:h-full">
 
         <!-- Mobile: Floating Cart Bar (Sticky Bottom, 44px+ touch targets) -->
-        <div class="lg:hidden fixed bottom-14 inset-x-2 z-30 flex items-center gap-2 p-2 rounded-2xl bg-ink-900/95 dark:bg-ink-950/95 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl">
+        <div class="lg:hidden fixed inset-x-2 z-30 flex items-center gap-2 p-2 rounded-2xl bg-ink-900/95 dark:bg-ink-950/95 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl"
+             style="bottom: calc(3.5rem + max(env(safe-area-inset-bottom, 0px), 0.5rem));">
             <button @click="cartPanelOpen = !cartPanelOpen"
                     type="button"
                     class="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-50 dark:text-white min-h-[44px] cursor-pointer"
@@ -201,7 +217,7 @@
                     <span class="text-xs font-semibold">Keranjang</span>
                 </div>
                 <span class="text-xs font-bold text-up-mint tabular-nums">
-                    Rp {{ number_format($this->totalAkhir, 0, ',', '.') }}
+                    Rp {{ number_format($totalAkhir, 0, ',', '.') }}
                 </span>
             </button>
             @if(count($cart) > 0)
@@ -254,8 +270,8 @@
                 <div class="mb-3 pb-3 border-b border-white/5">
                     <div class="flex items-center justify-between mb-1.5">
                         <label class="text-[11px] font-semibold text-ink-300 uppercase">Pelanggan</label>
-                        @if($this->customer)
-                            <x-prism.tier-badge :tier="$this->customer->tierMembership?->nama ?? ($this->customer->is_reseller ? 'Reseller' : 'Retail')" />
+                        @if($customer)
+                            <x-prism.tier-badge :tier="$customer->tierMembership?->nama ?? ($customer->is_reseller ? 'Reseller' : 'Retail')" />
                         @endif
                     </div>
                     <select
@@ -275,7 +291,7 @@
                         'total' => $total,
                         'diskonTotal' => $diskonTotal,
                         'totalBayar' => $totalBayar,
-                        'customer' => $this->customer,
+                        'customer' => $customer,
                         'canHargaFleksibel' => $canHargaFleksibel,
                     ])
                 </div>
@@ -288,8 +304,8 @@
             <div class="mb-4 pb-3.5 border-b border-white/5 flex-shrink-0">
                 <div class="flex items-center justify-between mb-2">
                     <label class="text-xs font-semibold text-ink-300 uppercase tracking-wider">Pelanggan / Member</label>
-                    @if($this->customer)
-                        <x-prism.tier-badge :tier="$this->customer->tierMembership?->nama ?? ($this->customer->is_reseller ? 'Reseller' : 'Retail')" />
+                    @if($customer)
+                        <x-prism.tier-badge :tier="$customer->tierMembership?->nama ?? ($customer->is_reseller ? 'Reseller' : 'Retail')" />
                     @endif
                 </div>
 
@@ -330,12 +346,12 @@
                     />
                 </div>
 
-            @if($this->customer && $this->customer->tierMembership)
+            @if($customer && $customer->tierMembership)
                 <div class="mt-2 text-[11px] text-up-mint flex items-center gap-1.5 font-medium">
                     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                     </svg>
-                    <span>Diskon {{ $this->customer->tierMembership->diskon_persen }}% otomatis aktif untuk member {{ $this->customer->tierMembership->nama }}</span>
+                    <span>Diskon {{ $customer->tierMembership->diskon_persen }}% otomatis aktif untuk member {{ $customer->tierMembership->nama }}</span>
                 </div>
             @endif
         </div>
@@ -350,6 +366,7 @@
                  transaksi ditahan). --}}
             @forelse($cart as $key => $item)
                 <div
+                    wire:key="cart-item-desktop-{{ $key }}"
                     x-data="{
                         flexOpen: false,
                         flexHarga: '{{ number_format($item['harga'] ?? 0, 0, '', '') }}',
@@ -528,17 +545,23 @@
             <div class="space-y-1.5 text-xs text-ink-300">
                 <div class="flex justify-between">
                     <span>Subtotal</span>
-                    <span class="font-semibold text-white tabular-nums">Rp {{ number_format($this->subtotal, 0, ',', '.') }}</span>
+                    <span class="font-semibold text-white tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
                 </div>
                 @if($diskonNominal > 0 || $diskonPersen > 0)
                     <div class="flex justify-between text-up-mint">
                         <span>Diskon</span>
-                        <span class="font-semibold tabular-nums">- Rp {{ number_format($this->subtotal - $this->totalAkhir, 0, ',', '.') }}</span>
+                        <span class="font-semibold tabular-nums">- Rp {{ number_format($diskonTotal, 0, ',', '.') }}</span>
+                    </div>
+                @endif
+                @if($pajakNominal > 0)
+                    <div class="flex justify-between text-ink-300">
+                        <span>{{ $pajakNama ?? 'PPN' }} ({{ $ppnPersen }}%)</span>
+                        <span class="font-semibold text-white tabular-nums">+ Rp {{ number_format($pajakNominal, 0, ',', '.') }}</span>
                     </div>
                 @endif
                 <div class="flex justify-between text-base font-bold text-white pt-2 border-t border-white/10">
                     <span>Total Akhir</span>
-                    <span class="text-up-mint text-xl tabular-nums">Rp {{ number_format($this->totalAkhir, 0, ',', '.') }}</span>
+                    <span class="text-up-mint text-xl tabular-nums">Rp {{ number_format($totalAkhir, 0, ',', '.') }}</span>
                 </div>
             </div>
 
@@ -587,26 +610,30 @@
                 @endif
             </div>
 
-            <!-- [T-03] Panel transaksi ditahan -->
-            <div class="pt-1">
+            <!-- [T-03] Panel transaksi ditahan & Riwayat Transaksi -->
+            <div class="pt-2 border-t border-white/5 flex items-center justify-between">
                 <button wire:click="$toggle('showDitahanPanel')" class="text-[11px] font-semibold text-ink-400 hover:text-white flex items-center gap-1 cursor-pointer">
                     <span>{{ $showDitahanPanel ? '▼' : '▶' }}</span>
-                    Transaksi Ditahan ({{ $ditahanList->count() }})
+                    Ditahan ({{ $ditahanList->count() }})
                 </button>
-                @if($showDitahanPanel && $ditahanList->isNotEmpty())
-                    <div class="mt-2 space-y-1.5 max-h-44 overflow-y-auto">
-                        @foreach($ditahanList as $dt)
-                            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white/[0.03] border border-white/5 text-[11px]">
-                                <div class="min-w-0">
-                                    <span class="font-mono text-white truncate block">{{ $dt->no_transaksi }}</span>
-                                    <span class="text-ink-400">Rp <span class="tabular-nums">{{ number_format($dt->total_akhir, 0, ',', '.') }}</span> · {{ $dt->kasir?->name }}</span>
-                                </div>
-                                <button wire:click="resumeDitahan({{ $dt->id }})" class="px-2.5 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold cursor-pointer whitespace-nowrap">Lanjutkan</button>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
+                <button wire:click="bukaRiwayatTransaksi" class="text-[11px] font-semibold text-up-primary hover:text-indigo-300 flex items-center gap-1 cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Riwayat Transaksi</span>
+                </button>
             </div>
+            @if($showDitahanPanel && $ditahanList->isNotEmpty())
+                <div class="mt-2 space-y-1.5 max-h-44 overflow-y-auto">
+                    @foreach($ditahanList as $dt)
+                        <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white/[0.03] border border-white/5 text-[11px]">
+                            <div class="min-w-0">
+                                <span class="font-mono text-white truncate block">{{ $dt->no_transaksi }}</span>
+                                <span class="text-ink-400">Rp <span class="tabular-nums">{{ number_format($dt->total_akhir, 0, ',', '.') }}</span> · {{ $dt->kasir?->name }}</span>
+                            </div>
+                            <button wire:click="resumeDitahan({{ $dt->id }})" class="px-2.5 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold cursor-pointer whitespace-nowrap">Lanjutkan</button>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
     </div>
 
@@ -623,19 +650,19 @@
                 <div class="bg-white/5 p-4 rounded-2xl text-center mb-5 border border-white/5">
                     <span class="text-xs uppercase tracking-wider text-ink-400 font-semibold block mb-1">Total Tagihan</span>
                     <span class="text-3xl font-black text-up-mint tabular-nums">
-                        Rp {{ number_format($this->totalAkhir, 0, ',', '.') }}
+                        Rp {{ number_format($totalAkhir, 0, ',', '.') }}
                     </span>
                 </div>
 
                 <!-- Payment Method Selector -->
                 <div class="mb-5">
                     <label class="block text-xs font-semibold text-ink-300 mb-2">Metode Pembayaran</label>
-                    <div class="grid grid-cols-5 gap-2">
+                    <div class="grid grid-cols-2 xxs:grid-cols-3 sm:grid-cols-5 gap-2">
                         @foreach(['tunai' => 'Tunai', 'transfer' => 'Transfer', 'qris' => 'QRIS', 'split' => 'Split', 'piutang' => 'Kasbon'] as $val => $label)
                             <button
                                 type="button"
                                 wire:click="$set('metodeBayar', '{{ $val }}')"
-                                class="py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer {{ $metodeBayar === $val ? 'bg-up-primary text-white border-up-primary shadow-md shadow-up-primary/30' : 'bg-white/5 text-ink-300 border-white/10 hover:bg-white/10' }}"
+                                class="py-2.5 px-2 rounded-xl text-xs font-bold border transition-[transform,background-color,border-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer {{ $metodeBayar === $val ? 'bg-up-primary text-white border-up-primary shadow-md shadow-up-primary/30' : 'bg-white/5 text-ink-300 border-white/10 hover:bg-white/10' }}"
                             >
                                 {{ $label }}
                             </button>
@@ -650,22 +677,22 @@
                         <input
                             type="text" inputmode="numeric" x-format-number
                             wire:model.live="jumlahBayar"
-                            class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums text-white"
+                            class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums text-white min-h-[44px]"
                         />
 
                         <!-- Quick Cash Shortcuts -->
-                        <div class="flex gap-2 pt-1 flex-wrap">
-                            <button type="button" wire:click="setQuickCash({{ $this->totalAkhir }})" class="px-3.5 py-2 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold min-h-[40px] cursor-pointer">Uang Pas</button>
-                            <button type="button" wire:click="setQuickCash(50000)" class="px-3.5 py-2 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[40px] cursor-pointer">Rp 50.000</button>
-                            <button type="button" wire:click="setQuickCash(100000)" class="px-3.5 py-2 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[40px] cursor-pointer">Rp 100.000</button>
-                            <button type="button" wire:click="setQuickCash(200000)" class="px-3.5 py-2 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[40px] cursor-pointer">Rp 200.000</button>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                            <button type="button" wire:click="setQuickCash({{ $totalAkhir }})" class="px-3 py-2.5 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold min-h-[44px] flex items-center justify-center cursor-pointer">Uang Pas</button>
+                            <button type="button" wire:click="setQuickCash(50000)" class="px-3 py-2.5 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[44px] flex items-center justify-center cursor-pointer">Rp 50.000</button>
+                            <button type="button" wire:click="setQuickCash(100000)" class="px-3 py-2.5 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[44px] flex items-center justify-center cursor-pointer">Rp 100.000</button>
+                            <button type="button" wire:click="setQuickCash(200000)" class="px-3 py-2.5 rounded-xl bg-white/5 text-xs text-ink-200 hover:bg-white/10 active:scale-[0.97] border border-white/10 font-bold tabular-nums min-h-[44px] flex items-center justify-center cursor-pointer">Rp 200.000</button>
                         </div>
 
                         <!-- Kembalian Display -->
                         <div class="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5 text-sm">
                             <span class="text-ink-400 font-medium">Kembalian</span>
-                            <span class="font-bold text-lg tabular-nums {{ $this->kembalian > 0 ? 'text-up-mint' : 'text-white' }}">
-                                Rp {{ number_format($this->kembalian, 0, ',', '.') }}
+                            <span class="font-bold text-lg tabular-nums {{ $kembalian > 0 ? 'text-up-mint' : 'text-white' }}">
+                                Rp {{ number_format($kembalian, 0, ',', '.') }}
                             </span>
                         </div>
                     </div>
@@ -673,11 +700,11 @@
                     <div class="space-y-3 mb-5">
                         <div>
                             <label class="block text-xs text-ink-300 mb-1">Nominal Tunai</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="splitTunai" class="w-full px-3 py-2 rounded-xl glass-input text-sm font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="splitTunai" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-bold tabular-nums min-h-[44px]" />
                         </div>
                         <div>
                             <label class="block text-xs text-ink-300 mb-1">Nominal Non-Tunai</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="splitNonTunai" class="w-full px-3 py-2 rounded-xl glass-input text-sm font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="splitNonTunai" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-bold tabular-nums min-h-[44px]" />
                         </div>
                     </div>
                 @elseif($metodeBayar === 'piutang')
@@ -692,24 +719,24 @@
                     <div class="p-4 rounded-xl bg-white/5 text-center text-xs text-ink-300 mb-5 border border-white/5">
                         Silakan scan QRIS atau konfirmasi bukti transfer sebesar
                         <strong class="text-white block mt-1 text-sm font-bold tabular-nums">
-                            Rp {{ number_format($this->totalAkhir, 0, ',', '.') }}
+                            Rp {{ number_format($totalAkhir, 0, ',', '.') }}
                         </strong>
                     </div>
                 @endif
 
                 <!-- Submit Button -->
-                <div class="flex gap-3">
+                <div class="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3">
                     <button
                         type="button"
                         wire:click="$set('showPaymentModal', false)"
-                        class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-sm transition-all border border-white/10 cursor-pointer"
+                        class="w-full sm:flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-sm transition-[transform,background-color] active:scale-[0.97] border border-white/10 cursor-pointer min-h-[44px]"
                     >
                         Batal
                     </button>
                     <button
                         type="button"
                         wire:click="processTransaction"
-                        class="flex-2 py-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-sm transition-all shadow-lg shadow-up-mint/20 cursor-pointer"
+                        class="w-full sm:flex-2 py-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-sm transition-[transform,opacity] active:scale-[0.97] shadow-lg shadow-up-mint/20 cursor-pointer min-h-[44px]"
                     >
                         Konfirmasi & Cetak Struk
                     </button>
@@ -720,9 +747,12 @@
 
     <!-- RECEIPT MODAL (Thermal Print Preview) -->
     @if($showReceiptModal && $receiptData)
+        <script id="pos-receipt-data" type="application/json">
+            {!! json_encode($receiptData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}
+        </script>
         <div
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            x-data="thermalPrinter(@json($receiptData))"
+            x-data="thermalPrinter({{ \Illuminate\Support\Js::from($receiptData) }})"
         >
             <div class="w-full max-w-sm glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative"> 
                 <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
@@ -805,42 +835,151 @@
                 <div class="print-area print-58" id="printTarget-58" aria-hidden="true"></div>
                 <div class="print-area print-80" id="printTarget-80" aria-hidden="true"></div>
 
-                <!-- [T-35] Cetak thermal via Web Bluetooth (Chrome Android/Edge) -->
-                <div class="mt-4 flex gap-2">
-                    <button
-                        type="button"
-                        @click="printStruk58()"
-                        class="flex-1 py-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-xs shadow-lg shadow-up-mint/20 cursor-pointer min-h-[44px]"
-                        aria-label="Cetak struk 58mm langsung ke printer Bluetooth"
-                    >
-                        <span class="block">Cetak Bluetooth 58mm</span>
-                        <span class="block text-[9px] font-medium opacity-80">langsung ke printer</span>
-                    </button>
-                    <button
-                        type="button"
-                        @click="printFaktur80()"
-                        class="flex-1 py-3 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:opacity-95 text-white font-bold text-xs shadow-lg shadow-up-primary/20 cursor-pointer min-h-[44px]"
-                        aria-label="Cetak faktur 80mm langsung ke printer Bluetooth"
-                    >
-                        <span class="block">Cetak Faktur 80mm</span>
-                        <span class="block text-[9px] font-medium opacity-80">lembar penuh + barcode</span>
-                    </button>
-                </div>
-                <p class="mt-2 text-[10px] text-ink-400">
-                    Di iPhone/tablet, pakai <span class="font-semibold text-ink-300">Cetak Struk (A4)</span>.
-                </p>
+                <!-- [T-35] Cetak thermal via Web Bluetooth BLE (Chrome Android & PC) -->
+                <div class="mt-4 space-y-2">
+                    <!-- Status Printer Bluetooth Terhubung -->
+                    <template x-if="pairedPrinterName">
+                        <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-up-mint/10 border border-up-mint/20 text-[11px] text-up-mint">
+                            <span class="flex items-center gap-1.5 truncate">
+                                <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
+                                <span class="truncate">Printer: <strong x-text="pairedPrinterName"></strong></span>
+                            </span>
+                            <button
+                                type="button"
+                                @click="disconnectPrinter()"
+                                class="text-ink-400 hover:text-white underline text-[10px] ml-2 shrink-0 cursor-pointer"
+                            >
+                                Ganti
+                            </button>
+                        </div>
+                    </template>
 
-                <!-- Print Action Button -->
-                <div class="mt-4 flex gap-2">
+                    <div class="flex gap-2">
+                        <button
+                            type="button"
+                            @click="printStruk58()"
+                            :disabled="isPrinting"
+                            class="flex-1 py-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-xs shadow-lg shadow-up-mint/20 cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                            aria-label="Cetak struk 58mm langsung ke printer Bluetooth BLE"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            <span x-text="isPrinting ? 'Menghubungkan...' : 'Cetak BLE (58mm)'">Cetak BLE (58mm)</span>
+                        </button>
+                        <button
+                            type="button"
+                            @click="printFaktur80()"
+                            :disabled="isPrinting"
+                            class="flex-1 py-3 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:opacity-95 text-white font-bold text-xs shadow-lg shadow-up-primary/20 cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                            aria-label="Cetak faktur 80mm langsung ke printer Bluetooth BLE"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span x-text="isPrinting ? 'Menghubungkan...' : 'Faktur BLE (80mm)'">Faktur BLE (80mm)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex gap-2 pt-1">
+                        <button
+                            type="button"
+                            @click="webPrint()"
+                            class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs border border-white/10 cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5"
+                            title="Cetak via browser print dialog / RawBT / PDF"
+                        >
+                            <span>Web Print (A4 / RawBT)</span>
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="$set('showReceiptModal', false)"
+                            class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs cursor-pointer min-h-[44px]"
+                        >
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: RIWAYAT TRANSAKSI HARI INI -->
+    @if($showRiwayatTransaksiModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-4xl glass-panel p-6 rounded-3xl relative max-h-[85vh] flex flex-col">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary font-bold">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Riwayat Transaksi Hari Ini</h3>
+                            <p class="text-xs text-ink-400">Daftar transaksi kasir di cabang aktif hari ini</p>
+                        </div>
+                    </div>
+                    <button wire:click="tutupRiwayatTransaksi" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+
+                <div class="overflow-y-auto flex-1 pr-1">
+                    @if($riwayatTransaksiHariIni->isEmpty())
+                        <div class="py-12 text-center text-ink-400 text-xs">
+                            Belum ada transaksi tercatat hari ini di cabang ini.
+                        </div>
+                    @else
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider">
+                                    <th class="pb-3 px-3">No Transaksi</th>
+                                    <th class="pb-3 px-3">Waktu</th>
+                                    <th class="pb-3 px-3">Kasir</th>
+                                    <th class="pb-3 px-3">Pelanggan</th>
+                                    <th class="pb-3 px-3 text-right">Total</th>
+                                    <th class="pb-3 px-3">Metode</th>
+                                    <th class="pb-3 px-3">Status</th>
+                                    <th class="pb-3 px-3 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach($riwayatTransaksiHariIni as $trx)
+                                    <tr class="hover:bg-white/[0.02] transition-colors">
+                                        <td class="py-3 px-3 font-mono font-bold text-white">{{ $trx->no_transaksi }}</td>
+                                        <td class="py-3 px-3 text-ink-300 tabular-nums">{{ $trx->created_at?->format('H:i:s') }}</td>
+                                        <td class="py-3 px-3 text-ink-200">{{ $trx->kasir?->name ?? '-' }}</td>
+                                        <td class="py-3 px-3 text-ink-200">{{ $trx->pelanggan?->nama ?? 'Umum' }}</td>
+                                        <td class="py-3 px-3 text-right font-bold text-white tabular-nums">Rp {{ number_format($trx->total_akhir, 0, ',', '.') }}</td>
+                                        <td class="py-3 px-3 uppercase text-[10px] text-ink-300 font-bold">{{ $trx->metode_bayar }}</td>
+                                        <td class="py-3 px-3">
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $trx->status === 'selesai' ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : ($trx->status === 'dibatalkan' ? 'bg-up-red/10 text-up-red border border-up-red/20' : 'bg-up-amber/10 text-up-amber border border-up-amber/20') }}">
+                                                {{ ucfirst($trx->status) }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-3 text-right whitespace-nowrap">
+                                            <div class="flex items-center justify-end gap-1.5">
+                                                <button
+                                                    wire:click="lihatDetailTransaksi({{ $trx->id }})"
+                                                    class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-100 font-semibold text-[11px] transition-colors border border-white/10 cursor-pointer"
+                                                    title="Lihat Struk / Detail Barang"
+                                                >
+                                                    Detail
+                                                </button>
+                                                @can('lihat-audit-log')
+                                                    <button
+                                                        wire:click="bukaRiwayat('transaksi', {{ $trx->id }})"
+                                                        class="px-2 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary font-bold text-[11px] transition-colors border border-up-primary/20 cursor-pointer"
+                                                        title="Lihat Log Mutasi Transaksi"
+                                                    >
+                                                        Audit Log
+                                                    </button>
+                                                @endcan
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @endif
+                </div>
+
+                <div class="pt-4 mt-2 border-t border-white/10 flex justify-end">
                     <button
-                        onclick="window.print()"
-                        class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md cursor-pointer min-h-[44px]"
-                    >
-                        Cetak Struk
-                    </button>
-                    <button
-                        wire:click="$set('showReceiptModal', false)"
-                        class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs cursor-pointer"
+                        wire:click="tutupRiwayatTransaksi"
+                        class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs cursor-pointer"
                     >
                         Tutup
                     </button>

@@ -8,6 +8,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\PurchaseOrderService;
 use App\Modules\Workflow\Services\ApprovalService;
 use Livewire\Attributes\On;
@@ -47,6 +48,57 @@ class PoTab extends Component
     public ?int $bayarPoId = null;
 
     public float $bayarPoJumlah = 0;
+
+    // [PROCUREMENT MODAL: ABC, ROP, Min-Max, JIT]
+    public bool $showProcurementModal = false;
+
+    public array $procurementFilter = [
+        'abc_class' => '',
+        'only_reorder' => true,
+        'is_ondemand' => '',
+        'search' => '',
+    ];
+
+    #[On('wms-procurement-modal')]
+    public function openProcurementModal(): void
+    {
+        $this->showProcurementModal = true;
+    }
+
+    public function closeProcurementModal(): void
+    {
+        $this->showProcurementModal = false;
+    }
+
+    public function terapkanKePo(int $produkId, int $qty): void
+    {
+        $produk = Produk::find($produkId);
+        if (! $produk) {
+            return;
+        }
+
+        $this->poForm = [
+            'supplier_id' => null,
+            'gudang_tujuan_id' => null,
+            'metode_bayar' => 'kredit',
+            'jatuh_tempo' => '',
+            'items' => [
+                [
+                    'produk_id' => $produk->id,
+                    'sku_variant_id' => $produk->skuVariants()->first()?->id,
+                    'harga_beli' => (float) $produk->harga_beli,
+                    'jumlah' => max(1, $qty),
+                ],
+            ],
+        ];
+
+        $this->showProcurementModal = false;
+        $this->showPoModal = true;
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => "Produk {$produk->nama} ({$qty} unit) dimasukkan ke usulan PO",
+        ]);
+    }
 
     // Quick action header "+ Buat PO" (dari shell WmsDashboard via $dispatch)
     #[On('wms-po-baru')]
@@ -130,6 +182,10 @@ class PoTab extends Component
 
     public function simpanPo()
     {
+        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin membuat PO.')) {
+            return;
+        }
+
         $this->validate([
             'poForm.supplier_id' => 'required|exists:supplier,id',
             'poForm.gudang_tujuan_id' => 'required|exists:gudang,id',
@@ -241,6 +297,10 @@ class PoTab extends Component
 
     public function bayarPo()
     {
+        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin memproses pembayaran PO.')) {
+            return;
+        }
+
         try {
             app(PurchaseOrderService::class)->bayarPO(
                 PurchaseOrder::findOrFail($this->bayarPoId),
@@ -255,6 +315,10 @@ class PoTab extends Component
 
     public function simpanSupplier()
     {
+        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin membuat supplier.')) {
+            return;
+        }
+
         $this->validate([
             'supplierForm.nama' => 'required|string|max:255',
         ]);
@@ -263,6 +327,17 @@ class PoTab extends Component
         $this->showSupplierModal = false;
         $this->supplierForm = ['nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier disimpan']);
+    }
+
+    protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
+    {
+        if (auth()->user()?->can($permission)) {
+            return true;
+        }
+
+        $this->dispatch('alert', ['type' => 'error', 'message' => $pesan]);
+
+        return false;
     }
 
     public function render()
@@ -284,11 +359,28 @@ class PoTab extends Component
             ->limit(self::PRODUK_DROPDOWN_LIMIT)
             ->get(['id', 'nama']); // blade cuma pakai id + nama (harga_beli di-set poProdukDipilih)
 
+        $procurementData = null;
+        $procurementSummary = null;
+
+        if ($this->showProcurementModal) {
+            $service = app(ProcurementService::class);
+            $filterPayload = [
+                'abc_class' => $this->procurementFilter['abc_class'],
+                'only_reorder' => $this->procurementFilter['only_reorder'],
+                'is_ondemand' => $this->procurementFilter['is_ondemand'] !== '' ? filter_var($this->procurementFilter['is_ondemand'], FILTER_VALIDATE_BOOLEAN) : null,
+                'search' => $this->procurementFilter['search'],
+            ];
+            $procurementData = $service->getProcurementRecommendations($cabangId, $filterPayload);
+            $procurementSummary = $service->getProcurementSummary($cabangId);
+        }
+
         return view('modules.wms.livewire.po-tab', [
             'gudangs' => $gudangs,
             'allProducts' => $allProducts,
             'suppliers' => Supplier::orderBy('nama')->get(),
             'poList' => PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk'])->latest()->paginate(15, pageName: 'po'),
+            'procurementData' => $procurementData,
+            'procurementSummary' => $procurementSummary,
         ]);
     }
 }

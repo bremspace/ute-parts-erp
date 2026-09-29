@@ -5,11 +5,14 @@ namespace App\Modules\Servis\Models;
 use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'no_tiket', 'cabang_id', 'jenis_servis_id', 'pelanggan_id', 'teknisi_id',
@@ -21,7 +24,15 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class TiketServis extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
     protected $table = 'tiket_servis';
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('Tiket Servis');
+    }
 
     protected $casts = [
         'kondisi_fisik' => 'array',

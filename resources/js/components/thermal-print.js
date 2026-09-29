@@ -1,13 +1,12 @@
-// [T-35] [ADR 0009] Cetak thermal 58mm/80mm via Web Bluetooth (ESC/POS) + fallback Web Print
-// Pure-client, tanpa dependensi npm baru. Barcode GS k Code128, ASCI-safe (transliterasi seperti sisi server).
-// Alur: Bluetooth dulu → gagal → window.print() dengan area render tersembunyi (tidak pernah buntu).
-// Fallback server-side (queue/CUPS) dikerjakan paralel di sisi backend (fixer).
+// [T-35] [ADR 0009] Cetak thermal 58mm/80mm via Web Bluetooth (BLE / GATT) murni di browser (PC & Mobile)
+// Bekerja langsung di Google Chrome / Edge (Android, Windows, Mac, Linux).
+// Tanpa aplikasi pihak ketiga (RawBT dll). Mendukung auto-reconnect printer tersimpan.
 
 /* ============================== ESC/POS builder ============================== */
 
 const ESC = 0x1b;
 
-// Transliterasi ASCI-safe: é→e, dst. (sama dengan sisi fixer), sisanya → '?'
+// Transliterasi ASCI-safe: é→e, dst., sisanya → '?'
 const MAP = { ß: 'ss', œ: 'oe', æ: 'ae', '’': "'", '‘': "'", '“': '"', '”': '"', '–': '-', '—': '-', '…': '...', '°': 'o', '·': '.', '\u00a0': ' ' };
 
 function transliterate(s) {
@@ -33,11 +32,15 @@ class EscPos {
     feed(n) { return this.raw(ESC, 0x64, n); }
     barcode128(s) {
         const d = transliterate(String(s));
-        this.raw(0x1d, 0x6b, 0x49, d.length); // GS k 73 = Code128
+        // Code128 standard ESC/POS: GS k 73 (len+2) {B data...
+        this.raw(0x1d, 0x6b, 0x49, d.length + 2, 0x7b, 0x42);
         this.text(d);
         return this;
     }
-    cut() { return this.raw(0x1d, 0x56, 0x41); } // GS V 65 = partial cut
+    cut() {
+        // Feed 3 baris lalu potong kertas
+        return this.feed(3).raw(0x1d, 0x56, 0x42, 0x00);
+    }
     toBytes() { return new Uint8Array(this.bytes); }
 }
 
@@ -69,7 +72,6 @@ function rupiah(n) {
     return 'Rp ' + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-// Entri layout: {t:'line', s, c:0/1/2 (align), b (bold), h (size 0/1/2)} | {t:'sep', w} | {t:'barcode', d} | {t:'feed', n}
 function pad(s, w) { s = String(s); return s.length >= w ? s : s + ' '.repeat(w - s.length); }
 function pair(l, r, w) { return pad(l, w - String(r).length) + r; }
 
@@ -95,7 +97,9 @@ function layoutStruk58(data) {
     E.push({ t: 'line', s: pair('BAYAR (' + (data.metode ?? '') + ')', rupiah(data.bayar), W) });
     E.push({ t: 'line', s: pair('KEMBALI', rupiah(data.kembali), W) });
     E.push({ t: 'sep', w: W });
-    E.push({ t: 'barcode', d: data.no_transaksi ?? '' });
+    if (data.no_transaksi) {
+        E.push({ t: 'barcode', d: data.no_transaksi });
+    }
     E.push({ t: 'line', s: 'Terima Kasih atas Kunjungan Anda!', c: 1 });
     E.push({ t: 'line', s: 'Garansi part sesuai ketentuan toko.', c: 1 });
     E.push({ t: 'feed', n: 3 });
@@ -131,7 +135,9 @@ function layoutFaktur80(data) {
     E.push({ t: 'line', s: pair('BAYAR (' + (data.metode ?? '') + ')', rupiah(data.bayar), W) });
     E.push({ t: 'line', s: pair('KEMBALI', rupiah(data.kembali), W) });
     E.push({ t: 'sep', w: W, c: '=' });
-    E.push({ t: 'barcode', d: data.no_transaksi ?? '' });
+    if (data.no_transaksi) {
+        E.push({ t: 'barcode', d: data.no_transaksi });
+    }
     E.push({ t: 'line', s: 'Terima Kasih atas Kunjungan Anda!', c: 1 });
     E.push({ t: 'line', s: 'Garansi part sesuai ketentuan toko.', c: 1 });
     E.push({ t: 'feed', n: 1 });
@@ -154,20 +160,20 @@ function entriesToBytes(entries, width) {
             continue;
         }
         if (e.t === 'barcode') {
-            p.align(1).size(0).barcode128(e.d).feed(2); // 2 baris di bawah barcode
+            p.align(1).size(0).barcode128(e.d).feed(2);
             continue;
         }
         // line
         p.align(e.c ?? 0).size(e.h ? (e.h === 1 ? 0x10 : 0x90) : 0).bold(!!e.b);
         let s = e.s;
-        if (e.c === 2) s = s.padStart(width); // rata kanan
+        if (e.c === 2) s = s.padStart(width);
         p.line(s);
     }
     p.cut();
     return p.toBytes();
 }
 
-/* ============================== Renderer: HTML (fallback Web Print) ============================== */
+/* ============================== Renderer: HTML (Web Print A4 / PDF) ============================== */
 
 function entriesToHtml(entries) {
     const parts = [];
@@ -193,80 +199,306 @@ function escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/* ============================== Bluetooth print ============================== */
+/* ============================== Web Bluetooth (BLE GATT) ============================== */
 
-async function printBluetooth(bytes) {
-    if (!('bluetooth' in navigator)) {
-        alert('Browser ini tidak mendukung Bluetooth. Coba gunakan Chrome di Android.');
-        throw new Error('bluetooth-unsupported');
-    }
-    const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb', '000018f0-0000-1000-8000-00805f9b34fb'],
-    });
-    const server = await device.gatt.connect();
-    let char = null;
-    try {
-        const services = await server.getPrimaryServices();
-        for (const svc of services) {
-            let cs = [];
-            try { cs = await svc.getCharacteristics(); } catch (err) { /* layanan tertentu diblokir browser */ }
-            char = cs.find((c) => c.properties.write || c.properties.writeWithoutResponse);
-            if (char) break;
-        }
-        if (!char) {
-            throw new Error('Printer Bluetooth tidak ditemukan. Pastikan printer menyala dan dalam mode pairing.');
-        }
-        if (char.properties.write) await char.writeValue(bytes);
-        else if (char.properties.writeWithoutResponse) await char.writeValueWithoutResponse(bytes);
-    } finally {
-        try { if (device.gatt.connected) device.gatt.disconnect(); } catch (err) { /* abaikan */ }
+// Daftar UUID Service BLE Thermal Printer populer (58mm & 80mm)
+const THERMAL_SERVICES = [
+    '0000ffe0-0000-1000-8000-00805f9b34fb', // Standard HM-10 / CC2540 / POS-58
+    '000018f0-0000-1000-8000-00805f9b34fb', // MPT-II / Rego
+    '0000fff0-0000-1000-8000-00805f9b34fb', // Goojprt / Panda / EP-58
+    '0000ff00-0000-1000-8000-00805f9b34fb', // Xprinter / PT-210
+    '0000fee7-0000-1000-8000-00805f9b34fb', // Tencent / micro-printer
+    '0000ae00-0000-1000-8000-00805f9b34fb',
+    '0000ae30-0000-1000-8000-00805f9b34fb',
+    '0000af30-0000-1000-8000-00805f9b34fb',
+    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC transparent UART
+    '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service (NUS)
+    'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Nordic UART legacy
+];
+
+// Persistent state di memory browser agar bisa print otomatis tanpa popup berulang
+let cachedBleDevice = null;
+let cachedCharacteristic = null;
+
+function notify(message, type = 'info') {
+    if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+    } else {
+        console.log(`[POS Print ${type}]:`, message);
     }
 }
 
-/* ============================== Alpine component ============================== */
+function resolveReceiptData(passedData) {
+    if (passedData && passedData.no_transaksi) return passedData;
+    const el = document.getElementById('pos-receipt-data');
+    if (el && el.textContent) {
+        try {
+            const d = JSON.parse(el.textContent);
+            if (d && d.no_transaksi) return d;
+        } catch (e) {
+            console.error('Failed to parse #pos-receipt-data:', e);
+        }
+    }
+    return null;
+}
 
+// Cari characteristic untuk menulis byte ESC/POS
+async function findWriteCharacteristic(server) {
+    let char = null;
+    let services = [];
+
+    try {
+        services = await server.getPrimaryServices();
+    } catch (err) {
+        console.warn('[BLE] getPrimaryServices failed, checking specific UUIDs:', err);
+    }
+
+    for (const svc of services) {
+        try {
+            const cs = await svc.getCharacteristics();
+            char = cs.find((c) => c.properties.write || c.properties.writeWithoutResponse);
+            if (char) return char;
+        } catch (e) { /* ignore */ }
+    }
+
+    // Jika getPrimaryServices kosong, loop spesifik service UUID
+    for (const uuid of THERMAL_SERVICES) {
+        try {
+            const svc = await server.getPrimaryService(uuid);
+            const cs = await svc.getCharacteristics();
+            char = cs.find((c) => c.properties.write || c.properties.writeWithoutResponse);
+            if (char) return char;
+        } catch (err) { /* service tidak ada di printer ini */ }
+    }
+
+    return null;
+}
+
+// Kirim data byte ke printer Bluetooth BLE dengan chunking
+async function writeBytesToCharacteristic(char, bytes) {
+    const CHUNK_SIZE = 64; // Batas aman BLE MTU
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        const chunk = bytes.slice(i, i + CHUNK_SIZE);
+        if (char.properties.write) {
+            await char.writeValue(chunk);
+        } else if (char.properties.writeWithoutResponse) {
+            await char.writeValueWithoutResponse(chunk);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+}
+
+// Koneksi BLE Printer (Otomatis pakai cached jika ada, atau minta pairing)
+async function connectBlePrinter(forceNewPairing = false) {
+    if (!('bluetooth' in navigator)) {
+        const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!isSecure) {
+            throw new Error('SECURE_CONTEXT_REQUIRED');
+        }
+        throw new Error('BLUETOOTH_UNSUPPORTED');
+    }
+
+    // Jika sudah ada device tersimpan dan masih tersambung
+    if (!forceNewPairing && cachedBleDevice && cachedCharacteristic && cachedBleDevice.gatt && cachedBleDevice.gatt.connected) {
+        return { device: cachedBleDevice, char: cachedCharacteristic, reused: true };
+    }
+
+    // Coba reconnect ke device yang pernah dipilih jika gatt terputus
+    if (!forceNewPairing && cachedBleDevice && cachedBleDevice.gatt) {
+        try {
+            notify(`Menghubungkan ulang ke ${cachedBleDevice.name || 'Printer Bluetooth'}...`, 'info');
+            const server = await cachedBleDevice.gatt.connect();
+            const char = await findWriteCharacteristic(server);
+            if (char) {
+                cachedCharacteristic = char;
+                return { device: cachedBleDevice, char, reused: true };
+            }
+        } catch (err) {
+            console.warn('[BLE] Reconnect failed, requesting device pairing:', err);
+            cachedBleDevice = null;
+            cachedCharacteristic = null;
+        }
+    }
+
+    // Minta user memilih printer BLE via popup native browser
+    notify('Pilih printer Bluetooth Anda pada popup browser...', 'info');
+    const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: THERMAL_SERVICES,
+    });
+
+    device.addEventListener('gattserverdisconnected', () => {
+        console.log('[BLE] Printer disconnected:', device.name);
+        cachedCharacteristic = null;
+    });
+
+    const server = await device.gatt.connect();
+    const char = await findWriteCharacteristic(server);
+
+    if (!char) {
+        throw new Error('Karakteristik cetak tidak ditemukan pada printer Bluetooth ini. Pastikan printer mendukung BLE ESC/POS.');
+    }
+
+    cachedBleDevice = device;
+    cachedCharacteristic = char;
+    localStorage.setItem('ute_ble_printer_name', device.name || 'Printer BLE');
+
+    return { device, char, reused: false };
+}
+
+// Cetak data ke Bluetooth BLE
+async function printViaBluetooth(bytes, forceNewPairing = false) {
+    const { device, char, reused } = await connectBlePrinter(forceNewPairing);
+    await writeBytesToCharacteristic(char, bytes);
+    return device;
+}
+
+// Putus / Reset printer tersimpan
+function resetBlePrinter() {
+    if (cachedBleDevice && cachedBleDevice.gatt && cachedBleDevice.gatt.connected) {
+        try { cachedBleDevice.gatt.disconnect(); } catch (e) { /* ignore */ }
+    }
+    cachedBleDevice = null;
+    cachedCharacteristic = null;
+    localStorage.removeItem('ute_ble_printer_name');
+    notify('Printer Bluetooth berhasil diputus / di-reset.', 'info');
+}
+
+/* ============================== Universal Print Entrypoint ============================== */
+
+let isPrintingLock = false;
+
+async function printThermalReceipt(kind = '58', customData = null, forceNewPairing = false) {
+    if (isPrintingLock) return;
+    isPrintingLock = true;
+
+    try {
+        const data = resolveReceiptData(customData);
+        if (!data) {
+            notify('Data struk tidak ditemukan.', 'warning');
+            return;
+        }
+
+        const bytes = kind === '80' ? buildFaktur80(data) : buildStruk58(data);
+
+        try {
+            const device = await printViaBluetooth(bytes, forceNewPairing);
+            notify(`Struk berhasil dicetak ke ${device.name || 'Printer Bluetooth'}!`, 'success');
+        } catch (e) {
+            console.error('[POS BLE Print Error]:', e);
+
+            if (e && (e.name === 'NotFoundError' || e.name === 'AbortError')) {
+                notify('Pemilihan printer Bluetooth dibatalkan.', 'warning');
+                return;
+            }
+
+            if (e.message === 'SECURE_CONTEXT_REQUIRED') {
+                const modalHtml = `
+                    <div id="ble-https-warning" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+                        <div class="glass-panel p-6 rounded-2xl max-w-md w-full border border-up-amber/40 shadow-2xl">
+                            <h4 class="text-base font-bold text-up-amber flex items-center gap-2 mb-3">
+                                <span>⚠️</span> Web Bluetooth Butuh HTTPS
+                            </h4>
+                            <p class="text-xs text-ink-200 leading-relaxed mb-4">
+                                Browser (Chrome/Edge) <strong>memblokir koneksi Bluetooth langsung</strong> jika aplikasi diakses lewat protokol HTTP biasa (<code class="text-up-amber bg-black/40 px-1 py-0.5 rounded">${window.location.origin}</code>).
+                            </p>
+                            <div class="bg-black/30 p-3 rounded-xl border border-white/10 text-xs text-ink-300 space-y-2 mb-4">
+                                <p class="font-bold text-white">Cara agar Bluetooth BLE bisa langsung aktif:</p>
+                                <p>1. Akses aplikasi via domain <strong>HTTPS</strong> dengan sertifikat SSL.</p>
+                                <p>2. Atau di Chrome: buka <code class="text-up-mint">chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, masukkan URL <code class="text-up-mint">${window.location.origin}</code>, pilih <strong>Enabled</strong>, lalu Relaunch.</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="document.getElementById('ble-https-warning')?.remove()" class="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs">
+                                    Tutup
+                                </button>
+                                <button onclick="document.getElementById('ble-https-warning')?.remove(); window.print()" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/80 text-white font-bold text-xs">
+                                    Gunakan Web Print
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                const existing = document.getElementById('ble-https-warning');
+                if (existing) existing.remove();
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                return;
+            }
+
+            if (e.message === 'BLUETOOTH_UNSUPPORTED') {
+                notify('Browser ini tidak mendukung Web Bluetooth. Gunakan Google Chrome atau Microsoft Edge.', 'error');
+                return;
+            }
+
+            notify(`Gagal mencetak: ${e.message || 'Koneksi Bluetooth gagal'}. Pastikan printer menyala & dekat.`, 'error');
+        }
+    } finally {
+        setTimeout(() => {
+            isPrintingLock = false;
+        }, 500);
+    }
+}
+
+/* ============================== Alpine Component ============================== */
+
+function thermalPrinter(receiptData) {
+    return {
+        data: receiptData || null,
+        isPrinting: false,
+        pairedPrinterName: localStorage.getItem('ute_ble_printer_name') || null,
+
+        init() {
+            if (!this.data) {
+                this.data = resolveReceiptData();
+            }
+        },
+
+        async printStruk58(forceNewPairing = false) {
+            if (this.isPrinting) return;
+            this.isPrinting = true;
+            try {
+                await printThermalReceipt('58', this.data, forceNewPairing);
+                this.pairedPrinterName = localStorage.getItem('ute_ble_printer_name');
+            } finally {
+                this.isPrinting = false;
+            }
+        },
+
+        async printFaktur80(forceNewPairing = false) {
+            if (this.isPrinting) return;
+            this.isPrinting = true;
+            try {
+                await printThermalReceipt('80', this.data, forceNewPairing);
+                this.pairedPrinterName = localStorage.getItem('ute_ble_printer_name');
+            } finally {
+                this.isPrinting = false;
+            }
+        },
+
+        disconnectPrinter() {
+            resetBlePrinter();
+            this.pairedPrinterName = null;
+        },
+
+        webPrint() {
+            window.print();
+        },
+    };
+}
+
+// Global exports
+window.thermalPrinter = thermalPrinter;
+window.printThermalReceipt = printThermalReceipt;
+window.resetBlePrinter = resetBlePrinter;
+window.getPosReceiptData = resolveReceiptData;
+
+// Alpine registration
+if (window.Alpine) {
+    window.Alpine.data('thermalPrinter', thermalPrinter);
+}
 document.addEventListener('alpine:init', () => {
-    Alpine.data('thermalPrinter', (receiptData) => ({
-        data: receiptData || {},
-
-        async printStruk58() {
-            try {
-                await printBluetooth(buildStruk58(this.data));
-                return;
-            } catch (e) {
-                // Batal pilih perangkat (NotFoundError/AbortError) → diam, jangan dialog print.
-                if (e && (e.name === 'NotFoundError' || e.name === 'AbortError')) return;
-            }
-            this.printFallback('58', entriesToHtml(layoutStruk58(this.data)));
-        },
-
-        async printFaktur80() {
-            try {
-                await printBluetooth(buildFaktur80(this.data));
-                return;
-            } catch (e) {
-                if (e && (e.name === 'NotFoundError' || e.name === 'AbortError')) return;
-            }
-            this.printFallback('80', entriesToHtml(layoutFaktur80(this.data)));
-        },
-
-        // Fallback: render area tersembunyi → window.print() → bersihkan setelah cetak.
-        printFallback(kind, html) {
-            const area = document.getElementById('printTarget-' + kind);
-            if (!area) { window.print(); return; }
-            area.innerHTML = html;
-            document.body.dataset.modalPrint = kind;
-            const done = () => {
-                delete document.body.dataset.modalPrint;
-                area.innerHTML = '';
-                window.removeEventListener('afterprint', done);
-            };
-            window.addEventListener('afterprint', done);
-            setTimeout(done, 60 * 1000); // pengaman jika dialog print dibatalkan
-            setTimeout(() => window.print(), 60);
-        },
-    }));
+    if (window.Alpine) {
+        window.Alpine.data('thermalPrinter', thermalPrinter);
+    }
 });
 
 function buildStruk58(data) { return entriesToBytes(layoutStruk58(data), 32); }

@@ -62,6 +62,8 @@ function showToast(message, type = 'info') {
     }, 5000);
 }
 
+window.showToast = showToast;
+
 // [T-45] Feedback toast utk event Livewire `$dispatch('alert', ...)` — dipakai
 // buka/tutup kas, transaksi POS, pelanggan baru, stok, dll. Sebelumnya tidak ada
 // listener → submit "tidak ada respon".

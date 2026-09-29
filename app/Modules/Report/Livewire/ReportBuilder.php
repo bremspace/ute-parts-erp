@@ -57,6 +57,17 @@ class ReportBuilder extends Component
     public function updatedSourceModel(string $model): void
     {
         $this->sourceModel = $model;
+
+        if (empty($model)) {
+            $this->availableColumns = [];
+            $this->selectedColumns = [];
+            $this->filters = [];
+            $this->groupBy = [];
+            $this->showResults = false;
+
+            return;
+        }
+
         $this->availableColumns = app(ReportBuilderService::class)->getAvailableColumns($model);
         $this->selectedColumns = array_keys($this->availableColumns);
         $this->filters = [];
@@ -133,7 +144,8 @@ class ReportBuilder extends Component
         );
 
         // Limit to 500 rows for display
-        $this->queryResults = $query->limit(500)->get()->toArray();
+        $rawResults = $query->limit(500)->get()->toArray();
+        $this->queryResults = $service->formatRowsForDisplay($rawResults);
 
         // [P1-10] Header/isi tabel mengikuti kolom hasil aktual
         // (saat groupBy: kolom tergrup + 'jumlah', bukan selectedColumns mentah).
@@ -221,10 +233,18 @@ class ReportBuilder extends Component
     public function deleteReport(int $reportId): void
     {
         $report = SavedReport::findOrFail($reportId);
+        $user = auth()->user();
 
-        // Scope to owner
-        if ($report->user_id !== auth()->id()) {
-            abort(403, 'Anda tidak dapat menghapus laporan ini');
+        // Hak akses hapus:
+        // 1. Pemilik laporan (user pembuat)
+        // 2. Super Admin (akses penuh seluruh sistem)
+        // 3. Admin Toko (laporan bersama di cabang yang sama)
+        $canDelete = $report->user_id === auth()->id()
+            || ($user && $user->hasRole('super-admin'))
+            || ($user && $user->hasRole('admin-toko') && (int) $report->cabang_id === (int) session('cabang_id'));
+
+        if (! $canDelete) {
+            abort(403, 'Anda tidak memiliki hak akses untuk menghapus laporan ini');
         }
 
         $report->delete();

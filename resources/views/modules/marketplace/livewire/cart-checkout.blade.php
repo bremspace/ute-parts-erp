@@ -19,8 +19,9 @@
                 </p>
             </div>
 
-            <div class="flex gap-3 mt-6 justify-center">
-                <a href="{{ route('shop') }}" class="px-5 py-3 rounded-xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors min-h-[44px] flex items-center">Lanjut Belanja</a>
+            <div class="flex flex-wrap gap-3 mt-6 justify-center">
+                <a href="{{ route('customer.account') }}" class="px-5 py-3 rounded-xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors min-h-[44px] flex items-center">Lihat di Akun Saya</a>
+                <a href="{{ route('shop') }}" class="px-5 py-3 rounded-xl border border-ink-200 text-ink-700 font-bold text-sm hover:bg-ink-50 transition-colors min-h-[44px] flex items-center">Lanjut Belanja</a>
                 <a href="{{ route('cart') }}" class="px-5 py-3 rounded-xl border border-ink-200 text-ink-700 font-bold text-sm hover:bg-ink-50 transition-colors min-h-[44px] flex items-center">Lihat Keranjang</a>
             </div>
         </div>
@@ -64,9 +65,21 @@
                         @endforeach
                     </div>
 
-                    <div class="flex justify-between items-center pt-4 mt-2 border-t border-ink-100">
-                        <span class="font-bold text-ink-900">Total</span>
-                        <span class="text-xl font-black text-up-primary tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
+                    <div class="pt-4 mt-2 border-t border-ink-100 space-y-2">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-ink-600">Subtotal</span>
+                            <span class="font-bold text-ink-900 tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
+                        </div>
+                        @if(!empty($pajakPreview['enabled']) && $pajakPreview['ppn_nominal'] > 0)
+                            <div class="flex justify-between items-center text-xs text-ink-500">
+                                <span>PPN ({{ $pajakPreview['ppn_percent'] }}%)</span>
+                                <span class="font-semibold text-ink-700 tabular-nums">+ Rp {{ number_format($pajakPreview['ppn_nominal'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                        <div class="flex justify-between items-center pt-2 border-t border-ink-50">
+                            <span class="font-bold text-ink-900 text-base">Total Tagihan</span>
+                            <span class="text-xl font-black text-up-primary tabular-nums">Rp {{ number_format($pajakPreview['total_akhir'] ?? $subtotal, 0, ',', '.') }}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -85,7 +98,7 @@
                     </div>
 
                     <label class="block text-xs font-bold text-ink-700 uppercase tracking-wider mb-1.5">Cabang Pengambilan</label>
-                    <select wire:model="selectedCabangId" class="w-full px-3.5 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium outline-none focus:border-up-primary">
+                    <select wire:model.live="selectedCabangId" class="w-full px-3.5 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium outline-none focus:border-up-primary">
                         @foreach($cabangs as $c)
                             <option value="{{ $c->id }}" class="text-ink-900">{{ $c->nama }} — {{ $c->alamat }}</option>
                         @endforeach
@@ -96,7 +109,7 @@
                 </div>
 
                 <button wire:click="placeOrder" class="w-full py-4 rounded-2xl bg-gradient-to-r from-up-primary to-indigo-600 text-white font-black text-base hover:from-up-primary-dark shadow-lg shadow-up-primary/25 transition-all cursor-pointer active:scale-[0.99]">
-                    Buat Pesanan — Rp {{ number_format($subtotal, 0, ',', '.') }}
+                    Buat Pesanan — Rp {{ number_format($pajakPreview['total_akhir'] ?? $subtotal, 0, ',', '.') }}
                 </button>
 
                 @if($riwayatOrders->count() > 0)
@@ -123,9 +136,9 @@
                     <p class="text-sm text-ink-500 mt-1.5 max-w-sm mx-auto">
                         Checkout wajib menggunakan akun pelanggan. Daftar sekali dengan nomor HP — prosesnya 1 langkah cepat.
                     </p>
-                    <div class="flex gap-3 justify-center mt-6">
-                        <a href="{{ route('customer.login') }}" class="px-6 py-3 rounded-xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors">Masuk</a>
-                        <a href="{{ route('customer.register') }}" class="px-6 py-3 rounded-xl bg-up-accent text-white font-bold text-sm hover:opacity-90 transition-colors">Daftar Baru</a>
+                    <div class="flex flex-wrap gap-3 justify-center mt-6">
+                        <a href="{{ route('customer.login') }}" class="px-6 py-3 rounded-xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors min-h-[44px] flex items-center justify-center active:scale-[0.97]">Masuk</a>
+                        <a href="{{ route('customer.register') }}" class="px-6 py-3 rounded-xl bg-up-accent text-white font-bold text-sm hover:opacity-90 transition-colors min-h-[44px] flex items-center justify-center active:scale-[0.97]">Daftar Baru</a>
                     </div>
                 </div>
             @endauth

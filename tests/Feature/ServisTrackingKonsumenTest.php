@@ -151,6 +151,32 @@ class ServisTrackingKonsumenTest extends TestCase
         $this->assertEquals('ditolak', $tiket->fresh()->status);
     }
 
+    public function test_tracking_search_page_renders_with_status_200(): void
+    {
+        $response = $this->get('/tracking');
+        $response->assertStatus(200);
+        $response->assertSee('Lacak Status Servis Gadget');
+    }
+
+    public function test_tracking_search_redirects_when_ticket_number_matched(): void
+    {
+        $tiket = $this->servisService->terimaUnit([
+            'cabang_id' => $this->cabang->id,
+            'jenis_hp' => 'Poco X3',
+            'keluhan' => 'Restart sendiri',
+        ], $this->user);
+
+        $response = $this->post('/tracking', ['q' => $tiket->no_tiket]);
+        $response->assertRedirect('/tracking/'.$tiket->token_approval);
+    }
+
+    public function test_tracking_search_flashes_error_when_not_found(): void
+    {
+        $response = $this->post('/tracking', ['q' => 'NON-EXISTENT-999']);
+        $response->assertRedirect('/tracking');
+        $response->assertSessionHas('error');
+    }
+
     public function test_api_servis_tracking_dapat_diakses_publik_tanpa_authorization(): void
     {
         $tiket = $this->servisService->terimaUnit([

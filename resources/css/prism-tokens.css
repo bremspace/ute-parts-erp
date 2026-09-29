@@ -120,6 +120,14 @@ button:not(:disabled),
 [x-cloak] { display: none !important; }
 
 /* Scrollbars */
+.scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -185,8 +193,10 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
     .sidebar-collapsed .sidebar-brand-text,
     .sidebar-collapsed .sidebar-branch-label,
     .sidebar-collapsed .sidebar-branch-ganti,
-    .sidebar-collapsed .sidebar-user-meta {
-        display: none;
+    .sidebar-collapsed .sidebar-user-meta,
+    .sidebar-collapsed .sidebar-chevron,
+    .sidebar-collapsed .sidebar-submenu {
+        display: none !important;
     }
 
     .sidebar-collapsed .sidebar-brand {

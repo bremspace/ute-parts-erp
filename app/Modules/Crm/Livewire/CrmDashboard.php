@@ -52,6 +52,10 @@ class CrmDashboard extends Component
 
     public function simpanPelangganBaruCrm()
     {
+        if (! $this->boleh('crm.create', 'Anda tidak memiliki izin menambah pelanggan.')) {
+            return;
+        }
+
         $this->validate([
             'pelangganBaruForm.nama' => 'required|string|max:255',
             'pelangganBaruForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon',
@@ -148,6 +152,10 @@ class CrmDashboard extends Component
     // ===== TIER CRUD =====
     public function openTierModal(?int $id = null)
     {
+        if (! $this->boleh('tier.manage', 'Anda tidak memiliki izin mengelola tier.')) {
+            return;
+        }
+
         if ($id) {
             $tier = TierMembership::findOrFail($id);
             $this->tierForm = $tier->toArray();
@@ -162,6 +170,10 @@ class CrmDashboard extends Component
 
     public function simpanTier()
     {
+        if (! $this->boleh('tier.manage', 'Anda tidak memiliki izin mengelola tier.')) {
+            return;
+        }
+
         $this->validate([
             'tierForm.nama' => 'required|string|max:255',
             'tierForm.kode' => 'required|string|max:50',
@@ -183,6 +195,10 @@ class CrmDashboard extends Component
 
     public function recalcTier()
     {
+        if (! $this->boleh('tier.manage', 'Anda tidak memiliki izin rekalkulasi tier.')) {
+            return;
+        }
+
         $updated = app(TierService::class)->recalcSemua();
         $this->dispatch('alert', ['type' => 'success', 'message' => "Rekalkulasi tier: {$updated} pelanggan diperbarui"]);
     }
@@ -223,6 +239,17 @@ class CrmDashboard extends Component
             'type' => 'success',
             'message' => "Broadcast dikirim ke {$kampanye->total_target} pelanggan via antrian",
         ]);
+    }
+
+    protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
+    {
+        if (auth()->user()?->can($permission)) {
+            return true;
+        }
+
+        $this->dispatch('alert', ['type' => 'error', 'message' => $pesan]);
+
+        return false;
     }
 
     public function render()

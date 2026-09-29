@@ -45,25 +45,36 @@ class ShopController extends Controller
 
         $query = Produk::query()
             ->where('is_active', true)
-            ->with(['skuVariants' => fn ($q) => $q->where('is_active', true)])
-            ->withCount('stokItems');
+            ->with([
+                'skuVariants' => fn ($q) => $q->where('is_active', true),
+                'kategoriRelasi',
+                'brand',
+                'tipeHps',
+                'hargaTier',
+            ])
+            ->withSum('stokItems', 'jumlah');
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
-                    ->orWhere('brand_kompatibel', 'like', "%{$search}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$search}%")
-                    ->orWhere('kategori', 'like', "%{$search}%");
-            });
+            $query->cariPintar($search);
         }
         if ($kategori) {
-            $query->where('kategori', $kategori);
+            if (is_numeric($kategori)) {
+                $query->where('kategori_id', (int) $kategori);
+            } else {
+                $query->where(function ($q) use ($kategori) {
+                    $q->where('kategori', $kategori)
+                        ->orWhereHas('kategoriRelasi', fn ($kq) => $kq->where('nama', $kategori)->orWhere('slug', $kategori));
+                });
+            }
         }
         if ($kondisi) {
             $query->where('kondisi', $kondisi);
         }
         if ($brand) {
-            $query->where('brand_kompatibel', $brand);
+            $query->where(function ($q) use ($brand) {
+                $q->where('brand_kompatibel', $brand)
+                    ->orWhereHas('brand', fn ($bq) => $bq->where('nama', $brand));
+            });
         }
         if ($hargaMin) {
             $query->where('harga_jual_retail', '>=', (float) $hargaMin);
@@ -76,23 +87,27 @@ class ShopController extends Controller
 
         $products = $query->paginate(24)->through(function ($p) use ($customer) {
             $pricing = $this->pricingService->resolve($p, $customer);
-            $totalStok = StokItem::where('produk_id', $p->id)->sum('jumlah');
+            $totalStok = (int) ($p->stok_items_sum_jumlah ?? 0);
 
             return [
                 'id' => $p->id,
                 'nama' => $p->nama,
                 'slug' => $p->slug,
-                'kategori' => $p->kategori,
+                'kategori' => $p->kategoriRelasi?->nama ?? $p->kategori,
+                'kategori_id' => $p->kategori_id,
                 'kondisi' => $p->kondisi,
                 'brand_kompatibel' => $p->brand_kompatibel,
                 'model_kompatibel' => $p->model_kompatibel,
-                'gambar' => $p->gambar,
+                'gambar' => $p->thumbnail_url ?: $p->gambar,
+                'foto_utama' => $p->foto_utama,
+                'thumbnail_url' => $p->thumbnail_url,
+                'foto' => $p->galeri_foto,
                 'harga_retail' => (float) $p->harga_jual_retail,
                 'harga_final' => $pricing['harga'],
                 'diskon_nominal' => $pricing['diskon_nominal'],
                 'alasan_harga' => $pricing['alasan'],
                 'tier' => $pricing['tier'],
-                'stok_total' => (int) $totalStok,
+                'stok_total' => $totalStok,
                 'tersedia' => $totalStok > 0,
             ];
         });
@@ -105,7 +120,15 @@ class ShopController extends Controller
     {
         $produk = Produk::where('slug', $slug)
             ->where('is_active', true)
-            ->with(['skuVariants' => fn ($q) => $q->where('is_active', true)])
+            ->with([
+                'skuVariants' => fn ($q) => $q->where('is_active', true),
+                'kategoriRelasi',
+                'brand',
+                'kualitas',
+                'tipeHps',
+                'produkKompatibel',
+                'hargaTier',
+            ])
             ->firstOrFail();
 
         $customer = $this->customerAktif();
@@ -137,6 +160,12 @@ class ShopController extends Controller
 
         return $this->success([
             'produk' => $produk,
+            'kategori' => $produk->kategoriRelasi?->nama ?? $produk->kategori,
+            'foto_utama' => $produk->foto_utama,
+            'thumbnail_url' => $produk->thumbnail_url,
+            'galeri_foto' => $produk->galeri_foto,
+            'tipe_hp_kompatibel' => $produk->tipeHps->map(fn ($t) => ['id' => $t->id, 'merk' => $t->merk, 'model' => $t->model, 'nama' => $t->nama]),
+            'produk_kompatibel' => $produk->produkKompatibel->map(fn ($pk) => ['id' => $pk->id, 'nama' => $pk->nama, 'slug' => $pk->slug, 'harga' => (float) $pk->harga_jual_retail, 'gambar' => $pk->thumbnail_url ?: $pk->gambar, 'catatan' => $pk->pivot?->catatan]),
             'harga' => $pricing,
             'stok_per_cabang' => $stokPerCabang,
             'stok_total' => (int) StokItem::where('produk_id', $produk->id)->sum('jumlah'),

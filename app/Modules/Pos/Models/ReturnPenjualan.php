@@ -3,9 +3,12 @@
 namespace App\Modules\Pos\Models;
 
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 /**
  * Retur penjualan (customer return) — tabel return_penjualan (migrasi SID fase 1).
@@ -16,7 +19,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class ReturnPenjualan extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
     protected $table = 'return_penjualan';
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('Return Penjualan');
+    }
 
     protected $casts = [
         'tanggal' => 'date',

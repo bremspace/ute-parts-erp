@@ -4,6 +4,7 @@ namespace App\Modules\Marketplace\Imports;
 
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
@@ -34,7 +35,7 @@ class ProdukImport implements ToModel, WithHeadingRow, WithValidation
         ];
     }
 
-    public function model(array $row)
+    public function model(array $row): Model|array|null
     {
         $nama = (string) $row['nama'];
         $slug = Str::slug($nama);

@@ -94,6 +94,9 @@ class PosKasir extends Component
 
     public ?array $receiptData = null;
 
+    // Riwayat transaksi modal state
+    public bool $showRiwayatTransaksiModal = false;
+
     // [T-03] Transaksi ditahan (park)
     public bool $showDitahanPanel = false;
 
@@ -285,12 +288,32 @@ class PosKasir extends Component
     // [F1-2] Diskon berubah → wajib rehitung PPN (DPP berubah)
     public function updatedDiskonPersen(): void
     {
+        $this->resetComputedTotals();
         $this->recalcPajak();
     }
 
     public function updatedDiskonNominal(): void
     {
+        $this->resetComputedTotals();
         $this->recalcPajak();
+    }
+
+    /**
+     * Reset Livewire memoized computed property cache.
+     * Wajib dipanggil saat cart/diskon berubah agar getter getXxxProperty()
+     * mengevaluasi state keranjang terbaru pada request yang sama.
+     */
+    private function resetComputedTotals(): void
+    {
+        unset(
+            $this->subtotal,
+            $this->totalAkhir,
+            $this->total,
+            $this->diskonTotal,
+            $this->totalBayar,
+            $this->kembalian,
+            $this->customer
+        );
     }
 
     // For cart partial
@@ -336,7 +359,13 @@ class PosKasir extends Component
             return;
         }
 
-        $variant = SkuVariant::where('sku', $q)->where('is_active', true)->first();
+        // 1. Cek exact match barcode atau SKU pada varian aktif
+        $variant = SkuVariant::where('is_active', true)
+            ->where(function ($query) use ($q) {
+                $query->where('barcode', $q)->orWhere('sku', $q);
+            })
+            ->first();
+
         if ($variant) {
             $this->addToCart($variant->produk_id, $variant->id);
             $this->search = '';
@@ -344,7 +373,15 @@ class PosKasir extends Component
             return;
         }
 
-        $produk = Produk::where('id', $q)->orWhere('nama', $q)->first();
+        // 2. Cek exact match barcode produk, ID, atau nama produk
+        $produk = Produk::where('is_active', true)
+            ->where(function ($query) use ($q) {
+                $query->where('barcode', $q)
+                    ->orWhere('id', $q)
+                    ->orWhere('nama', $q);
+            })
+            ->first();
+
         if ($produk) {
             $this->addToCart($produk->id);
             $this->search = '';
@@ -385,9 +422,6 @@ class PosKasir extends Component
 
             return;
         }
-
-        // Hitung ulang PPN setelah perubahan keranjang
-        $this->recalcPajak();
 
         // Resolusi harga
         $pricingService = app(PricingService::class);
@@ -431,7 +465,7 @@ class PosKasir extends Component
                 'varian' => $variant?->nama_varian ?? 'Standar',
                 'harga' => $harga,
                 'qty' => 1,
-                'diskon' => 0.0,
+                'diskon' => (float) ($pricing['diskon_nominal'] ?? 0.0),
                 'subtotal' => $harga,
                 'stok_max' => $stokTersedia,
                 'flex' => $produk->harga_fleksibel ? true : false,
@@ -440,6 +474,10 @@ class PosKasir extends Component
                 'sn_list' => [],
             ];
         }
+
+        // Reset computed properties cache & recalc pajak SETELAH item masuk keranjang
+        $this->resetComputedTotals();
+        $this->recalcPajak();
     }
 
     /** [B-02/P1-5] Load-more katalog (seluruh produk aktif bisa diakses). */
@@ -627,12 +665,14 @@ class PosKasir extends Component
             ]);
         }
 
+        $this->resetComputedTotals();
         $this->recalcPajak();
     }
 
     public function removeFromCart(string $itemKey)
     {
         unset($this->cart[$itemKey]);
+        $this->resetComputedTotals();
         $this->recalcPajak();
     }
 
@@ -644,6 +684,7 @@ class PosKasir extends Component
         $this->pajakNominal = 0.0;
         $this->dpp = 0.0;
         $this->ppnPersen = 0.0;
+        $this->resetComputedTotals();
         $this->recalcPajak();
     }
 
@@ -689,6 +730,7 @@ class PosKasir extends Component
 
         $this->cart[$itemKey]['harga'] = $harga;
         $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $harga;
+        $this->resetComputedTotals();
         $this->recalcPajak();
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Harga fleksibel diupdate']);
     }
@@ -734,6 +776,8 @@ class PosKasir extends Component
                 $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $pricing['harga'];
             }
         }
+        $this->resetComputedTotals();
+        $this->recalcPajak();
     }
 
     public function openPaymentModal()
@@ -752,6 +796,8 @@ class PosKasir extends Component
             return;
         }
 
+        $this->resetComputedTotals();
+        $this->recalcPajak();
         $this->jumlahBayar = $this->totalAkhir;
         $this->splitTunai = $this->totalAkhir;
         $this->splitNonTunai = 0.0;
@@ -1029,6 +1075,67 @@ class PosKasir extends Component
         }
     }
 
+    public function bukaRiwayatTransaksi(): void
+    {
+        $this->showRiwayatTransaksiModal = true;
+    }
+
+    public function tutupRiwayatTransaksi(): void
+    {
+        $this->showRiwayatTransaksiModal = false;
+    }
+
+    public function lihatDetailTransaksi(int $id): void
+    {
+        $cabangId = session('cabang_id');
+        $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->findOrFail($id);
+
+        $items = $transaksi->items->map(function ($item) {
+            return [
+                'nama' => $item->produk?->nama ?? 'Produk',
+                'sku' => $item->produk?->sku ?? '-',
+                'jumlah' => (int) $item->jumlah,
+                'harga' => (float) $item->harga_satuan,
+                'subtotal' => (float) $item->subtotal,
+            ];
+        })->toArray();
+
+        $this->receiptData = [
+            'no_transaksi' => $transaksi->no_transaksi,
+            'waktu' => $transaksi->created_at?->format('d/m/Y H:i'),
+            'kasir' => $transaksi->kasir?->name ?? 'Kasir',
+            'pelanggan' => $transaksi->pelanggan?->nama ?? 'Umum',
+            'tier' => $transaksi->pelanggan?->tierMembership?->nama ?? 'Retail',
+            'items' => $items,
+            'subtotal' => (float) $transaksi->subtotal,
+            'diskon' => (float) $transaksi->diskon_nominal,
+            'dpp' => (float) $transaksi->subtotal - (float) $transaksi->diskon_nominal,
+            'pajak' => (float) $transaksi->pajak_nominal,
+            'ppn_persen' => (float) $transaksi->pajak_persen,
+            'total' => (float) $transaksi->total_akhir,
+            'bayar' => (float) $transaksi->jumlah_bayar,
+            'kembali' => (float) $transaksi->kembalian,
+            'metode' => strtoupper($transaksi->metode_bayar ?? 'TUNAI'),
+        ];
+
+        $this->completedTransactionId = $transaksi->id;
+        $this->showReceiptModal = true;
+    }
+
+    public function getRiwayatTransaksiHariIniProperty()
+    {
+        $cabangId = session('cabang_id');
+
+        return Transaksi::with(['pelanggan', 'kasir'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->whereDate('created_at', now()->toDateString())
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+    }
+
     // ==================== [T-03] PARK / TAHAN ====================
 
     /** Simpan keranjang sebagai transaksi status 'ditahan' (F6) — belum kurangi stok. */
@@ -1131,6 +1238,7 @@ class PosKasir extends Component
         }
         $this->diskonPersen = (float) ($detail['diskon_persen'] ?? 0);
         $this->diskonNominal = (float) ($detail['diskon_nominal'] ?? 0);
+        $this->resetComputedTotals();
         $this->recalcPajak(); // [F1-2] resume park → rehitung PPN dari diskon tersimpan
         $this->selectedCustomerId = $transaksi->pelanggan_id;
 
@@ -1345,16 +1453,15 @@ class PosKasir extends Component
     {
         $productsQuery = Produk::query()
             ->where('is_active', true)
-            ->with(['skuVariants' => fn ($q) => $q->where('is_active', true)]);
+            ->with([
+                'skuVariants' => fn ($q) => $q->where('is_active', true),
+                'tipeHps',
+                'kategoriRelasi',
+                'hargaTier',
+            ]);
 
         if (! empty($this->search)) {
-            $search = $this->search;
-            $productsQuery->where(function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
-                    ->orWhere('brand_kompatibel', 'like', "%{$search}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$search}%")
-                    ->orWhereHas('skuVariants', fn ($sq) => $sq->where('sku', 'like', "%{$search}%"));
-            });
+            $productsQuery->cariPintar($this->search);
         }
 
         // [B-02/P1-5] Load-more: ambil batas+1 utk tahu masih ada sisanya
@@ -1389,8 +1496,13 @@ class PosKasir extends Component
             'dpp' => $this->dpp,
             'pajakNominal' => $this->pajakNominal,
             'ppnPersen' => $this->ppnPersen,
+            'pajakNama' => app(PajakService::class)->getNama(session('cabang_id')),
             'totalBayar' => $this->totalBayar,
             'subtotal' => $this->subtotal,
+            'totalAkhir' => $this->totalAkhir,
+            'kembalian' => $this->kembalian,
+            'customer' => $this->customer,
+            'riwayatTransaksiHariIni' => $this->riwayatTransaksiHariIni,
             // [F2-3] computed props SN — pass eksplisit (WAIBS)
             'snCari' => $this->snCari,
             'snItemKey' => $this->snItemKey,

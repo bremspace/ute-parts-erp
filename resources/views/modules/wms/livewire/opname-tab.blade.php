@@ -99,9 +99,9 @@
                     </table>
                 </div>
 
-                <div class="flex gap-3">
-                    <button wire:click="$set('showOpnameModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="saveOpname" class="flex-2 py-3 rounded-xl bg-up-primary text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px]">Kirim ke Supervisor untuk Approval</button>
+                <div class="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
+                    <button wire:click="$set('showOpnameModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.97]">Batal</button>
+                    <button wire:click="saveOpname" class="flex-1 sm:flex-2 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px] transition active:scale-[0.97]">Kirim ke Supervisor untuk Approval</button>
                 </div>
             </div>
         </div>

@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * [T-43] Proses import master produk via queue (QUEUE_CONNECTION=database).
@@ -22,7 +23,7 @@ class ImportProdukExcelJob implements ShouldQueue
 
     public int $tries = 2;
 
-    public int $timeout = 600;
+    public int $timeout = 3600;
 
     public function __construct(
         public int $importLogId,
@@ -32,6 +33,9 @@ class ImportProdukExcelJob implements ShouldQueue
 
     public function handle(ImportProdukService $service, NotificationService $notifikasi): void
     {
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(0);
+
         $log = ImportLog::find($this->importLogId);
         if (! $log) {
             return;
@@ -41,12 +45,17 @@ class ImportProdukExcelJob implements ShouldQueue
 
         try {
             $filePath = $this->filePath;
-            // Relative path (storage/app/...) → absolut
+            // Relative path (storage/app/...) → absolut via resolveFilePath
             if (! str_starts_with($filePath, DIRECTORY_SEPARATOR)) {
-                $filePath = storage_path('app/'.$filePath);
+                $filePath = $service->resolveFilePath($filePath);
             }
 
             $hasil = $service->commit($filePath, $this->importLogId, $this->userId);
+
+            $label = $hasil['label_status'] ?? ($hasil['gagal'] > 0 ? 'Diterima Sebagian' : 'Diterima Sempurna');
+            $pesanPeringatan = (! empty($hasil['total_peringatan']) && $hasil['total_peringatan'] > 0)
+                ? " (Terdapat {$hasil['total_peringatan']} catatan kemiripan/kompatibilitas)."
+                : '.';
 
             $log->update([
                 'total_baris' => $hasil['total_baris'],
@@ -60,18 +69,24 @@ class ImportProdukExcelJob implements ShouldQueue
                 'inapp',
                 null,
                 'Import Produk Selesai',
-                "Import produk selesai: {$hasil['sukses']} sukses, {$hasil['gagal']} gagal (jurnal stok awal Rp "
+                "Import produk selesai ({$label}): {$hasil['sukses']} sukses, {$hasil['gagal']} gagal{$pesanPeringatan} (jurnal stok awal Rp "
                     .number_format($hasil['jurnal_nilai'], 0, ',', '.').').',
                 [
                     'import_log_id' => $this->importLogId,
+                    'status_keseluruhan' => $hasil['status_keseluruhan'] ?? ($hasil['gagal'] > 0 ? 'sukses_sebagian' : 'sukses_penuh'),
+                    'label_status' => $label,
                     'sukses' => $hasil['sukses'],
                     'gagal' => $hasil['gagal'],
+                    'total_peringatan' => $hasil['total_peringatan'] ?? 0,
                     'type' => $hasil['gagal'] > 0 ? 'warning' : 'success',
                 ]
             );
 
             // Bersihkan file sementara
             @unlink($filePath);
+            if (! empty($this->filePath)) {
+                Storage::disk('local')->delete($this->filePath);
+            }
         } catch (\Throwable $e) {
             $log->update([
                 'status' => 'gagal',

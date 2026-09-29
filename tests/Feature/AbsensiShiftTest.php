@@ -108,6 +108,7 @@ class AbsensiShiftTest extends TestCase
 
     public function test_clock_out_mengisi_jam_keluar_idempotent(): void
     {
+        Carbon::setTestNow(Carbon::create(2026, 9, 24, 8, 0, 0));
         $karyawan = $this->buatKaryawan($this->buatUser());
         $this->absensi->clockIn($karyawan->id);
 
@@ -120,6 +121,7 @@ class AbsensiShiftTest extends TestCase
         // Idempotent: clock-out ganda tidak menimpa catatan
         $this->assertStringContainsString('pulang', $log->catatan);
         $this->assertStringNotContainsString('kedua', $log->catatan);
+        Carbon::setTestNow();
     }
 
     public function test_buka_kas_wajib_clock_in_terlebih_dahulu(): void

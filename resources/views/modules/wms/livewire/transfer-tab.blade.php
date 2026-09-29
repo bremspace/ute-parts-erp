@@ -77,10 +77,10 @@
                     <button type="button" wire:click="$set('showTransferModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang Asal</label>
-                        <select wire:model.live="transferGudangAsalId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                        <select wire:model.live="transferGudangAsalId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                             <option value="" class="bg-ink-900">Pilih Gudang Asal...</option>
                             @foreach($gudangs as $g)
                                 <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->kode }})</option>
@@ -90,7 +90,7 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang Tujuan</label>
-                        <select wire:model.live="transferGudangTujuanId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                        <select wire:model.live="transferGudangTujuanId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                             <option value="" class="bg-ink-900">Pilih Gudang Tujuan...</option>
                             @foreach($gudangs as $g)
                                 <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->kode }})</option>
@@ -111,12 +111,12 @@
                             $trfInfo = $transferStokRows[$index] ?? null;
                         @endphp
                         <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                            <div class="flex gap-3 items-center">
+                            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
                                 <div class="flex-1">
                                     <select
                                         wire:model="transferItems.{{ $index }}.produk_id"
                                         wire:change="transferProdukDipilih({{ $index }})"
-                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs"
+                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px]"
                                     >
                                         <option value="" class="bg-ink-900">Pilih Produk...</option>
                                         @foreach($allProducts as $p)
@@ -124,8 +124,8 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="w-32">
-                                    <select wire:model="transferItems.{{ $index }}.rak_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs">
+                                <div class="w-full sm:w-32">
+                                    <select wire:model="transferItems.{{ $index }}.rak_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px]">
                                         <option value="" class="bg-ink-900">Rak Tujuan</option>
                                         @foreach($raks as $rk)
                                             @if($rk->gudang_id == $transferGudangTujuanId)
@@ -134,22 +134,24 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="w-24">
+                                <div class="w-full sm:w-24">
                                     <input
                                         type="number"
                                         wire:model.live="transferItems.{{ $index }}.jumlah"
                                         data-trf-qty="{{ $index }}"
                                         min="1"
-                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-center tabular-nums"
+                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-center tabular-nums min-h-[44px]"
                                     />
                                 </div>
-                                <button
-                                    type="button"
-                                    wire:click="removeTransferRow({{ $index }})"
-                                    class="p-2 text-up-red hover:bg-white/5 rounded-lg text-xs"
-                                >
-                                    ✕
-                                </button>
+                                <div class="flex items-center justify-end">
+                                    <button
+                                        type="button"
+                                        wire:click="removeTransferRow({{ $index }})"
+                                        class="p-2 text-up-red hover:bg-white/5 rounded-lg text-xs min-h-[44px] flex items-center justify-center cursor-pointer"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- [T-41] Info stok real-time per item -->

@@ -54,6 +54,10 @@ class TransferTab extends Component
     #[On('wms-transfer-baru')]
     public function openNewTransferModal()
     {
+        if (! $this->boleh('wms.transfer', 'Anda tidak memiliki izin membuat transfer stok.')) {
+            return;
+        }
+
         $this->transferGudangAsalId = $this->filterGudangId;
         $this->transferGudangTujuanId = null;
         $this->transferCatatan = '';
@@ -218,6 +222,10 @@ class TransferTab extends Component
 
     public function saveTransfer()
     {
+        if (! $this->boleh('wms.transfer', 'Anda tidak memiliki izin menyimpan transfer stok.')) {
+            return;
+        }
+
         $this->validate([
             'transferGudangAsalId' => 'required|exists:gudang,id',
             'transferGudangTujuanId' => 'required|exists:gudang,id|different:transferGudangAsalId',
@@ -283,6 +291,10 @@ class TransferTab extends Component
 
     public function kirimTransfer(int $transferId)
     {
+        if (! $this->boleh('wms.transfer', 'Anda tidak memiliki izin mengirim transfer stok.')) {
+            return;
+        }
+
         $transfer = StokTransfer::with('items')->findOrFail($transferId);
 
         try {
@@ -349,6 +361,10 @@ class TransferTab extends Component
 
     public function terimaTransfer(int $transferId)
     {
+        if (! $this->boleh('wms.transfer', 'Anda tidak memiliki izin menerima transfer stok.')) {
+            return;
+        }
+
         $transfer = StokTransfer::with('items')->findOrFail($transferId);
 
         try {
@@ -407,6 +423,17 @@ class TransferTab extends Component
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
+    }
+
+    protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
+    {
+        if (auth()->user()?->can($permission)) {
+            return true;
+        }
+
+        $this->dispatch('alert', ['type' => 'error', 'message' => $pesan]);
+
+        return false;
     }
 
     public function render()

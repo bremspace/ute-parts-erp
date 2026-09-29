@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
@@ -15,6 +16,7 @@ use App\Modules\Report\Services\ReportBuilderService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -602,5 +604,188 @@ class DrillDownTest extends TestCase
             ->assertSet('selectedItemId', $trxA->id)
             ->assertSet('currentModel', 'Transaksi')
             ->assertSet('detail.no_transaksi', $trxA->no_transaksi);
+    }
+
+    /**
+     * Pastikan DrillDownViewer me-render kolom atribut model riil, bukan properti internal Eloquent (exists/incrementing).
+     */
+    public function test_drill_down_viewer_renders_actual_attributes_not_eloquent_internal_booleans(): void
+    {
+        $trx = Transaksi::create([
+            'no_transaksi' => 'TRX-REAL-'.Str::random(4),
+            'cabang_id' => session('cabang_id'),
+            'total_akhir' => 150000,
+            'status' => 'selesai',
+        ]);
+
+        $test = Livewire::test(DrillDownViewer::class, ['model' => 'Transaksi']);
+
+        $items = $test->get('items');
+        $this->assertNotEmpty($items);
+        $this->assertArrayHasKey('no_transaksi', $items[0]);
+        $this->assertArrayNotHasKey('exists', $items[0]);
+        $this->assertArrayNotHasKey('incrementing', $items[0]);
+
+        $test->assertSee($trx->no_transaksi)
+            ->assertDontSee('WAS RECENTLY CREATED');
+    }
+
+    /**
+     * Pastikan ReportBuilder saat memilih sourceModel langsung memunculkan availableColumns dan selectedColumns.
+     */
+    public function test_report_builder_reactive_source_model_exposes_columns(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user, 'web');
+
+        $component = Livewire::test(ReportBuilder::class)
+            ->assertSet('sourceModel', '')
+            ->assertSet('availableColumns', [])
+            ->set('sourceModel', 'Transaksi')
+            ->assertSet('sourceModel', 'Transaksi');
+
+        $available = $component->get('availableColumns');
+        $this->assertNotEmpty($available);
+        $this->assertArrayHasKey('no_transaksi', $available);
+        $this->assertNotEmpty($component->get('selectedColumns'));
+    }
+
+    /**
+     * Hak akses delete saved report:
+     * - super-admin bisa hapus laporan milik siapa saja.
+     * - admin-toko bisa hapus laporan bersama di cabangnya.
+     * - user biasa ditolak (403) jika bukan miliknya.
+     */
+    public function test_delete_saved_report_permissions_super_admin_admin_toko_and_owner(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $cabangId = session('cabang_id');
+        $userOwner = User::factory()->create();
+        $userOther = User::factory()->create();
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole('super-admin');
+        $adminToko = User::factory()->create();
+        $adminToko->assignRole('admin-toko');
+
+        $report1 = SavedReport::create([
+            'name' => 'Laporan Owner',
+            'source_model' => 'Transaksi',
+            'columns' => ['no_transaksi'],
+            'user_id' => $userOwner->id,
+            'cabang_id' => $cabangId,
+            'shared' => true,
+        ]);
+
+        $report2 = SavedReport::create([
+            'name' => 'Laporan Lain',
+            'source_model' => 'Transaksi',
+            'columns' => ['no_transaksi'],
+            'user_id' => $userOwner->id,
+            'cabang_id' => $cabangId,
+            'shared' => false,
+        ]);
+
+        // 1. User lain bukan super-admin dan bukan admin-toko -> 403
+        $this->actingAs($userOther, 'web');
+        Livewire::test(ReportBuilder::class)
+            ->call('deleteReport', $report1->id)
+            ->assertStatus(403);
+
+        $this->assertDatabaseHas('saved_reports', ['id' => $report1->id]);
+
+        // 2. Admin toko dapat menghapus laporan shared di cabangnya
+        $this->actingAs($adminToko, 'web');
+        Livewire::test(ReportBuilder::class)->call('deleteReport', $report1->id);
+        $this->assertDatabaseMissing('saved_reports', ['id' => $report1->id]);
+
+        // 3. Super admin dapat menghapus laporan milik siapa saja
+        $this->actingAs($superAdmin, 'web');
+        Livewire::test(ReportBuilder::class)->call('deleteReport', $report2->id);
+        $this->assertDatabaseMissing('saved_reports', ['id' => $report2->id]);
+    }
+
+    /**
+     * Pastikan ReportBuilder dan DrillDownViewer menampilkan data yang mudah dibaca pengguna:
+     * - cabang_id -> nama cabang
+     * - kasir_id / user_id -> nama user
+     * - pelanggan_id null -> Pelanggan Umum (Walk-in)
+     * - pelanggan_id terisi -> Nama pelanggan (+ No HP)
+     * - metode_pembayaran -> format terbaca (misal QRIS, Tunai)
+     * - status -> format terbaca (misal Selesai)
+     */
+    public function test_report_builder_and_drill_down_format_foreign_keys_and_enums_to_human_readable(): void
+    {
+        $cabang = Cabang::find(session('cabang_id'));
+        $kasir = User::factory()->create(['name' => 'Budi Kasir']);
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Joko Pelanggan',
+            'no_hp' => '08123456789',
+            'cabang_id' => $cabang->id,
+            'is_active' => true,
+        ]);
+
+        $trx1 = Transaksi::create([
+            'no_transaksi' => 'TRX-FMT-1',
+            'cabang_id' => $cabang->id,
+            'kasir_id' => $kasir->id,
+            'pelanggan_id' => null, // Pelanggan umum
+            'total_akhir' => 100000,
+            'metode_bayar' => 'qris',
+            'status' => 'selesai',
+        ]);
+
+        $trx2 = Transaksi::create([
+            'no_transaksi' => 'TRX-FMT-2',
+            'cabang_id' => $cabang->id,
+            'kasir_id' => $kasir->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_akhir' => 250000,
+            'metode_bayar' => 'tunai',
+            'status' => 'proses',
+        ]);
+
+        $service = app(ReportBuilderService::class);
+
+        // Test service formatRowsForDisplay
+        $formatted = $service->formatRowsForDisplay([$trx1->toArray(), $trx2->toArray()]);
+        $this->assertSame($cabang->nama, $formatted[0]['cabang_id']);
+        $this->assertSame('Budi Kasir', $formatted[0]['kasir_id']);
+        $this->assertSame('Pelanggan Umum (Walk-in)', $formatted[0]['pelanggan_id']);
+        $this->assertSame('QRIS', $formatted[0]['metode_bayar']);
+        $this->assertSame('Selesai', $formatted[0]['status']);
+
+        $this->assertSame($cabang->nama, $formatted[1]['cabang_id']);
+        $this->assertStringContainsString('Joko Pelanggan', $formatted[1]['pelanggan_id']);
+        $this->assertSame('Tunai', $formatted[1]['metode_bayar']);
+        $this->assertSame('Diproses', $formatted[1]['status']);
+
+        // Test Livewire ReportBuilder preview
+        $user = User::factory()->create();
+        $this->actingAs($user, 'web');
+
+        $rb = Livewire::test(ReportBuilder::class)
+            ->set('sourceModel', 'Transaksi')
+            ->set('selectedColumns', ['no_transaksi', 'cabang_id', 'kasir_id', 'pelanggan_id', 'metode_bayar', 'status'])
+            ->call('buildAndShow')
+            ->assertSet('showResults', true);
+
+        $results = $rb->get('queryResults');
+        $this->assertNotEmpty($results);
+
+        $row1 = collect($results)->firstWhere('no_transaksi', 'TRX-FMT-1');
+        $this->assertNotNull($row1);
+        $this->assertSame($cabang->nama, $row1['cabang_id']);
+        $this->assertSame('Budi Kasir', $row1['kasir_id']);
+        $this->assertSame('Pelanggan Umum (Walk-in)', $row1['pelanggan_id']);
+
+        // Test Livewire DrillDownViewer
+        $dd = Livewire::test(DrillDownViewer::class, ['model' => 'Transaksi']);
+        $ddItems = $dd->get('items');
+        $ddRow1 = collect($ddItems)->firstWhere('no_transaksi', 'TRX-FMT-1');
+        $this->assertNotNull($ddRow1);
+        $this->assertSame($cabang->nama, $ddRow1['cabang_id']);
+        $this->assertSame('Budi Kasir', $ddRow1['kasir_id']);
+        $this->assertSame('Pelanggan Umum (Walk-in)', $ddRow1['pelanggan_id']);
     }
 }

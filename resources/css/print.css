@@ -39,6 +39,11 @@
     body[data-modal-print="80"] .print-80 {
         display: block !important;
     }
+    body[data-modal-print="58"] .print-a4,
+    body[data-modal-print="80"] .print-a4 {
+        display: none !important;
+        visibility: hidden !important;
+    }
 
     /* Named pages: ukuran kertas per area. */
     @page a4page { size: A4; margin: 1cm; }

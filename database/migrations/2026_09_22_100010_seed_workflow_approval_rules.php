@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
@@ -47,9 +46,9 @@ return new class extends Migration
         ];
 
         foreach ($rules as $rule) {
-            ApprovalRule::firstOrCreate(
+            DB::table('approval_rules')->updateOrInsert(
                 ['entity_type' => $rule['entity_type'], 'cabang_id' => null],
-                $rule + ['max_amount' => null, 'is_aktif' => true]
+                $rule + ['max_amount' => null, 'is_aktif' => true, 'created_at' => now(), 'updated_at' => now()]
             );
         }
     }

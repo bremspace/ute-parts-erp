@@ -303,17 +303,28 @@
                 @endif
             </div>
         @else
-            <!-- Tiket Tidak Ditemukan -->
+            <!-- Form Pencarian & Tracking Servis -->
             <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-8 text-center">
-                <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
+                <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center mb-3">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </div>
-                <h3 class="font-bold text-slate-800 text-lg">Tiket Servis Tidak Ditemukan</h3>
-                <p class="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-                    Mohon periksa kembali link atau token tracking servis yang Anda buka. Hubungi customer service kami bila membutuhkan bantuan.
+                <h3 class="font-bold text-slate-800 text-lg">Lacak Status Servis Gadget</h3>
+                <p class="text-sm text-slate-500 mt-1 max-w-sm mx-auto mb-6">
+                    Masukkan Nomor Tiket Servis Anda (contoh: SRV-ONL-... atau SRV-...) atau Token Approval untuk melihat perkembangan perbaikan.
                 </p>
+
+                <form action="{{ route('servis.tracking.search') }}" method="POST" class="max-w-md mx-auto space-y-3">
+                    @csrf
+                    <div class="flex gap-2">
+                        <input type="text" name="q" placeholder="Nomor Tiket atau Token Servis" required autofocus
+                               class="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                        <button type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-colors cursor-pointer">
+                            Lacak
+                        </button>
+                    </div>
+                </form>
             </div>
         @endif
 

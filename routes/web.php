@@ -22,6 +22,8 @@ use App\Modules\Marketplace\Livewire\ShopPage;
 use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter;
 use App\Modules\Pos\Livewire\PosKasir;
+use App\Modules\Rbac\Livewire\RiwayatAktivitas;
+use App\Modules\Rbac\Livewire\SessionManagementPage;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Report\Livewire\DrillDownViewer;
@@ -45,6 +47,23 @@ Route::get('/shop', ShopPage::class)->name('shop');
 Route::get('/shop/{slug}', ShopPage::class)->name('shop.detail');
 
 // Tracking servis publik (PRD §4.3: link status via token, tanpa login)
+Route::match(['GET', 'POST'], '/tracking', function (Request $request) {
+    $query = trim((string) $request->input('q', $request->query('q', '')));
+    if ($query !== '') {
+        $tiket = TiketServis::where('token_approval', $query)
+            ->orWhere('no_tiket', $query)
+            ->first();
+
+        if ($tiket && ! empty($tiket->token_approval)) {
+            return redirect()->to(url('/tracking/'.$tiket->token_approval));
+        }
+
+        return redirect()->to(url('/tracking'))->with('error', "Tiket atau token '{$query}' tidak ditemukan. Silakan periksa kembali nomor tiket Anda.");
+    }
+
+    return view('servis.tracking-publik', ['tiket' => null]);
+})->name('servis.tracking.search');
+
 Route::get('/tracking/{token}', function ($token) {
     $tiket = TiketServis::with([
         'garansi',
@@ -322,14 +341,14 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
     // Servis HP Kanban Screen — [T-06] wajib role dgn permission servis.view (staf)
     Route::get('/servis', ServisBoard::class)->name('servis')->middleware('permission:servis.view');
 
-    // CRM & Membership Screen
-    Route::get('/crm', CrmDashboard::class)->name('crm');
+    // CRM & Membership Screen — RBAC: permission crm.view
+    Route::get('/crm', CrmDashboard::class)->name('crm')->middleware('permission:crm.view');
 
     // Lead Pipeline Kanban — [F2-1] wajib permission crm.view
     Route::get('/crm/leads', LeadKanban::class)->name('crm.leads')->middleware('permission:crm.view');
 
-    // Reseller & Komisi Screen
-    Route::get('/reseller', ResellerDashboard::class)->name('reseller');
+    // Reseller & Komisi Screen — RBAC: permission reseller.view
+    Route::get('/reseller', ResellerDashboard::class)->name('reseller')->middleware('permission:reseller.view');
 
     // Akunting & Keuangan Screen
     // [B-10a / P0-2] sebelumnya hanya `auth` (grup parent) → Livewire bisa post
@@ -353,11 +372,14 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
         ->name('laporan.pajak')
         ->middleware('permission:laporan.cabang');
 
-    // Omnichannel Command Center Screen
-    Route::get('/omnichannel', OmnichannelCommandCenter::class)->name('omnichannel');
+    // Omnichannel Command Center Screen — RBAC: permission omnichannel.view
+    Route::get('/omnichannel', OmnichannelCommandCenter::class)->name('omnichannel')->middleware('permission:omnichannel.view');
 
-    // Pengaturan & RBAC Screen
-    Route::get('/pengaturan', SettingsRbac::class)->name('pengaturan');
+    // Pengaturan & RBAC Screen — RBAC: permission pengaturan.manage|user.view
+    Route::get('/pengaturan', SettingsRbac::class)->name('pengaturan')->middleware('permission:pengaturan.manage|user.view');
+
+    // [F1-4] Audit Trail Log Aktivitas Sistem
+    Route::get('/audit-log', RiwayatAktivitas::class)->name('audit-log')->middleware('permission:lihat-audit-log');
 
     // [F2-4] BI Drill-down & Custom Report Builder
     Route::get('/laporan', ReportBuilder::class)->name('laporan')->middleware('permission:laporan.cabang');
@@ -408,4 +430,5 @@ Route::middleware('auth')->prefix('app/keamanan')->group(function () {
     Route::post('/dua-faktor/aktifkan', [TwoFactorSetupController::class, 'enable'])->name('two-factor.enable');
     Route::post('/dua-faktor/nonaktifkan', [TwoFactorSetupController::class, 'disable'])->name('two-factor.disable');
     Route::post('/dua-faktor/kode-cadangan', [TwoFactorSetupController::class, 'regenerateBackupCodes'])->name('two-factor.backup-codes');
+    Route::get('/sesi', SessionManagementPage::class)->name('keamanan.sesi')->middleware('permission:kelola-sesi');
 });

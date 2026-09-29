@@ -42,25 +42,29 @@ class PosController extends Controller
         if ($q !== '') {
             $query = Produk::query()
                 ->where('is_active', true)
-                ->with(['skuVariants' => fn ($sq) => $sq->where('is_active', true)])
-                ->where(fn ($sub) => $sub
-                    ->where('nama', 'like', "%{$q}%")
-                    ->orWhere('kategori', 'like', "%{$q}%")
-                    ->orWhere('brand_kompatibel', 'like', "%{$q}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$q}%")
-                    ->orWhereHas('skuVariants', fn ($sq) => $sq->where('sku', 'like', "%{$q}%"))
-                );
+                ->with(['skuVariants' => fn ($sq) => $sq->where('is_active', true), 'hargaTier'])
+                ->cariPintar($q);
 
             $pelanggan = $customerId ? Pelanggan::with('tierMembership')->find($customerId) : null;
 
-            $items = $query->limit(10)->get()->map(fn ($product) => [
+            $rawProducts = $query->limit(10)->get();
+            $productIds = $rawProducts->pluck('id')->all();
+
+            $stokMap = ($gudangId && ! empty($productIds))
+                ? StokItem::whereIn('produk_id', $productIds)
+                    ->where('gudang_id', $gudangId)
+                    ->groupBy('produk_id')
+                    ->selectRaw('produk_id, SUM(jumlah) as total')
+                    ->pluck('total', 'produk_id')
+                    ->all()
+                : [];
+
+            $items = $rawProducts->map(fn ($product) => [
                 'id' => $product->id,
                 'nama' => $product->nama,
                 'sku' => $product->skuVariants->first()?->sku,
                 'harga' => (float) $this->pricingService->resolve($product, $pelanggan)['harga'],
-                'stok' => $gudangId
-                    ? (int) StokItem::where('produk_id', $product->id)->where('gudang_id', $gudangId)->sum('jumlah')
-                    : 0,
+                'stok' => (int) ($stokMap[$product->id] ?? 0),
                 'foto' => $product->foto[0] ?? $product->gambar,
             ]);
 
@@ -74,34 +78,37 @@ class PosController extends Controller
 
         $query = Produk::query()
             ->where('is_active', true)
-            ->with(['skuVariants' => function ($q) {
-                $q->where('is_active', true);
-            }]);
+            ->with([
+                'skuVariants' => fn ($q) => $q->where('is_active', true),
+                'hargaTier',
+            ]);
 
         if (! empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
-                    ->orWhere('kategori', 'like', "%{$search}%")
-                    ->orWhere('brand_kompatibel', 'like', "%{$search}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$search}%")
-                    ->orWhereHas('skuVariants', function ($sq) use ($search) {
-                        $sq->where('sku', 'like', "%{$search}%")
-                            ->orWhere('nama_varian', 'like', "%{$search}%");
-                    });
-            });
+            $query->cariPintar($search);
         }
 
         $products = $query->paginate(24);
 
-        // Append real-time stock and resolved price
-        $items = $products->getCollection()->map(function ($product) use ($gudangId, $pelanggan) {
-            $stokTotal = 0;
-            if ($gudangId) {
-                $stokTotal = StokItem::where('produk_id', $product->id)
-                    ->where('gudang_id', $gudangId)
-                    ->sum('jumlah');
-            }
+        $productIds = $products->getCollection()->pluck('id')->all();
+        $stokItems = ($gudangId && ! empty($productIds))
+            ? StokItem::whereIn('produk_id', $productIds)
+                ->where('gudang_id', $gudangId)
+                ->select(['produk_id', 'sku_variant_id', 'jumlah'])
+                ->get()
+            : collect();
 
+        $stokMap = [];
+        $stokVariantMap = [];
+        foreach ($stokItems as $si) {
+            $stokMap[$si->produk_id] = ($stokMap[$si->produk_id] ?? 0) + $si->jumlah;
+            if ($si->sku_variant_id) {
+                $stokVariantMap[$si->produk_id.'_'.$si->sku_variant_id] = $si->jumlah;
+            }
+        }
+
+        // Append real-time stock and resolved price (bebas N+1)
+        $items = $products->getCollection()->map(function ($product) use ($stokMap, $stokVariantMap, $pelanggan) {
+            $stokTotal = (int) ($stokMap[$product->id] ?? 0);
             $pricing = $this->pricingService->resolve($product, $pelanggan);
 
             return [
@@ -119,14 +126,8 @@ class PosController extends Controller
                 'alasan_harga' => $pricing['alasan'],
                 'stok' => (int) $stokTotal,
                 'gambar' => $product->gambar,
-                'variants' => $product->skuVariants->map(function ($variant) use ($gudangId, $product, $pelanggan) {
-                    $stokVariant = 0;
-                    if ($gudangId) {
-                        $stokVariant = StokItem::where('produk_id', $product->id)
-                            ->where('sku_variant_id', $variant->id)
-                            ->where('gudang_id', $gudangId)
-                            ->value('jumlah') ?? 0;
-                    }
+                'variants' => $product->skuVariants->map(function ($variant) use ($stokVariantMap, $product, $pelanggan) {
+                    $stokVariant = (int) ($stokVariantMap[$product->id.'_'.$variant->id] ?? 0);
                     $variantPricing = $this->pricingService->resolve($product, $pelanggan, $variant);
 
                     return [

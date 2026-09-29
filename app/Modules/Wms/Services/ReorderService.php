@@ -33,7 +33,7 @@ class ReorderService
             ->where('jumlah_minimum', '>', 0)
             ->with(['produk', 'gudang'])
             ->get()
-            ->filter(fn (StokItem $item) => $item->produk && $item->gudang && $item->produk->is_active);
+            ->filter(fn (StokItem $item) => $item->produk && $item->gudang && $item->produk->is_active && ! $item->produk->is_ondemand);
 
         $kelompok = [];
 
@@ -116,7 +116,11 @@ class ReorderService
         $baris = [];
 
         foreach ($items as $item) {
-            $qty = max(1, (int) $item->jumlah_minimum - (int) $item->jumlah);
+            $targetMax = $item->produk?->max_stock;
+            $qty = $targetMax !== null && $targetMax > (int) $item->jumlah
+                ? (int) $targetMax - (int) $item->jumlah
+                : max(1, (int) $item->jumlah_minimum - (int) $item->jumlah);
+
             $harga = (float) ($item->produk->harga_beli ?? 0);
             $subtotal = $harga * $qty;
             $total += $subtotal;

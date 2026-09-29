@@ -5,31 +5,31 @@
             <div class="flex-1">
                 <x-prism.barcode-scan-input placeholder="Cari nama, telepon, atau email pelanggan..." model="search" />
             </div>
-            <div class="flex items-center gap-2">
-                <select wire:model.live="filterTierId" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                <select wire:model.live="filterTierId" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                     <option value="" class="bg-ink-900">Semua Tier</option>
                     @foreach($tiers as $t)
                         <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>
                     @endforeach
                 </select>
-                <label class="flex items-center gap-2 text-xs text-ink-300 font-medium cursor-pointer select-none px-3 py-2.5 rounded-xl bg-white/5 border border-white/10">
+                <label class="flex items-center gap-2 text-xs text-ink-300 font-medium cursor-pointer select-none px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 min-h-[44px]">
                     <input type="checkbox" wire:model.live="filterReseller" class="accent-up-accent w-3.5 h-3.5" />
                     Reseller
                 </label>
             </div>
         </div>
-        <div class="flex items-center gap-2">
-            <x-prism.prism-button variant="mint" size="sm" wire:click="$set('showPelangganBaruModal', true)">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
+            <x-prism.prism-button variant="mint" size="sm" wire:click="$set('showPelangganBaruModal', true)" class="whitespace-nowrap min-h-[44px]">
                 + Tambah Pelanggan
             </x-prism.prism-button>
-            <x-prism.prism-button variant="primary" size="sm" wire:click="openTierModal()">
+            <x-prism.prism-button variant="primary" size="sm" wire:click="openTierModal()" class="whitespace-nowrap min-h-[44px]">
                 + Tambah Tier
             </x-prism.prism-button>
-            <x-prism.prism-button variant="ghost" size="sm" wire:click="recalcTier">
+            <x-prism.prism-button variant="ghost" size="sm" wire:click="recalcTier" class="whitespace-nowrap min-h-[44px]">
                 ⟳ Rekalkulasi Tier
             </x-prism.prism-button>
             @can('crm.broadcast')
-                <x-prism.prism-button variant="accent" size="sm" wire:click="$set('showBroadcastModal', true)">
+                <x-prism.prism-button variant="accent" size="sm" wire:click="$set('showBroadcastModal', true)" class="whitespace-nowrap min-h-[44px]">
                     📢 Broadcast Promo
                 </x-prism.prism-button>
             @endcan

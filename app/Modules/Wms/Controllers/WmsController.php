@@ -14,6 +14,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\Rak;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
@@ -29,6 +30,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 class WmsController extends Controller
@@ -57,12 +59,9 @@ class WmsController extends Controller
         }
 
         if ($search) {
-            $query->whereHas('produk', function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
-                    ->orWhere('brand_kompatibel', 'like', "%{$search}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$search}%");
-            })->orWhereHas('skuVariant', function ($q) use ($search) {
-                $q->where('sku', 'like', "%{$search}%");
+            $query->where(function ($sq) use ($search) {
+                $sq->whereIn('produk_id', Produk::cariPintar($search)->select('id'))
+                    ->orWhereIn('sku_variant_id', SkuVariant::where('sku', 'like', "%{$search}%")->orWhere('barcode', $search)->select('id'));
             });
         }
 
@@ -74,9 +73,15 @@ class WmsController extends Controller
 
         $stokItems = $query->paginate(20);
 
-        // [T-13] Warning: tampilkan qty terkunci transfer pending per item stok
+        // [T-13] Warning: tampilkan qty terkunci transfer pending per item stok (memoized per gudang — bebas N+1)
+        $lockedCache = [];
         foreach ($stokItems as $stok) {
-            $stok->stok_dikunci = StokTransfer::pendingLockedFor($stok);
+            $gid = $stok->gudang_id;
+            if (! isset($lockedCache[$gid])) {
+                $lockedCache[$gid] = StokTransfer::pendingLockedByGudang($gid);
+            }
+            $key = $stok->produk_id.':'.($stok->sku_variant_id ?? 'null');
+            $stok->stok_dikunci = (int) ($lockedCache[$gid][$key] ?? 0);
         }
 
         return $this->success($stokItems, 'Data stok berhasil diambil');
@@ -784,7 +789,9 @@ class WmsController extends Controller
 
         try {
             $path = $request->file('file')->store('import-tmp');
-            $hasil = app(ImportProdukService::class)->preview(storage_path('app/'.$path));
+            $realPath = Storage::disk('local')->path($path);
+            $hasil = app(ImportProdukService::class)->preview($realPath);
+            Storage::disk('local')->delete($path);
             @unlink(storage_path('app/'.$path));
 
             return $this->success($hasil, 'Preview import produk selesai — belum ada data diubah');

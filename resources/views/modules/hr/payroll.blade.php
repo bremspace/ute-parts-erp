@@ -7,19 +7,19 @@
         </div>
         <div class="mt-3 sm:mt-0 flex gap-2">
             <button wire:click="buatPeriode"
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-up-primary hover:bg-up-primary/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-up-primary">
+                class="inline-flex items-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-up-primary hover:bg-up-primary/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-up-primary min-h-[44px] active:scale-[0.97] transition">
                 + Buat Periode
             </button>
         </div>
     </div>
 
-    {{-- Periode Selector --}}
-    <div class="glass-card p-4 mb-6">
-        <div class="flex flex-col sm:flex-row gap-4 items-end">
+    {{-- Periode Selector & Actions --}}
+    <div class="glass-card p-4 mb-6 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
             <div class="flex-1">
                 <label class="block text-sm font-medium text-ink-700 mb-1">Periode</label>
                 <select wire:model="periode"
-                    class="block w-full rounded-md border-ink-300 shadow-sm focus:border-up-primary focus:ring-up-primary sm:text-sm">
+                    class="block w-full rounded-xl border-ink-300 shadow-sm focus:border-up-primary focus:ring-up-primary sm:text-sm min-h-[44px]">
                     <option value="">-- Pilih Periode --</option>
                     @foreach($periodeList as $id => $label)
                         <option value="{{ $label }}">{{ $label }}</option>
@@ -29,23 +29,26 @@
             <div>
                 <label class="block text-sm font-medium text-ink-700 mb-1">Status</label>
                 <select wire:model="statusFilter"
-                    class="block w-full rounded-md border-ink-300 shadow-sm focus:border-up-primary focus:ring-up-primary sm:text-sm">
+                    class="block w-full rounded-xl border-ink-300 shadow-sm focus:border-up-primary focus:ring-up-primary sm:text-sm min-h-[44px]">
                     <option value="semua">Semua</option>
                     <option value="draft">Draft</option>
                     <option value="disetujui">Disetujui</option>
                     <option value="dibayar">Dibayar</option>
                 </select>
             </div>
+        </div>
+
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap pt-2 border-t border-ink-100">
             <button wire:click="hitungDraft"
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 whitespace-nowrap min-h-[44px] cursor-pointer active:scale-[0.97] transition">
                 💵 Hitung Draft
             </button>
             <button wire:click="ajukanApproval"
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 whitespace-nowrap min-h-[44px] cursor-pointer active:scale-[0.97] transition">
                 📋 Ajukan Approval
             </button>
             <button wire:click="bayarPayroll"
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 whitespace-nowrap min-h-[44px] cursor-pointer active:scale-[0.97] transition">
                 💰 Bayar
             </button>
         </div>

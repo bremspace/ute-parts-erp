@@ -1,10 +1,10 @@
 <div class="space-y-5">
     {{-- Filter status [F2-2] --}}
-    <div class="flex items-center gap-2 flex-wrap">
+    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
         @foreach (['all' => 'Semua', 'draft' => 'Menunggu Approval', 'terima' => 'Diterima', 'ditolak' => 'Ditolak'] as $val => $label)
             <button
                 wire:click="$set('filterStatus', '{{ $val }}')"
-                class="px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer {{ $filterStatus === $val ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}"
+                class="px-3.5 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] cursor-pointer active:scale-[0.97] whitespace-nowrap min-h-[44px] flex items-center {{ $filterStatus === $val ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}"
             >
                 {{ $label }}
             </button>

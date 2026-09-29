@@ -75,38 +75,49 @@
             />
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
-            <select wire:model.live="filterKategori" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            <select wire:model.live="filterKategori" class="px-3 py-2.5 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary min-h-[44px]">
                 <option value="" class="text-ink-400">Semua Kategori</option>
-                @foreach($categories as $k)
-                    <option value="{{ $k }}" class="text-ink-900">{{ $k }}</option>
+                @foreach($categories as $cat)
+                    @if(is_object($cat) && isset($cat->children) && $cat->children->count() > 0)
+                        <optgroup label="{{ $cat->nama }}">
+                            <option value="{{ $cat->id }}">— Semua {{ $cat->nama }} —</option>
+                            @foreach($cat->children as $child)
+                                <option value="{{ $child->id }}">{{ $child->nama }}</option>
+                            @endforeach
+                        </optgroup>
+                    @elseif(is_object($cat))
+                        <option value="{{ $cat->id }}">{{ $cat->nama }}</option>
+                    @else
+                        <option value="{{ $cat }}">{{ $cat }}</option>
+                    @endif
                 @endforeach
             </select>
-            <select wire:model.live="filterKondisi" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
+            <select wire:model.live="filterKondisi" class="px-3 py-2.5 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary min-h-[44px]">
                 <option value="" class="text-ink-400">Semua Kondisi</option>
                 <option value="baru">Baru</option>
                 <option value="oem">OEM</option>
                 <option value="compatible">Compatible</option>
             </select>
-            <select wire:model.live="filterHpMerk" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
+            <select wire:model.live="filterHpMerk" class="px-3 py-2.5 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary min-h-[44px]">
                 <option value="" class="text-ink-400">Merk HP</option>
                 @foreach($hpMerkList as $m)
                     <option value="{{ $m }}" class="text-ink-900">{{ $m }}</option>
                 @endforeach
             </select>
-            <select wire:model.live="filterHpModel" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
+            <select wire:model.live="filterHpModel" class="px-3 py-2.5 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary min-h-[44px]">
                 <option value="" class="text-ink-400">Model HP</option>
                 @foreach($hpModelList as $m)
                     <option value="{{ $m }}" class="text-ink-900">{{ $m }}</option>
                 @endforeach
             </select>
-            <select wire:model.live="filterBrand" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
+            <select wire:model.live="filterBrand" class="px-3 py-2.5 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary min-h-[44px]">
                 <option value="" class="text-ink-400">Semua Brand</option>
                 @foreach($brands as $b)
                     <option value="{{ $b }}" class="text-ink-900">{{ $b }}</option>
                 @endforeach
             </select>
-            <select wire:model.live="hargaMax" class="px-3 py-3 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary">
+            <select wire:model.live="hargaMax" class="px-3 py-2.5 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary min-h-[44px]">
                 <option value="" class="text-ink-400">Semua Harga</option>
                 @foreach([100000, 250000, 500000, 1000000] as $hb)
                     <option value="{{ $hb }}" class="text-ink-900">≤ Rp {{ number_format($hb, 0, ',', '.') }}</option>
@@ -126,16 +137,20 @@
                     $stok = (int) ($p->stok_items_sum_jumlah ?? 0);
                     $customer = auth('customer')->user();
                     $price = app(\App\Modules\Pos\Services\PricingService::class)->resolve($p, $customer);
+                    $thumbImg = $p->thumbnail_url ?: $p->gambar;
                 @endphp
                 <a href="{{ route('shop.detail', $p->slug) }}" class="group bg-white rounded-2xl border border-ink-100 hover:border-up-primary/50 hover:shadow-lg hover:shadow-up-primary/5 transition-all overflow-hidden flex flex-col">
                     <!-- Thumb -->
                     <div class="aspect-square bg-ink-50 flex items-center justify-center relative overflow-hidden">
-                        @if($p->gambar)
-                            <img src="{{ $p->gambar }}" alt="{{ $p->nama }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        @if($thumbImg)
+                            <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
                         @else
-                            <svg class="w-12 h-12 text-ink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                            </svg>
+                            <div class="flex flex-col items-center justify-center text-ink-300 p-4 text-center">
+                                <svg class="w-10 h-10 text-ink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                </svg>
+                                <span class="text-[9px] mt-1 font-medium text-ink-400">Ute Parts</span>
+                            </div>
                         @endif
                         @if($stok <= 0)
                             <span class="absolute top-2 right-2 text-[10px] font-bold bg-up-red text-white px-2 py-0.5 rounded-full">Habis</span>
@@ -148,9 +163,13 @@
 
                     <!-- Info -->
                     <div class="p-3.5 flex flex-col flex-1">
-                        <span class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold">{{ $p->kategori }}</span>
+                        <span class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold truncate">{{ ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? $p->kategori }}</span>
                         <h3 class="text-sm font-bold text-ink-900 mt-1 line-clamp-2 leading-snug group-hover:text-up-primary transition-colors">{{ $p->nama }}</h3>
-                        @if($p->brand_kompatibel)
+                        @if($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty())
+                            <p class="text-[10px] text-up-primary font-semibold mt-1 truncate">
+                                📱 {{ $p->tipeHps->pluck('model')->take(3)->join(', ') }}
+                            </p>
+                        @elseif($p->brand_kompatibel)
                             <p class="text-[11px] text-ink-400 mt-0.5">{{ $p->brand_kompatibel }} {{ $p->model_kompatibel }}</p>
                         @endif
 

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Rbac\Services;
 
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
 use Illuminate\Database\Eloquent\Model;
 
@@ -15,13 +16,17 @@ class AktivitasCabang
 {
     public static function untuk(Model $model): ?int
     {
+        if ($model instanceof Cabang) {
+            return (int) $model->getKey();
+        }
+
         $attributes = $model->getAttributes();
 
         if (array_key_exists('cabang_id', $attributes)) {
             return $attributes['cabang_id'] === null ? null : (int) $attributes['cabang_id'];
         }
 
-        foreach (['gudang_id', 'gudang_tujuan_id'] as $kolom) {
+        foreach (['gudang_id', 'gudang_tujuan_id', 'gudang_asal_id'] as $kolom) {
             if (! empty($attributes[$kolom])) {
                 $cabangId = Gudang::query()->whereKey($attributes[$kolom])->value('cabang_id');
 

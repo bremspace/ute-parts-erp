@@ -87,8 +87,11 @@ class DrillDownViewer extends Component
         );
         // [P0-3] Scope cabang sudah diterapkan di buildQuery via CABANG_SCOPE.
 
-        $this->items = $query->paginate($this->perPage, ['*'], 'page', $this->currentPage)
-            ->items();
+        $rawItems = collect($query->paginate($this->perPage, ['*'], 'page', $this->currentPage)->items())
+            ->map(fn ($item) => $item->toArray())
+            ->all();
+
+        $this->items = $service->formatRowsForDisplay($rawItems);
 
         // Build breadcrumbs
         $this->breadcrumbs = array_map(function ($m) {
@@ -120,11 +123,19 @@ class DrillDownViewer extends Component
             abort(403, 'Anda tidak punya akses ke data cabang lain');
         }
 
-        $this->detail = $item->toArray();
+        $this->detail = $service->formatRowForDisplay($item->toArray());
     }
 
     public function back(): void
     {
+        if ($this->selectedItemId !== null) {
+            $this->selectedItemId = null;
+            $this->detail = [];
+            $this->loadRecords();
+
+            return;
+        }
+
         if (count($this->breadcrumbs) > 1) {
             array_pop($this->breadcrumbs);
             $prev = end($this->breadcrumbs);

@@ -6,12 +6,12 @@
             <p class="text-xs text-ink-400 mt-0.5">Rekap PPN keluaran &amp; masukan — siap ekspor e-Faktur</p>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap">
-            <label class="text-[11px] text-ink-400 font-medium">Periode</label>
-            <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
+            <label class="text-[11px] text-ink-400 font-medium whitespace-nowrap">Periode</label>
+            <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
             <span class="text-ink-400 text-xs">—</span>
-            <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
-            <x-prism.prism-button variant="accent" size="sm" wire:click="exportPajak">
+            <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
+            <x-prism.prism-button variant="accent" size="sm" wire:click="exportPajak" class="whitespace-nowrap min-h-[44px]">
                 Export Excel (Queue)
             </x-prism.prism-button>
         </div>

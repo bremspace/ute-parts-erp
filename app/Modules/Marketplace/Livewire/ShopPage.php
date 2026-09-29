@@ -4,6 +4,7 @@ namespace App\Modules\Marketplace\Livewire;
 
 use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Database\Eloquent\Builder;
@@ -79,7 +80,24 @@ class ShopPage extends Component
 
     public function getCategoriesProperty()
     {
-        return Produk::where('is_active', true)->distinct()->orderBy('kategori')->pluck('kategori')->filter()->values();
+        return Cache::remember('shop.categories.tree.v1', self::HP_LIST_CACHE_TTL, function () {
+            $kat = KategoriProduk::where('is_active', true)
+                ->orderBy('urutan')
+                ->orderBy('nama')
+                ->get();
+
+            if ($kat->isNotEmpty()) {
+                $grouped = $kat->groupBy('parent_id');
+                $roots = $grouped->get(null, collect());
+                foreach ($roots as $r) {
+                    $r->setRelation('children', $grouped->get($r->id, collect()));
+                }
+
+                return $roots;
+            }
+
+            return Produk::where('is_active', true)->distinct()->orderBy('kategori')->pluck('kategori')->filter()->values();
+        });
     }
 
     public function getHpMerkListProperty(): array
@@ -153,41 +171,47 @@ class ShopPage extends Component
     public function getProductsProperty()
     {
         // [B-15a] withSum (bukan withCount) supaya total stok per kartu datang
-        // dari subquery — SUM(jumlah) — tanpa query per produk. Alias mengikuti
-        // default Laravel >= 12 (`{relasi_snake}_{kolom}` = stok_items_sum_jumlah)
-        // dan dibaca di blade. with('hargaTier') dipakai
-        // PricingService::resolve() lewat relasi yang sudah di-load
-        // (PelangganService::rowsHargaTier) sehingga harga tier cukup 1 query
-        // untuk seluruh halaman, bukan 1 per produk.
+        // dari subquery — SUM(jumlah) — tanpa query per produk.
         $query = Produk::where('is_active', true)
             ->withSum('stokItems', 'jumlah')
             ->with('hargaTier');
 
         if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('nama', 'like', "%{$this->search}%")
-                    ->orWhere('brand_kompatibel', 'like', "%{$this->search}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$this->search}%")
-                    ->orWhere('kategori', 'like', "%{$this->search}%")
-                  // [T-11] Search juga di kompatibilitas_hp JSON
-                    ->orWhereRaw("JSON_SEARCH(kompatibilitas_hp, 'one', ?) IS NOT NULL", ["%{$this->search}%"]);
-            });
+            $query->cariPintar($this->search);
         }
         if ($this->filterKategori) {
-            $query->where('kategori', $this->filterKategori);
+            if (is_numeric($this->filterKategori)) {
+                $kat = KategoriProduk::find($this->filterKategori);
+                $ids = $kat ? $kat->semuaKeturunanIds() : [(int) $this->filterKategori];
+                $query->whereIn('kategori_id', $ids);
+            } else {
+                $query->where(function ($q) {
+                    $q->where('kategori', $this->filterKategori)
+                        ->orWhereHas('kategoriRelasi', fn ($kq) => $kq->where('nama', $this->filterKategori)->orWhere('slug', $this->filterKategori));
+                });
+            }
         }
         if ($this->filterKondisi) {
             $query->where('kondisi', $this->filterKondisi);
         }
         if ($this->filterBrand) {
-            $query->where('brand_kompatibel', $this->filterBrand);
+            $query->where(function ($q) {
+                $q->where('brand_kompatibel', $this->filterBrand)
+                    ->orWhereHas('brand', fn ($bq) => $bq->where('nama', $this->filterBrand));
+            });
         }
-        // [T-11] Filter by HP merk/model dari kompatibilitas_hp terstruktur (prioritaskan data terstruktur)
+        // Filter by HP merk/model menggunakan B-Tree join tipeHps (cepat) dan JSON fallback
         if ($this->filterHpMerk) {
-            $query->whereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['merk' => $this->filterHpMerk])]);
+            $query->where(function ($q) {
+                $q->whereHas('tipeHps', fn ($tq) => $tq->where('merk', $this->filterHpMerk))
+                    ->orWhereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['merk' => $this->filterHpMerk])]);
+            });
         }
         if ($this->filterHpModel) {
-            $query->whereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['model' => $this->filterHpModel])]);
+            $query->where(function ($q) {
+                $q->whereHas('tipeHps', fn ($tq) => $tq->where('model', $this->filterHpModel))
+                    ->orWhereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['model' => $this->filterHpModel])]);
+            });
         }
         if ($this->hargaMax) {
             $query->where('harga_jual_retail', '<=', $this->hargaMax);
@@ -204,9 +228,15 @@ class ShopPage extends Component
 
         return Produk::where('slug', $this->slug)
             ->where('is_active', true)
-            // [B-15a] hargaTier di-load sekalian: resolveHarga() memakainya via
-            // relasi (rowsHargaTier) sehingga tidak query terpisah per render.
-            ->with(['hargaTier', 'skuVariants' => fn ($q) => $q->where('is_active', true)])
+            ->with([
+                'hargaTier',
+                'skuVariants' => fn ($q) => $q->where('is_active', true),
+                'kategoriRelasi.parent',
+                'brand',
+                'kualitas',
+                'tipeHps',
+                'produkKompatibel',
+            ])
             ->first();
     }
 

@@ -138,10 +138,9 @@ class StokTab extends Component
         }
         if (! empty($this->search)) {
             $s = $this->search;
-            $stokQuery->whereHas('produk', function ($q) use ($s) {
-                $q->where('nama', 'like', "%{$s}%")
-                    ->orWhere('brand_kompatibel', 'like', "%{$s}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$s}%");
+            $stokQuery->where(function ($sq) use ($s) {
+                $sq->whereIn('produk_id', Produk::cariPintar($s)->select('id'))
+                    ->orWhereIn('sku_variant_id', SkuVariant::where('sku', 'like', "%{$s}%")->orWhere('barcode', $s)->select('id'));
             });
         }
         $stokItems = $stokQuery->paginate(15);

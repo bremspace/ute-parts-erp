@@ -296,7 +296,19 @@ class DashboardIndex extends Component
                 $values[] = round((float) ($rows[$d]->total ?? 0), 0);
             }
 
-            return ['labels' => $labels, 'values' => $values];
+            $total = array_sum($values);
+            $avg = count($values) > 0 ? round($total / count($values)) : 0;
+            $max = count($values) > 0 ? max($values) : 0;
+            $maxIdx = array_search($max, $values);
+
+            return [
+                'labels' => $labels,
+                'values' => $values,
+                'total' => $total,
+                'avg' => $avg,
+                'max' => $max,
+                'max_label' => $labels[$maxIdx] ?? '-',
+            ];
         });
     }
 
@@ -318,9 +330,16 @@ class DashboardIndex extends Component
                 ->limit(6)
                 ->get();
 
+            $labels = $query->pluck('kate')->values()->all();
+            $values = $query->pluck('total')->map(fn ($v) => round((float) $v, 0))->values()->all();
+            $total = array_sum($values);
+            $percentages = collect($values)->map(fn ($v) => $total > 0 ? round(($v / $total) * 100, 1) : 0)->all();
+
             return [
-                'labels' => $query->pluck('kate')->values()->all(),
-                'values' => $query->pluck('total')->map(fn ($v) => round((float) $v, 0))->values()->all(),
+                'labels' => $labels,
+                'values' => $values,
+                'total' => $total,
+                'percentages' => $percentages,
             ];
         });
     }
@@ -344,7 +363,11 @@ class DashboardIndex extends Component
                 ->values()
                 ->all();
 
-            return ['labels' => $labels, 'values' => $values];
+            return [
+                'labels' => $labels,
+                'values' => $values,
+                'total' => array_sum($values),
+            ];
         });
     }
 
@@ -373,7 +396,17 @@ class DashboardIndex extends Component
                 }
             }
 
-            return ['labels' => array_keys($buckets), 'values' => array_values($buckets)];
+            $labels = array_keys($buckets);
+            $values = array_values($buckets);
+            $total = array_sum($values);
+            $percentages = collect($values)->map(fn ($v) => $total > 0 ? round(($v / $total) * 100, 1) : 0)->all();
+
+            return [
+                'labels' => $labels,
+                'values' => $values,
+                'total' => $total,
+                'percentages' => $percentages,
+            ];
         });
     }
 

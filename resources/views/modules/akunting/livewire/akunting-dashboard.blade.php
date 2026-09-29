@@ -1,31 +1,40 @@
 <div class="space-y-6">
-    <!-- Header + Periode -->
-    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-white/5 pb-4">
-        <div class="flex items-center gap-2 flex-wrap">
+    <!-- Header + Periode (Responsive, No Overlap) -->
+    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-black/10 dark:border-white/5 pb-4">
+        <!-- Navigation Tabs: Horizontal Scroll on Mobile, No Overlapping -->
+        <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x">
             @foreach(['laporan' => 'Laporan', 'jurnal' => 'Jurnal', 'coa' => 'COA', 'piutang' => 'Piutang', 'utang' => 'Utang'] as $kode => $label)
-                <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">{{ $label }}</button>
+                <button
+                    wire:click="$set('activeTab', '{{ $kode }}')"
+                    class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    {{ $label }}
+                </button>
             @endforeach
         </div>
 
-        <div class="flex items-center gap-3 flex-wrap">
+        <!-- Filter & Periode Controls: Responsive Stack on Mobile -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto flex-shrink-0">
             @if(auth()->user()?->can('laporan.konsolidasi'))
-                <div class="flex items-center bg-white/5 p-1 rounded-xl border border-white/5 text-xs font-semibold">
+                <div class="flex items-center bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-black/10 dark:border-white/5 text-xs font-semibold w-full sm:w-auto">
                     <button type="button" wire:click="setCakupanLaporan('cabang')"
-                            class="px-3 py-1.5 rounded-lg transition-all cursor-pointer {{ $cakupanLaporan === 'cabang' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-ink-200' }}">
+                            class="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg transition-all cursor-pointer text-center whitespace-nowrap {{ $cakupanLaporan === 'cabang' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-ink-200' }}">
                         {{ session('cabang_nama', 'Cabang Ini') }}
                     </button>
                     <button type="button" wire:click="setCakupanLaporan('konsolidasi')"
-                            class="px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 {{ $cakupanLaporan === 'konsolidasi' ? 'bg-up-accent text-white shadow-sm' : 'text-ink-400 hover:text-ink-200' }}">
-                        <span>Konsolidasi Nasional</span>
+                            class="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap {{ $cakupanLaporan === 'konsolidasi' ? 'bg-up-accent text-white shadow-sm' : 'text-ink-400 hover:text-ink-200' }}">
+                        <span>Konsolidasi</span>
                     </button>
                 </div>
             @endif
 
-            <div class="flex items-center gap-2">
-                <label class="text-[11px] text-ink-400 font-medium">Periode</label>
-                <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
-                <span class="text-ink-400 text-xs">—</span>
-                <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <label class="text-[11px] text-ink-400 font-medium hidden sm:inline">Periode</label>
+                <div class="flex items-center gap-1.5 w-full sm:w-auto">
+                    <input type="date" wire:model.live="periodeDari" class="flex-1 sm:w-32 px-2.5 py-1.5 rounded-xl glass-input text-xs font-medium min-h-[40px]" />
+                    <span class="text-ink-400 text-xs">—</span>
+                    <input type="date" wire:model.live="periodeSampai" class="flex-1 sm:w-32 px-2.5 py-1.5 rounded-xl glass-input text-xs font-medium min-h-[40px]" />
+                </div>
             </div>
         </div>
     </div>

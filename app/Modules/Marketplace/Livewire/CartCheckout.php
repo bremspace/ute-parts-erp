@@ -120,12 +120,28 @@ class CartCheckout extends Component
         }
     }
 
+    public function getPajakPreviewProperty(): array
+    {
+        if (! $this->selectedCabangId) {
+            return [
+                'enabled' => false,
+                'ppn_nominal' => 0.0,
+                'ppn_percent' => 0.0,
+                'dpp' => $this->subtotal,
+                'total_akhir' => $this->subtotal,
+            ];
+        }
+
+        return app(OrderService::class)->previewPajak($this->selectedCabangId, $this->subtotal);
+    }
+
     public function render()
     {
         return view('modules.marketplace.livewire.cart-checkout', [
             'pelanggan' => auth('customer')->user(),
             'cart' => $this->cart,
             'subtotal' => $this->subtotal,
+            'pajakPreview' => $this->pajakPreview,
             'jumlahItem' => $this->jumlahItem,
             'cabangs' => $this->cabangs,
             'riwayatOrders' => $this->orderSuccess ? collect() : Transaksi::where('pelanggan_id', auth('customer')->id())

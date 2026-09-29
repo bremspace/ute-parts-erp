@@ -7,6 +7,7 @@ use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
@@ -21,6 +22,7 @@ use Livewire\WithPagination;
 
 class ServisBoard extends Component
 {
+    use PunyaRiwayatAktivitas;
     use WithPagination;
 
     /**
@@ -985,7 +987,7 @@ class ServisBoard extends Component
             'pelangganList' => Pelanggan::with('tierMembership')->limit(10)->get(),
             'teknisiList' => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(),
             'gudangList' => Gudang::where('is_active', true)->get(),
-            'produkList' => Produk::where('is_active', true)->orderBy('nama')->limit(50)->get(),
+            'produkList' => $this->produkEstimasiList,
             'produkEstimasiList' => $this->produkEstimasiList,
             'stateMachineColumns' => $this->stateMachineColumns,
             'groupedTikets' => $this->groupedTikets,

@@ -90,6 +90,10 @@ class OpnameTab extends Component
 
     public function saveOpname()
     {
+        if (! $this->boleh('wms.opname', 'Anda tidak memiliki izin mengajukan stok opname.')) {
+            return;
+        }
+
         $this->validate([
             'opnameGudangId' => 'required|exists:gudang,id',
             'opnameRakId' => 'nullable|exists:rak,id',
@@ -129,6 +133,10 @@ class OpnameTab extends Component
 
     public function approveOpname(int $opnameId)
     {
+        if (! $this->boleh('wms.approve-opname', 'Anda tidak memiliki izin menyetujui stok opname.')) {
+            return;
+        }
+
         $opname = StokOpname::with('items')->findOrFail($opnameId);
 
         DB::transaction(function () use ($opname) {
@@ -185,6 +193,17 @@ class OpnameTab extends Component
         });
 
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Stock opname disetujui & stok sistem berhasil diselaraskan']);
+    }
+
+    protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
+    {
+        if (auth()->user()?->can($permission)) {
+            return true;
+        }
+
+        $this->dispatch('alert', ['type' => 'error', 'message' => $pesan]);
+
+        return false;
     }
 
     public function render()

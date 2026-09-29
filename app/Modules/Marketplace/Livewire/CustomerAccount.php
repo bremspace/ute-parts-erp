@@ -2,17 +2,18 @@
 
 namespace App\Modules\Marketplace\Livewire;
 
+use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
 use Livewire\Component;
 
 /**
  * Dashboard pelanggan marketplace (ACCOUNT-01..05):
- * riwayat order, tracking servis, komisi reseller.
+ * riwayat order, tracking servis, komisi reseller, status membership & poin loyalty.
  */
 class CustomerAccount extends Component
 {
-    public string $activeTab = 'orders'; // orders, servis, komisi
+    public string $activeTab = 'orders'; // orders, servis, komisi, membership
 
     public function getOrdersProperty()
     {
@@ -68,6 +69,51 @@ class CustomerAccount extends Component
             ->get();
     }
 
+    public function getTiersProperty()
+    {
+        return TierMembership::where('is_active', true)
+            ->orderBy('min_belanja_12bulan', 'asc')
+            ->get();
+    }
+
+    public function getMembershipInfoProperty(): array
+    {
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return [];
+        }
+
+        $customer->loadMissing('tierMembership');
+        $currentTier = $customer->tierMembership;
+        $totalBelanja = (float) ($customer->total_belanja_12bulan ?? 0);
+        $tiers = $this->tiers;
+
+        $nextTier = $tiers->first(fn ($t) => (float) $t->min_belanja_12bulan > $totalBelanja);
+
+        $progress = 100;
+        $kekurangan = 0.0;
+        if ($nextTier) {
+            $minCurrent = $currentTier ? (float) $currentTier->min_belanja_12bulan : 0.0;
+            $minNext = (float) $nextTier->min_belanja_12bulan;
+            $range = max(1.0, $minNext - $minCurrent);
+            $progress = (int) min(100, max(0, round((($totalBelanja - $minCurrent) / $range) * 100)));
+            $kekurangan = max(0.0, $minNext - $totalBelanja);
+        }
+
+        return [
+            'currentTier' => $currentTier,
+            'tierName' => $currentTier?->nama ?? ($customer->is_reseller ? 'Reseller' : 'Retail / Standar'),
+            'diskonPersen' => (float) ($currentTier?->diskon_persen ?? 0),
+            'poinMultiplier' => (float) ($currentTier?->poin_multiplier ?? 1.0),
+            'totalBelanja' => $totalBelanja,
+            'poinLoyalty' => (int) ($customer->poin_loyalty ?? 0),
+            'nextTier' => $nextTier,
+            'kekurangan' => $kekurangan,
+            'progress' => $progress,
+            'allTiers' => $tiers,
+        ];
+    }
+
     public function render()
     {
         // [B-15c] Computed property WAJIB di-pass eksplisit ke view — blade memakai
@@ -78,6 +124,7 @@ class CustomerAccount extends Component
             'orders' => $this->orders,
             'servis' => $this->servis,
             'komisi' => $this->komisi,
+            'membershipInfo' => $this->membershipInfo,
         ])->layout('layouts.marketplace', ['title' => 'Akun Saya']);
     }
 }

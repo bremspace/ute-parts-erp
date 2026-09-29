@@ -6,13 +6,21 @@ use App\Models\User;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
+use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\AktivitasLog;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AktivitasCabang;
+use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Models\StokOpname;
+use App\Modules\Wms\Models\StokTransfer;
+use App\Modules\Wms\Models\Supplier;
 use Illuminate\Contracts\Pagination\Paginator;
 use Livewire\Component;
 
@@ -30,6 +38,7 @@ class RiwayatAktivitas extends Component
     /** tipe pendek → model kritis yang di-log [F1-4 / §5.4] */
     public const TIPE = [
         'transaksi' => Transaksi::class,
+        'servis' => TiketServis::class,
         'jurnal' => JurnalAkuntansi::class,
         'stok' => StokItem::class,
         'po' => PurchaseOrder::class,
@@ -37,6 +46,14 @@ class RiwayatAktivitas extends Component
         'piutang' => Piutang::class,
         'utang' => Utang::class,
         'produk' => Produk::class,
+        'pelanggan' => Pelanggan::class,
+        'supplier' => Supplier::class,
+        'opname' => StokOpname::class,
+        'transfer' => StokTransfer::class,
+        'retur_penjualan' => ReturnPenjualan::class,
+        'retur_pembelian' => ReturnPembelian::class,
+        'user' => User::class,
+        'cabang' => Cabang::class,
     ];
 
     public string $tipe = '';
@@ -96,6 +113,10 @@ class RiwayatAktivitas extends Component
             return 'tanpa-izin';
         }
 
+        if ($this->tipe === '' && $this->entityId === null) {
+            return 'ok';
+        }
+
         $modelClass = self::TIPE[$this->tipe] ?? null;
         if (! $modelClass) {
             return 'tidak-dikenal';
@@ -124,6 +145,10 @@ class RiwayatAktivitas extends Component
             return '';
         }
 
+        if ($this->tipe === '' && $this->entityId === null) {
+            return 'Seluruh Log Aktivitas Sistem';
+        }
+
         $modelClass = self::TIPE[$this->tipe] ?? null;
         if (! $modelClass || $this->entityId === null) {
             return '';
@@ -136,11 +161,20 @@ class RiwayatAktivitas extends Component
 
         return (string) match ($this->tipe) {
             'transaksi' => $model->no_transaksi,
+            'servis' => $model->no_tiket.' · '.($model->jenis_hp ?? ''),
             'jurnal' => $model->no_jurnal,
             'piutang' => $model->no_piutang,
             'utang' => $model->no_utang,
             'po' => $model->no_po,
             'produk' => $model->nama,
+            'pelanggan' => $model->nama.' · '.($model->telepon ?? ''),
+            'supplier' => $model->nama,
+            'opname' => $model->no_opname,
+            'transfer' => $model->no_transfer,
+            'retur_penjualan' => $model->no_return ?? '#'.$model->id,
+            'retur_pembelian' => $model->no_return ?? '#'.$model->id,
+            'user' => $model->name.' ('.$model->email.')',
+            'cabang' => $model->nama.' ('.$model->kode.')',
             'stok' => ($model->produk?->nama ?? 'Produk').' · '.($model->gudang?->nama ?? 'Gudang'),
             default => '#'.$model->getKey(),
         };
@@ -152,11 +186,14 @@ class RiwayatAktivitas extends Component
             return new \Illuminate\Pagination\Paginator(collect(), self::PER_HALAMAN, $this->halaman);
         }
 
-        $modelClass = self::TIPE[$this->tipe];
+        $query = AktivitasLog::query()->orderByDesc('id');
 
-        $query = AktivitasLog::query()
-            ->where('subject_type', $modelClass)
-            ->orderByDesc('id');
+        if ($this->tipe !== '') {
+            $modelClass = self::TIPE[$this->tipe] ?? null;
+            if ($modelClass) {
+                $query->where('subject_type', $modelClass);
+            }
+        }
 
         if ($this->entityId !== null) {
             // Scope per entitas: cabang sudah diverifikasi di getAksesProperty()
@@ -217,12 +254,32 @@ class RiwayatAktivitas extends Component
             'akses' => $this->akses,
             'judul' => $this->judul,
             'aktivitas' => $this->aktivitas,
-            'labelTipe' => strtoupper($this->tipe),
+            'labelTipe' => $this->tipe ? strtoupper($this->tipe) : 'AUDIT TRAIL',
             'opsiAksi' => [
                 'created' => 'Dibuat',
                 'updated' => 'Diperbarui',
                 'deleted' => 'Dihapus',
             ],
-        ]);
+            'opsiTipe' => [
+                '' => 'Semua Modul / Entitas',
+                'transaksi' => 'POS Transaksi',
+                'servis' => 'Tiket Servis',
+                'jurnal' => 'Jurnal Akuntansi',
+                'stok' => 'Stok Gudang',
+                'po' => 'Purchase Order (PO)',
+                'grn' => 'Penerimaan Barang (GRN)',
+                'piutang' => 'Piutang Usaha (AR)',
+                'utang' => 'Utang Usaha (AP)',
+                'produk' => 'Katalog Produk',
+                'pelanggan' => 'Pelanggan CRM',
+                'supplier' => 'Supplier / Vendor',
+                'opname' => 'Stok Opname',
+                'transfer' => 'Stok Transfer',
+                'retur_penjualan' => 'Retur Penjualan',
+                'retur_pembelian' => 'Retur Pembelian',
+                'user' => 'Pengguna & Akun',
+                'cabang' => 'Master Cabang',
+            ],
+        ])->layout('layouts.backoffice', ['header' => 'Audit Trail & Log']);
     }
 }

@@ -38,7 +38,7 @@
             return $v;
         };
     @endphp
-    <nav class="flex items-center gap-2 text-xs">
+    <nav class="flex items-center gap-2 text-xs overflow-x-auto scrollbar-none py-1 flex-nowrap">
         @foreach($breadcrumbs as $i => $crumb)
             @if($i === $currentCrumbIdx)
                 <span class="text-white font-semibold" aria-current="page">{{ $crumb['label'] }}</span>
@@ -66,7 +66,7 @@
                 @foreach($detail as $key => $value)
                     @if(!is_array($value) && !is_object($value))
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                            <p class="text-[10px] uppercase text-ink-400 font-bold">{{ str_replace('_', ' ', $key) }}</p>
+                            <p class="text-[10px] uppercase text-ink-400 font-bold">{{ \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? str_replace('_', ' ', $key) }}</p>
                             <p class="text-sm font-semibold text-white tabular-nums mt-1">{{ $fmtVal($value, $key) }}</p>
                         </div>
                     @endif
@@ -81,10 +81,10 @@
         <x-prism.glass-card title="{{ \App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST[$currentModel] ?? $currentModel }}" :subtitle="count($items) . ' item ditemukan'">
             @if($currentModel === 'Transaksi')
                 <!-- [F2-5] Export laporan transaksi (queue) -->
-                <div class="flex items-center gap-2 mb-3">
+                <div class="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
                     @can('laporan.cabang')
-                        <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
-                        <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+                        <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">Export Excel</button>
+                        <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">Export CSV</button>
                     @endcan
                 </div>
             @endif
@@ -94,7 +94,7 @@
                         <thead>
                             <tr class="bg-white/5">
                                 @foreach($items[0] ?? [] as $key => $val)
-                                    <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ str_replace('_', ' ', $key) }}</th>
+                                    <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? str_replace('_', ' ', $key) }}</th>
                                 @endforeach
                             </tr>
                         </thead>

@@ -24,14 +24,14 @@
                         <option value="bulanan">Bulanan</option>
                     </select>
                 </div>
-                <div class="grid grid-cols-3 gap-3">
-                    <input type="number" wire:model="sampleSize" placeholder="Sample size" class="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm">
-                    <input type="number" wire:model="thresholdUnit" placeholder="Threshold unit" class="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm">
-                    <input type="number" wire:model="thresholdPersen" placeholder="Threshold %" class="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input type="number" wire:model="sampleSize" placeholder="Sample size" class="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm min-h-[44px]">
+                    <input type="number" wire:model="thresholdUnit" placeholder="Threshold unit" class="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm min-h-[44px]">
+                    <input type="number" wire:model="thresholdPersen" placeholder="Threshold %" class="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm min-h-[44px]">
                 </div>
-                <div class="flex gap-2">
-                    <button wire:click="simpanSchedule" class="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm">Simpan</button>
-                    <button wire:click="showScheduleForm=false" class="px-4 py-2 bg-white/10 text-ink-300 rounded-lg text-sm">Batal</button>
+                <div class="flex items-center gap-2">
+                    <button wire:click="simpanSchedule" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm transition active:scale-[0.97] min-h-[44px]">Simpan</button>
+                    <button wire:click="showScheduleForm=false" class="px-4 py-2 bg-white/10 hover:bg-white/15 text-ink-300 rounded-lg text-sm transition active:scale-[0.97] min-h-[44px]">Batal</button>
                 </div>
             </div>
         @endif
@@ -52,9 +52,9 @@
     </x-prism.glass-card>
 
     <x-prism.glass-card title="Tugas Cycle Count" subtitle="Hasil count dan status persetujuan">
-        <div class="flex gap-2 mb-4">
-            <input type="text" wire:model="search" placeholder="Cari tugas..." class="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm">
-            <select wire:model="filterStatus" class="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm">
+        <div class="flex flex-col sm:flex-row gap-2 mb-4">
+            <input type="text" wire:model="search" placeholder="Cari tugas..." class="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm min-h-[44px]">
+            <select wire:model="filterStatus" class="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm min-h-[44px]">
                 <option value="semua">Semua</option>
                 <option value="menunggu_count">Menunggu Count</option>
                 <option value="menunggu_approval">Menunggu Approval</option>
@@ -84,13 +84,13 @@
             <div class="mt-4 p-4 rounded-xl bg-white/[0.05] border border-white/10 space-y-3">
                 <h4 class="font-semibold text-ink-100">Input Stok Fisik</h4>
                 @foreach($tasks->where('id', $selectedTaskId)->first()->sample_items ?? [] as $item)
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm text-ink-200 w-48">{{ $item['nama'] ?? 'Produk #' . $item['stok_item_id'] }}</span>
-                        <input type="number" wire:model="fisikPerItem.{{ $item['stok_item_id'] }}" placeholder="Qty fisik" class="w-32 px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <span class="text-sm text-ink-200 sm:w-48">{{ $item['nama'] ?? 'Produk #' . $item['stok_item_id'] }}</span>
+                        <input type="number" wire:model="fisikPerItem.{{ $item['stok_item_id'] }}" placeholder="Qty fisik" class="w-full sm:w-32 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-ink-100 text-sm min-h-[44px]">
                         <span class="text-xs text-ink-400">Sistem: {{ $item['stok_sistem'] ?? '-' }}</span>
                     </div>
                 @endforeach
-                <button wire:click="submitCount" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm">Kirim Count</button>
+                <button wire:click="submitCount" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold active:scale-[0.97] min-h-[44px]">Kirim Count</button>
             </div>
         @endif
     </x-prism.glass-card>

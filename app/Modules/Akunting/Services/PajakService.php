@@ -18,19 +18,50 @@ class PajakService
      *
      * @param  ?int  $cabangId  — cabang aktif (session), nullable utk fallback global
      * @param  float  $dpp  — harga di luar pajak (existing "harga" di Transaksi)
-     * @return array ['ppn_percent'=>float, 'ppn_nominal'=>float, 'dpp'=>float, 'enabled'=>bool]
+     * @param  ?string  $mode  — 'exclusive' | 'inclusive', default ambil dari config
+     * @return array ['ppn_percent'=>float, 'ppn_nominal'=>float, 'dpp'=>float, 'enabled'=>bool, 'nama'=>string, 'mode'=>string]
      */
-    public function hitung(?int $cabangId, float $dpp): array
+    public function hitung(?int $cabangId, float $dpp, ?string $mode = null): array
     {
         $enabled = $this->enabled($cabangId);
         $percent = $enabled ? $this->getPercent($cabangId) : 0.0;
-        $nominal = $enabled ? round($dpp * $percent / 100, 2) : 0.0;
+        $taxMode = $mode ?? $this->getMode($cabangId);
+        $taxNama = $this->getNama($cabangId);
+
+        if (! $enabled || $percent <= 0) {
+            return [
+                'ppn_percent' => 0.0,
+                'ppn_nominal' => 0.0,
+                'dpp' => $dpp,
+                'enabled' => false,
+                'nama' => $taxNama,
+                'mode' => $taxMode,
+            ];
+        }
+
+        if ($taxMode === 'inclusive') {
+            $baseDpp = round($dpp / (1 + ($percent / 100)), 2);
+            $nominal = round($dpp - $baseDpp, 2);
+
+            return [
+                'ppn_percent' => $percent,
+                'ppn_nominal' => $nominal,
+                'dpp' => $baseDpp,
+                'enabled' => true,
+                'nama' => $taxNama,
+                'mode' => 'inclusive',
+            ];
+        }
+
+        $nominal = round($dpp * $percent / 100, 2);
 
         return [
             'ppn_percent' => $percent,
             'ppn_nominal' => $nominal,
             'dpp' => $dpp,
-            'enabled' => $enabled,
+            'enabled' => true,
+            'nama' => $taxNama,
+            'mode' => 'exclusive',
         ];
     }
 
@@ -51,20 +82,54 @@ class PajakService
      * order dibuat, lalu disimpan (dpp / pajak_nominal / ppn_nominal) — webhook
      * cukup memisahkannya, tidak menghitung ulang.
      *
-     * @return array{dpp:float, ppn_nominal:float, ppn_percent:float, enabled:bool, total_akhir:float}
+     * @return array{dpp:float, ppn_nominal:float, ppn_percent:float, enabled:bool, total_akhir:float, nama:string, mode:string}
      */
     public function hitungPenjualan(?int $cabangId, float $subtotal, float $diskon = 0.0): array
     {
-        $dpp = max(0.0, round($subtotal - max(0.0, $diskon), 2));
-        $hitung = $this->hitung($cabangId, $dpp);
+        $net = max(0.0, round($subtotal - max(0.0, $diskon), 2));
+        $enabled = $this->enabled($cabangId);
+        $percent = $enabled ? $this->getPercent($cabangId) : 0.0;
+        $mode = $this->getMode($cabangId);
+        $nama = $this->getNama($cabangId);
+
+        if (! $enabled || $percent <= 0) {
+            return [
+                'dpp' => $net,
+                'ppn_nominal' => 0.0,
+                'ppn_percent' => 0.0,
+                'enabled' => false,
+                'total_akhir' => $net,
+                'nama' => $nama,
+                'mode' => $mode,
+            ];
+        }
+
+        if ($mode === 'inclusive') {
+            $dpp = round($net / (1 + ($percent / 100)), 2);
+            $ppnNominal = round($net - $dpp, 2);
+
+            return [
+                'dpp' => $dpp,
+                'ppn_nominal' => $ppnNominal,
+                'ppn_percent' => $percent,
+                'enabled' => true,
+                'total_akhir' => $net,
+                'nama' => $nama,
+                'mode' => 'inclusive',
+            ];
+        }
+
+        $hitung = $this->hitung($cabangId, $net, 'exclusive');
         $ppnNominal = (float) $hitung['ppn_nominal'];
 
         return [
-            'dpp' => $dpp,
+            'dpp' => $net,
             'ppn_nominal' => $ppnNominal,
-            'ppn_percent' => (float) $hitung['ppn_percent'],
-            'enabled' => (bool) $hitung['enabled'],
-            'total_akhir' => round($dpp + $ppnNominal, 2),
+            'ppn_percent' => $percent,
+            'enabled' => true,
+            'total_akhir' => round($net + $ppnNominal, 2),
+            'nama' => $nama,
+            'mode' => 'exclusive',
         ];
     }
 
@@ -113,6 +178,68 @@ class PajakService
     }
 
     /**
+     * Nama pajak yang berlaku (default 'PPN').
+     * Kunci: pajak_nama.{cabang} / pajak_nama.
+     */
+    public function getNama(?int $cabangId): string
+    {
+        $key = $cabangId ? "pajak_nama.{$cabangId}" : 'pajak_nama';
+        $val = DB::table('konfigurasi')->where('kunci', $key)->value('nilai');
+        if ($val === null && $cabangId !== null) {
+            $val = DB::table('konfigurasi')->where('kunci', 'pajak_nama')->value('nilai');
+        }
+
+        return ! empty($val) ? (string) $val : 'PPN';
+    }
+
+    /**
+     * Mode perhitungan pajak: 'exclusive' (harga belum termasuk pajak) atau 'inclusive' (harga sudah termasuk pajak).
+     * Kunci: pajak_mode.{cabang} / pajak_mode.
+     */
+    public function getMode(?int $cabangId): string
+    {
+        $key = $cabangId ? "pajak_mode.{$cabangId}" : 'pajak_mode';
+        $val = DB::table('konfigurasi')->where('kunci', $key)->value('nilai');
+        if ($val === null && $cabangId !== null) {
+            $val = DB::table('konfigurasi')->where('kunci', 'pajak_mode')->value('nilai');
+        }
+
+        return in_array($val, ['exclusive', 'inclusive'], true) ? (string) $val : 'exclusive';
+    }
+
+    /**
+     * Ambil bundel konfigurasi pajak lengkap untuk cabang/global.
+     *
+     * @return array{enabled: bool, percent: float, nama: string, mode: string}
+     */
+    public function getConfig(?int $cabangId): array
+    {
+        return [
+            'enabled' => $this->enabled($cabangId),
+            'percent' => $this->getPercent($cabangId),
+            'nama' => $this->getNama($cabangId),
+            'mode' => $this->getMode($cabangId),
+        ];
+    }
+
+    /**
+     * Simpan bundel konfigurasi pajak lengkap.
+     */
+    public function saveConfig(?int $cabangId, array $data): void
+    {
+        $enabled = (bool) ($data['enabled'] ?? false);
+        $percent = max(0.0, (float) ($data['percent'] ?? 11.0));
+        $nama = ! empty($data['nama']) ? trim((string) $data['nama']) : 'PPN';
+        $mode = in_array($data['mode'] ?? '', ['exclusive', 'inclusive'], true) ? $data['mode'] : 'exclusive';
+
+        $this->setBool($cabangId, 'pajak_enabled', $enabled);
+        $this->setBool($cabangId, 'ppn_enabled', $enabled);
+        $this->setFloat($cabangId, 'ppn_percent', $percent);
+        $this->setString($cabangId, 'pajak_nama', $nama);
+        $this->setString($cabangId, 'pajak_mode', $mode);
+    }
+
+    /**
      * Atur konfigurasi Pajak Otomatis (tulis key baru pajak_enabled + legacy ppn_enabled).
      *
      * @param  ?int  $cabangId  nullable utk set global
@@ -153,6 +280,8 @@ class PajakService
             ['kunci' => 'pajak_enabled', 'nilai' => 'false', 'deskripsi' => 'Aktifkan Pajak Otomatis (PPN) global'],
             ['kunci' => 'ppn_enabled', 'nilai' => 'false', 'deskripsi' => 'Aktifkan Pajak Otomatis per cabang'],
             ['kunci' => 'ppn_percent', 'nilai' => '11', 'deskripsi' => 'Persen PPN nasional default'],
+            ['kunci' => 'pajak_nama', 'nilai' => 'PPN', 'deskripsi' => 'Label nama pajak default'],
+            ['kunci' => 'pajak_mode', 'nilai' => 'exclusive', 'deskripsi' => 'Mode perhitungan: exclusive atau inclusive'],
         ];
 
         foreach ($defaults as $d) {
@@ -161,6 +290,18 @@ class PajakService
                 ['nilai' => $d['nilai'], 'deskripsi' => $d['deskripsi'], 'created_at' => now(), 'updated_at' => now()]
             );
         }
+    }
+
+    /**
+     * Simpan nilai string untuk cabang.
+     */
+    private function setString(?int $cabangId, string $base, string $val): void
+    {
+        $kunci = $cabangId ? "{$base}.{$cabangId}" : $base;
+        DB::table('konfigurasi')->updateOrInsert(
+            ['kunci' => $kunci],
+            ['nilai' => $val, 'deskripsi' => null, 'created_at' => now(), 'updated_at' => now()]
+        );
     }
 
     /**

@@ -2,13 +2,13 @@
      x-data="{ dragId: null, overCol: null, photoIndex: 0 }">
 
     <!-- ===== TOOLBAR ===== -->
-    <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between mb-4 flex-shrink-0">
-        <div class="flex-1">
+    <div class="flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center justify-between mb-3 flex-shrink-0">
+        <div class="flex-1 min-w-0">
             <x-prism.barcode-scan-input placeholder="Cari tiket: no. tiket, jenis HP, nama pelanggan..." model="search" />
         </div>
 
-        <div class="flex items-center gap-2">
-            <select wire:model.live="filterStatus" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
+            <select wire:model.live="filterStatus" class="flex-1 sm:flex-initial px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                 <option value="" class="bg-ink-900">Semua Status</option>
                 @foreach($stateMachineColumns as $kode => $col)
                     <option value="{{ $kode }}" class="bg-ink-900">{{ $col['label'] }}</option>
@@ -17,23 +17,40 @@
 
             <!-- [F2-5] Export laporan servis (queue) -->
             @can('laporan.cabang')
-                <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
-                <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" wire:click="exportLaporan('xlsx')" title="Export Excel" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">
+                        <span class="hidden sm:inline">Export Excel</span>
+                        <span class="sm:hidden">XLS</span>
+                    </button>
+                    <button type="button" wire:click="exportLaporan('csv')" title="Export CSV" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">
+                        <span class="hidden sm:inline">Export CSV</span>
+                        <span class="sm:hidden">CSV</span>
+                    </button>
+                </div>
             @endcan
 
             @can('servis.create')
                 <button
                     type="button"
                     wire:click="openTerimaModal"
-                    class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
+                    class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] transition-[transform,background-color] min-h-[44px] whitespace-nowrap"
                 >
-                    <span class="text-base leading-none">+</span> Terima Unit Servis
+                    <span class="text-base leading-none font-bold">+</span>
+                    <span>Terima Unit</span>
                 </button>
             @endcan
-            {{-- [B-14] Role non-teknisi (kasir/marketing) sekarang punya `servis.view`
-                 (READ-ONLY) → tombol "Terima Unit" disembunyikan utk mereka; aksi
-                 tetap dijaga server-side di `ServisBoard::simpanTerima()`. --}}
         </div>
+    </div>
+
+    <!-- Mobile Kanban Swipe Hint -->
+    <div class="sm:hidden flex items-center justify-between text-[11px] text-ink-400 mb-1.5 px-0.5 flex-shrink-0">
+        <span class="inline-flex items-center gap-1">
+            <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            Geser horizontal untuk melihat alur status
+        </span>
+        <span class="text-[10px] font-mono text-ink-500">6 Kolom</span>
     </div>
 
     <!-- ===== ANTREAN BOOKING ONLINE ===== -->
@@ -710,6 +727,17 @@
                                 {{ $selectedTiket->garansi->active ? 'Dalam Garansi' : 'Garansi Habis' }}
                             </span>
                         @endif
+                        @can('lihat-audit-log')
+                            <button
+                                type="button"
+                                wire:click="bukaRiwayat('servis', {{ $selectedTiket->id }})"
+                                class="text-[10px] font-bold text-up-primary bg-up-primary/10 border border-up-primary/30 hover:bg-up-primary/20 px-2 py-0.5 rounded-full cursor-pointer flex items-center gap-1"
+                                title="Lihat Riwayat & Log Mutasi Lengkap"
+                            >
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span>Audit Log</span>
+                            </button>
+                        @endcan
                     </div>
                     <button wire:click="$set('selectedTiketId', null)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
@@ -1109,4 +1137,7 @@
             </div>
         </div>
     @endif
+
+    {{-- Modal Riwayat Aktivitas & Log Mutasi --}}
+    @include('partials.riwayat-modal')
 </div>

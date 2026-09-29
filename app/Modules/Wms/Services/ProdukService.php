@@ -5,6 +5,7 @@ namespace App\Modules\Wms\Services;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
@@ -12,6 +13,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Models\TipeHp;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -57,20 +59,82 @@ class ProdukService
         array $tipeHpIds = [],
         array $hargaTier = [],
         bool $hargaFleksibel = false,
-        bool $sn = false // [F2-3]
+        bool $sn = false, // [F2-3]
+        ?int $kategoriId = null,
+        array $foto = [],
+        ?string $deskripsi = null,
+        array $produkKompatibelIds = [],
+        string $abcClass = 'B',
+        ?int $reorderPoint = null,
+        ?int $minStock = null,
+        ?int $maxStock = null,
+        bool $isOndemand = false
     ): Produk {
-        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn) {
+        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand) {
             $satuan = $satuanKode ?: 'pcs';
             $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
             if ($satuanKode && ! $satuanRef) {
                 throw new \Exception("Satuan '{$satuanKode}' tidak terdaftar di satuan_unit");
             }
 
+            // Sinkronisasi kategori_id dan kategori string
+            $finalKategoriId = $kategoriId;
+            $finalKategoriStr = $kategori ?: 'Umum';
+            if ($finalKategoriId) {
+                $katRow = KategoriProduk::find($finalKategoriId);
+                if ($katRow) {
+                    $finalKategoriStr = $katRow->nama;
+                }
+            } elseif (! empty($kategori)) {
+                $katRow = KategoriProduk::where('nama', $kategori)->orWhere('slug', Str::slug($kategori))->first();
+                if ($katRow) {
+                    $finalKategoriId = $katRow->id;
+                }
+            }
+
+            // Normalisasi foto utama ke kolom gambar
+            $fotoUtamaUrl = null;
+            if (! empty($foto)) {
+                foreach ($foto as $f) {
+                    if (is_array($f) && ! empty($f['is_primary']) && ! empty($f['url'])) {
+                        $fotoUtamaUrl = $f['url'];
+                        break;
+                    }
+                }
+                if (! $fotoUtamaUrl && isset($foto[0])) {
+                    $fotoUtamaUrl = is_array($foto[0]) ? ($foto[0]['url'] ?? null) : $foto[0];
+                }
+            }
+
+            // Sinkronisasi dua arah: brand_kompatibel, model_kompatibel, dan tipe_hp
+            $brand = $brand ? trim($brand) : null;
+            $model = $model ? trim($model) : null;
+            $finalTipeHpIds = array_values(array_filter($tipeHpIds));
+
+            if (! empty($brand) && ! empty($model)) {
+                $matchedTipeHp = TipeHp::firstOrCreate(
+                    ['merk' => $brand, 'model' => $model],
+                    ['nama' => "{$brand} {$model}", 'is_active' => true]
+                );
+                if (! in_array($matchedTipeHp->id, $finalTipeHpIds, true)) {
+                    $finalTipeHpIds[] = $matchedTipeHp->id;
+                }
+            } elseif (empty($brand) && ! empty($finalTipeHpIds)) {
+                $firstTipe = TipeHp::find($finalTipeHpIds[0]);
+                if ($firstTipe) {
+                    $brand = $firstTipe->merk;
+                    if (empty($model)) {
+                        $model = $firstTipe->model;
+                    }
+                }
+            }
+
             $produk = Produk::create([
                 'nama' => $nama,
                 'slug' => Str::slug($nama).'-'.Str::lower(Str::random(4)),
-                'deskripsi' => null,
-                'kategori' => $kategori ?: 'Umum',
+                'deskripsi' => $deskripsi,
+                'kategori' => $finalKategoriStr,
+                'kategori_id' => $finalKategoriId,
                 'brand_id' => $brandId,
                 'kualitas_id' => $kualitasId,
                 'brand_kompatibel' => $brand,
@@ -79,9 +143,16 @@ class ProdukService
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,
                 'harga_jual_retail' => $hargaJual,
+                'gambar' => $fotoUtamaUrl,
+                'foto' => ! empty($foto) ? array_values($foto) : null,
                 'is_active' => true,
                 'harga_fleksibel' => $hargaFleksibel,
                 'sn' => $sn, // [F2-3]
+                'abc_class' => in_array($abcClass, ['A', 'B', 'C']) ? $abcClass : 'B',
+                'reorder_point' => $reorderPoint,
+                'min_stock' => $minStock ?? ($stokMinimum > 0 ? $stokMinimum : null),
+                'max_stock' => $maxStock,
+                'is_ondemand' => $isOndemand,
             ]);
 
             $variant = SkuVariant::create([
@@ -94,8 +165,12 @@ class ProdukService
                 'is_active' => true,
             ]);
 
-            if ($tipeHpIds) {
-                $produk->tipeHps()->sync(array_values(array_filter($tipeHpIds)));
+            if ($finalTipeHpIds) {
+                $produk->tipeHps()->sync($finalTipeHpIds);
+            }
+
+            if ($produkKompatibelIds) {
+                $produk->produkKompatibel()->sync(array_values(array_filter($produkKompatibelIds)));
             }
 
             $this->simpanHargaTier($produk->id, $variant->id, $hargaTier, $hargaJual);
@@ -118,6 +193,136 @@ class ProdukService
             }
 
             return $produk;
+        });
+    }
+
+    /**
+     * Update data master produk.
+     */
+    public function updateProduk(
+        int $produkId,
+        string $nama,
+        ?string $kategori,
+        ?string $brand,
+        ?string $model,
+        string $kondisi,
+        float $hargaBeli,
+        float $hargaJual,
+        ?int $brandId = null,
+        ?int $kualitasId = null,
+        ?string $satuanKode = null,
+        array $tipeHpIds = [],
+        array $hargaTier = [],
+        bool $hargaFleksibel = false,
+        bool $sn = false,
+        ?int $kategoriId = null,
+        array $foto = [],
+        ?string $deskripsi = null,
+        array $produkKompatibelIds = [],
+        ?string $abcClass = null,
+        ?int $reorderPoint = null,
+        ?int $minStock = null,
+        ?int $maxStock = null,
+        ?bool $isOndemand = null
+    ): Produk {
+        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand) {
+            $produk = Produk::findOrFail($produkId);
+
+            $satuan = $satuanKode ?: ($produk->satuan ?: 'pcs');
+            $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
+
+            // Sinkronisasi kategori
+            $finalKategoriId = $kategoriId ?? $produk->kategori_id;
+            $finalKategoriStr = $kategori ?: ($produk->kategori ?: 'Umum');
+            if ($kategoriId) {
+                $katRow = KategoriProduk::find($kategoriId);
+                if ($katRow) {
+                    $finalKategoriStr = $katRow->nama;
+                }
+            }
+
+            // Normalisasi foto
+            $fotoUtamaUrl = null;
+            if (! empty($foto)) {
+                foreach ($foto as $f) {
+                    if (is_array($f) && ! empty($f['is_primary']) && ! empty($f['url'])) {
+                        $fotoUtamaUrl = $f['url'];
+                        break;
+                    }
+                }
+                if (! $fotoUtamaUrl && isset($foto[0])) {
+                    $fotoUtamaUrl = is_array($foto[0]) ? ($foto[0]['url'] ?? null) : $foto[0];
+                }
+            }
+
+            // Sinkronisasi dua arah: brand_kompatibel, model_kompatibel, dan tipe_hp
+            $brand = $brand ? trim($brand) : null;
+            $model = $model ? trim($model) : null;
+            $finalTipeHpIds = array_values(array_filter($tipeHpIds));
+
+            if (! empty($brand) && ! empty($model)) {
+                $matchedTipeHp = TipeHp::firstOrCreate(
+                    ['merk' => $brand, 'model' => $model],
+                    ['nama' => "{$brand} {$model}", 'is_active' => true]
+                );
+                if (! in_array($matchedTipeHp->id, $finalTipeHpIds, true)) {
+                    $finalTipeHpIds[] = $matchedTipeHp->id;
+                }
+            } elseif (empty($brand) && ! empty($finalTipeHpIds)) {
+                $firstTipe = TipeHp::find($finalTipeHpIds[0]);
+                if ($firstTipe) {
+                    $brand = $firstTipe->merk;
+                    if (empty($model)) {
+                        $model = $firstTipe->model;
+                    }
+                }
+            }
+
+            $produk->update([
+                'nama' => $nama,
+                'deskripsi' => $deskripsi ?? $produk->deskripsi,
+                'kategori' => $finalKategoriStr,
+                'kategori_id' => $finalKategoriId,
+                'brand_id' => $brandId,
+                'kualitas_id' => $kualitasId,
+                'brand_kompatibel' => $brand,
+                'model_kompatibel' => $model,
+                'kondisi' => in_array($kondisi, ['baru', 'oem', 'compatible'], true) ? $kondisi : 'baru',
+                'satuan' => $satuan,
+                'harga_beli' => $hargaBeli,
+                'harga_jual_retail' => $hargaJual,
+                'gambar' => $fotoUtamaUrl ?? $produk->gambar,
+                'foto' => ! empty($foto) ? array_values($foto) : $produk->foto,
+                'harga_fleksibel' => $hargaFleksibel,
+                'sn' => $sn,
+                'abc_class' => $abcClass !== null ? (in_array($abcClass, ['A', 'B', 'C']) ? $abcClass : 'B') : $produk->abc_class,
+                'reorder_point' => $reorderPoint !== null ? $reorderPoint : $produk->reorder_point,
+                'min_stock' => $minStock !== null ? $minStock : $produk->min_stock,
+                'max_stock' => $maxStock !== null ? $maxStock : $produk->max_stock,
+                'is_ondemand' => $isOndemand !== null ? $isOndemand : $produk->is_ondemand,
+            ]);
+
+            // Sync tipe HP kompatibel
+            $produk->tipeHps()->sync($finalTipeHpIds);
+
+            // Sync produk kompatibel / substitusi
+            $produk->produkKompatibel()->sync(array_values(array_filter($produkKompatibelIds)));
+
+            // Update primary SKU variant harga
+            $variant = $produk->skuVariants()->first();
+            if ($variant) {
+                $variant->update([
+                    'satuan_kode' => $satuanRef?->kode ?? $variant->satuan_kode,
+                    'harga_beli' => $hargaBeli,
+                    'harga_jual_retail' => $hargaJual,
+                ]);
+
+                if (! empty($hargaTier)) {
+                    $this->simpanHargaTier($produk->id, $variant->id, $hargaTier, $hargaJual);
+                }
+            }
+
+            return $produk->fresh();
         });
     }
 

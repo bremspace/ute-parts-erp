@@ -37,7 +37,7 @@
             </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap xl:flex-wrap">
             <!-- Filter status (Livewire nyata — AsetRegister::$filterStatus) -->
             <div class="flex items-center gap-2">
                 <label for="aset-filter-status" class="text-[11px] text-ink-400 font-medium whitespace-nowrap">Status</label>

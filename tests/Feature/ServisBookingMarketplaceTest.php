@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Marketplace\Livewire\BookingServis;
 use App\Modules\Marketplace\Livewire\CustomerAccount;
 use App\Modules\Rbac\Models\Cabang;
@@ -140,5 +141,54 @@ class ServisBookingMarketplaceTest extends TestCase
         $tiketFound = $servisList->firstWhere('id', $tiket->id);
         $this->assertEquals(450000, $tiketFound->estimasi_biaya);
         $this->assertEquals('belum_bayar', $tiketFound->status_pembayaran);
+    }
+
+    public function test_customer_account_menampilkan_status_membership_dan_poin_loyalty(): void
+    {
+        $silver = TierMembership::create([
+            'nama' => 'Silver',
+            'kode' => 'silver',
+            'min_belanja_12bulan' => 500000,
+            'diskon_persen' => 3.0,
+            'poin_multiplier' => 1.0,
+            'urutan' => 1,
+            'is_active' => true,
+        ]);
+
+        $gold = TierMembership::create([
+            'nama' => 'Gold',
+            'kode' => 'gold',
+            'min_belanja_12bulan' => 2000000,
+            'diskon_persen' => 5.0,
+            'poin_multiplier' => 1.5,
+            'urutan' => 2,
+            'is_active' => true,
+        ]);
+
+        $customer = Pelanggan::create([
+            'nama' => 'Member Setia',
+            'telepon' => '081233445566',
+            'password' => Hash::make('password'),
+            'tier_membership_id' => $silver->id,
+            'poin_loyalty' => 350,
+            'total_belanja_12bulan' => 1200000,
+        ]);
+
+        $this->actingAs($customer, 'customer');
+
+        $component = Livewire::test(CustomerAccount::class)
+            ->set('activeTab', 'membership')
+            ->assertOk()
+            ->assertSee('Silver')
+            ->assertSee('350')
+            ->assertSee('Gold')
+            ->assertSee('Status Membership & Poin');
+
+        $info = $component->get('membershipInfo');
+        $this->assertEquals('Silver', $info['tierName']);
+        $this->assertEquals(350, $info['poinLoyalty']);
+        $this->assertEquals(1200000, $info['totalBelanja']);
+        $this->assertEquals('Gold', $info['nextTier']->nama);
+        $this->assertEquals(800000, $info['kekurangan']);
     }
 }

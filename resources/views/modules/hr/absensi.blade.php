@@ -7,12 +7,12 @@
     </div>
 
     {{-- Tabs --}}
-    <div class="glass-card p-3 mb-6">
-        <div class="flex flex-wrap gap-2">
+    <div class="glass-card p-2 sm:p-3 mb-6">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
             @foreach(['shift' => 'Shift', 'roster' => 'Roster', 'absensi' => 'Absensi', 'kpi' => 'KPI'] as $key => $label)
                 <button wire:click="pilihTab('{{ $key }}')"
-                    class="px-4 py-2 text-sm font-medium rounded-md transition
-                    {{ $tab === $key ? 'bg-up-primary text-white shadow-sm' : 'text-ink-600 hover:bg-up-primary/10' }}">
+                    class="px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center justify-center
+                    {{ $tab === $key ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-600 hover:bg-up-primary/10 hover:text-up-primary' }}">
                     {{ $label }}
                 </button>
             @endforeach

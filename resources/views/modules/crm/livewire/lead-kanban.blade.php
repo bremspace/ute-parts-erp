@@ -32,14 +32,14 @@
             <div class="flex-1">
                 <x-prism.barcode-scan-input placeholder="Cari nama, telepon, atau email lead..." model="search" />
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <select wire:model.live="filterSumber" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+            <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
+                <select wire:model.live="filterSumber" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                     <option value="" class="bg-ink-900">Semua Sumber</option>
                     @foreach($sumberOptions as $key => $label)
                         <option value="{{ $key }}" class="bg-ink-900">{{ $label }}</option>
                     @endforeach
                 </select>
-                <select wire:model.live="filterAssignedTo" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                <select wire:model.live="filterAssignedTo" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                     <option value="" class="bg-ink-900">Semua Penanggung Jawab</option>
                     @foreach($salesUsers as $u)
                         <option value="{{ $u->id }}" class="bg-ink-900">{{ $u->name }}</option>
@@ -47,13 +47,14 @@
                 </select>
             </div>
         </div>
-        <div class="flex items-center gap-2">
-            <x-prism.prism-button variant="mint" size="sm" wire:click="openCreateModal">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
+            <x-prism.prism-button variant="mint" size="sm" wire:click="openCreateModal" class="whitespace-nowrap min-h-[44px]">
                 + Tambah Lead
             </x-prism.prism-button>
             @if($search !== '' || $filterSumber || $filterAssignedTo)
                 <x-prism.prism-button variant="ghost" size="sm"
-                    @click="$wire.set('search', ''); $wire.set('filterSumber', null); $wire.set('filterAssignedTo', null)">
+                    @click="$wire.set('search', ''); $wire.set('filterSumber', null); $wire.set('filterAssignedTo', null)"
+                    class="whitespace-nowrap min-h-[44px]">
                     ✕ Reset Filter
                 </x-prism.prism-button>
             @endif

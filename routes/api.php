@@ -13,6 +13,7 @@ use App\Modules\Rbac\Controllers\RbacController;
 use App\Modules\Rbac\Controllers\RbacFlexController;
 use App\Modules\Reseller\Controllers\ResellerController;
 use App\Modules\Servis\Controllers\ServisController;
+use App\Modules\Wms\Controllers\ProcurementController;
 use App\Modules\Wms\Controllers\WmsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -89,10 +90,18 @@ Route::middleware(['throttle:60,1'])->group(function () {
             // [T-10] WMS-09..12: Supplier & PO
             Route::get('/supplier', [WmsController::class, 'supplier'])->middleware('permission:wms.view');
             Route::post('/supplier', [WmsController::class, 'storeSupplier'])->middleware('permission:wms.create');
+            Route::put('/supplier/{id}', [WmsController::class, 'updateSupplier'])->name('wms.supplier.update')->middleware('permission:wms.create');
+            Route::delete('/supplier/{id}', [WmsController::class, 'destroySupplier'])->name('wms.supplier.destroy')->middleware('permission:wms.create');
             Route::get('/po', [WmsController::class, 'indexPo'])->middleware('permission:wms.view');
             Route::post('/po', [WmsController::class, 'storePo'])->middleware('permission:wms.create');
             Route::put('/po/{id}/status', [WmsController::class, 'updatePoStatus'])->middleware('permission:wms.create');
             Route::post('/po/{id}/bayar', [WmsController::class, 'bayarPo'])->middleware('permission:wms.create');
+
+            // [WMS-13] Rak CRUD
+            Route::get('/rak', [WmsController::class, 'indexRak'])->name('wms.rak.index')->middleware('permission:wms.view');
+            Route::post('/rak', [WmsController::class, 'storeRak'])->name('wms.rak.store')->middleware('permission:wms.create');
+            Route::put('/rak/{id}', [WmsController::class, 'updateRak'])->name('wms.rak.update')->middleware('permission:wms.create');
+            Route::delete('/rak/{id}', [WmsController::class, 'destroyRak'])->name('wms.rak.destroy')->middleware('permission:wms.create');
 
             // [T-15] WMS-14: generate barcode
             Route::post('/produk/{id}/generate-barcode', [WmsController::class, 'generateBarcode'])->middleware('permission:wms.create');
@@ -107,6 +116,10 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::post('/produk/import/preview', [WmsController::class, 'previewImportProduk'])->middleware('permission:wms.create');
             Route::post('/produk/import/commit', [WmsController::class, 'commitImportProduk'])->middleware('permission:wms.create');
             Route::get('/produk/import/log/{id}', [WmsController::class, 'importLog'])->middleware('permission:wms.view');
+
+            // [API: WMS-PROCUREMENT-01/02] Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, Modified JIT)
+            Route::get('/procurement/recommendations', [ProcurementController::class, 'recommendations'])->middleware('permission:wms.view');
+            Route::get('/procurement/summary', [ProcurementController::class, 'summary'])->middleware('permission:wms.view');
         });
 
         // [API: SERVICE-01..06] Modul Servis HP
@@ -232,13 +245,3 @@ Route::middleware(['throttle:60,1'])->group(function () {
     });
 
 }); // End global throttle:60,1 group (T-28)
-
-// WMS-09 Supplier CRUD (update/delete)
-Route::put('/wms/supplier/{id}', [WmsController::class, 'updateSupplier'])->name('wms.supplier.update')->middleware('permission:wms.supplier.edit');
-Route::delete('/wms/supplier/{id}', [WmsController::class, 'destroySupplier'])->name('wms.supplier.destroy')->middleware('permission:wms.supplier.delete');
-
-// WMS-13 Rak CRUD
-Route::get('/wms/rak', [WmsController::class, 'indexRak'])->name('wms.rak.index')->middleware('permission:wms.rak.view');
-Route::post('/wms/rak', [WmsController::class, 'storeRak'])->name('wms.rak.store')->middleware('permission:wms.rak.create');
-Route::put('/wms/rak/{id}', [WmsController::class, 'updateRak'])->name('wms.rak.update')->middleware('permission:wms.rak.edit');
-Route::delete('/wms/rak/{id}', [WmsController::class, 'destroyRak'])->name('wms.rak.destroy')->middleware('permission:wms.rak.delete');

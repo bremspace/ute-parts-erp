@@ -8,6 +8,7 @@
              tidak mungkin ada item stok kosong dari jalur UI. --}}
         @forelse($cart as $key => $item)
             <div
+                wire:key="cart-item-mobile-{{ $key }}"
                 x-data="{
                     flexOpen: false,
                     flexHarga: '{{ number_format($item['harga'] ?? 0, 0, '', '') }}',
@@ -132,33 +133,38 @@
                     @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
                 </div>
 
-                <!-- Quantity Controls - Touch-friendly 44x44px minimum -->
-                <div class="flex items-center gap-2 flex-shrink-0">
-                    <button
-                        wire:click="updateQty('{{ $key }}', -1)"
-                        class="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-lg font-bold transition-all cursor-pointer active:scale-95 min-h-[44px] min-w-[44px]"
-                        aria-label="Kurangi jumlah">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4" />
-                        </svg>
-                    </button>
-                    <span class="w-10 text-center text-base font-bold tabular-nums text-white">{{ $item['qty'] }}</span>
-                    <button
-                        wire:click="updateQty('{{ $key }}', 1)"
-                        class="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-lg font-bold transition-all cursor-pointer active:scale-95 min-h-[44px] min-w-[44px]"
-                        aria-label="Tambah jumlah">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-                        </svg>
-                    </button>
-                    <button
-                        wire:click="removeFromCart('{{ $key }}')"
-                        class="w-10 h-10 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red flex items-center justify-center transition-all cursor-pointer active:scale-95 min-h-[44px] min-w-[44px]"
-                        aria-label="Hapus item">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                <!-- Quantity Controls & Line Subtotal -->
+                <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <div class="flex items-center gap-1.5">
+                        <button
+                            wire:click="updateQty('{{ $key }}', -1)"
+                            class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
+                            aria-label="Kurangi jumlah">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4" />
+                            </svg>
+                        </button>
+                        <span class="w-7 text-center text-sm font-bold tabular-nums text-white">{{ $item['qty'] }}</span>
+                        <button
+                            wire:click="updateQty('{{ $key }}', 1)"
+                            class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
+                            aria-label="Tambah jumlah">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                            </svg>
+                        </button>
+                        <button
+                            wire:click="removeFromCart('{{ $key }}')"
+                            class="w-8 h-8 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red flex items-center justify-center transition-all cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
+                            aria-label="Hapus item">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <span class="text-xs font-bold text-white tabular-nums">
+                        Rp {{ number_format($item['subtotal'] ?? ($item['harga'] * $item['qty']), 0, ',', '.') }}
+                    </span>
                 </div>
             </div>
         @empty
@@ -191,12 +197,12 @@
             <span class="text-up-mint tabular-nums">Rp {{ number_format($totalBayar ?? $total ?? 0, 0, ',', '.') }}</span>
         </div>
 
-        @if($this->customer && $this->customer->tierMembership)
+        @if($customer && $customer->tierMembership)
             <div class="text-xs text-up-mint flex items-center gap-1.5 font-medium">
                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
-                <span>Diskon {{ $this->customer->tierMembership->diskon_persen }}% aktif untuk {{ $this->customer->tierMembership->nama }}</span>
+                <span>Diskon {{ $customer->tierMembership->diskon_persen }}% aktif untuk {{ $customer->tierMembership->nama }}</span>
             </div>
         @endif
     </div>

@@ -3,6 +3,100 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-09-28 — Refactor Navigasi Tab Horizontal & Responsivitas Mobile Seluruh Modul ✅
+
+Refactor menyeluruh pada sistem navigasi tab dan button action bar di semua modul dan sub-modul (WMS, RBAC/Pengaturan, Akunting, Reseller, Omnichannel, Marketplace Customer Account, HR, CRM, Report Builder, Drill Down, Workflow Approval, POS, dan Dashboard) untuk mencegah tab stacking, overcrowding, dan overlap pada layar sentuh mobile/tablet:
+- **Utilitas Utility Scrollbar (.scrollbar-none):**
+  - Ditambahkan styling utility `.scrollbar-none` di `resources/css/prism-tokens.css` untuk scrolling horizontal yang halus tanpa menampilkan scrollbar default yang merusak tampilan.
+- **Hierarchical 2-Tier Navigation di Modul Kompleks:**
+  - **WMS Dashboard (`wms-dashboard.blade.php`):** Tier 1 (Inventori, Operasional, Pengadaan) dan Tier 2 kontekstual (Stok, Master Produk, Transfer, Stock Opname, PO, GRN) dengan responsive action buttons container.
+  - **Settings RBAC (`settings-rbac.blade.php`):** Tier 1 (Akses & Cabang, Master Data, Bisnis & Pajak) dan Tier 2 kontekstual, memecah deretan tab berjubel menjadi hierarki terstruktur tanpa menghilangkan kompatibilitas DOM/test.
+- **Horizontal Scrollable Tab Strip & Responsive Actions Bar:**
+  - **Akunting (`akunting-dashboard.blade.php`, `aset-register.blade.php`, `laporan-pajak.blade.php`):** Tab strip horizontal scrollable, touch-friendly min-h-[44px] action bar untuk depresiasi, tambah aset, dan date-range e-Faktur tax report.
+  - **Reseller (`reseller-dashboard.blade.php`):** Tab strip horizontal scrollable dengan badge pending counter, tombol aksi approval dan export yang responsif.
+  - **Omnichannel (`omnichannel-command-center.blade.php`):** Tab strip terisolasi dari tombol sinkronisasi stok dan hubungkan channel, form mapping responsif.
+  - **Report & Analytics (`report-builder.blade.php`, `drill-down.blade.php`):** Filter actions, breadcrumbs navigation, dan export bar yang scrollable tanpa tumpang tindih pada layar sempit.
+  - **WMS Sub-Views (`cycle-count`, `stok-tab`, `produk-tab`, `grn-tab`, `transfer-tab`, `po-tab`, `opname-tab`):** Action bar tabel, modal items, dan status filter disesuaikan dengan grid responsif (`grid-cols-1 sm:grid-cols-...`) dan action wrapper `overflow-x-auto scrollbar-none`.
+  - **Workflow & HR (`approval-inbox.blade.php`, `payroll.blade.php`, `komisi-skema.blade.php`, `absensi.blade.php`):** Tombol keputusan approval, filter periode, formula skema komisi multi-aktor, dan tab absensi/roster/KPI responsif.
+  - **CRM & Servis (`crm-dashboard.blade.php`, `lead-kanban.blade.php`, `servis-board.blade.php`):** Action bar pelanggan/lead/tiket, quick filter, dan export bar touch-friendly.
+  - **Marketplace (`customer-account.blade.php`, `shop-catalog.blade.php`, `shop-detail.blade.php`, `cart-checkout.blade.php`):** Multi-filter grid catalog responsif, bottom/action bar detail belanja, dan keranjang touch-friendly.
+  - **Dashboard (`dashboard-index.blade.php`):** Quick shortcut buttons wrap/scrollable secara aman pada mobile viewport.
+- **Standar Emil Design Engineering & Touch Readiness:**
+  - Semua tombol aksi, input, dan select memenuhi standar touch target `min-h-[44px]` dan `active:scale-[0.97]` dengan transisi tactile feedback.
+- **Pengujian & Validasi:**
+  - `php artisan test` pada modul terdampak (`WmsDashboardSplitTest`, `MasterProdukManagementTest`, `PajakOpsiTest`, `ExportLaporanTest`, `HrPageSingleRootTest`, `AbsensiShiftTest`, `ServisBookingMarketplaceTest`, `DrillDownTest`, `ApprovalWorkflowTest`) lulus `PASS`.
+  - Format kode rapi sesuai PSR-12 via Laravel Pint (449 files).
+  - Asset build via Vite (`npm run build`) sukses tanpa error.
+
+## 2026-09-27 — Penguatan Keamanan RBAC Seluruh CRUD & Audit Trail Terintegrasi (spatie/laravel-activitylog) ✅
+
+Penguatan menyeluruh untuk kontrol hak akses (RBAC) pada setiap operasi mutasi (CRUD) di 15 modul serta pencatatan audit log komprehensif:
+- **Pengamanan Rute Web & API (RBAC Middleware):**
+  - Web routes backoffice `/app/crm`, `/app/reseller`, `/app/omnichannel`, `/app/pengaturan`, `/app/audit-log` kini terlindungi Spatie permission (`crm.view`, `reseller.view`, `omnichannel.view`, `pengaturan.manage`, `lihat-audit-log`).
+  - API WMS unauthenticated (`/api/wms/supplier` dan `/api/wms/rak`) dipindahkan ke dalam middleware `auth:sanctum` + `cabang.selected` dengan permission `wms.view` dan `wms.create`.
+- **Pengamanan Aksi Livewire (Method Guards):**
+  - Implementasi guard `boleh($permission, $pesan)` di seluruh komponen Livewire:
+    - `TransferTab.php`: `saveTransfer`, `kirimTransfer`, `terimaTransfer` diverifikasi dengan `wms.transfer`.
+    - `CrmDashboard.php`: `simpanPelangganBaruCrm` dengan `crm.create`, serta `simpanTier` dan `recalcTier` dengan `tier.manage`.
+    - `SettingsRbac.php`: tab role & permission dengan `role.manage`, cabang dengan `cabang.manage`, gudang dengan `gudang.manage`, master produk dengan `wms.create`, dan pajak dengan `pengaturan.manage`.
+    - `ProdukTab.php`, `PoTab.php`, `OpnameTab.php`: seluruh mutasi create/edit/import/approve diproteksi permission terkait.
+  - Registrasi implicit bypass untuk `super-admin` via `Gate::before` di `AppServiceProvider` sesuai rekomendasi resmi Spatie.
+- **Pencatatan Audit Trail Menyeluruh (Spatie Activitylog):**
+  - Trait `CatatAktivitas` dan `LogsActivity` dipasang pada 17 model bisnis kritis: `TiketServis`, `Pelanggan`, `TierMembership`, `ReturnPenjualan`, `ReturnPembelian`, `StokOpname`, `StokTransfer`, `Supplier`, `Gudang`, `Rak`, `KategoriProduk`, `Brand`, `User`, `Cabang`, `ApprovalRule`, `SkemaKomisi`, `Channel`.
+  - Perekaman otomatis dirty diffs (`before` dan `after` JSON), causer user (`auth()->user()`, fallback "sistem" jika job/seeder), dan resolusi cerdas `cabang_id` (termasuk multi-gudang dan transfer asal).
+- **Halaman & Antarmuka Audit Trail:**
+  - Route `/app/audit-log` dengan navigasi sidebar `Audit Trail & Log` di bawah menu Pengaturan Sistem (`@can('lihat-audit-log')`).
+  - Komponen `RiwayatAktivitas` diperluas dengan layout backoffice standar, pencarian lintas entitas, dan filter modul, aksi, rentang tanggal, serta nama user.
+- **Pengujian & Validasi:**
+  - `Tests\Feature\ActivityLogTest` diperluas menjadi 11 tes lengkap dengan 121 asersi, memvalidasi logging entitas, before/after diffs, pembatasan RBAC Livewire, dan keamanan route audit trail (semua `PASS`).
+  - Format kode dipastikan 100% PSR-12 menggunakan Laravel Pint (443 files checked).
+
+## 2026-09-27 — Manajemen Master Data Produk & Katalog (Pengaturan, Quick Add, & Searchable Dropdown) ✅
+
+Penyempurnaan manajemen master data produk dan pengalaman UI/UX register produk:
+- **Menu Khusus Manajemen Master Produk di Pengaturan (`/app/pengaturan`):**
+  - Tab baru `📦 Master Produk & Katalog` (`SettingsRbac.php` & `settings-rbac.blade.php`) dengan 6 sub-tab navigasi modern:
+    1. **Kategori Hierarkis:** Tambah, edit, atur kategori induk (parent-child), ikon emoji, urutan tampil, aktif/nonaktifkan, dan hapus aman (proteksi jika ada produk/sub-kategori terkait).
+    2. **Brand Produk:** CRUD merek produk, catatan keterangan, jumlah produk terkait, dan toggle status aktif.
+    3. **Tingkat Kualitas:** Klasifikasi kualitas (Original Pabrik, Grade A+, Disassembled, dll) dengan keterangan mutu dan proteksi hapus.
+    4. **Satuan Unit (UOM):** Pengelolaan kode dan nama satuan inventaris (`pcs`, `unit`, `set`, `roll`, `box`).
+    5. **Kondisi Produk:** Manajemen opsi kondisi (Baru, OEM, Copotan, dll) tersimpan fleksibel via `KonfigurasiService` (`master_produk_kondisi_list`).
+    6. **Tipe HP Kompatibel:** Database perangkat (Merk, Model, Nama) untuk referensi kompatibilitas part.
+- **Fitur Quick Add Inline di Form Produk:**
+  - Penambahan tombol `+ Baru` pada setiap dropdown (Kategori, Kondisi, Brand, Kualitas, Satuan) di modal Tambah Produk & Edit Produk (`ProdukTab.php`).
+  - Modal quick add responsif yang langsung menyimpan data baru dan otomatis memilih nilai yang baru dibuat ke dalam form produk tanpa perlu berpindah halaman.
+- **Komponen Searchable Multi-Select UI/UX:**
+  - Dibuat komponen blade reusable `<x-prism.searchable-multi-select>` berbasis Alpine.js + Livewire entangle.
+  - Dropdown pencarian real-time dengan multi-pilihan badge, keyboard escape, dan klik luar untuk menutup.
+  - Menggantikan elemen multi-select kaku pada pemilihan Tipe HP dan Kompatibilitas Antar Produk (Part Substitution) agar UI/UX tetap ringkas, luas, dan rapi.
+- **Pengujian & Validasi:**
+  - Ditambahkan `Tests\Feature\MasterProdukManagementTest` (3 tests, 20 assertions) mencakup CRUD Kategori, Brand, Kualitas, Satuan, Kondisi, Tipe HP di Settings, serta inline Quick Add di ProdukTab (semua lulus `PASS`).
+
+## 2026-09-27 — Optimasi Master Produk, Katalog WebP, Kategori Hierarkis & Kompatibilitas Produk ✅
+
+Peningkatan performa dan fungsionalitas master data produk di seluruh ekosistem (WMS, POS Kasir, dan Marketplace Storefront):
+- **Opsi Foto Produk Hemat Storage (WebP Otomatis):**
+  - Implementasi `ProductImageService` berbasis native GD PHP: kompresi gambar otomatis ke format WebP kualitas 80 (full ~800x800) dan thumbnail kualitas 75 (thumb ~250x250, size ~2-4KB).
+  - Storage efisien: menghemat hingga 80-90% ukuran file dibanding JPG/PNG konvensional untuk ratusan ribu produk.
+  - Multi-foto galeri dengan pengelolaan foto utama dan hapus foto per item.
+  - Aksesor `foto_utama`, `thumbnail_url`, dan `galeri_foto` pada model `Produk`.
+  - Fallback visual SVG dan placeholder responsif di Marketplace, POS, dan Backoffice (gambar tidak boleh kosong).
+- **Struktur Kategori Berjenjang (Hierarki Parent-Child):**
+  - Migrasi skema database `kategori_produk` dengan kolom `id`, `parent_id`, `nama`, `slug`, `icon`, `urutan`, `is_active`, dan relasi `kategori_id` pada tabel `produk`.
+  - Dukungan kategori hierarkis (kategori utama & sub-kategori), nama berjenjang (`parent > child`), dan pengambilan keturunan rekursif.
+  - Dropdown hierarkis di WMS (tambah & edit produk) serta filter berjenjang di Marketplace katalog.
+- **Kompatibilitas Produk & Substitusi Part:**
+  - Pembuatan tabel pivot `kompatibilitas_antar_produk` untuk relasi cross-compatibility / part substitution antar sparepart.
+  - Tampilan alternatif substitusi part di halaman detail produk Marketplace dan pengelolaan di form WMS.
+  - Relasi `tipeHps` dan badge model kompatibel di katalog dan kasir POS.
+- **Optimasi Performa Query & Skalabilitas Ratusan Ribu Item:**
+  - Penambahan composite indexes pada tabel `produk`: `(is_active, kategori_id)`, `(is_active, brand_id)`, `(is_active, kondisi)`, `(is_active, kualitas_id)`, `(is_active, harga_jual_retail)`, dan `(nama)`.
+  - Scope `cariPintar($keyword)` dengan pengindeksan multi-kolom yang optimal (nama, brand, model, SKU, barcode, dan tipe HP).
+  - Penghapusan N+1 query stok menggunakan `withSum('stokItems', 'jumlah')` dan in-memory grouping untuk pohon kategori (`shop.categories.tree.v1`), mempertahankan query budget ketat (≤ 8 query katalog guest).
+- **Pengujian:**
+  - Ditambahkan test suite `Tests\Feature\ProdukKatalogOptimasiTest` (5 tests, 17 assertions) menguji pembuatan hierarki kategori, generasi WebP & thumbnail, kompatibilitas antar produk, Livewire master produk WMS, dan filter katalog marketplace.
+  - Seluruh test `MarketplaceNplus1Test` (25 tests) dan `WmsDashboardSplitTest` (7 tests) berhasil lolos (`PASS`).
+
 ## 2026-09-27 — Fix & Integrasi Alur Estimasi Biaya Modul Servis ✅
 
 Perbaikan bug input rincian estimasi biaya, integrasi tarif standar master data servis, dan kelancaran submit estimasi:

@@ -1,10 +1,10 @@
-<div class="p-6">
-    <div class="flex justify-between items-center mb-6">
+<div class="p-4 sm:p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Approval Inbox</h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-1">Permintaan persetujuan yang perlu diproses</p>
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Approval Inbox</h1>
+            <p class="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-0.5">Permintaan persetujuan yang perlu diproses</p>
         </div>
-        <div class="text-sm text-gray-500 dark:text-gray-400">
+        <div class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             Total: <span class="font-semibold">{{ $requests->total() }}</span> permintaan
         </div>
     </div>
@@ -14,7 +14,7 @@
             <input wire:model.live.debounce.300ms="search" 
                    type="text" 
                    placeholder="Cari entity, jumlah, nomor PO..." 
-                   class="w-full px-4 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                   class="w-full px-4 py-2.5 pl-10 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm min-h-[44px]">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -111,14 +111,14 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     @if($request->status === 'pending')
-                                        <div class="flex space-x-2">
+                                        <div class="flex items-center space-x-2">
                                             <button wire:click="approveRequest({{ $request->id }})" 
-                                                    class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition-colors"
+                                                    class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition active:scale-[0.97] min-h-[36px] cursor-pointer"
                                                     :disabled="$processing">
                                                 Setujui
                                             </button>
                                             <button wire:click="openRejectModal({{ $request->id }})"
-                                                    class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg transition-colors"
+                                                    class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition active:scale-[0.97] min-h-[36px] cursor-pointer"
                                                     :disabled="$processing">
                                                 Tolak
                                             </button>

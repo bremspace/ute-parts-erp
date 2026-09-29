@@ -24,37 +24,49 @@
         </div>
     @else
         {{-- ===== Filter ===== --}}
-        <div class="flex flex-wrap items-end gap-2">
-            <div>
+        <div class="flex items-end gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap md:flex-wrap">
+            @if(empty($entityId))
+                <div class="flex-shrink-0">
+                    <label class="block text-[10px] text-ink-400 font-semibold mb-1">Modul / Entitas</label>
+                    <select wire:model.live="tipe" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]">
+                        @foreach($opsiTipe as $kode => $label)
+                            <option value="{{ $kode }}" class="bg-ink-900">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+            <div class="flex-shrink-0">
                 <label class="block text-[10px] text-ink-400 font-semibold mb-1">Pengguna</label>
                 <input type="text" wire:model.live.debounce.400ms="filterUser" placeholder="Nama / id / sistem"
-                    class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium w-36" />
+                    class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium w-36 min-h-[44px]" />
             </div>
-            <div>
+            <div class="flex-shrink-0">
                 <label class="block text-[10px] text-ink-400 font-semibold mb-1">Aksi</label>
-                <select wire:model.live="filterAksi" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium">
+                <select wire:model.live="filterAksi" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]">
                     <option value="">Semua aksi</option>
                     @foreach($opsiAksi as $kode => $label)
                         <option value="{{ $kode }}" class="bg-ink-900">{{ $label }}</option>
                     @endforeach
                 </select>
             </div>
-            <div>
+            <div class="flex-shrink-0">
                 <label class="block text-[10px] text-ink-400 font-semibold mb-1">Dari</label>
-                <input type="date" wire:model.live="filterDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
+                <input type="date" wire:model.live="filterDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
             </div>
-            <div>
+            <div class="flex-shrink-0">
                 <label class="block text-[10px] text-ink-400 font-semibold mb-1">Sampai</label>
-                <input type="date" wire:model.live="filterSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium" />
+                <input type="date" wire:model.live="filterSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
             </div>
-            <button wire:click="resetFilter"
-                class="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[11px] cursor-pointer">
-                Reset
-            </button>
+            <div class="flex-shrink-0">
+                <button wire:click="resetFilter"
+                    class="px-3.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-xs cursor-pointer whitespace-nowrap min-h-[44px] active:scale-[0.97] transition">
+                    Reset
+                </button>
+            </div>
         </div>
 
         {{-- ===== Tabel riwayat ===== --}}
-        <x-prism.data-table :headers="['Waktu', 'Aksi', 'Oleh', 'Perubahan (sebelum → sesudah)']">
+        <x-prism.data-table :headers="empty($tipe) ? ['Waktu', 'Entitas', 'Aksi', 'Oleh', 'Perubahan (sebelum → sesudah)'] : ['Waktu', 'Aksi', 'Oleh', 'Perubahan (sebelum → sesudah)']">
             @forelse($aktivitas as $baris)
                 @php
                     $changes = $baris->attribute_changes ?? collect();
@@ -89,6 +101,12 @@
                     <td class="py-3.5 px-4 tabular-nums text-ink-300 whitespace-nowrap">
                         {{ $baris->created_at?->format('d/m/Y H:i:s') }}
                     </td>
+                    @if(empty($tipe))
+                        <td class="py-3.5 px-4 font-medium text-ink-200 whitespace-nowrap">
+                            <span class="text-up-primary font-semibold">{{ class_basename($baris->subject_type ?? 'Sistem') }}</span>
+                            <span class="text-ink-400 text-[10px] block font-mono">#{{ $baris->subject_id }}</span>
+                        </td>
+                    @endif
                     <td class="py-3.5 px-4">
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold
                             {{ $baris->event === 'created' ? 'bg-up-mint/10 text-up-mint'

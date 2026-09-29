@@ -1,29 +1,31 @@
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
-        <div class="flex items-center gap-2">
-            <button wire:click="$set('activeTab', 'reseller')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $activeTab === 'reseller' ? 'bg-up-accent text-white shadow-md shadow-up-accent/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">Dashboard Reseller</button>
-            <button wire:click="$set('activeTab', 'komisi')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $activeTab === 'komisi' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">
-                Komisi <span class="ml-1 tabular-nums">{{ $komisiList->where('status', 'pending')->count() }}</span>
+    <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 border-b border-white/5 pb-4">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
+            <button wire:click="$set('activeTab', 'reseller')" class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center {{ $activeTab === 'reseller' ? 'bg-up-accent text-white shadow-md shadow-up-accent/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">Dashboard Reseller</button>
+            <button wire:click="$set('activeTab', 'komisi')" class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center {{ $activeTab === 'komisi' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">
+                Komisi <span class="ml-1.5 tabular-nums px-1.5 py-0.5 rounded-md bg-white/10 text-[10px]">{{ $komisiList->where('status', 'pending')->count() }}</span>
             </button>
-            <button wire:click="$set('activeTab', 'skema')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $activeTab === 'skema' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">Skema Komisi</button>
+            <button wire:click="$set('activeTab', 'skema')" class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center {{ $activeTab === 'skema' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">Skema Komisi</button>
         </div>
 
         @if($activeTab === 'komisi')
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto scrollbar-none py-1 -my-1 w-full xl:w-auto justify-start xl:justify-end">
                 <!-- [F2-5] Export laporan komisi (queue) -->
                 @can('laporan.cabang')
-                    <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
-                    <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+                    <button type="button" wire:click="exportLaporan('xlsx')" class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center">Export Excel</button>
+                    <button type="button" wire:click="exportLaporan('csv')" class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center">Export CSV</button>
                 @endcan
-                <span class="text-[11px] text-ink-400 font-medium">
+                <span class="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-ink-400 font-medium whitespace-nowrap min-h-[44px] flex items-center">
                     {{ count($selectedKomisiIds) }} terpilih
                 </span>
-                <button wire:click="prosesApproval('reject')" class="px-3 py-2 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red font-bold text-xs border border-up-red/30 transition-all cursor-pointer">Tolak Terpilih</button>
-                <button wire:click="prosesApproval('approve')" class="px-3 py-2 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-all cursor-pointer">Setujui Terpilih → Jurnal & Utang</button>
+                <button wire:click="prosesApproval('reject')" class="px-3.5 py-2.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red font-bold text-xs border border-up-red/30 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center">Tolak Terpilih</button>
+                <button wire:click="prosesApproval('approve')" class="px-3.5 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center">Setujui Terpilih → Jurnal & Utang</button>
             </div>
         @elseif($activeTab === 'skema')
-            <button wire:click="openSkemaModal" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer">+ Tambah Skema</button>
+            <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
+                <button wire:click="openSkemaModal" class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap flex items-center">+ Tambah Skema</button>
+            </div>
         @endif
     </div>
 
@@ -69,7 +71,7 @@
     <!-- TAB: Komisi -->
     @if($activeTab === 'komisi')
         <div class="flex items-center gap-2 mb-4">
-            <select wire:model.live="filterStatus" class="px-3 py-2 rounded-xl glass-input text-xs font-medium w-44">
+            <select wire:model.live="filterStatus" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium w-full sm:w-48 min-h-[44px]">
                 <option value="" class="bg-ink-900">Semua Status</option>
                 <option value="pending" class="bg-ink-900">Pending</option>
                 <option value="disetujui" class="bg-ink-900">Disetujui</option>

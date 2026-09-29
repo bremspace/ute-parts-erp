@@ -6,7 +6,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="text-xs font-bold text-ink-400 uppercase tracking-wider">Sumber Data</label>
-                <select wire:model="sourceModel" class="w-full mt-1 p-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:border-up-primary outline-none">
+                <select wire:model.live="sourceModel" class="w-full mt-1 p-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:border-up-primary outline-none">
                     <option value="">-- Pilih Model --</option>
                     @foreach($whitelist as $key => $label)
                         <option value="{{ $key }}">{{ $label }}</option>
@@ -74,24 +74,24 @@
             </div>
 
             <!-- Actions -->
-            <div class="flex gap-2 flex-wrap">
-                <x-prism.prism-button variant="primary" size="sm" wire:click="buildAndShow">
+            <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
+                <x-prism.prism-button variant="primary" size="sm" wire:click="buildAndShow" class="whitespace-nowrap min-h-[44px]">
                     Tampilkan Data
                 </x-prism.prism-button>
-                <x-prism.prism-button variant="accent" size="sm" wire:click="saveReport">
+                <x-prism.prism-button variant="accent" size="sm" wire:click="saveReport" class="whitespace-nowrap min-h-[44px]">
                     Simpan Laporan
                 </x-prism.prism-button>
                 <!-- [P2-4] Bagikan laporan tersimpan ke cabang aktif (default aktif) -->
-                <label class="flex items-center gap-1.5 text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 cursor-pointer hover:border-up-primary transition">
+                <label class="flex items-center gap-1.5 text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 cursor-pointer hover:border-up-primary transition whitespace-nowrap min-h-[44px]">
                     <input type="checkbox" wire:model="shared" class="accent-up-primary">
                     <span class="text-ink-300">Bagikan ke cabang</span>
                 </label>
-                <div class="flex items-center gap-2">
-                    <select wire:model="exportFormat" class="p-2 rounded bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none">
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <select wire:model="exportFormat" class="p-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none min-h-[44px]">
                         <option value="xlsx">Excel (.xlsx)</option>
                         <option value="csv">CSV (.csv)</option>
                     </select>
-                    <x-prism.prism-button variant="mint" size="sm" wire:click="export" :disabled="$exporting">
+                    <x-prism.prism-button variant="mint" size="sm" wire:click="export" :disabled="$exporting" class="whitespace-nowrap min-h-[44px]">
                         @if($exporting)
                             <span class="animate-pulse">Processing...</span>
                         @else
@@ -104,12 +104,35 @@
 
         <!-- Results -->
         @if($showResults && count($queryResults) > 0)
+            @php
+                $fmtCell = function ($v, $key) {
+                    if (is_bool($v)) {
+                        return $v ? 'Ya' : 'Tidak';
+                    }
+                    if (is_array($v) || is_object($v)) {
+                        return '-';
+                    }
+                    $key = (string) $key;
+                    $bukanNominal = $key === 'id'
+                        || str_ends_with($key, '_id')
+                        || $key === 'kode'
+                        || str_ends_with($key, '_kode')
+                        || $key === 'sku'
+                        || $key === 'barcode'
+                        || str_starts_with($key, 'no_')
+                        || str_ends_with($key, '_persen');
+                    if (! $bukanNominal && is_numeric($v)) {
+                        return number_format((float) $v, 0, ',', '.');
+                    }
+                    return $v ?? '-';
+                };
+            @endphp
             <div class="mt-4 overflow-x-auto">
                 <table class="w-full text-xs text-left border-collapse">
                     <thead>
                         <tr class="bg-white/5">
                             @foreach($resultColumns as $col)
-                                <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ $availableColumns[$col] ?? $col }}</th>
+                                <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ $availableColumns[$col] ?? \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$col] ?? str_replace('_', ' ', $col) }}</th>
                             @endforeach
                         </tr>
                     </thead>
@@ -117,7 +140,7 @@
                         @foreach($queryResults as $row)
                             <tr class="hover:bg-white/5 transition">
                                 @foreach($resultColumns as $col)
-                                    <td class="py-1.5 px-3 tabular-nums">{{ $row[$col] ?? '-' }}</td>
+                                    <td class="py-1.5 px-3 tabular-nums">{{ $fmtCell($row[$col] ?? null, $col) }}</td>
                                 @endforeach
                             </tr>
                         @endforeach
@@ -136,20 +159,36 @@
 
 <!-- Saved Reports List -->
 @if($savedReports->isNotEmpty())
-    <x-prism.glass-card title="Laporan Tersimpan" subtitle="Milik Anda">
+    <x-prism.glass-card title="Laporan Tersimpan" subtitle="Daftar laporan yang dapat diakses">
         <div class="space-y-2">
             @foreach($savedReports as $report)
+                @php
+                    $user = auth()->user();
+                    $isOwner = (int) $report->user_id === (int) auth()->id();
+                    $canDelete = $isOwner
+                        || ($user && $user->hasRole('super-admin'))
+                        || ($user && $user->hasRole('admin-toko') && (int) $report->cabang_id === (int) session('cabang_id'));
+                @endphp
                 <div class="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                     <div>
-                        <p class="text-xs font-semibold text-white">{{ $report->name }}</p>
-                        <p class="text-[10px] text-ink-500">
+                        <div class="flex items-center gap-2">
+                            <p class="text-xs font-semibold text-white">{{ $report->name }}</p>
+                            @if($isOwner)
+                                <span class="px-1.5 py-0.5 rounded bg-up-primary/20 text-up-primary text-[9px] font-bold">Milik Saya</span>
+                            @elseif($report->shared)
+                                <span class="px-1.5 py-0.5 rounded bg-up-mint/20 text-up-mint text-[9px] font-bold">Dibagikan Cabang</span>
+                            @endif
+                        </div>
+                        <p class="text-[10px] text-ink-500 mt-0.5">
                             {{ app(\App\Modules\Report\Services\ReportBuilderService::class)->getModelLabel($report->source_model) }} ·
                             {{ $report->created_at->format('d/m/Y H:i') }}
                         </p>
                     </div>
-                    <div class="flex gap-2">
-                        <button wire:click="drillDown('{{ $report->source_model }}')" class="text-xs text-up-primary hover:underline">Lihat</button>
-                        <button wire:click="deleteReport({{ $report->id }})" class="text-xs text-up-red hover:underline">Hapus</button>
+                    <div class="flex gap-2 items-center">
+                        <button wire:click="drillDown('{{ $report->source_model }}')" class="text-xs text-up-primary hover:underline font-semibold cursor-pointer">Lihat</button>
+                        @if($canDelete)
+                            <button wire:click="deleteReport({{ $report->id }})" class="text-xs text-up-red hover:underline font-semibold cursor-pointer" onclick="confirm('Yakin ingin menghapus laporan tersimpan ini?') || event.stopImmediatePropagation()">Hapus</button>
+                        @endif
                     </div>
                 </div>
             @endforeach

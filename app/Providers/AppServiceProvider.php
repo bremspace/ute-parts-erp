@@ -11,6 +11,7 @@ use App\Modules\Workflow\Observers\ReturnPembelianObserver;
 use App\Modules\Workflow\Observers\ReturnPenjualanObserver;
 use App\Modules\Workflow\Observers\TransaksiObserver;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -29,6 +30,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Super-admin implicitly grants all permissions (Spatie recommended practice)
+        Gate::before(function ($user, $ability) {
+            return method_exists($user, 'hasRole') && $user->hasRole('super-admin') ? true : null;
+        });
+
         // [F1-1] Approval Engine auto-fire — observer pada model (PO, retur, diskon besar),
         // menyala terlepas dari komponen/controller mana pun yang menyimpan model tsb.
         PurchaseOrder::observe(PurchaseOrderObserver::class);

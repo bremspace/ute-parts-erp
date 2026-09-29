@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -86,9 +85,9 @@ return new class extends Migration
             ],
         ];
         foreach ($rules as $rule) {
-            ApprovalRule::firstOrCreate(
+            DB::table('approval_rules')->updateOrInsert(
                 ['entity_type' => $rule['entity_type'], 'cabang_id' => $rule['cabang_id']],
-                $rule
+                $rule + ['created_at' => now(), 'updated_at' => now()]
             );
         }
     }

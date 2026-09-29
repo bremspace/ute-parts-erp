@@ -382,10 +382,11 @@ class AkuntingNplus1Test extends TestCase
         $this->assertEquals($ekspektasiArusKas, $view->viewData('arusKas'));
     }
 
-    /** @param  Collection<int,array<string,mixed>>  $baris */
-    private function petakanPerKode(Collection $baris): array
+    /** @param  Collection<int,array<string,mixed>>|array  $baris */
+    private function petakanPerKode(Collection|array $baris): array
     {
-        $peta = $baris->mapWithKeys(fn (array $r): array => [$r['kode'] => [$r['nama'], $r['total']]])->all();
+        $col = $baris instanceof Collection ? $baris : collect($baris);
+        $peta = $col->mapWithKeys(fn (array $r): array => [$r['kode'] => [$r['nama'], $r['total']]])->all();
         ksort($peta);
 
         return $peta;

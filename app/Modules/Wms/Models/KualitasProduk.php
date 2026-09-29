@@ -17,6 +17,6 @@ class KualitasProduk extends Model
 
     public function produk(): HasMany
     {
-        return $this->hasMany(Produk::class);
+        return $this->hasMany(Produk::class, 'kualitas_id');
     }
 }

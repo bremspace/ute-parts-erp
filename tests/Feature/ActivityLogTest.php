@@ -7,15 +7,23 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
+use App\Modules\Crm\Livewire\CrmDashboard;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use App\Modules\Rbac\Models\AktivitasLog;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Servis\Livewire\ServisBoard;
+use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Wms\Livewire\TransferTab;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\Supplier;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -364,5 +372,151 @@ class ActivityLogTest extends TestCase
                 "Role {$namaRole} wajib punya lihat-audit-log"
             );
         }
+    }
+
+    public function test_audit_log_entitas_tambahan_servis_tier_transfer_gudang_rak(): void
+    {
+        $user = $this->userAuthed();
+
+        $tier = TierMembership::create([
+            'nama' => 'Gold Audit',
+            'kode' => 'GOLD-AUDIT',
+            'min_belanja_12bulan' => 5000000,
+            'diskon_persen' => 5,
+            'poin_multiplier' => 1.5,
+            'urutan' => 1,
+            'is_active' => true,
+        ]);
+        $this->assertNotNull(
+            AktivitasLog::where('subject_type', TierMembership::class)->where('subject_id', $tier->id)->where('event', 'created')->first()
+        );
+
+        $gudang = Gudang::create([
+            'cabang_id' => $this->cabang->id,
+            'nama' => 'Gudang Tambahan',
+            'kode' => 'GDG-TMB',
+            'is_active' => true,
+        ]);
+        $this->assertNotNull(
+            AktivitasLog::where('subject_type', Gudang::class)->where('subject_id', $gudang->id)->where('event', 'created')->first()
+        );
+
+        $rak = Rak::create([
+            'gudang_id' => $gudang->id,
+            'kode' => 'RAK-TMB-1',
+            'nama' => 'Rak Tambahan',
+            'zona' => 'A',
+        ]);
+        $this->assertNotNull(
+            AktivitasLog::where('subject_type', Rak::class)->where('subject_id', $rak->id)->where('event', 'created')->first()
+        );
+
+        $tiket = TiketServis::create([
+            'cabang_id' => $this->cabang->id,
+            'no_tiket' => 'SRV-TEST-'.Str::random(4),
+            'pelanggan_id' => $this->pelanggan->id,
+            'jenis_hp' => 'iPhone',
+            'seri_hp' => '13 Pro',
+            'keluhan' => 'Layar bergaris',
+            'status' => 'menunggu_dicek',
+            'estimasi_biaya' => 500000,
+        ]);
+        $this->assertNotNull(
+            AktivitasLog::where('subject_type', TiketServis::class)->where('subject_id', $tiket->id)->where('event', 'created')->first()
+        );
+
+        $transfer = StokTransfer::create([
+            'no_transfer' => 'TRF-TEST-'.Str::random(4),
+            'gudang_asal_id' => $this->gudang->id,
+            'gudang_tujuan_id' => $gudang->id,
+            'user_pengirim_id' => $user->id,
+            'status' => 'draft',
+            'catatan' => 'Transfer audit test',
+        ]);
+        $this->assertNotNull(
+            AktivitasLog::where('subject_type', StokTransfer::class)->where('subject_id', $transfer->id)->where('event', 'created')->first()
+        );
+    }
+
+    public function test_transfer_tab_action_guarded_by_wms_transfer_permission(): void
+    {
+        // kasir tidak memiliki izin wms.transfer
+        $this->userAuthed('kasir');
+
+        Livewire::test(TransferTab::class)
+            ->call('saveTransfer')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? $params['type'] ?? '') === 'error');
+
+        Livewire::test(TransferTab::class)
+            ->call('kirimTransfer', 999)
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? $params['type'] ?? '') === 'error');
+    }
+
+    public function test_crm_dashboard_action_guarded_by_crm_create_dan_tier_manage(): void
+    {
+        // kasir tidak memiliki crm.create atau tier.manage
+        $this->userAuthed('kasir');
+
+        Livewire::test(CrmDashboard::class)
+            ->call('simpanPelangganBaruCrm')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? $params['type'] ?? '') === 'error');
+
+        Livewire::test(CrmDashboard::class)
+            ->call('simpanTier')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? $params['type'] ?? '') === 'error');
+    }
+
+    public function test_audit_log_global_view_route(): void
+    {
+        $this->userAuthed('super-admin');
+
+        $response = $this->get('/app/audit-log');
+        $response->assertStatus(200);
+
+        // teknisi ditolak
+        $this->userAuthed('teknisi');
+        $responseTeknisi = $this->get('/app/audit-log');
+        $responseTeknisi->assertStatus(403);
+    }
+
+    public function test_pos_kasir_riwayat_transaksi_dan_detail_satu_persatu(): void
+    {
+        $user = $this->userAuthed('super-admin');
+        $trx = $this->buatTransaksi();
+
+        Livewire::test(PosKasir::class)
+            ->call('bukaRiwayatTransaksi')
+            ->assertSet('showRiwayatTransaksiModal', true)
+            ->assertSee($trx->no_transaksi)
+            ->call('lihatDetailTransaksi', $trx->id)
+            ->assertSet('showReceiptModal', true)
+            ->assertSet('completedTransactionId', $trx->id)
+            ->call('bukaRiwayat', 'transaksi', $trx->id)
+            ->assertSet('showRiwayatModal', true)
+            ->assertSet('riwayatId', $trx->id)
+            ->assertSet('riwayatTipe', 'transaksi');
+    }
+
+    public function test_servis_board_audit_log_tiket_satu_persatu(): void
+    {
+        $user = $this->userAuthed('super-admin');
+        $tiket = TiketServis::create([
+            'cabang_id' => $this->cabang->id,
+            'no_tiket' => 'SRV-TEST-'.Str::random(4),
+            'pelanggan_id' => $this->pelanggan->id,
+            'jenis_hp' => 'Samsung',
+            'seri_hp' => 'S21',
+            'keluhan' => 'Mati total',
+            'status' => 'menunggu_dicek',
+            'estimasi_biaya' => 750000,
+        ]);
+
+        Livewire::test(ServisBoard::class)
+            ->call('bukaRiwayat', 'servis', $tiket->id)
+            ->assertSet('showRiwayatModal', true)
+            ->assertSet('riwayatId', $tiket->id)
+            ->assertSet('riwayatTipe', 'servis')
+            ->call('tutupRiwayat')
+            ->assertSet('showRiwayatModal', false);
     }
 }

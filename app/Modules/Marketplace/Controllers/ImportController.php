@@ -7,6 +7,8 @@ use App\Modules\Wms\Models\Produk;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\HeadingRowImport;
 
@@ -27,10 +29,11 @@ class ImportController extends Controller
         ]);
 
         $path = $request->file('file')->store('import-tmp');
+        $realPath = Storage::disk('local')->path($path);
 
         // Validasi heading awal — mapping kolom sumber → field Ute Parts (SID Retail generik)
         try {
-            $headings = Excel::toArray(new HeadingRowImport, storage_path('app/'.$path));
+            $headings = Excel::toArray(new HeadingRowImport, $realPath);
             $kolom = collect($headings[0][0] ?? [])->toArray();
         } catch (\Throwable $e) {
             // Bukan error fatal — ToModel WithValidation akan menangkap per-row
@@ -38,7 +41,7 @@ class ImportController extends Controller
         }
 
         $import = new ProdukImport(preview: true);
-        $rows = Excel::toCollection($import, storage_path('app/'.$path));
+        $rows = Excel::toCollection($import, $realPath);
 
         $valid = 0;
         $invalid = 0;
@@ -82,13 +85,17 @@ class ImportController extends Controller
         ]);
 
         $path = $request->file('file')->store('import-tmp');
+        $realPath = Storage::disk('local')->path($path);
 
         try {
             $import = new ProdukImport(preview: false);
-            $count = Excel::import($import, storage_path('app/'.$path));
+            $count = Excel::import($import, $realPath);
+            @unlink($realPath);
 
             return $this->success(['rows_processed' => $count], 'Import produk berhasil disimpan');
         } catch (\Throwable $e) {
+            @unlink($realPath);
+
             return $this->error('Import gagal: '.$e->getMessage(), 422);
         }
     }

@@ -1,18 +1,21 @@
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
             @foreach(['channels' => 'Channels', 'mapping' => 'Mapping Produk', 'orders' => 'Order Terpadu'] as $kode => $label)
-                <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">{{ $label }}</button>
+                <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">{{ $label }}</button>
             @endforeach
-            <button wire:click="triggerSyncAll" class="ml-2 px-4 py-2 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs cursor-pointer flex items-center gap-1.5">
-                ⟳ Sinkron Stok
-            </button>
         </div>
 
-        @if($activeTab === 'channels')
-            <button wire:click="openConnectModal" class="px-4 py-2 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer">+ Hubungkan Channel</button>
-        @endif
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap shrink-0">
+            <button wire:click="triggerSyncAll" class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap flex items-center gap-1.5">
+                ⟳ Sinkron Stok
+            </button>
+
+            @if($activeTab === 'channels')
+                <button wire:click="openConnectModal" class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap flex items-center">+ Hubungkan Channel</button>
+            @endif
+        </div>
     </div>
 
     @if($syncMessage)
@@ -71,7 +74,7 @@
     @if($activeTab === 'mapping')
         <div class="space-y-4">
             <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-                <select wire:model.live="mappingChannelId" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium w-full sm:w-64">
+                <select wire:model.live="mappingChannelId" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium w-full sm:w-64 min-h-[44px]">
                     <option value="" class="bg-ink-900">Semua Channel</option>
                     @foreach($channels as $c)
                         <option value="{{ $c['id'] }}" class="bg-ink-900">{{ $c['nama'] }}</option>
@@ -79,9 +82,9 @@
                 </select>
 
                 @if($mappingChannelId)
-                    <div class="text-xs text-ink-300 font-medium">
-                        {{ count($selectedProdukIds) }} produk dipilih →
-                        <button wire:click="saveMapping" class="px-3 py-2 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer">Simpan Mapping</button>
+                    <div class="text-xs text-ink-300 font-medium flex items-center gap-2 flex-wrap">
+                        <span>{{ count($selectedProdukIds) }} produk dipilih &rarr;</span>
+                        <button wire:click="saveMapping" class="px-3.5 py-2.5 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px] whitespace-nowrap active:scale-[0.97] transition-[transform,background-color] flex items-center">Simpan Mapping</button>
                     </div>
                 @endif
             </div>

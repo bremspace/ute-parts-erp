@@ -61,14 +61,16 @@ class ReportExportJob implements ShouldQueue
 
             // [P2-11] Tanpa cache dataset penuh di store — baris dibaca sekali
             // (limit+1 untuk deteksi pemotongan) lalu langsung ditulis ke file.
-            $rows = $query->limit($this->rowLimit + 1)->get()
+            $rawRows = $query->limit($this->rowLimit + 1)->get()
                 ->map(fn ($item) => $item->toArray())
                 ->all();
 
-            $truncated = count($rows) > $this->rowLimit;
+            $truncated = count($rawRows) > $this->rowLimit;
             if ($truncated) {
-                $rows = array_slice($rows, 0, $this->rowLimit);
+                $rawRows = array_slice($rawRows, 0, $this->rowLimit);
             }
+
+            $rows = $service->formatRowsForDisplay($rawRows);
 
             // [P2-11/CROSS-LANE] Nama file WAJIB diawali "{userId}_" — cek
             // kepemilikan unduh di AkuntingController membaca integer sebelum "_".

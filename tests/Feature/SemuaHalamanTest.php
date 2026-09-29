@@ -76,6 +76,8 @@ class SemuaHalamanTest extends TestCase
         $this->get('/shop/lcd-iphone')->assertSuccessful();
         $this->get('/cart')->assertSuccessful();
         $this->get('/checkout')->assertSuccessful();
+        $this->get('/booking-servis')->assertSuccessful();
+        $this->get('/tracking')->assertSuccessful();
         $this->get('/login-pelanggan')->assertSuccessful();
         $this->get('/daftar-pelanggan')->assertSuccessful();
     }

@@ -633,4 +633,31 @@ class PosStokSinkronTest extends TestCase
         $this->assertSame(0, StockMutationLog::count());
         $this->assertSame(0, StokLog::count());
     }
+
+    public function test_pos_cart_menghitung_subtotal_dan_total_seketika_saat_pilih_produk(): void
+    {
+        $key = $this->key($this->produk);
+
+        $component = $this->buatKomponen()
+            ->call('addToCart', $this->produk->id);
+
+        $cart = $component->get('cart');
+        $this->assertArrayHasKey($key, $cart);
+        $hargaItem = (float) $cart[$key]['harga'];
+        $this->assertGreaterThan(0.0, $hargaItem);
+
+        // Subtotal dan totalAkhir langsung terhitung tanpa perlu klik Bayar
+        $this->assertSame($hargaItem, (float) $component->get('subtotal'));
+        $this->assertGreaterThanOrEqual($hargaItem, (float) $component->get('totalAkhir'));
+
+        // Update qty → subtotal dan totalAkhir langsung berlipat
+        $component->call('updateQty', $key, 1);
+        $this->assertSame($hargaItem * 2, (float) $component->get('subtotal'));
+        $this->assertGreaterThanOrEqual($hargaItem * 2, (float) $component->get('totalAkhir'));
+
+        // Hapus dari keranjang → kembali 0
+        $component->call('removeFromCart', $key);
+        $this->assertSame(0.0, (float) $component->get('subtotal'));
+        $this->assertSame(0.0, (float) $component->get('totalAkhir'));
+    }
 }
