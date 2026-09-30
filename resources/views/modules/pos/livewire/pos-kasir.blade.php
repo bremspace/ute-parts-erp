@@ -11,18 +11,20 @@
         <x-prism.pwa-install-prompt variant="banner" class="mb-2 flex-shrink-0" />
 
         <!-- Top Toolbar: Search & Gudang Selector -->
-        <div class="flex items-center gap-3 mb-2 flex-shrink-0 flex-wrap">
-            <div class="flex-1 min-w-0">
-                <div class="relative">
+        <div class="flex items-center gap-3 mb-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+            <div class="flex-1 min-w-0 flex items-center gap-2">
+                <div class="flex-1 min-w-0">
                     <x-prism.barcode-scan-input
-                        placeholder="Scan Barcode atau ketik nama/tipe HP (Tekan F2, Enter=add)..."
+                        placeholder="Scan Barcode atau ketik nama/tipe HP (F2 / Kamera)..."
                         model="search"
                         wire:keydown.enter="scanEnter"
+                        :continuous="true"
+                        title="Kamera Scanner Barcode Kasir"
                     />
-                    <button wire:click="scanEnter"
-                            class="absolute right-12 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg bg-up-primary/20 hover:bg-up-primary/40 text-up-primary text-xs font-bold cursor-pointer active:scale-[0.97]"
-                            title="Tambah dari barcode/SKU (Enter)">ADD</button>
                 </div>
+                <button wire:click="scanEnter"
+                        class="px-3.5 py-2.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/40 text-up-primary border border-up-primary/30 text-xs font-bold cursor-pointer active:scale-[0.97] transition-all whitespace-nowrap flex items-center gap-1 shadow-sm"
+                        title="Tambah dari barcode/SKU (Enter)">+ ADD</button>
             </div>
 
             <div class="w-full sm:w-48">
@@ -958,6 +960,15 @@
                                                 >
                                                     Detail
                                                 </button>
+                                                @if($trx->status === 'selesai')
+                                                    <button
+                                                        wire:click="bukaModalRetur({{ $trx->id }})"
+                                                        class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red font-bold text-[11px] transition-colors border border-up-red/20 cursor-pointer"
+                                                        title="Proses Retur Barang Penjualan"
+                                                    >
+                                                        Retur
+                                                    </button>
+                                                @endif
                                                 @can('lihat-audit-log')
                                                     <button
                                                         wire:click="bukaRiwayat('transaksi', {{ $trx->id }})"
@@ -982,6 +993,92 @@
                         class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs cursor-pointer"
                     >
                         Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL RETUR PENJUALAN --}}
+    @if($showReturPenjualanModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <div>
+                        <h3 class="text-base font-bold text-white">Retur Barang Penjualan</h3>
+                        <p class="text-[10px] text-ink-400">Pengembalian barang pelanggan, pemulihan stok & pembukuan kas/piutang</p>
+                    </div>
+                    <button wire:click="tutupModalRetur" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+
+                <div class="space-y-4 flex-1 overflow-y-auto pr-1 text-xs">
+                    @if(!empty($returItemInputs))
+                        <div class="space-y-2">
+                            <label class="block font-semibold text-ink-300">Pilih Barang yang Diretur & Jumlah</label>
+                            <div class="rounded-xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+                                @foreach($returItemInputs as $itemId => $item)
+                                    <div class="p-3 bg-white/[0.02] space-y-2">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <div>
+                                                <div class="font-bold text-white">{{ $item['produk_nama'] }}</div>
+                                                <div class="text-[11px] text-ink-400">
+                                                    Qty Beli: {{ $item['qty_beli'] }} · Harga: Rp {{ number_format($item['harga_final'], 0, ',', '.') }}
+                                                </div>
+                                            </div>
+                                            <div class="w-28">
+                                                <label class="text-[10px] text-ink-400 block mb-0.5">Qty Retur</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="{{ $item['qty_beli'] }}"
+                                                    wire:model.live="returItemInputs.{{ $itemId }}.jumlah"
+                                                    class="w-full px-2 py-1.5 rounded-lg glass-input text-xs tabular-nums text-center"
+                                                />
+                                            </div>
+                                        </div>
+                                        @if(($returItemInputs[$itemId]['jumlah'] ?? 0) > 0)
+                                            <div>
+                                                <label class="text-[10px] text-ink-400 block mb-0.5">Nomor Seri yang diretur (Pisahkan koma / baris baru jika produk ber-SN):</label>
+                                                <textarea
+                                                    wire:model="returItemInputs.{{ $itemId }}.sn_raw"
+                                                    rows="2"
+                                                    placeholder="SN123, SN124..."
+                                                    class="w-full px-2.5 py-1.5 rounded-lg glass-input text-[11px] font-mono"
+                                                ></textarea>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-semibold text-ink-300 mb-1.5">Metode Pengembalian *</label>
+                            <select wire:model="returMetodePengembalian" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                <option value="kas" class="bg-ink-900">Uang Tunai / Kas (110-01)</option>
+                                <option value="piutang" class="bg-ink-900">Potong Piutang Pelanggan (120-01)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-ink-300 mb-1.5">Alasan Retur *</label>
+                            <input
+                                type="text"
+                                wire:model="returAlasan"
+                                placeholder="Contoh: Barang cacat pabrik / salah tipe"
+                                class="w-full px-3 py-2.5 rounded-xl glass-input text-xs min-h-[44px]"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4 border-t border-white/10 mt-4">
+                    <button wire:click="tutupModalRetur" class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                        Batal
+                    </button>
+                    <button wire:click="simpanReturPenjualan" class="flex-1 py-3 rounded-xl bg-up-red text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-md shadow-up-red/20 active:scale-[0.97]">
+                        Proses Retur Penjualan
                     </button>
                 </div>
             </div>
@@ -1045,7 +1142,7 @@
                                 <label for="kasSaldoAwal" class="block text-xs font-semibold text-ink-300 mb-1.5">Saldo Awal (Rp)</label>
                                 <input
                                     id="kasSaldoAwal"
-                                    type="text" inputmode="numeric" wire:model.debounce.300ms="kasSaldoAwalRaw" min="0"
+                                    type="text" inputmode="numeric" x-format-number wire:model.debounce.300ms="kasSaldoAwalRaw" min="0"
                                     x-ref="kasSaldoInput"
                                     @keydown.enter.prevent="$wire.prosesKas()"
                                     @blur="$wire.formatKasSaldoAwal()"
@@ -1067,7 +1164,7 @@
                                 <label for="kasSaldoFisik" class="block text-xs font-semibold text-ink-300 mb-1.5">Saldo Fisik Akhir (Rp) *</label>
                                 <input
                                     id="kasSaldoFisik"
-                                    type="text" inputmode="numeric" wire:model.debounce.300ms="kasSaldoFisikRaw" min="0" step="500"
+                                    type="text" inputmode="numeric" x-format-number wire:model.debounce.300ms="kasSaldoFisikRaw" min="0" step="500"
                                     x-ref="kasSaldoInput"
                                     @keydown.enter.prevent="$wire.prosesKas()"
                                     @blur="$wire.formatKasSaldoFisik()"

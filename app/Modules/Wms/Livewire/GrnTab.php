@@ -53,6 +53,18 @@ class GrnTab extends Component
 
     public string $filterStatus = 'all';
 
+    public ?int $detailGrnId = null;
+
+    public function bukaDetailGrn(int $id): void
+    {
+        $this->detailGrnId = $id;
+    }
+
+    public function tutupDetailGrn(): void
+    {
+        $this->detailGrnId = null;
+    }
+
     public function openGrnModal(int $poId): void
     {
         $po = PurchaseOrder::with(['items.produk', 'gudangTujuan'])->findOrFail($poId);
@@ -98,6 +110,12 @@ class GrnTab extends Component
 
     public function simpanGrn(): void
     {
+        abort_unless(
+            auth()->user()?->can('wms.receive-po') || auth()->user()?->can('wms.create'),
+            403,
+            'Anda tidak memiliki izin penerimaan barang (GRN).'
+        );
+
         $this->validate([
             'grnForm.po_id' => 'required|exists:purchase_order,id',
             'grnForm.item_qty' => 'required|array|min:1',
@@ -320,9 +338,16 @@ class GrnTab extends Component
             ->latest()
             ->paginate(15, pageName: 'grn');
 
+        $detailGrn = null;
+        if ($this->detailGrnId) {
+            $detailGrn = Grn::with(['purchaseOrder.supplier', 'purchaseOrder.items.produk', 'gudang', 'user'])
+                ->find($this->detailGrnId);
+        }
+
         return view('modules.wms.livewire.grn-tab', [
             'poList' => $poList,
             'grnList' => $grnList,
+            'detailGrn' => $detailGrn,
             'filterStatus' => $this->filterStatus,
         ]);
     }

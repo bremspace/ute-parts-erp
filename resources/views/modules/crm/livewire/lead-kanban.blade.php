@@ -285,7 +285,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nilai Estimasi (Rp)</label>
-                            <input type="number" inputmode="numeric" wire:model="createForm.nilai_estimasi" min="0" step="1000" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model="createForm.nilai_estimasi" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                             @error('createForm.nilai_estimasi')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                         <div>
@@ -379,7 +379,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nilai Estimasi (Rp)</label>
-                            <input type="number" inputmode="numeric" wire:model="editForm.nilai_estimasi" min="0" step="1000" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model="editForm.nilai_estimasi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                             @error('editForm.nilai_estimasi')<p class="text-[10px] text-up-red mt-1">{{ $message }}</p>@enderror
                         </div>
                     </div>

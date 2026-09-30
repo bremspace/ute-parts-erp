@@ -4,6 +4,8 @@ namespace App\Modules\Akunting\Services;
 
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
+use App\Modules\Wms\Models\PembayaranSupplier;
+use App\Modules\Wms\Models\PurchaseOrder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 
@@ -174,6 +176,22 @@ class PembayaranSubledgerService
                 'jumlah_dibayar' => $dibayar,
                 'status' => $status,
             ]);
+
+            // [SYNC PO & WMS] Sinkronkan ke Purchase Order jika utang berasal dari PO
+            if ($utang->referensi_tipe === PurchaseOrder::class || $utang->referensi_tipe === 'PurchaseOrder') {
+                $po = PurchaseOrder::find($utang->referensi_id);
+                if ($po) {
+                    $po->increment('total_dibayar', $jumlah);
+
+                    PembayaranSupplier::create([
+                        'po_id' => $po->id,
+                        'jumlah' => $jumlah,
+                        'dibayar_at' => now(),
+                        'user_id' => $userId,
+                        'keterangan' => "Pembayaran utang {$utang->no_utang} via modul Akunting (Jurnal {$noJurnal})",
+                    ]);
+                }
+            }
 
             return [
                 'model' => $utang->fresh(),

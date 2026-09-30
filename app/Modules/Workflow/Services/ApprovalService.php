@@ -4,8 +4,12 @@ namespace App\Modules\Workflow\Services;
 
 use App\Models\User;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Pos\Models\ReturnPenjualan;
+use App\Modules\Pos\Services\ReturnPenjualanService;
+use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Wms\Services\CycleCountService;
 use App\Modules\Wms\Services\GrnService;
+use App\Modules\Wms\Services\ReturnPembelianService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Support\Facades\DB;
@@ -167,6 +171,36 @@ class ApprovalService
             } else {
                 $cycleCountService->tolakTask((int) $request->entity_id, $actionedBy, (string) $catatan);
             }
+
+            return;
+        }
+
+        if ($request->entity_type === 'retur') {
+            $returPenjualan = ReturnPenjualan::find($request->entity_id);
+            if ($returPenjualan) {
+                $service = app(ReturnPenjualanService::class);
+                if ($status === 'disetujui') {
+                    $service->eksekusiRetur($returPenjualan, null, $actionedBy);
+                } else {
+                    $service->tolakRetur($returPenjualan, $catatan);
+                }
+            }
+
+            return;
+        }
+
+        if ($request->entity_type === 'retur_pembelian') {
+            $returPembelian = ReturnPembelian::find($request->entity_id);
+            if ($returPembelian) {
+                $service = app(ReturnPembelianService::class);
+                if ($status === 'disetujui') {
+                    $service->eksekusiRetur($returPembelian, $actionedBy);
+                } else {
+                    $service->tolakRetur($returPembelian, $catatan);
+                }
+            }
+
+            return;
         }
     }
 

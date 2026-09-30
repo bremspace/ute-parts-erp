@@ -5,8 +5,9 @@
             <div class="flex flex-col sm:flex-row gap-3">
                 <div class="flex-1">
                     <x-prism.barcode-scan-input
-                        placeholder="Cari sparepart berdasarkan nama, brand, atau tipe HP..."
+                        placeholder="Scan Barcode / ketik nama, brand, SKU, tipe HP..."
                         model="search"
+                        title="Scan Barcode Inventori Stok"
                     />
                 </div>
 

@@ -8,12 +8,14 @@ use App\Modules\Marketplace\Controllers\ShippingController;
 use App\Modules\Marketplace\Controllers\ShopController;
 use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Pos\Controllers\PosController;
+use App\Modules\Pos\Controllers\ReturnPenjualanController;
 use App\Modules\Rbac\Controllers\AuthController;
 use App\Modules\Rbac\Controllers\RbacController;
 use App\Modules\Rbac\Controllers\RbacFlexController;
 use App\Modules\Reseller\Controllers\ResellerController;
 use App\Modules\Servis\Controllers\ServisController;
 use App\Modules\Wms\Controllers\ProcurementController;
+use App\Modules\Wms\Controllers\ReturnPembelianController;
 use App\Modules\Wms\Controllers\WmsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -73,6 +75,11 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::post('/kas/tutup', [PosController::class, 'tutupKas'])->middleware('permission:pos.create'); // POS-08
             Route::get('/kas/riwayat', [PosController::class, 'riwayatKas'])->middleware('permission:pos.view'); // POS-09
             Route::post('/transaksi/{id}/print', [PosController::class, 'printStruk'])->middleware('permission:pos.view'); // [T-35] POS-10
+
+            // Retur Penjualan
+            Route::get('/retur', [ReturnPenjualanController::class, 'index'])->middleware('permission:pos.view');
+            Route::get('/retur/{id}', [ReturnPenjualanController::class, 'show'])->middleware('permission:pos.view');
+            Route::post('/retur', [ReturnPenjualanController::class, 'store'])->middleware('permission:pos.create');
         });
         Route::get('/pricing/{produk_id}', [PosController::class, 'resolvePrice'])->middleware('permission:pos.view');
 
@@ -93,9 +100,17 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::put('/supplier/{id}', [WmsController::class, 'updateSupplier'])->name('wms.supplier.update')->middleware('permission:wms.create');
             Route::delete('/supplier/{id}', [WmsController::class, 'destroySupplier'])->name('wms.supplier.destroy')->middleware('permission:wms.create');
             Route::get('/po', [WmsController::class, 'indexPo'])->middleware('permission:wms.view');
+            Route::get('/po/{id}', [WmsController::class, 'showPo'])->middleware('permission:wms.view');
             Route::post('/po', [WmsController::class, 'storePo'])->middleware('permission:wms.create');
             Route::put('/po/{id}/status', [WmsController::class, 'updatePoStatus'])->middleware('permission:wms.create');
-            Route::post('/po/{id}/bayar', [WmsController::class, 'bayarPo'])->middleware('permission:wms.create');
+            Route::post('/po/{id}/bayar', [WmsController::class, 'bayarPo'])->middleware('role_or_permission:super-admin|utang.manage|akunting.create');
+
+            // [API: WMS-GRN] Goods Received Note (Penerimaan Barang PO)
+            Route::get('/grn', [WmsController::class, 'indexGrn'])->middleware('permission:wms.view');
+            Route::get('/grn/{id}', [WmsController::class, 'showGrn'])->middleware('permission:wms.view');
+            Route::post('/grn', [WmsController::class, 'storeGrn'])->middleware('permission:wms.receive-po|wms.create');
+            Route::post('/grn/{id}/setujui', [WmsController::class, 'approveGrn'])->middleware('permission:approve-workflow');
+            Route::post('/grn/{id}/tolak', [WmsController::class, 'rejectGrn'])->middleware('permission:approve-workflow');
 
             // [WMS-13] Rak CRUD
             Route::get('/rak', [WmsController::class, 'indexRak'])->name('wms.rak.index')->middleware('permission:wms.view');
@@ -120,6 +135,11 @@ Route::middleware(['throttle:60,1'])->group(function () {
             // [API: WMS-PROCUREMENT-01/02] Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, Modified JIT)
             Route::get('/procurement/recommendations', [ProcurementController::class, 'recommendations'])->middleware('permission:wms.view');
             Route::get('/procurement/summary', [ProcurementController::class, 'summary'])->middleware('permission:wms.view');
+
+            // Retur Pembelian (ke Supplier)
+            Route::get('/retur-pembelian', [ReturnPembelianController::class, 'index'])->middleware('permission:wms.view');
+            Route::get('/retur-pembelian/{id}', [ReturnPembelianController::class, 'show'])->middleware('permission:wms.view');
+            Route::post('/retur-pembelian', [ReturnPembelianController::class, 'store'])->middleware('permission:wms.create');
         });
 
         // [API: SERVICE-01..06] Modul Servis HP

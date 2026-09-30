@@ -18,6 +18,7 @@ use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\TipeHp;
+use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -31,6 +32,7 @@ use Spatie\Permission\Models\Role;
  */
 class SettingsRbac extends Component
 {
+    use ParsesNominal;
     use WithPagination;
 
     public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak
@@ -130,6 +132,14 @@ class SettingsRbac extends Component
     {
         if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi loyalitas.')) {
             return;
+        }
+
+        $this->loyalitasForm['poin_redeem_rupiah'] = $this->parseNominal($this->loyalitasForm['poin_redeem_rupiah'] ?? 0);
+
+        foreach ($this->skemaKomisiForm as $k => $row) {
+            if (($row['tipe'] ?? '') === 'nominal') {
+                $this->skemaKomisiForm[$k]['nilai'] = $this->parseNominal($row['nilai'] ?? 0);
+            }
         }
 
         $this->validate([
@@ -341,6 +351,8 @@ class SettingsRbac extends Component
 
     public function simpanJenisServis()
     {
+        $this->jenisServisForm['biaya_jasa'] = $this->parseNominal($this->jenisServisForm['biaya_jasa'] ?? 0);
+
         $this->validate([
             'jenisServisForm.nama' => 'required|string|max:255',
             'jenisServisForm.kode' => 'required|string|max:20|unique:jenis_servis,kode,'.($this->jenisServisForm['id'] ?? 'NULL'),

@@ -43,8 +43,8 @@ class SecurityHeaders
         // Referrer Policy
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // Permissions Policy (Feature Policy)
-        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+        // Permissions Policy (Feature Policy) - camera=(self) wajib aktif untuk Barcode Scanner (POS, WMS, Servis)
+        $response->headers->set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=()');
 
         // Remove server header
         $response->headers->remove('Server');

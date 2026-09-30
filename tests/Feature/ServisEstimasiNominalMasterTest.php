@@ -119,6 +119,14 @@ class ServisEstimasiNominalMasterTest extends TestCase
         $component->set('estimasiItems.0.harga', '175.000')
             ->assertSet('estimasiBiaya', 175000.0);
 
+        // Input transisi saat mengetik "50000" dengan format debounced "5.0000"
+        $component->set('estimasiItems.0.harga', '5.0000')
+            ->assertSet('estimasiBiaya', 50000.0);
+
+        // Set kembali ke 175.000 untuk submit
+        $component->set('estimasiItems.0.harga', '175.000')
+            ->assertSet('estimasiBiaya', 175000.0);
+
         // Kosongkan alasan (tetap boleh submit, tidak silent error)
         $component->set('estimasiAlasan', '')
             ->call('simpanEstimasi')

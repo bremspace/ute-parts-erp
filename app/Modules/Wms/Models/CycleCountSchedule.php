@@ -64,9 +64,9 @@ class CycleCountSchedule extends Model
         if ($this->tipe_target === 'rak') {
             $rak = $this->rak;
 
-            return $rak ? 'Rak '.$rak->kode.' — '.$rak->nama : 'Rak #'.$this->target_id;
+            return $rak ? 'Rak '.$rak->kode.' — '.$rak->nama : ($this->target_id ? 'Rak #'.$this->target_id : 'Semua Rak');
         }
 
-        return 'Kategori '.($this->target_kategori ?? '-');
+        return 'Kategori '.($this->target_kategori ?: 'Semua Kategori');
     }
 }

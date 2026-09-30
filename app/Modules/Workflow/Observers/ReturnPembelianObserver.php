@@ -25,8 +25,8 @@ class ReturnPembelianObserver
                 return;
             }
 
-            // Retur pembelian tidak punya cabang_id → derive via PO → gudang tujuan
-            $cabangId = $retur->purchaseOrder?->gudangTujuan()->value('cabang_id');
+            // Retur pembelian punya cabang_id atau derive via PO → gudang tujuan
+            $cabangId = $retur->cabang_id ?? $retur->purchaseOrder?->gudangTujuan?->cabang_id;
 
             app(ApprovalService::class)->ajukan('retur_pembelian', $retur->id, $cabangId, [
                 'amount' => (float) $retur->jumlah,

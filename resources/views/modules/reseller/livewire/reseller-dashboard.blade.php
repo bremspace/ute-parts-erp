@@ -179,7 +179,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nilai *</label>
-                            <input type="number" wire:model="skemaForm.nilai" step="500" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model="skemaForm.nilai" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                         </div>
                     </div>
                 </div>

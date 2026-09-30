@@ -27,8 +27,11 @@
                                 @elseif($po->status === 'dikirim')
                                     <button wire:click="terimaPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-mint text-ink-950 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Terima</button>
                                 @endif
+                                <button wire:click="bukaDetailPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Detail</button>
                                 @if($po->status === 'diterima' && $po->sisa > 0)
-                                    <button wire:click="bukaBayarPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-accent text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Bayar</button>
+                                    @if(auth()->user()?->hasRole('super-admin') || auth()->user()?->can('utang.manage') || auth()->user()?->can('akunting.create') || auth()->user()?->hasRole('akuntan') || auth()->user()?->hasRole('keuangan'))
+                                        <button wire:click="bukaBayarPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-accent text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Bayar</button>
+                                    @endif
                                 @endif
                                 @can('lihat-audit-log')
                                     <button wire:click="bukaRiwayat('po', {{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Riwayat</button>
@@ -45,9 +48,28 @@
             <x-prism.glass-card title="Supplier Terdaftar" subtitle="Pembelian dikelola via Purchase Order (PO)">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     @forelse($suppliers as $sp)
-                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                            <p class="text-xs font-bold text-white">{{ $sp->nama }}</p>
-                            <p class="text-[10px] text-ink-400">{{ $sp->telepon ?? '-' }} · termin {{ $sp->termin_hari }} hari</p>
+                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex items-start justify-between gap-2">
+                            <div class="space-y-0.5">
+                                <div class="flex items-center gap-1.5">
+                                    <p class="text-xs font-bold text-white">{{ $sp->nama }}</p>
+                                    @if(! $sp->is_active)
+                                        <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-red/10 text-up-red font-semibold">Nonaktif</span>
+                                    @endif
+                                </div>
+                                <p class="text-[10px] text-ink-400">{{ $sp->telepon ?? '-' }} · termin {{ $sp->termin_hari }} hari</p>
+                                @if($sp->kontak)
+                                    <p class="text-[10px] text-ink-500">PIC: {{ $sp->kontak }}</p>
+                                @endif
+                            </div>
+                            @can('wms.create')
+                                <button
+                                    wire:click="bukaEditSupplier({{ $sp->id }})"
+                                    class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition text-xs cursor-pointer"
+                                    title="Edit Supplier"
+                                >
+                                    ✏️
+                                </button>
+                            @endcan
                         </div>
                     @empty
                         <p class="text-xs text-ink-500 col-span-full py-4 text-center">Belum ada supplier.</p>
@@ -89,15 +111,26 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Metode Bayar *</label>
-                        <select wire:model="poForm.metode_bayar" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                        <select wire:model.live="poForm.metode_bayar" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                             <option value="kredit" class="bg-ink-900">Kredit (utang)</option>
                             <option value="tunai" class="bg-ink-900">Tunai</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jatuh Tempo (kosong = termin supplier)</label>
-                        <input type="date" wire:model="poForm.jatuh_tempo" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs min-h-[44px]" />
-                    </div>
+                    @if(($poForm['metode_bayar'] ?? 'kredit') === 'tunai')
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kas / Bank Pembayaran *</label>
+                            <select wire:model="poForm.akun_kas_bank" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                @foreach($akunKasBankList ?? [] as $ak)
+                                    <option value="{{ $ak->kode }}" class="bg-ink-900">[{{ $ak->kode }}] {{ $ak->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @else
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jatuh Tempo (kosong = termin supplier)</label>
+                            <input type="date" wire:model="poForm.jatuh_tempo" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs min-h-[44px]" />
+                        </div>
+                    @endif
                 </div>
 
                 <div class="mb-3 flex items-center justify-between">
@@ -116,7 +149,7 @@
                             </select>
                             <div class="flex items-center gap-2">
                                 @cansee('harga_beli')
-                                <input type="number" wire:model="poForm.items.{{ $idx }}.harga_beli" class="w-full sm:w-24 px-2 py-2 rounded-xl glass-input text-xs tabular-nums min-h-[44px]" placeholder="Harga" />
+                                <input type="text" inputmode="numeric" x-format-number wire:model="poForm.items.{{ $idx }}.harga_beli" class="w-full sm:w-24 px-2 py-2 rounded-xl glass-input text-xs tabular-nums min-h-[44px]" placeholder="Harga" />
                                 @cannotsee('harga_beli')
                                 <input type="text" class="w-full sm:w-24 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed min-h-[44px]" placeholder="Harga (superadmin)" disabled />
                                 @endcansee
@@ -159,11 +192,14 @@
     @endif
 
     <!-- MODAL: BAYAR PO [T-10] -->
-    @if($bayarPoId)
+    @if($bayarPoId && (auth()->user()?->hasRole('super-admin') || auth()->user()?->can('utang.manage') || auth()->user()?->can('akunting.create') || auth()->user()?->hasRole('akuntan') || auth()->user()?->hasRole('keuangan')))
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" x-data="{ open: true }">
             <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative" @keydown.escape.window="Livewire.dispatch('alert', {type:'info',message:''})">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Bayar Purchase Order</h3>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Bayar Purchase Order</h3>
+                        <p class="text-[10px] text-ink-400">Pembayaran diaudit & sinkron ke buku utang</p>
+                    </div>
                     <button wire:click="$set('bayarPoId', null)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
 
@@ -174,10 +210,215 @@
                         <div class="flex justify-between"><span class="text-ink-400">Sisa utang</span><span class="font-bold text-up-amber tabular-nums">Rp {{ number_format($poAktif?->sisa ?? 0, 0, ',', '.') }}</span></div>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jumlah Bayar (Rp)</label>
-                        <input type="number" wire:model.live="bayarPoJumlah" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Sumber Dana (Kas / Bank) *</label>
+                        <select wire:model="bayarPoAkun" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                            @foreach($akunKasBankList ?? [] as $ak)
+                                <option value="{{ $ak->kode }}" class="bg-ink-900">[{{ $ak->kode }}] {{ $ak->nama }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <button wire:click="bayarPo" class="w-full py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">Catat Pembayaran</button>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jumlah Bayar (Rp) *</label>
+                        <input type="text" inputmode="numeric" x-format-number wire:model.live="bayarPoJumlah" class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums" />
+                    </div>
+                    <div class="flex gap-2">
+                        <button wire:click="$set('bayarPoId', null)" class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                        <button wire:click="bayarPo" class="flex-1 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px] shadow-md shadow-up-mint/20 active:scale-[0.97]">Konfirmasi Bayar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: EDIT SUPPLIER -->
+    @if($editSupplierId)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-base font-bold text-white">Edit Supplier</h3>
+                    <button wire:click="$set('editSupplierId', null)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama *</label>
+                        <input type="text" wire:model="editSupplierForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kontak / PIC</label>
+                        <input type="text" wire:model="editSupplierForm.kontak" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon</label>
+                        <input type="text" wire:model="editSupplierForm.telepon" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
+                        <textarea wire:model="editSupplierForm.alamat" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Termin (hari)</label>
+                        <input type="number" wire:model="editSupplierForm.termin_hari" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                        <input type="checkbox" id="supplierActive" wire:model="editSupplierForm.is_active" class="rounded border-white/20 text-up-primary focus:ring-up-primary" />
+                        <label for="supplierActive" class="text-xs text-ink-200">Supplier Aktif</label>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                    <button wire:click="$set('editSupplierId', null)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                    <button wire:click="perbaruiSupplier" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px] active:scale-[0.97]">Simpan Perubahan</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: DETAIL PURCHASE ORDER (AUDIT & RINCIAN) -->
+    @if($detailPo)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
+            <div class="w-full max-w-3xl glass-panel p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+                <!-- Header -->
+                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base sm:text-lg font-bold text-white font-mono tracking-wide">{{ $detailPo->no_po }}</h3>
+                            <x-prism.status-pill :status="str_replace('_','-',$detailPo->status)" size="sm" />
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $detailPo->metode_bayar === 'kredit' ? 'bg-up-amber/10 text-up-amber' : 'bg-up-mint/10 text-up-mint' }}">
+                                {{ strtoupper($detailPo->metode_bayar) }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-ink-400 mt-1">
+                            Dibuat: {{ $detailPo->created_at->format('d/m/Y H:i') }} · Jatuh Tempo: {{ $detailPo->jatuh_tempo?->format('d/m/Y') ?? '-' }}
+                        </p>
+                    </div>
+                    <button wire:click="tutupDetailPo" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Info Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4 text-xs">
+                    <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                        <span class="text-[10px] text-ink-400 block font-semibold uppercase">Supplier</span>
+                        <div class="font-bold text-white">{{ $detailPo->supplier?->nama ?? '-' }}</div>
+                        <div class="text-ink-400 text-[11px]">{{ $detailPo->supplier?->telepon ?? '-' }} · PIC: {{ $detailPo->supplier?->kontak ?? '-' }}</div>
+                        <div class="text-ink-500 text-[11px]">{{ $detailPo->supplier?->alamat ?? '-' }}</div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                        <span class="text-[10px] text-ink-400 block font-semibold uppercase">Gudang Tujuan</span>
+                        <div class="font-bold text-white">{{ $detailPo->gudangTujuan?->nama ?? '-' }}</div>
+                        <div class="text-ink-400 text-[11px]">Cabang: {{ $detailPo->gudangTujuan?->cabang?->nama ?? '-' }}</div>
+                        @if($detailPo->catatan)
+                            <div class="text-ink-400 text-[11px] mt-1 pt-1 border-t border-white/5">Catatan: {{ $detailPo->catatan }}</div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Line Items Table -->
+                <div class="space-y-2 mb-4 flex-1 overflow-y-auto">
+                    <h4 class="text-xs font-bold text-ink-300 uppercase tracking-wider">Item Pembelian</h4>
+                    <div class="rounded-xl border border-white/5 overflow-hidden">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-white/5 text-ink-400 font-semibold border-b border-white/5">
+                                <tr>
+                                    <th class="py-2.5 px-3">Produk</th>
+                                    <th class="py-2.5 px-3 text-right">Harga Beli</th>
+                                    <th class="py-2.5 px-3 text-center">Qty</th>
+                                    <th class="py-2.5 px-3 text-right">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach($detailPo->items as $item)
+                                    <tr class="hover:bg-white/[0.02]">
+                                        <td class="py-2.5 px-3">
+                                            <div class="font-bold text-white">{{ $item->produk?->nama ?? '-' }}</div>
+                                            @if($item->skuVariant)
+                                                <div class="text-[10px] text-ink-400 font-mono">SKU: {{ $item->skuVariant->sku }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="py-2.5 px-3 text-right tabular-nums text-ink-200">
+                                            @cansee('harga_beli')
+                                                Rp {{ number_format((float) $item->harga_beli, 0, ',', '.') }}
+                                            @cannotsee('harga_beli')
+                                                —
+                                            @endcansee
+                                        </td>
+                                        <td class="py-2.5 px-3 text-center tabular-nums font-bold text-white">{{ $item->jumlah }}</td>
+                                        <td class="py-2.5 px-3 text-right tabular-nums font-bold text-white">
+                                            @cansee('harga_beli')
+                                                Rp {{ number_format((float) $item->subtotal, 0, ',', '.') }}
+                                            @cannotsee('harga_beli')
+                                                —
+                                            @endcansee
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Financial Summary Cards -->
+                <div class="grid grid-cols-3 gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 text-xs mb-4">
+                    <div>
+                        <span class="text-[10px] text-ink-400 block">Total Nilai PO</span>
+                        <span class="text-sm font-bold text-white tabular-nums">Rp {{ number_format((float) $detailPo->total, 0, ',', '.') }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-ink-400 block">Total Dibayar</span>
+                        <span class="text-sm font-bold text-up-mint tabular-nums">Rp {{ number_format((float) $detailPo->total_dibayar, 0, ',', '.') }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-ink-400 block">Sisa Utang</span>
+                        <span class="text-sm font-bold text-up-amber tabular-nums">Rp {{ number_format((float) $detailPo->sisa, 0, ',', '.') }}</span>
+                    </div>
+                </div>
+
+                <!-- Riwayat Pembayaran Supplier (Audited) -->
+                <div class="space-y-2 mb-2">
+                    <h4 class="text-xs font-bold text-ink-300 uppercase tracking-wider">Riwayat Pembayaran Supplier (Audited)</h4>
+                    @if($detailPo->pembayaran->isNotEmpty())
+                        <div class="rounded-xl border border-white/5 overflow-hidden">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-white/5 text-ink-400 font-semibold border-b border-white/5">
+                                    <tr>
+                                        <th class="py-2 px-3">Tanggal</th>
+                                        <th class="py-2 px-3 text-right">Nominal</th>
+                                        <th class="py-2 px-3">Dicatat Oleh</th>
+                                        <th class="py-2 px-3">Keterangan</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @foreach($detailPo->pembayaran as $pby)
+                                        <tr class="hover:bg-white/[0.02]">
+                                            <td class="py-2 px-3 tabular-nums text-ink-300">{{ $pby->dibayar_at?->format('d/m/Y H:i') ?? '-' }}</td>
+                                            <td class="py-2 px-3 text-right tabular-nums font-bold text-up-mint">Rp {{ number_format((float) $pby->jumlah, 0, ',', '.') }}</td>
+                                            <td class="py-2 px-3 text-ink-200">{{ $pby->user?->name ?? 'Sistem' }}</td>
+                                            <td class="py-2 px-3 text-ink-400 text-[11px]">{{ $pby->keterangan ?? '-' }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <p class="text-xs text-ink-500 py-2">Belum ada riwayat pembayaran untuk PO ini.</p>
+                    @endif
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="flex items-center justify-between pt-4 border-t border-white/10 mt-2">
+                    <button wire:click="tutupDetailPo" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                        Tutup
+                    </button>
+                    @if($detailPo->status === 'diterima' && $detailPo->sisa > 0)
+                        @if(auth()->user()?->can('utang.manage') || auth()->user()?->can('akunting.create'))
+                            <button
+                                wire:click="tutupDetailPo; bukaBayarPo({{ $detailPo->id }})"
+                                class="px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-accent/25 active:scale-[0.97]"
+                            >
+                                Bayar PO Ini (Sisa Rp {{ number_format($detailPo->sisa, 0, ',', '.') }})
+                            </button>
+                        @endif
+                    @endif
                 </div>
             </div>
         </div>

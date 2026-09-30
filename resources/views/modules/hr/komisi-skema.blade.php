@@ -63,7 +63,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-ink-700 mb-1">Nilai</label>
-                            <input type="number" step="any" wire:model="nilai" placeholder="mis. 5"
+                            <input type="text" inputmode="numeric" x-format-number wire:model="nilai" placeholder="mis. 5"
                                 class="block w-full rounded-md border-ink-300 shadow-sm focus:border-up-primary focus:ring-up-primary sm:text-sm min-h-[44px]">
                             @error('nilai') <span class="text-xs text-up-red">{{ $message }}</span> @enderror
                         </div>
@@ -72,7 +72,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-ink-700 mb-1">Min. Amount (Rp)</label>
-                            <input type="number" step="any" wire:model="minAmount" placeholder="0 = tanpa ambang"
+                            <input type="text" inputmode="numeric" x-format-number wire:model="minAmount" placeholder="0 = tanpa ambang"
                                 class="block w-full rounded-md border-ink-300 shadow-sm focus:border-up-primary focus:ring-up-primary sm:text-sm min-h-[44px]">
                         </div>
                         <div>

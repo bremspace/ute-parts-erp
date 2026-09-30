@@ -83,6 +83,12 @@
                                 @endcan
                             @endif
                             <button
+                                wire:click="bukaDetailGrn({{ $grn->id }})"
+                                class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] cursor-pointer"
+                            >
+                                Detail
+                            </button>
+                            <button
                                 wire:click="bukaRiwayat('grn', {{ $grn->id }})"
                                 class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer"
                             >
@@ -171,6 +177,101 @@
                 <div class="flex gap-3">
                     <button wire:click="cancelGrnModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button wire:click="simpanGrn" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan GRN</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL: DETAIL GRN --}}
+    @if($detailGrn)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
+            <div class="w-full max-w-2xl glass-panel p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+                <!-- Header -->
+                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base sm:text-lg font-bold text-white font-mono tracking-wide">{{ $detailGrn->no_grn }}</h3>
+                            <x-prism.status-pill :status="str_replace('_','-',$detailGrn->status)" size="sm" />
+                        </div>
+                        <p class="text-xs text-ink-400 mt-1">
+                            PO: <span class="font-mono font-bold text-white">{{ $detailGrn->purchaseOrder?->no_po ?? '-' }}</span> · 
+                            Penerima: {{ $detailGrn->user?->name ?? '-' }} · 
+                            Tanggal: {{ $detailGrn->created_at->format('d/m/Y H:i') }}
+                        </p>
+                    </div>
+                    <button wire:click="tutupDetailGrn" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Summary Info -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4 text-xs">
+                    <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                        <span class="text-[10px] text-ink-400 block font-semibold uppercase">Supplier</span>
+                        <div class="font-bold text-white">{{ $detailGrn->purchaseOrder?->supplier?->nama ?? '-' }}</div>
+                        <div class="text-ink-400 text-[11px]">{{ $detailGrn->purchaseOrder?->supplier?->telepon ?? '-' }}</div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                        <span class="text-[10px] text-ink-400 block font-semibold uppercase">Gudang & Total HPP</span>
+                        <div class="font-bold text-white">{{ $detailGrn->gudang?->nama ?? '-' }}</div>
+                        <div class="text-up-mint font-bold tabular-nums">
+                            @cansee('harga_beli')
+                                Total HPP: Rp {{ number_format((float) $detailGrn->total_hpp, 0, ',', '.') }}
+                            @cannotsee('harga_beli')
+                                Total HPP: —
+                            @endcansee
+                        </div>
+                    </div>
+                </div>
+
+                @if($detailGrn->catatan)
+                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-ink-300 mb-4">
+                        <span class="text-[10px] text-ink-400 block font-semibold mb-0.5">Catatan:</span>
+                        {{ $detailGrn->catatan }}
+                    </div>
+                @endif
+
+                <!-- Items Table -->
+                <div class="space-y-2 mb-4 flex-1 overflow-y-auto">
+                    <h4 class="text-xs font-bold text-ink-300 uppercase tracking-wider">Item Diterima</h4>
+                    <div class="rounded-xl border border-white/5 overflow-hidden">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-white/5 text-ink-400 font-semibold border-b border-white/5">
+                                <tr>
+                                    <th class="py-2 px-3">Produk</th>
+                                    <th class="py-2 px-3 text-center">Qty PO</th>
+                                    <th class="py-2 px-3 text-center">Qty Diterima</th>
+                                    <th class="py-2 px-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach($detailGrn->item_qty_received ?? [] as $item)
+                                    <tr class="hover:bg-white/[0.02]">
+                                        <td class="py-2 px-3">
+                                            <div class="font-bold text-white">{{ $item['produk_nama'] ?? ('Produk #'.$item['produk_id']) }}</div>
+                                            @cansee('harga_beli')
+                                                <div class="text-[10px] text-ink-400 tabular-nums">@ Rp {{ number_format((float) ($item['harga_beli'] ?? 0), 0, ',', '.') }}</div>
+                                            @endcansee
+                                        </td>
+                                        <td class="py-2 px-3 text-center tabular-nums text-ink-300">{{ $item['qty_po'] ?? '-' }}</td>
+                                        <td class="py-2 px-3 text-center tabular-nums font-bold text-white">{{ $item['qty_received'] ?? 0 }}</td>
+                                        <td class="py-2 px-3 text-center">
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ ($item['status'] ?? '') === 'lengkap' ? 'bg-up-mint/10 text-up-mint' : 'bg-up-amber/10 text-up-amber' }}">
+                                                {{ $item['status'] ?? 'selisih' }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="flex items-center justify-end pt-4 border-t border-white/10 mt-2">
+                    <button wire:click="tutupDetailGrn" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                        Tutup
+                    </button>
                 </div>
             </div>
         </div>

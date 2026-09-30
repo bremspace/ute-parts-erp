@@ -11,7 +11,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
-    'no_po', 'supplier_id', 'gudang_tujuan_id', 'status', 'metode_bayar',
+    'no_po', 'supplier_id', 'gudang_tujuan_id', 'status', 'metode_bayar', 'akun_kas_bank',
     'jatuh_tempo', 'total', 'total_dibayar', 'catatan',
 ])]
 class PurchaseOrder extends Model

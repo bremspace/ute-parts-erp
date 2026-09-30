@@ -68,9 +68,10 @@ class ProdukService
         ?int $reorderPoint = null,
         ?int $minStock = null,
         ?int $maxStock = null,
-        bool $isOndemand = false
+        bool $isOndemand = false,
+        ?string $barcode = null
     ): Produk {
-        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand) {
+        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode) {
             $satuan = $satuanKode ?: 'pcs';
             $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
             if ($satuanKode && ! $satuanRef) {
@@ -129,9 +130,12 @@ class ProdukService
                 }
             }
 
+            $cleanBarcode = $barcode ? trim($barcode) : null;
+
             $produk = Produk::create([
                 'nama' => $nama,
                 'slug' => Str::slug($nama).'-'.Str::lower(Str::random(4)),
+                'barcode' => $cleanBarcode,
                 'deskripsi' => $deskripsi,
                 'kategori' => $finalKategoriStr,
                 'kategori_id' => $finalKategoriId,
@@ -158,6 +162,7 @@ class ProdukService
             $variant = SkuVariant::create([
                 'produk_id' => $produk->id,
                 'sku' => $sku ?: 'SKU-'.strtoupper(Str::random(6)),
+                'barcode' => $cleanBarcode,
                 'nama_varian' => 'Standar',
                 'satuan_kode' => $satuanRef?->kode,
                 'harga_beli' => $hargaBeli,
@@ -176,7 +181,7 @@ class ProdukService
             $this->simpanHargaTier($produk->id, $variant->id, $hargaTier, $hargaJual);
 
             if ($gudangId && $stokAwal > 0) {
-                $this->tambahStokPembelian(
+                $this->inisialisasiStokAwal(
                     $produk->id,
                     $variant->id,
                     $gudangId,
@@ -223,9 +228,10 @@ class ProdukService
         ?int $reorderPoint = null,
         ?int $minStock = null,
         ?int $maxStock = null,
-        ?bool $isOndemand = null
+        ?bool $isOndemand = null,
+        ?string $barcode = null
     ): Produk {
-        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand) {
+        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode) {
             $produk = Produk::findOrFail($produkId);
 
             $satuan = $satuanKode ?: ($produk->satuan ?: 'pcs');
@@ -278,8 +284,11 @@ class ProdukService
                 }
             }
 
+            $cleanBarcode = $barcode !== null ? (trim($barcode) ?: null) : $produk->barcode;
+
             $produk->update([
                 'nama' => $nama,
+                'barcode' => $cleanBarcode,
                 'deskripsi' => $deskripsi ?? $produk->deskripsi,
                 'kategori' => $finalKategoriStr,
                 'kategori_id' => $finalKategoriId,
@@ -312,6 +321,7 @@ class ProdukService
             $variant = $produk->skuVariants()->first();
             if ($variant) {
                 $variant->update([
+                    'barcode' => $cleanBarcode,
                     'satuan_kode' => $satuanRef?->kode ?? $variant->satuan_kode,
                     'harga_beli' => $hargaBeli,
                     'harga_jual_retail' => $hargaJual,
@@ -375,6 +385,85 @@ class ProdukService
                 ]
             );
         }
+    }
+
+    /**
+     * Inisialisasi stok awal saat setup master produk baru.
+     * Jurnal: Persediaan (130-01) debit / Modal Pemilik (310-01) kredit.
+     */
+    public function inisialisasiStokAwal(
+        int $produkId,
+        ?int $variantId,
+        int $gudangId,
+        int $qty,
+        float $hargaBeli,
+        string $keterangan,
+        ?int $userId = null,
+        ?int $rakId = null
+    ): StokItem {
+        if ($qty <= 0) {
+            throw new \Exception('Kuantitas harus > 0');
+        }
+
+        return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId, $rakId) {
+            $cabangId = Gudang::find($gudangId)?->cabang_id;
+
+            $stok = StokItem::firstOrCreate(
+                ['produk_id' => $produkId, 'sku_variant_id' => $variantId, 'gudang_id' => $gudangId],
+                ['jumlah' => 0, 'jumlah_minimum' => 0, 'rak_id' => $rakId]
+            );
+
+            $sebelum = (int) $stok->jumlah;
+            $setelah = $sebelum + $qty;
+
+            $stok->update(['jumlah' => $setelah]);
+
+            StokLog::create([
+                'gudang_id' => $gudangId,
+                'produk_id' => $produkId,
+                'sku_variant_id' => $variantId,
+                'user_id' => $userId,
+                'jenis' => 'stok_awal',
+                'referensi_tipe' => Produk::class,
+                'referensi_id' => $produkId,
+                'jumlah_sebelum' => $sebelum,
+                'perubahan' => $qty,
+                'jumlah_setelah' => $setelah,
+                'catatan' => $keterangan,
+            ]);
+
+            StockMutationLog::create([
+                'produk_id' => $produkId,
+                'sku_variant_id' => $variantId,
+                'gudang_id' => $gudangId,
+                'user_id' => $userId,
+                'delta' => $qty,
+                'sumber' => 'stok_awal',
+                'referensi_tipe' => Produk::class,
+                'referensi_id' => $produkId,
+                'terjadi_at' => now(),
+            ]);
+
+            $total = round($hargaBeli * $qty, 2);
+            if ($total > 0) {
+                $this->jurnalService->post(
+                    $this->jurnalService->generateNoJurnal('awal', $cabangId),
+                    now(),
+                    'stok_awal',
+                    [
+                        ['akun_kode' => '130-01', 'debit' => $total, 'kredit' => 0],   // Persediaan bertambah
+                        ['akun_kode' => '310-01', 'debit' => 0, 'kredit' => $total],  // Modal Pemilik (Ekuitas)
+                    ],
+                    $keterangan,
+                    $cabangId,
+                    $userId,
+                    Produk::class,
+                    $produkId
+                );
+            }
+
+            return $stok;
+        });
     }
 
     /**

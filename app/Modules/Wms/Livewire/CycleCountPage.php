@@ -4,7 +4,12 @@ namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Wms\Models\CycleCountSchedule;
 use App\Modules\Wms\Models\CycleCountTask;
+use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Services\CycleCountService;
+use App\Modules\Workflow\Models\ApprovalRequest;
+use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -41,9 +46,9 @@ class CycleCountPage extends Component
 
     public int $sampleSize = 10;
 
-    public int $thresholdUnit = 5;
+    public int $thresholdUnit = 0;
 
-    public int $thresholdPersen = 10;
+    public int $thresholdPersen = 0;
 
     // Count form
     public ?int $selectedTaskId = null;
@@ -58,6 +63,23 @@ class CycleCountPage extends Component
         if (! session('cabang_id')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Cabang aktif belum dipilih.']);
         }
+    }
+
+    // Detail Task state
+    public ?int $detailTaskId = null;
+
+    public bool $showDetailModal = false;
+
+    public function bukaDetail(int $taskId): void
+    {
+        $this->detailTaskId = $taskId;
+        $this->showDetailModal = true;
+    }
+
+    public function tutupDetail(): void
+    {
+        $this->detailTaskId = null;
+        $this->showDetailModal = false;
     }
 
     // ===== Schedule =====
@@ -83,8 +105,8 @@ class CycleCountPage extends Component
         $this->hari = 1;
         $this->jam = '08:00';
         $this->sampleSize = 10;
-        $this->thresholdUnit = 5;
-        $this->thresholdPersen = 10;
+        $this->thresholdUnit = 0;
+        $this->thresholdPersen = 0;
     }
 
     public function simpanSchedule(): void
@@ -141,9 +163,76 @@ class CycleCountPage extends Component
 
         $schedule = CycleCountSchedule::where('cabang_id', session('cabang_id'))->findOrFail($scheduleId);
         $service = app(CycleCountService::class);
-        $tasks = $service->jalankanHarian();
+        $task = $service->generateTask($schedule);
 
-        $this->dispatch('alert', ['type' => 'success', 'message' => $tasks->count().' task cycle count dibuat.']);
+        if ($task) {
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Tugas cycle count {$task->no_task} siap dihitung."]);
+        } else {
+            $this->dispatch('alert', ['type' => 'info', 'message' => 'Tidak ada kandidat produk stok untuk jadwal ini di cabang aktif.']);
+        }
+    }
+
+    public function approveTask(int $taskId): void
+    {
+        if (! auth()->user()?->can('wms.approve-opname')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin menyetujui cycle count.']);
+
+            return;
+        }
+
+        $task = CycleCountTask::where('cabang_id', session('cabang_id'))
+            ->where('status', 'menunggu_approval')
+            ->findOrFail($taskId);
+
+        $actionedBy = auth()->id() ?? 1;
+
+        $pending = ApprovalRequest::where('entity_type', 'cycle_count')
+            ->where('entity_id', $task->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($pending) {
+            app(ApprovalService::class)->proses($pending->id, 'disetujui', $actionedBy, 'Disetujui supervisor dari Cycle Count');
+        } else {
+            app(CycleCountService::class)->terapkanKoreksi($task->id, $actionedBy);
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Tugas cycle count {$task->no_task} disetujui & stok fisik berhasil diselaraskan.",
+        ]);
+    }
+
+    public function tolakTask(int $taskId, ?string $alasan = null): void
+    {
+        if (! auth()->user()?->can('wms.approve-opname')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin menolak cycle count.']);
+
+            return;
+        }
+
+        $task = CycleCountTask::where('cabang_id', session('cabang_id'))
+            ->where('status', 'menunggu_approval')
+            ->findOrFail($taskId);
+
+        $actionedBy = auth()->id() ?? 1;
+        $catatan = $alasan ?: 'Ditolak supervisor dari Cycle Count';
+
+        $pending = ApprovalRequest::where('entity_type', 'cycle_count')
+            ->where('entity_id', $task->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($pending) {
+            app(ApprovalService::class)->proses($pending->id, 'ditolak', $actionedBy, $catatan);
+        } else {
+            app(CycleCountService::class)->tolakTask($task->id, $actionedBy, $catatan);
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => "Tugas cycle count {$task->no_task} ditolak. Stok fisik tidak diubah.",
+        ]);
     }
 
     // ===== Count =====
@@ -221,14 +310,39 @@ class CycleCountPage extends Component
             ->raksCabang(session('cabang_id'));
     }
 
+    public function getKategorisProperty(): Collection
+    {
+        $fromMaster = KategoriProduk::where('is_active', true)->pluck('nama');
+        $fromProduk = Produk::whereNotNull('kategori')->where('kategori', '!=', '')->distinct()->pluck('kategori');
+
+        return $fromMaster->merge($fromProduk)->filter()->unique()->sort()->values();
+    }
+
     public function render()
     {
+        $detailTask = null;
+        $mutasiLogs = collect();
+        if ($this->showDetailModal && $this->detailTaskId) {
+            $detailTask = CycleCountTask::with(['schedule', 'cabang', 'pembuat', 'approver'])
+                ->where('cabang_id', session('cabang_id'))
+                ->find($this->detailTaskId);
+
+            $mutasiLogs = StokLog::with(['gudang', 'produk', 'skuVariant', 'user'])
+                ->where('referensi_tipe', CycleCountTask::class)
+                ->where('referensi_id', $this->detailTaskId)
+                ->orderBy('created_at')
+                ->get();
+        }
+
         return view('modules.wms.livewire.cycle-count', [
             // Legacy computed (`getSchedulesProperty()`) diakses sebagai `$this->schedules`,
             // bukan `$this->schedulesProperty` — nama property literal tidak ada di komponen.
             'schedules' => $this->schedules,
             'tasks' => $this->tasks,
             'raks' => $this->raks,
+            'kategoris' => $this->kategoris,
+            'detailTask' => $detailTask,
+            'mutasiLogs' => $mutasiLogs,
         ])->layout('layouts.backoffice', ['header' => 'Cycle Count Otomatis']);
     }
 }

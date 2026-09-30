@@ -7,11 +7,13 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Reseller\Services\KomisiService;
+use App\Traits\ParsesNominal;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class ResellerDashboard extends Component
 {
+    use ParsesNominal;
     use WithPagination;
 
     public string $activeTab = 'reseller'; // reseller, komisi
@@ -126,6 +128,8 @@ class ResellerDashboard extends Component
 
     public function simpanSkema()
     {
+        $this->skemaForm['nilai'] = $this->parseNominal($this->skemaForm['nilai'] ?? 0);
+
         $this->validate([
             'skemaForm.nama' => 'required|string|max:255',
             'skemaForm.tipe' => 'required|in:persen,nominal',

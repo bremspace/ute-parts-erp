@@ -4,7 +4,7 @@
             <!-- Search & Filters -->
             <div class="flex flex-col md:flex-row gap-3">
                 <div class="flex-1">
-                    <x-prism.barcode-scan-input placeholder="Cari produk: nama, brand, model, SKU, barcode..." model="produkSearch" />
+                    <x-prism.barcode-scan-input placeholder="Cari produk: nama, brand, model, SKU, barcode..." model="produkSearch" title="Scan Barcode Master Produk" />
                 </div>
                 <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
                     <select wire:model.live="filterKategoriId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
@@ -73,9 +73,13 @@
                             </div>
                         </td>
                         <td class="py-3.5 px-4 font-mono text-xs">
-                            <span class="text-ink-300 block">{{ $skuPertama ?? '-' }}</span>
+                            <span class="text-ink-300 block font-semibold">{{ $skuPertama ?? '-' }}</span>
                             @if($p->barcode)
-                                <span class="text-[10px] text-ink-500 font-mono block">{{ $p->barcode }}</span>
+                                <div class="flex items-center gap-1 mt-0.5">
+                                    <span class="text-[10px] text-up-primary font-mono block px-1.5 py-0.5 rounded bg-up-primary/10 border border-up-primary/20">{{ $p->barcode }}</span>
+                                </div>
+                            @else
+                                <span class="text-[11px] text-ink-500 font-mono block mt-0.5">-</span>
                             @endif
                         </td>
                         <td class="py-3.5 px-4 tabular-nums text-xs">
@@ -97,15 +101,8 @@
                                 <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-up-mint border border-up-mint/30 font-bold text-[11px] cursor-pointer whitespace-nowrap active:scale-[0.97]">
                                     ✏️ Edit
                                 </button>
-                                @if(auth()->user()?->hasRole('super-admin'))
-                                    <button wire:click="openTambahStokModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-accent hover:opacity-90 text-white font-bold text-[11px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.97]">
-                                        + Stok
-                                    </button>
-                                @else
-                                    <span class="px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/10 text-[10px] text-up-amber whitespace-nowrap" title="Stok masuk hanya via PO Supplier">PO</span>
-                                @endif
-                                <button wire:click="generateBarcodeProduk({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[11px] cursor-pointer whitespace-nowrap active:scale-[0.97]">
-                                    Barcode
+                                <button wire:click="orderPo({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[11px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.97]" title="Buat PO untuk produk ini">
+                                    📦 Order PO
                                 </button>
                                 <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-[11px] cursor-pointer whitespace-nowrap active:scale-[0.97]">
                                     🖨️ Cetak
@@ -147,9 +144,29 @@
                 </div>
 
                 <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Produk *</label>
-                        <input type="text" wire:model="produkForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="LCD iPhone 13 Original" />
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Produk *</label>
+                            <input type="text" wire:model="produkForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="LCD iPhone 13 Original" />
+                            @error('produkForm.nama') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-semibold text-ink-300">Kode Barcode (Fisik / Scan)</label>
+                                <button type="button" wire:click="generateBarcodeForm('create')" class="text-[10px] text-up-amber hover:underline font-semibold cursor-pointer" title="Buat kode barcode otomatis">⚡ Auto</button>
+                            </div>
+                            <div class="relative flex items-center">
+                                <input type="text" wire:model="produkForm.barcode" class="w-full pl-3 pr-16 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001" />
+                                <button type="button"
+                                        onclick="window.uteBarcode && window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Produk', onScan: (code) => { @this.set('produkForm.barcode', code); } })"
+                                        class="absolute right-1.5 px-2 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary text-[10px] font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                                        title="Scan Barcode via Kamera HP/Web">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <span>Scan</span>
+                                </button>
+                            </div>
+                            @error('produkForm.barcode') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -234,11 +251,11 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Beli (Rp) *</label>
-                            <input type="number" wire:model.live="produkForm.harga_beli" step="500" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Jual Retail (Rp) *</label>
-                            <input type="number" wire:model.live="produkForm.harga_jual_retail" step="500" min="0" wire:change="produkHargaJualBerubah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_jual_retail" wire:change="produkHargaJualBerubah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                         </div>
                     </div>
 
@@ -288,9 +305,10 @@
                                             <span class="text-[9px] text-up-mint font-medium">Otomatis</span>
                                         @endif
                                     </div>
-                                    <input type="number"
+                                    <input type="text"
+                                        inputmode="numeric"
+                                        x-format-number
                                         wire:model.live="produkForm.harga_tier.{{ $tipe }}.nominal_tetap"
-                                        min="0"
                                         placeholder="Nominal"
                                         @if($tipe === 'retail') readonly tabindex="-1" title="Terkunci: otomatis sama dengan Harga Jual Retail" @endif
                                         class="w-full px-2 py-2 rounded-lg glass-input text-xs font-bold tabular-nums @if($tipe === 'retail') bg-white/5 opacity-80 cursor-not-allowed @endif" />
@@ -395,81 +413,6 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
                     <button wire:click="$set('showProdukModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button wire:click="simpanProduk" class="flex-1 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">Simpan Produk</button>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    <!-- MODAL: TAMBAH STOK (PEMBELIAN) -->
-    @if($showTambahStokModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Tambah Stok — Pembelian</h3>
-                    <button wire:click="$set('showTambahStokModal', false)" class="text-ink-400 hover:text-white">✕</button>
-                </div>
-
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang Tujuan *</label>
-                        <select wire:model="tambahStokForm.gudang_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                            <option value="" class="bg-ink-900">Pilih Gudang...</option>
-                            @foreach($gudangs as $g)
-                                <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->kode }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Rak (Bin) *</label>
-                        <select wire:model="tambahStokForm.rak_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                            <option value="" class="bg-ink-900">Pilih Rak...</option>
-                            @foreach($raks as $rk)
-                                @if($rk->gudang_id == (isset($tambahStokForm['gudang_id']) ? $tambahStokForm['gudang_id'] : $filterGudangId))
-                                    <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->kode }} - {{ $rk->nama }}</option>
-                                @endif
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jumlah *</label>
-                            <input type="number" wire:model.live="tambahStokForm.qty" min="1" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Beli (Rp) *</label>
-                            <input type="number" wire:model="tambahStokForm.harga_beli" step="500" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Keterangan</label>
-                        <input type="text" wire:model="tambahStokForm.keterangan" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Pembelian dari supplier" />
-                    </div>
-
-                    {{-- [F2-3] Input SN utk produk sn=true — jumlah wajib = jumlah --}}
-                    @if($stokProdukSn)
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <label class="block text-xs font-semibold text-up-accent">Nomor Seri (wajib)</label>
-                                <span class="text-[10px] text-ink-400 tabular-nums">Jumlah SN harus = Jumlah</span>
-                            </div>
-                            <textarea
-                                wire:model="tambahStokForm.sn"
-                                rows="3"
-                                placeholder="Satu SN per baris (boleh pisah koma) — scan/tempel di sini"
-                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono"
-                            ></textarea>
-                            @error('tambahStokForm.sn') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
-                        </div>
-                    @endif
-
-                    <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30 text-[11px] text-up-mint">
-                        Pencatatan pembelian dari supplier — stok bertambah + StokLog + <strong>jurnal otomatis (Persediaan / Utang Usaha)</strong>.
-                    </div>
-                </div>
-
-                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
-                    <button wire:click="$set('showTambahStokModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanTambahStok" class="flex-1 py-3 rounded-xl bg-up-accent text-white font-bold text-xs cursor-pointer min-h-[44px]">Catat Pembelian</button>
                 </div>
             </div>
         </div>
@@ -700,10 +643,29 @@
                 </div>
 
                 <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Produk *</label>
-                        <input type="text" wire:model="editProdukForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
-                        @error('editProdukForm.nama') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Produk *</label>
+                            <input type="text" wire:model="editProdukForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            @error('editProdukForm.nama') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-semibold text-ink-300">Kode Barcode (Fisik / Scan)</label>
+                                <button type="button" wire:click="generateBarcodeForm('edit')" class="text-[10px] text-up-amber hover:underline font-semibold cursor-pointer" title="Buat kode barcode otomatis">⚡ Auto</button>
+                            </div>
+                            <div class="relative flex items-center">
+                                <input type="text" wire:model="editProdukForm.barcode" class="w-full pl-3 pr-16 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001" />
+                                <button type="button"
+                                        onclick="window.uteBarcode && window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Produk', onScan: (code) => { @this.set('editProdukForm.barcode', code); } })"
+                                        class="absolute right-1.5 px-2 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary text-[10px] font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                                        title="Scan Barcode via Kamera HP/Web">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <span>Scan</span>
+                                </button>
+                            </div>
+                            @error('editProdukForm.barcode') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -792,12 +754,12 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Beli (Rp) *</label>
-                            <input type="number" wire:model="editProdukForm.harga_beli" step="500" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model="editProdukForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                             @error('editProdukForm.harga_beli') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Jual Retail (Rp) *</label>
-                            <input type="number" wire:model="editProdukForm.harga_jual_retail" step="500" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model="editProdukForm.harga_jual_retail" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                             @error('editProdukForm.harga_jual_retail') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
                     </div>
@@ -832,9 +794,10 @@
                                             <span class="text-[9px] text-up-mint font-medium">Otomatis</span>
                                         @endif
                                     </div>
-                                    <input type="number"
+                                    <input type="text"
+                                        inputmode="numeric"
+                                        x-format-number
                                         wire:model="editProdukForm.harga_tier.{{ $tipe }}.nominal_tetap"
-                                        min="0"
                                         placeholder="Nominal"
                                         @if($tipe === 'retail') readonly tabindex="-1" title="Terkunci: otomatis sama dengan Harga Jual Retail" @endif
                                         class="w-full px-2 py-2 rounded-lg glass-input text-xs font-bold tabular-nums @if($tipe === 'retail') bg-white/5 opacity-80 cursor-not-allowed @endif" />

@@ -175,6 +175,62 @@ class NomorSeriService
     }
 
     /**
+     * Kembalikan SN dari penjualan yang diretur → status kembali 'tersedia'.
+     *
+     * @param  array<int, string>  $snList
+     */
+    public function returPenjualan(array $snList, int $produkId, int $cabangId): void
+    {
+        foreach ($snList as $sn) {
+            $row = NomorSeri::where('produk_id', $produkId)
+                ->where('nomor_seri', $sn)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $row) {
+                continue;
+            }
+
+            $this->snapshotLinkDitimpa($row, 'retur_penjualan', [
+                'transaksi_item_id' => null,
+            ]);
+
+            $row->update([
+                'status' => NomorSeri::STATUS_TERSEDIA,
+                'cabang_id' => $cabangId,
+            ]);
+        }
+    }
+
+    /**
+     * Keluarkan SN untuk retur pembelian ke supplier → status menjadi 'return'.
+     *
+     * @param  array<int, string>  $snList
+     */
+    public function returPembelian(array $snList, int $produkId, int $cabangId): void
+    {
+        foreach ($snList as $sn) {
+            $row = NomorSeri::where('produk_id', $produkId)
+                ->where('nomor_seri', $sn)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $row) {
+                throw new \Exception("Nomor seri {$sn} tidak ditemukan untuk produk ini");
+            }
+            if ($row->status !== NomorSeri::STATUS_TERSEDIA) {
+                throw new \Exception("Nomor seri {$sn} tidak berstatus tersedia untuk diretur ke supplier");
+            }
+
+            $this->snapshotLinkDitimpa($row, 'retur_pembelian', []);
+
+            $row->update([
+                'status' => 'return',
+            ]);
+        }
+    }
+
+    /**
      * Autocomplete SN (POS & Tiket) — status tersedia + cabang aktif (+ filter produk opsional).
      *
      * @return Collection<int, NomorSeri>

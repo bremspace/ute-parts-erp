@@ -313,7 +313,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Rasio Redeem (1 poin = Rp ...)</label>
-                            <input type="number" step="0.01" wire:model="loyalitasForm.poin_redeem_rupiah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium tabular-nums" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model="loyalitasForm.poin_redeem_rupiah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium tabular-nums" />
                         </div>
                     </div>
                     <div class="grid grid-cols-3 gap-3">
@@ -1026,7 +1026,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tarif Biaya Jasa Standar (Rp)</label>
-                        <input type="number" min="0" step="500" wire:model="jenisServisForm.biaya_jasa" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                        <input type="text" inputmode="numeric" x-format-number wire:model="jenisServisForm.biaya_jasa" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                         <p class="text-[10px] text-ink-400 mt-1">Tarif acuan otomatis saat memilih jasa ini pada estimasi servis.</p>
                     </div>
                     <div class="grid grid-cols-2 gap-2">

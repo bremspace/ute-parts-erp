@@ -34,6 +34,11 @@ class TransferTab extends Component
     // New Transfer Modal state
     public bool $showTransferModal = false;
 
+    // Detail Transfer Modal state
+    public ?int $selectedTransferId = null;
+
+    public bool $showDetailModal = false;
+
     public ?int $transferGudangAsalId = null;
 
     public ?int $transferGudangTujuanId = null;
@@ -425,6 +430,18 @@ class TransferTab extends Component
         }
     }
 
+    public function bukaDetail(int $transferId): void
+    {
+        $this->selectedTransferId = $transferId;
+        $this->showDetailModal = true;
+    }
+
+    public function tutupDetail(): void
+    {
+        $this->selectedTransferId = null;
+        $this->showDetailModal = false;
+    }
+
     protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
     {
         if (auth()->user()?->can($permission)) {
@@ -461,12 +478,35 @@ class TransferTab extends Component
             ->take(20)
             ->get();
 
+        $selectedTransfer = null;
+        $mutasiLogs = collect();
+        if ($this->showDetailModal && $this->selectedTransferId) {
+            $selectedTransfer = StokTransfer::with([
+                'gudangAsal',
+                'gudangTujuan',
+                'pengirim',
+                'penerima',
+                'approver',
+                'items.produk',
+                'items.skuVariant',
+                'items.rak',
+            ])->find($this->selectedTransferId);
+
+            $mutasiLogs = StokLog::with(['gudang', 'produk', 'skuVariant', 'user'])
+                ->where('referensi_tipe', StokTransfer::class)
+                ->where('referensi_id', $this->selectedTransferId)
+                ->orderBy('created_at')
+                ->get();
+        }
+
         return view('modules.wms.livewire.transfer-tab', [
             'gudangs' => $gudangs,
             'allProducts' => $allProducts,
             'transfers' => $transfers,
             'raks' => Rak::with('gudang')->get(),
             'transferStokRows' => $this->transferStokRows(), // [T-41] info stok per baris form transfer
+            'selectedTransfer' => $selectedTransfer,
+            'mutasiLogs' => $mutasiLogs,
         ]);
     }
 }

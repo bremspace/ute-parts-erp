@@ -183,11 +183,11 @@ class CycleCountService
         return StokItem::query()
             ->whereIn('gudang_id', $gudangIds)
             ->when(
-                $schedule->tipe_target === 'rak',
+                $schedule->tipe_target === 'rak' && ! empty($schedule->target_id),
                 fn ($q) => $q->where('rak_id', $schedule->target_id)
             )
             ->when(
-                $schedule->tipe_target === 'kategori',
+                $schedule->tipe_target === 'kategori' && ! empty($schedule->target_kategori),
                 fn ($q) => $q->whereHas('produk', fn ($p) => $p->where('kategori', $schedule->target_kategori))
             )
             ->with('produk:id,nama,kategori')
@@ -448,6 +448,8 @@ class CycleCountService
             // state machine (F3-7: hitung → minor=koreksi / major=approval)
             // tidak disentuh.
             $stokPerItem = $this->stokItemTerScoped($gudangIds, $this->idStokDariHasil($task->hasil ?? []));
+            $produkIds = array_map(fn ($h) => (int) ($h['produk_id'] ?? 0), $task->hasil ?? []);
+            $produkHargas = Produk::whereIn('id', array_values(array_unique(array_filter($produkIds))))->pluck('harga_beli', 'id');
 
             foreach ($task->hasil ?? [] as $h) {
                 $selisih = (int) ($h['selisih'] ?? 0);
@@ -497,16 +499,21 @@ class CycleCountService
                     'catatan' => "Cycle Count {$task->no_task}: ".($h['nama'] ?? '')." — {$catatan}",
                 ]);
 
-                // Jurnal penyesuaian persis pola opname existing (T-14):
-                // selisih > 0 (fisik > sistem): 130-01 debit / 520-08 kredit
-                // selisih < 0 (fisik < sistem): 130-01 kredit / 520-08 debit
-                $abs = abs($selisih);
-                $jurnalLines[] = $selisih > 0
-                    ? ['akun_kode' => '130-01', 'debit' => $abs, 'kredit' => 0]
-                    : ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $abs];
-                $jurnalLines[] = $selisih > 0
-                    ? ['akun_kode' => '520-08', 'debit' => 0, 'kredit' => $abs]
-                    : ['akun_kode' => '520-08', 'debit' => $abs, 'kredit' => 0];
+                // Jurnal penyesuaian keuangan persis prinsip akuntansi persediaan:
+                // Nominal = |selisih| * harga_beli (HPP modal barang).
+                // selisih > 0 (fisik > sistem / barang lebih): 130-01 Persediaan debit, 520-08 Selisih Stok kredit
+                // selisih < 0 (fisik < sistem / barang hilang): 520-08 Selisih Stok debit, 130-01 Persediaan kredit
+                $hargaBeli = (float) ($produkHargas[(int) $h['produk_id']] ?? 0);
+                $nominal = round(abs($selisih) * $hargaBeli, 2);
+
+                if ($nominal > 0) {
+                    $jurnalLines[] = $selisih > 0
+                        ? ['akun_kode' => '130-01', 'debit' => $nominal, 'kredit' => 0]
+                        : ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $nominal];
+                    $jurnalLines[] = $selisih > 0
+                        ? ['akun_kode' => '520-08', 'debit' => 0, 'kredit' => $nominal]
+                        : ['akun_kode' => '520-08', 'debit' => $nominal, 'kredit' => 0];
+                }
 
                 $jumlahDikoreksi++;
             }

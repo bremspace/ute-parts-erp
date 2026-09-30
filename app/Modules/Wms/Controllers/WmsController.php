@@ -7,6 +7,7 @@ use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Brand;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Models\KualitasProduk;
@@ -24,8 +25,11 @@ use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
+use App\Modules\Wms\Services\GrnService;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\PurchaseOrderService;
+use App\Modules\Workflow\Models\ApprovalRequest;
+use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -442,12 +446,17 @@ class WmsController extends Controller
                     // [T-14] Akumulasi jurnal penyesuaian stok: Persediaan (130-01) vs Selisih Stok (520-08)
                     // selisih > 0 (fisik > sistem): Persediaan debit, 520-08 kredit (penemuan stok)
                     // selisih < 0 (fisik < sistem): Persediaan kredit, 520-08 debit (kehilangan stok)
-                    $jurnalLines[] = $item->selisih > 0
-                        ? ['akun_kode' => '130-01', 'debit' => abs($item->selisih), 'kredit' => 0]
-                        : ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => abs($item->selisih)];
-                    $jurnalLines[] = $item->selisih > 0
-                        ? ['akun_kode' => '520-08', 'debit' => 0, 'kredit' => abs($item->selisih)]
-                        : ['akun_kode' => '520-08', 'debit' => abs($item->selisih), 'kredit' => 0];
+                    $hargaBeli = (float) ($item->produk?->harga_beli ?? 0);
+                    $nominal = round(abs($item->selisih) * $hargaBeli, 2);
+
+                    if ($nominal > 0) {
+                        $jurnalLines[] = $item->selisih > 0
+                            ? ['akun_kode' => '130-01', 'debit' => $nominal, 'kredit' => 0]
+                            : ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $nominal];
+                        $jurnalLines[] = $item->selisih > 0
+                            ? ['akun_kode' => '520-08', 'debit' => 0, 'kredit' => $nominal]
+                            : ['akun_kode' => '520-08', 'debit' => $nominal, 'kredit' => 0];
+                    }
 
                     $totalSelisihAbs += abs($item->selisih);
                 }
@@ -618,11 +627,34 @@ class WmsController extends Controller
     // [API: WMS-10] CRUD PO + ubah status
     public function indexPo(Request $request)
     {
+        $cabangId = session('cabang_id');
+        $query = PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk']);
+
+        if ($cabangId) {
+            $query->whereHas('gudangTujuan', fn ($q) => $q->where('cabang_id', $cabangId));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
         return $this->success(
-            PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk'])
-                ->latest()->paginate(20),
+            $query->latest()->paginate(20),
             'Daftar PO berhasil dimuat'
         );
+    }
+
+    public function showPo(Request $request, $id)
+    {
+        $cabangId = session('cabang_id');
+        $po = PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk', 'items.skuVariant', 'pembayaran.user'])
+            ->findOrFail($id);
+
+        if ($cabangId && $po->gudangTujuan && (int) $po->gudangTujuan->cabang_id !== (int) $cabangId) {
+            return $this->error('PO bukan milik cabang aktif', 403);
+        }
+
+        return $this->success($po, 'Detail PO berhasil dimuat');
     }
 
     public function storePo(Request $request)
@@ -727,19 +759,172 @@ class WmsController extends Controller
         return $this->success($produk->fresh(), 'Barcode berhasil digenerate');
     }
 
-    // [API: WMS-12] Bayar PO
+    // [API: WMS-12] Bayar PO (Hanya role dengan hak akses utang/akuntansi)
     public function bayarPo(Request $request, $id)
     {
-        $request->validate(['jumlah' => 'required|numeric|min:1']);
+        $user = auth()->user();
+        abort_unless(
+            $user && ($user->hasRole('super-admin') || $user->can('utang.manage') || $user->can('akunting.create') || $user->hasRole('akuntan') || $user->hasRole('keuangan')),
+            403,
+            'Hanya pengguna dengan izin akuntansi/keuangan yang berhak memproses pembayaran PO.'
+        );
+
+        $request->validate([
+            'jumlah' => 'required|numeric|min:1',
+            'akun_kas_bank' => 'nullable|string',
+        ]);
+
+        $po = PurchaseOrder::with('gudangTujuan')->findOrFail($id);
+        $cabangId = session('cabang_id');
+        if ($cabangId && $po->gudangTujuan && (int) $po->gudangTujuan->cabang_id !== (int) $cabangId) {
+            return $this->error('PO bukan milik cabang aktif', 403);
+        }
 
         try {
             $po = app(PurchaseOrderService::class)->bayarPO(
-                PurchaseOrder::findOrFail($id),
+                $po,
                 (float) $request->jumlah,
-                auth()->id()
+                auth()->id(),
+                $request->input('akun_kas_bank', '110-01')
             );
 
             return $this->success($po, 'Pembayaran PO tercatat — sisa utang terupdate');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+    }
+
+    // ============================================================
+    // [API: WMS-GRN] Goods Received Note (Penerimaan Barang PO)
+    // ============================================================
+
+    public function indexGrn(Request $request)
+    {
+        $cabangId = session('cabang_id');
+        $query = Grn::with(['purchaseOrder.supplier', 'gudang', 'user'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId));
+
+        if ($request->filled('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('search')) {
+            $term = $request->search;
+            $query->where(function ($q) use ($term) {
+                $q->where('no_grn', 'like', "%{$term}%")
+                    ->orWhereHas('purchaseOrder', fn ($q2) => $q2->where('no_po', 'like', "%{$term}%"));
+            });
+        }
+
+        return $this->success($query->latest()->paginate(20), 'Daftar GRN berhasil dimuat');
+    }
+
+    public function showGrn(Request $request, $id)
+    {
+        $cabangId = session('cabang_id');
+        $grn = Grn::with(['purchaseOrder.supplier', 'purchaseOrder.items.produk', 'gudang', 'user'])
+            ->findOrFail($id);
+
+        if ($cabangId && (int) $grn->cabang_id !== (int) $cabangId) {
+            return $this->error('GRN bukan milik cabang aktif', 403);
+        }
+
+        return $this->success($grn, 'Detail GRN berhasil dimuat');
+    }
+
+    public function storeGrn(Request $request)
+    {
+        $request->validate([
+            'po_id' => 'required|exists:purchase_order,id',
+            'item_received' => 'required|array|min:1',
+            'sn' => 'nullable|array',
+            'catatan' => 'nullable|string',
+        ]);
+
+        $po = PurchaseOrder::with('gudangTujuan')->findOrFail($request->po_id);
+        $cabangId = session('cabang_id');
+        if ($cabangId && $po->gudangTujuan && (int) $po->gudangTujuan->cabang_id !== (int) $cabangId) {
+            return $this->error('PO bukan milik cabang aktif', 403);
+        }
+
+        try {
+            $grn = app(GrnService::class)->inputGudang(
+                $po,
+                $request->item_received,
+                auth()->id(),
+                $request->input('sn', [])
+            );
+
+            if ($request->filled('catatan')) {
+                $grn->update(['catatan' => $request->catatan]);
+            }
+
+            return $this->success(
+                $grn->load(['purchaseOrder', 'gudang']),
+                $grn->status === 'terima'
+                    ? 'GRN berhasil diterima — stok bertambah dan pembukuan tercatat'
+                    : 'GRN tersimpan sebagai draft — menunggu approval selisih',
+                201
+            );
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+    }
+
+    public function approveGrn(Request $request, $id)
+    {
+        abort_unless(auth()->user()?->can('approve-workflow'), 403, 'Anda tidak memiliki hak akses persetujuan workflow');
+
+        $grn = Grn::findOrFail($id);
+        $cabangId = session('cabang_id');
+        if ($cabangId && (int) $grn->cabang_id !== (int) $cabangId) {
+            return $this->error('GRN bukan milik cabang aktif', 403);
+        }
+
+        try {
+            $pending = ApprovalRequest::where('entity_type', 'grn')
+                ->where('entity_id', $grn->id)
+                ->where('status', 'pending')
+                ->first();
+
+            if ($pending) {
+                app(ApprovalService::class)->proses($pending->id, 'approved', auth()->id(), $request->input('catatan'));
+                $grn = $grn->fresh();
+            } else {
+                $grn = app(GrnService::class)->setujuiGrn($grn->id, auth()->id());
+            }
+
+            return $this->success($grn, 'GRN berhasil disetujui — stok dan jurnal tercatat');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+    }
+
+    public function rejectGrn(Request $request, $id)
+    {
+        abort_unless(auth()->user()?->can('approve-workflow'), 403, 'Anda tidak memiliki hak akses persetujuan workflow');
+        $request->validate(['catatan' => 'required|string|max:500']);
+
+        $grn = Grn::findOrFail($id);
+        $cabangId = session('cabang_id');
+        if ($cabangId && (int) $grn->cabang_id !== (int) $cabangId) {
+            return $this->error('GRN bukan milik cabang aktif', 403);
+        }
+
+        try {
+            $pending = ApprovalRequest::where('entity_type', 'grn')
+                ->where('entity_id', $grn->id)
+                ->where('status', 'pending')
+                ->first();
+
+            if ($pending) {
+                app(ApprovalService::class)->proses($pending->id, 'rejected', auth()->id(), $request->catatan);
+                $grn = $grn->fresh();
+            } else {
+                $grn = app(GrnService::class)->tolakGrn($grn->id, auth()->id(), $request->catatan);
+            }
+
+            return $this->success($grn, 'GRN berhasil ditolak');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 422);
         }

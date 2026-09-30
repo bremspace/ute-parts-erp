@@ -2,6 +2,8 @@
 
 namespace App\Modules\Wms\Services;
 
+use App\Models\User;
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Wms\Models\Grn;
@@ -89,7 +91,7 @@ class PurchaseOrderService
 
             // Jurnal
             $totalHpp = round($totalHpp, 2);
-            $akunUtang = $po->metode_bayar === 'kredit' ? '210-01' : '110-01';
+            $akunKas = $po->akun_kas_bank ?: '110-01';
             $jurnalLines = [
                 ['akun_kode' => '130-01', 'debit' => $totalHpp, 'kredit' => 0], // Persediaan
             ];
@@ -97,7 +99,7 @@ class PurchaseOrderService
             if ($po->metode_bayar === 'kredit') {
                 $jurnalLines[] = ['akun_kode' => '210-01', 'debit' => 0, 'kredit' => $totalHpp]; // Utang Usaha
             } else {
-                $jurnalLines[] = ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => $totalHpp]; // Kas
+                $jurnalLines[] = ['akun_kode' => $akunKas, 'debit' => 0, 'kredit' => $totalHpp]; // Kas/Bank
             }
 
             $this->jurnalService->post(
@@ -145,7 +147,7 @@ class PurchaseOrderService
         });
     }
 
-    public function bayarPO(PurchaseOrder $po, float $jumlah, ?int $userId): PurchaseOrder
+    public function bayarPO(PurchaseOrder $po, float $jumlah, ?int $userId, string $akunKasBank = '110-01'): PurchaseOrder
     {
         if ($po->status !== 'diterima' || $po->sisa <= 0.01) {
             throw new \Exception('PO ini tidak memiliki sisa utang untuk dibayar');
@@ -155,7 +157,7 @@ class PurchaseOrderService
             throw new \Exception('Pembayaran melebihi sisa utang PO');
         }
 
-        return DB::transaction(function () use ($po, $jumlah, $userId) {
+        return DB::transaction(function () use ($po, $jumlah, $userId, $akunKasBank) {
             // [B-10b/P1-6] Kunci baris PO + cek ulang sisa — pembayaran paralel
             // (double-submit / kasir lain) tidak boleh melebihi sisa utang.
             $po = PurchaseOrder::whereKey($po->id)->lockForUpdate()->firstOrFail();
@@ -168,6 +170,9 @@ class PurchaseOrderService
                 throw new \Exception('Pembayaran melebihi sisa utang PO');
             }
 
+            $sisaSebelum = $po->sisa;
+            $totalDibayarSebelum = (float) $po->total_dibayar;
+
             PembayaranSupplier::create([
                 'po_id' => $po->id,
                 'jumlah' => $jumlah,
@@ -176,7 +181,7 @@ class PurchaseOrderService
                 'keterangan' => "Pembayaran PO {$po->no_po}",
             ]);
 
-            $po->update(['total_dibayar' => $po->total_dibayar + $jumlah]);
+            $po->update(['total_dibayar' => $totalDibayarSebelum + $jumlah]);
 
             // [T-10] Sinkron record Utang (AP): jumlah_dibayar + status
             $utang = Utang::where('referensi_tipe', PurchaseOrder::class)
@@ -190,14 +195,19 @@ class PurchaseOrderService
                 ]);
             }
 
-            // Jurnal: Utang Usaha (210-01) debit / Kas (110-01) kredit
+            // Jurnal: Utang Usaha (210-01) debit / Kas/Bank kredit
+            $akunValid = AkunCOA::where('kode', $akunKasBank)
+                ->where('is_active', true)
+                ->whereIn('kelompok', ['kas', 'bank'])
+                ->exists();
+            $akunKredit = $akunValid ? $akunKasBank : '110-01';
             $this->jurnalService->post(
                 $this->jurnalService->generateNoJurnal('bayar', $po->gudangTujuan?->cabang_id),
                 now(),
                 'manual',
                 [
                     ['akun_kode' => '210-01', 'debit' => $jumlah, 'kredit' => 0],
-                    ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => $jumlah],
+                    ['akun_kode' => $akunKredit, 'debit' => 0, 'kredit' => $jumlah],
                 ],
                 "Bayar PO {$po->no_po} — Rp ".number_format($jumlah, 0, ',', '.'),
                 $po->gudangTujuan?->cabang_id,
@@ -207,6 +217,18 @@ class PurchaseOrderService
                 PurchaseOrder::class,
                 $po->id
             );
+
+            // [AUDIT] Catat aktivitas pembayaran pada PO
+            $activity = activity('wms')->performedOn($po);
+            if ($userId && ($user = User::find($userId))) {
+                $activity->causedBy($user);
+            }
+            $activity->withProperties([
+                'jumlah' => $jumlah,
+                'total_dibayar' => $totalDibayarSebelum + $jumlah,
+                'sisa' => max(0, $sisaSebelum - $jumlah),
+                'akun_pembayaran' => $akunKredit,
+            ])->log("Pembayaran PO {$po->no_po} dicatat sebesar Rp ".number_format($jumlah, 0, ',', '.'));
 
             return $po;
         });

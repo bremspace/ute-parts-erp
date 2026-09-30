@@ -10,11 +10,13 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Traits\ParsesNominal;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class CrmDashboard extends Component
 {
+    use ParsesNominal;
     use WithPagination;
 
     public string $search = '';
@@ -173,6 +175,8 @@ class CrmDashboard extends Component
         if (! $this->boleh('tier.manage', 'Anda tidak memiliki izin mengelola tier.')) {
             return;
         }
+
+        $this->tierForm['min_belanja_12bulan'] = $this->parseNominal($this->tierForm['min_belanja_12bulan'] ?? 0);
 
         $this->validate([
             'tierForm.nama' => 'required|string|max:255',

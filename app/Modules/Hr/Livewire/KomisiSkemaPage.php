@@ -3,6 +3,7 @@
 namespace App\Modules\Hr\Livewire;
 
 use App\Modules\Reseller\Models\KomisiSkema;
+use App\Traits\ParsesNominal;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -13,6 +14,8 @@ use Livewire\Component;
  */
 class KomisiSkemaPage extends Component
 {
+    use ParsesNominal;
+
     public string $filterAktor = 'semua';
 
     public string $filterTrigger = 'semua';
@@ -56,6 +59,9 @@ class KomisiSkemaPage extends Component
 
     public function simpan(): void
     {
+        $this->nilai = (string) $this->parseNominal($this->nilai);
+        $this->minAmount = (string) $this->parseNominal($this->minAmount);
+
         $this->validate();
 
         $data = [

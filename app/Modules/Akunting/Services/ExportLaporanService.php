@@ -319,14 +319,21 @@ class ExportLaporanService
     private function dataStok(?int $cabangId): array
     {
         $rows = [['LAPORAN STOK'], []];
-        $rows[] = ['PRODUK', 'GUDANG', 'QTY', 'MIN'];
+        $rows[] = ['BARCODE', 'SKU', 'PRODUK', 'GUDANG', 'QTY', 'MIN'];
 
-        $stoks = StokItem::with('produk', 'gudang');
+        $stoks = StokItem::with(['produk.skuVariants', 'gudang']);
         if ($cabangId) {
             $stoks->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId));
         }
         foreach ($stoks->get() as $s) {
-            $rows[] = [$s->produk?->nama, $s->gudang?->nama, $s->jumlah, $s->jumlah_minimum];
+            $rows[] = [
+                $s->produk?->barcode ?? '',
+                $s->produk?->skuVariants?->first()?->sku ?? '',
+                $s->produk?->nama,
+                $s->gudang?->nama,
+                $s->jumlah,
+                $s->jumlah_minimum,
+            ];
         }
 
         return $rows;

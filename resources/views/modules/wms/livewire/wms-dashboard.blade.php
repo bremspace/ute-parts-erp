@@ -7,7 +7,7 @@
                 $wire.set('activeTab', 'stok');
             } else if (modul === 'operasional' && !['transfer', 'opname'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'transfer');
-            } else if (modul === 'pengadaan' && !['po', 'grn'].includes(@js($activeTab))) {
+            } else if (modul === 'pengadaan' && !['po', 'grn', 'retur'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'po');
             }
         }
@@ -15,7 +15,7 @@
     x-init="$watch('$wire.activeTab', value => {
         if (['stok', 'produk'].includes(value)) subModul = 'inventori';
         else if (['transfer', 'opname'].includes(value)) subModul = 'operasional';
-        else if (['po', 'grn'].includes(value)) subModul = 'pengadaan';
+        else if (['po', 'grn', 'retur'].includes(value)) subModul = 'pengadaan';
     })"
 >
     <!-- Header with 2-Tier Sub-Modul Tabs and Actions (No Overlapping on Mobile/Desktop) -->
@@ -161,6 +161,12 @@
                     >
                         GRN
                     </button>
+                    <button
+                        wire:click="$set('activeTab', 'retur')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'retur' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        Retur Pembelian
+                    </button>
                 </div>
             </div>
 
@@ -244,5 +250,10 @@
     <!-- TAB 5: GRN (penerimaan barang) [F2-2] -->
     <div @unless($activeTab === 'grn') class="hidden" @endunless>
         @livewire(\App\Modules\Wms\Livewire\GrnTab::class)
+    </div>
+
+    <!-- TAB 6: RETUR PEMBELIAN -->
+    <div @unless($activeTab === 'retur') class="hidden" @endunless>
+        @livewire(\App\Modules\Wms\Livewire\ReturnPembelianTab::class)
     </div>
 </div>

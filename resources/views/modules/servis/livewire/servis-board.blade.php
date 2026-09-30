@@ -4,7 +4,7 @@
     <!-- ===== TOOLBAR ===== -->
     <div class="flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center justify-between mb-3 flex-shrink-0">
         <div class="flex-1 min-w-0">
-            <x-prism.barcode-scan-input placeholder="Cari tiket: no. tiket, jenis HP, nama pelanggan..." model="search" />
+            <x-prism.barcode-scan-input placeholder="Scan barcode tiket / cari no. tiket, HP, nama..." model="search" title="Scan Barcode / QR Tiket Servis" />
         </div>
 
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">

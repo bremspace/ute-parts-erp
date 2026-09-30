@@ -163,14 +163,14 @@
 
                     <!-- Info -->
                     <div class="p-3.5 flex flex-col flex-1">
-                        <span class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold truncate">{{ ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? $p->kategori }}</span>
+                        <span class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold truncate">{{ ($p->relationLoaded('kategoriRelasi') ? $p->kategoriRelasi?->nama : null) ?? (is_array($p->kategori) ? implode(', ', $p->kategori) : (string) $p->kategori) }}</span>
                         <h3 class="text-sm font-bold text-ink-900 mt-1 line-clamp-2 leading-snug group-hover:text-up-primary transition-colors">{{ $p->nama }}</h3>
                         @if($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty())
                             <p class="text-[10px] text-up-primary font-semibold mt-1 truncate">
                                 📱 {{ $p->tipeHps->pluck('model')->take(3)->join(', ') }}
                             </p>
                         @elseif($p->brand_kompatibel)
-                            <p class="text-[11px] text-ink-400 mt-0.5">{{ $p->brand_kompatibel }} {{ $p->model_kompatibel }}</p>
+                            <p class="text-[11px] text-ink-400 mt-0.5">{{ is_array($p->brand_kompatibel) ? implode(' ', $p->brand_kompatibel) : (string) $p->brand_kompatibel }} {{ is_array($p->model_kompatibel) ? implode(' ', $p->model_kompatibel) : (string) $p->model_kompatibel }}</p>
                         @endif
 
                         <div class="mt-auto pt-3">

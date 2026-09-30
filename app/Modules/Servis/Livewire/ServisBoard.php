@@ -15,6 +15,7 @@ use App\Modules\Servis\Services\ServisStateMachine;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Services\NomorSeriService;
+use App\Traits\ParsesNominal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Livewire\Component;
@@ -22,6 +23,7 @@ use Livewire\WithPagination;
 
 class ServisBoard extends Component
 {
+    use ParsesNominal;
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
@@ -494,33 +496,6 @@ class ServisBoard extends Component
     }
 
     // --- Estimasi ---
-    private function parseNominal($val): float
-    {
-        if (is_int($val) || is_float($val)) {
-            return (float) $val;
-        }
-
-        if (is_string($val)) {
-            $val = trim($val);
-            if ($val === '') {
-                return 0.0;
-            }
-
-            if (str_contains($val, ',')) {
-                $val = str_replace('.', '', $val);
-                $val = str_replace(',', '.', $val);
-            } else {
-                $val = str_replace('.', '', $val);
-            }
-
-            $cleaned = preg_replace('/[^0-9.]/', '', $val);
-
-            return is_numeric($cleaned) ? (float) $cleaned : 0.0;
-        }
-
-        return (float) ($val ?? 0);
-    }
-
     public function estimasiRowBaru(string $tipe = 'jasa'): array
     {
         return [
@@ -559,7 +534,9 @@ class ServisBoard extends Component
 
         $row = &$this->estimasiItems[$idx];
 
-        if ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
+        if ($field === 'harga') {
+            $row['harga'] = $this->parseNominal($value);
+        } elseif ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
             if ($value) {
                 $produk = Produk::find($value);
                 if ($produk) {
@@ -595,6 +572,7 @@ class ServisBoard extends Component
             $qty = max(1, (int) ($row['qty'] ?? 1));
             $harga = $this->parseNominal($row['harga'] ?? 0);
             $this->estimasiItems[$i]['qty'] = $qty;
+            $this->estimasiItems[$i]['harga'] = $harga;
             $this->estimasiItems[$i]['subtotal'] = $qty * $harga;
         }
 
@@ -868,7 +846,9 @@ class ServisBoard extends Component
 
         $row = &$this->pekerjaanItems[$idx];
 
-        if ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
+        if ($field === 'harga') {
+            $row['harga'] = $this->parseNominal($value);
+        } elseif ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
             if ($value) {
                 $produk = Produk::find($value);
                 if ($produk) {

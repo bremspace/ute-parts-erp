@@ -1,74 +1,151 @@
 // [T-34] [ADR 0011] Ribuan separator untuk input nominal (format Indonesia, mis. 1.000.000)
 // Design:
-// - Model TETAP bersih (angka mentah). Urutan dipastikan oleh Livewire: wire:model di-bind
-//   sebagai x-model lewat Alpine.bind saat interceptInit → x-model SELALU proses lebih dulu
-//   daripada atribut x-* element (termasuk x-format-number). Jadi saat 'input', x-model sudah
-//   membaca el.value mentah & menulis model; listener ini hanya memformat ulang tampilan.
-// - Paste '1.000.000' / '1000000': x-model sempat menulis versi berformat → kita koreksi
-//   dengan el._x_model.set(toRaw(...)) sehingga backend selalu terima '1000000'.
-// - Perubahan model dari luar (setQuickCash, $set, respons server): effect reaktif membaca
-//   el._x_model.get() → tampilan diformat ulang (berjalan SETELAH effect x-model yang
-//   menulis nilai mentah, karena terdaftar setelahnya).
-// - Pendukung desimal: koma = pemisah desimal (1.234,5), titik berkelompok-3 = ribuan.
+// - Model TETAP bersih (angka mentah).
+// - Input event memformat tampilan dengan pemisah ribuan titik (IDR).
+// - Pemisah desimal HANYA koma (mis. 1.000.000,50). Titik selalu pemisah ribuan.
+// - Menjaga posisi kursor agar tidak melompat ke akhir input saat mengetik.
+// - Model dari luar (Livewire, server, MySQL decimal "50000.00") dinormalisasi rapi.
+
 document.addEventListener('alpine:init', () => {
     Alpine.directive('format-number', (el, { expression, modifiers }, { effect, cleanup }) => {
-        // Pisahkan string input menjadi bagian integer + desimal.
-        const split = (s) => {
-            s = String(s ?? '');
-            if (!s) return { int: '', dec: '' };
-            let dec = '';
+        // Parsing input DOM dari pengguna (saat mengetik atau paste)
+        const parseDom = (val) => {
+            if (val === null || val === undefined) return { int: '', dec: null };
+            val = String(val).trim();
+            if (!val) return { int: '', dec: null };
 
-            // Koma selalu pemisah desimal (konvensi Indonesia: "1.000.000,50").
-            const comma = s.lastIndexOf(',');
-            if (comma !== -1 && /\d/.test(s.slice(comma + 1))) {
-                dec = s.slice(comma + 1).replace(/[^\d]/g, '');
-                s = s.slice(0, comma);
-            } else {
-                // Tanpa koma: titik terakhir dianggap desimal HANYA jika bukan pengelompok
-                // ribuan (semua grup setelah grup pertama berisi 3 digit).
-                const dot = s.lastIndexOf('.');
-                if (dot !== -1 && /\d/.test(s.slice(dot + 1))) {
-                    const tail = s.slice(dot + 1);
-                    const groups = s.slice(0, dot).split('.');
-                    const groupedAsThousands = groups.slice(1).every((g) => g.length === 3);
-                    if (!(tail.length === 3 && groupedAsThousands)) {
-                        dec = tail.replace(/[^\d]/g, '');
-                        s = s.slice(0, dot);
-                    }
-                }
+            // Koma = pemisah desimal khas Indonesia (mis. "50.000,50" atau "50,5")
+            const commaIdx = val.lastIndexOf(',');
+            if (commaIdx !== -1) {
+                const intPart = val.slice(0, commaIdx).replace(/[^\d]/g, '');
+                const decPart = val.slice(commaIdx + 1).replace(/[^\d]/g, '');
+                return { int: intPart, dec: decPart };
             }
-            return { int: s.replace(/[^\d]/g, ''), dec };
+
+            // Tidak ada koma: semua titik adalah pemisah ribuan (atau sisa dari format sebelumnya)
+            const intPart = val.replace(/[^\d]/g, '');
+            return { int: intPart, dec: null };
         };
 
-        // Tampilan: integer diberi titik ribuan; desimal dikembalikan dengan koma.
-        const toDisplay = (s) => {
-            const { int, dec } = split(s);
-            const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-            return dec ? grouped + ',' + dec : grouped;
+        // Parsing nilai yang datang dari model Alpine / Livewire / database
+        const parseModel = (val) => {
+            if (val === null || val === undefined) return { int: '', dec: null };
+            if (typeof val === 'number') {
+                if (isNaN(val)) return { int: '', dec: null };
+                const s = String(val);
+                if (s.includes('.')) {
+                    const [intPart, decPart] = s.split('.');
+                    return { int: intPart, dec: decPart };
+                }
+                return { int: s, dec: null };
+            }
+            let s = String(val).trim();
+            if (!s) return { int: '', dec: null };
+
+            // Koma desimal: "1.000.000,50"
+            const commaIdx = s.lastIndexOf(',');
+            if (commaIdx !== -1) {
+                const intPart = s.slice(0, commaIdx).replace(/[^\d]/g, '');
+                const decPart = s.slice(commaIdx + 1).replace(/[^\d]/g, '');
+                return { int: intPart, dec: decPart };
+            }
+
+            // Lebih dari 1 titik = pasti ribuan bertitik ("1.000.000")
+            const dotCount = (s.match(/\./g) || []).length;
+            if (dotCount > 1) {
+                return { int: s.replace(/[^\d]/g, ''), dec: null };
+            }
+
+            if (dotCount === 1) {
+                const [intPart, decPart] = s.split('.');
+                // Jika bagian setelah titik >= 3 digit (mis. "5.000", "5.0000", "50.0000"), itu ribuan
+                if (decPart.length >= 3) {
+                    return { int: s.replace(/[^\d]/g, ''), dec: null };
+                }
+                // Jika desimal hanya 0 (cth ".00" atau ".0"), perlakukan sebagai rupiah bulat
+                if (/^0+$/.test(decPart)) {
+                    return { int: intPart.replace(/[^\d]/g, ''), dec: null };
+                }
+                // Float 1-2 desimal (cth "1250.50" atau "10.5")
+                return { int: intPart.replace(/[^\d]/g, ''), dec: decPart.replace(/[^\d]/g, '') };
+            }
+
+            return { int: s.replace(/[^\d]/g, ''), dec: null };
         };
 
-        // Nilai mentah untuk model: hanya digit; desimal dengan titik ("1000000" / "1000000.50").
-        const toRaw = (s) => {
-            const { int, dec } = split(s);
-            return dec ? int + '.' + dec : int;
+        const formatDisplay = (parsed) => {
+            const { int, dec } = parsed;
+            if (!int && dec === null) return '';
+            const grouped = (int || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            return dec !== null ? grouped + ',' + dec : grouped;
+        };
+
+        const formatRaw = (parsed) => {
+            const { int, dec } = parsed;
+            if (!int && dec === null) return '';
+            return dec !== null ? (int || '0') + '.' + dec : int;
         };
 
         const onInput = () => {
-            // x-model (wire:model) sudah menulis model lebih dulu; koreksi jika sempat
-            // menerima nilai berformat (kasus paste/isi "1.000.000").
-            if (el._x_model) el._x_model.set(toRaw(el.value));
-            el.value = toDisplay(el.value);
-        };
-        el.addEventListener('input', onInput);
+            const prevVal = el.value;
+            const cursor = el.selectionStart ?? prevVal.length;
+            // Hitung berapa banyak digit sebelum kursor
+            const digitsBeforeCursor = prevVal.slice(0, cursor).replace(/[^\d]/g, '').length;
 
-        // Sinkron model → tampilan: quick-cash, $set(...), respons server, inisialisasi.
+            const parsed = parseDom(prevVal);
+            const display = formatDisplay(parsed);
+            const raw = formatRaw(parsed);
+
+            // Update model x-model / wire:model dengan angka bersih
+            if (el._x_model) {
+                el._x_model.set(raw);
+            }
+
+            // Update tampilan input
+            el.value = display;
+
+            // Kembalikan posisi kursor agar tidak melompat ke ujung
+            if (el.setSelectionRange && typeof cursor === 'number') {
+                let newCursor = display.length;
+                let digitCount = 0;
+                if (digitsBeforeCursor === 0) {
+                    newCursor = 0;
+                } else {
+                    for (let i = 0; i < display.length; i++) {
+                        if (/\d/.test(display[i])) {
+                            digitCount++;
+                        }
+                        if (digitCount === digitsBeforeCursor) {
+                            newCursor = i + 1;
+                            break;
+                        }
+                    }
+                }
+                el.setSelectionRange(newCursor, newCursor);
+            }
+        };
+
+        el.addEventListener('input', onInput, true);
+
+        // Sinkronisasi dari model ke tampilan (inisialisasi, respons server, quick cash)
         effect(() => {
             const m = el._x_model;
             if (!m) return;
             const v = m.get();
-            el.value = toDisplay(v);
+
+            // Jika sedang diketik pengguna dan nilainya cocok, jangan timpa tampilan
+            if (document.activeElement === el) {
+                const currentRaw = formatRaw(parseDom(el.value));
+                const modelRaw = formatRaw(parseModel(v));
+                if (currentRaw === modelRaw || currentRaw === String(v ?? '')) {
+                    return;
+                }
+            }
+
+            const parsed = parseModel(v);
+            el.value = formatDisplay(parsed);
         });
 
-        cleanup(() => el.removeEventListener('input', onInput));
+        cleanup(() => el.removeEventListener('input', onInput, true));
     });
 });

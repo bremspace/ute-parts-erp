@@ -12,6 +12,7 @@ use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Reseller\Services\KomisiService;
@@ -21,6 +22,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\StokDeductionService;
+use App\Traits\ParsesNominal;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -28,6 +30,7 @@ use Livewire\Component;
 
 class PosKasir extends Component
 {
+    use ParsesNominal;
     use PunyaRiwayatAktivitas;
 
     /** [B-02/P1-5] Jumlah produk per muat katalog (load-more). */
@@ -76,14 +79,14 @@ class PosKasir extends Component
 
     public string $metodeBayar = 'tunai'; // tunai, transfer, qris, split
 
-    public float $jumlahBayar = 0.0;
+    public mixed $jumlahBayar = 0.0;
 
     public string $catatan = '';
 
     // Split payment details
-    public float $splitTunai = 0.0;
+    public mixed $splitTunai = 0.0;
 
-    public float $splitNonTunai = 0.0;
+    public mixed $splitNonTunai = 0.0;
 
     public string $splitMetodeNonTunai = 'qris';
 
@@ -96,6 +99,17 @@ class PosKasir extends Component
 
     // Riwayat transaksi modal state
     public bool $showRiwayatTransaksiModal = false;
+
+    // Retur Penjualan modal state
+    public bool $showReturPenjualanModal = false;
+
+    public ?int $selectedTransaksiReturId = null;
+
+    public array $returItemInputs = [];
+
+    public string $returAlasan = '';
+
+    public string $returMetodePengembalian = 'kas';
 
     // [T-03] Transaksi ditahan (park)
     public bool $showDitahanPanel = false;
@@ -352,7 +366,7 @@ class PosKasir extends Component
     }
 
     /** [T-07] Enter = scan barcode/SKU exact-match → auto add ke keranjang. */
-    public function scanEnter()
+    public function scanEnter(): void
     {
         $q = trim($this->search);
         if ($q === '') {
@@ -368,24 +382,51 @@ class PosKasir extends Component
 
         if ($variant) {
             $this->addToCart($variant->produk_id, $variant->id);
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Item '{$variant->nama_varian}' ditambahkan ke keranjang.",
+            ]);
             $this->search = '';
 
             return;
         }
 
-        // 2. Cek exact match barcode produk, ID, atau nama produk
+        // 2. Cek exact match barcode produk, ID (aman non-overflow), atau nama produk
         $produk = Produk::where('is_active', true)
             ->where(function ($query) use ($q) {
                 $query->where('barcode', $q)
-                    ->orWhere('id', $q)
+                    ->when(is_numeric($q) && (float) $q <= 2147483647, fn ($sub) => $sub->orWhere('id', (int) $q))
                     ->orWhere('nama', $q);
             })
             ->first();
 
         if ($produk) {
             $this->addToCart($produk->id);
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Produk '{$produk->nama}' ditambahkan ke keranjang.",
+            ]);
             $this->search = '';
+
+            return;
         }
+
+        // Jika tidak ditemukan: KOSONGKAN kembali search agar katalog kasir TIDAK hilang/freeze
+        $this->search = '';
+
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => "Barcode/SKU '{$q}' belum terdaftar di sistem.",
+        ]);
+
+        $this->dispatch('ute:barcode-not-found', ['code' => $q]);
+    }
+
+    /** Scan barcode langsung dari scanner kamera mobile / hardware keyboard wedge. */
+    public function scanBarcodeDirect(string $code): void
+    {
+        $this->search = trim($code);
+        $this->scanEnter();
     }
 
     /**
@@ -809,6 +850,21 @@ class PosKasir extends Component
         $this->jumlahBayar = $nominal;
     }
 
+    public function updatedJumlahBayar($value): void
+    {
+        $this->jumlahBayar = $this->parseNominal($value);
+    }
+
+    public function updatedSplitTunai($value): void
+    {
+        $this->splitTunai = $this->parseNominal($value);
+    }
+
+    public function updatedSplitNonTunai($value): void
+    {
+        $this->splitNonTunai = $this->parseNominal($value);
+    }
+
     /**
      * [B-02/P0-1] Gate stok sebelum potong: seluruh item keranjang harus punya
      * stok >= qty di gudang aktif. Tanpa gate ini, kegagalan baru ketahuan
@@ -870,6 +926,10 @@ class PosKasir extends Component
 
             return;
         }
+
+        $this->jumlahBayar = (float) $this->parseNominal($this->jumlahBayar);
+        $this->splitTunai = (float) $this->parseNominal($this->splitTunai);
+        $this->splitNonTunai = (float) $this->parseNominal($this->splitNonTunai);
 
         if ($this->metodeBayar === 'tunai' && $this->jumlahBayar < $this->totalAkhir) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Jumlah bayar kurang dari total belanja']);
@@ -1122,6 +1182,95 @@ class PosKasir extends Component
 
         $this->completedTransactionId = $transaksi->id;
         $this->showReceiptModal = true;
+    }
+
+    public function bukaModalRetur(int $transaksiId): void
+    {
+        $this->selectedTransaksiReturId = $transaksiId;
+        $this->returAlasan = '';
+        $this->returMetodePengembalian = 'kas';
+        $this->returItemInputs = [];
+
+        $transaksi = Transaksi::with(['items.produk'])->find($transaksiId);
+        if (! $transaksi) {
+            return;
+        }
+
+        foreach ($transaksi->items as $item) {
+            $this->returItemInputs[$item->id] = [
+                'transaksi_item_id' => $item->id,
+                'produk_nama' => $item->produk?->nama ?? 'Produk',
+                'qty_beli' => (float) $item->jumlah,
+                'harga_final' => (float) ($item->harga_final ?? $item->harga_satuan ?? 0),
+                'jumlah' => 0,
+                'sn_raw' => '',
+            ];
+        }
+
+        $this->showReturPenjualanModal = true;
+    }
+
+    public function tutupModalRetur(): void
+    {
+        $this->showReturPenjualanModal = false;
+        $this->selectedTransaksiReturId = null;
+        $this->returItemInputs = [];
+    }
+
+    public function simpanReturPenjualan(): void
+    {
+        $this->validate([
+            'selectedTransaksiReturId' => 'required|exists:transaksi,id',
+            'returAlasan' => 'required|string|max:500',
+            'returMetodePengembalian' => 'required|in:kas,piutang,saldo',
+        ]);
+
+        $items = [];
+        foreach ($this->returItemInputs as $item) {
+            $qty = (float) ($item['jumlah'] ?? 0);
+            if ($qty > 0) {
+                $snList = [];
+                if (! empty($item['sn_raw'])) {
+                    $snList = preg_split('/[\r\n,;]+/', (string) $item['sn_raw']) ?: [];
+                    $snList = array_values(array_filter(array_map('trim', $snList)));
+                }
+
+                $items[] = [
+                    'transaksi_item_id' => (int) $item['transaksi_item_id'],
+                    'jumlah' => $qty,
+                    'sn' => $snList,
+                ];
+            }
+        }
+
+        if (empty($items)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih minimal 1 barang dengan jumlah > 0 untuk diretur.']);
+
+            return;
+        }
+
+        $transaksi = Transaksi::findOrFail($this->selectedTransaksiReturId);
+
+        try {
+            $retur = app(ReturnPenjualanService::class)->buatRetur(
+                $transaksi,
+                $items,
+                $this->returAlasan,
+                $this->returMetodePengembalian,
+                auth()->id()
+            );
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => $retur->status === 'selesai'
+                    ? "Retur {$retur->no_return} berhasil diproses — stok bertambah & kas/piutang disesuaikan."
+                    : "Retur {$retur->no_return} dibuat — menunggu approval supervisor.",
+            ]);
+
+            $this->tutupModalRetur();
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     public function getRiwayatTransaksiHariIniProperty()
@@ -1433,20 +1582,7 @@ class PosKasir extends Component
      */
     protected function normalizeNominal(mixed $nilai): float
     {
-        $s = trim((string) ($nilai ?? ''));
-        if ($s === '') {
-            return 0.0;
-        }
-
-        // Pola separator ribuan ID: grup pertama 1-3 digit, sisanya persis 3 digit
-        if (preg_match('/^\d{1,3}(\.\d{3})+(,\d+)?$/', $s)) {
-            $s = str_replace('.', '', $s);
-            $s = str_replace(',', '.', $s);
-        } else {
-            $s = str_replace(',', '.', $s);
-        }
-
-        return (float) $s;
+        return $this->parseNominal($nilai);
     }
 
     public function render()

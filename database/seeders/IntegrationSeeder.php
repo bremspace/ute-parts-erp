@@ -77,10 +77,10 @@ class IntegrationSeeder extends Seeder
     // Role → permission matrix (dari RolesAndPermissionsSeeder)
     private const ROLES = [
         'super-admin' => ['label' => 'Super Admin', 'perms' => '*'],
-        'admin-toko' => ['label' => 'Admin Toko', 'perms' => ['pos.*', 'wms.view', 'wms.transfer', 'servis.*', 'crm.view', 'laporan.cabang', 'approve-workflow', 'lihat-audit-log', 'lihat.harga_beli', 'lihat.margin', 'kelola-hr', 'hr.lihat-sendiri']],
+        'admin-toko' => ['label' => 'Admin Toko', 'perms' => ['pos.*', 'wms.view', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'servis.*', 'crm.view', 'laporan.cabang', 'approve-workflow', 'lihat-audit-log', 'lihat.harga_beli', 'lihat.margin', 'kelola-hr', 'hr.lihat-sendiri']],
         'kasir' => ['label' => 'Kasir', 'perms' => ['pos.create', 'pos.view-own', 'wms.view', 'hr.lihat-sendiri']],
         'teknisi' => ['label' => 'Teknisi', 'perms' => ['servis.view', 'servis.update-status', 'servis.input-sparepart', 'hr.lihat-sendiri']],
-        'staff-gudang' => ['label' => 'Staff Gudang', 'perms' => ['wms.view', 'wms.create', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po', 'hr.lihat-sendiri']],
+        'staff-gudang' => ['label' => 'Staff Gudang', 'perms' => ['wms.view', 'wms.create', 'wms.transfer', 'wms.opname', 'wms.receive-po', 'hr.lihat-sendiri']],
         'finance' => ['label' => 'Finance', 'perms' => ['akunting.*', 'piutang.*', 'utang.*', 'komisi.approve', 'laporan.*', 'approve-workflow', 'lihat-audit-log', 'lihat.harga_beli', 'lihat.margin', 'kelola-hr', 'kelola-payroll', 'payroll.*', 'hr.lihat-sendiri']],
         'marketing' => ['label' => 'Marketing', 'perms' => ['crm.*', 'tier.manage', 'reseller.view', 'hr.lihat-sendiri']],
         'kelola-hr' => ['label' => 'HR Manager', 'perms' => ['kelola-hr', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']],

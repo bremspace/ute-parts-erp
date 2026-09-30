@@ -5,6 +5,7 @@ import '../css/app.css';
 import './theme.js'; // [T-32] Tema dark/light/auto
 import './components/format-number.js'; // [T-34] Ribuan separator input nominal
 import './components/thermal-print.js'; // [T-35] Cetak thermal Bluetooth 58/80mm + fallback web print
+import './components/barcode-scanner.js'; // Barcode scanner engine (hardware keyboard wedge + web mobile camera)
 
 // PWA Service Worker — SATU-SATUNYA registrasi via VitePWA (generateSW, /build/sw.js).
 // Registrasi manual lama `/sw.js` (404) dihapus; virtual module ini menyuntik

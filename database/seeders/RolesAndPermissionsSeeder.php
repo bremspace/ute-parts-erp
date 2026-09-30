@@ -81,7 +81,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminToko = Role::findOrCreate('admin-toko');
         $adminToko->givePermissionTo([
             'pos.create', 'pos.view', 'pos.view-own', 'pos.void',
-            'wms.view', 'wms.transfer',
+            'wms.view', 'wms.transfer', 'wms.opname', 'wms.approve-opname',
             'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
             'crm.view',
             'laporan.cabang',
@@ -115,7 +115,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $staffGudang = Role::findOrCreate('staff-gudang');
         $staffGudang->givePermissionTo([
-            'wms.view', 'wms.create', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po',
+            'wms.view', 'wms.create', 'wms.transfer', 'wms.opname', 'wms.receive-po',
         ]);
 
         $finance = Role::findOrCreate('finance');

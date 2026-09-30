@@ -15,6 +15,7 @@ use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
+use App\Modules\Wms\Livewire\PoTab;
 use App\Modules\Wms\Livewire\ProdukTab;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Gudang;
@@ -993,87 +994,30 @@ class SerialNumberTest extends TestCase
         $this->assertTrue((bool) $baru->sn, 'Flag sn wajib true setelah disimpan via UI');
     }
 
-    // ===== (m) [F2-3/P1] Tambah stok produk sn=true — SN wajib, count = qty, persist tersedia =====
+    // ===== (m) [F2-3/P1] Order PO dari master produk — dispatch ke PO tab =====
 
-    public function test_tambah_stok_produk_sn_wajib_sn_count_sama_dan_persist_tersedia(): void
-    {
-        Queue::fake();
-        $this->actingAs($this->user, 'web');
-        $this->withSession(['cabang_id' => $this->cabang->id]);
-
-        $component = Livewire::test(ProdukTab::class)
-            ->call('openTambahStokModal', $this->produkSn->id)
-            ->assertSet('stokProdukSn', true)
-            ->set('tambahStokForm.gudang_id', $this->gudang->id)
-            ->set('tambahStokForm.qty', 2)
-            ->set('tambahStokForm.harga_beli', 50000)
-            ->set('tambahStokForm.sn', "TSN-1\nTSN-2\nTSN-3"); // 3 ≠ 2
-
-        // Count ≠ qty → ValidationException field-level, tanpa side effect apa pun
-        $component->call('simpanTambahStok')
-            ->assertHasErrors('tambahStokForm.sn')
-            ->assertSet('showTambahStokModal', true);
-        $this->assertSame(0, StokItem::count(), 'Gagal validasi → tanpa stok masuk');
-        $this->assertSame(0, NomorSeri::count());
-        $this->assertSame(0, JurnalAkuntansi::count());
-        $this->assertSame(0, StokLog::count());
-
-        // SN valid (parse koma via NomorSeriService::parseList) → sukses
-        $component->set('tambahStokForm.sn', 'TSN-1,TSN-2')
-            ->call('simpanTambahStok')
-            ->assertHasNoErrors()
-            ->assertSet('showTambahStokModal', false);
-
-        $this->assertEquals(2, StokItem::where('produk_id', $this->produkSn->id)->first()->jumlah);
-        $sns = NomorSeri::where('produk_id', $this->produkSn->id)->get();
-        $this->assertCount(2, $sns);
-        $this->assertEqualsCanonicalizing(['TSN-1', 'TSN-2'], $sns->pluck('nomor_seri')->all());
-        foreach ($sns as $sn) {
-            $this->assertEquals(NomorSeri::STATUS_TERSEDIA, $sn->status, 'SN baru wajib status tersedia');
-            $this->assertEquals((int) $this->cabang->id, (int) $sn->cabang_id, 'SN wajib ter-taut cabang');
-        }
-
-        // Jurnal pembelian tetap balance + StokLog tercatat
-        $this->assertEquals(100000, (float) JurnalAkuntansi::sum('debit'));
-        $this->assertEquals(100000, (float) JurnalAkuntansi::sum('kredit'));
-        $this->assertTrue(
-            StokLog::where('produk_id', $this->produkSn->id)->where('jenis', 'pembelian')->exists()
-        );
-
-        // SN sudah terdaftar → ditolak di dalam transaksi service, stok tidak berubah
-        $component->call('openTambahStokModal', $this->produkSn->id)
-            ->set('tambahStokForm.gudang_id', $this->gudang->id)
-            ->set('tambahStokForm.qty', 1)
-            ->set('tambahStokForm.harga_beli', 50000)
-            ->set('tambahStokForm.sn', 'TSN-1')
-            ->call('simpanTambahStok')
-            ->assertSet('showTambahStokModal', true);
-        $this->assertEquals(2, StokItem::where('produk_id', $this->produkSn->id)->first()->jumlah, 'Tanpa partial stok');
-        $this->assertSame(2, NomorSeri::count());
-        $this->assertEquals(100000, (float) JurnalAkuntansi::sum('debit'), 'Tanpa jurnal dobel');
-    }
-
-    // ===== (n) [F2-3/P1] Tambah stok produk sn=false — tanpa input SN, flow tetap jalan =====
-
-    public function test_tambah_stok_produk_non_sn_tidak_diminta_sn(): void
+    public function test_order_po_dari_master_produk_mengarahkan_ke_po(): void
     {
         Queue::fake();
         $this->actingAs($this->user, 'web');
         $this->withSession(['cabang_id' => $this->cabang->id]);
 
         Livewire::test(ProdukTab::class)
-            ->call('openTambahStokModal', $this->produk->id)
-            ->assertSet('stokProdukSn', false)
-            ->assertDontSee('Nomor Seri (wajib)')
-            ->set('tambahStokForm.gudang_id', $this->gudang->id)
-            ->set('tambahStokForm.qty', 3)
-            ->set('tambahStokForm.harga_beli', 50000)
-            ->call('simpanTambahStok')
-            ->assertSet('showTambahStokModal', false);
+            ->call('orderPo', $this->produkSn->id)
+            ->assertDispatched('order-po-produk', produkId: $this->produkSn->id)
+            ->assertDispatched('wms-pindah-tab', tab: 'po');
+    }
 
-        $this->assertEquals(3, StokItem::where('produk_id', $this->produk->id)->first()->jumlah);
-        $this->assertSame(0, NomorSeri::count(), 'Produk sn=false → tanpa baris SN');
-        $this->assertSame(0, StokItem::where('produk_id', $this->produkSn->id)->count());
+    public function test_po_tab_menerima_order_po_produk(): void
+    {
+        Queue::fake();
+        $this->actingAs($this->user, 'web');
+        $this->withSession(['cabang_id' => $this->cabang->id]);
+
+        Livewire::test(PoTab::class)
+            ->call('orderPoProduk', $this->produkSn->id)
+            ->assertSet('showPoModal', true)
+            ->assertDispatched('wms-pindah-tab', tab: 'po');
     }
 
     // ===== (o) [F2-3/P2] Activity log NomorSeri + NomorSeriEvent (create/status-change) =====

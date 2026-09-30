@@ -278,6 +278,10 @@ class GrnService
             }
         }
 
+        $isKredit = ($po?->metode_bayar ?? 'kredit') === 'kredit';
+        $akunKas = $po?->akun_kas_bank ?: '110-01';
+        $akunKredit = $isKredit ? '210-01' : $akunKas;
+
         if ($totalHpp > 0) {
             $this->jurnalService->post(
                 $grn->no_grn,
@@ -285,7 +289,7 @@ class GrnService
                 'grn',
                 [
                     ['akun_kode' => '130-01', 'debit' => $totalHpp, 'kredit' => 0],
-                    ['akun_kode' => '210-01', 'debit' => 0, 'kredit' => $totalHpp],
+                    ['akun_kode' => $akunKredit, 'debit' => 0, 'kredit' => $totalHpp],
                 ],
                 "GRN {$grn->no_grn} — {$keterangan} (PO {$noPo})",
                 (int) $grn->cabang_id,
@@ -294,9 +298,10 @@ class GrnService
                 $grn->id
             );
 
-            // Subledger Utang (AP) — jumlah sama dgn jurnal 210-01 di atas,
-            // tanpa posting jurnal tambahan (lihat catatUtang).
-            $this->catatUtang($grn, $po, $totalHpp);
+            // Subledger Utang (AP) dicatat HANYA bila metode bayar PO adalah kredit
+            if ($isKredit) {
+                $this->catatUtang($grn, $po, $totalHpp);
+            }
         }
 
         foreach ($grn->item_qty_received ?? [] as $item) {
@@ -312,8 +317,16 @@ class GrnService
 
         // [F2-2] PO → 'diterima' saat finalisasi — cegah penerimaan ganda
         // via jalur legacy (PoTab::terimaPo / API updatePoStatus).
-        if ($po && $po->status !== 'diterima') {
-            $po->update(['status' => 'diterima']);
+        // Sinkronkan total PO dengan nilai HPP barang yang diterima agar sisa utang akurat.
+        if ($po) {
+            $poUpdates = [
+                'status' => 'diterima',
+                'total' => $totalHpp,
+            ];
+            if (! $isKredit) {
+                $poUpdates['total_dibayar'] = $totalHpp;
+            }
+            $po->update($poUpdates);
         }
 
         // [B-10b/P1-6] Sinkronkan instance milik caller (inputGudang mengembalikannya)

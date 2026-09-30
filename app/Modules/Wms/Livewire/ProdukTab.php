@@ -13,14 +13,14 @@ use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
-use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
+use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -31,6 +31,7 @@ use Livewire\WithPagination;
  */
 class ProdukTab extends Component
 {
+    use ParsesNominal;
     use PunyaRiwayatAktivitas;
     use WithFileUploads;
     use WithPagination;
@@ -52,7 +53,7 @@ class ProdukTab extends Component
     public bool $showProdukModal = false;
 
     public array $produkForm = [
-        'nama' => '', 'kategori' => '', 'kategori_id' => null, 'brand_kompatibel' => '', 'model_kompatibel' => '',
+        'nama' => '', 'barcode' => '', 'kategori' => '', 'kategori_id' => null, 'brand_kompatibel' => '', 'model_kompatibel' => '',
         'kondisi' => 'baru', 'harga_beli' => 0, 'harga_jual_retail' => 0,
         'sku' => '', 'gudang_id' => null, 'stok_awal' => 0, 'stok_minimum' => 0,
         'deskripsi' => '',
@@ -153,7 +154,7 @@ class ProdukTab extends Component
     public function openProdukModal()
     {
         $this->produkForm = [
-            'nama' => '', 'kategori' => '', 'kategori_id' => null, 'brand_kompatibel' => '', 'model_kompatibel' => '',
+            'nama' => '', 'barcode' => '', 'kategori' => '', 'kategori_id' => null, 'brand_kompatibel' => '', 'model_kompatibel' => '',
             'kondisi' => 'baru', 'harga_beli' => 0, 'harga_jual_retail' => 0,
             'sku' => '', 'gudang_id' => null, 'stok_awal' => 0, 'stok_minimum' => 0,
             'deskripsi' => '',
@@ -182,21 +183,22 @@ class ProdukTab extends Component
 
     public function produkHargaJualBerubah()
     {
+        $harga = $this->parseNominal($this->produkForm['harga_jual_retail'] ?? 0);
         // Isi otomatis harga tier retail bila belum di-set manual
         if (! $this->produkForm['harga_tier']['retail']['nominal_tetap']
-            && $this->produkForm['harga_jual_retail'] > 0) {
-            $this->produkForm['harga_tier']['retail']['nominal_tetap'] = (float) $this->produkForm['harga_jual_retail'];
+            && $harga > 0) {
+            $this->produkForm['harga_tier']['retail']['nominal_tetap'] = $harga;
         }
     }
 
     public function updatedProdukFormHargaJualRetail($value): void
     {
-        $this->produkForm['harga_tier']['retail']['nominal_tetap'] = (float) $value;
+        $this->produkForm['harga_tier']['retail']['nominal_tetap'] = $this->parseNominal($value);
     }
 
     public function updatedEditProdukFormHargaJualRetail($value): void
     {
-        $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = (float) $value;
+        $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = $this->parseNominal($value);
     }
 
     public function simpanProduk()
@@ -205,8 +207,19 @@ class ProdukTab extends Component
             return;
         }
 
+        $this->produkForm['harga_beli'] = $this->parseNominal($this->produkForm['harga_beli'] ?? 0);
+        $this->produkForm['harga_jual_retail'] = $this->parseNominal($this->produkForm['harga_jual_retail'] ?? 0);
+        if (isset($this->produkForm['harga_tier'])) {
+            foreach ($this->produkForm['harga_tier'] as $k => $tier) {
+                if (isset($tier['nominal_tetap']) && $tier['nominal_tetap'] !== '' && $tier['nominal_tetap'] !== null) {
+                    $this->produkForm['harga_tier'][$k]['nominal_tetap'] = $this->parseNominal($tier['nominal_tetap']);
+                }
+            }
+        }
+
         $this->validate([
             'produkForm.nama' => 'required|string|max:255',
+            'produkForm.barcode' => 'nullable|string|max:50|unique:produk,barcode',
             'produkForm.satuan_kode' => 'required|exists:satuan_unit,kode',
             'produkForm.harga_beli' => 'required|numeric|min:0',
             'produkForm.harga_jual_retail' => 'required|numeric|min:0',
@@ -305,7 +318,8 @@ class ProdukTab extends Component
                 reorderPoint: ! empty($this->produkForm['reorder_point']) ? (int) $this->produkForm['reorder_point'] : null,
                 minStock: ! empty($this->produkForm['min_stock']) ? (int) $this->produkForm['min_stock'] : null,
                 maxStock: ! empty($this->produkForm['max_stock']) ? (int) $this->produkForm['max_stock'] : null,
-                isOndemand: (bool) ($this->produkForm['is_ondemand'] ?? false)
+                isOndemand: (bool) ($this->produkForm['is_ondemand'] ?? false),
+                barcode: ! empty($this->produkForm['barcode']) ? trim($this->produkForm['barcode']) : null
             );
 
             $this->showProdukModal = false;
@@ -340,6 +354,7 @@ class ProdukTab extends Component
 
         $this->editProdukForm = [
             'nama' => $p->nama,
+            'barcode' => $p->barcode ?? '',
             'kategori' => $p->kategori,
             'kategori_id' => $p->kategori_id,
             'brand_kompatibel' => $p->brand_kompatibel,
@@ -395,8 +410,19 @@ class ProdukTab extends Component
             return;
         }
 
+        $this->editProdukForm['harga_beli'] = $this->parseNominal($this->editProdukForm['harga_beli'] ?? 0);
+        $this->editProdukForm['harga_jual_retail'] = $this->parseNominal($this->editProdukForm['harga_jual_retail'] ?? 0);
+        if (isset($this->editProdukForm['harga_tier'])) {
+            foreach ($this->editProdukForm['harga_tier'] as $k => $tier) {
+                if (isset($tier['nominal_tetap']) && $tier['nominal_tetap'] !== '' && $tier['nominal_tetap'] !== null) {
+                    $this->editProdukForm['harga_tier'][$k]['nominal_tetap'] = $this->parseNominal($tier['nominal_tetap']);
+                }
+            }
+        }
+
         $this->validate([
             'editProdukForm.nama' => 'required|string|max:255',
+            'editProdukForm.barcode' => 'nullable|string|max:50|unique:produk,barcode,'.$this->editProdukId,
             'editProdukForm.harga_beli' => 'required|numeric|min:0',
             'editProdukForm.harga_jual_retail' => 'required|numeric|min:0',
             'editFotoUploads.*' => 'nullable|image|max:10240',
@@ -450,7 +476,8 @@ class ProdukTab extends Component
                 reorderPoint: ! empty($this->editProdukForm['reorder_point']) ? (int) $this->editProdukForm['reorder_point'] : null,
                 minStock: ! empty($this->editProdukForm['min_stock']) ? (int) $this->editProdukForm['min_stock'] : null,
                 maxStock: ! empty($this->editProdukForm['max_stock']) ? (int) $this->editProdukForm['max_stock'] : null,
-                isOndemand: (bool) ($this->editProdukForm['is_ondemand'] ?? false)
+                isOndemand: (bool) ($this->editProdukForm['is_ondemand'] ?? false),
+                barcode: isset($this->editProdukForm['barcode']) ? trim((string) $this->editProdukForm['barcode']) : null
             );
 
             $this->showEditProdukModal = false;
@@ -663,82 +690,15 @@ class ProdukTab extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
     }
 
-    public function openTambahStokModal(int $produkId)
+    public function orderPo(int $produkId): void
     {
-        // [T-40] Stok masuk wajib via PO Supplier — tambah stok manual hanya super-admin
-        if (! $this->isSuperAdmin()) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Stok masuk hanya via PO Supplier']);
-
-            return;
-        }
-
-        $produk = Produk::with('skuVariants')->findOrFail($produkId);
-        $this->stokProdukId = $produkId;
-        // [F2-3] UI: bila produk sn=true → tampilkan wajib isi SN di modal
-        $this->stokProdukSn = (bool) $produk->sn;
-        $variant = $produk->skuVariants->first();
-        $this->tambahStokForm = [
-            'gudang_id' => $this->filterGudangId,
-            'rak_id' => null,
-            'qty' => 1,
-            'harga_beli' => $variant?->harga_beli ?? $produk->harga_beli ?? 0,
-            'keterangan' => 'Pembelian stok '.$produk->nama,
-            'sn' => '',
-        ];
-        $this->showTambahStokModal = true;
+        $this->dispatch('order-po-produk', produkId: $produkId);
+        $this->dispatch('wms-pindah-tab', tab: 'po');
     }
 
-    public function simpanTambahStok()
+    public function openTambahStokModal(int $produkId): void
     {
-        // [T-40] Guard server-side: jalur tambah stok manual diblokir selain super-admin
-        if (! $this->isSuperAdmin()) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Stok masuk hanya via PO Supplier']);
-
-            return;
-        }
-
-        $this->validate([
-            'tambahStokForm.gudang_id' => 'required|exists:gudang,id',
-            'tambahStokForm.rak_id' => 'nullable|exists:rak,id', // [T-12]
-            'tambahStokForm.qty' => 'required|integer|min:1',
-            'tambahStokForm.harga_beli' => 'required|numeric|min:0',
-            'tambahStokForm.sn' => 'nullable|string', // [F2-3]
-        ]);
-
-        $produk = Produk::with('skuVariants')->findOrFail($this->stokProdukId);
-        $variant = $produk->skuVariants->first();
-
-        // [F2-3] Produk sn=true → SN wajib, jumlah SN = qty. Validasi SEBELUM
-        // transaksi stok → kegagalan tidak meninggalkan perubahan stok sebagian.
-        $snList = null;
-        if ($produk->sn) {
-            $snList = app(NomorSeriService::class)->parseList((string) ($this->tambahStokForm['sn'] ?? ''));
-            $qty = (int) $this->tambahStokForm['qty'];
-            if (count($snList) !== $qty) {
-                throw ValidationException::withMessages([
-                    'tambahStokForm.sn' => 'Jumlah nomor seri ('.count($snList).') harus sama dengan jumlah ('.$qty.') — satu SN per unit',
-                ]);
-            }
-        }
-
-        try {
-            app(ProdukService::class)->tambahStokPembelian(
-                produkId: $produk->id,
-                variantId: $variant?->id,
-                gudangId: (int) $this->tambahStokForm['gudang_id'],
-                qty: (int) $this->tambahStokForm['qty'],
-                hargaBeli: (float) $this->tambahStokForm['harga_beli'],
-                keterangan: $this->tambahStokForm['keterangan'] ?: 'Pembelian dari supplier',
-                userId: auth()->id(),
-                rakId: $this->tambahStokForm['rak_id'] ?? null, // [T-12]
-                snList: $snList // [F2-3] null utk produk non-SN
-            );
-
-            $this->showTambahStokModal = false;
-            $this->dispatch('alert', ['type' => 'success', 'message' => 'Stok ditambahkan + jurnal pembelian dibuat']);
-        } catch (\Exception $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
-        }
+        $this->orderPo($produkId);
     }
 
     // [T-15] Generate barcode utk produk (api paralel ke WMS-14)
@@ -757,6 +717,21 @@ class ProdukTab extends Component
         }
 
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Barcode: '.$produk->fresh()->barcode]);
+    }
+
+    // Generate barcode acak unik untuk form Tambah/Edit Produk
+    public function generateBarcodeForm(string $target = 'create'): void
+    {
+        do {
+            $candidate = '899'.str_pad((string) random_int(1, 999999999), 9, '0', STR_PAD_LEFT);
+        } while (Produk::where('barcode', $candidate)->exists() || SkuVariant::where('barcode', $candidate)->exists());
+
+        if ($target === 'create') {
+            $this->produkForm['barcode'] = $candidate;
+        } else {
+            $this->editProdukForm['barcode'] = $candidate;
+        }
+        $this->dispatch('alert', ['type' => 'info', 'message' => "Kode barcode dibuat: {$candidate}"]);
     }
 
     // Quick action header "Import Excel" (dari shell WmsDashboard via $dispatch)

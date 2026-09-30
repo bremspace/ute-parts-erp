@@ -28,7 +28,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class JurnalService
 {
-    public const SUMBER_VALID = ['pos', 'servis', 'servis-bayar', 'pembelian', 'beli', 'komisi', 'opname', 'manual', 'kas', 'channel', 'pembayaran', 'payroll', 'asset', 'depresiasi', 'disposal', 'import', 'grn'];
+    public const SUMBER_VALID = ['pos', 'servis', 'servis-bayar', 'pembelian', 'beli', 'komisi', 'opname', 'manual', 'kas', 'channel', 'pembayaran', 'payroll', 'asset', 'depresiasi', 'disposal', 'import', 'grn', 'stok_awal'];
 
     /**
      * Cache status keberadaan tabel per request (server 1GB RAM: hindari

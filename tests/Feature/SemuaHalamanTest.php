@@ -273,7 +273,7 @@ class SemuaHalamanTest extends TestCase
         $this->assertDatabaseHas('produk', ['id' => $produk->id, 'barcode' => 'XYZ-123-BARCODE']);
     }
 
-    public function test_tambah_produk_dengan_stok_awal_membuat_jurnal_pembelian(): void
+    public function test_tambah_produk_dengan_stok_awal_membuat_jurnal_ekuitas_modal_pemilik(): void
     {
         $this->authed();
         $gudang = Gudang::where('kode', 'GDG-01')->firstOrFail();
@@ -297,19 +297,24 @@ class SemuaHalamanTest extends TestCase
         $this->assertDatabaseHas('sku_variants', ['produk_id' => $produk->id]);
         $this->assertDatabaseHas('stok_items', ['produk_id' => $produk->id, 'jumlah' => 10]);
         $this->assertDatabaseHas('stok_log', [
-            'produk_id' => $produk->id, 'jenis' => 'pembelian', 'perubahan' => 10,
+            'produk_id' => $produk->id, 'jenis' => 'stok_awal', 'perubahan' => 10,
         ]);
 
-        // Jurnal pembelian: Debit Persediaan (130-01) = 800.000, utk Kredit Utang (210-01)
+        // Jurnal stok awal: Debit Persediaan (130-01) = 800.000, Kredit Modal Pemilik (310-01) = 800.000
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'sumber' => 'pembelian',
+            'sumber' => 'stok_awal',
             'akun_coa_id' => AkunCOA::where('kode', '130-01')->first()->id,
             'debit' => 800000,
         ]);
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'sumber' => 'stok_awal',
+            'akun_coa_id' => AkunCOA::where('kode', '310-01')->first()->id,
+            'kredit' => 800000,
+        ]);
 
-        // Double-entry balance untuk jurnal pembelian
+        // Double-entry balance untuk jurnal stok awal
         $noJurnal = DB::table('jurnal_akuntansi')
-            ->where('sumber', 'pembelian')->value('no_jurnal');
+            ->where('sumber', 'stok_awal')->value('no_jurnal');
         $debit = DB::table('jurnal_akuntansi')->where('no_jurnal', $noJurnal)->sum('debit');
         $kredit = DB::table('jurnal_akuntansi')->where('no_jurnal', $noJurnal)->sum('kredit');
         $this->assertEqualsWithDelta($debit, $kredit, 0.01);

@@ -76,17 +76,34 @@ class CycleCountPageTest extends TestCase
         Livewire::test(CycleCountPage::class)
             ->call('bukaFormSchedule')
             ->assertSet('showScheduleForm', true)
+            ->assertSee('Buat Jadwal Cycle Count Baru')
+            ->assertSee('Nama Jadwal')
+            ->assertSee('Tipe Target Sampling')
+            ->assertSee('Frekuensi Pelaksanaan')
+            ->assertSee('Jam Eksekusi Otomatis')
+            ->assertSee('Jumlah Sampel Produk')
+            ->assertSee('Toleransi Unit (Threshold Unit)')
+            ->assertSee('Toleransi Persen (Threshold %)')
             ->set('scheduleNama', 'Rak A Mingguan')
             ->set('tipeTarget', 'rak')
             ->set('frekuensi', 'mingguan')
+            ->set('hari', 1)
             ->set('jam', '08:00')
+            ->set('sampleSize', 10)
+            ->set('thresholdUnit', 2)
+            ->set('thresholdPersen', 5)
             ->call('simpanSchedule')
             ->assertSet('showScheduleForm', false)
-            ->assertSee('Rak A Mingguan');
+            ->assertSee('Rak A Mingguan')
+            ->assertSee('10 produk')
+            ->assertSee('2 unit / 5%');
 
         $this->assertDatabaseHas('cycle_count_schedule', [
             'cabang_id' => $this->cabang->id,
             'nama' => 'Rak A Mingguan',
+            'sample_size' => 10,
+            'threshold_unit' => 2,
+            'threshold_persen' => 5,
         ]);
     }
 
@@ -128,7 +145,85 @@ class CycleCountPageTest extends TestCase
             ->assertSee('CC-TEST-0001')
             ->call('mulaiCount', $task->id)
             ->assertSet('selectedTaskId', $task->id)
-            ->assertSee('Input Stok Fisik')
-            ->assertSee('Oli 10W-30');
+            ->assertSee('Input Hitungan Fisik Sampel')
+            ->assertSee('Blind Count')
+            ->assertSee('Oli 10W-30')
+            // Memastikan blind count: angka stok sistem disembunyikan dari pelaksana saat input count
+            ->assertDontSee('Sistem: 8 unit');
+    }
+
+    public function test_supervisor_dapat_menyetujui_dan_menolak_task_menunggu_approval(): void
+    {
+        $this->authed();
+
+        $schedule = CycleCountSchedule::create([
+            'cabang_id' => $this->cabang->id,
+            'nama' => 'Rak C',
+            'tipe_target' => 'rak',
+            'frekuensi' => 'mingguan',
+            'hari' => 1,
+            'jam' => '08:00',
+            'sample_size' => 2,
+            'threshold_unit' => 2,
+            'threshold_persen' => 5,
+            'is_aktif' => true,
+        ]);
+
+        $task = CycleCountTask::create([
+            'cycle_count_schedule_id' => $schedule->id,
+            'cabang_id' => $this->cabang->id,
+            'no_task' => 'CC-APPR-0001',
+            'tanggal' => now()->toDateString(),
+            'tipe_target' => 'rak',
+            'seed' => 12345,
+            'sample_items' => [],
+            'hasil' => [],
+            'status' => 'menunggu_approval',
+            'threshold_unit' => 2,
+            'threshold_persen' => 5,
+        ]);
+
+        Livewire::test(CycleCountPage::class)
+            ->assertSee('CC-APPR-0001')
+            ->assertSee('Approve')
+            ->assertSee('Tolak')
+            ->call('approveTask', $task->id)
+            ->assertDispatched('alert');
+
+        $this->assertEquals('selesai', $task->fresh()->status);
+
+        // Uji tolak
+        $schedule2 = CycleCountSchedule::create([
+            'cabang_id' => $this->cabang->id,
+            'nama' => 'Rak D',
+            'tipe_target' => 'rak',
+            'frekuensi' => 'mingguan',
+            'hari' => 1,
+            'jam' => '08:00',
+            'sample_size' => 2,
+            'threshold_unit' => 2,
+            'threshold_persen' => 5,
+            'is_aktif' => true,
+        ]);
+
+        $taskTolak = CycleCountTask::create([
+            'cycle_count_schedule_id' => $schedule2->id,
+            'cabang_id' => $this->cabang->id,
+            'no_task' => 'CC-REJ-0001',
+            'tanggal' => now()->toDateString(),
+            'tipe_target' => 'rak',
+            'seed' => 54321,
+            'sample_items' => [],
+            'hasil' => [],
+            'status' => 'menunggu_approval',
+            'threshold_unit' => 2,
+            'threshold_persen' => 5,
+        ]);
+
+        Livewire::test(CycleCountPage::class)
+            ->call('tolakTask', $taskTolak->id, 'Alasan ditolak')
+            ->assertDispatched('alert');
+
+        $this->assertEquals('ditolak', $taskTolak->fresh()->status);
     }
 }

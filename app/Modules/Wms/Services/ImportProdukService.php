@@ -57,6 +57,29 @@ class ImportProdukService
     protected ?array $existingProductCache = null;
 
     /**
+     * Normalisasi nilai barcode dari Excel/CSV.
+     * Mencegah notasi ilmiah (misal 8.99123E+12) dan float tidak sengaja dari cell format General.
+     */
+    public function normalizeBarcode(mixed $raw): string
+    {
+        if ($raw === null || $raw === '') {
+            return '';
+        }
+        $str = trim((string) $raw);
+        if ($str === '') {
+            return '';
+        }
+        if (preg_match('/^[0-9]+(\.[0-9]+)?[eE]\+[0-9]+$/', $str) && is_numeric($str)) {
+            return sprintf('%.0f', (float) $str);
+        }
+        if (is_float($raw) || (is_numeric($str) && str_contains($str, '.') && (float) $str == (int) (float) $str)) {
+            return sprintf('%.0f', (float) $raw);
+        }
+
+        return $str;
+    }
+
+    /**
      * Normalisasi nama satuan ke kode baku yang terdaftar di sistem.
      * Mengakomodir variasi input pengguna: pcs, PCS, pieces, buah, dus, pack, dll.
      */
@@ -491,7 +514,7 @@ class ImportProdukService
     {
         $errors = [];
         $sku = trim((string) ($row['sku'] ?? ''));
-        $barcode = trim((string) ($row['barcode'] ?? ''));
+        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
         $nama = trim((string) ($row['nama'] ?? ''));
 
         if (! $sku) {
@@ -795,7 +818,7 @@ class ImportProdukService
         if ($s !== '') {
             $konteks['skuDalamFile'][$s] = true;
         }
-        $b = trim((string) ($row['barcode'] ?? ''));
+        $b = $this->normalizeBarcode($row['barcode'] ?? null);
         if ($b !== '') {
             $konteks['barcodeDalamFile'][$b] = true;
         }
@@ -818,7 +841,7 @@ class ImportProdukService
     {
         $nama = trim((string) $row['nama']);
         $sku = trim((string) $row['sku']);
-        $barcode = trim((string) ($row['barcode'] ?? ''));
+        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
         $satuan = $this->normalizeSatuan(trim((string) $row['satuan']));
         $kategori = trim((string) ($row['kategori'] ?? 'Umum')) ?: 'Umum';
         $hargaBeli = round((float) $row['harga_beli'], 2);

@@ -5,6 +5,7 @@ namespace App\Modules\Akunting\Livewire;
 use App\Modules\Akunting\Jobs\DepresiasiAsetJob;
 use App\Modules\Akunting\Models\AsetTetap;
 use App\Modules\Akunting\Services\DepresiasiService;
+use App\Traits\ParsesNominal;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -19,6 +20,7 @@ use Livewire\WithPagination;
  */
 class AsetRegister extends Component
 {
+    use ParsesNominal;
     use WithPagination;
 
     public bool $showForm = false;
@@ -158,44 +160,6 @@ class AsetRegister extends Component
             'type' => 'success',
             'message' => 'Aset tetap "'.$this->form['nama'].'" berhasil didaftarkan (Rp '.number_format($hargaPerolehan, 0, ',', '.').').',
         ]);
-    }
-
-    /**
-     * Bersihkan input nominal berformat ribuan (ADR 0011 "1.000.000" / "1.000.000,50")
-     * menjadi angka float. Nilai yang tidak bisa diparse dikembalikan apa adanya supaya
-     * pesan validasi (mis. "harus berupa angka") tetap akurat.
-     */
-    private function parseNominal(mixed $value): float
-    {
-        $teks = str_replace(['Rp', ' '], '', trim((string) $value));
-
-        if ($teks === '') {
-            return 0.0;
-        }
-
-        // "1.000.000,50" — titik ribuan + koma desimal
-        if (str_contains($teks, ',') && str_contains($teks, '.')) {
-            $teks = str_replace('.', '', $teks);
-            $teks = str_replace(',', '.', $teks);
-        } elseif (str_contains($teks, ',')) {
-            // "1000,50" — koma desimal
-            $teks = str_replace(',', '.', $teks);
-        } else {
-            // "1.000.000" — titik Ribuan bila semua grup setelah titik berisi 3 digit
-            $bagian = explode('.', $teks);
-            $ribuan = count($bagian) > 1;
-            foreach (array_slice($bagian, 1) as $grup) {
-                if (strlen($grup) !== 3) {
-                    $ribuan = false;
-                    break;
-                }
-            }
-            if ($ribuan) {
-                $teks = str_replace('.', '', $teks);
-            }
-        }
-
-        return is_numeric($teks) ? (float) $teks : 0.0;
     }
 
     /** Buka konfirmasi disposal (2 langkah — pola ConfirmDialog). */

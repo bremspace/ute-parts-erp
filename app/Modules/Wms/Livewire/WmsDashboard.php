@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -11,7 +12,13 @@ use Livewire\Component;
  */
 class WmsDashboard extends Component
 {
-    public string $activeTab = 'stok'; // stok, produk, transfer, opname, po, grn
+    public string $activeTab = 'stok'; // stok, produk, transfer, opname, po, grn, retur
+
+    #[On('wms-pindah-tab')]
+    public function pindahTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+    }
 
     public function render()
     {

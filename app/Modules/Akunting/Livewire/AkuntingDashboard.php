@@ -14,6 +14,7 @@ use App\Modules\Akunting\Services\PembayaranSubledgerService;
 use App\Modules\Akunting\Services\ValidasiBarisJurnal;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
+use App\Traits\ParsesNominal;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
@@ -25,6 +26,7 @@ use Livewire\WithPagination;
 
 class AkuntingDashboard extends Component
 {
+    use ParsesNominal;
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
@@ -83,7 +85,7 @@ class AkuntingDashboard extends Component
 
     public ?int $piutangId = null;
 
-    public float $bayarPiutangJumlah = 0;
+    public mixed $bayarPiutangJumlah = 0;
 
     // [B-10a / P0-1] Kunci idempotensi per opening modal — double submit / retry
     // tidak boleh menghasilkan jurnal + update subledger dua kali.
@@ -94,7 +96,7 @@ class AkuntingDashboard extends Component
 
     public ?int $utangId = null;
 
-    public float $bayarUtangJumlah = 0;
+    public mixed $bayarUtangJumlah = 0;
 
     public string $bayarUtangKunci = '';
 
@@ -591,34 +593,6 @@ class AkuntingDashboard extends Component
         ];
     }
 
-    private function parseNominal(mixed $value): float
-    {
-        $normalized = str_replace(['Rp', ' '], '', trim((string) $value));
-
-        if (str_contains($normalized, ',') && str_contains($normalized, '.')) {
-            $normalized = str_replace('.', '', $normalized);
-            $normalized = str_replace(',', '.', $normalized);
-        } elseif (str_contains($normalized, ',')) {
-            $normalized = str_replace(',', '.', $normalized);
-        } else {
-            $parts = explode('.', $normalized);
-            $groupedAsThousands = count($parts) > 1;
-
-            foreach (array_slice($parts, 1) as $part) {
-                if (strlen($part) !== 3) {
-                    $groupedAsThousands = false;
-                    break;
-                }
-            }
-
-            if ($groupedAsThousands) {
-                $normalized = str_replace('.', '', $normalized);
-            }
-        }
-
-        return (float) $normalized;
-    }
-
     private function resetManualJournalForm(): void
     {
         $this->manualTanggal = now()->toDateString();
@@ -802,7 +776,7 @@ class AkuntingDashboard extends Component
         try {
             $hasil = app(PembayaranSubledgerService::class)->bayarPiutang(
                 (int) $this->piutangId,
-                (float) $this->bayarPiutangJumlah,
+                (float) $this->parseNominal($this->bayarPiutangJumlah),
                 $this->cabangAktif(),
                 auth()->id(),
                 $this->bayarPiutangKunci !== '' ? $this->bayarPiutangKunci : null
@@ -872,7 +846,7 @@ class AkuntingDashboard extends Component
         try {
             $hasil = app(PembayaranSubledgerService::class)->bayarUtang(
                 (int) $this->utangId,
-                (float) $this->bayarUtangJumlah,
+                (float) $this->parseNominal($this->bayarUtangJumlah),
                 $this->cabangAktif(),
                 auth()->id(),
                 $this->bayarUtangKunci !== '' ? $this->bayarUtangKunci : null

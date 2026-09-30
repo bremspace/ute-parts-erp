@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
@@ -11,6 +12,7 @@ use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\PurchaseOrderService;
 use App\Modules\Workflow\Services\ApprovalService;
+use App\Traits\ParsesNominal;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,6 +22,7 @@ use Livewire\WithPagination;
  */
 class PoTab extends Component
 {
+    use ParsesNominal;
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
@@ -37,7 +40,7 @@ class PoTab extends Component
     public bool $showPoModal = false;
 
     public array $poForm = [
-        'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'jatuh_tempo' => '',
+        'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'akun_kas_bank' => '110-01', 'jatuh_tempo' => '',
         'items' => [],
     ];
 
@@ -47,7 +50,19 @@ class PoTab extends Component
 
     public ?int $bayarPoId = null;
 
-    public float $bayarPoJumlah = 0;
+    public float|string $bayarPoJumlah = 0;
+
+    public string $bayarPoAkun = '110-01';
+
+    // Detail PO Modal
+    public ?int $detailPoId = null;
+
+    // Edit Supplier Modal
+    public ?int $editSupplierId = null;
+
+    public array $editSupplierForm = [
+        'nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30, 'is_active' => true,
+    ];
 
     // [PROCUREMENT MODAL: ABC, ROP, Min-Max, JIT]
     public bool $showProcurementModal = false;
@@ -81,6 +96,7 @@ class PoTab extends Component
             'supplier_id' => null,
             'gudang_tujuan_id' => null,
             'metode_bayar' => 'kredit',
+            'akun_kas_bank' => '110-01',
             'jatuh_tempo' => '',
             'items' => [
                 [
@@ -100,12 +116,19 @@ class PoTab extends Component
         ]);
     }
 
+    #[On('order-po-produk')]
+    public function orderPoProduk(int $produkId): void
+    {
+        $this->terapkanKePo($produkId, 1);
+        $this->dispatch('wms-pindah-tab', tab: 'po');
+    }
+
     // Quick action header "+ Buat PO" (dari shell WmsDashboard via $dispatch)
     #[On('wms-po-baru')]
     public function openPoModal()
     {
         $this->poForm = [
-            'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'jatuh_tempo' => '',
+            'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'akun_kas_bank' => '110-01', 'jatuh_tempo' => '',
             'items' => [['produk_id' => null, 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1]],
         ];
         $this->showPoModal = true;
@@ -190,6 +213,7 @@ class PoTab extends Component
             'poForm.supplier_id' => 'required|exists:supplier,id',
             'poForm.gudang_tujuan_id' => 'required|exists:gudang,id',
             'poForm.metode_bayar' => 'required|in:tunai,kredit',
+            'poForm.akun_kas_bank' => 'nullable|string|max:20',
             'poForm.items' => 'required|array|min:1',
         ]);
 
@@ -198,8 +222,10 @@ class PoTab extends Component
         $noPo = sprintf('PO-%s-%03d', $today, $count);
 
         $total = 0;
-        foreach ($this->poForm['items'] as $i) {
-            $total += (float) ($i['harga_beli'] ?? 0) * (int) ($i['jumlah'] ?? 1);
+        foreach ($this->poForm['items'] as $idx => $i) {
+            $harga = $this->parseNominal($i['harga_beli'] ?? 0);
+            $this->poForm['items'][$idx]['harga_beli'] = $harga;
+            $total += $harga * (int) ($i['jumlah'] ?? 1);
         }
 
         $po = PurchaseOrder::create([
@@ -208,19 +234,21 @@ class PoTab extends Component
             'gudang_tujuan_id' => $this->poForm['gudang_tujuan_id'],
             'status' => 'draft',
             'metode_bayar' => $this->poForm['metode_bayar'],
+            'akun_kas_bank' => $this->poForm['metode_bayar'] === 'tunai' ? ($this->poForm['akun_kas_bank'] ?? '110-01') : null,
             'jatuh_tempo' => $this->poForm['jatuh_tempo'] ?: now()->addDays((int) Supplier::find($this->poForm['supplier_id'])?->termin_hari ?? 30)->toDateString(),
             'total' => $total,
             'total_dibayar' => 0,
         ]);
 
         foreach ($this->poForm['items'] as $i) {
+            $harga = $this->parseNominal($i['harga_beli'] ?? 0);
             PurchaseOrderItem::create([
                 'purchase_order_id' => $po->id,
                 'produk_id' => $i['produk_id'],
                 'sku_variant_id' => $i['sku_variant_id'] ?? null,
-                'harga_beli' => (float) ($i['harga_beli'] ?? 0),
+                'harga_beli' => $harga,
                 'jumlah' => (int) ($i['jumlah'] ?? 1),
-                'subtotal' => (float) ($i['harga_beli'] ?? 0) * (int) ($i['jumlah'] ?? 1),
+                'subtotal' => $harga * (int) ($i['jumlah'] ?? 1),
             ]);
         }
 
@@ -288,29 +316,104 @@ class PoTab extends Component
         ]);
     }
 
+    public function bukaDetailPo(int $id): void
+    {
+        $this->detailPoId = $id;
+    }
+
+    public function tutupDetailPo(): void
+    {
+        $this->detailPoId = null;
+    }
+
     public function bukaBayarPo(int $id)
     {
+        if (! $this->bolehBayarPo()) {
+            return;
+        }
+
+        $po = PurchaseOrder::find($id);
         $this->bayarPoId = $id;
-        $this->bayarPoJumlah = (float) PurchaseOrder::find($id)?->sisa ?? 0;
+        $this->bayarPoJumlah = (float) $po?->sisa ?? 0;
+        $this->bayarPoAkun = $po?->akun_kas_bank ?: '110-01';
         $this->dispatch('alert-open-bayar-po', ['id' => $id]);
     }
 
     public function bayarPo()
     {
-        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin memproses pembayaran PO.')) {
+        if (! $this->bolehBayarPo()) {
+            return;
+        }
+
+        $nominal = $this->parseNominal($this->bayarPoJumlah);
+        if ($nominal <= 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Nominal pembayaran harus lebih besar dari 0']);
+
             return;
         }
 
         try {
             app(PurchaseOrderService::class)->bayarPO(
                 PurchaseOrder::findOrFail($this->bayarPoId),
-                (float) $this->bayarPoJumlah,
-                auth()->id()
+                $nominal,
+                auth()->id(),
+                $this->bayarPoAkun
             );
-            $this->dispatch('alert', ['type' => 'success', 'message' => 'Pembayaran PO tercatat — sisa utang updated']);
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Pembayaran PO tercatat — sisa utang dan pembukuan terupdate']);
+            $this->bayarPoId = null;
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
+    }
+
+    protected function bolehBayarPo(): bool
+    {
+        $user = auth()->user();
+        if ($user && ($user->hasRole('super-admin') || $user->can('utang.manage') || $user->can('akunting.create') || $user->hasRole('akuntan') || $user->hasRole('keuangan'))) {
+            return true;
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'error',
+            'message' => 'Anda tidak memiliki hak akses pembayaran PO (khusus superadmin dan bagian akuntansi / keuangan).',
+        ]);
+
+        return false;
+    }
+
+    public function bukaEditSupplier(int $id): void
+    {
+        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin mengedit supplier.')) {
+            return;
+        }
+
+        $supplier = Supplier::findOrFail($id);
+        $this->editSupplierId = $supplier->id;
+        $this->editSupplierForm = [
+            'nama' => $supplier->nama,
+            'kontak' => $supplier->kontak ?? '',
+            'telepon' => $supplier->telepon ?? '',
+            'alamat' => $supplier->alamat ?? '',
+            'termin_hari' => (int) $supplier->termin_hari,
+            'is_active' => (bool) $supplier->is_active,
+        ];
+    }
+
+    public function perbaruiSupplier(): void
+    {
+        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin mengedit supplier.')) {
+            return;
+        }
+
+        $this->validate([
+            'editSupplierForm.nama' => 'required|string|max:255',
+            'editSupplierForm.termin_hari' => 'nullable|integer|min:0',
+        ]);
+
+        $supplier = Supplier::findOrFail($this->editSupplierId);
+        $supplier->update($this->editSupplierForm);
+        $this->editSupplierId = null;
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier berhasil diperbarui']);
     }
 
     public function simpanSupplier()
@@ -374,13 +477,21 @@ class PoTab extends Component
             $procurementSummary = $service->getProcurementSummary($cabangId);
         }
 
+        $detailPo = null;
+        if ($this->detailPoId) {
+            $detailPo = PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk', 'pembayaran.user'])
+                ->find($this->detailPoId);
+        }
+
         return view('modules.wms.livewire.po-tab', [
             'gudangs' => $gudangs,
             'allProducts' => $allProducts,
             'suppliers' => Supplier::orderBy('nama')->get(),
             'poList' => PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk'])->latest()->paginate(15, pageName: 'po'),
+            'detailPo' => $detailPo,
             'procurementData' => $procurementData,
             'procurementSummary' => $procurementSummary,
+            'akunKasBankList' => AkunCOA::whereIn('kelompok', ['kas', 'bank'])->where('is_active', true)->orderBy('kode')->get(),
         ]);
     }
 }

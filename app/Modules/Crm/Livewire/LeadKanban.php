@@ -5,11 +5,13 @@ namespace App\Modules\Crm\Livewire;
 use App\Models\User;
 use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Services\LeadService;
+use App\Traits\ParsesNominal;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class LeadKanban extends Component
 {
+    use ParsesNominal;
     use WithPagination;
 
     public string $search = '';
@@ -174,6 +176,8 @@ class LeadKanban extends Component
 
     public function createLead(): void
     {
+        $this->createForm['nilai_estimasi'] = $this->parseNominal($this->createForm['nilai_estimasi'] ?? 0);
+
         $this->validate([
             'createForm.nama' => 'required|string|max:255',
             'createForm.telepon' => 'nullable|string|max:20|unique:leads,telepon',
@@ -200,6 +204,8 @@ class LeadKanban extends Component
 
     public function updateLead(): void
     {
+        $this->editForm['nilai_estimasi'] = $this->parseNominal($this->editForm['nilai_estimasi'] ?? 0);
+
         $this->validate([
             'editForm.nama' => 'required|string|max:255',
             'editForm.telepon' => 'nullable|string|max:20|unique:leads,telepon,'.$this->editingLeadId,

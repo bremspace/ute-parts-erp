@@ -2,19 +2,23 @@
 
 namespace App\Modules\Wms\Models;
 
+use App\Models\User;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
- * Retur pembelian (return ke supplier) — tabel return_pembelian (migrasi SID fase 1).
+ * Retur pembelian (return ke supplier) — tabel return_pembelian.
  * [F1-1] Observer ReturnPembelianObserver auto-fire approval bila jumlah > threshold.
  */
 #[Fillable([
-    'no_return', 'purchase_order_id', 'supplier_id', 'tanggal', 'jumlah', 'status', 'alasan', 'is_migrasi_sid',
+    'no_return', 'purchase_order_id', 'supplier_id', 'cabang_id', 'gudang_id', 'user_id',
+    'tanggal', 'jumlah', 'status', 'metode_pengembalian', 'alasan', 'is_migrasi_sid',
 ])]
 class ReturnPembelian extends Model
 {
@@ -42,5 +46,25 @@ class ReturnPembelian extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function cabang(): BelongsTo
+    {
+        return $this->belongsTo(Cabang::class);
+    }
+
+    public function gudang(): BelongsTo
+    {
+        return $this->belongsTo(Gudang::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(ReturnPembelianItem::class, 'return_pembelian_id');
     }
 }
