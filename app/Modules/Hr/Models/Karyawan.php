@@ -4,9 +4,11 @@ namespace App\Modules\Hr\Models;
 
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -19,6 +21,7 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class Karyawan extends Model
 {
+    use CatatAktivitas;
     use LogsActivity;
 
     protected $table = 'karyawan';
@@ -44,8 +47,24 @@ class Karyawan extends Model
         return $this->hasMany(PayrollSlip::class);
     }
 
+    /**
+     * [F1-4] Audit trail data karyawan.
+     *
+     * `logOnly` — HANYA kolom yang relevan untuk audit. `rekening_bank` NOMOR
+     * REKENING Employee DIBUANG dari snapshot: permission `lihat-audit-log` juga
+     * dipegang admin-toko, dan nomor rekening staff bukan miliknya untuk dilihat.
+     * `dontLogEmptyChanges()` sengaja TIDAK dipakai supaya perubahan rekening
+     * saja tetap menulis baris log (event terlihat, isi sensitifnya tidak) —
+     * dengan begitu tidak ada CRUD karyawan yang tak terlihat pemiliknya.
+     */
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll();
+        return LogOptions::defaults()
+            ->logOnly([
+                'user_id', 'nik', 'nama', 'jabatan', 'cabang_id',
+                'tgl_masuk', 'gaji_pokok', 'status_aktif',
+            ])
+            ->logOnlyDirty()
+            ->setDescriptionForEvent(fn (string $event) => 'Data Karyawan '.self::labelAksiAktivitas($event));
     }
 }

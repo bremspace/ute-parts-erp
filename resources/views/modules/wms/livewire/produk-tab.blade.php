@@ -101,6 +101,11 @@
                                 <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-up-mint border border-up-mint/30 font-bold text-[11px] cursor-pointer whitespace-nowrap active:scale-[0.97]">
                                     ✏️ Edit
                                 </button>
+                                @if(isSuperAdminOrOwner())
+                                    <button wire:click="hapusProduk({{ $p->id }})" wire:confirm="Yakin ingin menghapus master produk '{{ $p->nama }}'? Jika produk memiliki riwayat transaksi/mutasi, status akan dinonaktifkan." class="px-2.5 py-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-[11px] cursor-pointer whitespace-nowrap active:scale-[0.97]" title="Hapus Master Produk">
+                                        🗑️ Hapus
+                                    </button>
+                                @endif
                                 <button wire:click="orderPo({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[11px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.97]" title="Buat PO untuk produk ini">
                                     📦 Order PO
                                 </button>
@@ -429,16 +434,76 @@
 
                 @if($importStep === 'upload')
                     <div class="space-y-4">
-                        <div class="p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/25 text-[11px] text-ink-200 leading-relaxed">
-                            <p class="font-bold text-up-primary mb-1">📥 Template &amp; cara pakai</p>
-                            Unduh template di bawah, isi (baris contoh bisa dihapus), lalu upload.<br>
-                            <strong class="text-up-amber">Import = inisialisasi master produk</strong> (termasuk stok awal modal: jurnal Debit Persediaan / Kredit Modal).
-                            Stok masuk harian TETAP wajib lewat <strong>PO Supplier</strong>. SKU/barcode duplikat otomatis ditolak — jalankan 2× tidak menimbulkan dobel.
+                        {{-- Format Selector Radio Pills --}}
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-2">Pilih Format Sumber Data</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all {{ $importFormat === 'standar' ? 'bg-up-primary/15 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}">
+                                    <input type="radio" wire:model.live="importFormat" value="standar" class="accent-up-primary" />
+                                    <div>
+                                        <div class="text-xs font-bold leading-none">Template Standar UteParts</div>
+                                        <div class="text-[10px] text-ink-400 mt-1">Format Excel baku dengan kolom lengkap</div>
+                                    </div>
+                                </label>
+                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all {{ $importFormat === 'sid_retail' ? 'bg-up-primary/15 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}">
+                                    <input type="radio" wire:model.live="importFormat" value="sid_retail" class="accent-up-primary" />
+                                    <div>
+                                        <div class="text-xs font-bold leading-none">Export SID Retail Pro</div>
+                                        <div class="text-[10px] text-ink-400 mt-1">Mapping otomatis stok etalase & gudang</div>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
-                        <a href="{{ url('/api/wms/produk/import/template') }}" target="_blank"
-                           class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer">
-                            ⬇️ Download Template (.xlsx)
-                        </a>
+
+                        @if($importFormat === 'sid_retail')
+                            {{-- Info Box SID Retail --}}
+                            <div class="p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/25 text-[11px] text-ink-200 leading-relaxed">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary text-white uppercase tracking-wider">SID Retail Pro</span>
+                                    <span class="font-bold text-up-primary">Otomatis Terpetakan</span>
+                                </div>
+                                Kolom <span class="font-semibold text-white">KODE_BARANG</span>, <span class="font-semibold text-white">BARCODE</span>, <span class="font-semibold text-white">NAMA</span>, <span class="font-semibold text-white">KATEGORI</span>, <span class="font-semibold text-white">SUB_KATEGORI</span>, <span class="font-semibold text-white">HPP</span>, <span class="font-semibold text-white">HARGA_TOKO_1/2</span>, <span class="font-semibold text-white">HARGA_PARTAI_1</span>, serta stok <span class="font-semibold text-white">TOKO</span> dan <span class="font-semibold text-white">GUDANG</span> akan diproses otomatis secara hemat memori (streaming XML).
+                            </div>
+
+                            {{-- Dropdown Pilihan Gudang Cabang --}}
+                            <div class="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-white/5 border border-white/10">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1.5">
+                                        🏪 Gudang untuk Kolom <strong class="text-up-mint">TOKO</strong> (Etalase)
+                                    </label>
+                                    <select wire:model="gudangTokoId" class="w-full text-xs bg-slate-900/80 border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-up-primary cursor-pointer">
+                                        <option value="">-- Lewati Stok Toko --</option>
+                                        @foreach($gudangsCabang as $g)
+                                            <option value="{{ $g->id }}">{{ $g->nama }} ({{ $g->kode }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1.5">
+                                        🏢 Gudang untuk Kolom <strong class="text-up-amber">GUDANG</strong> (Penyimpanan)
+                                    </label>
+                                    <select wire:model="gudangPusatId" class="w-full text-xs bg-slate-900/80 border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-up-primary cursor-pointer">
+                                        <option value="">-- Lewati Stok Gudang --</option>
+                                        @foreach($gudangsCabang as $g)
+                                            <option value="{{ $g->id }}">{{ $g->nama }} ({{ $g->kode }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                        @else
+                            {{-- Info Box & Download Template Standar --}}
+                            <div class="p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/25 text-[11px] text-ink-200 leading-relaxed">
+                                <p class="font-bold text-up-primary mb-1">📥 Template &amp; cara pakai</p>
+                                Unduh template di bawah, isi (baris contoh bisa dihapus), lalu upload.<br>
+                                <strong class="text-up-amber">Import = inisialisasi master produk</strong> (termasuk stok awal modal: jurnal Debit Persediaan / Kredit Modal).
+                                Stok masuk harian TETAP wajib lewat <strong>PO Supplier</strong>. SKU/barcode duplikat otomatis ditolak — jalankan 2× tidak menimbulkan dobel.
+                            </div>
+                            <a href="{{ url('/api/wms/produk/import/template') }}" target="_blank"
+                               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer">
+                                ⬇️ Download Template (.xlsx)
+                            </a>
+                        @endif
+
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">File Excel (.xlsx / .xls / .csv, maks 5MB)</label>
                             <input type="file" wire:model="importFile" accept=".xlsx,.xls,.csv" class="w-full text-xs text-ink-300 file:mr-3 file:px-4 file:py-2 file:rounded-xl file:border-0 file:bg-up-primary file:text-white file:font-bold file:text-xs file:cursor-pointer" />
@@ -899,12 +964,19 @@
                     </div>
                 </div>
 
-                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
-                    <button wire:click="$set('showEditProdukModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanEditProduk" wire:loading.attr="disabled" class="flex-1 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">
-                        <span wire:loading.remove wire:target="simpanEditProduk">💾 Simpan Perubahan</span>
-                        <span wire:loading wire:target="simpanEditProduk">Menyimpan…</span>
-                    </button>
+                <div class="flex items-center justify-between gap-3 pt-4 border-t border-white/5 mt-5">
+                    @if(isSuperAdminOrOwner() && $editProdukId)
+                        <button type="button" wire:click="hapusProduk({{ $editProdukId }})" wire:confirm="Yakin ingin menghapus master produk ini? Jika produk memiliki riwayat transaksi/mutasi, status akan dinonaktifkan." class="px-4 py-3 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer min-h-[44px]">
+                            🗑️ Hapus Produk
+                        </button>
+                    @endif
+                    <div class="flex-1 flex gap-3 justify-end">
+                        <button wire:click="$set('showEditProdukModal', false)" class="px-5 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                        <button wire:click="simpanEditProduk" wire:loading.attr="disabled" class="px-6 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">
+                            <span wire:loading.remove wire:target="simpanEditProduk">💾 Simpan Perubahan</span>
+                            <span wire:loading wire:target="simpanEditProduk">Menyimpan…</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

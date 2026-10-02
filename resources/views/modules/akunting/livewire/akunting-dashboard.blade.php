@@ -328,11 +328,16 @@
             <button wire:click="openCoaModal" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer">+ Tambah Akun</button>
         </div>
 
-        <x-prism.data-table :headers="['Kode', 'Nama Akun', 'Tipe', 'Kelompok', 'Saldo Normal']">
+        <x-prism.data-table :headers="['Kode', 'Nama Akun', 'Tipe', 'Kelompok', 'Saldo Normal', 'Aksi']">
             @forelse($akunCoaList as $akun)
                 <tr class="hover:bg-white/[0.02] transition-colors text-xs">
                     <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $akun->kode }}</td>
-                    <td class="py-3.5 px-4 text-ink-100 font-medium">{{ $akun->nama }}</td>
+                    <td class="py-3.5 px-4 text-ink-100 font-medium">
+                        {{ $akun->nama }}
+                        @if(! $akun->is_active)
+                            <span class="block text-[9px] font-bold text-up-red bg-up-red/10 px-1.5 py-0.5 rounded mt-0.5 w-fit">NONAKTIF</span>
+                        @endif
+                    </td>
                     <td class="py-3.5 px-4">
                         <span class="text-[10px] font-semibold capitalize {{ $akun->tipe === 'aset' ? 'text-up-mint bg-up-mint/10 px-2 py-0.5 rounded-full' : ($akun->tipe === 'beban' ? 'text-up-red bg-up-red/10 px-2 py-0.5 rounded-full' : 'text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-full') }}">
                             {{ $akun->tipe }}
@@ -340,10 +345,22 @@
                     </td>
                     <td class="py-3.5 px-4 text-ink-300">{{ $akun->kelompok }}</td>
                     <td class="py-3.5 px-4 text-ink-300">{{ $akun->saldo_normal }}</td>
+                    <td class="py-3.5 px-4">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            @can('akunting.edit')
+                                <button type="button" wire:click="openEditCoaModal({{ $akun->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer active:scale-[0.97]" title="Edit Akun COA">Edit</button>
+                            @endcan
+                            @if(isSuperAdminOrOwner())
+                                <button type="button" wire:click="hapusCoa({{ $akun->id }})" wire:confirm="Yakin ingin menghapus akun COA '{{ $akun->kode }} — {{ $akun->nama }}'? Jika akun memiliki riwayat jurnal atau akun anak, status akan dinonaktifkan." class="px-2.5 py-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]" title="Hapus Akun COA">Hapus</button>
+                            @endif
+                        </div>
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="py-12 text-center text-ink-400">Belum ada akun COA.</td></tr>
+                <tr><td colspan="6" class="py-12 text-center text-ink-400">Belum ada akun COA.</td></tr>
             @endforelse
+
+            <x-slot:pagination>{{ $akunCoaList->links() }}</x-slot:pagination>
         </x-prism.data-table>
     @endif
 
@@ -774,7 +791,7 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Tambah Akun COA</h3>
+                    <h3 class="text-lg font-bold text-white">{{ ! empty($coaForm['id']) ? 'Edit Akun COA' : 'Tambah Akun COA' }}</h3>
                     <button wire:click="$set('showCoaModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
 

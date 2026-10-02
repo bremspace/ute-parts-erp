@@ -5,6 +5,7 @@ namespace App\Modules\Wms\Jobs;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Services\ImportProdukService;
+use App\Modules\Wms\Services\ImportSidRetailService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -28,11 +29,18 @@ class ImportProdukExcelJob implements ShouldQueue
     public function __construct(
         public int $importLogId,
         public string $filePath,
-        public ?int $userId = null
+        public ?int $userId = null,
+        public string $format = 'standar',
+        public ?int $cabangId = null,
+        public ?int $gudangTokoId = null,
+        public ?int $gudangPusatId = null
     ) {}
 
-    public function handle(ImportProdukService $service, NotificationService $notifikasi): void
-    {
+    public function handle(
+        ImportProdukService $service,
+        ImportSidRetailService $sidService,
+        NotificationService $notifikasi
+    ): void {
         @ini_set('memory_limit', '512M');
         @set_time_limit(0);
 
@@ -47,10 +55,24 @@ class ImportProdukExcelJob implements ShouldQueue
             $filePath = $this->filePath;
             // Relative path (storage/app/...) → absolut via resolveFilePath
             if (! str_starts_with($filePath, DIRECTORY_SEPARATOR)) {
-                $filePath = $service->resolveFilePath($filePath);
+                $filePath = $this->format === 'sid_retail'
+                    ? $sidService->resolveFilePath($filePath)
+                    : $service->resolveFilePath($filePath);
             }
 
-            $hasil = $service->commit($filePath, $this->importLogId, $this->userId);
+            if ($this->format === 'sid_retail') {
+                $cabangId = $this->cabangId ?? 1;
+                $hasil = $sidService->commit(
+                    $filePath,
+                    $this->importLogId,
+                    $cabangId,
+                    $this->gudangTokoId,
+                    $this->gudangPusatId,
+                    $this->userId
+                );
+            } else {
+                $hasil = $service->commit($filePath, $this->importLogId, $this->userId);
+            }
 
             $label = $hasil['label_status'] ?? ($hasil['gagal'] > 0 ? 'Diterima Sebagian' : 'Diterima Sempurna');
             $pesanPeringatan = (! empty($hasil['total_peringatan']) && $hasil['total_peringatan'] > 0)

@@ -31,6 +31,8 @@ class StokTab extends Component
     // [T-12] Rak management
     public bool $showRakModal = false;
 
+    public ?int $editRakId = null;
+
     public array $rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
 
     public function mount()
@@ -71,21 +73,86 @@ class StokTab extends Component
     #[On('wms-rak-modal')]
     public function openRakModal(): void
     {
+        $this->editRakId = null;
+        $this->rakForm = ['gudang_id' => $this->filterGudangId, 'nama' => '', 'kode' => '', 'zona' => ''];
+        $this->showRakModal = true;
+    }
+
+    public function editRak(int $id): void
+    {
+        $user = auth()->user();
+        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('staff-gudang') || $user->can('wms.create')))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, atau Staff Gudang yang berhak mengedit rak.']);
+
+            return;
+        }
+
+        $rak = Rak::findOrFail($id);
+        $this->editRakId = $rak->id;
+        $this->rakForm = [
+            'gudang_id' => $rak->gudang_id,
+            'nama' => $rak->nama,
+            'kode' => $rak->kode,
+            'zona' => $rak->zona ?? '',
+        ];
         $this->showRakModal = true;
     }
 
     public function simpanRak()
     {
+        $user = auth()->user();
+        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('staff-gudang') || $user->can('wms.create')))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, atau Staff Gudang yang berhak menyimpan rak.']);
+
+            return;
+        }
+
         $this->validate([
             'rakForm.gudang_id' => 'required|exists:gudang,id',
             'rakForm.nama' => 'required|string|max:255',
-            'rakForm.kode' => 'required|string|max:20|unique:rak,kode',
+            'rakForm.kode' => 'required|string|max:20|unique:rak,kode,'.($this->editRakId ?: 'NULL'),
+            'rakForm.zona' => 'nullable|string|max:50',
         ]);
 
-        Rak::create($this->rakForm);
+        if ($this->editRakId) {
+            $rak = Rak::findOrFail($this->editRakId);
+            $rak->update($this->rakForm);
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Rak berhasil diperbarui']);
+        } else {
+            Rak::create($this->rakForm);
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Rak berhasil ditambahkan']);
+        }
+
         $this->showRakModal = false;
+        $this->editRakId = null;
         $this->rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Rak ditambahkan']);
+    }
+
+    public function hapusRak(int $id): void
+    {
+        $user = auth()->user();
+        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('staff-gudang') || $user->can('wms.create')))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, atau Staff Gudang yang berhak menghapus rak.']);
+
+            return;
+        }
+
+        $rak = Rak::find($id);
+        if (! $rak) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Rak tidak ditemukan.']);
+
+            return;
+        }
+
+        if (StokItem::where('rak_id', $id)->where('jumlah', '>', 0)->exists()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Rak '{$rak->nama}' masih berisi stok aktif (jumlah > 0). Pindahkan stok ke rak lain terlebih dahulu."]);
+
+            return;
+        }
+
+        $nama = $rak->nama;
+        $rak->delete();
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Rak '{$nama}' berhasil dihapus."]);
     }
 
     /** [F2-5] Export laporan stok via queue (async — jangan sinkron di request). */

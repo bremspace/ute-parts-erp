@@ -3,10 +3,13 @@
 namespace App\Modules\Wms\Models;
 
 use App\Modules\Pos\Models\HargaTier;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'produk_id', 'sku', 'barcode', 'nama_varian', 'satuan_kode', 'atribut', 'harga_beli',
@@ -14,6 +17,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class SkuVariant extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('SKU Varian');
+    }
+
     protected $casts = [
         'is_active' => 'boolean',
         'atribut' => 'array',

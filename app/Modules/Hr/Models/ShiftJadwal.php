@@ -3,6 +3,7 @@
 namespace App\Modules\Hr\Models;
 
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +19,7 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class ShiftJadwal extends Model
 {
+    use CatatAktivitas;
     use LogsActivity;
 
     protected $table = 'shift_jadwal';
@@ -40,8 +42,15 @@ class ShiftJadwal extends Model
         return $this->belongsTo(Shift::class);
     }
 
+    /**
+     * [F1-4] Audit trail roster shift.
+     *
+     * Roster adalah master jadwal kerja → perubahan shift staff adalah keputusan
+     * yang harus bisa diaudit. `cabang_id` ada di tabel sehingga `CatatAktivitas`
+     * menyimpan cabang ke activity log (filter per cabang tetap bekerja).
+     */
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll();
+        return $this->opsilogAktivitas('Jadwal Shift');
     }
 }

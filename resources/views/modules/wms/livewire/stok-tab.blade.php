@@ -95,8 +95,8 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div class="w-full max-w-lg glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Manajemen Rak (Bin)</h3>
-                    <button wire:click="$set('showRakModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <h3 class="text-lg font-bold text-white">{{ $editRakId ? 'Edit Rak (Bin)' : 'Manajemen Rak (Bin)' }}</h3>
+                    <button wire:click="$set('showRakModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
                 </div>
 
                 <div class="space-y-3 mb-4">
@@ -124,16 +124,33 @@
                             <input type="text" wire:model="rakForm.zona" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" placeholder="A" />
                         </div>
                     </div>
-                    <button wire:click="simpanRak" class="w-full py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">+ Tambah Rak</button>
+                    <div class="flex gap-2">
+                        @if($editRakId)
+                            <button type="button" wire:click="$set('editRakId', null); $set('rakForm', ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''])" class="px-4 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                        @endif
+                        <button wire:click="simpanRak" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">
+                            {{ $editRakId ? '💾 Simpan Perubahan Rak' : '+ Tambah Rak' }}
+                        </button>
+                    </div>
                 </div>
 
                 <div class="space-y-2">
                     <p class="text-xs font-bold text-ink-300 uppercase">Rak Terdaftar</p>
                     @forelse($raks as $rk)
-                        <div class="flex justify-between py-2 px-3 rounded-lg bg-white/[0.03] border border-white/5 text-xs">
-                            <span class="font-mono text-up-primary">{{ $rk->kode }}</span>
-                            <span class="text-ink-200">{{ $rk->nama }}</span>
-                            <span class="text-ink-400">{{ $rk->gudang?->nama }}</span>
+                        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-white/[0.03] border border-white/5 text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-up-primary font-bold">{{ $rk->kode }}</span>
+                                <span class="text-ink-200">{{ $rk->nama }}</span>
+                                <span class="text-ink-400 text-[10px]">({{ $rk->gudang?->nama }})</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button type="button" wire:click="editRak({{ $rk->id }})" class="p-1 rounded bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white text-xs cursor-pointer" title="Edit Rak">
+                                    ✏️
+                                </button>
+                                <button type="button" wire:click="hapusRak({{ $rk->id }})" wire:confirm="Yakin ingin menghapus rak '{{ $rk->kode }}'?" class="p-1 rounded bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 text-xs cursor-pointer" title="Hapus Rak">
+                                    🗑️
+                                </button>
+                            </div>
                         </div>
                     @empty
                         <p class="text-xs text-ink-500 text-center py-4">Belum ada rak.</p>

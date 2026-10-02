@@ -53,7 +53,7 @@
                 <div>
                     <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-[11px] uppercase tracking-wider font-bold text-up-accent bg-up-accent/10 px-2.5 py-1 rounded-full">
-                            {{ $produk->kategoriRelasi ? $produk->kategoriRelasi->nama_lengkap : $produk->kategori }}
+                            {{ $produk->kategoriRelasi ? $produk->kategoriRelasi->nama_lengkap : (is_array($produk->kategori) ? implode(', ', $produk->kategori) : (string) $produk->kategori) }}
                         </span>
                         <span class="text-[11px] uppercase tracking-wider font-bold text-ink-500 bg-ink-50 px-2.5 py-1 rounded-full">{{ $produk->kondisi }}</span>
                         @if($produk->brand)
@@ -69,7 +69,7 @@
                     </div>
                     <h1 class="text-2xl sm:text-3xl font-black text-ink-900 mt-3 leading-tight">{{ $produk->nama }}</h1>
                     @if($produk->brand_kompatibel)
-                        <p class="text-sm text-ink-500 mt-1.5">Kompatibel Utama: <strong class="text-ink-700">{{ $produk->brand_kompatibel }} {{ $produk->model_kompatibel }}</strong></p>
+                        <p class="text-sm text-ink-500 mt-1.5">Kompatibel Utama: <strong class="text-ink-700">{{ is_array($produk->brand_kompatibel) ? implode(' ', $produk->brand_kompatibel) : (string) $produk->brand_kompatibel }} {{ is_array($produk->model_kompatibel) ? implode(' ', $produk->model_kompatibel) : (string) $produk->model_kompatibel }}</strong></p>
                     @endif
                 </div>
 

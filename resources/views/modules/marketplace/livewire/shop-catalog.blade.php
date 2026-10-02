@@ -79,17 +79,25 @@
             <select wire:model.live="filterKategori" class="px-3 py-2.5 rounded-xl bg-white border border-ink-100 text-sm font-medium text-ink-700 outline-none focus:border-up-primary min-h-[44px]">
                 <option value="" class="text-ink-400">Semua Kategori</option>
                 @foreach($categories as $cat)
-                    @if(is_object($cat) && isset($cat->children) && $cat->children->count() > 0)
-                        <optgroup label="{{ $cat->nama }}">
-                            <option value="{{ $cat->id }}">— Semua {{ $cat->nama }} —</option>
-                            @foreach($cat->children as $child)
-                                <option value="{{ $child->id }}">{{ $child->nama }}</option>
+                    @php
+                        $catId = is_array($cat) ? ($cat['id'] ?? '') : ($cat->id ?? (is_scalar($cat) ? (string) $cat : ''));
+                        $catNama = is_array($cat) ? ($cat['nama'] ?? '') : ($cat->nama ?? (is_scalar($cat) ? (string) $cat : ''));
+                        $children = is_array($cat) ? ($cat['children'] ?? []) : ($cat->children ?? []);
+                        $hasChildren = !empty($children) && (is_countable($children) ? count($children) : 0) > 0;
+                    @endphp
+                    @if($hasChildren)
+                        <optgroup label="{{ $catNama }}">
+                            <option value="{{ $catId }}">— Semua {{ $catNama }} —</option>
+                            @foreach($children as $child)
+                                @php
+                                    $childId = is_array($child) ? ($child['id'] ?? '') : ($child->id ?? (is_scalar($child) ? (string) $child : ''));
+                                    $childNama = is_array($child) ? ($child['nama'] ?? '') : ($child->nama ?? (is_scalar($child) ? (string) $child : ''));
+                                @endphp
+                                <option value="{{ $childId }}">{{ $childNama }}</option>
                             @endforeach
                         </optgroup>
-                    @elseif(is_object($cat))
-                        <option value="{{ $cat->id }}">{{ $cat->nama }}</option>
-                    @else
-                        <option value="{{ $cat }}">{{ $cat }}</option>
+                    @elseif(!empty($catNama))
+                        <option value="{{ $catId }}">{{ $catNama }}</option>
                     @endif
                 @endforeach
             </select>

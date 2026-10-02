@@ -52,6 +52,15 @@ class CrmDashboard extends Component
 
     public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false];
 
+    public bool $showEditPelangganModal = false;
+
+    public ?int $editPelangganId = null;
+
+    public array $editPelangganForm = [
+        'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
+        'tanggal_lahir' => '', 'tier_membership_id' => null, 'is_reseller' => false,
+    ];
+
     public function simpanPelangganBaruCrm()
     {
         if (! $this->boleh('crm.create', 'Anda tidak memiliki izin menambah pelanggan.')) {
@@ -76,6 +85,98 @@ class CrmDashboard extends Component
         $this->showPelangganBaruModal = false;
         $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan (tersedia di POS & Servis)']);
+    }
+
+    public function openEditPelangganModal(int $id): void
+    {
+        $user = auth()->user();
+        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('admin-toko') || $user->hasRole('marketing') || $user->can('crm.create')))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, Admin Toko, atau Marketing yang berhak mengedit data pelanggan.']);
+
+            return;
+        }
+
+        $p = Pelanggan::findOrFail($id);
+        $this->editPelangganId = $p->id;
+        $this->editPelangganForm = [
+            'nama' => $p->nama,
+            'telepon' => $p->telepon,
+            'email' => $p->email ?? '',
+            'alamat' => $p->alamat ?? '',
+            'tanggal_lahir' => $p->tanggal_lahir?->format('Y-m-d') ?? '',
+            'tier_membership_id' => $p->tier_membership_id,
+            'is_reseller' => (bool) $p->is_reseller,
+        ];
+        $this->showEditPelangganModal = true;
+    }
+
+    public function simpanEditPelanggan(): void
+    {
+        $user = auth()->user();
+        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('admin-toko') || $user->hasRole('marketing') || $user->can('crm.create')))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, Admin Toko, atau Marketing yang berhak mengedit data pelanggan.']);
+
+            return;
+        }
+
+        $this->validate([
+            'editPelangganForm.nama' => 'required|string|max:255',
+            'editPelangganForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon,'.$this->editPelangganId,
+            'editPelangganForm.email' => 'nullable|email|unique:pelanggan,email,'.$this->editPelangganId,
+            'editPelangganForm.tier_membership_id' => 'nullable|exists:tier_memberships,id',
+        ]);
+
+        $pelanggan = Pelanggan::findOrFail($this->editPelangganId);
+        $pelanggan->update([
+            'nama' => $this->editPelangganForm['nama'],
+            'telepon' => $this->editPelangganForm['telepon'],
+            'email' => $this->editPelangganForm['email'] ?: null,
+            'alamat' => $this->editPelangganForm['alamat'] ?: null,
+            'tanggal_lahir' => $this->editPelangganForm['tanggal_lahir'] ?: null,
+            'tier_membership_id' => $this->editPelangganForm['tier_membership_id'] ?: null,
+            'is_reseller' => (bool) $this->editPelangganForm['is_reseller'],
+        ]);
+
+        $this->showEditPelangganModal = false;
+        $this->editPelangganId = null;
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Data pelanggan berhasil diperbarui']);
+    }
+
+    public function hapusPelanggan(int $id): void
+    {
+        $user = auth()->user();
+        if (! isSuperAdminOrOwner($user)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin / Owner yang berhak menghapus data pelanggan.']);
+
+            return;
+        }
+
+        $pelanggan = Pelanggan::find($id);
+        if (! $pelanggan) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pelanggan tidak ditemukan.']);
+
+            return;
+        }
+
+        // Cek riwayat transaksi & servis
+        $hasTransaksi = Transaksi::where('pelanggan_id', $id)->exists();
+        $hasServis = TiketServis::where('pelanggan_id', $id)->exists();
+
+        if ($hasTransaksi || $hasServis) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Pelanggan '{$pelanggan->nama}' memiliki riwayat transaksi penjualan / servis sehingga tidak dapat dihapus demi integritas pembukuan & audit.",
+            ]);
+
+            return;
+        }
+
+        $nama = $pelanggan->nama;
+        $pelanggan->delete();
+        if ($this->selectedCustomerId === $id) {
+            $this->selectedCustomerId = null;
+        }
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Pelanggan '{$nama}' berhasil dihapus."]);
     }
 
     public function getTiersProperty()
@@ -195,6 +296,38 @@ class CrmDashboard extends Component
         }
 
         $this->showTierModal = false;
+    }
+
+    public function hapusTier(int $id): void
+    {
+        $user = auth()->user();
+        if (! isSuperAdminOrOwner($user) && ! ($user && $user->can('tier.manage'))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin / Owner yang berhak menghapus tier membership.']);
+
+            return;
+        }
+
+        $tier = TierMembership::find($id);
+        if (! $tier) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tier tidak ditemukan.']);
+
+            return;
+        }
+
+        $countPelanggan = Pelanggan::where('tier_membership_id', $id)->count();
+        if ($countPelanggan > 0) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Tier '{$tier->nama}' sedang digunakan oleh {$countPelanggan} pelanggan. Pindahkan pelanggan ke tier lain terlebih dahulu.",
+            ]);
+
+            return;
+        }
+
+        $nama = $tier->nama;
+        $tier->delete();
+        $this->showTierModal = false;
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Tier '{$nama}' berhasil dihapus."]);
     }
 
     public function recalcTier()

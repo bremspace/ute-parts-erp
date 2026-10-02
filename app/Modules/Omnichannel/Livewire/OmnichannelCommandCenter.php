@@ -95,6 +95,15 @@ class OmnichannelCommandCenter extends Component
 
     public function connectChannel()
     {
+        // [RBAC] Rute /app/omnichannel hanya `omnichannel.view`, tapi method ini
+        // menulis kredensial kanal + status koneksi. API equivalentnya
+        // (POST /api/omnichannel/channels) butuh `omnichannel.manage`.
+        if (! auth()->user()?->can('omnichannel.manage')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin mengelola kanal omnichannel.']);
+
+            return;
+        }
+
         $this->validate([
             'connectForm.nama' => 'required|string|max:255',
             'connectForm.platform' => 'required|in:shopee,tokopedia,blibli,tiktok,lazada',
@@ -150,6 +159,13 @@ class OmnichannelCommandCenter extends Component
 
     public function saveMapping()
     {
+        // [RBAC] Menulis ChannelProductMapping = API POST /api/omnichannel/channels/{id}/mapping
+        if (! auth()->user()?->can('omnichannel.manage')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin mengelola mapping produk omnichannel.']);
+
+            return;
+        }
+
         if (! $this->mappingChannelId || empty($this->selectedProdukIds)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih channel & minimal 1 produk']);
 
@@ -176,6 +192,13 @@ class OmnichannelCommandCenter extends Component
 
     public function triggerSyncAll()
     {
+        // [RBAC] Trigger push stok ke marketplace = API POST /api/omnichannel/sync-stock
+        if (! auth()->user()?->can('omnichannel.manage')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin menjalankan sinkronisasi omnichannel.']);
+
+            return;
+        }
+
         try {
             $produkIds = ChannelProductMapping::where('status', 'tersinkron')
                 ->pluck('produk_id')->unique();

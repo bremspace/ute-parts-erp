@@ -24,7 +24,9 @@ class RolesAndPermissionsSeeder extends Seeder
             // WMS
             'wms.view', 'wms.create', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po',
             // SERVIS
-            'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
+            // SERVIS — `servis.manage` = permission resmi master jenis servis
+            // (pengganti ekuivalen sementara `servis.update-status`).
+            'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status', 'servis.manage',
             // CRM
             'crm.view', 'crm.create', 'crm.edit', 'crm.delete', 'crm.broadcast',
             // TIER
@@ -78,11 +80,16 @@ class RolesAndPermissionsSeeder extends Seeder
         $superAdmin = Role::findOrCreate('super-admin');
         $superAdmin->givePermissionTo(Permission::all());
 
+        $owner = Role::findOrCreate('owner');
+        $owner->givePermissionTo(Permission::all());
+
         $adminToko = Role::findOrCreate('admin-toko');
         $adminToko->givePermissionTo([
             'pos.create', 'pos.view', 'pos.view-own', 'pos.void',
             'wms.view', 'wms.transfer', 'wms.opname', 'wms.approve-opname',
             'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
+            // admin-toko = bagian terkait servis → boleh kelola master jenis servis
+            'servis.manage',
             'crm.view',
             'laporan.cabang',
             'approve-workflow',

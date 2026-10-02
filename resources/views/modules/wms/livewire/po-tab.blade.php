@@ -61,15 +61,27 @@
                                     <p class="text-[10px] text-ink-500">PIC: {{ $sp->kontak }}</p>
                                 @endif
                             </div>
-                            @can('wms.create')
-                                <button
-                                    wire:click="bukaEditSupplier({{ $sp->id }})"
-                                    class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition text-xs cursor-pointer"
-                                    title="Edit Supplier"
-                                >
-                                    ✏️
-                                </button>
-                            @endcan
+                            <div class="flex items-center gap-1">
+                                @can('wms.create')
+                                    <button
+                                        wire:click="bukaEditSupplier({{ $sp->id }})"
+                                        class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition text-xs cursor-pointer"
+                                        title="Edit Supplier"
+                                    >
+                                        ✏️
+                                    </button>
+                                @endcan
+                                @if(isSuperAdminOrOwner() || auth()->user()?->hasRole('finance'))
+                                    <button
+                                        wire:click="hapusSupplier({{ $sp->id }})"
+                                        wire:confirm="Yakin ingin menghapus supplier '{{ $sp->nama }}'? Jika memiliki riwayat PO, status akan dinonaktifkan."
+                                        class="p-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 transition text-xs cursor-pointer"
+                                        title="Hapus Supplier"
+                                    >
+                                        🗑️
+                                    </button>
+                                @endif
+                            </div>
                         </div>
                     @empty
                         <p class="text-xs text-ink-500 col-span-full py-4 text-center">Belum ada supplier.</p>
@@ -264,9 +276,16 @@
                         <label for="supplierActive" class="text-xs text-ink-200">Supplier Aktif</label>
                     </div>
                 </div>
-                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
-                    <button wire:click="$set('editSupplierId', null)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="perbaruiSupplier" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px] active:scale-[0.97]">Simpan Perubahan</button>
+                <div class="flex items-center justify-between gap-3 pt-4 border-t border-white/5 mt-5">
+                    @if(isSuperAdminOrOwner() || auth()->user()?->hasRole('finance'))
+                        <button type="button" wire:click="hapusSupplier({{ $editSupplierId }})" wire:confirm="Yakin ingin menghapus supplier ini? Jika memiliki riwayat PO, status akan dinonaktifkan." class="px-3 py-3 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer min-h-[44px]">
+                            🗑️ Hapus
+                        </button>
+                    @endif
+                    <div class="flex-1 flex gap-2 justify-end">
+                        <button wire:click="$set('editSupplierId', null)" class="px-4 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                        <button wire:click="perbaruiSupplier" class="px-5 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px] active:scale-[0.97]">Simpan Perubahan</button>
+                    </div>
                 </div>
             </div>
         </div>

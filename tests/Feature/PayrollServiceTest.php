@@ -26,10 +26,22 @@ class PayrollServiceTest extends TestCase
 
     protected PayrollService $payrollService;
 
+    /**
+     * Periode payroll yang dihitung test, format 'Y-m'.
+     *
+     * Fixture di file ini selalu membuat tiket servis dengan
+     * `tanggal_selesai => now()`, jadi periode TIDAK boleh ditulis tetap.
+     * `PayrollService` menghitung komisi per periode; hardcode bulan membuat
+     * test gagal begitu tanggal bergeser ke bulan berikutnya — gagal karena
+     * waktu, bukan karena logika gaji. Ambil dari jam lokal test.
+     */
+    private string $periode;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->payrollService = app(PayrollService::class);
+        $this->periode = now()->format('Y-m');
 
         // Seed cabang dan COA
         $this->seed(CabangSeeder::class);
@@ -103,7 +115,7 @@ class PayrollServiceTest extends TestCase
             'tanggal_selesai' => now()->format('Y-m-d'),
         ]);
 
-        $result = $this->payrollService->hitungDraft('2026-09');
+        $result = $this->payrollService->hitungDraft($this->periode);
 
         $this->assertEquals(1, $result['karyawan_diproses']);
         $this->assertGreaterThan(0, $result['total_gaji']);
@@ -132,8 +144,8 @@ class PayrollServiceTest extends TestCase
             'status_aktif' => true,
         ]);
 
-        $this->payrollService->hitungDraft('2026-09');
-        $result1 = $this->payrollService->hitungDraft('2026-09');
+        $this->payrollService->hitungDraft($this->periode);
+        $result1 = $this->payrollService->hitungDraft($this->periode);
 
         $this->assertEquals($result1['total_gaji'], PayrollSlip::sum('total_gaji'));
         $this->assertEquals(1, PayrollSlip::count());
@@ -142,10 +154,10 @@ class PayrollServiceTest extends TestCase
     /** @test */
     public function test_periode_dibuat_idempoten(): void
     {
-        $this->payrollService->hitungDraft('2026-09');
-        $this->payrollService->hitungDraft('2026-09');
+        $this->payrollService->hitungDraft($this->periode);
+        $this->payrollService->hitungDraft($this->periode);
 
-        $this->assertEquals(1, PayrollPeriode::where('periode', '2026-09')->count());
+        $this->assertEquals(1, PayrollPeriode::where('periode', $this->periode)->count());
     }
 
     /** @test */
@@ -162,7 +174,7 @@ class PayrollServiceTest extends TestCase
             'status_aktif' => true,
         ]);
 
-        $result = $this->payrollService->hitungDraft('2026-09');
+        $result = $this->payrollService->hitungDraft($this->periode);
         $slip = PayrollSlip::first();
 
         $this->assertEquals(4500000, $slip->total_gaji);
@@ -224,7 +236,7 @@ class PayrollServiceTest extends TestCase
         // Engine mencatat komisi utk tiket ini (status pending)
         app(KomisiService::class)->hitungKomisiMultiAktor('tiket_servis', ['tiket_servis_id' => $tiket->id]);
 
-        $this->payrollService->hitungDraft('2026-09');
+        $this->payrollService->hitungDraft($this->periode);
 
         $slip = PayrollSlip::first();
         $this->assertNotNull($slip);
@@ -247,8 +259,13 @@ class PayrollServiceTest extends TestCase
             'status_aktif' => true,
         ]);
 
-        // 5 hari absen tanpa izin dalam periode 2026-09
-        foreach (['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-05', '2026-09-08'] as $tanggal) {
+        // 5 hari absen tanpa izin, tersebar di bulan periode test.
+        // Tanggal dihitung dari $this->periode supaya test tidak bergantung
+        // pada bulan kalender tertentu. Spread [+0,+1,+2,+4,+7] dipakai supaya
+        // hitungan tidak bergantung jumlah hari dalam bulan.
+        $awalBulan = date('Y-m-01', strtotime($this->periode.'-01'));
+        foreach ([0, 1, 2, 4, 7] as $offsetHari) {
+            $tanggal = date('Y-m-d', strtotime($awalBulan.'+'.$offsetHari.' day'));
             AbsensiLog::create([
                 'karyawan_id' => $karyawan->id,
                 'tanggal' => $tanggal,
@@ -264,7 +281,7 @@ class PayrollServiceTest extends TestCase
             'hr.potongan_absen.nominal_per_hari' => 25000,
         ]);
 
-        $this->payrollService->hitungDraft('2026-09');
+        $this->payrollService->hitungDraft($this->periode);
         $slip = PayrollSlip::first();
         $this->assertNotNull($slip);
 
@@ -278,7 +295,7 @@ class PayrollServiceTest extends TestCase
 
         // Kasus cabang TIDAK opt-in → potongan absen 0
         config(['hr.potongan_absen.cabang_aktif' => []]);
-        $this->payrollService->hitungDraft('2026-09');
+        $this->payrollService->hitungDraft($this->periode);
         $this->assertEquals(0.0, (float) $slip->fresh()->total_potongan);
         $rincianNonaktif = json_decode($slip->fresh()->rincian, true);
         $this->assertEquals(0.0, (float) $rincianNonaktif['potongan_absen']);

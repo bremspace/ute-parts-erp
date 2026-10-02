@@ -74,11 +74,11 @@ class AkuntingDashboard extends Component
 
     public array $manualLines = [];
 
-    // COA modal
+    // COA modal. `id` = null → mode tambah; terisi → mode edit.
     public bool $showCoaModal = false;
 
     public array $coaForm = [
-        'kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit',
+        'id' => null, 'kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit',
     ];
 
     public bool $showBayarPiutangModal = false;
@@ -615,33 +615,196 @@ class AkuntingDashboard extends Component
     }
 
     // ===== COA =====
+
+    /**
+     * [COA-CRUD] Daftar akun COA = paginasi, bukan `get()`.
+     *
+     * SEBELUMNYA `->get()` menarik SELURUH akun COA ke memori tiap render tab
+     * COA. COA bersifat global (tanpa cabang_id) sehingga grow-nya mengikuti
+     * seluruh cabang — di produksi ratusan baris, dan `get()` di server RAM
+     * 1GB adalah risiko nyata. Sekarang 25 baris per halaman lewat
+     * `WithPagination` (komponen sudah memakainya untuk jurnal). Nama halaman
+     * `pageCoa` dipisah dari `page` (jurnal) / `pagePiutang` / `pageUtang`
+     * supaya halaman tabel satu tidak ikut bergeser saat tabel lain dimuat
+     * ulang — sama seperti `PER_HALAMAN_SUBLEDGER` di atas.
+     */
     public function getCoaListProperty()
     {
-        return AkunCOA::orderBy('kode')->get();
+        return AkunCOA::orderBy('kode')->paginate(25, ['*'], 'pageCoa');
     }
 
     public function openCoaModal()
     {
-        $this->coaForm = ['kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit'];
+        $this->resetCoaForm();
         $this->showCoaModal = true;
     }
 
+    /**
+     * [COA-CRUD] Buka modal edit. Guard permission tetap di `simpanCoa()`
+     * (satu-satunya titik mutasi), tapi aksi ini datang dari client
+     * `wire:click` dengan id arbitrary → guard di sini juga, supaya user tanpa
+     * izin tidak bisa memuat form akun yang tidak berhak dia lihat ubah.
+     */
+    public function openEditCoaModal(int $id)
+    {
+        $this->izin('akunting.edit');
+
+        $akun = AkunCOA::find($id);
+
+        if (! $akun) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Akun COA tidak ditemukan.']);
+
+            return;
+        }
+
+        $this->resetCoaForm();
+        $this->coaForm = [
+            'id' => $akun->id,
+            'kode' => $akun->kode,
+            'nama' => $akun->nama,
+            'tipe' => $akun->tipe,
+            'kelompok' => $akun->kelompok,
+            'saldo_normal' => $akun->saldo_normal,
+        ];
+        $this->showCoaModal = true;
+    }
+
+    /**
+     * [COA-CRUD] Tambah ATAU ubah akun COA — mode ditentukan `coaForm.id`.
+     * Audit trail otomatis dari `AkunCOA` (`LogsActivity` + `logOnly` kolom
+     * sensitif + `logOnlyDirty`), jadi update yang tidak mengubah apa pun
+     * tidak menulis baris log.
+     */
     public function simpanCoa()
     {
-        // [B-10a / P0-2] guard server-side: buat COA wajib akunting.edit
+        // [B-10a / P0-2] guard server-side: tambah & ubah COA wajib akunting.edit
         $this->izin('akunting.edit');
 
         $this->validate([
-            'coaForm.kode' => 'required|string|max:20|unique:akun_coa,kode',
+            // Mode edit: aturan unique mengabaikan record yang sedang diedit.
+            'coaForm.kode' => 'required|string|max:20|unique:akun_coa,kode,'.($this->coaForm['id'] ?? 'NULL'),
             'coaForm.nama' => 'required|string|max:255',
             'coaForm.tipe' => 'required|in:aset,kewajiban,ekuitas,pendapatan,beban',
             'coaForm.kelompok' => 'required|string|max:100',
             'coaForm.saldo_normal' => 'required|in:debit,kredit',
         ]);
 
-        AkunCOA::create($this->coaForm);
+        $data = [
+            'kode' => $this->coaForm['kode'],
+            'nama' => $this->coaForm['nama'],
+            'tipe' => $this->coaForm['tipe'],
+            'kelompok' => $this->coaForm['kelompok'],
+            'saldo_normal' => $this->coaForm['saldo_normal'],
+        ];
+
+        if (! empty($this->coaForm['id'])) {
+            AkunCOA::findOrFail($this->coaForm['id'])->update($data);
+            $pesan = 'Akun COA diperbarui';
+        } else {
+            AkunCOA::create($data);
+            $pesan = 'Akun COA ditambahkan';
+        }
+
+        $this->resetCoaForm();
         $this->showCoaModal = false;
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Akun COA ditambahkan']);
+        $this->resetPage('pageCoa');
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
+    }
+
+    /**
+     * [COA-CRUD] Hapus akun COA.
+     *
+     * Menghapus chart of accounts adalah aksi TIDAK bisa dibalik dan berdampak
+     * ke pembukuan seluruh cabang (COA global, tanpa `cabang_id`), jadi
+     * gerbang = Super Admin / Owner — mengikuti preseden `ProdukTab::hapusProduk`
+     * (satu-satunya master-data delete yang sudah ada di repo ini). Permission
+     * `akunting.edit` cukup untuk tambah/ubah, TIDAK untuk hapus.
+     *
+     * Tiga cabang:
+     * 1. Ada baris jurnal → JANGAN hard delete (`jurnal_akuntansi.akun_coa_id`
+     *    `cascadeOnDelete`, jadi delete diam-diam menghapus bukti pembukuan).
+     *    Nonaktifkan + tulis baris log eksplisit via `activity()`, karena
+     *    `dontLogEmptyChanges()` pada model bisa tidak menghasilkan baris log
+     *    yang menjelaskan MENGGAPA akun dinonaktifkan.
+     * 2. Ada akun anak (`parent_id` menunjuk ke akun ini) → nonaktifkan;
+     *    akun induk tidak boleh hilang dari hierarki COA.
+     * 3. Bersih (tidak ada jurnal, tidak ada anak) → hapus permanen.
+     */
+    public function hapusCoa(int $id)
+    {
+        if (! isSuperAdminOrOwner(auth()->user())) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin / Owner yang berhak menghapus akun COA.']);
+
+            return;
+        }
+
+        $akun = AkunCOA::find($id);
+        if (! $akun) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Akun COA tidak ditemukan.']);
+
+            return;
+        }
+
+        // 1. Jurnal yang sudah posted = jejak audit yang tidak boleh hilang.
+        if ($akun->jurnal()->exists()) {
+            $this->nonaktifkanCoa($akun, 'memiliki riwayat jurnal');
+
+            return;
+        }
+
+        // 2. Ada akun anak yang menunjuk ke akun ini.
+        if (AkunCOA::where('parent_id', $akun->id)->exists()) {
+            $this->nonaktifkanCoa($akun, 'masih memiliki akun anak');
+
+            return;
+        }
+
+        // 3. Bersih dari jurnal & anak akun → hapus permanen.
+        try {
+            $akun->delete();
+            $this->resetPage('pageCoa');
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Akun COA '{$akun->kode} — {$akun->nama}' berhasil dihapus permanen."]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal menghapus akun COA: '.$e->getMessage()]);
+        }
+    }
+
+    /**
+     * [COA-CRUD] Nonaktifkan akun + catat alasan eksplisit di activity log.
+     *
+     * Baris `activity()` manual WAJIB: `AkunCOA::getActivitylogOptions()` memakai
+     * `logOnlyDirty()->dontLogEmptyChanges()`, jadi flip `is_active` pada akun
+     * yang sudah nonaktif (atau update lain tanpa efek) tidak menghasilkan jejak
+     * yang menjelaskan keputusan nonaktif — padahal inherit predefined tetap
+     * menulis `Akun COA diperbarui`. Pola ini disamakan dengan
+     * `ProdukTab::hapusProduk()`.
+     */
+    private function nonaktifkanCoa(AkunCOA $akun, string $alasan): void
+    {
+        $akun->update(['is_active' => false]);
+        activity()
+            ->performedOn($akun)
+            ->causedBy(auth()->user())
+            ->log("Akun COA '{$akun->kode} — {$akun->nama}' dinonaktifkan karena {$alasan}.");
+
+        if (($this->coaForm['id'] ?? null) === $akun->id) {
+            $this->showCoaModal = false;
+            $this->resetCoaForm();
+        }
+
+        $this->resetPage('pageCoa');
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => "Akun COA '{$akun->kode} — {$akun->nama}' {$alasan} sehingga tidak dapat dihapus permanen demi keutuhan data audit & akuntansi. Status akun berhasil diubah menjadi NONAKTIF.",
+        ]);
+    }
+
+    private function resetCoaForm(): void
+    {
+        $this->resetValidation();
+        $this->coaForm = [
+            'id' => null, 'kode' => '', 'nama' => '', 'tipe' => 'aset', 'kelompok' => '', 'saldo_normal' => 'debit',
+        ];
     }
 
     // ===== PIUTANG / UTANG =====

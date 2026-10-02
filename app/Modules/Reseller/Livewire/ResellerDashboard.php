@@ -100,6 +100,16 @@ class ResellerDashboard extends Component
 
     public function prosesApproval(string $action)
     {
+        // [RBAC] Rute /app/reseller hanya `reseller.view` (dimiliki marketing),
+        // tapi prosesApproval mem-post jurnal (510-01/210-03) + Utang lewat
+        // KomisiService. Otoritas approve komisi = `komisi.approve` (finance),
+        // sama seperti API POST /api/reseller/komisi/approve.
+        if (! auth()->user()?->can('komisi.approve')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin approval komisi.']);
+
+            return;
+        }
+
         if (empty($this->selectedKomisiIds)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih minimal satu komisi terlebih dahulu']);
 
@@ -112,7 +122,10 @@ class ResellerDashboard extends Component
             $this->dispatch('alert', [
                 'type' => 'success',
                 'message' => $action === 'approve'
-                    ? "{$approved} komisi disetujui — jurnal & utang dibuat otomatis"
+                    // count(), bukan interpolasi array — `{$approved}` memicu
+                    // "Array to string conversion" yang ditangkap catch di bawah,
+                    // sehingga approval BERHASIL justru menampilkan toast error.
+                    ? count($approved).' komisi disetujui — jurnal & utang dibuat otomatis'
                     : count($approved).' komisi ditolak',
             ]);
         } catch (\Exception $e) {

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Notifikasi\Jobs\KirimNotifikasiJob;
+use App\Modules\Rbac\Models\Cabang;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -25,6 +26,17 @@ class TwoFactorTest extends TestCase
         Role::firstOrCreate(['name' => 'finance', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'kasir', 'guard_name' => 'web']);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        // Route /app/* berada di middleware 'cabang.selected'. Kalau tidak ada
+        // cabang aktif sama sekali, User::cabangDefault() mengembalikan null dan
+        // middleware itu abort(403) — test yang hanya menguji 2FA ikut gagal
+        // dengan 403 yang tidak ada hubungannya. Satu cabang aktif sudah cukup:
+        // cabangDefault() jatuh ke fallback "cabang aktif pertama" tanpa perlu
+        // penugasan pivot eksplisit.
+        Cabang::firstOrCreate(
+            ['kode' => 'T2FA'],
+            ['nama' => 'Cabang 2FA Test', 'is_active' => true]
+        );
     }
 
     protected function createUser(array $attributes = [], ?string $role = null): User

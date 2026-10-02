@@ -78,9 +78,9 @@ class ShopPage extends Component
         $this->resetPage();
     }
 
-    public function getCategoriesProperty()
+    public function getCategoriesProperty(): array
     {
-        return Cache::remember('shop.categories.tree.v1', self::HP_LIST_CACHE_TTL, function () {
+        return Cache::remember('shop.categories.tree.v2', self::HP_LIST_CACHE_TTL, function (): array {
             $kat = KategoriProduk::where('is_active', true)
                 ->orderBy('urutan')
                 ->orderBy('nama')
@@ -89,14 +89,36 @@ class ShopPage extends Component
             if ($kat->isNotEmpty()) {
                 $grouped = $kat->groupBy('parent_id');
                 $roots = $grouped->get(null, collect());
+                $result = [];
                 foreach ($roots as $r) {
-                    $r->setRelation('children', $grouped->get($r->id, collect()));
+                    $children = $grouped->get($r->id, collect())->map(function ($c): array {
+                        return [
+                            'id' => (string) $c->id,
+                            'nama' => (string) $c->nama,
+                            'slug' => (string) $c->slug,
+                        ];
+                    })->values()->all();
+
+                    $result[] = [
+                        'id' => (string) $r->id,
+                        'nama' => (string) $r->nama,
+                        'slug' => (string) $r->slug,
+                        'children' => $children,
+                    ];
                 }
 
-                return $roots;
+                return $result;
             }
 
-            return Produk::where('is_active', true)->distinct()->orderBy('kategori')->pluck('kategori')->filter()->values();
+            return Produk::where('is_active', true)
+                ->distinct()
+                ->orderBy('kategori')
+                ->pluck('kategori')
+                ->filter()
+                ->map(fn ($k) => is_array($k) ? implode(', ', $k) : (string) $k)
+                ->values()
+                ->map(fn ($k) => ['id' => $k, 'nama' => $k, 'children' => []])
+                ->all();
         });
     }
 

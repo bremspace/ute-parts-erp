@@ -432,6 +432,39 @@ class PoTab extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier disimpan']);
     }
 
+    public function hapusSupplier(int $id): void
+    {
+        $user = auth()->user();
+        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('finance') || $user->can('wms.create')))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, atau Finance yang berhak menghapus supplier.']);
+
+            return;
+        }
+
+        $supplier = Supplier::find($id);
+        if (! $supplier) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Supplier tidak ditemukan.']);
+
+            return;
+        }
+
+        if ($supplier->purchaseOrders()->exists()) {
+            $supplier->update(['is_active' => false]);
+            activity()
+                ->performedOn($supplier)
+                ->causedBy($user)
+                ->log("Supplier '{$supplier->nama}' dinonaktifkan karena memiliki riwayat Purchase Order.");
+
+            $this->dispatch('alert', ['type' => 'warning', 'message' => "Supplier '{$supplier->nama}' memiliki riwayat PO terkait, status diubah menjadi Nonaktif."]);
+
+            return;
+        }
+
+        $nama = $supplier->nama;
+        $supplier->delete();
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Supplier '{$nama}' berhasil dihapus."]);
+    }
+
     protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
     {
         if (auth()->user()?->can($permission)) {

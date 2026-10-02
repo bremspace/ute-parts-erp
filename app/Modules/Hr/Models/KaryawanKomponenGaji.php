@@ -2,6 +2,7 @@
 
 namespace App\Modules\Hr\Models;
 
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable(['karyawan_id', 'tipe', 'nama', 'nominal_bulanan', 'is_aktif'])]
 class KaryawanKomponenGaji extends Model
 {
+    use CatatAktivitas;
     use LogsActivity;
 
     protected $table = 'karyawan_komponen_gaji';
@@ -22,8 +24,16 @@ class KaryawanKomponenGaji extends Model
         return $this->belongsTo(Karyawan::class);
     }
 
+    /**
+     * [F1-4] Audit trail komponen gaji (tunjangan/potongan/bonus) per karyawan.
+     *
+     * Volume rendah: hanya menulis saat admin menambah/mengubah komponen, bukan
+     * per slip. Efek bersihnya tetap terekam di `PayrollSlip` (total_tunjangan /
+     * total_potongan), tapi perubahan struktur gaji baru terlihat di slip bulan
+     *berikutnya — jadi log di sini yang menutup celah "gaji quietly dinaikkan".
+     */
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll();
+        return $this->opsilogAktivitas('Komponen Gaji Karyawan');
     }
 }

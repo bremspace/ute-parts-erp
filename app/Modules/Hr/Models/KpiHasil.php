@@ -2,6 +2,7 @@
 
 namespace App\Modules\Hr\Models;
 
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,7 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class KpiHasil extends Model
 {
+    use CatatAktivitas;
     use LogsActivity;
 
     protected $table = 'kpi_hasil';
@@ -36,8 +38,15 @@ class KpiHasil extends Model
         return $this->belongsTo(KpiMetric::class, 'kpi_metric_id');
     }
 
+    /**
+     * [F1-4] Audit trail hasil KPI.
+     *
+     * Dihitung service dari data real (idempotent per karyawan+metric+periode),
+     * jadi `logOnlyDirty()` bawaan `opsilogAktivitas` sudah cukup: re-run
+     * perhitungan yang hasilnya sama tidak menulis baris log baru.
+     */
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll();
+        return $this->opsilogAktivitas('Hasil KPI');
     }
 }

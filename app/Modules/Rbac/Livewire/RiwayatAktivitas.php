@@ -3,24 +3,41 @@
 namespace App\Modules\Rbac\Livewire;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Hr\Models\AbsensiLog;
+use App\Modules\Hr\Models\Karyawan;
+use App\Modules\Hr\Models\KaryawanKomponenGaji;
+use App\Modules\Hr\Models\KomisiTeknisiRule;
+use App\Modules\Hr\Models\KpiHasil;
+use App\Modules\Hr\Models\PayrollPeriode;
+use App\Modules\Hr\Models\PayrollSlip;
+use App\Modules\Hr\Models\ShiftJadwal;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\AktivitasLog;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AktivitasCabang;
+use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Grn;
+use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\ReturnPembelian;
+use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Models\TipeHp;
 use Illuminate\Contracts\Pagination\Paginator;
 use Livewire\Component;
 
@@ -54,6 +71,27 @@ class RiwayatAktivitas extends Component
         'retur_pembelian' => ReturnPembelian::class,
         'user' => User::class,
         'cabang' => Cabang::class,
+        // Master data katalog — CRUD-nya sudah dilog `CatatAktivitas`, tapi tanpa
+        // key di sini owner/super-admin tidak bisa menyaring atau membuka log-nya.
+        'kategori' => KategoriProduk::class,
+        'brand' => Brand::class,
+        'kualitas' => KualitasProduk::class,
+        'satuan' => SatuanUnit::class,
+        'tipe_hp' => TipeHp::class,
+        'gudang' => Gudang::class,
+        'rak' => Rak::class,
+        'jenis_servis' => JenisServis::class,
+        'coa' => AkunCOA::class,
+        // Modul HR — log-nya sudah ditulis model, tanpa key di sini owner
+        // tidak bisa menyaring/membuka per entitas (tidak terlihat sama sekali).
+        'karyawan' => Karyawan::class,
+        'payroll_periode' => PayrollPeriode::class,
+        'payroll_slip' => PayrollSlip::class,
+        'komponen_gaji' => KaryawanKomponenGaji::class,
+        'absensi' => AbsensiLog::class,
+        'kpi_hasil' => KpiHasil::class,
+        'shift_jadwal' => ShiftJadwal::class,
+        'komisi_teknisi' => KomisiTeknisiRule::class,
     ];
 
     public string $tipe = '';
@@ -175,6 +213,27 @@ class RiwayatAktivitas extends Component
             'retur_pembelian' => $model->no_return ?? '#'.$model->id,
             'user' => $model->name.' ('.$model->email.')',
             'cabang' => $model->nama.' ('.$model->kode.')',
+            'kategori' => $model->nama,
+            'brand' => $model->nama,
+            'kualitas' => $model->nama,
+            'satuan' => $model->kode.' · '.$model->nama,
+            'tipe_hp' => ($model->nama ?: $model->model).' ('.$model->merk.')',
+            'gudang' => $model->nama.' ('.$model->kode.')',
+            'rak' => $model->nama.' ('.$model->kode.')',
+            'jenis_servis' => $model->nama.' ('.$model->kode.')',
+            'coa' => $model->kode.' · '.$model->nama,
+            // HR banyak yang child record — judul WAJIB membawa konteks induknya,
+            // karena "2026-10-01" atau "Periode 2026-01" saja tidak menjelaskan siapa.
+            // Tanggal ditampilkan apa adanya (ISO): model HR tidak punya cast `date`,
+            // jadi `->format()` akan meledak, dan ISO justru lebih mudah diurutkan.
+            'karyawan' => $model->nama.' ('.$model->jabatan.')',
+            'payroll_periode' => 'Periode '.$model->periode,
+            'payroll_slip' => 'Slip gaji · '.$model->karyawan?->nama.' ('.$model->periode?->periode.')',
+            'komponen_gaji' => $model->nama.' · '.$model->karyawan?->nama,
+            'absensi' => $model->karyawan?->nama.' · '.$model->tanggal.' ('.$model->status.')',
+            'kpi_hasil' => $model->karyawan?->nama.' · '.$model->periode,
+            'shift_jadwal' => $model->karyawan?->nama.' · '.$model->tanggal.' ('.$model->shift?->nama.')',
+            'komisi_teknisi' => $model->jenis.' · '.$model->jabatan_target,
             'stok' => ($model->produk?->nama ?? 'Produk').' · '.($model->gudang?->nama ?? 'Gudang'),
             default => '#'.$model->getKey(),
         };
@@ -241,9 +300,15 @@ class RiwayatAktivitas extends Component
         return $query->paginate(self::PER_HALAMAN, ['*'], 'page', $this->halaman);
     }
 
+    /**
+     * Bypass scoping cabang utk audit trail. `owner` WAJIB ikut di sini: ia
+     * pemilik usaha, maka aktivitas di cabang manapun pun harus terlihat —
+     * kalau hanya super-admin, CRUD di cabang yang tidak lagi aktif di sesi
+     * owner akan hilang dari pembukaannya (= CRUD tak bisa diaudit).
+     */
     protected function adalahSuperAdmin(): bool
     {
-        return (bool) auth()->user()?->hasRole('super-admin');
+        return isSuperAdminOrOwner(auth()->user());
     }
 
     public function render()
@@ -279,6 +344,24 @@ class RiwayatAktivitas extends Component
                 'retur_pembelian' => 'Retur Pembelian',
                 'user' => 'Pengguna & Akun',
                 'cabang' => 'Master Cabang',
+                'kategori' => 'Master Kategori Produk',
+                'brand' => 'Master Brand',
+                'kualitas' => 'Master Tingkat Kualitas',
+                'satuan' => 'Master Satuan Unit',
+                'tipe_hp' => 'Master Tipe HP',
+                'gudang' => 'Master Gudang',
+                'rak' => 'Master Rak',
+                'jenis_servis' => 'Master Jenis Servis',
+                'coa' => 'Master Akun COA',
+                // HR
+                'karyawan' => 'Data Karyawan',
+                'payroll_periode' => 'Periode Payroll',
+                'payroll_slip' => 'Slip Gaji',
+                'komponen_gaji' => 'Komponen Gaji Karyawan',
+                'absensi' => 'Log Absensi',
+                'kpi_hasil' => 'Hasil KPI',
+                'shift_jadwal' => 'Jadwal Shift',
+                'komisi_teknisi' => 'Aturan Komisi Teknisi',
             ],
         ])->layout('layouts.backoffice', ['header' => 'Audit Trail & Log']);
     }

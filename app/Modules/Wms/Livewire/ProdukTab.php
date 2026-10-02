@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Brand;
@@ -14,11 +15,14 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
+use App\Modules\Wms\Services\ImportSidRetailService;
 use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
 use App\Traits\ParsesNominal;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -124,6 +128,12 @@ class ProdukTab extends Component
 
     public string $importStep = 'upload'; // upload → preview → selesai
 
+    public string $importFormat = 'standar'; // 'standar' | 'sid_retail'
+
+    public ?int $gudangTokoId = null;
+
+    public ?int $gudangPusatId = null;
+
     public array $importPreview = [];
 
     public string $importFilePath = '';
@@ -141,12 +151,11 @@ class ProdukTab extends Component
     }
 
     /**
-     * [T-40] Guard role: tambah stok manual & stok awal produk hanya super-admin.
-     * Role lain wajib lewat PO Supplier (single source of truth stok masuk).
+     * [T-40] Guard role: super-admin atau owner.
      */
     protected function isSuperAdmin(): bool
     {
-        return (bool) (auth()->user()?->hasRole('super-admin'));
+        return isSuperAdminOrOwner();
     }
 
     // Quick action header "+ Tambah Produk" (dari shell WmsDashboard via $dispatch)
@@ -488,6 +497,93 @@ class ProdukTab extends Component
         }
     }
 
+    public function hapusProduk(int $produkId): void
+    {
+        if (! $this->isSuperAdmin()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin / Owner yang berhak menghapus master data produk.']);
+
+            return;
+        }
+
+        $produk = Produk::find($produkId);
+        if (! $produk) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk tidak ditemukan.']);
+
+            return;
+        }
+
+        // 1. Cek sisa stok fisik
+        $stokFisik = (int) StokItem::where('produk_id', $produkId)->sum('jumlah');
+        if ($stokFisik > 0) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Tidak dapat menghapus produk '{$produk->nama}'. Masih ada sisa stok fisik sebanyak {$stokFisik} unit. Kosongkan stok terlebih dahulu via transfer atau opname.",
+            ]);
+
+            return;
+        }
+
+        // 2. Cek riwayat transaksi/mutasi yang terhubung
+        $hasTransaksi = DB::table('transaksi_items')->where('produk_id', $produkId)->exists();
+        $hasPo = DB::table('po_items')->where('produk_id', $produkId)->exists();
+        $hasServis = DB::table('servis_item')->where('produk_id', $produkId)->exists();
+        $hasTransfer = DB::table('stok_transfer_item')->where('produk_id', $produkId)->exists();
+        $hasOpname = DB::table('stok_opname_item')->where('produk_id', $produkId)->exists();
+
+        if ($hasTransaksi || $hasPo || $hasServis || $hasTransfer || $hasOpname) {
+            $produk->update(['is_active' => false]);
+            activity()
+                ->performedOn($produk)
+                ->causedBy(auth()->user())
+                ->log("Produk '{$produk->nama}' dinonaktifkan karena memiliki riwayat transaksi/mutasi.");
+
+            if ($this->editProdukId === $produkId) {
+                $this->showEditProdukModal = false;
+                $this->editProdukId = null;
+            }
+
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Produk '{$produk->nama}' memiliki riwayat transaksi/mutasi sehingga tidak dapat dihapus permanen demi keutuhan data audit & akuntansi. Status produk berhasil diubah menjadi NONAKTIF.",
+            ]);
+
+            return;
+        }
+
+        // 3. Jika bersih dari riwayat transaksi dan stok = 0, hapus permanen
+        try {
+            DB::transaction(function () use ($produk, $produkId) {
+                HargaTier::where('produk_id', $produkId)->delete();
+                StokItem::where('produk_id', $produkId)->delete();
+                SkuVariant::where('produk_id', $produkId)->delete();
+                DB::table('sid_import_maps')->where('entity_type', 'produk')->where('entity_id', $produkId)->delete();
+
+                if (! empty($produk->foto)) {
+                    $fotos = is_array($produk->foto) ? $produk->foto : json_decode((string) $produk->foto, true);
+                    if (is_array($fotos)) {
+                        $imgService = app(ProductImageService::class);
+                        foreach ($fotos as $f) {
+                            if (isset($f['url'])) {
+                                $imgService->hapusFoto($f['url'], $f['thumb'] ?? null);
+                            }
+                        }
+                    }
+                }
+
+                $produk->delete();
+            });
+
+            if ($this->editProdukId === $produkId) {
+                $this->showEditProdukModal = false;
+                $this->editProdukId = null;
+            }
+
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Produk '{$produk->nama}' berhasil dihapus permanen."]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal menghapus produk: '.$e->getMessage()]);
+        }
+    }
+
     public function updatedProdukFormTipeHpIds($value): void
     {
         if (! empty($value) && is_array($value)) {
@@ -743,6 +839,19 @@ class ProdukTab extends Component
         $this->importPreview = [];
         $this->importFilePath = '';
         $this->activeImportLog = null;
+        $this->importFormat = 'standar';
+
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
+        $gudangsCabang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->get();
+        $this->gudangTokoId = $gudangsCabang->firstWhere('kode', 'GD-TOKO')?->id
+            ?? $gudangsCabang->first(fn ($g) => str_contains(strtolower($g->nama), 'toko'))?->id
+            ?? $gudangsCabang->first()?->id;
+
+        $this->gudangPusatId = $gudangsCabang->firstWhere('kode', 'GD-PUSAT')?->id
+            ?? $gudangsCabang->first(fn ($g) => str_contains(strtolower($g->nama), 'pusat') || str_contains(strtolower($g->nama), 'gudang'))?->id
+            ?? $gudangsCabang->skip(1)->first()?->id
+            ?? $this->gudangTokoId;
+
         $this->showImportModal = true;
     }
 
@@ -773,7 +882,19 @@ class ProdukTab extends Component
         try {
             $path = $this->importFile->store('import-tmp');
             $realPath = Storage::disk('local')->path($path);
-            $hasil = app(ImportProdukService::class)->preview($realPath);
+            $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
+
+            if ($this->importFormat === 'sid_retail') {
+                $hasil = app(ImportSidRetailService::class)->preview(
+                    $realPath,
+                    $cabangId,
+                    $this->gudangTokoId,
+                    $this->gudangPusatId
+                );
+            } else {
+                $hasil = app(ImportProdukService::class)->preview($realPath);
+            }
+
             $this->importFilePath = $path;
             $this->importPreview = $hasil;
             $this->importStep = 'preview';
@@ -812,23 +933,60 @@ class ProdukTab extends Component
 
         try {
             $totalBaris = (int) ($this->importPreview['total_baris'] ?? 0);
-            $log = ImportLog::create([
-                'tipe' => 'produk_excel',
-                'nama_file' => $this->importFile?->getClientOriginalName() ?? 'produk-import.xlsx',
-                'status' => 'proses',
-                'user_id' => auth()->id(),
-            ]);
-            $this->importLogId = $log->id;
-            $filePath = $this->importFilePath;
+            $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
 
-            // Lepas referensi importFilePath agar tidak terhapus jika modal ditutup saat proses
-            $this->importFilePath = '';
+            if ($this->importFormat === 'sid_retail') {
+                $log = ImportLog::create([
+                    'tipe' => 'produk_sid_retail',
+                    'nama_file' => $this->importFile?->getClientOriginalName() ?? 'sid-retail-import.xlsx',
+                    'status' => 'proses',
+                    'user_id' => auth()->id(),
+                ]);
+                $this->importLogId = $log->id;
+                $filePath = $this->importFilePath;
 
-            // Jika <= 100 baris, proses langsung secara sinkron agar hasil instan dan tidak stuck di antrian
-            if ($totalBaris <= 100) {
-                ImportProdukExcelJob::dispatchSync($log->id, $filePath, auth()->id());
+                $this->importFilePath = '';
+
+                if ($totalBaris <= 100) {
+                    ImportProdukExcelJob::dispatchSync(
+                        $log->id,
+                        $filePath,
+                        auth()->id(),
+                        'sid_retail',
+                        $cabangId,
+                        $this->gudangTokoId,
+                        $this->gudangPusatId
+                    );
+                } else {
+                    ImportProdukExcelJob::dispatch(
+                        $log->id,
+                        $filePath,
+                        auth()->id(),
+                        'sid_retail',
+                        $cabangId,
+                        $this->gudangTokoId,
+                        $this->gudangPusatId
+                    );
+                }
             } else {
-                ImportProdukExcelJob::dispatch($log->id, $filePath, auth()->id());
+                $log = ImportLog::create([
+                    'tipe' => 'produk_excel',
+                    'nama_file' => $this->importFile?->getClientOriginalName() ?? 'produk-import.xlsx',
+                    'status' => 'proses',
+                    'user_id' => auth()->id(),
+                ]);
+                $this->importLogId = $log->id;
+                $filePath = $this->importFilePath;
+
+                // Lepas referensi importFilePath agar tidak terhapus jika modal ditutup saat proses
+                $this->importFilePath = '';
+
+                // Jika <= 100 baris, proses langsung secara sinkron agar hasil instan dan tidak stuck di antrian
+                if ($totalBaris <= 100) {
+                    ImportProdukExcelJob::dispatchSync($log->id, $filePath, auth()->id());
+                } else {
+                    ImportProdukExcelJob::dispatch($log->id, $filePath, auth()->id());
+                }
             }
 
             $this->importStep = 'selesai';
@@ -971,8 +1129,12 @@ class ProdukTab extends Component
             ->values()
             ->all();
 
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
+        $gudangsCabang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->get();
+
         return view('modules.wms.livewire.produk-tab', [
             'gudangs' => $gudangs,
+            'gudangsCabang' => $gudangsCabang,
             'raks' => Rak::with('gudang')->get(),
             'produks' => $produks,
             'kategoriTree' => $kategoriTree,

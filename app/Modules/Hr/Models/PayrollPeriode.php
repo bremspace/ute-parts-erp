@@ -2,8 +2,10 @@
 
 namespace App\Modules\Hr\Models;
 
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -12,6 +14,7 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class PayrollPeriode extends Model
 {
+    use CatatAktivitas;
     use LogsActivity;
 
     public const STATUS_DRAFT = 'draft';
@@ -31,8 +34,14 @@ class PayrollPeriode extends Model
         return $this->hasMany(PayrollSlip::class);
     }
 
+    /**
+     * [F1-4] Audit trail periode payroll — pemilik wajib bisa melihat siapa yang
+     * membuka/menutup/dua bayar periode (pola: draft → diproses → selesai → dibayar).
+     *
+     * `catatan` free-text tidak dilog agar isi log tetap ramping.
+     */
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll();
+        return $this->opsilogAktivitas('Periode Payroll');
     }
 }

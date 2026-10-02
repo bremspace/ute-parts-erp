@@ -3,11 +3,14 @@
 namespace App\Modules\Pos\Models;
 
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 /**
  * [T-44] Harga tier produk — perluasan skema lama.
@@ -21,6 +24,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class HargaTier extends Model
 {
+    use CatatAktivitas;
+    use LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return $this->opsilogAktivitas('Harga Tier');
+    }
+
     protected $table = 'harga_tier';
 
     protected $casts = [

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Hr\Models;
 
+use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +19,7 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 class AbsensiLog extends Model
 {
+    use CatatAktivitas;
     use LogsActivity;
 
     protected $table = 'absensi_log';
@@ -46,8 +48,34 @@ class AbsensiLog extends Model
         return $this->belongsTo(Shift::class);
     }
 
+    /**
+     * [F1-4] Audit trail absensi.
+     *
+     * SENGJA `logOnly` + `dontLogEmptyChanges()`, bukan `opsilogAktivitas()` polos:
+     * tabel ini adalah ledger harian yang ditulis OTOMATIS saat employee check-in
+     * (satu baris per karyawan per hari, ±3.000 baris/tahun untuk 10 karyawan).
+     * `logAll()` akan membanjiri audit trail dengan baris tanpa nilai audit —
+     * persis yang membuat pemilik gagal menemukan perubahan yang penting.
+     *
+     * Yang TIDAK ikut disalin ke log:
+     * - `lokasi` (koordinat GPS) — data pribadi employee dan ditulis ulang tiap
+     *   sync dari ponsel, jadi sumber noise terbesar.
+     * - `self_photo` — path file, bukan informasi audit.
+     * - `catatan` — free-text.
+     *
+     * Yang tetap tercatat: status (hadir/izin/cuti/terlambat), jam masuk/keluar,
+     * dan shift — yaitu koreksi manual HR atas absensi. Koreksi status inilah yang
+     * akhirnya memengaruhi besaran gaji, jadi harus bisa diaudit.
+     */
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll();
+        return LogOptions::defaults()
+            ->logOnly([
+                'karyawan_id', 'tanggal', 'jam_masuk', 'jam_keluar',
+                'shift_id', 'status',
+            ])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges()
+            ->setDescriptionForEvent(fn (string $event) => 'Log Absensi '.self::labelAksiAktivitas($event));
     }
 }

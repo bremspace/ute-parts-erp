@@ -7,6 +7,7 @@ use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
+use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
@@ -109,7 +110,17 @@ class PelangganService
             ];
         }
 
-        $hasDb = Model::getConnectionResolver() !== null;
+        // [B-FIX] `Model::getConnectionResolver()` adalah static GLOBAL: hanya
+        // di-set sekali saat container Laravel boot dan tidak pernah
+        // dikembalikan null. Jadi "resolver !== null" TIDAK berarti "DB siap" —
+        // di konteks tanpa container (mis. unit test murni yang memanggil
+        // PricingService langsung) resolver masih tertinggal tapi container-nya
+        // sudah mati, sehingga query DB berikutnya lempar
+        // "Target class [config] does not exist". Cek container juga supaya
+        // price resolution tetap pure/kalkulatif saat DB tidak benar-benar bisa
+        // dipakai (harga retail + diskon tier sudah cukup untuk fallback).
+        $hasDb = Model::getConnectionResolver() !== null
+            && Container::getInstance()->bound('config');
         $rows = $this->rowsHargaTier($produk, $variant, $hasDb);
         $tipe = $this->tipeKonsumen($pelanggan);
 

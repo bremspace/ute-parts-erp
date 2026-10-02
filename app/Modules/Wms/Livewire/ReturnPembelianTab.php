@@ -89,6 +89,15 @@ class ReturnPembelianTab extends Component
 
     public function simpanRetur(): void
     {
+        // [RBAC] `wms.view` (dimiliki kasir) hanyaIzIN LIHAT retur. Membuat retur
+        // = jalur API `POST /api/wms/retur-pembelian` yang butuh `wms.create`,
+        // dan tombol "Buat Retur Pembelian" di blade juga sudah `@can('wms.create')`.
+        abort_unless(
+            auth()->user()?->can('wms.create'),
+            403,
+            'Anda tidak memiliki izin membuat retur pembelian.'
+        );
+
         $this->validate([
             'selectedPoId' => 'required|exists:purchase_order,id',
             'alasan' => 'required|string|max:500',

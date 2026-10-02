@@ -81,9 +81,13 @@ class WmsDashboardSplitTest extends TestCase
     {
         $this->authed();
 
+        // Placeholder input cari di StokTab. Teksnya berubah dari
+        // "Cari sparepart berdasarkan nama" ke versi scan-barcode
+        // ("Scan Barcode / ketik nama, brand, SKU, tipe HP..").
+        // Assert di sinkron dengan placeholder yang benar-benar di-render.
         Livewire::test(StokTab::class)
             ->assertSee('Kompatibilitas')
-            ->assertSee('Cari sparepart berdasarkan nama');
+            ->assertSee('Scan Barcode / ketik nama, brand, SKU, tipe HP..');
     }
 
     public function test_tab_transfer_merender(): void

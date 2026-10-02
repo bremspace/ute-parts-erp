@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Controllers;
 
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
@@ -622,6 +623,47 @@ class WmsController extends Controller
         $rak->delete();
 
         return $this->success(null, 'Rak berhasil dihapus');
+    }
+
+    public function destroyProduk(Request $request, $id)
+    {
+        $user = $request->user();
+        if (! isSuperAdminOrOwner($user)) {
+            return $this->error('Hanya Super Admin / Owner yang berhak menghapus produk.', 403);
+        }
+
+        $produk = Produk::findOrFail($id);
+
+        $stokFisik = (int) StokItem::where('produk_id', $id)->sum('jumlah');
+        if ($stokFisik > 0) {
+            return $this->error("Tidak dapat menghapus produk '{$produk->nama}'. Masih ada stok fisik sebanyak {$stokFisik} unit.", 422);
+        }
+
+        $hasTransaksi = DB::table('transaksi_items')->where('produk_id', $id)->exists();
+        $hasPo = DB::table('po_items')->where('produk_id', $id)->exists();
+        $hasServis = DB::table('servis_item')->where('produk_id', $id)->exists();
+        $hasTransfer = DB::table('stok_transfer_item')->where('produk_id', $id)->exists();
+        $hasOpname = DB::table('stok_opname_item')->where('produk_id', $id)->exists();
+
+        if ($hasTransaksi || $hasPo || $hasServis || $hasTransfer || $hasOpname) {
+            $produk->update(['is_active' => false]);
+            activity()
+                ->performedOn($produk)
+                ->causedBy($user)
+                ->log("Produk '{$produk->nama}' dinonaktifkan karena memiliki riwayat transaksi/mutasi.");
+
+            return $this->success($produk, "Produk '{$produk->nama}' memiliki riwayat transaksi/mutasi sehingga status diubah menjadi nonaktif.");
+        }
+
+        DB::transaction(function () use ($produk, $id) {
+            HargaTier::where('produk_id', $id)->delete();
+            StokItem::where('produk_id', $id)->delete();
+            SkuVariant::where('produk_id', $id)->delete();
+            DB::table('sid_import_maps')->where('entity_type', 'produk')->where('entity_id', $id)->delete();
+            $produk->delete();
+        });
+
+        return $this->success(null, "Produk '{$produk->nama}' berhasil dihapus permanen.");
     }
 
     // [API: WMS-10] CRUD PO + ubah status

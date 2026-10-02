@@ -278,7 +278,10 @@
                                 <p class="text-xs font-bold text-white">{{ $c->nama }} <span class="text-ink-500 font-mono">({{ $c->kode }})</span></p>
                                 <p class="text-[10px] text-ink-400">{{ $c->alamat ?? '-' }} · {{ $c->gudang_count }} gudang · {{ $c->users_count }} staff</p>
                             </div>
-                            <button wire:click="openCabangModal({{ $c->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
+                            <div class="flex items-center gap-2">
+                                <button wire:click="openCabangModal({{ $c->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
+                                <button wire:click="hapusCabang({{ $c->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan cabang ini?" class="text-up-red hover:underline text-[11px] cursor-pointer">Hapus</button>
+                            </div>
                         </div>
                     @endforeach
                 </div>
@@ -293,7 +296,10 @@
                                 <p class="text-xs font-bold text-white">{{ $g->nama }} <span class="text-ink-500 font-mono">({{ $g->kode }})</span></p>
                                 <p class="text-[10px] text-ink-400">{{ $g->cabang?->nama }}</p>
                             </div>
-                            <button wire:click="openGudangModal({{ $g->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
+                            <div class="flex items-center gap-2">
+                                <button wire:click="openGudangModal({{ $g->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
+                                <button wire:click="hapusGudang({{ $g->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan gudang ini?" class="text-up-red hover:underline text-[11px] cursor-pointer">Hapus</button>
+                            </div>
                         </div>
                     @endforeach
                 </div>
@@ -827,6 +833,7 @@
                                     <span class="text-[9px] text-up-primary bg-up-primary/10 px-1.5 py-0.5 rounded">part</span>
                                 @endif
                                 <button wire:click="openJenisServisModal({{ $j->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
+                                <button wire:click="hapusJenisServis({{ $j->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan jenis servis ini?" class="text-up-red hover:underline text-[11px] cursor-pointer">Hapus</button>
                             </div>
                         </div>
                     @endforeach

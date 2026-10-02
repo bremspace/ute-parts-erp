@@ -60,7 +60,13 @@
                     @endif
                 </td>
                 <td class="py-3.5 px-4">
-                    <button wire:click="$set('selectedCustomerId', {{ $c->id }})" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-up-primary/20 hover:text-white text-ink-300 font-semibold text-[11px] transition-all cursor-pointer">Detail 360°</button>
+                    <div class="flex items-center gap-1.5">
+                        <button wire:click="$set('selectedCustomerId', {{ $c->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-up-primary/20 hover:text-white text-ink-300 font-semibold text-[11px] transition-all cursor-pointer">Detail 360°</button>
+                        <button wire:click="openEditPelangganModal({{ $c->id }})" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-up-mint hover:text-white transition text-xs cursor-pointer" title="Edit Pelanggan">✏️</button>
+                        @if(isSuperAdminOrOwner())
+                            <button wire:click="hapusPelanggan({{ $c->id }})" wire:confirm="Yakin ingin menghapus pelanggan '{{ $c->nama }}'?" class="p-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 transition text-xs cursor-pointer" title="Hapus Pelanggan">🗑️</button>
+                        @endif
+                    </div>
                 </td>
             </tr>
         @empty
@@ -144,9 +150,16 @@
                     </div>
                 </div>
 
-                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
-                    <button wire:click="$set('showTierModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanTier" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan Tier</button>
+                <div class="flex items-center justify-between gap-3 pt-4 border-t border-white/5 mt-5">
+                    @if(!empty($tierForm['id']) && (isSuperAdminOrOwner() || auth()->user()?->can('tier.manage')))
+                        <button type="button" wire:click="hapusTier({{ $tierForm['id'] }})" wire:confirm="Yakin ingin menghapus tier '{{ $tierForm['nama'] }}'?" class="px-4 py-3 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer min-h-[44px]">
+                            🗑️ Hapus Tier
+                        </button>
+                    @endif
+                    <div class="flex-1 flex gap-2 justify-end">
+                        <button wire:click="$set('showTierModal', false)" class="px-4 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                        <button wire:click="simpanTier" class="px-5 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan Tier</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -347,6 +360,64 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
                     <button wire:click="$set('showPelangganBaruModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button wire:click="simpanPelangganBaruCrm" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: EDIT PELANGGAN -->
+    @if($showEditPelangganModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-lg font-bold text-white">Edit Pelanggan</h3>
+                    <button wire:click="$set('showEditPelangganModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama *</label>
+                        <input type="text" wire:model="editPelangganForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">No. HP *</label>
+                        <input type="text" wire:model="editPelangganForm.telepon" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email</label>
+                        <input type="email" wire:model="editPelangganForm.email" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tier Membership</label>
+                        <select wire:model="editPelangganForm.tier_membership_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="" class="bg-ink-900">Tanpa Tier (Retail Biasa)</option>
+                            @foreach($tiers as $t)
+                                <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
+                        <textarea wire:model="editPelangganForm.alamat" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal Lahir</label>
+                        <input type="date" wire:model="editPelangganForm.tanggal_lahir" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+                    <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
+                        <input type="checkbox" wire:model="editPelangganForm.is_reseller" class="accent-up-accent w-4 h-4" />
+                        Jadikan Reseller
+                    </label>
+                </div>
+                <div class="flex items-center justify-between gap-3 pt-4 border-t border-white/5 mt-5">
+                    @if(isSuperAdminOrOwner())
+                        <button type="button" wire:click="hapusPelanggan({{ $editPelangganId }})" wire:confirm="Yakin ingin menghapus pelanggan ini?" class="px-3 py-3 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer min-h-[44px]">
+                            🗑️ Hapus
+                        </button>
+                    @endif
+                    <div class="flex-1 flex gap-2 justify-end">
+                        <button wire:click="$set('showEditPelangganModal', false)" class="px-4 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                        <button wire:click="simpanEditPelanggan" class="px-5 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan Perubahan</button>
+                    </div>
                 </div>
             </div>
         </div>

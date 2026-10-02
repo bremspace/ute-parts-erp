@@ -25,8 +25,8 @@ class SidImportMap extends Model
     public static function setId(string $kodeSumber, string $tabelSumber, string $entityType, int $entityId): void
     {
         static::updateOrCreate(
-            ['kode_sumber' => $kodeSumber, 'tabel_sumber' => $tabelSumber],
-            ['entity_type' => $entityType, 'entity_id' => $entityId]
+            ['kode_sumber' => $kodeSumber, 'tabel_sumber' => $tabelSumber, 'entity_type' => $entityType],
+            ['entity_id' => $entityId]
         );
     }
 

@@ -169,7 +169,8 @@ class WebhookOutboundTest extends TestCase
     /** T-F3-5-07: Context berisi data yang benar. */
     public function test_delivery_context_berisi_data(): void
     {
-        $this->authed();
+        // Panggil authed() SATU kali. Dua kali = dua user dengan email sama
+        // (email di-hardcode di dalam helper) → UNIQUE constraint users.email.
         $cabang = $this->authed()['cabang'];
 
         WebhookEndpoint::create([
@@ -214,7 +215,7 @@ class WebhookOutboundTest extends TestCase
     /** T-F3-5-09: Endpoint non-aktif tidak memicu delivery. */
     public function test_endpoint_nonaktif_tidak_memiliki_delivery(): void
     {
-        $this->authed();
+        // authed() cukup satu kali — lihat catatan di test_delivery_context_berisi_data.
         $cabang = $this->authed()['cabang'];
 
         WebhookEndpoint::create([

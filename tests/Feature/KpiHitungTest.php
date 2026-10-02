@@ -21,6 +21,17 @@ class KpiHitungTest extends TestCase
 
     protected KpiService $kpi;
 
+    /**
+     * Periode KPI yang dihitung test, format 'Y-m'.
+     *
+     * TIDAK boleh hardcode bulan. Semua fixture di bawah membuat baris dengan
+     * `now()`, jadi kalau periode test ditulis tetap ('2026-09') sementara
+     * `KpiService::rentangPeriode()` menyaring `whereBetween` per bulan,
+     * test mulai gagal begitu tanggal bergeser melewati bulan berikutnya —
+     * gagal karena waktu, bukan karena logika KPI. Ambil dari jam lokal test.
+     */
+    private string $periode;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -28,6 +39,7 @@ class KpiHitungTest extends TestCase
         $this->seed(AkunCoaSeeder::class);
         $this->kpi = app(KpiService::class);
         session(['cabang_id' => 1]);
+        $this->periode = now()->format('Y-m');
     }
 
     private function buatUser(string $email): User
@@ -138,7 +150,7 @@ class KpiHitungTest extends TestCase
         $this->buatTiket($teknisi->user);
         $this->buatMetric('tiket_selesai', 'tiket_selesai', 20);
 
-        $hasil = $this->kpi->hitung('2026-09');
+        $hasil = $this->kpi->hitung($this->periode);
         $this->assertEquals(1, $hasil['hasil']);
 
         $row = KpiHasil::where('karyawan_id', $teknisi->id)->first();
@@ -156,7 +168,7 @@ class KpiHitungTest extends TestCase
         $this->buatMetric('transaksi_kasir', 'transaksi_kasir', 15);
         $this->buatMetric('selisih_kas', 'selisih_kas', 50000);
 
-        $this->kpi->hitung('2026-09');
+        $this->kpi->hitung($this->periode);
 
         $transaksi = KpiHasil::where('karyawan_id', $kasir->id)->whereHas('metric', fn ($q) => $q->where('rumus', 'transaksi_kasir'))->first();
         $this->assertNotNull($transaksi);
@@ -178,7 +190,7 @@ class KpiHitungTest extends TestCase
         $this->buatMetric('lead_won', 'lead_won', 10);
         $this->buatMetric('penjualan_lead_won', 'penjualan_lead_won', 50000000);
 
-        $this->kpi->hitung('2026-09');
+        $this->kpi->hitung($this->periode);
 
         $leadWon = KpiHasil::where('karyawan_id', $marketing->id)->whereHas('metric', fn ($q) => $q->where('rumus', 'lead_won'))->first();
         $this->assertNotNull($leadWon);
@@ -199,7 +211,7 @@ class KpiHitungTest extends TestCase
         $this->buatTiket($teknisi->user);
         $evil = $this->buatMetric('evil_rumus', 'eval(system("id"))');
 
-        $hasil = $this->kpi->hitung('2026-09');
+        $hasil = $this->kpi->hitung($this->periode);
         $this->assertEquals(0, $hasil['metric_diproses']);
         $this->assertEquals(0, KpiHasil::where('kpi_metric_id', $evil->id)->count());
     }
@@ -210,11 +222,11 @@ class KpiHitungTest extends TestCase
         $this->buatTiket($teknisi->user);
         $this->buatMetric('tiket_selesai', 'tiket_selesai', 20);
 
-        $this->kpi->hitung('2026-09');
-        $this->kpi->hitung('2026-09');
+        $this->kpi->hitung($this->periode);
+        $this->kpi->hitung($this->periode);
 
         $this->assertEquals(1, KpiHasil::where('karyawan_id', $teknisi->id)->count());
-        $this->assertEquals(1, KpiHasil::where('periode', '2026-09')->count());
+        $this->assertEquals(1, KpiHasil::where('periode', $this->periode)->count());
     }
 
     public function test_karyawan_jabatan_tidak_cocok_tidak_dihitung(): void
@@ -223,7 +235,7 @@ class KpiHitungTest extends TestCase
         $admin = $this->buatKaryawan($this->buatUser('admin@test.local'), 'admin');
         $this->buatMetric('tiket_selesai', 'tiket_selesai', 20);
 
-        $hasil = $this->kpi->hitung('2026-09');
+        $hasil = $this->kpi->hitung($this->periode);
         $this->assertEquals(0, $hasil['hasil']);
         $this->assertEquals(0, KpiHasil::where('karyawan_id', $admin->id)->count());
     }

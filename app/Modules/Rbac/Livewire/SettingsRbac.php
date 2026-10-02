@@ -19,6 +19,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\TipeHp;
 use App\Traits\ParsesNominal;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -34,6 +35,24 @@ class SettingsRbac extends Component
 {
     use ParsesNominal;
     use WithPagination;
+
+    /**
+     * [RBAC] Permission gerbang master data katalog produk. Seeder tidak punya
+     * permission per-entitas (kategori/brand/kualitas/satuan/kondisi/tipe HP),
+     * jadi dipakai yang sudah ada: `pengaturan.manage` (pemilik halaman) atau
+     * permission departemen WMS `wms.create` (staff-gudang).
+     *
+     * @var string[]
+     */
+    private const PERM_MASTER_PRODUK = ['pengaturan.manage', 'wms.create'];
+
+    /**
+     * [RBAC] Master jenis servis: `pengaturan.manage` (pemilik halaman) atau
+     * permission departemen servis `servis.manage` (bagian terkait = admin-toko).
+     *
+     * @var string[]
+     */
+    private const PERM_JENIS_SERVIS = ['pengaturan.manage', 'servis.manage'];
 
     public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak
 
@@ -335,6 +354,10 @@ class SettingsRbac extends Component
     /** [T-16] open modal edit/tambah jenis servis */
     public function openJenisServisModal(?int $id = null)
     {
+        if (! $this->bolehBuka(self::PERM_JENIS_SERVIS)) {
+            return;
+        }
+
         if ($id) {
             $j = JenisServis::findOrFail($id);
             $this->jenisServisForm = $j->toArray();
@@ -351,6 +374,10 @@ class SettingsRbac extends Component
 
     public function simpanJenisServis()
     {
+        if (! $this->bolehKatalog(self::PERM_JENIS_SERVIS, 'Anda tidak memiliki izin mengelola master jenis servis.')) {
+            return;
+        }
+
         $this->jenisServisForm['biaya_jasa'] = $this->parseNominal($this->jenisServisForm['biaya_jasa'] ?? 0);
 
         $this->validate([
@@ -370,6 +397,37 @@ class SettingsRbac extends Component
 
         $this->showJenisServisModal = false;
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Jenis servis disimpan']);
+    }
+
+    /**
+     * [T-16] Hapus master jenis servis. Ticket & estimasi yang sudah memakai
+     * jenis servis ini adalah riwayat layanan — tidak dihapus permanen, hanya
+     * dinonaktifkan (pola sama dengan hapusKategori/hapusKualitas).
+     */
+    public function hapusJenisServis(int $id): void
+    {
+        if (! $this->bolehKatalog(self::PERM_JENIS_SERVIS, 'Anda tidak memiliki izin menghapus jenis servis.')) {
+            return;
+        }
+
+        $jenis = JenisServis::findOrFail($id);
+
+        $referensi = DB::table('tiket_servis')->where('jenis_servis_id', $id)->count()
+            + DB::table('tiket_servis_estimasi_item')->where('jenis_servis_id', $id)->count();
+
+        if ($referensi > 0) {
+            $jenis->update(['is_active' => false]);
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Jenis servis '{$jenis->kode}' dipakai oleh {$referensi} data tiket servis/estimasi. Status dinonaktifkan (tidak dihapus permanen).",
+            ]);
+
+            return;
+        }
+
+        $kode = $jenis->kode;
+        $jenis->delete();
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Jenis servis '{$kode}' berhasil dihapus"]);
     }
 
     public function getCoaListProperty()
@@ -504,6 +562,45 @@ class SettingsRbac extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Cabang disimpan']);
     }
 
+    /**
+     * Hapus cabang. Cabang hampir selalu punya referensi (transaksi, jurnal,
+     * tiket servis, user) — semua itu riwayat akuntansi/layanan, jadi kalau
+     * masih direferensikan cabang hanya dinonaktifkan, tidak dihapus permanen
+     * (pola sama dengan hapusKategori / hapusKualitas).
+     */
+    public function hapusCabang(int $id): void
+    {
+        if (! $this->boleh('cabang.manage', 'Anda tidak memiliki izin menghapus cabang.')) {
+            return;
+        }
+
+        $cabang = Cabang::findOrFail($id);
+
+        $gudang = DB::table('gudang')->where('cabang_id', $id)->count();
+        $user = DB::table('user_cabang')->where('cabang_id', $id)->count();
+        $transaksi = DB::table('transaksi')->where('cabang_id', $id)->count();
+        $piutang = DB::table('piutang')->where('cabang_id', $id)->count();
+        $utang = DB::table('utang')->where('cabang_id', $id)->count();
+        $jurnal = DB::table('jurnal_akuntansi')->where('cabang_id', $id)->count();
+        $tiket = DB::table('tiket_servis')->where('cabang_id', $id)->count();
+
+        $total = $gudang + $user + $transaksi + $piutang + $utang + $jurnal + $tiket;
+
+        if ($total > 0) {
+            $cabang->update(['is_active' => false]);
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Cabang '{$cabang->kode}' masih memiliki {$total} data terkait ({$gudang} gudang, {$user} user, {$transaksi} transaksi, {$piutang} piutang, {$utang} utang, {$jurnal} jurnal, {$tiket} tiket servis). Status dinonaktifkan (tidak dihapus permanen).",
+            ]);
+
+            return;
+        }
+
+        $kode = $cabang->kode;
+        $cabang->delete();
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Cabang '{$kode}' berhasil dihapus"]);
+    }
+
     // ===== GUDANG =====
     public function openGudangModal(?int $id = null)
     {
@@ -538,11 +635,62 @@ class SettingsRbac extends Component
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Gudang disimpan']);
     }
 
+    /**
+     * Hapus gudang. Hampir semua tabel di bawah memakai cascadeOnDelete
+     * (lihat migration: stok_items, stok_log, stok_opname, rak, PO, transfer),
+     * jadi hard delete gudang yang pernah dipakai = menghapus riwayat stok
+     * tanpa jejak. Kalau ada baris stok/riwayat, gudang hanya dinonaktifkan.
+     */
+    public function hapusGudang(int $id): void
+    {
+        if (! $this->boleh('cabang.manage', 'Anda tidak memiliki izin menghapus gudang.')) {
+            return;
+        }
+
+        $gudang = Gudang::findOrFail($id);
+
+        // Baris stok_items = jejak stok fisik. Satu baris pun (walau jumlah 0)
+        // sudah berarti gudang pernah dipakai → hard delete tidak aman.
+        $stok = DB::table('stok_items')->where('gudang_id', $id)->count();
+        $rak = DB::table('rak')->where('gudang_id', $id)->count();
+        $po = DB::table('purchase_order')->where('gudang_tujuan_id', $id)->count();
+        $transfer = DB::table('stok_transfer')
+            ->where('gudang_asal_id', $id)
+            ->orWhere('gudang_tujuan_id', $id)
+            ->count();
+        $opname = DB::table('stok_opname')->where('gudang_id', $id)->count();
+        $mutasi = DB::table('stock_mutation_log')->where('gudang_id', $id)->count();
+        // grn memakai FK tanpa onDelete (RESTRICT) — hard delete akan error SQL.
+        $grn = DB::table('grn')->where('gudang_id', $id)->count();
+        $sparepart = DB::table('servis_sparepart')->where('gudang_id', $id)->count();
+        $transaksi = DB::table('transaksi')->where('gudang_id', $id)->count();
+
+        $total = $stok + $rak + $po + $transfer + $opname + $mutasi + $grn + $sparepart + $transaksi;
+
+        if ($total > 0) {
+            $gudang->update(['is_active' => false]);
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Gudang '{$gudang->kode}' memiliki {$total} data terkait ({$stok} baris stok, {$mutasi} mutasi, {$po} PO, {$transfer} transfer, {$opname} opname, {$rak} rak, {$grn} GRN, {$sparepart} sparepart servis, {$transaksi} transaksi). Status dinonaktifkan (tidak dihapus permanen).",
+            ]);
+
+            return;
+        }
+
+        $kode = $gudang->kode;
+        $gudang->delete();
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Gudang '{$kode}' berhasil dihapus"]);
+    }
+
     // ===== MASTER DATA PRODUK & KATALOG =====
 
     // 1. Kategori
     public function openKategoriModal(?int $id = null): void
     {
+        if (! $this->bolehBuka(self::PERM_MASTER_PRODUK)) {
+            return;
+        }
+
         if ($id) {
             $kat = KategoriProduk::findOrFail($id);
             $this->kategoriForm = [
@@ -568,6 +716,10 @@ class SettingsRbac extends Component
 
     public function simpanKategori(): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola kategori produk.')) {
+            return;
+        }
+
         $this->validate([
             'kategoriForm.nama' => 'required|string|max:255',
             'kategoriForm.parent_id' => 'nullable|exists:kategori_produk,id',
@@ -605,6 +757,10 @@ class SettingsRbac extends Component
 
     public function toggleKategoriStatus(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengubah status kategori produk.')) {
+            return;
+        }
+
         $kat = KategoriProduk::findOrFail($id);
         $kat->update(['is_active' => ! $kat->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status kategori diubah']);
@@ -612,6 +768,10 @@ class SettingsRbac extends Component
 
     public function hapusKategori(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin menghapus kategori produk.')) {
+            return;
+        }
+
         $kat = KategoriProduk::withCount(['produk', 'children'])->findOrFail($id);
 
         if ($kat->produk_count > 0 || $kat->children_count > 0) {
@@ -631,6 +791,10 @@ class SettingsRbac extends Component
     // 2. Brand
     public function openBrandModal(?int $id = null): void
     {
+        if (! $this->bolehBuka(self::PERM_MASTER_PRODUK)) {
+            return;
+        }
+
         if ($id) {
             $brand = Brand::findOrFail($id);
             $this->brandForm = [
@@ -647,6 +811,10 @@ class SettingsRbac extends Component
 
     public function simpanBrand(): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola brand produk.')) {
+            return;
+        }
+
         $this->validate([
             'brandForm.nama' => 'required|string|max:255',
         ]);
@@ -671,6 +839,10 @@ class SettingsRbac extends Component
 
     public function toggleBrandStatus(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengubah status brand.')) {
+            return;
+        }
+
         $brand = Brand::findOrFail($id);
         $brand->update(['is_active' => ! $brand->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status brand diubah']);
@@ -678,6 +850,10 @@ class SettingsRbac extends Component
 
     public function hapusBrand(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin menghapus brand.')) {
+            return;
+        }
+
         $brand = Brand::withCount('produk')->findOrFail($id);
         if ($brand->produk_count > 0) {
             $brand->update(['is_active' => false]);
@@ -696,6 +872,10 @@ class SettingsRbac extends Component
     // 3. Kualitas
     public function openKualitasModal(?int $id = null): void
     {
+        if (! $this->bolehBuka(self::PERM_MASTER_PRODUK)) {
+            return;
+        }
+
         if ($id) {
             $k = KualitasProduk::findOrFail($id);
             $this->kualitasForm = [
@@ -712,6 +892,10 @@ class SettingsRbac extends Component
 
     public function simpanKualitas(): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola tingkat kualitas produk.')) {
+            return;
+        }
+
         $this->validate([
             'kualitasForm.nama' => 'required|string|max:255',
         ]);
@@ -736,6 +920,10 @@ class SettingsRbac extends Component
 
     public function toggleKualitasStatus(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengubah status tingkat kualitas.')) {
+            return;
+        }
+
         $k = KualitasProduk::findOrFail($id);
         $k->update(['is_active' => ! $k->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status kualitas diubah']);
@@ -743,6 +931,10 @@ class SettingsRbac extends Component
 
     public function hapusKualitas(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin menghapus tingkat kualitas.')) {
+            return;
+        }
+
         $k = KualitasProduk::withCount('produk')->findOrFail($id);
         if ($k->produk_count > 0) {
             $k->update(['is_active' => false]);
@@ -761,6 +953,10 @@ class SettingsRbac extends Component
     // 4. Satuan
     public function openSatuanModal(?int $id = null): void
     {
+        if (! $this->bolehBuka(self::PERM_MASTER_PRODUK)) {
+            return;
+        }
+
         if ($id) {
             $s = SatuanUnit::findOrFail($id);
             $this->satuanForm = [
@@ -777,6 +973,10 @@ class SettingsRbac extends Component
 
     public function simpanSatuan(): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola satuan unit.')) {
+            return;
+        }
+
         $id = $this->satuanForm['id'] ?? 'NULL';
         $this->validate([
             'satuanForm.kode' => "required|string|max:20|unique:satuan_unit,kode,{$id}",
@@ -805,6 +1005,10 @@ class SettingsRbac extends Component
 
     public function toggleSatuanStatus(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengubah status satuan unit.')) {
+            return;
+        }
+
         $s = SatuanUnit::findOrFail($id);
         $s->update(['is_active' => ! $s->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status satuan diubah']);
@@ -812,6 +1016,10 @@ class SettingsRbac extends Component
 
     public function hapusSatuan(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin menghapus satuan unit.')) {
+            return;
+        }
+
         $s = SatuanUnit::findOrFail($id);
         $terpakai = Produk::where('satuan_kode', $s->kode)->count();
         if ($terpakai > 0) {
@@ -831,6 +1039,10 @@ class SettingsRbac extends Component
     // 5. Kondisi (JSON via KonfigurasiService)
     public function openKondisiModal(?string $kode = null): void
     {
+        if (! $this->bolehBuka(self::PERM_MASTER_PRODUK)) {
+            return;
+        }
+
         if ($kode) {
             $list = $this->getKondisiList();
             $item = collect($list)->firstWhere('kode', $kode);
@@ -855,6 +1067,10 @@ class SettingsRbac extends Component
 
     public function simpanKondisi(): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola kondisi produk.')) {
+            return;
+        }
+
         $this->validate([
             'kondisiForm.nama' => 'required|string|max:100',
         ]);
@@ -884,28 +1100,60 @@ class SettingsRbac extends Component
 
         app(KonfigurasiService::class)->set('master_produk_kondisi_list', array_values($list));
 
+        // [RBAC] Kondisi produk disimpan sebagai JSON di KonfigurasiService —
+        // tidak ada model Eloquent, jadi LogsActivity tidak bisa men-log.
+        // Catat manual lewat AuditService (helper yang sudah dipakai komponen ini).
+        app(AuditService::class)->catat(
+            'KondisiProduk',
+            $ada ? 'update' : 'create',
+            null,
+            "Kondisi produk '{$kode}' ({$nama}) disimpan",
+            null,
+            ['kode' => $kode, 'nama' => $nama, 'is_active' => (bool) $this->kondisiForm['is_active']]
+        );
+
         $this->showKondisiModal = false;
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Kondisi produk disimpan']);
     }
 
     public function toggleKondisiStatus(string $kode): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengubah status kondisi produk.')) {
+            return;
+        }
+
         $list = $this->getKondisiList();
+        $statusBaru = null;
         foreach ($list as &$item) {
             if ($item['kode'] === $kode) {
                 $item['is_active'] = ! ($item['is_active'] ?? true);
+                $statusBaru = (bool) $item['is_active'];
                 break;
             }
         }
         app(KonfigurasiService::class)->set('master_produk_kondisi_list', array_values($list));
+
+        if ($statusBaru !== null) {
+            app(AuditService::class)->catat(
+                'KondisiProduk',
+                'update',
+                null,
+                "Kondisi produk '{$kode}' → ".($statusBaru ? 'aktif' : 'nonaktif')
+            );
+        }
+
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status kondisi diubah']);
     }
 
     public function hapusKondisi(string $kode): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin menghapus kondisi produk.')) {
+            return;
+        }
+
         $terpakai = Produk::where('kondisi', $kode)->count();
         if ($terpakai > 0) {
-            $this->toggleKondisiStatus($kode);
+            $this->setKondisiAktif($kode, false);
             $this->dispatch('alert', [
                 'type' => 'warning',
                 'message' => "Kondisi '{$kode}' dipakai pada {$terpakai} produk. Status dinonaktifkan.",
@@ -916,7 +1164,38 @@ class SettingsRbac extends Component
 
         $list = collect($this->getKondisiList())->reject(fn ($i) => $i['kode'] === $kode)->values()->all();
         app(KonfigurasiService::class)->set('master_produk_kondisi_list', $list);
+
+        app(AuditService::class)->catat('KondisiProduk', 'delete', null, "Kondisi produk '{$kode}' dihapus");
+
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Kondisi berhasil dihapus']);
+    }
+
+    /**
+     * [RBAC] Set status satu kondisi tanpa dispatch alert — dipakai hapusKondisi
+     * supaya hanya satu pesan (warning) terkirim, bukan dua.
+     */
+    private function setKondisiAktif(string $kode, bool $aktif): void
+    {
+        $list = [];
+        $ditemukan = false;
+        foreach ($this->getKondisiList() as $item) {
+            if ($item['kode'] === $kode) {
+                $item['is_active'] = $aktif;
+                $ditemukan = true;
+            }
+            $list[] = $item;
+        }
+
+        app(KonfigurasiService::class)->set('master_produk_kondisi_list', $list);
+
+        if ($ditemukan) {
+            app(AuditService::class)->catat(
+                'KondisiProduk',
+                'update',
+                null,
+                "Kondisi produk '{$kode}' → ".($aktif ? 'aktif' : 'nonaktif')
+            );
+        }
     }
 
     private function getKondisiList(): array
@@ -937,6 +1216,10 @@ class SettingsRbac extends Component
     // 6. Tipe HP
     public function openTipeHpModal(?int $id = null): void
     {
+        if (! $this->bolehBuka(self::PERM_MASTER_PRODUK)) {
+            return;
+        }
+
         if ($id) {
             $t = TipeHp::findOrFail($id);
             $this->tipeHpForm = [
@@ -954,6 +1237,10 @@ class SettingsRbac extends Component
 
     public function simpanTipeHp(): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola tipe HP.')) {
+            return;
+        }
+
         $this->validate([
             'tipeHpForm.merk' => 'required|string|max:100',
             'tipeHpForm.model' => 'required|string|max:100',
@@ -983,6 +1270,10 @@ class SettingsRbac extends Component
 
     public function toggleTipeHpStatus(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengubah status tipe HP.')) {
+            return;
+        }
+
         $t = TipeHp::findOrFail($id);
         $t->update(['is_active' => ! $t->is_active]);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status tipe HP diubah']);
@@ -990,6 +1281,10 @@ class SettingsRbac extends Component
 
     public function hapusTipeHp(int $id): void
     {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin menghapus tipe HP.')) {
+            return;
+        }
+
         $t = TipeHp::withCount('produk')->findOrFail($id);
         if ($t->produk_count > 0) {
             $t->update(['is_active' => false]);
@@ -1012,6 +1307,57 @@ class SettingsRbac extends Component
         }
 
         $this->dispatch('alert', ['type' => 'error', 'message' => $pesan]);
+
+        return false;
+    }
+
+    /**
+     * [RBAC] Gerbang master data katalog (kategori, brand, kualitas, satuan,
+     * kondisi, tipe HP, jenis servis).
+     *
+     * Seeder tidak punya permission per-entitas master, jadi memakai fallback
+     * yang sudah ada: `pengaturan.manage` (pemilik halaman pengaturan).
+     * Super-admin & owner selalu lolos lewat Gate::before di AppServiceProvider
+     * sehingga `can()` selalu true untuk mereka.
+     *
+     * @param  string[]  $permissions
+     */
+    protected function bolehKatalog(array $permissions, string $pesan): bool
+    {
+        $user = auth()->user();
+
+        if ($user !== null) {
+            foreach ($permissions as $permission) {
+                if ($user->can($permission)) {
+                    return true;
+                }
+            }
+        }
+
+        $this->dispatch('alert', ['type' => 'error', 'message' => $pesan]);
+
+        return false;
+    }
+
+    /**
+     * [RBAC] Versi senyap dari bolehKatalog() — untuk aksi pembuka modal
+     * (form read-ish). Menolak tanpa mengirim alert agar tidak spam toast.
+     *
+     * @param  string[]  $permissions
+     */
+    protected function bolehBuka(array $permissions): bool
+    {
+        $user = auth()->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        foreach ($permissions as $permission) {
+            if ($user->can($permission)) {
+                return true;
+            }
+        }
 
         return false;
     }
