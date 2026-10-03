@@ -6,6 +6,7 @@ use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Exceptions\StokTidakCukupException;
 use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Models\Transaksi;
@@ -327,18 +328,9 @@ class PosController extends Controller
                     }
                 }
 
-                // Jika pelanggan terdaftar, update akumulasi belanja & poin loyalty
+                // Jika pelanggan terdaftar, update akumulasi belanja & poin loyalty (sinkron CRM)
                 if ($request->pelanggan_id) {
-                    $pelanggan = Pelanggan::find($request->pelanggan_id);
-                    if ($pelanggan) {
-                        $pelanggan->increment('total_belanja_12bulan', $totalAkhir);
-                        // Poin: 1% nominal belanja dikali multiplier tier
-                        $multiplier = $pelanggan->tierMembership ? (float) $pelanggan->tierMembership->poin_multiplier : 1.0;
-                        $poinTambahan = (int) floor(($totalAkhir / 1000) * $multiplier);
-                        if ($poinTambahan > 0) {
-                            $pelanggan->increment('poin_loyalty', $poinTambahan);
-                        }
-                    }
+                    app(PelangganService::class)->tambahBelanjaDanPoin($request->pelanggan_id, (float) $totalAkhir);
                 }
 
                 // Jurnal akuntansi otomatis (PRD §4.6): Kas masuk, Pendapatan, HPP, Persediaan turun
@@ -351,10 +343,10 @@ class PosController extends Controller
                 $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
                 $kasbon = $request->metode_bayar === 'piutang';
 
-                // Kasbon (piutang): debit Piutang Usaha 120-01, bukan Kas 110-01
+                // Kasbon (piutang): debit Piutang Usaha 120-01, bukan Kas Laci 110-04
                 // [F1-2] Balance: debit totalAkhir = kredit (DPP 410-01 + PPN 220-01)
                 $lines = [
-                    ['akun_kode' => $kasbon ? '120-01' : '110-01', 'debit' => (float) $totalAkhir, 'kredit' => 0],
+                    ['akun_kode' => $kasbon ? '120-01' : '110-04', 'debit' => (float) $totalAkhir, 'kredit' => 0],
                     ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? (float) $dpp : (float) $totalAkhir],  // Pendapatan = DPP
                 ];
                 // PPN Keluaran → akun 220-01 (kontrak AC F1-2)
@@ -488,13 +480,16 @@ class PosController extends Controller
         $request->validate([
             'saldo_awal' => 'required|numeric|min:0',
             'cabang_id' => 'nullable|exists:cabang,id',
+            'akun_sumber_kode' => 'nullable|string|max:20',
         ]);
 
         try {
             $sesi = app(KasSesiState::class)->bukaKas(
                 (float) $request->saldo_awal,
                 $request->cabang_id ?? session('cabang_id'),
-                auth()->id()
+                auth()->id(),
+                'manual',
+                $request->input('akun_sumber_kode', '110-01')
             );
 
             return $this->success($sesi, 'Kas berhasil dibuka');

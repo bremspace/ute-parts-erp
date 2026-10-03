@@ -113,6 +113,36 @@
                         return '-';
                     }
                     $key = (string) $key;
+                    $kosong = ($v === null || $v === '');
+                    // 1. Cek dulu di COLUMN_LABELS yang sudah didefinisikan di ReportBuilderService
+                    // HANYA kembalikan label jika nilai $v kosong/null (belum ada data).
+                    // Jika ada data asli, tampilkan data tersebut agar tidak menimpa nilai nyata dengan nama header.
+                    $label = \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? null;
+                    if ($label && $kosong) {
+                        return $label;
+                    }
+                    // 2. Untuk kolom _id tanpa label eksplisit, coba mapping nama relasi statis
+                    // HANYA sebagai placeholder saat nilai kosong — bila ada data (sudah diterjemahkan
+                    // formatRowsForDisplay menjadi nama entitas), tampilkan data tersebut.
+                    if ($kosong && str_ends_with($key, '_id')) {
+                        $modelShort = str_replace('_id', '', $key);
+                        $modelLabels = [
+                            'cabang' => 'Cabang',
+                            'gudang' => 'Gudang',
+                            'pelanggan' => 'Pelanggan',
+                            'supplier' => 'Supplier',
+                            'produk' => 'Produk',
+                            'akun' => 'Akun COA',
+                            'rak' => 'Lokasi Rak',
+                            'kategori' => 'Kategori',
+                            'brand' => 'Brand',
+                            'kualitas' => 'Kualitas',
+                            'tier' => 'Tier Pelanggan',
+                        ];
+                        if (isset($modelLabels[$modelShort])) {
+                            return $modelLabels[$modelShort];
+                        }
+                    }
                     $bukanNominal = $key === 'id'
                         || str_ends_with($key, '_id')
                         || $key === 'kode'

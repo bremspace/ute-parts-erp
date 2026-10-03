@@ -13,7 +13,7 @@ class RecalcTierCommand extends Command
 
     public function handle(TierService $tierService): int
     {
-        $updated = $tierService->recalcSemua();
+        $updated = $tierService->recalcSemua(true);
 
         $this->info("Tier membership direkalkulasi. Pelanggan yang diupdate: {$updated}");
 

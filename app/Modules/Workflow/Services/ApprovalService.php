@@ -5,6 +5,7 @@ namespace App\Modules\Workflow\Services;
 use App\Models\User;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\ReturnPenjualan;
+use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Wms\Services\CycleCountService;
@@ -24,7 +25,7 @@ class ApprovalService
      */
     public static function normalisasiStatus(string $action): string
     {
-        return in_array($action, ['approved', 'disetujui', 'setuju'], true)
+        return in_array($action, ['approved', 'disetujui', 'setuju', 'setujui'], true)
             ? 'disetujui'
             : 'ditolak';
     }
@@ -100,12 +101,20 @@ class ApprovalService
             throw ValidationException::withMessages(['msg' => 'Request sudah diproses']);
         }
 
-        // validasi user memiliki approver_role snapshot ATAU permission approve-workflow
+        // [KAS-LACI] Validasi hak approval:
+        // 1. Memiliki approver_role snapshot
+        // 2. ATAU permission approve-workflow
+        // 3. ATAU role super-admin / owner (bisa approve semua request)
+        // 4. ATAU bila entity_type == 'selisih_kas' dan rule mengizinkan admin-toko
         $user = User::find($actionedBy);
         $hasRole = $user && $user->hasRole($request->approver_role);
         $hasPermission = $user && $user->hasPermissionTo('approve-workflow');
+        $isSuperOrOwner = $user && ($user->hasRole('super-admin') || $user->hasRole('owner'));
+        $isKasApprover = $user && $request->entity_type === 'selisih_kas' && (
+            $user->hasRole('admin-toko') || $user->hasRole('super-admin') || $user->hasRole('owner')
+        );
 
-        if (! ($hasRole || $hasPermission)) {
+        if (! ($hasRole || $hasPermission || $isSuperOrOwner || $isKasApprover)) {
             throw ValidationException::withMessages(['msg' => 'Anda tidak memiliki hak untuk menyetujui permintaan ini']);
         }
 
@@ -198,6 +207,19 @@ class ApprovalService
                 } else {
                     $service->tolakRetur($returPembelian, $catatan);
                 }
+            }
+
+            return;
+        }
+
+        // [KAS-LACI] Selisih kas: disetujui → finalisasi tutup kas; ditolak → reopen
+        if ($request->entity_type === 'selisih_kas') {
+            $kasSesiState = app(KasSesiState::class);
+
+            if ($status === 'disetujui') {
+                $kasSesiState->finalizeTutupKasApproved((int) $request->entity_id);
+            } else {
+                $kasSesiState->reopenKasRejected((int) $request->entity_id, $catatan);
             }
 
             return;

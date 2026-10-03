@@ -185,6 +185,14 @@
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Channel *</label>
+                            <select wire:model="broadcastChannel" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                <option value="inapp" class="bg-ink-900">In-App Notifikasi</option>
+                                <option value="wa" class="bg-ink-900">WhatsApp (WA Gateway)</option>
+                                <option value="email" class="bg-ink-900">Email Broadcast</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Segmentasi Tier</label>
                             <select wire:model="broadcastTierId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">Semua Tier</option>
@@ -193,12 +201,12 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="flex items-end pb-2">
-                            <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
-                                <input type="checkbox" wire:model="broadcastReseller" class="accent-up-accent w-4 h-4" />
-                                Hanya Reseller
-                            </label>
-                        </div>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
+                            <input type="checkbox" wire:model="broadcastReseller" class="accent-up-accent w-4 h-4" />
+                            Hanya Khusus Reseller
+                        </label>
                     </div>
                     <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/30 text-[11px] text-ink-200">
                         Broadcast dikirim <strong>via antrian (queue)</strong> — tidak memperlambat sistem.
@@ -351,9 +359,17 @@
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal Lahir (opsional)</label>
                         <input type="date" wire:model="pelangganBaruForm.tanggal_lahir" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                     </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tipe Konsumen</label>
+                        <select wire:model="pelangganBaruForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="retail" class="bg-ink-900">Retail (Umum)</option>
+                            <option value="reseller" class="bg-ink-900">Reseller</option>
+                            <option value="agen" class="bg-ink-900">Agen / Mitra B2B</option>
+                        </select>
+                    </div>
                     <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
                         <input type="checkbox" wire:model="pelangganBaruForm.is_reseller" class="accent-up-accent w-4 h-4" />
-                        Jadikan Reseller
+                        Jadikan Reseller (Akses Portal Reseller)
                     </label>
                     <p class="text-[10px] text-ink-500">Satu data pelanggan — langsung bisa dipakai di POS & Servis.</p>
                 </div>
@@ -386,14 +402,24 @@
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email</label>
                         <input type="email" wire:model="editPelangganForm.email" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tier Membership</label>
-                        <select wire:model="editPelangganForm.tier_membership_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                            <option value="" class="bg-ink-900">Tanpa Tier (Retail Biasa)</option>
-                            @foreach($tiers as $t)
-                                <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>
-                            @endforeach
-                        </select>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tier Membership</label>
+                            <select wire:model="editPelangganForm.tier_membership_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                <option value="" class="bg-ink-900">Tanpa Tier</option>
+                                @foreach($tiers as $t)
+                                    <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tipe Konsumen</label>
+                            <select wire:model="editPelangganForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                <option value="retail" class="bg-ink-900">Retail</option>
+                                <option value="reseller" class="bg-ink-900">Reseller</option>
+                                <option value="agen" class="bg-ink-900">Agen</option>
+                            </select>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>

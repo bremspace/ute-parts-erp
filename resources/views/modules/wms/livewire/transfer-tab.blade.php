@@ -129,17 +129,34 @@
                         @endphp
                         <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
                             <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
-                                <div class="flex-1">
-                                    <select
-                                        wire:model="transferItems.{{ $index }}.produk_id"
-                                        wire:change="transferProdukDipilih({{ $index }})"
-                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px]"
+                                <div class="flex-1 flex gap-1.5 items-center">
+                                    <div class="flex-1 relative">
+                                        <input type="text"
+                                               wire:model="transferItems.{{ $index }}.produk_nama"
+                                               wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $index }}, context: 'transfer' })"
+                                               class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px] cursor-pointer"
+                                               placeholder="Klik untuk cari produk..."
+                                               readonly>
+                                        @if($row['produk_id'])
+                                            <button type="button"
+                                                    wire:click="$set('transferItems.{{ $index }}.produk_id', null); $set('transferItems.{{ $index }}.produk_nama', ''); $set('transferItems.{{ $index }}.sku_variant_id', null)"
+                                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                </svg>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    <button
+                                        type="button"
+                                        wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $index }}, context: 'transfer' })"
+                                        class="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 text-xs min-h-[44px] flex items-center justify-center cursor-pointer shrink-0 transition"
+                                        title="Cari Produk Lengkap"
                                     >
-                                        <option value="" class="bg-ink-900">Pilih Produk...</option>
-                                        @foreach($allProducts as $p)
-                                            <option value="{{ $p->id }}" class="bg-ink-900">{{ $p->nama }}</option>
-                                        @endforeach
-                                    </select>
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                        </svg>
+                                    </button>
                                 </div>
                                 <div class="w-full sm:w-32">
                                     <select wire:model="transferItems.{{ $index }}.rak_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px]">

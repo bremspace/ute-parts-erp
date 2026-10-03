@@ -142,38 +142,38 @@
     @endif
 
     <!-- Reject Modal -->
-    <div x-data="{ show: false }" x-show="show" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
-            <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Konfirmasi Penolakan</h3>
-                <div class="mt-2 px-7 py-3">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                        Berikan alasan penolakan (wajib)
-                    </p>
-                    <textarea wire:model="catatan" 
-                              class="w-full mt-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                              rows="3"
-                              placeholder="Alasan penolakan..."></textarea>
-                </div>
-                <div class="items-center px-4 py-3">
-                    <button wire:click="rejectRequest({{ $selectedRequest }})"
-                            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-base font-medium rounded-lg shadow-sm mr-2">
-                        Tolak
-                    </button>
-                    <button wire:click="reset(['selectedRequest', 'catatan'])"
-                            class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 dark:text-gray-200 text-base font-medium rounded-lg shadow-sm">
-                        Batal
-                    </button>
+    @if($showRejectModal)
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+            <div class="relative mx-auto p-5 border border-white/10 w-full max-w-md shadow-2xl rounded-2xl bg-white dark:bg-gray-800">
+                <div class="text-center">
+                    <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white">Konfirmasi Penolakan</h3>
+                    <div class="mt-2 px-2 py-3 text-left">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            Berikan alasan penolakan (wajib) agar kasir/pemohon mengetahui tindak lanjut yang perlu dilakukan:
+                        </p>
+                        <textarea wire:model="catatan" 
+                                  class="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                                  rows="3"
+                                  placeholder="Contoh: Tolong hitung ulang uang fisik di laci kasir..."></textarea>
+                        @error('catatan')
+                            <p class="mt-1 text-xs text-red-500 font-medium">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <button wire:click="closeRejectModal"
+                                type="button"
+                                class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 text-xs font-semibold rounded-xl cursor-pointer">
+                            Batal
+                        </button>
+                        <button wire:click="rejectRequest"
+                                type="button"
+                                :disabled="$processing"
+                                class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl shadow-sm cursor-pointer">
+                            Tolak Permintaan
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    @endif
 </div>
-
-@push('scripts')
-<script>
-    window.addEventListener('open-reject-modal', event => {
-        document.querySelector('[x-data]').__x.$data.show = true;
-    });
-</script>
-@endpush

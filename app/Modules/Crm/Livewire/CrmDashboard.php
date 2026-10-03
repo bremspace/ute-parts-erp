@@ -43,6 +43,8 @@ class CrmDashboard extends Component
 
     public string $broadcastPesan = '';
 
+    public string $broadcastChannel = 'inapp';
+
     public ?int $broadcastTierId = null;
 
     public bool $broadcastReseller = false;
@@ -50,7 +52,7 @@ class CrmDashboard extends Component
     // [T-04] Tambah pelanggan dari CRM (CRM-06)
     public bool $showPelangganBaruModal = false;
 
-    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false];
+    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail'];
 
     public bool $showEditPelangganModal = false;
 
@@ -58,7 +60,7 @@ class CrmDashboard extends Component
 
     public array $editPelangganForm = [
         'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
-        'tanggal_lahir' => '', 'tier_membership_id' => null, 'is_reseller' => false,
+        'tanggal_lahir' => '', 'tier_membership_id' => null, 'is_reseller' => false, 'tipe_konsumen' => 'retail',
     ];
 
     public function simpanPelangganBaruCrm()
@@ -106,6 +108,7 @@ class CrmDashboard extends Component
             'tanggal_lahir' => $p->tanggal_lahir?->format('Y-m-d') ?? '',
             'tier_membership_id' => $p->tier_membership_id,
             'is_reseller' => (bool) $p->is_reseller,
+            'tipe_konsumen' => $p->tipe_konsumen ?? ($p->is_reseller ? 'reseller' : 'retail'),
         ];
         $this->showEditPelangganModal = true;
     }
@@ -119,23 +122,8 @@ class CrmDashboard extends Component
             return;
         }
 
-        $this->validate([
-            'editPelangganForm.nama' => 'required|string|max:255',
-            'editPelangganForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon,'.$this->editPelangganId,
-            'editPelangganForm.email' => 'nullable|email|unique:pelanggan,email,'.$this->editPelangganId,
-            'editPelangganForm.tier_membership_id' => 'nullable|exists:tier_memberships,id',
-        ]);
-
         $pelanggan = Pelanggan::findOrFail($this->editPelangganId);
-        $pelanggan->update([
-            'nama' => $this->editPelangganForm['nama'],
-            'telepon' => $this->editPelangganForm['telepon'],
-            'email' => $this->editPelangganForm['email'] ?: null,
-            'alamat' => $this->editPelangganForm['alamat'] ?: null,
-            'tanggal_lahir' => $this->editPelangganForm['tanggal_lahir'] ?: null,
-            'tier_membership_id' => $this->editPelangganForm['tier_membership_id'] ?: null,
-            'is_reseller' => (bool) $this->editPelangganForm['is_reseller'],
-        ]);
+        app(PelangganService::class)->update($pelanggan, $this->editPelangganForm);
 
         $this->showEditPelangganModal = false;
         $this->editPelangganId = null;
@@ -158,21 +146,19 @@ class CrmDashboard extends Component
             return;
         }
 
-        // Cek riwayat transaksi & servis
-        $hasTransaksi = Transaksi::where('pelanggan_id', $id)->exists();
-        $hasServis = TiketServis::where('pelanggan_id', $id)->exists();
+        $nama = $pelanggan->nama;
 
-        if ($hasTransaksi || $hasServis) {
+        try {
+            app(PelangganService::class)->delete($pelanggan);
+        } catch (\DomainException $e) {
             $this->dispatch('alert', [
                 'type' => 'error',
-                'message' => "Pelanggan '{$pelanggan->nama}' memiliki riwayat transaksi penjualan / servis sehingga tidak dapat dihapus demi integritas pembukuan & audit.",
+                'message' => $e->getMessage(),
             ]);
 
             return;
         }
 
-        $nama = $pelanggan->nama;
-        $pelanggan->delete();
         if ($this->selectedCustomerId === $id) {
             $this->selectedCustomerId = null;
         }
@@ -348,6 +334,7 @@ class CrmDashboard extends Component
         $this->validate([
             'broadcastJudul' => 'required|string|max:255',
             'broadcastPesan' => 'required|string',
+            'broadcastChannel' => 'required|in:inapp,wa,email',
         ]);
 
         $segment = [];
@@ -358,12 +345,10 @@ class CrmDashboard extends Component
             $segment[] = ['tipe' => 'reseller'];
         }
 
-        // UI memakai channel inapp yang lama, tetapi tetap melewati BroadcastService
-        // supaya campaign, relasi log, segmentasi, dan idempotensi tidak terpisah.
         $kampanye = KampanyeBroadcast::create([
             'judul' => $this->broadcastJudul,
             'pesan' => "[Broadcast] {$this->broadcastPesan}",
-            'channel' => 'inapp',
+            'channel' => $this->broadcastChannel ?: 'inapp',
             'segment' => $segment,
             'status' => 'draft',
             'user_id' => auth()->id(),

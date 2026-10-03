@@ -4,6 +4,7 @@ namespace App\Modules\Marketplace\Controllers;
 
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Marketplace\Services\DuitkuService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
@@ -259,6 +260,11 @@ class PaymentController extends Controller
                     "Pesanan {$merchantOrderId} lunas — stok siap diproses. Terima kasih!",
                     ['transaksi_id' => $transaksi->id]
                 );
+
+                // f. Integrasi CRM: update total belanja 12 bulan & poin loyalty pelanggan
+                if ($transaksi->pelanggan_id) {
+                    app(PelangganService::class)->tambahBelanjaDanPoin($transaksi->pelanggan_id, $totalAkhir);
+                }
 
                 return ['kode' => 'sukses'];
             });

@@ -31,10 +31,10 @@ class LeadService
             : 'nullable|email';
 
         return [
-            'cabang_id' => 'required|exists:cabang,id',
-            'sumber' => 'required|string|in:walkin,phone,website,referral,social_media,marketplace,lain',
+            'cabang_id' => $isUpdate ? 'sometimes|required|exists:cabang,id' : 'required|exists:cabang,id',
+            'sumber' => $isUpdate ? 'sometimes|required|string|in:walkin,phone,website,referral,social_media,marketplace,lain' : 'required|string|in:walkin,phone,website,referral,social_media,marketplace,lain',
             'stage' => 'sometimes|in:baru,kontak,kualifikasi,negosiasi,won,lost',
-            'nama' => 'required|string|max:255',
+            'nama' => $isUpdate ? 'sometimes|required|string|max:255' : 'required|string|max:255',
             'telepon' => $teleponRule,
             'email' => $emailRule,
             'nilai_estimasi' => 'sometimes|numeric|min:0',
@@ -119,15 +119,26 @@ class LeadService
         }
 
         return DB::transaction(function () use ($lead) {
-            $pelanggan = $this->pelangganService->create([
-                'nama' => $lead->nama,
-                'telepon' => $lead->telepon,
-                'email' => $lead->email,
-                'alamat' => null,
-                'tanggal_lahir' => null,
-                'is_reseller' => false,
-                'tipe_konsumen' => 'retail',
-            ]);
+            $pelanggan = null;
+            if ($lead->telepon) {
+                $pelanggan = Pelanggan::where('telepon', $lead->telepon)->first();
+            }
+            if (! $pelanggan && $lead->email) {
+                $pelanggan = Pelanggan::where('email', $lead->email)->first();
+            }
+
+            if (! $pelanggan) {
+                $telepon = $lead->telepon ?: '08'.str_pad((string) random_int(10000000, 99999999), 10, '0', STR_PAD_LEFT);
+                $pelanggan = $this->pelangganService->create([
+                    'nama' => $lead->nama,
+                    'telepon' => $telepon,
+                    'email' => $lead->email,
+                    'alamat' => null,
+                    'tanggal_lahir' => null,
+                    'is_reseller' => false,
+                    'tipe_konsumen' => 'retail',
+                ]);
+            }
 
             $lead->update([
                 'pelanggan_id' => $pelanggan->id,
@@ -247,6 +258,12 @@ class LeadService
                     $updateData = ['stage' => $newStage];
                     $this->handleStageTransition($lead, $oldStage, $newStage, $updateData);
                     $lead->update($updateData);
+
+                    // Trigger komisi lead_won saat dipindahkan ke won via bulk/kanban
+                    if ($oldStage !== 'won' && $newStage === 'won') {
+                        app(KomisiService::class)->hitungKomisiMultiAktor('lead_won', ['lead_id' => $lead->id]);
+                    }
+
                     $updated++;
                 }
             }

@@ -5,6 +5,9 @@ namespace App\Modules\Crm\Services;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Pos\Models\HargaTier;
+use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Reseller\Models\Komisi;
+use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Container\Container;
@@ -31,12 +34,20 @@ use Illuminate\Support\Facades\Validator;
  */
 class PelangganService
 {
-    public function rules(): array
+    public function rules(bool $isUpdate = false, ?int $pelangganId = null): array
     {
+        $teleponRule = $isUpdate
+            ? 'sometimes|required|string|max:20|unique:pelanggan,telepon,'.$pelangganId
+            : 'required|string|max:20|unique:pelanggan,telepon';
+
+        $emailRule = $isUpdate
+            ? 'nullable|email|unique:pelanggan,email,'.$pelangganId
+            : 'nullable|email|unique:pelanggan,email';
+
         return [
-            'nama' => 'required|string|max:255',
-            'telepon' => 'required|string|max:20|unique:pelanggan,telepon',
-            'email' => 'nullable|email|unique:pelanggan,email',
+            'nama' => $isUpdate ? 'sometimes|required|string|max:255' : 'required|string|max:255',
+            'telepon' => $teleponRule,
+            'email' => $emailRule,
             'alamat' => 'nullable|string',
             'tanggal_lahir' => 'nullable|date',
             'is_reseller' => 'sometimes|boolean',
@@ -70,6 +81,96 @@ class PelangganService
         ]);
 
         return $pelanggan->load('tierMembership');
+    }
+
+    public function update(Pelanggan $pelanggan, array $data): Pelanggan
+    {
+        $validated = Validator::make($data, $this->rules(true, $pelanggan->id))->validate();
+
+        $updateData = [];
+        if (array_key_exists('nama', $validated)) {
+            $updateData['nama'] = $validated['nama'];
+        }
+        if (array_key_exists('telepon', $validated)) {
+            $updateData['telepon'] = $validated['telepon'];
+        }
+        if (array_key_exists('email', $validated)) {
+            $updateData['email'] = $validated['email'] ?: null;
+        }
+        if (array_key_exists('alamat', $validated)) {
+            $updateData['alamat'] = $validated['alamat'] ?: null;
+        }
+        if (array_key_exists('tanggal_lahir', $validated)) {
+            $updateData['tanggal_lahir'] = $validated['tanggal_lahir'] ?: null;
+        }
+        if (array_key_exists('tier_membership_id', $validated)) {
+            $updateData['tier_membership_id'] = $validated['tier_membership_id'] ?: null;
+        }
+
+        if (array_key_exists('is_reseller', $validated)) {
+            $isReseller = (bool) $validated['is_reseller'];
+            $updateData['is_reseller'] = $isReseller;
+            $tipeKonsumen = $validated['tipe_konsumen'] ?? ($isReseller ? 'reseller' : 'retail');
+            if ($isReseller && $tipeKonsumen === 'retail') {
+                $tipeKonsumen = 'reseller';
+            } elseif (! $isReseller && $tipeKonsumen === 'reseller') {
+                $tipeKonsumen = 'retail';
+            }
+            $updateData['tipe_konsumen'] = $tipeKonsumen;
+        } elseif (array_key_exists('tipe_konsumen', $validated)) {
+            $tipe = $validated['tipe_konsumen'] ?: 'retail';
+            $updateData['tipe_konsumen'] = $tipe;
+            if ($tipe === 'reseller' || $tipe === 'agen') {
+                $updateData['is_reseller'] = true;
+            } elseif ($tipe === 'retail') {
+                $updateData['is_reseller'] = false;
+            }
+        }
+
+        $pelanggan->update($updateData);
+
+        return $pelanggan->fresh('tierMembership');
+    }
+
+    public function delete(Pelanggan $pelanggan): bool
+    {
+        $hasTransaksi = Transaksi::where('pelanggan_id', $pelanggan->id)->exists();
+        $hasServis = TiketServis::where('pelanggan_id', $pelanggan->id)->exists();
+        $hasKomisi = Komisi::where('pelanggan_id', $pelanggan->id)->exists();
+
+        if ($hasTransaksi || $hasServis || $hasKomisi) {
+            throw new \DomainException(
+                "Pelanggan '{$pelanggan->nama}' memiliki riwayat transaksi penjualan, tiket servis, atau komisi sehingga tidak dapat dihapus demi integritas pembukuan dan audit."
+            );
+        }
+
+        return (bool) $pelanggan->delete();
+    }
+
+    /**
+     * Tambah akumulasi belanja & poin loyalty pelanggan serta cek rekalkulasi tier.
+     * Single source of truth untuk POS kasir, pembayaran marketplace online, dan pelunasan servis.
+     */
+    public function tambahBelanjaDanPoin(Pelanggan|int $pelanggan, float $nominal): void
+    {
+        if ($nominal <= 0) {
+            return;
+        }
+
+        $model = $pelanggan instanceof Pelanggan ? $pelanggan : Pelanggan::find($pelanggan);
+        if (! $model) {
+            return;
+        }
+
+        $model->increment('total_belanja_12bulan', $nominal);
+
+        $tierService = app(TierService::class);
+        $poin = $tierService->hitungPoin($nominal, $model->tierMembership);
+        if ($poin > 0) {
+            $model->increment('poin_loyalty', $poin);
+        }
+
+        $tierService->recalcSatu($model);
     }
 
     /**

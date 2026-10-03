@@ -130,15 +130,23 @@ class CycleCountService
         $snapshot = $kandidat
             ->filter(fn (StokItem $item) => isset($terpilihSet[$item->id]))
             ->values()
-            ->map(fn (StokItem $item) => [
-                'stok_item_id' => $item->id,
-                'produk_id' => $item->produk_id,
-                'sku_variant_id' => $item->sku_variant_id,
-                'gudang_id' => $item->gudang_id,
-                'rak_id' => $item->rak_id,
-                'nama' => $item->produk?->nama ?? ('Produk #'.$item->produk_id),
-                'stok_sistem' => (int) $item->jumlah,
-            ])
+            ->map(function (StokItem $item) {
+                $nama = $item->produk?->nama ?? ('Produk #'.$item->produk_id);
+                if ($item->skuVariant?->nama_varian) {
+                    $nama .= ' ('.$item->skuVariant->nama_varian.')';
+                }
+
+                return [
+                    'stok_item_id' => $item->id,
+                    'produk_id' => $item->produk_id,
+                    'sku_variant_id' => $item->sku_variant_id,
+                    'gudang_id' => $item->gudang_id,
+                    'rak_id' => $item->rak_id,
+                    'rak_nama' => $item->rak ? ($item->rak->kode.' - '.$item->rak->nama) : null,
+                    'nama' => $nama,
+                    'stok_sistem' => (int) $item->jumlah,
+                ];
+            })
             ->all();
 
         $task = CycleCountTask::firstOrCreate(
@@ -190,7 +198,7 @@ class CycleCountService
                 $schedule->tipe_target === 'kategori' && ! empty($schedule->target_kategori),
                 fn ($q) => $q->whereHas('produk', fn ($p) => $p->where('kategori', $schedule->target_kategori))
             )
-            ->with('produk:id,nama,kategori')
+            ->with(['produk:id,nama,kategori', 'skuVariant:id,nama_varian', 'rak:id,kode,nama', 'gudang:id,nama'])
             ->get();
     }
 

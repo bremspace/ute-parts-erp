@@ -150,12 +150,12 @@
                                             <div class="flex items-center gap-1">
                                                 @if($tiket->status_pembayaran === 'lunas')
                                                     <span class="bg-up-mint/20 text-up-mint text-[9px] font-bold px-1.5 py-0.5 rounded">LUNAS</span>
-                                                @elseif($tiket->status === 'selesai')
-                                                    <button
-                                                        type="button"
-                                                        wire:click.stop="openBayarModal({{ $tiket->id }})"
-                                                        class="bg-up-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-lg hover:bg-up-primary/80 cursor-pointer"
-                                                    >Bayar</button>
+                                                @elseif(in_array($tiket->status, ['selesai', 'diambil'], true))
+                                                    <a
+                                                        href="/app/pos?bayar_servis_id={{ $tiket->id }}"
+                                                        class="bg-up-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-lg hover:bg-up-primary/80 cursor-pointer inline-flex items-center gap-1"
+                                                        title="Bayar di Kasir POS"
+                                                    >Bayar Kasir</a>
                                                 @endif
                                                 @if($tiket->garansi && $tiket->garansi->active)
                                                     <span class="text-[9px] font-bold text-up-mint bg-up-mint/10 border border-up-mint/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">Dalam Garansi</span>
@@ -555,20 +555,33 @@
                                         <!-- Dropdown Pemilih Jasa / Part -->
                                         <div class="col-span-4">
                                             @if(($row['tipe'] ?? '') === 'part')
-                                                <select
-                                                    wire:model.live="estimasiItems.{{ $idx }}.produk_id"
-                                                    class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-medium"
-                                                >
-                                                    <option value="" class="bg-ink-900">— Pilih Produk Toko —</option>
-                                                    @foreach($produkEstimasiList as $p)
-                                                        @php
-                                                            $stokAda = (int) $p->stokItems->sum('jumlah');
-                                                        @endphp
-                                                        <option value="{{ $p->id }}" class="bg-ink-900">
-                                                            {{ $p->nama }} (Stok: {{ $stokAda }})
-                                                        </option>
-                                                    @endforeach
-                                                </select>
+                                                <div class="relative">
+                                                    <input type="text"
+                                                           wire:model="estimasiItems.{{ $idx }}.produk_nama"
+                                                           wire:click="bukaPencarianProduk({{ $idx }}, 'servis_estimasi')"
+                                                           class="w-full px-2 py-1.5 pr-7 rounded-lg glass-input text-xs font-medium cursor-pointer"
+                                                           placeholder="Klik untuk cari produk..."
+                                                           readonly>
+                                                    @if($row['produk_id'])
+                                                        <button type="button"
+                                                                wire:click="resetEstimasiPartRow({{ $idx }})"
+                                                                class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white"
+                                                                title="Hapus pilihan produk">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    @else
+                                                        <button type="button"
+                                                                wire:click="bukaPencarianProduk({{ $idx }}, 'servis_estimasi')"
+                                                                class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white cursor-pointer"
+                                                                title="Cari Produk">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                                            </svg>
+                                                        </button>
+                                                    @endif
+                                                </div>
                                             @else
                                                 <select
                                                     wire:model.live="estimasiItems.{{ $idx }}.jenis_servis_id"
@@ -814,15 +827,36 @@
                                 @endif
                             </div>
                         </div>
-                        @if($selectedTiket->status_pembayaran !== 'lunas' && in_array($selectedTiket->status, ['selesai', 'diambil'], true))
+                        <div class="flex items-center gap-2">
                             <button
                                 type="button"
-                                wire:click="openBayarModal({{ $selectedTiket->id }})"
-                                class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-all cursor-pointer self-start sm:self-auto"
+                                wire:click="bukaStrukServis({{ $selectedTiket->id }})"
+                                class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white border border-white/10 font-bold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
+                                title="Cetak struk thermal 58mm / nota servis"
                             >
-                                Bayar Sekarang
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                <span>Cetak Struk</span>
                             </button>
+                        @if($selectedTiket->status_pembayaran !== 'lunas' && in_array($selectedTiket->status, ['selesai', 'diambil'], true))
+                            <a
+                                href="/app/pos?bayar_servis_id={{ $selectedTiket->id }}"
+                                class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-all cursor-pointer self-start sm:self-auto inline-flex items-center gap-1.5 shadow-sm"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                <span>Bayar di Kasir POS</span>
+                            </a>
+                            @if($selectedTiket->sumber === 'online')
+                                <button
+                                    type="button"
+                                    wire:click="openBayarModal({{ $selectedTiket->id }})"
+                                    class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs border border-white/10 cursor-pointer"
+                                    title="Konfirmasi Pembayaran Online (Non-Tunai / Marketplace)"
+                                >
+                                    Bayar Online
+                                </button>
+                            @endif
                         @endif
+                        </div>
                     </div>
 
                     <!-- [B-06] Kunci Gadget — terlihat utk semua role yg berhak buka tiket, default ter-mask -->
@@ -989,12 +1023,33 @@
                                         <option value="jasa" class="bg-ink-900">Jasa</option>
                                         <option value="part" class="bg-ink-900">Part</option>
                                     </select>
-                                    <select wire:model.live="pekerjaanItems.{{ $idx }}.produk_id" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium">
-                                        <option value="" class="bg-ink-900">— Produk (part) —</option>
-                                        @foreach($produkList as $p)
-                                            <option value="{{ $p->id }}" class="bg-ink-900">{{ $p->nama }}</option>
-                                        @endforeach
-                                    </select>
+                                    <div class="col-span-3 relative">
+                                        <input type="text"
+                                               wire:model="pekerjaanItems.{{ $idx }}.produk_nama"
+                                               wire:click="bukaPencarianProduk({{ $idx }}, 'servis_pekerjaan')"
+                                               class="w-full px-2 py-2 pr-7 rounded-lg glass-input text-[11px] font-medium cursor-pointer"
+                                               placeholder="Klik untuk cari produk..."
+                                               readonly>
+                                        @if($row['produk_id'])
+                                            <button type="button"
+                                                    wire:click="resetPekerjaanPartRow({{ $idx }})"
+                                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white"
+                                                    title="Hapus pilihan produk">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                </svg>
+                                            </button>
+                                        @else
+                                            <button type="button"
+                                                    wire:click="bukaPencarianProduk({{ $idx }}, 'servis_pekerjaan')"
+                                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white cursor-pointer"
+                                                    title="Cari Produk">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                                </svg>
+                                            </button>
+                                        @endif
+                                    </div>
                                     <input type="text" wire:model="pekerjaanItems.{{ $idx }}.nama_item" placeholder="Nama item" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
                                     <input type="number" wire:model="pekerjaanItems.{{ $idx }}.qty" min="1" placeholder="Qty" class="col-span-1 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
                                     <input type="text" inputmode="numeric" x-format-number wire:model="pekerjaanItems.{{ $idx }}.harga" placeholder="Harga" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium tabular-nums" />
@@ -1069,13 +1124,18 @@
             <div class="w-full max-w-lg glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                     <div>
-                        <h3 class="text-lg font-bold text-white">Pembayaran Servis - #{{ $bayarTiketId }}</h3>
-                        <p class="text-xs text-ink-400">Pencatatan kas masuk & pelunasan piutang servis</p>
+                        <h3 class="text-lg font-bold text-white">Konfirmasi Bayar Online - #{{ $bayarTiketId }}</h3>
+                        <p class="text-xs text-ink-400">Pencatatan pembayaran non-tunai / gateway online</p>
                     </div>
                     <button wire:click="$set('showBayarModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
 
                 <div class="space-y-4">
+                    <!-- Info Banner Integrasi Kasir POS -->
+                    <div class="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+                        Pembayaran tunai / di toko wajib melalui <a href="/app/pos?bayar_servis_id={{ $bayarTiketId }}" class="underline font-bold text-white hover:text-blue-200">Kasir POS</a> agar tercatat di sesi kas laci. Form ini khusus pelunasan online / transfer.
+                    </div>
+
                     <!-- Ringkasan Total Tagihan -->
                     <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
                         <span class="text-xs font-semibold text-ink-300">Total Tagihan Servis</span>
@@ -1086,10 +1146,9 @@
 
                     <!-- Pemilihan Metode Pembayaran -->
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-2">Metode Pembayaran</label>
-                        <div class="grid grid-cols-2 gap-2">
+                        <label class="block text-xs font-semibold text-ink-300 mb-2">Metode Pembayaran Online</label>
+                        <div class="grid grid-cols-3 gap-2">
                             @foreach([
-                                'tunai' => 'Tunai (Kas)',
                                 'transfer' => 'Transfer Bank',
                                 'qris' => 'QRIS',
                                 'kartu' => 'Kartu Debit/Kredit'
@@ -1140,4 +1199,84 @@
 
     {{-- Modal Riwayat Aktivitas & Log Mutasi --}}
     @include('partials.riwayat-modal')
+
+    <!-- MODAL PENCARIAN PART SERVIS (inline, bukan sibling) -->
+    @if($showCariPartModal)
+        <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-xl glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl relative max-h-[85vh] flex flex-col">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10 flex-shrink-0">
+                    <div>
+                        <h3 class="text-base font-bold text-white">Cari Produk / Part</h3>
+                        <p class="text-[11px] text-ink-400">Ketik nama produk, barcode, atau tipe HP kompatibel</p>
+                    </div>
+                    <button wire:click="$set('showCariPartModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+
+                <!-- Search Input -->
+                <div class="mb-3 flex-shrink-0">
+                    <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                            <svg class="h-4 w-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                        <input type="text"
+                               wire:model.live.debounce.300ms="cariPartQuery"
+                               class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-medium"
+                               placeholder="Ketik minimal 2 huruf..."
+                               autofocus>
+                    </div>
+                </div>
+
+                <!-- Product List -->
+                <div class="overflow-y-auto flex-1 space-y-1 pr-1">
+                    @forelse($cariPartResults as $product)
+                        <button type="button"
+                                wire:click="pilihPartServis({{ $product->id }})"
+                                class="w-full flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-up-primary/30 transition-all cursor-pointer text-left group">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold text-white group-hover:text-up-primary truncate">{{ $product->nama }}</p>
+                                <p class="text-[10px] text-ink-400 mt-0.5">
+                                    @if($product->barcode)
+                                        <span class="inline-flex items-center rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-medium text-ink-300 mr-1">{{ $product->barcode }}</span>
+                                    @endif
+                                    @if($product->kategori)
+                                        <span>{{ $product->kategori }}</span>
+                                    @endif
+                                </p>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <p class="text-xs font-bold text-up-mint tabular-nums">Rp {{ number_format($product->harga_jual_retail ?? 0, 0, ',', '.') }}</p>
+                                <p class="text-[10px] text-ink-400">Beli: Rp {{ number_format($product->harga_beli ?? 0, 0, ',', '.') }}</p>
+                            </div>
+                        </button>
+                    @empty
+                        <div class="text-center py-8">
+                            <svg class="mx-auto h-10 w-10 text-ink-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                            </svg>
+                            <p class="mt-2 text-xs text-ink-400">
+                                @if(strlen($cariPartQuery) < 2)
+                                    Ketik minimal 2 karakter untuk mulai mencari...
+                                @else
+                                    Tidak ada produk ditemukan untuk "{{ $cariPartQuery }}"
+                                @endif
+                            </p>
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="pt-3 mt-3 border-t border-white/10 flex justify-end flex-shrink-0">
+                    <button type="button"
+                            wire:click="$set('showCariPartModal', false)"
+                            class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs border border-white/10 cursor-pointer">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- [T-35] Modal Cetak Struk Servis Thermal 58mm / 80mm --}}
+    @include('partials.thermal-receipt-modal')
 </div>

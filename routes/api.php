@@ -160,9 +160,12 @@ Route::middleware(['throttle:60,1'])->group(function () {
             Route::get('/pelanggan', [CrmController::class, 'index'])->middleware('permission:crm.view');
             Route::post('/pelanggan', [CrmController::class, 'store'])->middleware('permission:crm.create'); // [T-04] CRM-06
             Route::get('/pelanggan/{id}', [CrmController::class, 'show'])->middleware('permission:crm.view');
+            Route::put('/pelanggan/{id}', [CrmController::class, 'update'])->middleware('permission:crm.edit');
+            Route::delete('/pelanggan/{id}', [CrmController::class, 'destroy'])->middleware('permission:crm.delete');
             Route::get('/tiers', [CrmController::class, 'indexTiers'])->middleware('permission:crm.view');
             Route::post('/tiers', [CrmController::class, 'storeTier'])->middleware('permission:tier.manage');
             Route::put('/tiers/{id}', [CrmController::class, 'updateTier'])->middleware('permission:tier.manage');
+            Route::delete('/tiers/{id}', [CrmController::class, 'destroyTier'])->middleware('permission:tier.manage');
             Route::post('/recalc-tier', [CrmController::class, 'recalcTiers'])->middleware('permission:tier.manage');
             Route::match(['get', 'post'], '/config', [CrmController::class, 'config'])->middleware('permission:tier.manage'); // [T-22] CRM-07
             Route::post('/broadcast/kampanye', [CrmController::class, 'broadcastKampanye'])->middleware('permission:crm.broadcast'); // [T-23] CRM-08

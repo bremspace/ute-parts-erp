@@ -43,6 +43,12 @@ class BroadcastService
             ->with('tierMembership')
             ->orderBy('id');
 
+        if ($kampanye->channel === 'wa') {
+            $target->whereNotNull('telepon')->where('telepon', '!=', '');
+        } elseif ($kampanye->channel === 'email') {
+            $target->whereNotNull('email')->where('email', '!=', '');
+        }
+
         $segments = $kampanye->segment ?? [];
 
         foreach ($segments as $seg) {
@@ -66,7 +72,7 @@ class BroadcastService
                     if (! empty($seg['nilai'])) {
                         $target->whereDoesntHave(
                             'transaksi',
-                            fn ($q) => $q->where('created_at', '>=', now()->subDays((int) $seg['nilai']))
+                            fn ($q) => $q->whereIn('status', ['selesai', 'lunas'])->where('created_at', '>=', now()->subDays((int) $seg['nilai']))
                         );
                     }
                     break;

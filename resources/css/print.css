@@ -1,83 +1,161 @@
-/* [T-35] [ADR 0009] Cetak thermal 58mm/80mm + Web Print A4
-   - Bluetooth ESC/POS: layout 58/80 di JS (komponen thermal-print.js), bukan CSS.
-   - Fallback Web Print: area render tersembunyi (.print-58/.print-80) diisi JS lalu window.print().
-   - A4: modal struk lama tetap tercetak apa adanya (dibungkus .print-a4).
-   - @page per-elemen via named pages (Chrome/Edge); browser lain jatuh ke A4 default.
-*/
+/* [T-35] [ADR 0009] Cetak Thermal 58mm / 80mm & Web Print A4
+ *
+ * Prinsip Cetak Thermal 58mm:
+ * - Lebar fisik kertas: 58mm.
+ * - Lebar area cetak efektif (TPH / print head): 48mm (384 dots @ 203 DPI).
+ * - Margin browser HARUS 0mm (@page { margin: 0 !important; }) agar tidak terpotong atau menyusut.
+ * - Padding aman sisi kiri & kanan: 1mm.
+ * - Baris teks monospace: 32 karakter per baris (Font A).
+ */
 
-/* Screen: hanya area A4 (isi modal) yang tampil; target 58/80 tersembunyi. */
-.print-58, .print-80 {
-    display: none;
+/* Sembunyikan elemen print target di layar monitor biasa */
+.print-only {
+    display: none !important;
+}
+
+@media screen {
+    .thermal-receipt-preview {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    }
+}
+
+@page {
+    size: 58mm auto;
+    margin: 0mm !important;
+}
+
+@page struk58 {
+    size: 58mm auto;
+    margin: 0mm !important;
+}
+
+@page faktur80 {
+    size: 80mm auto;
+    margin: 0mm !important;
+}
+
+@page notaA4 {
+    size: A4;
+    margin: 10mm !important;
 }
 
 @media print {
-    /* Sembunyikan seluruh UI; hanya area cetak yang terlihat. */
-    body * {
-        visibility: hidden;
-    }
-    .print-area, .print-area * {
-        visibility: visible;
-    }
-    .print-area {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        color: #000;
-        background: #fff;
+    /* 1. Reset halaman & sembunyikan seluruh antarmuka web */
+    html, body {
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 
-    /* Target 58/80 hanya tampil saat JS menetapkan mode (fallback aktif). */
-    .print-58, .print-80 {
-        display: none !important;
-    }
-    body[data-modal-print="58"] .print-58 {
-        display: block !important;
-    }
-    body[data-modal-print="80"] .print-80 {
-        display: block !important;
-    }
-    body[data-modal-print="58"] .print-a4,
-    body[data-modal-print="80"] .print-a4 {
-        display: none !important;
+    body * {
         visibility: hidden !important;
     }
 
-    /* Named pages: ukuran kertas per area. */
-    @page a4page { size: A4; margin: 1cm; }
-    @page struk58 { size: 58mm auto; margin: 0; }
-    @page faktur80 { size: 80mm auto; margin: 0; }
-
-    .print-a4  { page: a4page; }
-    .print-58  { page: struk58; }
-    .print-80  { page: faktur80; }
-
-    /* Tipografi struk: monospace, hitam pekat, tanpa background dekoratif. */
-    .print-58, .print-80 {
-        font-family: 'Courier New', ui-monospace, monospace;
-        font-size: 10.5px;
-        line-height: 1.35;
-        font-weight: 400;
-        white-space: pre-wrap;
+    /* 2. Target cetak yang harus terlihat */
+    .print-area,
+    .print-area *,
+    .thermal-receipt-container,
+    .thermal-receipt-container * {
+        visibility: visible !important;
     }
-    .print-58 { width: 48mm; margin: 1mm auto; }
-    .print-80 { width: 72mm; margin: 1mm auto; }
 
-    .print-58 div, .print-80 div {
-        white-space: pre-wrap;
-        word-break: break-word;
+    /* 3. Setup container thermal receipt (default 58mm) */
+    .thermal-receipt-container {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 48mm !important;
+        max-width: 48mm !important;
+        margin: 0 auto !important;
+        padding: 0 1mm 4mm 1mm !important;
+        background: #fff !important;
+        color: #000 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        font-family: 'Courier New', Courier, ui-monospace, monospace !important;
+        font-size: 11px !important;
+        line-height: 1.25 !important;
+        box-sizing: border-box !important;
+        word-break: break-word !important;
+        overflow: visible !important;
+        page: struk58;
     }
-    .print-58 div.c, .print-80 div.c { text-align: center; }
-    .print-58 div.r, .print-80 div.r { text-align: right; }
-    .print-58 div.b, .print-80 div.b { font-weight: 700; }
-    .print-58 div.h2, .print-80 div.h2 { font-size: 1.55em; font-weight: 700; }
-    .print-58 div.h4, .print-80 div.h4 { font-size: 2em; font-weight: 700; }
-}
 
-/* Page default (fallback saat named pages tak didukung): A4 bersih. */
-@page {
-    size: A4;
-    margin: 1cm;
+    /* Mode 80mm bila disetel via body[data-modal-print="80"] */
+    body[data-modal-print="80"] .thermal-receipt-container {
+        width: 72mm !important;
+        max-width: 72mm !important;
+        font-size: 12px !important;
+        page: faktur80;
+    }
+
+    /* Mode A4 bila disetel via body[data-modal-print="a4"] */
+    body[data-modal-print="a4"] .thermal-receipt-container {
+        width: 100% !important;
+        max-width: 180mm !important;
+        margin: 0 auto !important;
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+        page: notaA4;
+    }
+
+    /* Elemen teks & tabel struk di print */
+    .thermal-receipt-container .dashed-divider {
+        border-bottom: 1px dashed #000 !important;
+        margin: 3px 0 !important;
+        padding: 0 !important;
+        height: 1px !important;
+    }
+
+    .thermal-receipt-container .double-divider {
+        border-bottom: 2px solid #000 !important;
+        margin: 4px 0 !important;
+        padding: 0 !important;
+        height: 2px !important;
+    }
+
+    .thermal-receipt-container .receipt-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        margin: 1.5px 0 !important;
+        width: 100% !important;
+    }
+
+    .thermal-receipt-container .receipt-row-title {
+        font-weight: 700 !important;
+        margin-top: 2px !important;
+    }
+
+    .thermal-receipt-container .receipt-title {
+        font-size: 13px !important;
+        font-weight: 900 !important;
+        text-align: center !important;
+        letter-spacing: 1px !important;
+    }
+
+    .thermal-receipt-container .receipt-center {
+        text-align: center !important;
+    }
+
+    .thermal-receipt-container .receipt-right {
+        text-align: right !important;
+    }
+
+    .thermal-receipt-container .receipt-bold {
+        font-weight: 700 !important;
+    }
+
+    /* Sembunyikan tombol / kontrol di dalam container saat print */
+    .no-print,
+    .no-print * {
+        display: none !important;
+        visibility: hidden !important;
+    }
 }

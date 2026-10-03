@@ -22,6 +22,7 @@ use App\Modules\Marketplace\Livewire\ShopPage;
 use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter;
 use App\Modules\Pos\Livewire\PosKasir;
+use App\Modules\Pos\Livewire\RiwayatTransaksiIndex;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use App\Modules\Rbac\Livewire\SessionManagementPage;
 use App\Modules\Rbac\Livewire\SettingsRbac;
@@ -326,6 +327,11 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
     Route::get('/pos', PosKasir::class)
         ->name('pos')
         ->middleware('permission:pos.view|pos.view-own');
+
+    // Riwayat Transaksi (POS, Mutasi Kas Laci, Servis)
+    Route::get('/pos/riwayat', RiwayatTransaksiIndex::class)
+        ->name('pos.riwayat')
+        ->middleware('permission:pos.view|pos.view-own|servis.view');
 
     // WMS Gudang & Stok Screen — [F2-2] RBAC: permission wms.view (pola servis.view/crm.view)
     Route::get('/wms', WmsDashboard::class)

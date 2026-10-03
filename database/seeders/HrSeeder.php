@@ -7,6 +7,7 @@ use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KomisiTeknisiRule;
 use App\Modules\Hr\Models\KpiMetric;
 use App\Modules\Hr\Models\Shift;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Models\KomisiSkema;
 use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -44,13 +45,17 @@ class HrSeeder extends Seeder
                 ['name' => $u['nama'], 'password' => bcrypt('password'), 'is_active' => true]
             );
 
+            // [FIX] Jangan hardcode cabang_id=1 — auto-increment bisa saja bukan 1
+            // (mis. setelah data di-DELETE tanpa TRUNCATE). Cari cabang aktif pertama.
+            $cabangId = session('cabang_id') ?? Cabang::where('is_active', true)->orderBy('id')->value('id');
+
             Karyawan::updateOrCreate(
                 ['user_id' => $user->id],
                 [
                     'nik' => strtoupper(substr($u['jabatan'], 0, 3)).date('Y').rand(100, 999),
                     'nama' => $u['nama'],
                     'jabatan' => $u['jabatan'],
-                    'cabang_id' => session('cabang_id') ?? 1,
+                    'cabang_id' => $cabangId,
                     'tgl_masuk' => '2024-01-01',
                     'gaji_pokok' => $u['jabatan'] === 'teknisi' ? 5000000 : ($u['jabatan'] === 'kasir' ? 4000000 : ($u['jabatan'] === 'marketing' ? 4500000 : 4500000)),
                     'status_aktif' => true,
@@ -71,7 +76,7 @@ class HrSeeder extends Seeder
         );
 
         // Demo Shift — idempotent (Pagi, Siang; Malam = overnight 22:00-06:00)
-        $shift = session('cabang_id') ?? 1;
+        $shift = session('cabang_id') ?? Cabang::where('is_active', true)->orderBy('id')->value('id');
         foreach ([
             ['nama' => 'Pagi', 'jam_mulai' => '08:00:00', 'jam_selesai' => '16:00:00'],
             ['nama' => 'Siang', 'jam_mulai' => '13:00:00', 'jam_selesai' => '21:00:00'],

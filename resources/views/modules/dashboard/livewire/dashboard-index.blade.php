@@ -93,7 +93,7 @@
         </a>
 
         <!-- 3. Stok Kritis -->
-        <a href="/app/wms/produk" class="block group relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5 hover:border-up-red/40 transition-all duration-200 active:scale-[0.98]">
+        <a href="/app/wms?tab=produk" class="block group relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5 hover:border-up-red/40 transition-all duration-200 active:scale-[0.98]">
             <div class="flex items-center justify-between">
                 <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-ink-400 group-hover:text-ink-200">Stok Kritis</span>
                 <div class="w-8 h-8 rounded-xl bg-up-red/10 border border-up-red/20 flex items-center justify-center text-up-red">

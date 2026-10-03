@@ -7,6 +7,10 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Livewire\CycleCountPage;
 use App\Modules\Wms\Models\CycleCountSchedule;
 use App\Modules\Wms\Models\CycleCountTask;
+use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\Rak;
+use App\Modules\Wms\Models\StokItem;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,12 +90,13 @@ class CycleCountPageTest extends TestCase
             ->assertSee('Toleransi Persen (Threshold %)')
             ->set('scheduleNama', 'Rak A Mingguan')
             ->set('tipeTarget', 'rak')
+            ->set('targetId', '5')
             ->set('frekuensi', 'mingguan')
-            ->set('hari', 1)
+            ->set('hari', '1')
             ->set('jam', '08:00')
-            ->set('sampleSize', 10)
-            ->set('thresholdUnit', 2)
-            ->set('thresholdPersen', 5)
+            ->set('sampleSize', '10')
+            ->set('thresholdUnit', '2')
+            ->set('thresholdPersen', '5')
             ->call('simpanSchedule')
             ->assertSet('showScheduleForm', false)
             ->assertSee('Rak A Mingguan')
@@ -101,6 +106,7 @@ class CycleCountPageTest extends TestCase
         $this->assertDatabaseHas('cycle_count_schedule', [
             'cabang_id' => $this->cabang->id,
             'nama' => 'Rak A Mingguan',
+            'target_id' => 5,
             'sample_size' => 10,
             'threshold_unit' => 2,
             'threshold_persen' => 5,
@@ -134,7 +140,7 @@ class CycleCountPageTest extends TestCase
             'seed' => 12345,
             'sample_items' => [[
                 'stok_item_id' => 11, 'produk_id' => 1, 'gudang_id' => 1,
-                'rak_id' => 1, 'nama' => 'Oli 10W-30', 'stok_sistem' => 8,
+                'rak_id' => 1, 'rak_nama' => 'R-01 - Rak Utama', 'nama' => 'Oli 10W-30', 'stok_sistem' => 8,
             ]],
             'status' => 'menunggu_count',
             'threshold_unit' => 5,
@@ -148,8 +154,88 @@ class CycleCountPageTest extends TestCase
             ->assertSee('Input Hitungan Fisik Sampel')
             ->assertSee('Blind Count')
             ->assertSee('Oli 10W-30')
+            ->assertSee('Rak: R-01 - Rak Utama')
+            ->assertSee('Item ID:')
+            ->assertSee('#11')
             // Memastikan blind count: angka stok sistem disembunyikan dari pelaksana saat input count
             ->assertDontSee('Sistem: 8 unit');
+    }
+
+    public function test_form_count_backfills_nama_produk_jika_sample_items_lama_hanya_ada_id(): void
+    {
+        $this->authed();
+
+        $schedule = CycleCountSchedule::create([
+            'cabang_id' => $this->cabang->id,
+            'nama' => 'Jadwal Test Backfill',
+            'tipe_target' => 'rak',
+            'frekuensi' => 'mingguan',
+            'hari' => 1,
+            'jam' => '08:00',
+            'sample_size' => 1,
+            'threshold_unit' => 1,
+            'threshold_persen' => 5,
+            'is_aktif' => true,
+        ]);
+
+        $gudang = Gudang::create([
+            'kode' => 'GDG-01',
+            'nama' => 'Gudang Utama',
+            'cabang_id' => $this->cabang->id,
+            'is_active' => true,
+        ]);
+
+        $rak = Rak::create([
+            'gudang_id' => $gudang->id,
+            'kode' => 'R-01',
+            'nama' => 'Rak A',
+            'is_active' => true,
+        ]);
+
+        $produk = Produk::create([
+            'nama' => 'Baterai iPhone 12 Pro Max',
+            'kode' => 'BAT-IP12PM',
+            'harga_jual_retail' => 200000,
+            'harga_beli' => 120000,
+            'cabang_id' => $this->cabang->id,
+        ]);
+
+        $stokItem = StokItem::create([
+            'produk_id' => $produk->id,
+            'gudang_id' => $gudang->id,
+            'rak_id' => $rak->id,
+            'jumlah' => 15,
+        ]);
+
+        // Simulasikan task lama tanpa key 'nama' atau nama hanya placeholder 'Produk #ID'
+        $task = CycleCountTask::create([
+            'cycle_count_schedule_id' => $schedule->id,
+            'cabang_id' => $this->cabang->id,
+            'no_task' => 'CC-LEGACY-001',
+            'tanggal' => now()->toDateString(),
+            'tipe_target' => 'rak',
+            'target_label' => 'Rak A-01',
+            'seed' => 9999,
+            'sample_items' => [[
+                'stok_item_id' => $stokItem->id,
+                'produk_id' => $produk->id,
+                'gudang_id' => $gudang->id,
+                'rak_id' => $rak->id,
+                'nama' => '',
+                'stok_sistem' => 15,
+            ]],
+            'status' => 'menunggu_count',
+            'threshold_unit' => 1,
+            'threshold_persen' => 5,
+        ]);
+
+        Livewire::test(CycleCountPage::class)
+            ->call('mulaiCount', $task->id)
+            ->assertSee($produk->nama)
+            ->assertSee('#'.$stokItem->id);
+
+        $task->refresh();
+        $this->assertSame($produk->nama, $task->sample_items[0]['nama']);
     }
 
     public function test_supervisor_dapat_menyetujui_dan_menolak_task_menunggu_approval(): void

@@ -19,13 +19,6 @@ use Livewire\Component;
  */
 class TransferTab extends Component
 {
-    /**
-     * [B-15c] Batas dropdown produk (transfer antar gudang). Master produk global
-     * bisa 500-2.000 baris; dropdown tanpa paginasi menarik semuanya tiap render.
-     * Dipotong → user diberi tahu (lihat pesanPotongDropdownProduk()).
-     */
-    public const PRODUK_DROPDOWN_LIMIT = 300;
-
     /** [B-15c] Pengaman jumlah gudang per cabang (normally < 10). */
     public const GUDANG_DROPDOWN_LIMIT = 100;
 
@@ -67,35 +60,9 @@ class TransferTab extends Component
         $this->transferGudangTujuanId = null;
         $this->transferCatatan = '';
         $this->transferItems = [
-            ['produk_id' => null, 'sku_variant_id' => null, 'rak_id' => null, 'jumlah' => 1],
+            ['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'rak_id' => null, 'jumlah' => 1],
         ];
         $this->showTransferModal = true;
-
-        // [B-15c] Beri tahu user kalau daftar produk dipotong (bukan diam-diam).
-        $this->peringatanProdukDipotong();
-    }
-
-    /** [B-15c] Toast sekali-buka-modal bila daftar produk di dropdown memang dipotong. */
-    private function peringatanProdukDipotong(): void
-    {
-        if ($this->totalProdukCabang() > self::PRODUK_DROPDOWN_LIMIT) {
-            $this->dispatch('alert', [
-                'type' => 'info',
-                'message' => 'Daftar produk pada dropdown dibatasi '.self::PRODUK_DROPDOWN_LIMIT.
-                    ' produk (urutan nama). Produk lain masih bisa dipilih lewat pencarian produk di halaman Master Produk.',
-            ]);
-        }
-    }
-
-    /**
-     * [B-15c] Jumlah produk yang lolos filter dropdown (gudang asal/tujuan cabang
-     * aktif). 1 query `count()` — hanya saat modal dibuka.
-     */
-    private function totalProdukCabang(): int
-    {
-        return Produk::where('is_active', true)
-            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
-            ->count();
     }
 
     /**
@@ -119,13 +86,57 @@ class TransferTab extends Component
 
     public function addTransferRow()
     {
-        $this->transferItems[] = ['produk_id' => null, 'sku_variant_id' => null, 'rak_id' => null, 'jumlah' => 1];
+        $this->transferItems[] = ['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'rak_id' => null, 'jumlah' => 1];
     }
 
     public function removeTransferRow(int $index)
     {
         unset($this->transferItems[$index]);
         $this->transferItems = array_values($this->transferItems);
+    }
+
+    #[On('produk-dipilih-global')]
+    public function onProdukDipilihGlobal($targetIndex = null, $context = null, $produkId = null): void
+    {
+        $idx = null;
+        if (is_array($targetIndex)) {
+            $context = $targetIndex['context'] ?? $context;
+            $produkId = $targetIndex['produkId'] ?? $produkId;
+            $idx = $targetIndex['targetIndex'] ?? null;
+        } else {
+            $idx = $targetIndex;
+        }
+
+        if ($context !== 'transfer') {
+            return;
+        }
+
+        if ($idx !== null && isset($this->transferItems[$idx]) && $produkId) {
+            $produk = Produk::find($produkId);
+            if ($produk) {
+                $this->transferItems[$idx]['produk_id'] = $produkId;
+                $this->transferItems[$idx]['produk_nama'] = $produk->nama;
+                $this->transferProdukDipilih($idx);
+            }
+        }
+    }
+
+    #[On('buka-pencarian-produk')]
+    public function bukaPencarianProduk($targetIndex = null, $context = 'transfer'): void
+    {
+        if (is_array($targetIndex)) {
+            $context = $targetIndex['context'] ?? $context;
+            $targetIndex = $targetIndex['targetIndex'] ?? null;
+        }
+
+        if ($context !== 'transfer') {
+            return;
+        }
+
+        $this->dispatch('open-global-product-search', [
+            'targetIndex' => $targetIndex,
+            'context' => $context,
+        ])->to(ProductSearchModal::class);
     }
 
     /**
@@ -465,12 +476,9 @@ class TransferTab extends Component
             ->limit(self::GUDANG_DROPDOWN_LIMIT)
             ->get();
 
-        // [B-15c] Produk: scope stok cabang aktif + limit dropdown (bukan 500-2.000 baris).
-        $allProducts = Produk::where('is_active', true)
-            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
-            ->orderBy('nama')
-            ->limit(self::PRODUK_DROPDOWN_LIMIT)
-            ->get(['id', 'nama']);
+        // Produk: tidak perlu lagi load semua produk ke dropdown.
+        // Pencarian produk global via ProductSearchModal.
+        $allProducts = collect();
 
         // Transfer Query
         $transfers = StokTransfer::with(['gudangAsal', 'gudangTujuan', 'pengirim', 'penerima', 'items.produk'])

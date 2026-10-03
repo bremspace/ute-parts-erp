@@ -134,30 +134,45 @@
                     </div>
                 </div>
 
-                <!-- 2. Kasir POS -->
+                <!-- 2. Menu Transaksi (Kasir POS, Servis HP, Riwayat Transaksi) -->
                 <div class="sidebar-group">
                     <button
                         type="button"
-                        @click="toggleDropdown('pos')"
-                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/pos*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
-                        title="Kasir POS"
+                        @click="toggleDropdown('transaksi')"
+                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/pos*', 'app/servis*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
+                        title="Transaksi & Operasional Kasir"
                     >
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
-                        <span class="sidebar-label">Kasir POS</span>
-                        <span class="sidebar-badge ml-auto text-[10px] font-mono text-ink-500 bg-black/10 dark:bg-white/10 dark:text-white/50 px-1.5 py-0.5 rounded">F2</span>
-                        <svg class="sidebar-chevron ml-1.5 w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': isDropdownOpen('pos') }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span class="sidebar-label">Transaksi</span>
+                        <svg class="sidebar-chevron ml-auto w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': isDropdownOpen('transaksi') }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    <div x-show="isDropdownOpen('pos')"
+                    <div x-show="isDropdownOpen('transaksi')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
-                        <a href="/app/pos" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pos*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pos*') ? 'bg-white' : 'bg-up-mint/70' }}"></span>
-                            <span>Kasir POS (F2)</span>
-                        </a>
+                        @canany(['pos.view', 'pos.view-own'])
+                            <a href="/app/pos" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pos') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pos') ? 'bg-white' : 'bg-up-mint/70' }}"></span>
+                                <span>Kasir POS (F2)</span>
+                            </a>
+                        @endcanany
+
+                        @can('servis.view')
+                            <a href="/app/servis" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/servis*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/servis*') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                                <span>Servis HP (Kanban)</span>
+                            </a>
+                        @endcan
+
+                        @canany(['pos.view', 'pos.view-own', 'servis.view'])
+                            <a href="/app/pos/riwayat" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pos/riwayat*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pos/riwayat*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
+                                <span>Riwayat Transaksi</span>
+                            </a>
+                        @endcanany
                     </div>
                 </div>
 
@@ -191,37 +206,6 @@
                         <a href="/app/laporan/nomor-seri" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/laporan/nomor-seri*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/laporan/nomor-seri*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
                             <span>Nomor Seri & Garansi</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- 4. Servis HP -->
-                <div class="sidebar-group">
-                    <button
-                        type="button"
-                        @click="toggleDropdown('servis')"
-                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/servis*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
-                        title="Servis HP"
-                    >
-                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span class="sidebar-label">Servis HP</span>
-                        <svg class="sidebar-chevron ml-auto w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': isDropdownOpen('servis') }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    <div x-show="isDropdownOpen('servis')"
-                         x-collapse
-                         class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
-                        <a href="/app/servis" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/servis*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/servis*') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Kanban Tiket Servis</span>
-                        </a>
-                        <a href="{{ route('servis.booking') }}" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5 transition-colors">
-                            <span class="w-1.5 h-1.5 rounded-full bg-up-mint/60"></span>
-                            <span>Booking Online Konsumen ↗</span>
                         </a>
                     </div>
                 </div>
@@ -628,7 +612,7 @@
             Alpine.data('sidebarManager', () => ({
                 sidebarOpen: false,
                 sidebarCollapsed: false,
-                activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*') ? 'pos' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/servis*') ? 'servis' : (request()->is('app/crm*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/reseller*') ? 'reseller' : (request()->is('app/omnichannel*') ? 'omnichannel' : ''))))))))) }}',
+                activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/reseller*') ? 'reseller' : (request()->is('app/omnichannel*') ? 'omnichannel' : '')))))))) }}',
 
                 init() {
                     try {

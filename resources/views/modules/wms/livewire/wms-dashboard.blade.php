@@ -256,4 +256,7 @@
     <div @unless($activeTab === 'retur') class="hidden" @endunless>
         @livewire(\App\Modules\Wms\Livewire\ReturnPembelianTab::class)
     </div>
+
+    <!-- MODAL PENCARIAN PRODUK GLOBAL -->
+    @livewire(\App\Modules\Wms\Livewire\ProductSearchModal::class)
 </div>

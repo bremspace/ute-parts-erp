@@ -25,7 +25,7 @@ class PrintThermalJob implements ShouldQueue
 
     public function handle(): void
     {
-        $transaksi = Transaksi::with(['items.produk', 'items.skuVariant', 'pelanggan', 'kasir', 'cabang'])
+        $transaksi = Transaksi::with(['items.produk', 'items.skuVariant', 'pelanggan', 'kasir', 'cabang', 'tiketServis'])
             ->find($this->transaksiId);
 
         if (! $transaksi) {
@@ -34,18 +34,35 @@ class PrintThermalJob implements ShouldQueue
             return;
         }
 
+        $items = $transaksi->items->map(fn ($item) => [
+            'nama' => $this->itemName($item),
+            'qty' => $item->jumlah,
+            'harga' => (float) $item->harga_satuan,
+            'subtotal' => (float) $item->subtotal,
+        ])->all();
+
+        if (empty($items) && $transaksi->tiketServis) {
+            $ts = $transaksi->tiketServis;
+            $rincian = $ts->getRincianBiayaLengkap();
+            foreach ($rincian['items'] as $it) {
+                $items[] = [
+                    'nama' => $it['nama'],
+                    'qty' => $it['qty'],
+                    'harga' => (float) $it['harga'],
+                    'subtotal' => (float) $it['subtotal'],
+                ];
+            }
+        }
+
         $data = [
             'headerLines' => [$transaksi->cabang?->nama ?? 'UTE PARTS', 'Jln. Contoh No. 1, Kota'],
-            'items' => $transaksi->items->map(fn ($item) => [
-                'nama' => $this->itemName($item),
-                'qty' => $item->jumlah,
-                'harga' => (float) $item->harga_satuan,
-                'subtotal' => (float) $item->subtotal,
-            ])->all(),
+            'items' => $items,
             'total' => (float) $transaksi->total_akhir,
             'bayar' => (float) $transaksi->jumlah_bayar,
             'kembali' => (float) $transaksi->kembalian,
             'no_transaksi' => $transaksi->no_transaksi,
+            'no_tiket' => $transaksi->tiketServis?->no_tiket,
+            'jenis_hp' => $transaksi->tiketServis?->jenis_hp,
             'metode_bayar' => $transaksi->metode_bayar,
             'footerLines' => ['Terima kasih atas kunjungan Anda', 'Barang yang sudah dibeli tidak dapat dikembalikan'],
             'tanggal' => $transaksi->created_at?->format('d-m-Y H:i'),

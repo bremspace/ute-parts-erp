@@ -94,12 +94,21 @@ class KasSesiJurnalFailClosedTest extends TestCase
         $hasil = $svc->bukaKas(100000, 1, $this->kasir->id);
         $sesiId = $hasil['id'];
 
-        // Saldo fisik != saldo sistem → selisih -10000 → jurnal penyesuaian wajib jalan
+        // Saldo fisik != saldo sistem → selisih -10000 → status menunggu_approval
+        $out = $svc->tutupKas(90000);
+        $this->assertSame('menunggu_approval', $out['status']);
+        $this->assertDatabaseHas('kas_sesi', [
+            'id' => $sesiId,
+            'status' => 'menunggu_approval',
+            'selisih' => -10000,
+        ]);
+
+        // Simulasi approval gagal karena jurnal gagal saat finalisasi
         $this->jurnalSelaluGagal();
 
         $gagal = null;
         try {
-            $svc->tutupKas(90000);
+            $svc->finalizeTutupKasApproved($sesiId);
         } catch (\Throwable $e) {
             $gagal = $e;
         }
@@ -108,9 +117,8 @@ class KasSesiJurnalFailClosedTest extends TestCase
         $this->assertStringContainsString('jurnal selisih kas', strtolower($gagal->getMessage()));
 
         $sesi = DB::table('kas_sesi')->where('id', $sesiId)->first();
-        $this->assertSame('buka', $sesi->status, 'Kas tidak boleh "tertutup" tanpa jurnal');
+        $this->assertSame('menunggu_approval', $sesi->status, 'Kas tidak boleh "tertutup" tanpa jurnal');
         $this->assertNull($sesi->ditutup_at, 'ditutup_at tidak boleh terisi');
-        $this->assertNull($sesi->selisih, 'selisih tidak boleh terisi');
     }
 
     public function test_tutup_kas_jurnal_berhasil_sesi_final_tutup(): void
@@ -119,10 +127,15 @@ class KasSesiJurnalFailClosedTest extends TestCase
         $hasil = $svc->bukaKas(100000, 1, $this->kasir->id);
         $sesiId = $hasil['id'];
 
-        // Saldo fisik 90000 vs sistem 100000 → selisih -10000 (butuh jurnal)
+        // Saldo fisik 90000 vs sistem 100000 → selisih -10000 → approval flow
         $out = $svc->tutupKas(90000);
 
         $this->assertSame(-10000.0, round((float) $out['selisih'], 2));
+        $this->assertSame('menunggu_approval', $out['status']);
+
+        // Owner / superadmin / manager menyetujui → finalisasi
+        $svc->finalizeTutupKasApproved($sesiId);
+
         $this->assertDatabaseHas('kas_sesi', [
             'id' => $sesiId,
             'status' => 'tutup',
@@ -130,16 +143,12 @@ class KasSesiJurnalFailClosedTest extends TestCase
         ]);
         $this->assertNotNull(DB::table('kas_sesi')->where('id', $sesiId)->value('ditutup_at'));
 
-        // Jurnal selisih: 520-07 (beban) debit 10000 & 110-01 (kas) kredit 10000.
-        // Total = jurnal buka kas (100000) + jurnal selisih (10000).
+        // Jurnal selisih (110-04 vs 520-07) + jurnal deposit back (110-01 vs 110-04)
         $jurnal = JurnalAkuntansi::with('akun')->where('sumber', 'manual')->get();
-        $this->assertSame(110000.0, (float) $jurnal->sum('debit'));
-        $this->assertSame(110000.0, (float) $jurnal->sum('kredit'));
-
-        $selisihRows = $jurnal->filter(fn ($j) => str_starts_with((string) $j->deskripsi, 'Tutup kas sesi'));
+        $selisihRows = $jurnal->filter(fn ($j) => str_starts_with((string) $j->deskripsi, 'Selisih kas sesi'));
         $this->assertCount(2, $selisihRows, 'Jurnal selisih = 2 baris');
         $this->assertSame(10000.0, (float) $selisihRows->firstWhere('akun.kode', '520-07')?->debit);
-        $this->assertSame(10000.0, (float) $selisihRows->firstWhere('akun.kode', '110-01')?->kredit);
+        $this->assertSame(10000.0, (float) $selisihRows->firstWhere('akun.kode', '110-04')?->kredit);
     }
 
     public function test_tutup_kas_tanpa_selisih_tidak_perlu_jurnal(): void
@@ -151,26 +160,32 @@ class KasSesiJurnalFailClosedTest extends TestCase
         $out = $svc->tutupKas(100000);
 
         $this->assertSame(0.0, round((float) $out['selisih'], 2));
+        $this->assertSame('tutup', $out['status']);
         $this->assertDatabaseHas('kas_sesi', ['id' => $hasil['id'], 'status' => 'tutup']);
-        // Hanya jurnal buka kas (dari langkah bukaKas), tidak ada jurnal selisih baru
-        $this->assertSame($jurnalSebelum, JurnalAkuntansi::count());
+        // Buka kas (2 baris) + deposit back saat tutup (2 baris) = 4 baris, TIDAK ada jurnal selisih
+        $selisihCount = JurnalAkuntansi::whereHas('akun', fn ($q) => $q->where('kode', '520-07'))->count();
+        $this->assertSame(0, $selisihCount, 'Tidak boleh ada jurnal selisih bila selisih 0');
     }
 
     public function test_sesi_kas_aktif_tetap_terbaca_setelah_gagal_tutup(): void
     {
         $svc = app(KasSesiState::class);
-        $svc->bukaKas(100000, 1, $this->kasir->id);
+        $hasil = $svc->bukaKas(100000, 1, $this->kasir->id);
+
+        // Tutup tanpa selisih tetapi simulasi deposit-back gagal
         $this->jurnalSelaluGagal();
 
+        $gagal = null;
         try {
-            $svc->tutupKas(50000);
-        } catch (\Throwable) {
-            // diharapkan
+            $svc->tutupKas(100000);
+        } catch (\Throwable $e) {
+            $gagal = $e;
         }
 
-        // Sesi masih aktif → kasir bisa tutup kas ulang setelah masalah jurnal beres
-        $this->assertNotNull($svc->sesiKasAktif());
-        $this->assertTrue($svc->isActiveSesi());
+        $this->assertNotNull($gagal, 'Jurnal gagal harus throw');
+        $sesiAktif = $svc->sesiKasAktif();
+        $this->assertNotNull($sesiAktif, 'Sesi kas aktif harus tetap terbaca');
+        $this->assertSame((int) $hasil['id'], (int) $sesiAktif->id);
     }
 
     public function test_buka_kas_gagal_tidak_menghapus_sesi_lama(): void

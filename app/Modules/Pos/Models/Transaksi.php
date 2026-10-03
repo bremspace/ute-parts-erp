@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
+use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Gudang;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
-    'no_transaksi', 'cabang_id', 'kasir_id', 'pelanggan_id', 'gudang_id',
+    'no_transaksi', 'cabang_id', 'kasir_id', 'pelanggan_id', 'tiket_servis_id', 'gudang_id',
     'sumber', 'subtotal', 'diskon_persen', 'diskon_nominal', 'dpp', 'pajak_nominal', 'ppn_nominal',
     'total_akhir', 'metode_bayar', 'jumlah_bayar', 'kembalian', 'split_detail',
     'status', 'catatan',
@@ -77,5 +78,10 @@ class Transaksi extends Model
     public function items(): HasMany
     {
         return $this->hasMany(TransaksiItem::class);
+    }
+
+    public function tiketServis(): BelongsTo
+    {
+        return $this->belongsTo(TiketServis::class, 'tiket_servis_id');
     }
 }

@@ -53,6 +53,12 @@ class EscPosWriter
 
         $this->align(0)->rule();
         $this->text('No    : '.$data['no_transaksi']);
+        if (! empty($data['no_tiket'])) {
+            $this->text('Tiket : '.$data['no_tiket']);
+        }
+        if (! empty($data['jenis_hp'])) {
+            $this->text('Unit  : '.$data['jenis_hp']);
+        }
         $this->text('Tgl   : '.$data['tanggal']);
         $this->text('Kasir : '.$data['kasir']);
         $this->text('Cabang: '.$data['cabang']);
@@ -79,6 +85,8 @@ class EscPosWriter
         // Barcode Code128 (GS k m=73, panjang 2 byte little-endian) + HRI di bawah
         $no = $this->ascii($data['no_transaksi']);
         $this->align(1);
+        $this->buf .= "\x1d\x77\x02"; // GS w 2 (lebar modul aman untuk thermal 58mm)
+        $this->buf .= "\x1d\x68\x28"; // GS h 40 (tinggi barcode)
         $this->buf .= "\x1d\x48\x02"; // HRI below
         $this->buf .= "\x1d\x6b\x49".chr(strlen($no) & 0xFF).chr((strlen($no) >> 8) & 0xFF).$no;
         $this->feed(1);

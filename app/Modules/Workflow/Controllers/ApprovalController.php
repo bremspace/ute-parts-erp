@@ -12,7 +12,7 @@ class ApprovalController
     public function ajukan(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'entity_type' => 'required|string|in:po,retur,retur_pembelian,diskon',
+            'entity_type' => 'required|string|in:po,retur,retur_pembelian,diskon,selisih_kas',
             'entity_id' => 'required|integer',
             'payload' => 'required|array',
             'payload.amount' => 'required|numeric|min:0',
@@ -85,7 +85,7 @@ class ApprovalController
     public function adaPending(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'entity_type' => 'required|string|in:po,retur,retur_pembelian,diskon',
+            'entity_type' => 'required|string|in:po,retur,retur_pembelian,diskon,selisih_kas',
             'entity_id' => 'required|integer',
         ]);
 

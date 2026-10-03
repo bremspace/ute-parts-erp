@@ -26,13 +26,6 @@ class PoTab extends Component
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
-    /**
-     * [B-15c] Batas dropdown produk PO. Master produk global bisa 500-2.000 baris;
-     * dropdown tanpa paginasi menarik semuanya tiap render. Dipotong → user diberi
-     * tahu (lihat peringatanProdukDipotong()).
-     */
-    public const PRODUK_DROPDOWN_LIMIT = 300;
-
     /** [B-15c] Pengaman jumlah gudang per cabang (normally < 10). */
     public const GUDANG_DROPDOWN_LIMIT = 100;
 
@@ -129,32 +122,9 @@ class PoTab extends Component
     {
         $this->poForm = [
             'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'akun_kas_bank' => '110-01', 'jatuh_tempo' => '',
-            'items' => [['produk_id' => null, 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1]],
+            'items' => [['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1]],
         ];
         $this->showPoModal = true;
-
-        // [B-15c] Beri tahu user kalau daftar produk dipotong (bukan diam-diam).
-        $this->peringatanProdukDipotong();
-    }
-
-    /** [B-15c] Toast sekali-buka-modal bila daftar produk di dropdown memang dipotong. */
-    private function peringatanProdukDipotong(): void
-    {
-        if ($this->totalProdukCabang() > self::PRODUK_DROPDOWN_LIMIT) {
-            $this->dispatch('alert', [
-                'type' => 'info',
-                'message' => 'Daftar produk pada dropdown dibatasi '.self::PRODUK_DROPDOWN_LIMIT.
-                    ' produk (urutan nama). Produk lain masih bisa dipilih lewat pencarian produk di halaman Master Produk.',
-            ]);
-        }
-    }
-
-    /** [B-15c] Jumlah produk yang lolos filter dropdown — 1 query, hanya saat modal dibuka. */
-    private function totalProdukCabang(): int
-    {
-        return Produk::where('is_active', true)
-            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
-            ->count();
     }
 
     /**
@@ -185,13 +155,57 @@ class PoTab extends Component
 
     public function addPoItem()
     {
-        $this->poForm['items'][] = ['produk_id' => null, 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1];
+        $this->poForm['items'][] = ['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1];
     }
 
     public function removePoItem(int $idx)
     {
         unset($this->poForm['items'][$idx]);
         $this->poForm['items'] = array_values($this->poForm['items']);
+    }
+
+    #[On('produk-dipilih-global')]
+    public function onProdukDipilihGlobal($targetIndex = null, $context = null, $produkId = null): void
+    {
+        $idx = null;
+        if (is_array($targetIndex)) {
+            $context = $targetIndex['context'] ?? $context;
+            $produkId = $targetIndex['produkId'] ?? $produkId;
+            $idx = $targetIndex['targetIndex'] ?? null;
+        } else {
+            $idx = $targetIndex;
+        }
+
+        if ($context !== 'po') {
+            return;
+        }
+
+        if ($idx !== null && isset($this->poForm['items'][$idx]) && $produkId) {
+            $produk = Produk::find($produkId);
+            if ($produk) {
+                $this->poForm['items'][$idx]['produk_id'] = $produkId;
+                $this->poForm['items'][$idx]['produk_nama'] = $produk->nama;
+                $this->poProdukDipilih($idx);
+            }
+        }
+    }
+
+    #[On('buka-pencarian-produk')]
+    public function bukaPencarianProduk($targetIndex = null, $context = 'po'): void
+    {
+        if (is_array($targetIndex)) {
+            $context = $targetIndex['context'] ?? $context;
+            $targetIndex = $targetIndex['targetIndex'] ?? null;
+        }
+
+        if ($context !== 'po') {
+            return;
+        }
+
+        $this->dispatch('open-global-product-search', [
+            'targetIndex' => $targetIndex,
+            'context' => $context,
+        ])->to(ProductSearchModal::class);
     }
 
     public function poProdukDipilih(int $idx)
@@ -488,12 +502,9 @@ class PoTab extends Component
             ->limit(self::GUDANG_DROPDOWN_LIMIT)
             ->get();
 
-        // [B-15c] Produk: scope stok cabang aktif + limit dropdown (bukan 500-2.000 baris).
-        $allProducts = Produk::where('is_active', true)
-            ->where(fn ($q) => $this->scopeStokCabangAktif($q))
-            ->orderBy('nama')
-            ->limit(self::PRODUK_DROPDOWN_LIMIT)
-            ->get(['id', 'nama']); // blade cuma pakai id + nama (harga_beli di-set poProdukDipilih)
+        // Produk: tidak perlu lagi load semua produk ke dropdown.
+        // Pencarian produk global via ProductSearchModal.
+        $allProducts = collect();
 
         $procurementData = null;
         $procurementSummary = null;

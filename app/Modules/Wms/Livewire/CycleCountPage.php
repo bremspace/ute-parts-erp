@@ -6,6 +6,7 @@ use App\Modules\Wms\Models\CycleCountSchedule;
 use App\Modules\Wms\Models\CycleCountTask;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Services\CycleCountService;
 use App\Modules\Workflow\Models\ApprovalRequest;
@@ -34,24 +35,26 @@ class CycleCountPage extends Component
 
     public string $tipeTarget = 'rak';
 
-    public int $targetId = 0;
+    public int|string $targetId = 0;
 
     public string $targetKategori = '';
 
     public string $frekuensi = 'mingguan';
 
-    public int $hari = 1;
+    public int|string $hari = 1;
 
     public string $jam = '08:00';
 
-    public int $sampleSize = 10;
+    public int|string $sampleSize = 10;
 
-    public int $thresholdUnit = 0;
+    public int|string $thresholdUnit = 0;
 
-    public int $thresholdPersen = 0;
+    public int|string $thresholdPersen = 0;
 
     // Count form
     public ?int $selectedTaskId = null;
+
+    public ?CycleCountTask $activeTask = null;
 
     public array $fisikPerItem = [];
 
@@ -132,18 +135,20 @@ class CycleCountPage extends Component
 
         $cabangId = session('cabang_id');
 
+        $targetId = ! empty($this->targetId) ? (int) $this->targetId : null;
+
         CycleCountSchedule::create([
             'cabang_id' => $cabangId,
             'nama' => $this->scheduleNama,
             'tipe_target' => $this->tipeTarget,
-            'target_id' => $this->targetId ?: null,
+            'target_id' => $targetId,
             'target_kategori' => $this->targetKategori ?: null,
             'frekuensi' => $this->frekuensi,
-            'hari' => $this->hari,
+            'hari' => (int) $this->hari,
             'jam' => $this->jam,
-            'sample_size' => $this->sampleSize,
-            'threshold_unit' => $this->thresholdUnit,
-            'threshold_persen' => $this->thresholdPersen,
+            'sample_size' => (int) $this->sampleSize,
+            'threshold_unit' => (int) $this->thresholdUnit,
+            'threshold_persen' => (int) $this->thresholdPersen,
             'is_aktif' => true,
         ]);
 
@@ -243,13 +248,60 @@ class CycleCountPage extends Component
             ->where('status', 'menunggu_count')
             ->findOrFail($taskId);
 
+        // Backfill nama produk & varian jika kosong pada data lama
+        $sampleItems = $task->sample_items ?? [];
+        $needUpdate = false;
+
+        $missingItemIds = collect($sampleItems)->filter(function ($item) {
+            $nama = $item['nama'] ?? '';
+
+            return empty($nama) || str_starts_with($nama, 'Produk #') || str_starts_with($nama, 'Item #');
+        })->pluck('stok_item_id')->filter()->all();
+
+        if (! empty($missingItemIds)) {
+            $stokItems = StokItem::with(['produk:id,nama', 'skuVariant:id,nama_varian', 'rak:id,kode,nama'])
+                ->whereIn('id', $missingItemIds)
+                ->get()
+                ->keyBy('id');
+
+            foreach ($sampleItems as &$sItem) {
+                $sId = $sItem['stok_item_id'] ?? null;
+                if ($sId && isset($stokItems[$sId])) {
+                    $stk = $stokItems[$sId];
+                    if ($stk->produk) {
+                        $namaLengkap = $stk->produk->nama;
+                        if ($stk->skuVariant?->nama_varian) {
+                            $namaLengkap .= ' ('.$stk->skuVariant->nama_varian.')';
+                        }
+                        $sItem['nama'] = $namaLengkap;
+                        $sItem['rak_nama'] = $stk->rak ? ($stk->rak->kode.' - '.$stk->rak->nama) : ($sItem['rak_nama'] ?? null);
+                        $needUpdate = true;
+                    }
+                }
+            }
+            unset($sItem);
+        }
+
+        if ($needUpdate) {
+            $task->update(['sample_items' => $sampleItems]);
+            $task->refresh();
+        }
+
         $this->selectedTaskId = $taskId;
+        $this->activeTask = $task;
         $this->fisikPerItem = [];
 
         // Initialize fisikPerItem dari sample_items
         foreach ($task->sample_items ?? [] as $item) {
             $this->fisikPerItem[$item['stok_item_id']] = '';
         }
+    }
+
+    public function batalCount(): void
+    {
+        $this->selectedTaskId = null;
+        $this->activeTask = null;
+        $this->fisikPerItem = [];
     }
 
     public function submitCount(): void
@@ -275,6 +327,7 @@ class CycleCountPage extends Component
         ]);
 
         $this->selectedTaskId = null;
+        $this->activeTask = null;
         $this->fisikPerItem = [];
     }
 

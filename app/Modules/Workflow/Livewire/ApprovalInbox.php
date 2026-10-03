@@ -18,6 +18,8 @@ class ApprovalInbox extends Component
 
     public $catatan = '';
 
+    public $showRejectModal = false;
+
     public $processing = false;
 
     protected $rules = [
@@ -37,7 +39,7 @@ class ApprovalInbox extends Component
         try {
             app(ApprovalService::class)->proses($requestId, 'disetujui', auth()->id(), $this->catatan);
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Permintaan disetujui']);
-            $this->reset(['selectedRequest', 'catatan']);
+            $this->reset(['selectedRequest', 'catatan', 'showRejectModal']);
         } catch (ValidationException $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         } catch (\Exception $e) {
@@ -47,15 +49,17 @@ class ApprovalInbox extends Component
         }
     }
 
-    public function rejectRequest($requestId)
+    public function rejectRequest()
     {
-        $this->validate(['catatan' => 'required|string|max:255']);
+        $this->validate(['catatan' => 'required|string|max:255'], [
+            'catatan.required' => 'Alasan penolakan wajib diisi',
+        ]);
         $this->processing = true;
 
         try {
-            app(ApprovalService::class)->proses($requestId, 'ditolak', auth()->id(), $this->catatan);
+            app(ApprovalService::class)->proses($this->selectedRequest, 'ditolak', auth()->id(), $this->catatan);
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Permintaan ditolak']);
-            $this->reset(['selectedRequest', 'catatan']);
+            $this->reset(['selectedRequest', 'catatan', 'showRejectModal']);
         } catch (ValidationException $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         } catch (\Exception $e) {
@@ -69,7 +73,12 @@ class ApprovalInbox extends Component
     {
         $this->selectedRequest = $requestId;
         $this->catatan = '';
-        $this->dispatch('open-reject-modal');
+        $this->showRejectModal = true;
+    }
+
+    public function closeRejectModal()
+    {
+        $this->reset(['selectedRequest', 'catatan', 'showRejectModal']);
     }
 
     public function render()

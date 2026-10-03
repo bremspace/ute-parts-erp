@@ -340,29 +340,56 @@
                             Angka stok sistem disembunyikan agar pelaksana menghitung fisik aktual di rak secara objektif tanpa bias.
                         </p>
                     </div>
-                    <button type="button" wire:click="$set('selectedTaskId', null)" class="text-xs text-ink-400 hover:text-white cursor-pointer">✕ Batal</button>
+                    <button type="button" wire:click="batalCount" class="text-xs text-ink-400 hover:text-white cursor-pointer">✕ Batal</button>
                 </div>
 
+                @php
+                    $countTask = $activeTask ?? $tasks->firstWhere('id', $selectedTaskId);
+                    $sampleItems = $countTask->sample_items ?? [];
+                @endphp
+
                 <div class="space-y-2">
-                    @foreach($tasks->where('id', $selectedTaskId)->first()->sample_items ?? [] as $item)
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                            <div class="min-w-0">
-                                <span class="text-xs text-white font-semibold block truncate">{{ $item['nama'] ?? 'Produk #' . $item['stok_item_id'] }}</span>
-                                <span class="text-[11px] text-ink-400">Rak / Bin ID: #{{ $item['rak_id'] ?? '-' }} • Item ID: #{{ $item['stok_item_id'] }}</span>
+                    @forelse($sampleItems as $item)
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-white font-bold block truncate">
+                                        {{ !empty($item['nama']) ? $item['nama'] : ('Produk #' . ($item['produk_id'] ?? $item['stok_item_id'])) }}
+                                    </span>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2 text-[11px] text-ink-400 mt-1">
+                                    @if(!empty($item['rak_nama']))
+                                        <span class="px-1.5 py-0.5 rounded bg-white/5 text-ink-300 font-mono text-[10px] border border-white/10">
+                                            📍 Rak: {{ $item['rak_nama'] }}
+                                        </span>
+                                    @elseif(!empty($item['rak_id']))
+                                        <span class="px-1.5 py-0.5 rounded bg-white/5 text-ink-300 font-mono text-[10px] border border-white/10">
+                                            📍 Rak ID: #{{ $item['rak_id'] }}
+                                        </span>
+                                    @endif
+                                    <span>Item ID: <strong class="text-ink-300 font-mono">#{{ $item['stok_item_id'] }}</strong></span>
+                                    @if(!empty($item['sku_variant_id']))
+                                        <span>• Varian ID: #{{ $item['sku_variant_id'] }}</span>
+                                    @endif
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2 self-end sm:self-center">
+                            <div class="flex items-center gap-2 self-end sm:self-center shrink-0">
                                 <label class="text-xs text-ink-300 font-medium whitespace-nowrap">Hitungan Fisik:</label>
                                 <input
                                     type="number"
                                     min="0"
                                     wire:model="fisikPerItem.{{ $item['stok_item_id'] }}"
                                     placeholder="0"
-                                    class="w-28 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs font-bold text-center tabular-nums min-h-[44px]"
+                                    class="w-28 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs font-bold text-center tabular-nums min-h-[44px] focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                                 >
                                 <span class="text-xs text-ink-400">unit</span>
                             </div>
                         </div>
-                    @endforeach
+                    @empty
+                        <div class="p-4 text-center text-xs text-ink-400">
+                            Tidak ada item sampel pada tugas ini.
+                        </div>
+                    @endforelse
                 </div>
 
                 <div class="flex items-center gap-3 pt-2">
@@ -373,7 +400,7 @@
                         Kirim Hasil Hitung
                     </button>
                     <button
-                        wire:click="$set('selectedTaskId', null)"
+                        wire:click="batalCount"
                         class="px-5 py-2.5 bg-white/10 hover:bg-white/15 text-ink-300 rounded-xl text-xs font-semibold transition active:scale-[0.97] min-h-[44px] cursor-pointer"
                     >
                         Batal
@@ -452,7 +479,12 @@
                                 <tbody class="divide-y divide-white/5">
                                     @foreach($detailTask->hasil as $h)
                                         <tr>
-                                            <td class="p-3 font-medium text-white">{{ $h['nama'] ?? 'Item #' . ($h['stok_item_id'] ?? '-') }}</td>
+                                            <td class="p-3">
+                                                <div class="font-medium text-white">{{ !empty($h['nama']) ? $h['nama'] : ('Item #' . ($h['stok_item_id'] ?? '-')) }}</div>
+                                                @if(!empty($h['stok_item_id']))
+                                                    <div class="text-[10px] text-ink-400 font-mono">Item ID: #{{ $h['stok_item_id'] }}</div>
+                                                @endif
+                                            </td>
                                             <td class="p-3 text-center tabular-nums text-ink-400">{{ $h['stok_snapshot'] ?? '-' }}</td>
                                             <td class="p-3 text-center tabular-nums text-ink-300">{{ $h['stok_sistem'] ?? '-' }}</td>
                                             <td class="p-3 text-center tabular-nums font-bold text-white">{{ $h['stok_fisik'] ?? '-' }}</td>
@@ -484,7 +516,17 @@
                                 <tbody class="divide-y divide-white/5">
                                     @foreach($detailTask->sample_items ?? [] as $sample)
                                         <tr>
-                                            <td class="p-3 font-medium text-white">{{ $sample['nama'] ?? 'Item #' . ($sample['stok_item_id'] ?? '-') }}</td>
+                                            <td class="p-3">
+                                                <div class="font-medium text-white">{{ !empty($sample['nama']) ? $sample['nama'] : ('Item #' . ($sample['stok_item_id'] ?? '-')) }}</div>
+                                                <div class="text-[10px] text-ink-400 font-mono">
+                                                    @if(!empty($sample['rak_nama']))
+                                                        <span>Rak: {{ $sample['rak_nama'] }} • </span>
+                                                    @elseif(!empty($sample['rak_id']))
+                                                        <span>Rak ID: #{{ $sample['rak_id'] }} • </span>
+                                                    @endif
+                                                    <span>Item ID: #{{ $sample['stok_item_id'] ?? '-' }}</span>
+                                                </div>
+                                            </td>
                                             <td class="p-3 text-center tabular-nums text-ink-300">{{ $sample['stok_sistem'] ?? '-' }} unit</td>
                                         </tr>
                                     @endforeach

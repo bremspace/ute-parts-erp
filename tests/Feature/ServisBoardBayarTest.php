@@ -111,9 +111,9 @@ class ServisBoardBayarTest extends TestCase
         $this->assertNotNull($tiket->tanggal_bayar);
         $this->assertNotNull($tiket->no_jurnal_bayar);
 
-        // Verifikasi jurnal pelunasan: Kas (debit) & Piutang (kredit)
+        // Verifikasi jurnal pelunasan: Kas/Bank (debit) & Piutang (kredit)
         $jurnalKas = JurnalAkuntansi::where('no_jurnal', $tiket->no_jurnal_bayar)
-            ->whereHas('akun', fn ($q) => $q->where('kode', '110-01'))
+            ->whereHas('akun', fn ($q) => $q->whereIn('kode', ['110-01', '110-02', '110-04']))
             ->first();
         $jurnalPiutang = JurnalAkuntansi::where('no_jurnal', $tiket->no_jurnal_bayar)
             ->whereHas('akun', fn ($q) => $q->where('kode', '120-01'))

@@ -41,6 +41,7 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '110-01', 'nama' => 'Kas',                          'tipe' => 'aset',      'kelompok' => 'kas',         'saldo_normal' => 'debit'],
             ['kode' => '110-02', 'nama' => 'Bank',                         'tipe' => 'aset',      'kelompok' => 'bank',        'saldo_normal' => 'debit'],
             ['kode' => '110-03', 'nama' => 'PPN Masukan',                  'tipe' => 'aset',      'kelompok' => 'pajak',       'saldo_normal' => 'debit'], // [F1-2] rekap PPN masukan
+            ['kode' => '110-04', 'nama' => 'Kas Laci',                     'tipe' => 'aset',      'kelompok' => 'kas',         'saldo_normal' => 'debit'], // [KAS-LACI] dana tunai laci kasir
             ['kode' => '120-01', 'nama' => 'Piutang Usaha',                'tipe' => 'aset',      'kelompok' => 'piutang',     'saldo_normal' => 'debit'],
             ['kode' => '130-01', 'nama' => 'Persediaan Barang Dagang',     'tipe' => 'aset',      'kelompok' => 'persediaan',  'saldo_normal' => 'debit'],
             ['kode' => '140-01', 'nama' => 'Perlengkapan Toko',            'tipe' => 'aset',      'kelompok' => 'perlengkapan', 'saldo_normal' => 'debit'],
@@ -62,6 +63,7 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '410-01', 'nama' => 'Pendapatan Penjualan',         'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit'],
             ['kode' => '410-02', 'nama' => 'Retur Penjualan',              'tipe' => 'pendapatan', 'kelompok' => 'retur_penjualan',      'saldo_normal' => 'kredit'],
             ['kode' => '420-01', 'nama' => 'Pendapatan Jasa Servis',       'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_jasa',      'saldo_normal' => 'kredit'],
+            ['kode' => '430-01', 'nama' => 'Pendapatan Lain-lain',         'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_lain',      'saldo_normal' => 'kredit'],
 
             // BEBAN
             ['kode' => '510-01', 'nama' => 'Beban Komisi Reseller',        'tipe' => 'beban', 'kelompok' => 'beban_komisi',      'saldo_normal' => 'debit'],

@@ -228,6 +228,7 @@ class CrmController extends Controller
         $search = $request->query('search');
         $tier = $request->query('tier');
         $reseller = $request->query('reseller');
+        $tipeKonsumen = $request->query('tipe_konsumen');
 
         $query = Pelanggan::with('tierMembership')->latest();
 
@@ -247,7 +248,34 @@ class CrmController extends Controller
             $query->where('is_reseller', filter_var($reseller, FILTER_VALIDATE_BOOLEAN));
         }
 
+        if ($tipeKonsumen) {
+            $query->where('tipe_konsumen', $tipeKonsumen);
+        }
+
         return $this->success($query->paginate(20), 'Daftar pelanggan berhasil diambil');
+    }
+
+    // [API: CRM-02b] Update data pelanggan
+    public function update(Request $request, $id)
+    {
+        $pelanggan = Pelanggan::findOrFail($id);
+        $pelanggan = app(PelangganService::class)->update($pelanggan, $request->all());
+
+        return $this->success($pelanggan, 'Data pelanggan berhasil diperbarui');
+    }
+
+    // [API: CRM-02c] Hapus pelanggan (aman, tolak bila ada riwayat transaksi/servis/komisi)
+    public function destroy(Request $request, $id)
+    {
+        $pelanggan = Pelanggan::findOrFail($id);
+
+        try {
+            app(PelangganService::class)->delete($pelanggan);
+        } catch (\DomainException $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+
+        return $this->success(null, 'Pelanggan berhasil dihapus');
     }
 
     // [API: CRM-03] CRUD Tier Membership
@@ -295,10 +323,29 @@ class CrmController extends Controller
         return $this->success($tier, 'Tier berhasil diperbarui');
     }
 
-    // [API: CRM-04] Rekalkulasi tier manual
+    public function destroyTier(Request $request, $id)
+    {
+        $tier = TierMembership::findOrFail($id);
+        $count = Pelanggan::where('tier_membership_id', $id)->count();
+        if ($count > 0) {
+            return $this->error("Tier '{$tier->nama}' sedang digunakan oleh {$count} pelanggan. Pindahkan pelanggan ke tier lain terlebih dahulu.", 422);
+        }
+
+        $nama = $tier->nama;
+        $tier->delete();
+
+        app(AuditService::class)->catat(
+            'TierMembership', 'delete', $id,
+            "Tier membership {$nama} dihapus"
+        );
+
+        return $this->success(null, "Tier '{$nama}' berhasil dihapus");
+    }
+
+    // [API: CRM-04] Rekalkulasi tier manual (rolling 12 bulan)
     public function recalcTiers()
     {
-        $updated = $this->tierService->recalcSemua();
+        $updated = $this->tierService->recalcSemua(true);
 
         return $this->success(['diperbarui' => $updated], "Rekalkulasi tier selesai, {$updated} pelanggan diperbarui");
     }

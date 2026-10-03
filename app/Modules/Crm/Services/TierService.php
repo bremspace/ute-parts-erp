@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Services;
 
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Pos\Models\Transaksi;
 
 /**
  * Tier Membership logic (PRD §4.4):
@@ -15,15 +16,16 @@ class TierService
 {
     /**
      * Rekalkulasi tier semua pelanggan. Dipanggil via scheduled job harian.
+     * Jika $rehitungBelanja = true, total_belanja_12bulan dihitung ulang dari data transaksi 12 bulan terakhir.
      */
-    public function recalcSemua(): int
+    public function recalcSemua(bool $rehitungBelanja = false): int
     {
         $updated = 0;
         $tiers = TierMembership::where('is_active', true)->orderBy('min_belanja_12bulan', 'desc')->get();
 
-        Pelanggan::chunkById(200, function ($pelanggan) use ($tiers, &$updated) {
+        Pelanggan::chunkById(200, function ($pelanggan) use ($tiers, &$updated, $rehitungBelanja) {
             foreach ($pelanggan as $p) {
-                if ($this->recalcSatu($p, $tiers)) {
+                if ($this->recalcSatu($p, $tiers, $rehitungBelanja)) {
                     $updated++;
                 }
             }
@@ -32,13 +34,21 @@ class TierService
         return $updated;
     }
 
-    public function recalcSatu(Pelanggan $pelanggan, $tiers = null): bool
+    public function recalcSatu(Pelanggan $pelanggan, $tiers = null, bool $rehitungBelanja = false): bool
     {
         $tiers ??= TierMembership::where('is_active', true)
             ->orderBy('min_belanja_12bulan', 'desc')
             ->get();
 
-        $belanja = (float) $pelanggan->total_belanja_12bulan;
+        if ($rehitungBelanja) {
+            $belanja = $this->hitungTotalBelanja12Bulan($pelanggan);
+            if ((float) $pelanggan->total_belanja_12bulan !== $belanja) {
+                $pelanggan->update(['total_belanja_12bulan' => $belanja]);
+            }
+        } else {
+            $belanja = (float) $pelanggan->total_belanja_12bulan;
+        }
+
         $targetTier = null;
 
         foreach ($tiers as $tier) {
@@ -56,6 +66,17 @@ class TierService
         }
 
         return false;
+    }
+
+    /**
+     * Hitung total transaksi lunas/selesai dalam 12 bulan terakhir (rolling 12-month).
+     */
+    public function hitungTotalBelanja12Bulan(Pelanggan $pelanggan): float
+    {
+        return (float) Transaksi::where('pelanggan_id', $pelanggan->id)
+            ->whereIn('status', ['selesai', 'lunas'])
+            ->where('created_at', '>=', now()->subMonths(12))
+            ->sum('total_akhir');
     }
 
     /**

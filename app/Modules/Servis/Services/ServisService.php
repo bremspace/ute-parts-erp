@@ -4,6 +4,7 @@ namespace App\Modules\Servis\Services;
 
 use App\Models\User;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
@@ -689,9 +690,9 @@ class ServisService
     /**
      * [T-12] Pelunasan pembayaran servis.
      */
-    public function bayar(TiketServis $tiket, string $metodePembayaran, User $user, ?string $catatan = null): TiketServis
+    public function bayar(TiketServis $tiket, string $metodePembayaran, User $user, ?string $catatan = null, ?array $splitDetail = null, ?int $transaksiId = null): TiketServis
     {
-        return DB::transaction(function () use ($tiket, $metodePembayaran, $user, $catatan) {
+        return DB::transaction(function () use ($tiket, $metodePembayaran, $user, $catatan, $splitDetail, $transaksiId) {
             $tiket = TiketServis::whereKey($tiket->id)->lockForUpdate()->firstOrFail();
 
             if (! in_array($tiket->status, ['selesai', 'diambil'], true)) {
@@ -718,10 +719,26 @@ class ServisService
                 $jurnalService = app(JurnalService::class);
                 $noJurnal = $jurnalService->generateNoJurnal('servis-bayar', $tiket->cabang_id);
 
-                $lines = [
-                    ['akun_kode' => '110-01', 'debit' => $totalTagihan, 'kredit' => 0], // Kas bertambah
+                $debitLines = [];
+                if ($metodePembayaran === 'tunai') {
+                    $debitLines[] = ['akun_kode' => '110-04', 'debit' => $totalTagihan, 'kredit' => 0]; // Kas Laci
+                } elseif ($metodePembayaran === 'split' && $splitDetail) {
+                    $tunai = (float) ($splitDetail['tunai'] ?? 0);
+                    $nonTunai = (float) ($splitDetail['non_tunai'] ?? 0);
+                    if ($tunai > 0) {
+                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $tunai, 'kredit' => 0];
+                    }
+                    if ($nonTunai > 0) {
+                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $nonTunai, 'kredit' => 0];
+                    }
+                } else {
+                    // transfer, qris, kartu, online
+                    $debitLines[] = ['akun_kode' => '110-02', 'debit' => $totalTagihan, 'kredit' => 0]; // Bank
+                }
+
+                $lines = array_merge($debitLines, [
                     ['akun_kode' => '120-01', 'debit' => 0, 'kredit' => $totalTagihan], // Piutang Usaha lunas
-                ];
+                ]);
 
                 $jurnalService->post(
                     noJurnal: $noJurnal,
@@ -742,6 +759,7 @@ class ServisService
                 'tanggal_bayar' => now(),
                 'metode_pembayaran' => $metodePembayaran,
                 'no_jurnal_bayar' => $noJurnal,
+                'transaksi_id' => $transaksiId ?? $tiket->transaksi_id,
             ]);
 
             $pesanLog = "Pelunasan servis ({$metodePembayaran}): Rp {$totalTagihan}";
@@ -750,6 +768,11 @@ class ServisService
             }
 
             $this->logStatus($tiket, $tiket->status, $tiket->status, $user, 'pembayaran', $pesanLog);
+
+            // Integrasi CRM: catat belanja & poin pelanggan
+            if ($tiket->pelanggan_id) {
+                app(PelangganService::class)->tambahBelanjaDanPoin($tiket->pelanggan_id, (float) $totalTagihan);
+            }
 
             return $tiket;
         }, 3);

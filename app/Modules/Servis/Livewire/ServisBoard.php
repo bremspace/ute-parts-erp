@@ -12,12 +12,14 @@ use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Servis\Services\ServisStateMachine;
+use App\Modules\Wms\Livewire\ProductSearchModal;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Traits\ParsesNominal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -127,6 +129,15 @@ class ServisBoard extends Component
     // [T-09d] Form estimasi multi-baris (part & jasa)
     public array $estimasiItems = [];
 
+    // Modal Pencarian Part Servis
+    public bool $showCariPartModal = false;
+
+    public string $cariPartQuery = '';
+
+    public ?int $cariPartIndex = null;
+
+    public string $cariPartContext = 'servis_estimasi';
+
     // Modal Pembayaran Servis
     public bool $showBayarModal = false;
 
@@ -138,11 +149,144 @@ class ServisBoard extends Component
 
     public float $bayarTotalTagihan = 0;
 
+    // Modal Struk Thermal Servis
+    public bool $showReceiptModal = false;
+
+    public ?array $receiptData = null;
+
     public ?int $pekerjaanGudangId = null;
 
     public function mount()
     {
         $this->photoInputs = [null, null, null]; // max 3 foto
+    }
+
+    #[On('produk-dipilih-global')]
+    public function onProdukDipilihGlobal($targetIndex = null, $context = null, $produkId = null): void
+    {
+        $idx = null;
+        if (is_array($targetIndex)) {
+            $context = $targetIndex['context'] ?? $context;
+            $produkId = $targetIndex['produkId'] ?? $produkId;
+            $idx = $targetIndex['targetIndex'] ?? null;
+        } else {
+            $idx = $targetIndex;
+        }
+
+        if (! $produkId || $idx === null) {
+            return;
+        }
+
+        $produk = Produk::find($produkId);
+        if (! $produk) {
+            return;
+        }
+
+        if ($context === 'servis_estimasi') {
+            if (isset($this->estimasiItems[$idx])) {
+                $this->estimasiItems[$idx]['produk_id'] = $produkId;
+                $this->estimasiItems[$idx]['produk_nama'] = $produk->nama;
+                $this->estimasiItems[$idx]['nama_item'] = $produk->nama;
+                $tiket = $this->estimasiTiketId ? $this->tiketScopedOrNull($this->estimasiTiketId) : null;
+                $pelanggan = $tiket?->pelanggan;
+                $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                $this->estimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
+                $this->recalculateEstimasiTotal();
+            }
+        } elseif ($context === 'servis_pekerjaan') {
+            if (isset($this->pekerjaanItems[$idx])) {
+                $this->pekerjaanItems[$idx]['produk_id'] = $produkId;
+                $this->pekerjaanItems[$idx]['produk_nama'] = $produk->nama;
+                $this->pekerjaanItems[$idx]['nama_item'] = $produk->nama;
+                $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
+                $pelanggan = $tiket?->pelanggan;
+                $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                $this->pekerjaanItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
+            }
+        }
+    }
+
+    public function resetEstimasiPartRow(int $idx): void
+    {
+        if (isset($this->estimasiItems[$idx])) {
+            $this->estimasiItems[$idx]['produk_id'] = null;
+            $this->estimasiItems[$idx]['produk_nama'] = '';
+            $this->estimasiItems[$idx]['nama_item'] = '';
+            $this->estimasiItems[$idx]['harga'] = 0;
+            $this->recalculateEstimasiTotal();
+        }
+    }
+
+    public function resetPekerjaanPartRow(int $idx): void
+    {
+        if (isset($this->pekerjaanItems[$idx])) {
+            $this->pekerjaanItems[$idx]['produk_id'] = null;
+            $this->pekerjaanItems[$idx]['produk_nama'] = '';
+            $this->pekerjaanItems[$idx]['nama_item'] = '';
+            $this->pekerjaanItems[$idx]['harga'] = 0;
+        }
+    }
+
+    #[On('buka-pencarian-produk')]
+    public function bukaPencarianProduk($targetIndex = null, $context = 'servis'): void
+    {
+        if (is_array($targetIndex)) {
+            $context = $targetIndex['context'] ?? $context;
+            $targetIndex = $targetIndex['targetIndex'] ?? null;
+        }
+
+        $this->cariPartIndex = (int) $targetIndex;
+        $this->cariPartContext = $context;
+        $this->cariPartQuery = '';
+        $this->showCariPartModal = true;
+    }
+
+    public function getCariPartResultsProperty()
+    {
+        if (! $this->showCariPartModal) {
+            return collect();
+        }
+
+        $query = Produk::where('is_active', true);
+
+        if (strlen($this->cariPartQuery) >= 2) {
+            $query->cariPintar($this->cariPartQuery);
+        }
+
+        return $query->orderBy('nama')->limit(30)->get();
+    }
+
+    public function pilihPartServis(int $produkId): void
+    {
+        $produk = Produk::find($produkId);
+        if (! $produk) {
+            return;
+        }
+
+        $idx = $this->cariPartIndex;
+        $context = $this->cariPartContext;
+
+        if ($context === 'servis_estimasi' && isset($this->estimasiItems[$idx])) {
+            $this->estimasiItems[$idx]['produk_id'] = $produkId;
+            $this->estimasiItems[$idx]['produk_nama'] = $produk->nama;
+            $this->estimasiItems[$idx]['nama_item'] = $produk->nama;
+            $tiket = $this->estimasiTiketId ? $this->tiketScopedOrNull($this->estimasiTiketId) : null;
+            $pelanggan = $tiket?->pelanggan;
+            $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+            $this->estimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? 0);
+            $this->recalculateEstimasiTotal();
+        } elseif ($context === 'servis_pekerjaan' && isset($this->pekerjaanItems[$idx])) {
+            $this->pekerjaanItems[$idx]['produk_id'] = $produkId;
+            $this->pekerjaanItems[$idx]['produk_nama'] = $produk->nama;
+            $this->pekerjaanItems[$idx]['nama_item'] = $produk->nama;
+            $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
+            $pelanggan = $tiket?->pelanggan;
+            $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+            $this->pekerjaanItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? 0);
+        }
+
+        $this->showCariPartModal = false;
+        $this->cariPartQuery = '';
     }
 
     /** [F2-5] Export laporan servis via queue (async — jangan sinkron di request). */
@@ -722,16 +866,9 @@ class ServisBoard extends Component
             return;
         }
 
-        $items = $tiket->items()->whereNull('dibatalkan_at')->get();
-        $jasa = (float) $items->where('tipe', 'jasa')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
-        $part = (float) $items->where('tipe', 'part')->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
-        $legacy = (float) $tiket->spareparts()->whereNull('dibatalkan_at')->get()->sum(fn ($sp) => (float) $sp->harga_satuan * (int) $sp->jumlah);
+        $rincian = $tiket->getRincianBiayaLengkap();
 
-        if ($items->isEmpty()) {
-            $jasa = (float) ($tiket->estimasi_biaya ?? 0);
-        }
-
-        $this->bayarTotalTagihan = $jasa + $part + $legacy;
+        $this->bayarTotalTagihan = $rincian['total'];
         $this->bayarTiketId = $tiketId;
         $this->bayarMetode = 'tunai';
         $this->bayarCatatan = '';
@@ -750,9 +887,50 @@ class ServisBoard extends Component
             app(ServisService::class)->bayar($tiket, $this->bayarMetode, auth()->user(), $this->bayarCatatan);
             $this->showBayarModal = false;
             $this->dispatch('alert', ['type' => 'success', 'message' => "Pembayaran servis {$tiket->no_tiket} berhasil dicatat (Lunas)."]);
+            $this->bukaStrukServis($tiket->id);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
+    }
+
+    public function bukaStrukServis(int $tiketId): void
+    {
+        $tiket = $this->tiketScopedOrNull($tiketId);
+        if (! $tiket) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tiket servis tidak ditemukan']);
+
+            return;
+        }
+
+        $rincian = $tiket->getRincianBiayaLengkap();
+        $cabang = $tiket->cabang;
+
+        $this->receiptData = [
+            'no_transaksi' => $tiket->transaksi?->no_transaksi ?? $tiket->no_tiket,
+            'no_tiket' => $tiket->no_tiket,
+            'jenis_hp' => $tiket->jenis_hp,
+            'seri_hp' => $tiket->seri_hp,
+            'waktu' => ($tiket->tanggal_bayar ?? $tiket->tanggal_terima ?? now())->format('d/m/Y H:i'),
+            'kasir' => auth()->user()?->name ?? 'Kasir / Staf',
+            'pelanggan' => $tiket->nama_pelanggan ?? $tiket->pelanggan?->nama ?? 'Pelanggan Umum',
+            'tier' => 'Servis HP ('.$tiket->jenis_hp.')',
+            'items' => $rincian['items'],
+            'subtotal_jasa' => $rincian['total_jasa'],
+            'subtotal_part' => $rincian['total_part'],
+            'subtotal' => $rincian['total'],
+            'diskon' => 0,
+            'dpp' => $rincian['total'],
+            'pajak' => 0,
+            'ppn_persen' => 0,
+            'total' => $rincian['total'],
+            'bayar' => $rincian['total'],
+            'kembali' => 0,
+            'metode' => strtoupper($tiket->metode_pembayaran ?? 'TUNAI'),
+            'status_pembayaran' => $tiket->status_pembayaran ?? 'belum_bayar',
+            'garansi' => $tiket->garansi ? ($tiket->garansi->durasi_hari.' Hari (s/d '.$tiket->garansi->tanggal_berakhir?->format('d/m/Y').')') : null,
+        ];
+
+        $this->showReceiptModal = true;
     }
 
     // --- Drag & drop ---
@@ -947,17 +1125,9 @@ class ServisBoard extends Component
 
     public function getProdukEstimasiListProperty()
     {
-        $cabangId = session('cabang_id');
-
-        return Produk::where('is_active', true)
-            ->with(['stokItems' => function ($q) use ($cabangId) {
-                if ($cabangId) {
-                    $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId));
-                }
-            }])
-            ->orderBy('nama')
-            ->limit(100)
-            ->get();
+        // Produk: tidak perlu lagi load semua produk ke dropdown.
+        // Pencarian produk global via ProductSearchModal.
+        return collect();
     }
 
     public function render()
@@ -975,6 +1145,7 @@ class ServisBoard extends Component
             'fotoCount' => $this->fotoCount,
             'pelangganCariServis' => $this->pelangganCariServis,
             'bookingOnline' => $this->bookingOnline,
+            'cariPartResults' => $this->cariPartResults,
         ])->layout('layouts.backoffice', ['header' => 'Servis HP — Papan Kanban']);
     }
 }
