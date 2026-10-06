@@ -110,6 +110,85 @@ class ReportBuilderService
     public const FILTER_OPERATORS = ['=', '!=', '>', '<', '>=', '<=', 'like'];
 
     /**
+     * Kolom-kolom bisnis terkurasi per model untuk tampilan dan ekspor laporan yang bersih dan relevan.
+     */
+    public const CURATED_COLUMNS = [
+        'Transaksi' => [
+            'no_transaksi', 'cabang_id', 'kasir_id', 'pelanggan_id', 'sumber',
+            'subtotal', 'diskon_nominal', 'total_akhir', 'metode_bayar',
+            'jumlah_bayar', 'kembalian', 'status', 'catatan', 'created_at',
+        ],
+        'TransaksiItem' => [
+            'transaksi_id', 'produk_id', 'sku_variant_id', 'qty',
+            'harga_satuan', 'diskon_nominal', 'subtotal', 'hpp',
+        ],
+        'Piutang' => [
+            'no_piutang', 'pelanggan_id', 'transaksi_id', 'cabang_id',
+            'jumlah', 'jumlah_dibayar', 'sisa', 'jatuh_tempo', 'status',
+            'keterangan', 'created_at',
+        ],
+        'Utang' => [
+            'no_utang', 'kreditor_nama', 'referensi_tipe', 'referensi_id',
+            'cabang_id', 'jumlah', 'jumlah_dibayar', 'sisa', 'jatuh_tempo',
+            'status', 'keterangan', 'created_at',
+        ],
+        'PurchaseOrder' => [
+            'no_po', 'supplier_id', 'gudang_tujuan_id', 'total',
+            'total_dibayar', 'sisa', 'status', 'metode_bayar',
+            'jatuh_tempo', 'catatan', 'created_at',
+        ],
+        'PurchaseOrderItem' => [
+            'purchase_order_id', 'produk_id', 'sku_variant_id',
+            'qty_dipesan', 'qty_diterima', 'harga_beli', 'subtotal',
+        ],
+        'TiketServis' => [
+            'no_tiket', 'cabang_id', 'pelanggan_id', 'nama_pelanggan',
+            'telepon_pelanggan', 'tipe_hp', 'seri_hp', 'keluhan',
+            'kondisi_fisik', 'teknisi_id', 'jenis_servis_id', 'status',
+            'estimasi_biaya', 'biaya_akhir', 'status_pembayaran',
+            'metode_pembayaran', 'tanggal_terima', 'tanggal_selesai', 'tanggal_diambil', 'created_at',
+        ],
+        'TiketServisItem' => [
+            'tiket_servis_id', 'tipe', 'nama_item', 'qty',
+            'harga_satuan', 'subtotal', 'created_at',
+        ],
+        'StokItem' => [
+            'produk_id', 'sku_variant_id', 'barcode', 'gudang_id',
+            'rak_id', 'jumlah', 'jumlah_minimum',
+        ],
+        'StokLog' => [
+            'created_at', 'produk_id', 'sku_variant_id', 'gudang_id',
+            'referensi_tipe', 'referensi_id', 'jumlah', 'jumlah_sebelum',
+            'jumlah_setelah', 'user_id', 'keterangan',
+        ],
+        'Produk' => [
+            'kode', 'barcode', 'nama', 'kategori_id', 'brand_id',
+            'kualitas_id', 'satuan', 'harga_beli', 'harga_jual_retail',
+            'is_active',
+        ],
+        'JurnalAkuntansi' => [
+            'no_jurnal', 'tanggal', 'cabang_id', 'akun_coa_id',
+            'deskripsi', 'debit', 'kredit', 'sumber', 'user_id',
+        ],
+    ];
+
+    /**
+     * Kolom internal, sensitif, atau teknis yang dilarang muncul dalam ekspor.
+     */
+    public const SENSITIVE_EXPORT_COLUMNS = [
+        'id', 'token_approval', 'kunci_terenkripsi', 'kunci', 'tipe_kunci',
+        'foto_unit', 'sid_detail', 'is_migrasi_sid', 'kas_id', 'kode_lama',
+        'split_detail', 'pajak_detail', 'payment_reference', 'payment_url',
+        'paid_at', 'sales', 'dpp', 'pajak_nominal', 'ppn_nominal', 'slug',
+        'meta_title', 'meta_description', 'abc_class', 'reorder_point',
+        'min_stock', 'max_stock', 'is_ondemand', 'harga_fleksibel', 'gambar',
+        'foto', 'barcode_alt', 'golongan', 'subgolongan', 'satuan_beli',
+        'isi_satuan', 'harga_lain', 'diskon', 'stok_maksimum', 'stok_warning',
+        'expired_at', 'wajib_serial', 'poin', 'komisi_sales', 'kena_pajak',
+        'nilai_ppn', 'sn', 'kompatibilitas_hp', 'password', 'remember_token',
+    ];
+
+    /**
      * Label ramah pengguna untuk kolom-kolom database umum.
      */
     public const COLUMN_LABELS = [
@@ -217,7 +296,57 @@ class ReportBuilderService
         'shared' => 'Dibagikan Cabang',
         'created_at' => 'Waktu Dibuat',
         'updated_at' => 'Waktu Diperbarui',
+        'total' => 'Total (Rp)',
+        'total_dibayar' => 'Total Dibayar (Rp)',
     ];
+
+    /**
+     * Resolusi label kolom kontekstual sesuai model agar nominal rupiah & judul tidak ambigu.
+     */
+    public static function getColumnLabel(string $field, ?string $model = null): string
+    {
+        if ($model === 'Piutang') {
+            if ($field === 'jumlah') {
+                return 'Nominal Piutang (Rp)';
+            }
+            if ($field === 'sisa') {
+                return 'Sisa Tagihan (Rp)';
+            }
+        }
+
+        if ($model === 'Utang') {
+            if ($field === 'jumlah') {
+                return 'Nominal Utang (Rp)';
+            }
+            if ($field === 'sisa') {
+                return 'Sisa Utang (Rp)';
+            }
+            if ($field === 'kreditor_nama') {
+                return 'Kreditor / Supplier';
+            }
+        }
+
+        if ($model === 'PurchaseOrder') {
+            if ($field === 'total') {
+                return 'Total PO (Rp)';
+            }
+            if ($field === 'total_dibayar') {
+                return 'Total Dibayar (Rp)';
+            }
+            if ($field === 'sisa') {
+                return 'Sisa Tagihan (Rp)';
+            }
+        }
+
+        if ($field === 'total') {
+            return 'Total (Rp)';
+        }
+        if ($field === 'total_dibayar') {
+            return 'Total Dibayar (Rp)';
+        }
+
+        return self::COLUMN_LABELS[$field] ?? ucwords(str_replace('_', ' ', $field));
+    }
 
     /**
      * Get columns available for a whitelisted model.
@@ -467,6 +596,32 @@ class ReportBuilderService
     }
 
     /**
+     * Dapatkan kolom tanggal / timestamp utama untuk model yang ditentukan.
+     */
+    public function getDateColumnForModel(string $modelShortName): ?string
+    {
+        $this->validateModel($modelShortName);
+        $modelClass = self::MODEL_MAP[$modelShortName];
+        $modelObj = new $modelClass;
+        $table = $modelObj->getTable();
+
+        // Preferensi kolom tanggal bisnis jika ada, fallback ke created_at
+        if ($modelShortName === 'JurnalAkuntansi') {
+            return 'tanggal';
+        }
+
+        if ($modelShortName === 'TiketServis') {
+            return 'created_at';
+        }
+
+        if ($modelObj->usesTimestamps()) {
+            return $modelObj->getCreatedAtColumn() ?: 'created_at';
+        }
+
+        return 'created_at';
+    }
+
+    /**
      * Get the drill-down chain as array for UI breadcrumb.
      */
     public function getDrillChain(string $modelShortName): array
@@ -489,7 +644,7 @@ class ReportBuilderService
      * Mengubah foreign key numerik (cabang_id, kasir_id, user_id, pelanggan_id, dll)
      * menjadi nama entitas riil secara efisien dalam 1 batch query per relasi.
      */
-    public function formatRowsForDisplay(array $rows): array
+    public function formatRowsForDisplay(array $rows, ?string $model = null): array
     {
         if (empty($rows)) {
             return [];
@@ -664,6 +819,15 @@ class ReportBuilderService
             'App\Modules\Akunting\Models\Piutang' => 'Piutang Pelanggan',
             'App\Modules\Akunting\Models\Utang' => 'Utang Supplier',
             'App\Modules\Akunting\Models\JurnalAkuntansi' => 'Jurnal Akuntansi',
+            'Transaksi' => 'Transaksi POS',
+            'TiketServis' => 'Tiket Servis',
+            'PurchaseOrder' => 'Purchase Order',
+            'StokOpname' => 'Stok Opname',
+            'StokTransfer' => 'Transfer Stok',
+            'ReturnPembelian' => 'Retur Pembelian',
+            'Piutang' => 'Piutang Pelanggan',
+            'Utang' => 'Utang Supplier',
+            'JurnalAkuntansi' => 'Jurnal Akuntansi',
             'kas_sesi' => 'Sesi Kasir',
             'kas_mutasi_laci' => 'Mutasi Kas Laci',
             'transaksi' => 'Transaksi POS',
@@ -714,10 +878,21 @@ class ReportBuilderService
             $cabangs, $users, $pelanggans, $gudangs, $suppliers,
             $produks, $akuns, $raks, $kategoris, $brands, $kualitas,
             $tiers, $transaksis, $pos, $tikets, $skuVariants, $jenisServis,
-            $resolvedRefDocs, $refTipeMap, $metodeMap, $statusMap
+            $resolvedRefDocs, $refTipeMap, $metodeMap, $statusMap, $model
         ) {
             if (! is_array($row)) {
                 return $row;
+            }
+
+            // Hitung kalkulasi sisa piutang/utang/PO bila belum terisi
+            if ($model === 'Utang' || (isset($row['no_utang']) && ! isset($row['sisa']))) {
+                $row['sisa'] = max(0, (float) ($row['jumlah'] ?? 0) - (float) ($row['jumlah_dibayar'] ?? 0));
+            } elseif ($model === 'PurchaseOrder' || (isset($row['no_po']) && ! isset($row['sisa']))) {
+                $row['sisa'] = max(0, (float) ($row['total'] ?? 0) - (float) ($row['total_dibayar'] ?? 0));
+            } elseif ($model === 'Piutang' || isset($row['no_piutang'])) {
+                if (! isset($row['sisa'])) {
+                    $row['sisa'] = max(0, (float) ($row['jumlah'] ?? 0) - (float) ($row['jumlah_dibayar'] ?? 0));
+                }
             }
 
             // Simpan raw values untuk lookup sekunder
@@ -740,7 +915,11 @@ class ReportBuilderService
 
             if (array_key_exists('pelanggan_id', $row)) {
                 $pid = $row['pelanggan_id'];
-                $row['pelanggan_id'] = empty($pid) ? 'Pelanggan Umum (Walk-in)' : ($pelanggans[$pid] ?? "Pelanggan #{$pid}");
+                if ($model === 'Utang' && empty($pid)) {
+                    $row['pelanggan_id'] = '-';
+                } else {
+                    $row['pelanggan_id'] = empty($pid) ? 'Pelanggan Umum (Walk-in)' : ($pelanggans[$pid] ?? "Pelanggan #{$pid}");
+                }
             }
 
             foreach (['gudang_id', 'gudang_asal_id', 'gudang_tujuan_id'] as $gk) {
@@ -884,27 +1063,40 @@ class ReportBuilderService
      * Menggunakan header berbahasa manusia sesuai UI/UX dan memformat tanggal, boolean,
      * serta nominal angka secara konsisten.
      */
-    public function formatRowsForExport(array $rows): array
+    public function formatRowsForExport(array $rows, ?string $model = null): array
     {
         if (empty($rows)) {
             return [];
         }
 
         $formatted = [];
+        $curated = $model && isset(self::CURATED_COLUMNS[$model]) ? self::CURATED_COLUMNS[$model] : null;
+
         foreach ($rows as $row) {
             if (! is_array($row)) {
                 continue;
             }
 
+            // Urutkan dan filter kolom jika ada curated columns untuk model ini
+            $orderedKeys = $curated ? array_intersect($curated, array_keys($row)) : array_keys($row);
+            if ($curated && empty($orderedKeys)) {
+                $orderedKeys = array_keys($row);
+            }
+
             $exportRow = [];
-            foreach ($row as $key => $val) {
-                $headerLabel = self::COLUMN_LABELS[$key] ?? ucwords(str_replace('_', ' ', (string) $key));
+            foreach ($orderedKeys as $key) {
+                if (in_array($key, self::SENSITIVE_EXPORT_COLUMNS, true)) {
+                    continue;
+                }
+
+                $val = $row[$key] ?? null;
+                $headerLabel = self::getColumnLabel((string) $key, $model);
 
                 if (is_bool($val)) {
                     $exportRow[$headerLabel] = $val ? 'Ya' : 'Tidak';
                 } elseif (is_array($val)) {
                     $exportRow[$headerLabel] = implode(', ', array_map('strval', $val));
-                } elseif (is_null($val) || $val === '') {
+                } elseif (is_null($val) || $val === '' || $val === '-') {
                     $exportRow[$headerLabel] = '-';
                 } elseif (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/', $val)) {
                     $exportRow[$headerLabel] = date('d/m/Y H:i', strtotime($val));
@@ -918,12 +1110,15 @@ class ReportBuilderService
                         || str_starts_with($keyStr, 'no_')
                         || str_ends_with($keyStr, '_persen');
 
-                    if (! $bukanNominal && in_array($keyStr, [
+                    $isNominalField = in_array($keyStr, [
                         'debit', 'kredit', 'total_akhir', 'total_kotor', 'total_diskon', 'total_pajak',
                         'harga_beli', 'harga_jual', 'harga_jual_retail', 'harga_satuan', 'subtotal',
                         'nominal', 'sisa', 'estimasi_biaya', 'biaya_akhir', 'harga', 'hpp',
                         'jumlah_bayar', 'kembalian', 'diskon_nominal', 'jumlah_dibayar',
-                    ])) {
+                        'total', 'total_dibayar',
+                    ]) || (in_array($model, ['Piutang', 'Utang'], true) && $keyStr === 'jumlah');
+
+                    if (! $bukanNominal && $isNominalField) {
                         $exportRow[$headerLabel] = number_format((float) $val, 0, ',', '.');
                     } else {
                         $exportRow[$headerLabel] = $val;
@@ -942,9 +1137,9 @@ class ReportBuilderService
     /**
      * Format satu baris data.
      */
-    public function formatRowForDisplay(array $row): array
+    public function formatRowForDisplay(array $row, ?string $model = null): array
     {
-        $res = $this->formatRowsForDisplay([$row]);
+        $res = $this->formatRowsForDisplay([$row], $model);
 
         return $res[0] ?? $row;
     }

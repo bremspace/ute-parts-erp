@@ -3,6 +3,27 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-06 — Perbaikan Ekspor Laporan Drilldown & Penambahan Ekspor Pricelist Master Produk ✅
+
+- **Perbaikan Ekspor & Formatting Drilldown Laporan (`ReportBuilderService`, `DrillDownViewer`, `drill-down.blade.php`):**
+  - Mengatasi bug ekspor drilldown yang menampilkan properti internal Eloquent (`connection`, `table`, `primaryKey`, `keyType`, `incrementing`, `wasRecentlyCreated`, `preventsLazyLoading`, `attributes`, `original`, `changes`) dengan memastikan serialisasi koleksi menggunakan `$item instanceof Model ? $item->toArray() : (array) $item` pada query pagination dan query export, serta kurasi kolom bisnis via `CURATED_COLUMNS`.
+  - Menambahkan kolom timestamp `created_at` pada `CURATED_COLUMNS` untuk seluruh model (termasuk `TiketServis`, `TiketServisItem`, dll).
+  - Menambahkan filter periode tanggal (`$periodeDari` dan `$periodeSampai`) pada menu Drilldown (`DrillDownViewer`) yang otomatis membatasi query list dan file download export berdasar kolom tanggal model terkait (`tanggal` untuk `JurnalAkuntansi`, `created_at` untuk model lainnya).
+  - Menyaring kolom teknis / rahasia internal (`token_approval`, `sid_detail`, `kunci_terenkripsi`, `foto_unit`, dll) via `SENSITIVE_EXPORT_COLUMNS`.
+  - Format angka nominal rupiah konsisten ribuan bertitik (`160.050`) untuk field `total`, `total_dibayar`, `sisa`, `jumlah` (Piutang/Utang), `debit`, `kredit`, dll.
+  - Label kolom kontekstual pada `ReportBuilderService::getColumnLabel`: membedakan label `jumlah` pada Piutang menjadi `Nominal Piutang (Rp)` dan Utang menjadi `Nominal Utang (Rp)`.
+  - Menambahkan dukungan ekspor drilldown saat berada di tampilan detail (`exportLaporan`), termasuk rincian child items (`childItems`) yang terhubung (TransaksiItem, TiketServisItem, PurchaseOrderItem, StokLog).
+  - Menjaga kompatibilitas antrian queue `ExportLaporanJob` pada ekspor transaksi di `DrillDownViewer`.
+  - Menghapus tombol & dropdown `Export Data` dari UI Builder Laporan kustom (`/app/laporan` di `report-builder.blade.php`) sesuai instruksi agar pengguna menggunakan ekspor bawaan modul yang sudah aman dan akurat.
+- **Fitur Ekspor Pricelist Master Produk Berdasarkan Tier Harga (`ProdukTab`, `produk-tab.blade.php`):**
+  - Menambahkan filter dropdown tier harga `$filterTierHarga` (`retail`, `reseller`, `agen`, atau tier membership CRM `tier_{id}`).
+  - Menambahkan aksi `exportPricelist('xlsx'|'csv')` di `ProdukTab` yang mengekspor daftar produk dengan kolom: Kode/SKU, Barcode, Nama Produk, Kategori, Brand, Kualitas, Satuan, Harga Retail, Tier Harga, dan Harga Pricelist.
+  - Keamanan data: melindungi rahasia internal dengan tidak menyertakan `harga_beli` atau `HPP`.
+- **Pengujian & Verifikasi:**
+  - Pembuatan test suite `tests/Feature/ProdukPricelistExportTest.php` (1 test, 7 assertions: pass).
+  - Pengujian drilldown & ekspor laporan: `DrillDownTest`, `ExportLaporanTest`, `ExportFixTest` (50 tests, 223 assertions: pass).
+  - Formatter Laravel Pint: pass.
+
 ## 2026-10-05 — Perbaikan Bug & Hardening Menu Approval Inbox (`approval-inbox.blade.php`) ✅
 
 - **Penyebab Utama & Solusi Error `format() on null`:**

@@ -24,6 +24,24 @@
                         @endforeach
                     </select>
 
+                    <!-- Filter Tier Harga Pricelist & Export -->
+                    <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 p-1 rounded-xl">
+                        <select wire:model.live="filterTierHarga" class="px-2.5 py-1.5 rounded-lg bg-black/40 border-0 text-xs font-medium text-white min-h-[36px] outline-none cursor-pointer" title="Pilih tier harga untuk ekspor pricelist">
+                            <option value="retail" class="bg-ink-900 text-white">Tier: Retail Standar</option>
+                            <option value="reseller" class="bg-ink-900 text-white">Tier: Reseller</option>
+                            <option value="agen" class="bg-ink-900 text-white">Tier: Agen</option>
+                            @foreach($tierMemberships as $tm)
+                                <option value="tier_{{ $tm->id }}" class="bg-ink-900 text-white">Tier CRM: {{ $tm->nama }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" wire:click="exportPricelist('xlsx')" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary/80 text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist format Excel">
+                            Excel
+                        </button>
+                        <button type="button" wire:click="exportPricelist('csv')" class="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist format CSV">
+                            CSV
+                        </button>
+                    </div>
+
                     <span class="text-[11px] text-ink-400 pl-1 whitespace-nowrap">{{ $produks->total() }} produk</span>
                 </div>
             </div>

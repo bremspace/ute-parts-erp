@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
@@ -29,6 +30,9 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * [F1-8 / S-01] Tab "Master Produk" — dipecah dari WmsDashboard (paritas perilaku).
@@ -46,6 +50,8 @@ class ProdukTab extends Component
     public ?int $filterKategoriId = null;
 
     public ?int $filterBrandId = null;
+
+    public string $filterTierHarga = 'retail'; // retail, reseller, agen, atau tier_{id}
 
     // Foto Uploads (Tambah Produk)
     public $fotoUploads = [];
@@ -1038,6 +1044,151 @@ class ProdukTab extends Component
         $this->resetPage();
     }
 
+    public function updatingFilterTierHarga()
+    {
+        $this->resetPage();
+    }
+
+    /**
+     * Ekspor daftar master produk sebagai pricelist (Excel / CSV)
+     * berdasarkan filter tier harga (retail, reseller, agen, atau tier membership CRM).
+     * Aman dari kebocoran internal (tanpa harga_beli / HPP).
+     */
+    public function exportPricelist(string $format = 'xlsx')
+    {
+        $fmt = $format === 'csv' ? 'csv' : 'xlsx';
+        $userId = auth()->id() ?? 0;
+
+        $selectedKategoriIds = [];
+        if ($this->filterKategoriId) {
+            $kat = KategoriProduk::with('children')->find($this->filterKategoriId);
+            if ($kat) {
+                $selectedKategoriIds = array_merge([$kat->id], $kat->children->pluck('id')->all());
+            }
+        }
+
+        $query = Produk::with(['brand', 'kualitas', 'kategoriRelasi', 'hargaTier.tierMembership', 'skuVariants'])
+            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch))
+            ->when(! empty($selectedKategoriIds), fn ($q) => $q->whereIn('kategori_id', $selectedKategoriIds))
+            ->when($this->filterBrandId, fn ($q) => $q->where('brand_id', $this->filterBrandId))
+            ->where('is_active', true)
+            ->orderBy('nama');
+
+        $produks = $query->get();
+
+        // Siapkan dummy pelanggan untuk resolver tier membership bila filter berupa tier_{id}
+        $tierMembershipId = null;
+        $tierMembershipObj = null;
+        if (str_starts_with($this->filterTierHarga, 'tier_')) {
+            $tierMembershipId = (int) str_replace('tier_', '', $this->filterTierHarga);
+            $tierMembershipObj = TierMembership::find($tierMembershipId);
+        }
+
+        $tierLabel = match ($this->filterTierHarga) {
+            'reseller' => 'Reseller',
+            'agen' => 'Agen',
+            default => $tierMembershipObj ? 'Tier '.$tierMembershipObj->nama : 'Retail Standar',
+        };
+
+        $rows = [];
+        foreach ($produks as $p) {
+            $hargaJual = (float) $p->harga_jual_retail;
+            $hargaTierFinal = $hargaJual;
+
+            if ($this->filterTierHarga === 'reseller') {
+                $ht = $p->hargaTier->first(fn ($h) => $h->tipe_konsumen === 'reseller' || ($h->is_reseller && ! $h->tier_membership_id));
+                if ($ht) {
+                    if ($ht->nominal_tetap !== null) {
+                        $hargaTierFinal = (float) $ht->nominal_tetap;
+                    } elseif ($ht->persen_diskon !== null) {
+                        $hargaTierFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
+                    } elseif ($ht->harga !== null) {
+                        $hargaTierFinal = (float) $ht->harga;
+                    }
+                }
+            } elseif ($this->filterTierHarga === 'agen') {
+                $ht = $p->hargaTier->first(fn ($h) => $h->tipe_konsumen === 'agen');
+                if ($ht) {
+                    if ($ht->nominal_tetap !== null) {
+                        $hargaTierFinal = (float) $ht->nominal_tetap;
+                    } elseif ($ht->persen_diskon !== null) {
+                        $hargaTierFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
+                    }
+                }
+            } elseif ($tierMembershipId) {
+                // Tier membership CRM
+                $ht = $p->hargaTier->first(fn ($h) => (int) $h->tier_membership_id === $tierMembershipId);
+                if ($ht) {
+                    if ($ht->nominal_tetap !== null) {
+                        $hargaTierFinal = (float) $ht->nominal_tetap;
+                    } elseif ($ht->persen_diskon !== null) {
+                        $hargaTierFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
+                    } elseif ($ht->harga !== null) {
+                        $hargaTierFinal = (float) $ht->harga;
+                    }
+                } elseif ($tierMembershipObj && (float) $tierMembershipObj->diskon_persen > 0) {
+                    $diskon = round(($hargaJual * (float) $tierMembershipObj->diskon_persen) / 100, 2);
+                    $hargaTierFinal = max(0, $hargaJual - $diskon);
+                }
+            }
+
+            $rows[] = [
+                'Kode / SKU' => $p->kode ?: ($p->skuVariants->first()?->sku ?? '-'),
+                'Barcode' => $p->barcode ?: '-',
+                'Nama Produk' => $p->nama,
+                'Kategori' => $p->kategoriRelasi?->nama ?? $p->kategori ?? '-',
+                'Brand' => $p->brand?->nama ?? $p->brand_kompatibel ?? '-',
+                'Kualitas' => $p->kualitas?->nama ?? '-',
+                'Satuan' => $p->satuan ?: 'pcs',
+                'Harga Retail (Rp)' => number_format($hargaJual, 0, ',', '.'),
+                'Tier Harga' => $tierLabel,
+                'Harga Pricelist (Rp)' => number_format(max(0, $hargaTierFinal), 0, ',', '.'),
+            ];
+        }
+
+        $slug = Str::slug('pricelist_'.$this->filterTierHarga) ?: 'pricelist';
+        $filename = $userId.'_'.$slug.'_'.now()->format('Ymd-His').'.'.$fmt;
+        $path = 'exports/'.$filename;
+
+        if ($fmt === 'csv') {
+            $out = fopen('php://memory', 'r+');
+            if (! empty($rows)) {
+                fputcsv($out, array_keys($rows[0]));
+                foreach ($rows as $row) {
+                    fputcsv($out, array_values($row));
+                }
+            }
+            rewind($out);
+            $csv = stream_get_contents($out);
+            fclose($out);
+            Storage::disk('local')->put($path, $csv);
+        } else {
+            Excel::store(new class($rows) implements FromArray, WithHeadings
+            {
+                public function __construct(private array $rows) {}
+
+                public function headings(): array
+                {
+                    return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
+                }
+
+                public function array(): array
+                {
+                    return array_map(fn ($r) => array_values((array) $r), $this->rows);
+                }
+            }, $path, 'local');
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Pricelist '.$tierLabel.' berhasil diekspor — unduhan dimulai.',
+        ]);
+
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, 'pricelist-'.$slug.'-'.now()->format('Ymd-His').'.'.$fmt);
+    }
+
     protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
     {
         if (auth()->user()?->can($permission)) {
@@ -1138,6 +1289,7 @@ class ProdukTab extends Component
             'raks' => Rak::with('gudang')->get(),
             'produks' => $produks,
             'kategoriTree' => $kategoriTree,
+            'tierMemberships' => TierMembership::where('is_active', true)->orderBy('urutan')->get(),
             // [T-44] master data pendukung
             'brands' => Brand::where('is_active', true)->orderBy('nama')->get(),
             'kualitasList' => KualitasProduk::where('is_active', true)->orderBy('nama')->get(),

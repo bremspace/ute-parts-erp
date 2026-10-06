@@ -67,31 +67,86 @@
             @endif
         </nav>
 
-        <!-- Selector Sumber Data -->
-        <div class="flex items-center gap-2 self-start sm:self-auto">
-            <label for="select-source-model" class="text-xs text-ink-400 font-semibold whitespace-nowrap">Sumber Data:</label>
-            <select id="select-source-model" wire:change="drillDown($event.target.value)" class="p-1.5 px-2.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none cursor-pointer">
-                @foreach(\App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST as $modelKey => $modelLabel)
-                    <option value="{{ $modelKey }}" class="bg-surface-800 text-white" @selected($currentModel === $modelKey)>{{ $modelLabel }}</option>
-                @endforeach
-            </select>
+        <!-- Selector Sumber Data & Filter Periode -->
+        <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <div class="flex items-center gap-1.5">
+                <label for="select-source-model" class="text-xs text-ink-400 font-semibold whitespace-nowrap">Sumber:</label>
+                <select id="select-source-model" wire:change="drillDown($event.target.value)" class="p-1.5 px-2.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none cursor-pointer">
+                    @foreach(\App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST as $modelKey => $modelLabel)
+                        <option value="{{ $modelKey }}" class="bg-surface-800 text-white" @selected($currentModel === $modelKey)>{{ $modelLabel }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+                <span class="text-xs text-ink-400 font-semibold whitespace-nowrap">Periode:</span>
+                <input type="date" wire:model.live="periodeDari" title="Dari Tanggal" class="p-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none" />
+                <span class="text-ink-500 text-xs">-</span>
+                <input type="date" wire:model.live="periodeSampai" title="Sampai Tanggal" class="p-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none" />
+                @if($periodeDari || $periodeSampai)
+                    <button type="button" wire:click="resetPeriode" title="Reset filter periode" class="p-1.5 px-2 rounded-lg bg-white/10 hover:bg-white/15 text-ink-300 text-xs font-semibold cursor-pointer">✕</button>
+                @endif
+            </div>
         </div>
     </div>
 
     @if($detail && !empty($detail))
         <!-- Detail View -->
         <x-prism.glass-card title="Detail: {{ \App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST[$currentModel] ?? $currentModel }} #{{ $selectedItemId }}">
+            <div class="flex items-center justify-between gap-2 mb-4">
+                <button wire:click="back" class="text-xs text-up-primary hover:underline font-semibold cursor-pointer">← Kembali ke daftar</button>
+                @can('laporan.cabang')
+                    <div class="flex items-center gap-2">
+                        <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]">Export Detail Excel</button>
+                        <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]">Export Detail CSV</button>
+                    </div>
+                @endcan
+            </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 @foreach($detail as $key => $value)
-                    @if(!is_array($value) && !is_object($value))
+                    @if(!is_array($value) && !is_object($value) && !in_array($key, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                            <p class="text-[10px] uppercase text-ink-400 font-bold">{{ \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? ucwords(str_replace('_', ' ', $key)) }}</p>
+                            <p class="text-[10px] uppercase text-ink-400 font-bold">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $key, $currentModel) }}</p>
                             <p class="text-sm font-semibold text-white tabular-nums mt-1">{{ $fmtVal($value, $key) }}</p>
                         </div>
                     @endif
                 @endforeach
             </div>
-            <div class="mt-3">
+
+            @if(!empty($childItems) && $childModel)
+                <!-- Rincian Child Items (mis. TransaksiItem, TiketServisItem, PurchaseOrderItem) -->
+                <div class="mt-6 pt-4 border-t border-white/10">
+                    <h4 class="text-sm font-bold text-white mb-3">
+                        Rincian {{ \App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST[$childModel] ?? $childModel }} ({{ count($childItems) }})
+                    </h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs text-left border-collapse">
+                            <thead>
+                                <tr class="bg-white/5">
+                                    @foreach($childItems[0] ?? [] as $cKey => $cVal)
+                                        @if(!in_array($cKey, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
+                                            <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $cKey, $childModel) }}</th>
+                                        @endif
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach($childItems as $cRow)
+                                    <tr class="hover:bg-white/5 transition">
+                                        @foreach($cRow as $cKey => $cVal)
+                                            @if(!in_array($cKey, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
+                                                <td class="py-1.5 px-3 tabular-nums">{{ is_array($cVal) || is_object($cVal) ? '-' : $fmtVal($cVal, $cKey) }}</td>
+                                            @endif
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
+            <div class="mt-4">
                 <button wire:click="back" class="text-xs text-up-primary hover:underline font-semibold cursor-pointer">← Kembali ke daftar</button>
             </div>
         </x-prism.glass-card>
@@ -110,7 +165,9 @@
                         <thead>
                             <tr class="bg-white/5">
                                 @foreach($items[0] ?? [] as $key => $val)
-                                    <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? ucwords(str_replace('_', ' ', $key)) }}</th>
+                                    @if(!in_array($key, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
+                                        <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $key, $currentModel) }}</th>
+                                    @endif
                                 @endforeach
                             </tr>
                         </thead>
@@ -118,7 +175,9 @@
                             @foreach($items as $item)
                                 <tr class="hover:bg-white/5 cursor-pointer transition" wire:click="drillDown('{{ $currentModel }}', {{ $item['id'] ?? 0 }})">
                                     @foreach($item as $key => $val)
-                                        <td class="py-1.5 px-3 tabular-nums">{{ is_array($val) || is_object($val) ? '-' : $fmtVal($val, $key) }}</td>
+                                        @if(!in_array($key, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
+                                            <td class="py-1.5 px-3 tabular-nums">{{ is_array($val) || is_object($val) ? '-' : $fmtVal($val, $key) }}</td>
+                                        @endif
                                     @endforeach
                                 </tr>
                             @endforeach

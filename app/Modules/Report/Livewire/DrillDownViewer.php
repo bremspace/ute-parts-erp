@@ -2,6 +2,7 @@
 
 namespace App\Modules\Report\Livewire;
 
+use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Report\Jobs\ReportExportJob;
 use App\Modules\Report\Services\ReportBuilderService;
 use Illuminate\Database\Eloquent\Model;
@@ -30,9 +31,17 @@ class DrillDownViewer extends Component
 
     public array $filters = [];
 
+    public string $periodeDari = '';
+
+    public string $periodeSampai = '';
+
     public ?int $selectedItemId = null;
 
     public array $detail = [];
+
+    public array $childItems = [];
+
+    public ?string $childModel = null;
 
     protected $listeners = ['drillDown', 'refreshDrillDown', 'backFromDetail'];
 
@@ -63,6 +72,7 @@ class DrillDownViewer extends Component
         }
 
         $this->currentModel = $model;
+        $this->currentPage = 1;
 
         if ($itemId) {
             $this->selectedItemId = $itemId;
@@ -71,6 +81,26 @@ class DrillDownViewer extends Component
             $this->selectedItemId = null;
             $this->loadRecords();
         }
+    }
+
+    public function updatedPeriodeDari(): void
+    {
+        $this->currentPage = 1;
+        $this->loadRecords();
+    }
+
+    public function updatedPeriodeSampai(): void
+    {
+        $this->currentPage = 1;
+        $this->loadRecords();
+    }
+
+    public function resetPeriode(): void
+    {
+        $this->periodeDari = '';
+        $this->periodeSampai = '';
+        $this->currentPage = 1;
+        $this->loadRecords();
     }
 
     public function loadRecords(): void
@@ -93,11 +123,21 @@ class DrillDownViewer extends Component
         );
         // [P0-3] Scope cabang sudah diterapkan di buildQuery via CABANG_SCOPE.
 
+        $dateCol = $service->getDateColumnForModel($this->currentModel);
+        if ($dateCol) {
+            if ($this->periodeDari !== '') {
+                $query->whereDate($dateCol, '>=', $this->periodeDari);
+            }
+            if ($this->periodeSampai !== '') {
+                $query->whereDate($dateCol, '<=', $this->periodeSampai);
+            }
+        }
+
         $rawItems = collect($query->paginate($this->perPage, ['*'], 'page', $this->currentPage)->items())
-            ->map(fn ($item) => $item->toArray())
+            ->map(fn ($item) => $item instanceof Model ? $item->toArray() : (array) $item)
             ->all();
 
-        $this->items = $service->formatRowsForDisplay($rawItems);
+        $this->items = $service->formatRowsForDisplay($rawItems, $this->currentModel);
 
         // Build breadcrumbs
         $this->breadcrumbs = array_map(function ($m) {
@@ -129,7 +169,29 @@ class DrillDownViewer extends Component
             abort(403, 'Anda tidak punya akses ke data cabang lain');
         }
 
-        $this->detail = $service->formatRowForDisplay($item->toArray());
+        $this->detail = $service->formatRowForDisplay($item->toArray(), $model);
+
+        $this->childModel = $service->getDrillDownTarget($model);
+        $this->childItems = [];
+
+        if ($this->childModel && isset(ReportBuilderService::MODEL_MAP[$this->childModel])) {
+            $childClass = ReportBuilderService::MODEL_MAP[$this->childModel];
+            $childForeignKey = match ($model) {
+                'Transaksi' => 'transaksi_id',
+                'TiketServis' => 'tiket_servis_id',
+                'PurchaseOrder' => 'purchase_order_id',
+                'StokItem' => 'produk_id',
+                'Produk' => 'produk_id',
+                default => null,
+            };
+
+            if ($childForeignKey) {
+                $rawChild = $childClass::where($childForeignKey, $item->id)->get()
+                    ->map(fn ($c) => $c->toArray())
+                    ->all();
+                $this->childItems = $service->formatRowsForDisplay($rawChild, $this->childModel);
+            }
+        }
     }
 
     public function back(): void
@@ -137,6 +199,8 @@ class DrillDownViewer extends Component
         if ($this->selectedItemId !== null) {
             $this->selectedItemId = null;
             $this->detail = [];
+            $this->childItems = [];
+            $this->childModel = null;
             $this->loadRecords();
 
             return;
@@ -148,6 +212,8 @@ class DrillDownViewer extends Component
             $this->currentModel = $prev['model'];
             $this->selectedItemId = null;
             $this->detail = [];
+            $this->childItems = [];
+            $this->childModel = null;
             $this->loadRecords();
         }
     }
@@ -177,23 +243,64 @@ class DrillDownViewer extends Component
         $userId = auth()->id() ?? 0;
         $fmt = $format === 'csv' ? 'csv' : 'xlsx';
 
-        $query = $service->buildQuery(
-            $this->currentModel,
-            ['*'],
-            $this->filters ?: null,
-            null,
-            $cabangId
-        );
+        // Kompatibilitas dispatch queue untuk Transaksi (ExportLaporanJob)
+        if ($this->currentModel === 'Transaksi') {
+            dispatch(new ExportLaporanJob(
+                jenis: 'transaksi',
+                periodeDari: $this->periodeDari !== '' ? $this->periodeDari : null,
+                periodeSampai: $this->periodeSampai !== '' ? $this->periodeSampai : null,
+                cabangId: $cabangId,
+                akunId: null,
+                userId: $userId,
+                format: $fmt,
+            ));
+        }
 
-        $limit = ReportExportJob::ROW_LIMIT;
-        $rawRows = $query->limit($limit)->get()
-            ->map(fn ($item) => $item instanceof Model ? $item->toArray() : (array) $item)
-            ->all();
+        if ($this->selectedItemId && ! empty($this->detail)) {
+            // Ekspor detail tunggal beserta child items jika ada
+            $headerDetail = $service->formatRowsForExport([$this->detail], $this->currentModel);
+            $exportRows = $headerDetail;
 
-        $rows = $service->formatRowsForDisplay($rawRows);
-        $exportRows = $service->formatRowsForExport($rows);
+            if (! empty($this->childItems) && $this->childModel) {
+                $exportRows[] = []; // Baris pemisah
+                $exportRows[] = ['--- RINCIAN ITEM ('.app(ReportBuilderService::class)->getModelLabel($this->childModel).') ---' => ''];
+                $childExport = $service->formatRowsForExport($this->childItems, $this->childModel);
+                foreach ($childExport as $cr) {
+                    $exportRows[] = $cr;
+                }
+            }
+        } else {
+            $query = $service->buildQuery(
+                $this->currentModel,
+                ['*'],
+                $this->filters ?: null,
+                null,
+                $cabangId
+            );
+
+            $dateCol = $service->getDateColumnForModel($this->currentModel);
+            if ($dateCol) {
+                if ($this->periodeDari !== '') {
+                    $query->whereDate($dateCol, '>=', $this->periodeDari);
+                }
+                if ($this->periodeSampai !== '') {
+                    $query->whereDate($dateCol, '<=', $this->periodeSampai);
+                }
+            }
+
+            $limit = ReportExportJob::ROW_LIMIT;
+            $rawRows = $query->limit($limit)->get()
+                ->map(fn ($item) => $item instanceof Model ? $item->toArray() : (array) $item)
+                ->all();
+
+            $rows = $service->formatRowsForDisplay($rawRows, $this->currentModel);
+            $exportRows = $service->formatRowsForExport($rows, $this->currentModel);
+        }
 
         $slug = Str::slug($this->currentModel) ?: 'laporan';
+        if ($this->selectedItemId) {
+            $slug .= '_detail_'.$this->selectedItemId;
+        }
         $filename = $userId.'_drilldown_'.$slug.'_'.now()->format('Ymd-His').'.'.$fmt;
         $path = 'exports/'.$filename;
 
@@ -254,6 +361,8 @@ class DrillDownViewer extends Component
             'breadcrumbs' => $this->breadcrumbs,
             'currentModel' => $this->currentModel,
             'detail' => $this->detail,
+            'childItems' => $this->childItems,
+            'childModel' => $this->childModel,
             'hasCabang' => $hasCabang,
             'cabangId' => session('cabang_id'),
         ])->layout('layouts.backoffice', ['header' => 'Drill-Down Laporan']);

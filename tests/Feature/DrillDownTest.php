@@ -780,6 +780,9 @@ class DrillDownTest extends TestCase
         $this->assertSame('Pelanggan Umum (Walk-in)', $row1['pelanggan_id']);
 
         // Test Livewire DrillDownViewer
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $user->givePermissionTo('laporan.cabang');
+
         $dd = Livewire::test(DrillDownViewer::class, ['model' => 'Transaksi']);
         $ddItems = $dd->get('items');
         $ddRow1 = collect($ddItems)->firstWhere('no_transaksi', 'TRX-FMT-1');
@@ -787,5 +790,36 @@ class DrillDownTest extends TestCase
         $this->assertSame($cabang->nama, $ddRow1['cabang_id']);
         $this->assertSame('Budi Kasir', $ddRow1['kasir_id']);
         $this->assertSame('Pelanggan Umum (Walk-in)', $ddRow1['pelanggan_id']);
+
+        // Test Export CSV DrillDownViewer kesesuaian data dengan UI
+        $dd->call('exportLaporan', 'csv');
+        $ddFiles = collect(Storage::disk('local')->allFiles('exports'))
+            ->filter(fn ($f) => str_contains($f, 'drilldown_transaksi'))
+            ->values()
+            ->all();
+        $this->assertNotEmpty($ddFiles);
+        $ddCsv = Storage::disk('local')->get(end($ddFiles));
+        $this->assertStringContainsString('TRX-FMT-1', $ddCsv);
+        $this->assertStringContainsString($cabang->nama, $ddCsv);
+        $this->assertStringContainsString('Budi Kasir', $ddCsv);
+        $this->assertStringContainsString('Pelanggan Umum (Walk-in)', $ddCsv);
+        $this->assertStringContainsString('QRIS', $ddCsv);
+        $this->assertStringContainsString('Selesai', $ddCsv);
+        $this->assertStringContainsString('100.000', $ddCsv);
+        // Pastikan tidak ada properti internal Eloquent
+        $this->assertStringNotContainsString('wasRecentlyCreated', $ddCsv);
+        $this->assertStringNotContainsString('preventsLazyLoading', $ddCsv);
+        $this->assertStringNotContainsString('connection', $ddCsv);
+
+        // Test Filter Periode pada DrillDownViewer
+        $dd->set('periodeDari', now()->addDay()->toDateString())
+            ->assertCount('items', 0);
+
+        $dd->set('periodeDari', '')
+            ->set('periodeSampai', now()->subDay()->toDateString())
+            ->assertCount('items', 0);
+
+        $dd->call('resetPeriode');
+        $this->assertCount(2, $dd->get('items'));
     }
 }

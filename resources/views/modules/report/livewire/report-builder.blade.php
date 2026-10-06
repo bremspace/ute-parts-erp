@@ -86,19 +86,6 @@
                     <input type="checkbox" wire:model="shared" class="accent-up-primary">
                     <span class="text-ink-300">Bagikan ke cabang</span>
                 </label>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                    <select wire:model="exportFormat" class="p-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none min-h-[44px]">
-                        <option value="xlsx">Excel (.xlsx)</option>
-                        <option value="csv">CSV (.csv)</option>
-                    </select>
-                    <x-prism.prism-button variant="mint" size="sm" wire:click="export" :disabled="$exporting" class="whitespace-nowrap min-h-[44px]">
-                        @if($exporting)
-                            <span class="animate-pulse">Processing...</span>
-                        @else
-                            Export Data
-                        @endif
-                    </x-prism.prism-button>
-                </div>
             </div>
         @endif
 
