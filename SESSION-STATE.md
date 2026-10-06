@@ -3,8 +3,7 @@
 Dokumen ini berisi semua keputusan, status, dan issue yang perlu diketahui saat melanjutkan dari posisi terakhir.
 **Baca file ini SEBELUM mulai coding di VPS Linux.**
 
-**Terakhir diperbarui:** 2026-09-19
-**Commit terakhir:** `d138439` (setup-vps.sh universal + install.php)
+**Terakhir diperbarui:** 2026-10-07
 **Branch:** `main`
 
 ---
@@ -14,13 +13,16 @@ Dokumen ini berisi semua keputusan, status, dan issue yang perlu diketahui saat 
 | Modul | Status | Catatan |
 |---|---|---|
 | Hari 1: RBAC + auth + migrasi inti | ✅ | 7 role, 44 permissions, Sanctum SPA |
-| Hari 2: WMS + POS | ✅ | stok, transfer, opname, PO, kas sesi |
+| Hari 2: WMS + POS | ✅ | stok, transfer, opname, PO, kas sesi, pricelist export per tier harga |
 | Hari 3: Servis HP | ✅ | state machine 8 status, part/jasa split, garansi, notifikasi queue |
-| Hari 4: CRM + Reseller + Akunting | ✅ | tier otomatis, komisi custom/skema, COA 23 akun, jurnal double-entry |
+| Hari 4: CRM + Reseller + Akunting | ✅ | tier otomatis, komisi multi-aktor, COA 23 akun, jurnal double-entry, depresiasi aset |
 | Hari 5: Marketplace katalog/checkout | ✅ | Livewire front, cart session, customer auth, harga tier live |
 | Hari 6: Duitku + Biteship + Omnichannel | ✅ | webhook idempotent, Shopee adapter, import Excel |
-| Hari 7: Hardening + deploy | ✅ | audit log, rate limit, integrasi test 26/26, browser installer, setup-vps.sh |
-| **Dashboard** | ✅ | omzet 30 hari, kategori, status servis, piutang aging |
+| Hari 7: Hardening + deploy | ✅ | audit log, rate limit, integrasi test, browser installer, setup-vps.sh |
+| **HR & Payroll** | ✅ | absensi shift, KPI, slip payroll, approval payroll |
+| **Workflow** | ✅ | multi-level approval rules & inbox (GRN, PO, payroll, cycle count) |
+| **Report & Drilldown** | ✅ | drilldown viewer, filter periode tanggal, kurasi data export tanpa kebocoran properti internal |
+| **Dashboard** | ✅ | omzet 30 hari, kategori, status servis, piutang aging, role-based widgets |
 | **Pengaturan** | ✅ | user CRUD, role+permission matrix, jenis servis CRUD |
 
 ---

@@ -12,11 +12,11 @@ Sistem ERP untuk bisnis sparepart & servis motor/sepeda: point of sale, manageme
 | Marketplace | `Marketplace` | Katalog, cart, checkout, payment, shipping, impor produk |
 | HR & Payroll | `Hr` | Karyawan, absensi shift, KPI, slip payroll, approval payroll |
 | Akunting | `Akunting` | Jurnal, akun, laporan laba-rugi/neraca, depresiasi aset |
-| Inventori | `Wms` | Produk, SKU/variant, stok, purchase order, return, cycle count, nomor seri |
+| Inventori | `Wms` | Produk, SKU/variant, stok, purchase order, return, cycle count, nomor seri, export pricelist per tier harga |
 | CRM | `Crm` | Pelanggan, lead, konversi lead, sales pipeline |
-| Workflow | `Workflow` | Approval rule & request multi-level, GRN/cycle count/payroll/PO |
+| Workflow | `Workflow` | Approval rule & request multi-level, GRN/cycle count/payroll/PO, badge counter inbox |
 | Integrasi | `Notifikasi`, `Omnichannel`, `Webhook` | Notifikasi internal, sinkron channel, outbound webhook |
-| Platform | `Rbac`, `Dashboard`, `Report` | Permission per role, audit log, dashboard & laporan |
+| Platform | `Rbac`, `Dashboard`, `Report` | Permission per role, audit log, dashboard, drilldown viewer dengan filter periode & ekspor data terkurasi |
 
 ## Kebutuhan Sistem
 

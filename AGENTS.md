@@ -17,18 +17,22 @@
 - `.npmrc`: `ignore-scripts=true`, `audit=true`
 
 ## Project State (Current)
-**NOT a fresh scaffold** — 11 modules fully implemented in `app/Modules/`:
-- **Akunting** — COA, Jurnal, Piutang/Utang, export jobs
-- **Crm** — Pelanggan, Tier, Broadcast, Konfigurasi
+**NOT a fresh scaffold** — 15 modules fully implemented in `app/Modules/`:
+- **Akunting** — COA, Jurnal, Piutang/Utang, export jobs, depresiasi aset
+- **Crm** — Pelanggan, Tier, Broadcast, Konfigurasi, lead & pipeline
 - **Dashboard** — Role-based widgets
+- **Hr** — Karyawan, absensi shift, KPI, slip payroll, approval payroll
 - **Marketplace** — Shop, Cart, Checkout, Customer Account, Duitku, Biteship, Shipping
 - **Notifikasi** — Queue jobs, channels (WA/Email), NotificationService
 - **Omnichannel** — ShopeeAdapter, webhook handling, command center
-- **Pos** — Kasir screen, ESC/POS thermal print, park/hold transactions
-- **Rbac** — Spatie permission, cabang scoping, settings UI
-- **Reseller** — Komisi, dashboard, konfigurasi
+- **Pos** — Kasir screen, ESC/POS thermal print, park/hold transactions, clock-in/out
+- **Rbac** — Spatie permission, cabang scoping, settings UI, audit log
+- **Report** — Drilldown viewer, filter periode, export data format terkurasi
+- **Reseller** — Komisi multi-aktor, dashboard, konfigurasi
 - **Servis** — Kanban board, state machine, garansi, sparepart, approval token
-- **Wms** — Produk/SKU, stok log/transfer/opname, PO, barcode, import Excel
+- **Webhook** — Outbound webhooks
+- **Wms** — Produk/SKU, pricelist export per tier, stok log/transfer/opname, PO, barcode, import Excel
+- **Workflow** — Multi-level approval inbox & rule engine (GRN, cycle count, PO, payroll)
 
 Each module owns Models, Controllers, Livewire components, Services, Migrations. Two zones:
 - **Backoffice** (`/app/*` routes) — internal staff, desktop-first, dark mode default

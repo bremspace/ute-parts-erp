@@ -46,7 +46,7 @@ Satu-satunya sistem operasional terpadu retail & reparasi HP yang mengawinkan li
 ## Evidence on Hand
 
 - Dokumen spesifikasi lengkap: `PRD-Frontend-UteParts.md` (spesifikasi antarmuka & token Ute Prism) dan `PRD-Backend-UteParts.md` (spesifikasi entitas, RBAC, dan kamus API).
-- 11 modul modular di `app/Modules/` (Akunting, Crm, Dashboard, Marketplace, Notifikasi, Omnichannel, Pos, Rbac, Reseller, Servis, Wms).
+- 15 modul domain terintegrasi di `app/Modules/` (Akunting, Crm, Dashboard, Hr, Marketplace, Notifikasi, Omnichannel, Pos, Rbac, Report, Reseller, Servis, Webhook, Wms, Workflow).
 - Rangkaian Architecture Decision Records di `docs/adr/` (ADR 0006 s.d. ADR 0012).
 - Unit dan feature tests: `tests/Unit/PricingServiceTest.php`, `tests/Unit/ServisStateMachineTest.php`, `tests/Feature/JurnalServiceTest.php`, `tests/Feature/IntegrasiModulTest.php`.
 
