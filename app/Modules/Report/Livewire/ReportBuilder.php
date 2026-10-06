@@ -5,7 +5,12 @@ namespace App\Modules\Report\Livewire;
 use App\Modules\Report\Jobs\ReportExportJob;
 use App\Modules\Report\Models\SavedReport;
 use App\Modules\Report\Services\ReportBuilderService;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Component;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * [F2-4] Custom Report Builder Livewire component.
@@ -119,7 +124,7 @@ class ReportBuilder extends Component
     public function buildAndShow(): void
     {
         if (empty($this->sourceModel)) {
-            $this->dispatch('toast', type: 'error', message: 'Pilih sumber data terlebih dahulu');
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih sumber data terlebih dahulu']);
 
             return;
         }
@@ -127,7 +132,7 @@ class ReportBuilder extends Component
         try {
             app(ReportBuilderService::class)->validateModel($this->sourceModel);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatch('toast', type: 'error', message: $e->getMessage());
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
 
             return;
         }
@@ -156,50 +161,120 @@ class ReportBuilder extends Component
         $this->showResults = true;
     }
 
-    public function export(): void
+    public function export()
     {
         if (empty($this->sourceModel)) {
-            $this->dispatch('toast', type: 'error', message: 'Pilih sumber data terlebih dahulu');
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih sumber data terlebih dahulu']);
 
-            return;
-        }
-
-        if (empty($this->reportName)) {
-            $this->dispatch('toast', type: 'error', message: 'Masukkan nama laporan');
-
-            return;
+            return null;
         }
 
         try {
             app(ReportBuilderService::class)->validateModel($this->sourceModel);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatch('toast', type: 'error', message: $e->getMessage());
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
 
-            return;
+            return null;
         }
 
+        $service = app(ReportBuilderService::class);
         $cabangId = session('cabang_id');
+        $userId = auth()->id() ?? 0;
 
-        // Dispatch QUEUE job — never sync
+        $reportName = trim($this->reportName);
+        if ($reportName === '') {
+            $label = $this->availableModels[$this->sourceModel]['label'] ?? class_basename($this->sourceModel);
+            $reportName = 'Laporan '.$label.' '.now()->format('d-m-Y');
+            $this->reportName = $reportName;
+        }
+
+        $format = $this->exportFormat === 'csv' ? 'csv' : 'xlsx';
+
+        // Dispatch QUEUE job — async background processing & audit
         dispatch(new ReportExportJob(
             modelName: $this->sourceModel,
             columns: $this->selectedColumns,
             filters: $this->filters ?: null,
             groupBy: $this->groupBy ?: null,
             cabangId: $cabangId,
-            format: $this->exportFormat,
-            userId: auth()->id(),
-            reportName: $this->reportName
+            format: $format,
+            userId: $userId,
+            reportName: $reportName
         ));
 
-        $this->dispatch('toast', type: 'success', message: 'Export laporan "'.$this->reportName.'" diantri. Notifikasi akan muncul saat selesai.');
+        // Generate file langsung untuk download instan ke browser
+        $query = $service->buildQuery(
+            $this->sourceModel,
+            $this->selectedColumns ?: ['*'],
+            $this->filters ?: null,
+            $this->groupBy ?: null,
+            $cabangId
+        );
+
+        $limit = ReportExportJob::ROW_LIMIT;
+        $rawRows = $query->limit($limit)->get()
+            ->map(fn ($item) => $item instanceof Model ? $item->toArray() : (array) $item)
+            ->all();
+
+        $rows = $service->formatRowsForDisplay($rawRows);
+        $exportRows = $service->formatRowsForExport($rows);
+
+        $ext = $format;
+        $slug = Str::slug($reportName) ?: 'laporan';
+        $filename = $userId.'_laporan_'.$slug.'-'.now()->format('Ymd-His').'.'.$ext;
+        $path = 'exports/'.$filename;
+
+        if ($format === 'csv') {
+            $out = fopen('php://memory', 'r+');
+            if (! empty($exportRows)) {
+                fputcsv($out, array_keys($exportRows[0]));
+                foreach ($exportRows as $row) {
+                    $values = array_map(function ($val) {
+                        if (is_array($val) || is_object($val)) {
+                            return json_encode($val);
+                        }
+
+                        return (string) $val;
+                    }, array_values($row));
+                    fputcsv($out, $values);
+                }
+            }
+            rewind($out);
+            $csv = stream_get_contents($out);
+            fclose($out);
+            Storage::disk('local')->put($path, $csv);
+        } else {
+            Excel::store(new class($exportRows) implements FromArray, WithHeadings
+            {
+                public function __construct(private array $rows) {}
+
+                public function headings(): array
+                {
+                    return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
+                }
+
+                public function array(): array
+                {
+                    return array_map(fn ($r) => array_values((array) $r), $this->rows);
+                }
+            }, $path, 'local');
+        }
+
         $this->exporting = false;
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Export laporan "'.$reportName.'" berhasil — berkas mulai diunduh.',
+        ]);
+
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, $slug.'.'.$ext);
     }
 
     public function saveReport(): void
     {
         if (empty($this->reportName) || empty($this->sourceModel)) {
-            $this->dispatch('toast', type: 'error', message: 'Isi nama laporan dan pilih sumber data');
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Isi nama laporan dan pilih sumber data']);
 
             return;
         }
@@ -208,7 +283,7 @@ class ReportBuilder extends Component
         try {
             $service->validateModel($this->sourceModel);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatch('toast', type: 'error', message: $e->getMessage());
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
 
             return;
         }
@@ -227,7 +302,7 @@ class ReportBuilder extends Component
             'shared' => $this->shared,
         ]);
 
-        $this->dispatch('toast', type: 'success', message: 'Laporan "'.$this->reportName.'" berhasil disimpan');
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Laporan "'.$this->reportName.'" berhasil disimpan']);
     }
 
     public function deleteReport(int $reportId): void

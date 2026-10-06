@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Facades\Excel;
 
 /**
@@ -71,6 +72,7 @@ class ReportExportJob implements ShouldQueue
             }
 
             $rows = $service->formatRowsForDisplay($rawRows);
+            $exportRows = $service->formatRowsForExport($rows);
 
             // [P2-11/CROSS-LANE] Nama file WAJIB diawali "{userId}_" — cek
             // kepemilikan unduh di AkuntingController membaca integer sebelum "_".
@@ -80,16 +82,21 @@ class ReportExportJob implements ShouldQueue
             $path = 'exports/'.$filename;
 
             if ($this->format === 'csv') {
-                $csv = $this->convertToCsv($rows);
+                $csv = $this->convertToCsv($exportRows);
                 Storage::put($path, $csv);
             } else {
-                Excel::store(new class($rows) implements FromArray
+                Excel::store(new class($exportRows) implements FromArray, WithHeadings
                 {
                     public function __construct(private array $rows) {}
 
+                    public function headings(): array
+                    {
+                        return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
+                    }
+
                     public function array(): array
                     {
-                        return $this->rows;
+                        return array_map(fn ($r) => array_values((array) $r), $this->rows);
                     }
                 }, $path, 'local');
             }

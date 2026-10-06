@@ -896,4 +896,35 @@ class FakeChannelAdapter implements ChannelAdapterInterface
     {
         return [];
     }
+
+    public function getAuthUrl(array $cred, string $redirectUrl): string
+    {
+        return 'https://fake-shopee.test/auth';
+    }
+
+    public function handleAuthCallback(array $cred, string $code, string|int $shopId): array
+    {
+        return [
+            'access_token' => 'fake_access_token',
+            'refresh_token' => 'fake_refresh_token',
+            'token_expires_at' => time() + 14400,
+            'refresh_token_expires_at' => time() + 2592000,
+            'shop_id' => $shopId,
+        ];
+    }
+
+    public function refreshAccessToken(array $cred): array
+    {
+        return [
+            'access_token' => 'refreshed_access_token',
+            'refresh_token' => 'refreshed_refresh_token',
+            'token_expires_at' => time() + 14400,
+            'refresh_token_expires_at' => time() + 2592000,
+        ];
+    }
+
+    public function verifyWebhookSignature(string $url, string $rawBody, string $signature, string $partnerKey): bool
+    {
+        return true;
+    }
 }

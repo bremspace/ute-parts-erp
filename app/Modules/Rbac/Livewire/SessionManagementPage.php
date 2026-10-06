@@ -3,8 +3,10 @@
 namespace App\Modules\Rbac\Livewire;
 
 use App\Modules\Rbac\Models\DeviceSession;
+use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\SessionManagementService;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * [F3-4] Session Management — device list, force logout per device.
@@ -14,11 +16,18 @@ use Livewire\Component;
  */
 class SessionManagementPage extends Component
 {
+    use WithPagination;
+
     public string $search = '';
 
     public int $perPage = 15;
 
     protected $listeners = ['deviceLoggedOut' => '$refresh'];
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
 
     public function getDevicesProperty()
     {
@@ -45,8 +54,8 @@ class SessionManagementPage extends Component
         $success = $service->forceLogoutDevice($deviceToken);
 
         if ($success) {
+            app(AuditService::class)->catat('DeviceSession', 'logout', null, "Sesi perangkat token {$deviceToken} diakhiri paksa");
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Device berhasil logout.']);
-            $this->emitSelf('deviceLoggedOut');
         } else {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Device tidak ditemukan.']);
         }
@@ -60,10 +69,15 @@ class SessionManagementPage extends Component
             return;
         }
 
-        $service = app(SessionManagementService::class);
-        $count = $service->forceLogoutAll(auth()->id());
+        $currentToken = (string) session('device_token');
+        $query = DeviceSession::where('is_active', true);
+        if ($currentToken) {
+            $query->where('device_token', '!=', $currentToken);
+        }
+        $count = $query->update(['is_active' => false]);
 
-        $this->dispatch('alert', ['type' => 'success', 'message' => "$count device berhasil logout."]);
+        app(AuditService::class)->catat('DeviceSession', 'logout_all', null, "{$count} sesi perangkat aktif diakhiri");
+        $this->dispatch('alert', ['type' => 'success', 'message' => "{$count} sesi perangkat berhasil diakhiri."]);
     }
 
     public function render()

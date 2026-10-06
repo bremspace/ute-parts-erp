@@ -3,12 +3,14 @@
 namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
+use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -156,28 +158,39 @@ class StokTab extends Component
     }
 
     /** [F2-5] Export laporan stok via queue (async — jangan sinkron di request). */
-    public function exportLaporan(string $format = 'xlsx'): void
+    public function exportLaporan(string $format = 'xlsx')
     {
         if (! auth()->user()?->can('laporan.cabang')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
 
-            return;
+            return null;
         }
+
+        $cabangId = session('cabang_id');
+        $userId = auth()->id();
+        $fmt = $format === 'csv' ? 'csv' : 'xlsx';
 
         dispatch(new ExportLaporanJob(
             jenis: 'stok',
             periodeDari: null,
             periodeSampai: null,
-            cabangId: session('cabang_id'),
+            cabangId: $cabangId,
             akunId: null,
-            userId: auth()->id(),
-            format: $format === 'csv' ? 'csv' : 'xlsx',
+            userId: $userId,
+            format: $fmt,
         ));
 
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Export stok diantre — notifikasi + link unduh muncul setelah selesai.',
+            'message' => 'Export stok selesai — berkas mulai diunduh.',
         ]);
+
+        $path = app(ExportLaporanService::class)->export(
+            'stok', null, null, $cabangId, null, $fmt, $userId
+        );
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, 'laporan-stok-'.now()->format('Ymd-His').'.'.$fmt);
     }
 
     public function render()

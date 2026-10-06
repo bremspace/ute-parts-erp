@@ -194,9 +194,11 @@ class ShopPage extends Component
     {
         // [B-15a] withSum (bukan withCount) supaya total stok per kartu datang
         // dari subquery — SUM(jumlah) — tanpa query per produk.
+        // Diurutkan dari ketersediaan stok (tersedia > habis) dan produk terlaris.
         $query = Produk::where('is_active', true)
             ->withSum('stokItems', 'jumlah')
-            ->with('hargaTier');
+            ->with('hargaTier')
+            ->urutKetersediaanDanTerlaris();
 
         if ($this->search) {
             $query->cariPintar($this->search);

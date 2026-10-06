@@ -36,4 +36,24 @@ class Channel extends Model
     {
         return $this->hasMany(ChannelOrder::class);
     }
+
+    public function isTokenExpired(): bool
+    {
+        $expiredAt = $this->kredensial['token_expires_at'] ?? $this->kredensial['expired_at'] ?? null;
+        if (! $expiredAt) {
+            return false;
+        }
+
+        return now()->timestamp >= (int) $expiredAt;
+    }
+
+    public function shouldRefreshToken(int $bufferSeconds = 3600): bool
+    {
+        $expiredAt = $this->kredensial['token_expires_at'] ?? $this->kredensial['expired_at'] ?? null;
+        if (! $expiredAt) {
+            return false;
+        }
+
+        return (now()->timestamp + $bufferSeconds) >= (int) $expiredAt;
+    }
 }

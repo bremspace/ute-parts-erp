@@ -3,13 +3,14 @@
 namespace App\Modules\Omnichannel\Models;
 
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'channel_id', 'produk_id', 'gudang_id', 'channel_sku',
-    'channel_item_id', 'status', 'error_message',
+    'channel_id', 'produk_id', 'sku_variant_id', 'gudang_id', 'channel_sku',
+    'channel_item_id', 'channel_model_id', 'status', 'error_message',
 ])]
 class ChannelProductMapping extends Model
 {
@@ -23,5 +24,10 @@ class ChannelProductMapping extends Model
     public function produk(): BelongsTo
     {
         return $this->belongsTo(Produk::class);
+    }
+
+    public function skuVariant(): BelongsTo
+    {
+        return $this->belongsTo(SkuVariant::class, 'sku_variant_id');
     }
 }

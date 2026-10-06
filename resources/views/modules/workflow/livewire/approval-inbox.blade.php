@@ -83,19 +83,19 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900 dark:text-white">
-                                        {{ $request->created_at->format('d/m/Y H:i') }}
+                                    <div class="text-xs text-ink-300 dark:text-ink-300">
+                                        {{ $request->created_at?->format('d/m/Y H:i') ?? '-' }}
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     @php
                                         // Status PRD F1-1: pending / disetujui / ditolak (+ alias lama approved/rejected)
                                         $statusColors = [
-                                            'pending' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-                                            'disetujui' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-                                            'ditolak' => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-                                            'approved' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-                                            'rejected' => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+                                            'pending' => 'bg-up-amber/15 text-up-amber border border-up-amber/30',
+                                            'disetujui' => 'bg-up-mint/15 text-up-mint border border-up-mint/30',
+                                            'ditolak' => 'bg-up-red/15 text-up-red border border-up-red/30',
+                                            'approved' => 'bg-up-mint/15 text-up-mint border border-up-mint/30',
+                                            'rejected' => 'bg-up-red/15 text-up-red border border-up-red/30',
                                         ];
                                         $statusLabels = [
                                             'pending' => 'Menunggu',
@@ -105,28 +105,36 @@
                                             'rejected' => 'Ditolak',
                                         ];
                                     @endphp
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusColors[$request->status] ?? 'bg-gray-100 text-gray-800' }}">
-                                        {{ $statusLabels[$request->status] ?? $request->status }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $statusColors[$request->status] ?? 'bg-white/10 text-ink-300' }}">
+                                        {{ $statusLabels[$request->status] ?? ucfirst($request->status) }}
                                     </span>
+                                    @if($request->catatan)
+                                        <p class="text-[11px] text-ink-400 mt-1 max-w-[200px] truncate" title="{{ $request->catatan }}">
+                                            💬 {{ $request->catatan }}
+                                        </p>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     @if($request->status === 'pending')
                                         <div class="flex items-center space-x-2">
                                             <button wire:click="approveRequest({{ $request->id }})" 
-                                                    class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition active:scale-[0.97] min-h-[36px] cursor-pointer"
+                                                    class="px-3.5 py-1.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer"
                                                     :disabled="$processing">
                                                 Setujui
                                             </button>
                                             <button wire:click="openRejectModal({{ $request->id }})"
-                                                    class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition active:scale-[0.97] min-h-[36px] cursor-pointer"
+                                                    class="px-3.5 py-1.5 bg-up-red/15 hover:bg-up-red/25 border border-up-red/30 text-up-red text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer"
                                                     :disabled="$processing">
                                                 Tolak
                                             </button>
                                         </div>
                                     @else
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ $request->actioned_at->format('d/m/Y H:i') }}
-                                        </span>
+                                        <div class="text-xs text-ink-400">
+                                            <span>{{ $request->actioned_at?->format('d/m/Y H:i') ?? '-' }}</span>
+                                            @if($request->actionedBy)
+                                                <span class="block text-[10px] text-ink-500">oleh {{ $request->actionedBy->name }}</span>
+                                            @endif
+                                        </div>
                                     @endif
                                 </td>
                             </tr>

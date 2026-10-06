@@ -56,7 +56,12 @@
                         <span class="text-[10px] font-bold {{ $c['platform'] === 'shopee' ? 'text-up-mint bg-up-mint/10 px-2 py-0.5 rounded-full' : 'text-ink-400 bg-white/5 px-2 py-0.5 rounded-full' }}">
                             {{ $c['platform'] === 'shopee' ? 'MVP — Full Integrated' : 'Fase 2 — Segera' }}
                         </span>
-                        <button wire:click="$set('activeTab', 'mapping')" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Atur Mapping →</button>
+                        <div class="flex items-center gap-2">
+                            @if($c['platform'] === 'shopee')
+                                <a href="{{ route('omnichannel.auth.redirect', ['id' => $c['id']]) }}" class="text-[11px] text-up-accent hover:text-amber-400 font-semibold cursor-pointer">Otorisasi OAuth &rarr;</a>
+                            @endif
+                            <button wire:click="$set('activeTab', 'mapping')" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Atur Mapping &rarr;</button>
+                        </div>
                     </div>
                 </div>
             @empty
@@ -85,15 +90,17 @@
                     <div class="text-xs text-ink-300 font-medium flex items-center gap-2 flex-wrap">
                         <span>{{ count($selectedProdukIds) }} produk dipilih &rarr;</span>
                         <button wire:click="saveMapping" class="px-3.5 py-2.5 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px] whitespace-nowrap active:scale-[0.97] transition-[transform,background-color] flex items-center">Simpan Mapping</button>
+                        <button wire:click="autoMatchAll" class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer min-h-[44px] whitespace-nowrap active:scale-[0.97] transition-[transform,background-color] flex items-center gap-1">⚡ Auto-Match by SKU</button>
                     </div>
                 @endif
             </div>
 
-            <x-prism.data-table :headers="['Channel', 'Produk', 'SKU Channel', 'Status', '']">
+            <x-prism.data-table :headers="['Channel', 'Produk', 'Varian / Model', 'SKU Channel', 'Status', '']">
                 @forelse($mappings as $m)
                     <tr class="hover:bg-white/[0.02] transition-colors text-xs">
                         <td class="py-3.5 px-4 text-ink-200 font-medium">{{ $m->channel?->nama }}</td>
                         <td class="py-3.5 px-4 text-white">{{ $m->produk?->nama }}</td>
+                        <td class="py-3.5 px-4 text-ink-300">{{ $m->skuVariant?->nama_varian ?? ($m->channel_model_id ? 'Model #'.$m->channel_model_id : 'Utama') }}</td>
                         <td class="py-3.5 px-4 font-mono text-ink-300">{{ $m->channel_sku ?? '-' }}</td>
                         <td class="py-3.5 px-4"><x-prism.status-pill :status="str_replace('_','-', $m->status)" /></td>
                         <td class="py-3.5 px-4">
@@ -102,7 +109,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="py-12 text-center text-ink-400">
+                        <td colspan="6" class="py-12 text-center text-ink-400">
                             Belum ada mapping. Pilih channel & produk di bawah untuk memetakan produk lokal → SKU channel.
                         </td>
                     </tr>

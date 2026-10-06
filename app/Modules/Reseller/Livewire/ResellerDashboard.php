@@ -3,11 +3,13 @@
 namespace App\Modules\Reseller\Livewire;
 
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
+use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Traits\ParsesNominal;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -20,6 +22,8 @@ class ResellerDashboard extends Component
 
     // Komisi filter
     public string $filterStatus = '';
+
+    public string $filterAktor = ''; // '', 'reseller', 'karyawan'
 
     public array $selectedKomisiIds = [];
 
@@ -49,11 +53,15 @@ class ResellerDashboard extends Component
 
     public function getKomisiListProperty()
     {
-        $query = Komisi::with(['pelanggan', 'approver', 'transaksi'])
+        $query = Komisi::with(['pelanggan', 'approver', 'transaksi', 'karyawan', 'tiketServis', 'lead'])
             ->latest();
 
         if ($this->filterStatus) {
             $query->where('status', $this->filterStatus);
+        }
+
+        if ($this->filterAktor) {
+            $query->where('aktor_tipe', $this->filterAktor);
         }
 
         return $query->get();
@@ -64,29 +72,40 @@ class ResellerDashboard extends Component
         return SkemaKomisi::orderBy('id')->get();
     }
 
-    /** [F2-5] Export laporan komisi reseller via queue (async — jangan sinkron di request). */
-    public function exportLaporan(string $format = 'xlsx'): void
+    /** [F2-5] Export laporan komisi reseller via queue & unduh langsung. */
+    public function exportLaporan(string $format = 'xlsx')
     {
         if (! auth()->user()?->can('laporan.cabang')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
 
-            return;
+            return null;
         }
+
+        $cabangId = session('cabang_id');
+        $userId = auth()->id();
+        $fmt = $format === 'csv' ? 'csv' : 'xlsx';
 
         dispatch(new ExportLaporanJob(
             jenis: 'komisi',
             periodeDari: null,
             periodeSampai: null,
-            cabangId: session('cabang_id'),
+            cabangId: $cabangId,
             akunId: null,
-            userId: auth()->id(),
-            format: $format === 'csv' ? 'csv' : 'xlsx',
+            userId: $userId,
+            format: $fmt,
         ));
 
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Export komisi diantre — notifikasi + link unduh muncul setelah selesai.',
+            'message' => 'Export komisi selesai — berkas mulai diunduh.',
         ]);
+
+        $path = app(ExportLaporanService::class)->export(
+            'komisi', null, null, $cabangId, null, $fmt, $userId
+        );
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, 'laporan-komisi-'.now()->format('Ymd-His').'.'.$fmt);
     }
 
     public function toggleKomisi(int $id)

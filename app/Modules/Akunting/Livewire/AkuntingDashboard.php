@@ -6,17 +6,21 @@ use App\Models\User;
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Models\KasMatching;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
+use App\Modules\Akunting\Services\DiagnosaNeracaService;
 use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PembayaranSubledgerService;
 use App\Modules\Akunting\Services\ValidasiBarisJurnal;
 use App\Modules\Pos\Services\KasSesiState;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -54,7 +58,7 @@ class AkuntingDashboard extends Component
      */
     private const PER_HALAMAN_SUBLEDGER = 15;
 
-    public string $activeTab = 'laporan'; // laporan, jurnal, coa, piutang, utang
+    public string $activeTab = 'laporan'; // laporan, jurnal, coa, piutang, utang, matching-kas, diagnosa-neraca
 
     /** Cakupan laporan keuangan: 'cabang' (cabang aktif) atau 'konsolidasi' (gabungan seluruh cabang) */
     public string $cakupanLaporan = 'cabang';
@@ -99,6 +103,33 @@ class AkuntingDashboard extends Component
     public mixed $bayarUtangJumlah = 0;
 
     public string $bayarUtangKunci = '';
+
+    // Matching Kas (Pencocokan Kas Real vs Aplikasi)
+    public bool $showFormMatchingModal = false;
+
+    public ?int $matchingCabangId = null;
+
+    public ?int $selectedAkunKasId = null;
+
+    public string $matchingTanggal = '';
+
+    public float $saldoSistemKas = 0;
+
+    public string $saldoFisikKasInput = '0';
+
+    public float $selisihKas = 0;
+
+    public string $catatanMatchingKas = '';
+
+    public bool $usePecahanMode = false;
+
+    public array $rincianPecahan = [
+        '100000' => 0, '50000' => 0, '20000' => 0, '10000' => 0,
+        '5000' => 0, '2000' => 0, '1000' => 0, 'koin' => 0,
+    ];
+
+    // Diagnosa Neraca Cerdas
+    public ?array $hasilDiagnosa = null;
 
     public function mount()
     {
@@ -161,31 +192,34 @@ class AkuntingDashboard extends Component
     // ===== LAPORAN =====
 
     /**
-     * [F2-5] Export tab jurnal/piutang/utang via queue (async — jangan sinkron di request).
+     * [F2-5] Export tab jurnal/piutang/utang via queue & unduh langsung.
      */
-    public function exportLaporan(string $jenis, string $format = 'xlsx'): void
+    public function exportLaporan(string $jenis, string $format = 'xlsx')
     {
         if (! in_array($jenis, ['jurnal', 'piutang', 'utang'], true)) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Jenis export tidak didukung']);
 
-            return;
+            return null;
         }
 
         if ($this->cakupanLaporan === 'konsolidasi') {
             if (! auth()->user()?->can('laporan.konsolidasi')) {
                 $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin laporan konsolidasi']);
 
-                return;
+                return null;
             }
             $exportCabangId = null;
         } else {
             if (! auth()->user()?->can('laporan.cabang')) {
                 $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
 
-                return;
+                return null;
             }
             $exportCabangId = session('cabang_id');
         }
+
+        $userId = auth()->id();
+        $fmt = $format === 'csv' ? 'csv' : 'xlsx';
 
         dispatch(new ExportLaporanJob(
             jenis: $jenis,
@@ -193,15 +227,22 @@ class AkuntingDashboard extends Component
             periodeSampai: $this->periodeSampai ?: null,
             cabangId: $exportCabangId,
             akunId: null,
-            userId: auth()->id(),
-            format: $format === 'csv' ? 'csv' : 'xlsx',
+            userId: $userId,
+            format: $fmt,
         ));
 
         $cakupanText = $this->cakupanLaporan === 'konsolidasi' ? ' konsolidasi' : '';
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Export '.str_replace('_', ' ', $jenis).$cakupanText.' diantre — notifikasi + link unduh muncul setelah selesai.',
+            'message' => 'Export '.str_replace('_', ' ', $jenis).$cakupanText.' selesai — berkas mulai diunduh.',
         ]);
+
+        $path = app(ExportLaporanService::class)->export(
+            $jenis, $this->periodeDari ?: null, $this->periodeSampai ?: null, $exportCabangId, null, $fmt, $userId
+        );
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, 'laporan-'.$jenis.'-'.now()->format('Ymd-His').'.'.$fmt);
     }
 
     /**
@@ -1050,6 +1091,220 @@ class AkuntingDashboard extends Component
         ]);
     }
 
+    // ===== MATCHING KAS (PENCOCOKAN KAS REAL VS APLIKASI) =====
+
+    public function getKasAccountsProperty(): Collection
+    {
+        $cabangId = $this->cabangScopeId();
+        $sampai = $this->periodeSampai ?: now()->toDateString();
+
+        $akunKas = AkunCOA::query()
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereIn('kelompok', ['kas', 'bank'])
+                    ->orWhere('kode', 'like', '110-%');
+            })
+            ->orderBy('kode')
+            ->get();
+
+        return $akunKas->map(function ($akun) use ($cabangId, $sampai) {
+            $query = JurnalAkuntansi::query()
+                ->where('akun_coa_id', $akun->id)
+                ->where('tanggal', '<=', $sampai.' 23:59:59');
+
+            if ($cabangId !== null) {
+                $query->where('cabang_id', $cabangId);
+            }
+
+            $debit = (float) $query->sum('debit');
+            $kredit = (float) $query->sum('kredit');
+            $saldo = $akun->saldo_normal === 'debit' ? $debit - $kredit : $kredit - $debit;
+
+            return [
+                'id' => $akun->id,
+                'kode' => $akun->kode,
+                'nama' => $akun->nama,
+                'kelompok' => $akun->kelompok,
+                'saldo' => round($saldo, 2),
+            ];
+        });
+    }
+
+    public function bukaFormMatching(?int $akunId = null, ?int $cabangId = null): void
+    {
+        $this->matchingTanggal = now()->toDateString();
+        $this->matchingCabangId = $cabangId ?: ((int) (session('cabang_id') ?: (auth()->user()?->cabangs()->first()?->id ?? Cabang::first()?->id ?? 1)));
+        $this->selectedAkunKasId = $akunId ?: ($this->kasAccounts->first()['id'] ?? null);
+        $this->catatanMatchingKas = '';
+        $this->usePecahanMode = false;
+        $this->resetPecahan();
+        $this->hitungSaldoSistemKas();
+        $this->saldoFisikKasInput = (string) $this->saldoSistemKas;
+        $this->hitungSelisihKas();
+        $this->showFormMatchingModal = true;
+    }
+
+    public function tutupFormMatching(): void
+    {
+        $this->showFormMatchingModal = false;
+    }
+
+    public function updatedMatchingCabangId(): void
+    {
+        $this->hitungSaldoSistemKas();
+        $this->hitungSelisihKas();
+    }
+
+    public function updatedSelectedAkunKasId(): void
+    {
+        $this->hitungSaldoSistemKas();
+        $this->hitungSelisihKas();
+    }
+
+    public function updatedMatchingTanggal(): void
+    {
+        $this->hitungSaldoSistemKas();
+        $this->hitungSelisihKas();
+    }
+
+    public function updatedSaldoFisikKasInput(): void
+    {
+        $this->hitungSelisihKas();
+    }
+
+    public function updatedRincianPecahan(): void
+    {
+        $total = 0;
+        foreach ($this->rincianPecahan as $nominal => $lembar) {
+            if ($nominal === 'koin') {
+                $total += (float) $lembar;
+            } else {
+                $total += ((float) $nominal) * ((int) $lembar);
+            }
+        }
+        $this->saldoFisikKasInput = (string) $total;
+        $this->hitungSelisihKas();
+    }
+
+    public function hitungSaldoSistemKas(): void
+    {
+        if (! $this->selectedAkunKasId) {
+            $this->saldoSistemKas = 0;
+
+            return;
+        }
+
+        $akun = AkunCOA::find($this->selectedAkunKasId);
+        if (! $akun) {
+            $this->saldoSistemKas = 0;
+
+            return;
+        }
+
+        // Prioritas cabang untuk matching fisik kas adalah matchingCabangId
+        $cabangId = $this->matchingCabangId ?: $this->cabangScopeId();
+        $query = JurnalAkuntansi::where('akun_coa_id', $akun->id)
+            ->where('tanggal', '<=', ($this->matchingTanggal ?: now()->toDateString()).' 23:59:59');
+
+        if ($cabangId !== null && $cabangId > 0) {
+            $query->where('cabang_id', $cabangId);
+        }
+
+        $debit = (float) $query->sum('debit');
+        $kredit = (float) $query->sum('kredit');
+        $this->saldoSistemKas = round($akun->saldo_normal === 'debit' ? $debit - $kredit : $kredit - $debit, 2);
+    }
+
+    public function hitungSelisihKas(): void
+    {
+        $fisik = $this->parseNominal($this->saldoFisikKasInput);
+        $this->selisihKas = round($fisik - $this->saldoSistemKas, 2);
+    }
+
+    public function resetPecahan(): void
+    {
+        $this->rincianPecahan = [
+            '100000' => 0, '50000' => 0, '20000' => 0, '10000' => 0,
+            '5000' => 0, '2000' => 0, '1000' => 0, 'koin' => 0,
+        ];
+    }
+
+    public function simpanMatchingKas(): void
+    {
+        $this->validate([
+            'selectedAkunKasId' => 'required|exists:akun_coa,id',
+            'matchingTanggal' => 'required|date',
+            'matchingCabangId' => 'required|exists:cabang,id',
+        ]);
+
+        $fisik = $this->parseNominal($this->saldoFisikKasInput);
+        $selisih = round($fisik - $this->saldoSistemKas, 2);
+        $status = abs($selisih) < 0.01 ? 'cocok' : 'selisih';
+
+        KasMatching::create([
+            'cabang_id' => $this->matchingCabangId,
+            'user_id' => auth()->id(),
+            'akun_id' => $this->selectedAkunKasId,
+            'tanggal' => $this->matchingTanggal,
+            'saldo_sistem' => $this->saldoSistemKas,
+            'saldo_fisik' => $fisik,
+            'selisih' => $selisih,
+            'status' => $status,
+            'rincian_pecahan' => $this->usePecahanMode ? $this->rincianPecahan : null,
+            'catatan' => $this->catatanMatchingKas ?: null,
+        ]);
+
+        $this->showFormMatchingModal = false;
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Hasil pencocokan kas berhasil disimpan.']);
+    }
+
+    public function postingPenyesuaianKas(int $matchingId): void
+    {
+        $diagnosaService = app(DiagnosaNeracaService::class);
+        $res = $diagnosaService->perbaikiOtomatis('posting_selisih_kas_matching', [
+            'kas_matching_id' => $matchingId,
+        ], auth()->id());
+
+        if ($res['success']) {
+            $this->dispatch('alert', ['type' => 'success', 'message' => $res['message']]);
+        } else {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $res['message']]);
+        }
+    }
+
+    public function getKasMatchingsProperty()
+    {
+        $cabangId = $this->cabangScopeId();
+        $query = KasMatching::with(['akun', 'user', 'jurnal', 'cabang'])->latest('tanggal');
+
+        if ($cabangId !== null) {
+            $query->where('cabang_id', $cabangId);
+        }
+
+        return $query->paginate(15, ['*'], 'pageKasMatching');
+    }
+
+    // ===== DIAGNOSA NERACA CERDAS =====
+
+    public function jalankanDiagnosa(): void
+    {
+        $cabangId = $this->cabangScopeId();
+        $sampai = $this->periodeSampai ?: now()->toDateString();
+        $this->hasilDiagnosa = app(DiagnosaNeracaService::class)->diagnosa($cabangId, $sampai);
+        $this->activeTab = 'diagnosa-neraca';
+    }
+
+    public function eksekusiSolusiDiagnosa(string $aksiKey, array $payload): void
+    {
+        $res = app(DiagnosaNeracaService::class)->perbaikiOtomatis($aksiKey, $payload, auth()->id());
+        if ($res['success']) {
+            $this->dispatch('alert', ['type' => 'success', 'message' => $res['message']]);
+            $this->jalankanDiagnosa();
+        } else {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $res['message']]);
+        }
+    }
+
     public function render()
     {
         $manualFormVisible = $this->showJurnalManual || $this->showJurnalConfirmation;
@@ -1073,6 +1328,10 @@ class AkuntingDashboard extends Component
             'piutangs' => $this->piutangs,
             'utangs' => $this->utangs,
             'kasSesiRiwayat' => $this->kasSesiRiwayat,
+            'kasAccounts' => $this->kasAccounts,
+            'kasMatchings' => $this->kasMatchings,
+            'daftarCabang' => Cabang::where('is_active', true)->orderBy('nama')->get(['id', 'nama', 'kode']),
+            'hasilDiagnosa' => $this->hasilDiagnosa,
         ])->layout('layouts.backoffice', ['header' => 'Akunting & Keuangan']);
     }
 }

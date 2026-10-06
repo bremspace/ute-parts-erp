@@ -3,9 +3,11 @@
 namespace App\Modules\Servis\Services;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
@@ -25,6 +27,7 @@ use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class ServisService
@@ -740,18 +743,41 @@ class ServisService
                     ['akun_kode' => '120-01', 'debit' => 0, 'kredit' => $totalTagihan], // Piutang Usaha lunas
                 ]);
 
+                $deskripsiJurnal = "Pelunasan servis {$tiket->no_tiket} ({$metodePembayaran})";
+                if ($transaksiId) {
+                    $trx = Transaksi::find($transaksiId);
+                    if ($trx) {
+                        $deskripsiJurnal .= " [{$trx->no_transaksi}]";
+                    }
+                }
+
                 $jurnalService->post(
                     noJurnal: $noJurnal,
                     tanggal: now(),
                     sumber: 'servis',
                     lines: $lines,
-                    deskripsi: "Pelunasan servis {$tiket->no_tiket} ({$metodePembayaran})",
+                    deskripsi: $deskripsiJurnal,
                     cabangId: $tiket->cabang_id,
                     userId: $user->id,
                     referensiTipe: TiketServis::class,
                     referensiId: $tiket->id,
                     idempotencyKey: 'servis-bayar:'.$tiket->id,
                 );
+            }
+
+            // [SUBLEDGER-SYNC] Lunaskan piutang servis bila ada di tabel piutang
+            if ($tiket->pelanggan_id && Schema::hasTable('piutang')) {
+                $piutang = Piutang::where('keterangan', 'like', "%{$tiket->no_tiket}%")
+                    ->where('cabang_id', $tiket->cabang_id)
+                    ->where('status', 'belum_lunas')
+                    ->first();
+                if ($piutang) {
+                    $piutang->update([
+                        'jumlah_dibayar' => $piutang->jumlah,
+                        'status' => 'lunas',
+                        'transaksi_id' => $transaksiId ?? $piutang->transaksi_id,
+                    ]);
+                }
             }
 
             $tiket->update([
@@ -1112,6 +1138,29 @@ class ServisService
                     // posting ganda ditegakkan MESIN DB, bukan hanya cek aplikasi.
                     idempotencyKey: 'servis:'.$tiket->id,
                 );
+
+                // [SUBLEDGER-SYNC] Catat piutang servis ke subledger piutang agar selaras dengan akun 120-01
+                if ($tiket->pelanggan_id && Schema::hasTable('piutang')) {
+                    $existingPiutang = Piutang::where('keterangan', 'like', "%{$tiket->no_tiket}%")
+                        ->where('cabang_id', $tiket->cabang_id)
+                        ->first();
+                    if (! $existingPiutang) {
+                        $countPiutang = Piutang::where('cabang_id', $tiket->cabang_id)
+                            ->whereDate('created_at', now()->toDateString())
+                            ->count() + 1;
+                        Piutang::create([
+                            'no_piutang' => sprintf('AR-SRV-%s-%04d', now()->format('Ymd'), $countPiutang),
+                            'pelanggan_id' => $tiket->pelanggan_id,
+                            'transaksi_id' => $tiket->transaksi_id,
+                            'cabang_id' => $tiket->cabang_id,
+                            'jumlah' => $totalTagihan,
+                            'jumlah_dibayar' => 0,
+                            'jatuh_tempo' => now()->addDays(14)->toDateString(),
+                            'status' => 'belum_lunas',
+                            'keterangan' => "Piutang Servis {$tiket->no_tiket} ({$tiket->jenis_hp})",
+                        ]);
+                    }
+                }
 
                 // Komisi reseller: jika servis milik reseller, hitung komisi
                 if ($tiket->pelanggan?->is_reseller) {

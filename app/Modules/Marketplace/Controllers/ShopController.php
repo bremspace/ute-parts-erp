@@ -52,7 +52,8 @@ class ShopController extends Controller
                 'tipeHps',
                 'hargaTier',
             ])
-            ->withSum('stokItems', 'jumlah');
+            ->withSum('stokItems', 'jumlah')
+            ->urutKetersediaanDanTerlaris();
 
         if ($search) {
             $query->cariPintar($search);

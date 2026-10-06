@@ -1,10 +1,12 @@
 <?php
 
+use App\Models\User;
+
 if (! function_exists('isSuperAdminOrOwner')) {
     /**
      * Check if the current user has super-admin or owner privileges.
      */
-    function isSuperAdminOrOwner(?\App\Models\User $user = null): bool
+    function isSuperAdminOrOwner(?User $user = null): bool
     {
         $user = $user ?? auth()->user();
         if (! $user) {

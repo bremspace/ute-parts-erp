@@ -127,6 +127,19 @@ document.addEventListener('alpine:init', () => {
 
         el.addEventListener('input', onInput, true);
 
+        const onBlur = () => {
+            if (el.value) {
+                const parsed = parseDom(el.value);
+                el.value = formatDisplay(parsed);
+            }
+        };
+        el.addEventListener('blur', onBlur);
+
+        if (el.value) {
+            const parsed = parseModel(el.value);
+            el.value = formatDisplay(parsed);
+        }
+
         // Sinkronisasi dari model ke tampilan (inisialisasi, respons server, quick cash)
         effect(() => {
             const m = el._x_model;
@@ -146,6 +159,9 @@ document.addEventListener('alpine:init', () => {
             el.value = formatDisplay(parsed);
         });
 
-        cleanup(() => el.removeEventListener('input', onInput, true));
+        cleanup(() => {
+            el.removeEventListener('input', onInput, true);
+            el.removeEventListener('blur', onBlur);
+        });
     });
 });

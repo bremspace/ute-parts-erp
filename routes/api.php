@@ -261,6 +261,7 @@ Route::middleware(['throttle:60,1'])->group(function () {
         Route::post('/omnichannel/channels', [OmnichannelController::class, 'storeChannel'])->middleware('permission:omnichannel.manage');
         Route::get('/omnichannel/channels/{id}/status', [OmnichannelController::class, 'statusChannel'])->middleware('permission:omnichannel.view');
         Route::get('/omnichannel/channels/{id}/health', [OmnichannelController::class, 'health'])->middleware('permission:omnichannel.view');
+        Route::get('/omnichannel/channels/{id}/auth-url', [OmnichannelController::class, 'authRedirect'])->middleware('permission:omnichannel.manage');
         Route::post('/omnichannel/channels/{id}/mapping', [OmnichannelController::class, 'mapping'])->middleware('permission:omnichannel.manage');
         Route::get('/omnichannel/orders', [OmnichannelController::class, 'orders'])->middleware('permission:omnichannel.view');
         Route::post('/omnichannel/sync-stock', [OmnichannelController::class, 'syncStock'])->middleware('permission:omnichannel.manage');

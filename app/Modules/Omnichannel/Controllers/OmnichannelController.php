@@ -6,7 +6,6 @@ use App\Modules\Omnichannel\Models\Channel;
 use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
-use App\Modules\Wms\Models\Produk;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -40,7 +39,7 @@ class OmnichannelController extends Controller
         $channel = Channel::create([
             'nama' => $request->nama,
             'platform' => $request->platform,
-            'kredensial' => $request->kredensial, // enkripsi penuh → fase deployment
+            'kredensial' => $request->kredensial,
             'status' => 'belum_terhubung',
             'is_active' => true,
         ]);
@@ -67,7 +66,81 @@ class OmnichannelController extends Controller
             'adapter_tersedia' => $this->syncService->adapterFor($channel->platform) !== null,
             'terakhir_sync' => $channel->last_sync_at,
             'status_sync' => $channel->last_sync_status,
+            'is_token_expired' => $channel->isTokenExpired(),
+            'should_refresh_token' => $channel->shouldRefreshToken(3600),
         ], 'Status koneksi channel berhasil dimuat');
+    }
+
+    // [API: OMNI-07] Redirect OAuth authorization
+    public function authRedirect(Request $request, $id)
+    {
+        $channel = Channel::findOrFail($id);
+        $adapter = $this->syncService->adapterFor($channel->platform);
+
+        if (! $adapter) {
+            return response()->json(['success' => false, 'message' => "Adapter {$channel->platform} tidak ditemukan"], 404);
+        }
+
+        $redirectUrl = route('omnichannel.auth.callback', ['platform' => $channel->platform]);
+        $authUrl = $adapter->getAuthUrl($channel->kredensial ?? [], $redirectUrl);
+
+        if ($request->wantsJson()) {
+            return $this->success(['auth_url' => $authUrl], 'URL otorisasi berhasil digenerate');
+        }
+
+        return redirect()->away($authUrl);
+    }
+
+    // [API: OMNI-08] Callback OAuth dari marketplace
+    public function authCallback(Request $request, $platform)
+    {
+        $code = $request->query('code');
+        $shopId = $request->query('shop_id');
+
+        if (! $code) {
+            return redirect('/app/omnichannel')->with('error', 'Otorisasi dibatalkan atau kode otorisasi tidak ditemukan');
+        }
+
+        $adapter = $this->syncService->adapterFor($platform);
+        if (! $adapter) {
+            return redirect('/app/omnichannel')->with('error', "Adapter platform {$platform} belum tersedia");
+        }
+
+        // Cari channel yang cocok berdasarkan platform dan shop_id (atau channel terbaru)
+        $channel = Channel::where('platform', $platform)
+            ->where(function ($q) use ($shopId) {
+                if ($shopId) {
+                    $q->where('kredensial->shop_id', (int) $shopId)
+                        ->orWhereNull('kredensial->access_token');
+                }
+            })
+            ->latest()
+            ->first();
+
+        if (! $channel) {
+            $channel = Channel::create([
+                'nama' => ucfirst($platform).' Shop #'.$shopId,
+                'platform' => $platform,
+                'status' => 'belum_terhubung',
+                'is_active' => true,
+            ]);
+        }
+
+        try {
+            $tokens = $adapter->handleAuthCallback($channel->kredensial ?? [], $code, $shopId);
+            $channel->update([
+                'kredensial' => array_merge($channel->kredensial ?? [], $tokens),
+                'status' => 'terhubung',
+                'last_sync_at' => now(),
+                'last_sync_status' => 'sukses',
+            ]);
+
+            return redirect('/app/omnichannel')->with('success', "Kanal {$channel->nama} berhasil terhubung dengan Shopee!");
+        } catch (\Throwable $e) {
+            $channel->update(['status' => 'token_bermasalah']);
+
+            return redirect('/app/omnichannel')->with('error', 'Gagal otorisasi: '.$e->getMessage());
+        }
     }
 
     // [API: OMNI-02] Mapping produk lokal ↔ SKU channel
@@ -76,7 +149,10 @@ class OmnichannelController extends Controller
         $request->validate([
             'mappings' => 'required|array|min:1',
             'mappings.*.produk_id' => 'required|exists:produk,id',
+            'mappings.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
             'mappings.*.channel_sku' => 'nullable|string',
+            'mappings.*.channel_item_id' => 'nullable|string',
+            'mappings.*.channel_model_id' => 'nullable|string',
             'mappings.*.gudang_id' => 'nullable|exists:gudang,id',
         ]);
 
@@ -90,7 +166,10 @@ class OmnichannelController extends Controller
                     'produk_id' => $row['produk_id'],
                 ],
                 [
+                    'sku_variant_id' => $row['sku_variant_id'] ?? null,
                     'channel_sku' => $row['channel_sku'] ?? null,
+                    'channel_item_id' => $row['channel_item_id'] ?? null,
+                    'channel_model_id' => $row['channel_model_id'] ?? null,
                     'gudang_id' => $row['gudang_id'] ?? null,
                     'status' => 'tersinkron',
                 ]
@@ -159,68 +238,57 @@ class OmnichannelController extends Controller
 
     /**
      * [API: OMNI-05] Webhook penerima order/update dari channel.
-     * Route: POST /webhook/channel/{channelId} — endpoint aman untuk callback marketplace.
+     * Route: POST /webhook/channel/{channelId}
      */
     public function webhook(Request $request, $channelId)
     {
-        $channel = Channel::find($channelId);
+        $channel = is_numeric($channelId)
+            ? Channel::find($channelId)
+            : Channel::where('platform', $channelId)->where('is_active', true)->first();
+
         if (! $channel) {
             return response()->json(['success' => false, 'message' => 'Channel tidak ditemukan'], 404);
         }
 
         // Rate limit per channel
-        $rateKey = 'channel-webhook:'.$channelId.':'.$request->ip();
-        if (RateLimiter::tooManyAttempts($rateKey, 60)) {
+        $rateKey = 'channel-webhook:'.$channel->id.':'.$request->ip();
+        if (RateLimiter::tooManyAttempts($rateKey, 120)) {
             return response()->json(['success' => false, 'message' => 'Terlalu banyak request'], 429);
         }
         RateLimiter::hit($rateKey, 60);
 
-        // Idempotency: payload harus berisi channel_order_id unik
-        $orderId = $request->input('order_sn') ?? $request->input('order_id') ?? $request->input('data.order_sn');
-        if (! $orderId) {
-            return response()->json(['success' => false, 'message' => 'order_id wajib'], 422);
-        }
+        // Verifikasi signature webhook bila ada kredensial partner_key
+        $partnerKey = $channel->kredensial['partner_key'] ?? env('SHOPEE_PARTNER_KEY', '');
+        $signature = $request->header('Authorization') ?? $request->header('X-Shopee-Signature') ?? '';
+        $adapter = $this->syncService->adapterFor($channel->platform);
 
-        if (ChannelOrder::where('channel_id', $channel->id)->where('channel_order_id', $orderId)->exists()) {
-            // Duplikat — update status jika ada, tanpa buat ulang
-            $existing = ChannelOrder::where('channel_id', $channel->id)->where('channel_order_id', $orderId)->first();
-            if ($request->input('order_status') && $existing) {
-                $existing->update([
-                    'channel_status' => $request->input('order_status'),
-                    'payload' => array_merge($existing->payload ?? [], $request->all()),
-                ]);
-            }
-            // [T-26] Status jadi COMPLETED via webhook → jurnal biaya admin (idempoten per order)
-            if ($request->input('order_status') === 'COMPLETED' && $existing && $existing->status !== 'selesai') {
-                $existing->update(['status' => 'selesai']);
-                $this->syncService->prosesBiayaAdmin($existing);
-            }
+        if ($adapter && ! empty($partnerKey) && ! empty($signature)) {
+            $valid = $adapter->verifyWebhookSignature($request->fullUrl(), $request->getContent(), $signature, $partnerKey);
+            if (! $valid) {
+                Log::warning("Signature webhook Shopee tidak valid untuk channel #{$channel->id}");
 
-            return response()->json(['success' => true, 'message' => 'Duplikat diabaikan (idempotent)']);
-        }
-
-        ChannelOrder::create([
-            'channel_id' => $channel->id,
-            'channel_order_id' => $orderId,
-            'payload' => $request->all(),
-            'channel_status' => $request->input('order_status'),
-            'status' => 'menunggu_proses',
-            // [T-26] Estimasi biaya admin marketplace per payload + biaya_persen kredensial (fallback 5%)
-            'estimasi_biaya_platform' => round(((float) ($request->input('total_amount') ?? $request->input('data.total_amount') ?? 0))
-                * ((float) ($channel->kredensial['biaya_persen'] ?? 5)) / 100, 2),
-        ]);
-
-        // [T-26] Order langsung COMPLETED dari webhook → jurnal biaya admin (idempoten)
-        if ($request->input('order_status') === 'COMPLETED') {
-            $fresh = ChannelOrder::where('channel_id', $channel->id)->where('channel_order_id', $orderId)->first();
-            if ($fresh) {
-                $fresh->update(['status' => 'selesai']);
-                $this->syncService->prosesBiayaAdmin($fresh);
+                return response()->json(['success' => false, 'message' => 'Signature tidak valid'], 401);
             }
         }
 
-        Log::info('[{channel}-webhook] Order baru', ['channel' => $channel->nama, 'order' => $orderId]);
+        try {
+            $channelOrder = $this->syncService->prosesOrderMasuk($channel, $request->all());
 
-        return response()->json(['success' => true, 'message' => 'OK']);
+            Log::info("[{$channel->platform}-webhook] Order diproses", [
+                'channel' => $channel->nama,
+                'order' => $channelOrder->channel_order_id,
+                'status' => $channelOrder->status,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order berhasil diproses',
+                'order_id' => $channelOrder->channel_order_id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Webhook channel {$channel->nama} gagal: {$e->getMessage()}");
+
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 }

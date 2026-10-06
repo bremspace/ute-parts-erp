@@ -3,7 +3,15 @@
     <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-black/10 dark:border-white/5 pb-4">
         <!-- Navigation Tabs: Horizontal Scroll on Mobile, No Overlapping -->
         <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x">
-            @foreach(['laporan' => 'Laporan', 'jurnal' => 'Jurnal', 'coa' => 'COA', 'piutang' => 'Piutang', 'utang' => 'Utang'] as $kode => $label)
+            @foreach([
+                'laporan' => 'Laporan',
+                'jurnal' => 'Jurnal',
+                'coa' => 'COA',
+                'piutang' => 'Piutang',
+                'utang' => 'Utang',
+                'matching-kas' => 'Matching Kas',
+                'diagnosa-neraca' => 'Diagnosa Neraca',
+            ] as $kode => $label)
                 <button
                     wire:click="$set('activeTab', '{{ $kode }}')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
@@ -171,14 +179,20 @@
                 </div>
 
                 @php $balanceOk = (bool) $neraca['balance']; $selisihNeraca = (float) $neraca['selisih']; @endphp
-                <div class="mt-4 p-3 rounded-xl {{ $balanceOk ? 'bg-up-mint/10 border border-up-mint/30' : 'bg-up-red/10 border border-up-red/30' }} flex flex-wrap items-center gap-2 text-xs">
-                    <span class="w-2 h-2 rounded-full {{ $balanceOk ? 'bg-up-mint' : 'bg-up-red' }}"></span>
-                    <span class="{{ $balanceOk ? 'text-up-mint' : 'text-up-red' }} font-semibold">
-                        {{ $balanceOk ? 'SEIMBANG — Aset = Kewajiban + Ekuitas + Laba Periode Berjalan' : 'TIDAK SEIMBANG — Aset ≠ Kewajiban + Ekuitas + Laba Periode Berjalan' }}
-                    </span>
-                    <span class="ml-auto tabular-nums {{ $balanceOk ? 'text-up-mint' : 'text-up-red' }} font-semibold">
-                        Selisih: {{ $selisihNeraca > 0 ? '+' : ($selisihNeraca < 0 ? '−' : '') }} Rp {{ number_format(abs($selisihNeraca), 0, ',', '.') }}
-                    </span>
+                <div class="mt-4 p-3 rounded-xl {{ $balanceOk ? 'bg-up-mint/10 border border-up-mint/30' : 'bg-up-red/10 border border-up-red/30' }} flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="w-2 h-2 rounded-full {{ $balanceOk ? 'bg-up-mint' : 'bg-up-red' }}"></span>
+                        <span class="{{ $balanceOk ? 'text-up-mint' : 'text-up-red' }} font-semibold">
+                            {{ $balanceOk ? 'SEIMBANG — Aset = Kewajiban + Ekuitas + Laba Periode Berjalan' : 'TIDAK SEIMBANG — Aset ≠ Kewajiban + Ekuitas + Laba Periode Berjalan' }}
+                        </span>
+                        <span class="tabular-nums {{ $balanceOk ? 'text-up-mint' : 'text-up-red' }} font-semibold ml-1">
+                            Selisih: {{ $selisihNeraca > 0 ? '+' : ($selisihNeraca < 0 ? '−' : '') }} Rp {{ number_format(abs($selisihNeraca), 0, ',', '.') }}
+                        </span>
+                    </div>
+                    <button type="button" wire:click="jalankanDiagnosa" class="px-3 py-1.5 rounded-lg {{ $balanceOk ? 'bg-up-mint text-ink-950' : 'bg-up-red text-white' }} font-bold text-xs hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        <span>Diagnosa Cerdas</span>
+                    </button>
                 </div>
                 <p class="mt-2 text-[11px] text-ink-400">
                     Angka saldo kumulatif sejak awal pembukuan s/d {{ $neraca['sampai_tanggal'] }} — bukan perubahan periode.
@@ -437,6 +451,278 @@
                 <tr><td colspan="8" class="py-12 text-center text-ink-400">Belum ada utang. Komisi reseller yang disetujui otomatis jadi utang.</td></tr>
             @endforelse
         </x-prism.data-table>
+    @endif
+
+    <!-- TAB: MATCHING KAS -->
+    @if($activeTab === 'matching-kas')
+        <div class="space-y-6">
+            <!-- Header matching kas -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-up-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span>Monitoring &amp; Pencocokan Kas Real vs Aplikasi</span>
+                    </h2>
+                    <p class="text-xs text-ink-400 mt-1">Bandingkan saldo kas buku besar (GL) aplikasi dengan uang fisik aktual di laci/brankas atau saldo mutasi rekening koran bank.</p>
+                </div>
+                <div>
+                    <button type="button" wire:click="bukaFormMatching"
+                        class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 transition flex items-center gap-2 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                        <span>+ Rekonsiliasi / Opname Kas</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Overview Akun Kas & Bank -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                @foreach($kasAccounts as $acc)
+                    <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="font-mono text-xs font-bold text-up-accent">{{ $acc['kode'] }}</span>
+                            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-white/5 text-ink-300">{{ $acc['kelompok'] }}</span>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-white">{{ $acc['nama'] }}</h3>
+                            <p class="text-xl font-bold text-white tabular-nums mt-1">Rp {{ number_format($acc['saldo'], 0, ',', '.') }}</p>
+                            <span class="text-[11px] text-ink-400">Saldo Buku Besar (GL) Sistem</span>
+                        </div>
+                        <div class="pt-2 border-t border-white/5 flex justify-end">
+                            <button type="button" wire:click="bukaFormMatching({{ $acc['id'] }})"
+                                class="text-xs text-up-mint hover:text-up-mint/80 font-bold transition flex items-center gap-1 cursor-pointer">
+                                <span>Cocokkan Fisik</span>
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            <!-- Tabel Riwayat Pencocokan Kas Real -->
+            <x-prism.glass-card title="Riwayat Pencocokan &amp; Opname Kas Real" subtitle="Daftar audit rekonsiliasi kas fisik vs catatan buku besar sistem" circuit="true">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead>
+                            <tr class="border-b border-white/10 text-ink-400 font-semibold uppercase text-[10px]">
+                                <th class="py-3 px-4">Tanggal</th>
+                                <th class="py-3 px-4">Cabang</th>
+                                <th class="py-3 px-4">Akun Kas / Bank</th>
+                                <th class="py-3 px-4">Auditor / Petugas</th>
+                                <th class="py-3 px-4 text-right">Saldo Sistem (GL)</th>
+                                <th class="py-3 px-4 text-right">Saldo Fisik (Real)</th>
+                                <th class="py-3 px-4 text-right">Selisih</th>
+                                <th class="py-3 px-4 text-center">Status</th>
+                                <th class="py-3 px-4">Catatan</th>
+                                <th class="py-3 px-4 text-center">Tindak Lanjut</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            @forelse($kasMatchings as $m)
+                                <tr class="hover:bg-white/[0.02] transition">
+                                    <td class="py-3.5 px-4 font-mono text-ink-200">{{ $m->tanggal->format('d/m/Y') }}</td>
+                                    <td class="py-3.5 px-4 text-ink-300 font-medium whitespace-nowrap">{{ $m->cabang?->nama ?? '-' }}</td>
+                                    <td class="py-3.5 px-4">
+                                        <div class="font-bold text-white">{{ $m->akun?->nama ?? '-' }}</div>
+                                        <div class="text-[10px] text-ink-400 font-mono">{{ $m->akun?->kode ?? '-' }}</div>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-ink-300">{{ $m->user?->name ?? 'Sistem' }}</td>
+                                    <td class="py-3.5 px-4 text-right tabular-nums text-white">Rp {{ number_format($m->saldo_sistem, 0, ',', '.') }}</td>
+                                    <td class="py-3.5 px-4 text-right tabular-nums text-white font-semibold">Rp {{ number_format($m->saldo_fisik, 0, ',', '.') }}</td>
+                                    <td class="py-3.5 px-4 text-right tabular-nums font-bold {{ abs($m->selisih) < 0.01 ? 'text-up-mint' : ($m->selisih > 0 ? 'text-up-amber' : 'text-up-red') }}">
+                                        {{ $m->selisih > 0 ? '+' : ($m->selisih < 0 ? '−' : '') }} Rp {{ number_format(abs($m->selisih), 0, ',', '.') }}
+                                    </td>
+                                    <td class="py-3.5 px-4 text-center">
+                                        @php
+                                            $statusBadge = match($m->status) {
+                                                'cocok' => 'bg-up-mint/15 text-up-mint border border-up-mint/30',
+                                                'disesuaikan' => 'bg-up-primary/15 text-up-primary border border-up-primary/30',
+                                                default => 'bg-up-red/15 text-up-red border border-up-red/30'
+                                            };
+                                        @endphp
+                                        <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase {{ $statusBadge }}">
+                                            {{ $m->status === 'cocok' ? 'Cocok' : ($m->status === 'disesuaikan' ? 'Disesuaikan' : 'Selisih') }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-ink-400 max-w-xs truncate">{{ $m->catatan ?: '-' }}</td>
+                                    <td class="py-3.5 px-4 text-center">
+                                        @if($m->status === 'selisih' && ! $m->jurnal_id)
+                                            <button type="button" wire:click="postingPenyesuaianKas({{ $m->id }})"
+                                                class="px-2.5 py-1 rounded-lg bg-up-amber hover:bg-up-amber/90 text-ink-950 font-bold text-[10px] transition cursor-pointer shadow-sm">
+                                                Posting Penyesuaian
+                                            </button>
+                                        @elseif($m->jurnal_id)
+                                            <span class="text-[10px] text-up-mint font-mono font-semibold">✓ Jurnal #{{ $m->jurnal_id }}</span>
+                                        @else
+                                            <span class="text-[10px] text-ink-500">-</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="10" class="py-10 text-center text-ink-400">
+                                        Belum ada riwayat pencocokan kas. Klik <strong>"+ Rekonsiliasi / Opname Kas"</strong> untuk mencocokkan saldo kas fisik dengan sistem.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
+
+    <!-- TAB: DIAGNOSA CERDAS NERACA -->
+    @if($activeTab === 'diagnosa-neraca')
+        <div class="space-y-6">
+            <!-- Header diagnosa -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        <span>Sistem Kecerdasan Diagnosa Neraca &amp; Integritas Transaksi</span>
+                    </h2>
+                    <p class="text-xs text-ink-400 mt-1">Audit otomatis seluruh transaksi (Jurnal, POS, Servis, WMS/PO, HR Payroll, Kas Laci) untuk mendeteksi penyebab ketidakseimbangan neraca dan membagikannya ke departemen terkait.</p>
+                </div>
+                <div>
+                    <button type="button" wire:click="jalankanDiagnosa"
+                        class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 transition flex items-center gap-2 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        <span>Jalankan Ulang Diagnosa</span>
+                    </button>
+                </div>
+            </div>
+
+            @if($hasilDiagnosa)
+                <!-- Kartu Skor & Ringkasan Cerdas -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="p-4 rounded-xl {{ $hasilDiagnosa['is_balance'] ? 'bg-up-mint/10 border border-up-mint/30' : 'bg-up-red/10 border border-up-red/30' }} space-y-1">
+                        <span class="text-[10px] uppercase font-bold tracking-wider {{ $hasilDiagnosa['is_balance'] ? 'text-up-mint' : 'text-up-red' }}">Status Neraca Saldo</span>
+                        <div class="text-xl font-bold {{ $hasilDiagnosa['is_balance'] ? 'text-up-mint' : 'text-up-red' }}">
+                            {{ $hasilDiagnosa['is_balance'] ? 'SEIMBANG' : 'TIDAK SEIMBANG' }}
+                        </div>
+                        <p class="text-xs text-ink-300 tabular-nums">
+                            Selisih: {{ $hasilDiagnosa['selisih'] > 0 ? '+' : ($hasilDiagnosa['selisih'] < 0 ? '−' : '') }} Rp {{ number_format(abs($hasilDiagnosa['selisih']), 0, ',', '.') }}
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                        <span class="text-[10px] uppercase font-bold tracking-wider text-ink-400">Skor Kesehatan Akuntansi</span>
+                        <div class="text-2xl font-bold tabular-nums {{ $hasilDiagnosa['skor_kesehatan'] >= 90 ? 'text-up-mint' : ($hasilDiagnosa['skor_kesehatan'] >= 70 ? 'text-up-amber' : 'text-up-red') }}">
+                            {{ $hasilDiagnosa['skor_kesehatan'] }}%
+                        </div>
+                        <p class="text-[11px] text-ink-400">Integritas double-entry &amp; sinkronisasi</p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                        <span class="text-[10px] uppercase font-bold tracking-wider text-ink-400">Temuan Anomali</span>
+                        <div class="text-2xl font-bold tabular-nums text-white">
+                            {{ $hasilDiagnosa['total_temuan'] }} <span class="text-xs font-normal text-ink-400">isu</span>
+                        </div>
+                        <p class="text-[11px] text-ink-400">
+                            <span class="text-up-red font-bold">{{ $hasilDiagnosa['jumlah_kritis'] }} Kritis</span> • 
+                            <span class="text-up-amber font-bold">{{ $hasilDiagnosa['jumlah_peringatan'] }} Peringatan</span>
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                        <span class="text-[10px] uppercase font-bold tracking-wider text-ink-400">Waktu Analisis</span>
+                        <div class="text-sm font-bold text-white mt-1">{{ $hasilDiagnosa['waktu_analisis'] }}</div>
+                        <p class="text-[11px] text-ink-400">Snapshot transaksi real-time</p>
+                    </div>
+                </div>
+
+                <!-- Kesimpulan Naratif AI / Audit Engine -->
+                <div class="p-4 rounded-xl bg-white/[0.03] border-l-4 {{ $hasilDiagnosa['is_balance'] ? 'border-up-mint bg-up-mint/[0.02]' : 'border-up-red bg-up-red/[0.02]' }} border-y border-r border-white/5 space-y-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider {{ $hasilDiagnosa['is_balance'] ? 'text-up-mint' : 'text-up-red' }}">
+                            💡 Analisa Otomatis Sistem Cerdas Ute Parts:
+                        </span>
+                    </div>
+                    <p class="text-xs text-ink-200 leading-relaxed font-medium">
+                        {{ $hasilDiagnosa['kesimpulan_ai'] }}
+                    </p>
+                </div>
+
+                <!-- Rangkuman Tanggung Jawab Departemen / Bagian Terkait -->
+                <div>
+                    <h3 class="text-xs uppercase font-bold tracking-wider text-ink-400 mb-3">Distribusi Tindak Lanjut per Bagian / Departemen</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        @foreach($hasilDiagnosa['ringkasan_bagian'] as $namaBagian => $dataBagian)
+                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                                <div class="text-xs font-bold text-white truncate" title="{{ $namaBagian }}">{{ $namaBagian }}</div>
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="text-ink-400">Total Isu:</span>
+                                    <span class="font-bold tabular-nums {{ $dataBagian['total'] > 0 ? 'text-up-amber' : 'text-up-mint' }}">{{ $dataBagian['total'] }}</span>
+                                </div>
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="text-ink-400">Kritis:</span>
+                                    <span class="font-bold tabular-nums {{ $dataBagian['kritis'] > 0 ? 'text-up-red' : 'text-ink-400' }}">{{ $dataBagian['kritis'] }}</span>
+                                </div>
+                                <div class="pt-1.5 border-t border-white/5 text-[11px] flex justify-between">
+                                    <span class="text-ink-500">Dampak:</span>
+                                    <span class="tabular-nums font-semibold text-ink-300">Rp {{ number_format($dataBagian['dampak'], 0, ',', '.') }}</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- Daftar Rincian Temuan & Rekomendasi Tindak Lanjut -->
+                <x-prism.glass-card title="Daftar Temuan, Akar Penyebab &amp; Solusi Rekomendasi" subtitle="Daftar masalah yang perlu ditindaklanjuti untuk menjaga keseimbangan neraca" circuit="true">
+                    <div class="space-y-4">
+                        @forelse($hasilDiagnosa['daftar_temuan'] as $item)
+                            <div class="p-4 rounded-xl bg-white/[0.02] border {{ $item['tingkat'] === 'kritis' ? 'border-up-red/30' : 'border-up-amber/30' }} space-y-3">
+                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md {{ $item['tingkat'] === 'kritis' ? 'bg-up-red/20 text-up-red' : 'bg-up-amber/20 text-up-amber' }}">
+                                            {{ strtoupper($item['tingkat']) }}
+                                        </span>
+                                        <h4 class="text-xs font-bold text-white">{{ $item['judul'] }}</h4>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-[11px] font-semibold text-up-accent bg-up-accent/10 px-2 py-0.5 rounded-lg border border-up-accent/20">
+                                            Bagian: {{ $item['bagian'] }}
+                                        </span>
+                                        @if($item['dampak_nominal'] > 0)
+                                            <span class="text-xs font-bold tabular-nums text-white">
+                                                Dampak: Rp {{ number_format($item['dampak_nominal'], 0, ',', '.') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="text-xs text-ink-300 space-y-1">
+                                    <p><strong class="text-ink-200">Akar Masalah:</strong> {{ $item['penyebab'] }}</p>
+                                    <p><strong class="text-up-mint">Rekomendasi Tindakan:</strong> {{ $item['rekomendasi'] }}</p>
+                                </div>
+
+                                @if(!empty($item['solusi_otomatis_tersedia']) && !empty($item['auto_fix_key']))
+                                    <div class="pt-2 border-t border-white/5 flex justify-end">
+                                        <button type="button" wire:click="eksekusiSolusiDiagnosa('{{ $item['auto_fix_key'] }}', @js($item['payload'] ?? []))"
+                                            class="px-3 py-1.5 rounded-lg bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-sm">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                            <span>Tindak Lanjut Otomatis (Perbaiki)</span>
+                                        </button>
+                                    </div>
+                                @endif
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-xs text-ink-400">
+                                ✓ Luar biasa! Tidak terdeteksi anomali apapun. Seluruh modul dan jurnal transaksi dalam keadaan seimbang dan sinkron.
+                            </div>
+                        @endforelse
+                    </div>
+                </x-prism.glass-card>
+            @else
+                <div class="p-12 text-center glass-card space-y-3">
+                    <p class="text-sm text-ink-300 font-medium">Klik tombol di bawah untuk menjalankan analisa menyeluruh pada seluruh transaksi aplikasi.</p>
+                    <button type="button" wire:click="jalankanDiagnosa"
+                        class="px-5 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/25 hover:bg-up-primary/90 transition cursor-pointer">
+                        🔍 Mulai Diagnosa Cerdas Sekarang
+                    </button>
+                </div>
+            @endif
+        </div>
     @endif
 
     <!-- MODAL: JURNAL MANUAL -->
@@ -935,4 +1221,106 @@
 
     {{-- [F1-4] Modal riwayat audit trail per entitas (jurnal / piutang / utang) --}}
     @include('partials.riwayat-modal')
+
+    <!-- MODAL: FORM MATCHING / REKONSILIASI KAS REAL -->
+    @if($showFormMatchingModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+            <x-prism.glass-card
+                title="Pencocokan Kas Real (Opname Fisik vs Sistem)"
+                subtitle="Hitung fisik kas aktual di laci kasir/brankas atau mutasi bank, dan bandingkan dengan catatan buku besar."
+                class="w-full max-w-2xl max-h-[92vh] flex flex-col my-auto"
+            >
+                <x-slot:action>
+                    <button wire:click="tutupFormMatching" class="text-ink-400 hover:text-white p-2 cursor-pointer">✕</button>
+                </x-slot:action>
+
+                <div class="space-y-4 overflow-y-auto pr-1">
+                    <!-- Pilihan Cabang, Akun & Tanggal -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Cabang *</label>
+                            <select wire:model.live="matchingCabangId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium bg-ink-900 text-white">
+                                @foreach($daftarCabang as $cb)
+                                    <option value="{{ $cb->id }}" class="bg-ink-900">{{ $cb->nama }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Akun Kas / Bank *</label>
+                            <select wire:model.live="selectedAkunKasId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium bg-ink-900 text-white">
+                                @foreach($kasAccounts as $k)
+                                    <option value="{{ $k['id'] }}" class="bg-ink-900">{{ $k['kode'] }} — {{ $k['nama'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tanggal Cut-off / Opname *</label>
+                            <input type="date" wire:model.live="matchingTanggal" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium text-white" />
+                        </div>
+                    </div>
+
+                    <!-- Saldo Sistem GL vs Fisik Real -->
+                    <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-ink-400 font-semibold">Saldo Tercatat di Sistem (GL):</span>
+                            <span class="text-sm font-bold text-white tabular-nums">Rp {{ number_format($saldoSistemKas, 0, ',', '.') }}</span>
+                        </div>
+
+                        <!-- Toggle Mode Pecahan Uang -->
+                        <div class="flex items-center justify-between pt-2 border-t border-white/5">
+                            <span class="text-xs text-ink-300">Gunakan Hitungan Pecahan Uang Kertas &amp; Logam:</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" wire:model.live="usePecahanMode" class="sr-only peer" />
+                                <div class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-up-mint"></div>
+                            </label>
+                        </div>
+
+                        @if($usePecahanMode)
+                            <!-- Input Rincian Pecahan -->
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                                @foreach(['100000' => 'Rp 100.000', '50000' => 'Rp 50.000', '20000' => 'Rp 20.000', '10000' => 'Rp 10.000', '5000' => 'Rp 5.000', '2000' => 'Rp 2.000', '1000' => 'Rp 1.000'] as $nom => $lbl)
+                                    <div>
+                                        <label class="block text-[10px] text-ink-400 mb-1">{{ $lbl }} (lbr)</label>
+                                        <input type="number" min="0" wire:model.live="rincianPecahan.{{ $nom }}" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono text-center" />
+                                    </div>
+                                @endforeach
+                                <div>
+                                    <label class="block text-[10px] text-ink-400 mb-1">Total Koin (Rp)</label>
+                                    <input type="number" min="0" step="100" wire:model.live="rincianPecahan.koin" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono text-center" />
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Input Saldo Fisik -->
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Total Uang Fisik Aktual (Rp) *</label>
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live="saldoFisikKasInput" {{ $usePecahanMode ? 'readonly' : '' }}
+                                class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums text-white {{ $usePecahanMode ? 'bg-white/5 opacity-80' : '' }}" />
+                        </div>
+
+                        <!-- Indikator Selisih -->
+                        <div class="p-3.5 rounded-xl {{ abs($selisihKas) < 0.01 ? 'bg-up-mint/10 border border-up-mint/30' : ($selisihKas > 0 ? 'bg-up-amber/10 border border-up-amber/30' : 'bg-up-red/10 border border-up-red/30') }} flex items-center justify-between">
+                            <div class="text-xs font-bold {{ abs($selisihKas) < 0.01 ? 'text-up-mint' : ($selisihKas > 0 ? 'text-up-amber' : 'text-up-red') }}">
+                                {{ abs($selisihKas) < 0.01 ? '✓ SALDO COCOK' : ($selisihKas > 0 ? 'LEBIH FISIK (+)' : 'SELISIH TEKOR (−)') }}
+                            </div>
+                            <div class="text-sm font-bold tabular-nums {{ abs($selisihKas) < 0.01 ? 'text-up-mint' : ($selisihKas > 0 ? 'text-up-amber' : 'text-up-red') }}">
+                                {{ $selisihKas > 0 ? '+' : ($selisihKas < 0 ? '−' : '') }} Rp {{ number_format(abs($selisihKas), 0, ',', '.') }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Catatan / Berita Acara -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Catatan / Keterangan Pencocokan</label>
+                        <textarea wire:model="catatanMatchingKas" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Opname kas harian shift malam, tidak ditemukan selisih..."></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex gap-3 border-t border-white/10 pt-4">
+                    <button type="button" wire:click="tutupFormMatching" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                    <button type="button" wire:click="simpanMatchingKas" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer min-h-[44px]">Simpan Hasil Pencocokan</button>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    @endif
 </div>

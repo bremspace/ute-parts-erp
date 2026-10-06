@@ -58,6 +58,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'approve-workflow',
             // AUDIT TRAIL (F1-4)
             'lihat-audit-log',
+            // KEAMANAN & SESI (F3-4)
+            'kelola-sesi',
             // [F3-1] Field-level security permissions — baru untuk menghide harga_beli/margin dari role kasir/staff
             'lihat.harga_beli',
             'lihat.margin',
@@ -94,6 +96,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'laporan.cabang',
             'approve-workflow',
             'lihat-audit-log', // [F1-4] admin melihat riwayat audit cabangnya
+            'kelola-sesi', // [F3-4] admin mengelola sesi perangkat
             // [F3-1] Field-level security: admin bisa lihat harga_beli/margin
             'lihat.harga_beli',
             'lihat.margin',

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Rbac\Services\SessionManagementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +18,10 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        if ($deviceToken = $request->session()->get('device_token')) {
+            app(SessionManagementService::class)->forceLogoutDevice($deviceToken);
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

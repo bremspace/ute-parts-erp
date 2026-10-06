@@ -47,6 +47,11 @@ class Karyawan extends Model
         return $this->hasMany(PayrollSlip::class);
     }
 
+    public function komponenGaji(): HasMany
+    {
+        return $this->hasMany(KaryawanKomponenGaji::class);
+    }
+
     /**
      * [F1-4] Audit trail data karyawan.
      *

@@ -34,67 +34,83 @@
             if (! $bukanNominal && is_numeric($v)) {
                 return number_format((float) $v, 0, ',', '.');
             }
+            if (is_string($v) && preg_match('/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/', $v)) {
+                return date('d/m/Y H:i', strtotime($v));
+            }
+            if (is_string($v) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) {
+                return date('d/m/Y', strtotime($v));
+            }
 
             return $v;
         };
     @endphp
-    <nav class="flex items-center gap-2 text-xs overflow-x-auto scrollbar-none py-1 flex-nowrap">
-        @foreach($breadcrumbs as $i => $crumb)
-            @if($i === $currentCrumbIdx)
-                <span class="text-white font-semibold" aria-current="page">{{ $crumb['label'] }}</span>
-            @elseif($i < count($breadcrumbs) - 1)
-                <button wire:click="drillDown('{{ $crumb['model'] }}')" class="text-up-primary hover:underline">
-                    {{ $crumb['label'] }}
-                </button>
-            @else
-                <!-- Anak berikutnya: tampil sebagai label, jadi current hanya setelah datanya dimuat -->
-                <span class="text-ink-400">{{ $crumb['label'] }}</span>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <!-- Breadcrumbs -->
+        <nav class="flex items-center gap-2 text-xs overflow-x-auto scrollbar-none py-1 flex-nowrap">
+            @foreach($breadcrumbs as $i => $crumb)
+                @if($i === $currentCrumbIdx)
+                    <span class="text-white font-semibold" aria-current="page">{{ $crumb['label'] }}</span>
+                @elseif($i < count($breadcrumbs) - 1)
+                    <button wire:click="drillDown('{{ $crumb['model'] }}')" class="text-up-primary hover:underline">
+                        {{ $crumb['label'] }}
+                    </button>
+                @else
+                    <!-- Anak berikutnya: tampil sebagai label, jadi current hanya setelah datanya dimuat -->
+                    <span class="text-ink-400">{{ $crumb['label'] }}</span>
+                @endif
+                @if($i < count($breadcrumbs) - 1)
+                    <span class="text-ink-500">/</span>
+                @endif
+            @endforeach
+            @if(count($breadcrumbs) === 0)
+                <span class="text-ink-400">Pilih sumber data</span>
             @endif
-            @if($i < count($breadcrumbs) - 1)
-                <span class="text-ink-500">/</span>
-            @endif
-        @endforeach
-        @if(count($breadcrumbs) === 0)
-            <span class="text-ink-400">Pilih sumber data</span>
-        @endif
-    </nav>
+        </nav>
+
+        <!-- Selector Sumber Data -->
+        <div class="flex items-center gap-2 self-start sm:self-auto">
+            <label for="select-source-model" class="text-xs text-ink-400 font-semibold whitespace-nowrap">Sumber Data:</label>
+            <select id="select-source-model" wire:change="drillDown($event.target.value)" class="p-1.5 px-2.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none cursor-pointer">
+                @foreach(\App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST as $modelKey => $modelLabel)
+                    <option value="{{ $modelKey }}" class="bg-surface-800 text-white" @selected($currentModel === $modelKey)>{{ $modelLabel }}</option>
+                @endforeach
+            </select>
+        </div>
+    </div>
 
     @if($detail && !empty($detail))
         <!-- Detail View -->
-        <x-prism.glass-card title="Detail: {{ $currentModel }} #{{ $selectedItemId }}">
+        <x-prism.glass-card title="Detail: {{ \App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST[$currentModel] ?? $currentModel }} #{{ $selectedItemId }}">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 @foreach($detail as $key => $value)
                     @if(!is_array($value) && !is_object($value))
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                            <p class="text-[10px] uppercase text-ink-400 font-bold">{{ \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? str_replace('_', ' ', $key) }}</p>
+                            <p class="text-[10px] uppercase text-ink-400 font-bold">{{ \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? ucwords(str_replace('_', ' ', $key)) }}</p>
                             <p class="text-sm font-semibold text-white tabular-nums mt-1">{{ $fmtVal($value, $key) }}</p>
                         </div>
                     @endif
                 @endforeach
             </div>
             <div class="mt-3">
-                <button wire:click="back" class="text-xs text-up-primary hover:underline font-semibold">← Kembali ke daftar</button>
+                <button wire:click="back" class="text-xs text-up-primary hover:underline font-semibold cursor-pointer">← Kembali ke daftar</button>
             </div>
         </x-prism.glass-card>
     @else
         <!-- List View -->
         <x-prism.glass-card title="{{ \App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST[$currentModel] ?? $currentModel }}" :subtitle="count($items) . ' item ditemukan'">
-            @if($currentModel === 'Transaksi')
-                <!-- [F2-5] Export laporan transaksi (queue) -->
-                <div class="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
-                    @can('laporan.cabang')
-                        <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">Export Excel</button>
-                        <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">Export CSV</button>
-                    @endcan
-                </div>
-            @endif
+            <div class="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
+                @can('laporan.cabang')
+                    <button type="button" wire:click="exportLaporan('xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">Export Excel</button>
+                    <button type="button" wire:click="exportLaporan('csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">Export CSV</button>
+                @endcan
+            </div>
             @if(count($items) > 0)
                 <div class="overflow-x-auto">
                     <table class="w-full text-xs text-left border-collapse">
                         <thead>
                             <tr class="bg-white/5">
                                 @foreach($items[0] ?? [] as $key => $val)
-                                    <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? str_replace('_', ' ', $key) }}</th>
+                                    <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$key] ?? ucwords(str_replace('_', ' ', $key)) }}</th>
                                 @endforeach
                             </tr>
                         </thead>

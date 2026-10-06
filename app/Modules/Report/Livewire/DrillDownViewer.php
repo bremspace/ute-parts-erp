@@ -2,9 +2,15 @@
 
 namespace App\Modules\Report\Livewire;
 
-use App\Modules\Akunting\Jobs\ExportLaporanJob;
+use App\Modules\Report\Jobs\ReportExportJob;
 use App\Modules\Report\Services\ReportBuilderService;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Component;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * [F2-4] Drill-down viewer Livewire component.
@@ -147,36 +153,94 @@ class DrillDownViewer extends Component
     }
 
     /**
-     * [F2-5] Export laporan transaksi via queue — hanya di list view model Transaksi
-     * (surface laporan transaksi; async, jangan sinkron di request).
+     * [F2-5] Export laporan drill-down via unduh langsung.
+     * Mendukung seluruh model sumber data dengan formatting UI/UX dan header bahasa manusia.
      */
-    public function exportLaporan(string $format = 'xlsx'): void
+    public function exportLaporan(string $format = 'xlsx')
     {
-        if ($this->currentModel !== 'Transaksi') {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Export hanya tersedia untuk laporan transaksi']);
-
-            return;
-        }
         if (! auth()->user()?->can('laporan.cabang')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
 
-            return;
+            return null;
         }
 
-        dispatch(new ExportLaporanJob(
-            jenis: 'transaksi',
-            periodeDari: null,
-            periodeSampai: null,
-            cabangId: session('cabang_id'),
-            akunId: null,
-            userId: auth()->id(),
-            format: $format === 'csv' ? 'csv' : 'xlsx',
-        ));
+        $service = app(ReportBuilderService::class);
+        try {
+            $service->validateModel($this->currentModel);
+        } catch (\InvalidArgumentException $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+
+            return null;
+        }
+
+        $cabangId = session('cabang_id');
+        $userId = auth()->id() ?? 0;
+        $fmt = $format === 'csv' ? 'csv' : 'xlsx';
+
+        $query = $service->buildQuery(
+            $this->currentModel,
+            ['*'],
+            $this->filters ?: null,
+            null,
+            $cabangId
+        );
+
+        $limit = ReportExportJob::ROW_LIMIT;
+        $rawRows = $query->limit($limit)->get()
+            ->map(fn ($item) => $item instanceof Model ? $item->toArray() : (array) $item)
+            ->all();
+
+        $rows = $service->formatRowsForDisplay($rawRows);
+        $exportRows = $service->formatRowsForExport($rows);
+
+        $slug = Str::slug($this->currentModel) ?: 'laporan';
+        $filename = $userId.'_drilldown_'.$slug.'_'.now()->format('Ymd-His').'.'.$fmt;
+        $path = 'exports/'.$filename;
+
+        if ($fmt === 'csv') {
+            $out = fopen('php://memory', 'r+');
+            if (! empty($exportRows)) {
+                fputcsv($out, array_keys($exportRows[0]));
+                foreach ($exportRows as $row) {
+                    $values = array_map(function ($val) {
+                        if (is_array($val) || is_object($val)) {
+                            return json_encode($val);
+                        }
+
+                        return (string) $val;
+                    }, array_values($row));
+                    fputcsv($out, $values);
+                }
+            }
+            rewind($out);
+            $csv = stream_get_contents($out);
+            fclose($out);
+            Storage::disk('local')->put($path, $csv);
+        } else {
+            Excel::store(new class($exportRows) implements FromArray, WithHeadings
+            {
+                public function __construct(private array $rows) {}
+
+                public function headings(): array
+                {
+                    return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
+                }
+
+                public function array(): array
+                {
+                    return array_map(fn ($r) => array_values((array) $r), $this->rows);
+                }
+            }, $path, 'local');
+        }
 
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Export transaksi diantre — notifikasi + link unduh muncul setelah selesai.',
+            'message' => 'Export laporan '.$this->currentModel.' selesai — berkas mulai diunduh.',
         ]);
+
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, 'laporan-'.$slug.'-'.now()->format('Ymd-His').'.'.$fmt);
     }
 
     public function render()

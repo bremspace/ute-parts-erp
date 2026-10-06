@@ -4,6 +4,7 @@ namespace App\Modules\Servis\Livewire;
 
 use App\Models\User;
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
+use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Services\PricingService;
@@ -19,6 +20,7 @@ use App\Modules\Wms\Services\NomorSeriService;
 use App\Traits\ParsesNominal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -289,29 +291,40 @@ class ServisBoard extends Component
         $this->cariPartQuery = '';
     }
 
-    /** [F2-5] Export laporan servis via queue (async — jangan sinkron di request). */
-    public function exportLaporan(string $format = 'xlsx'): void
+    /** [F2-5] Export laporan servis via queue & unduh langsung. */
+    public function exportLaporan(string $format = 'xlsx')
     {
         if (! auth()->user()?->can('laporan.cabang')) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak punya izin export laporan']);
 
-            return;
+            return null;
         }
+
+        $cabangId = session('cabang_id');
+        $userId = auth()->id();
+        $fmt = $format === 'csv' ? 'csv' : 'xlsx';
 
         dispatch(new ExportLaporanJob(
             jenis: 'servis',
             periodeDari: null,
             periodeSampai: null,
-            cabangId: session('cabang_id'),
+            cabangId: $cabangId,
             akunId: null,
-            userId: auth()->id(),
-            format: $format === 'csv' ? 'csv' : 'xlsx',
+            userId: $userId,
+            format: $fmt,
         ));
 
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Export servis diantre — notifikasi + link unduh muncul setelah selesai.',
+            'message' => 'Export servis selesai — berkas mulai diunduh.',
         ]);
+
+        $path = app(ExportLaporanService::class)->export(
+            'servis', null, null, $cabangId, null, $fmt, $userId
+        );
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, 'laporan-servis-'.now()->format('Ymd-His').'.'.$fmt);
     }
 
     public function getStateMachineColumnsProperty(): array

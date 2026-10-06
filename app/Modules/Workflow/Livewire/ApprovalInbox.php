@@ -4,6 +4,7 @@ namespace App\Modules\Workflow\Livewire;
 
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -38,10 +39,13 @@ class ApprovalInbox extends Component
 
         try {
             app(ApprovalService::class)->proses($requestId, 'disetujui', auth()->id(), $this->catatan);
+            Cache::forget('backoffice-approval-badge-'.(session('cabang_id') ?? 'all'));
+            Cache::forget('backoffice-approval-badge-all');
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Permintaan disetujui']);
             $this->reset(['selectedRequest', 'catatan', 'showRejectModal']);
         } catch (ValidationException $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+            $msg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+            $this->dispatch('alert', ['type' => 'error', 'message' => $msg]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         } finally {
@@ -58,10 +62,13 @@ class ApprovalInbox extends Component
 
         try {
             app(ApprovalService::class)->proses($this->selectedRequest, 'ditolak', auth()->id(), $this->catatan);
+            Cache::forget('backoffice-approval-badge-'.(session('cabang_id') ?? 'all'));
+            Cache::forget('backoffice-approval-badge-all');
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Permintaan ditolak']);
             $this->reset(['selectedRequest', 'catatan', 'showRejectModal']);
         } catch (ValidationException $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+            $msg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+            $this->dispatch('alert', ['type' => 'error', 'message' => $msg]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         } finally {
@@ -89,7 +96,7 @@ class ApprovalInbox extends Component
         // (wajib: super-admin dapat menyetujui request role lain — lihat ApprovalService::proses)
         $seeAll = (bool) $user?->can('approve-workflow');
 
-        $requests = ApprovalRequest::with(['rule', 'requestedBy'])
+        $requests = ApprovalRequest::with(['rule', 'requestedBy', 'actionedBy'])
             ->when(! $seeAll, fn ($q) => $q->whereIn('approver_role', $roles))
             // Scope cabang: request global (null) + cabang aktif sesi — PRD §2.2
             ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', session('cabang_id')))

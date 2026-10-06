@@ -76,6 +76,10 @@ document.addEventListener('livewire:init', () => {
         const data = Array.isArray(payload) ? (payload[0] || {}) : (payload || {});
         showToast(data?.message || 'Notifikasi', data?.type || 'info');
     });
+    Livewire.on('toast', (payload) => {
+        const data = Array.isArray(payload) ? (payload[0] || {}) : (payload || {});
+        showToast(data?.message || 'Notifikasi', data?.type || 'info');
+    });
 });
 
 // PWA Installation Prompt Manager

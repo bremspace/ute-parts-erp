@@ -312,9 +312,9 @@ class SettingsRbac extends Component
 
         $role = Role::findOrFail($this->editRoleId);
 
-        // Guardrail: super-admin tidak boleh dikosongkan (anti lockout)
-        if ($role->name === 'super-admin' && empty($this->editRolePermissions)) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'super-admin wajib punya minimal 1 permission']);
+        // Guardrail: super-admin dan owner tidak boleh dikosongkan (anti lockout)
+        if (in_array($role->name, ['super-admin', 'owner'], true) && empty($this->editRolePermissions)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Role {$role->name} wajib memiliki minimal 1 permission (anti-lockout)"]);
 
             return;
         }
@@ -328,7 +328,7 @@ class SettingsRbac extends Component
 
     public function getRolesProperty()
     {
-        return Role::all();
+        return Role::with('permissions')->orderBy('name')->get();
     }
 
     public function getCabangsProperty()
@@ -482,6 +482,21 @@ class SettingsRbac extends Component
             $aksi = 'create';
         } else {
             $user = User::findOrFail($this->userForm['id']);
+
+            // Guardrail anti self-lockout
+            if ($user->id === auth()->id()) {
+                if (! $this->userForm['is_active']) {
+                    $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak dapat menonaktifkan akun Anda sendiri (anti-lockout).']);
+
+                    return;
+                }
+                if ($user->hasRole('super-admin') && $this->userForm['role'] !== 'super-admin') {
+                    $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak dapat mencabut role super-admin dari akun Anda sendiri (anti-lockout).']);
+
+                    return;
+                }
+            }
+
             $user->update([
                 'name' => $this->userForm['name'],
                 'email' => $this->userForm['email'],
@@ -520,6 +535,12 @@ class SettingsRbac extends Component
     public function toggleUserActive(int $id)
     {
         if (! $this->boleh('user.edit', 'Anda tidak memiliki izin mengubah status pengguna.')) {
+            return;
+        }
+
+        if ($id === (int) auth()->id()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak dapat menonaktifkan akun Anda sendiri (anti-lockout).']);
+
             return;
         }
 

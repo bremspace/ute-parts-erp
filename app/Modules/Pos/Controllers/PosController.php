@@ -44,7 +44,8 @@ class PosController extends Controller
             $query = Produk::query()
                 ->where('is_active', true)
                 ->with(['skuVariants' => fn ($sq) => $sq->where('is_active', true), 'hargaTier'])
-                ->cariPintar($q);
+                ->cariPintar($q)
+                ->urutKetersediaanDanTerlaris($gudangId, $cabangId);
 
             $pelanggan = $customerId ? Pelanggan::with('tierMembership')->find($customerId) : null;
 
@@ -82,7 +83,8 @@ class PosController extends Controller
             ->with([
                 'skuVariants' => fn ($q) => $q->where('is_active', true),
                 'hargaTier',
-            ]);
+            ])
+            ->urutKetersediaanDanTerlaris($gudangId, $cabangId);
 
         if (! empty($search)) {
             $query->cariPintar($search);
@@ -182,6 +184,11 @@ class PosController extends Controller
             'catatan' => 'nullable|string',
             'split_detail' => 'nullable|array',
         ]);
+
+        // Validasi kasbon / piutang wajib memilih pelanggan
+        if ($request->metode_bayar === 'piutang' && ! $request->pelanggan_id) {
+            return $this->error('Pelanggan wajib dipilih untuk transaksi kasbon / piutang', 422);
+        }
 
         // [T-09] Validasi sesi kas utk pembayaran tunai (blokir bila belum buka kas)
         if ($request->metode_bayar === 'tunai') {

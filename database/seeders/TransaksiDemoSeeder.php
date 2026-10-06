@@ -15,7 +15,9 @@ use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
+use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\PembayaranSupplier;
@@ -383,10 +385,14 @@ class TransaksiDemoSeeder extends Seeder
             }
 
             // Create ticket in initial state 'diterima', then transition via ServisService
+            $jenisList = JenisServis::all();
+            $jenisId = $jenisList->isNotEmpty() ? $jenisList->random()->id : null;
+
             $tiket = TiketServis::create([
                 'no_tiket' => $no,
                 'cabang_id' => $cabangId,
                 'pelanggan_id' => $member?->id,
+                'jenis_servis_id' => $jenisId,
                 'nama_pelanggan' => $member?->nama ?? 'Customer Demo',
                 'telepon_pelanggan' => $member?->telepon ?? '08000000000',
                 'jenis_hp' => 'iPhone 13 Demo',
@@ -399,6 +405,30 @@ class TransaksiDemoSeeder extends Seeder
                 'token_approval' => Str::random(64),
                 'tanggal_terima' => now()->subDays(5),
                 'teknisi_id' => $this->teknisi->id,
+            ]);
+
+            // Buat item servis (part & jasa)
+            $produkPart = Produk::first();
+            $skuPart = $produkPart?->skuVariants()->first();
+            TiketServisItem::create([
+                'tiket_servis_id' => $tiket->id,
+                'tipe' => 'part',
+                'produk_id' => $produkPart?->id,
+                'sku_variant_id' => $skuPart?->id,
+                'nama_item' => $produkPart?->nama ?? 'Sparepart Demo',
+                'qty' => 1,
+                'harga' => $produkPart?->harga_jual_retail ?? 150000,
+                'hpp' => $produkPart?->harga_beli ?? 90000,
+            ]);
+            TiketServisItem::create([
+                'tiket_servis_id' => $tiket->id,
+                'tipe' => 'jasa',
+                'produk_id' => null,
+                'sku_variant_id' => null,
+                'nama_item' => 'Jasa Pengerjaan & Kalibrasi',
+                'qty' => 1,
+                'harga' => 100000,
+                'hpp' => 0,
             ]);
 
             // Transition through state machine to desired status
@@ -448,10 +478,12 @@ class TransaksiDemoSeeder extends Seeder
         // Satu tiket selesai baru (masih dalam garansi) + status diambil
         $baru = 'DEMO-SRV-'.now()->format('Ymd').'-99';
         if (! TiketServis::where('no_tiket', $baru)->exists()) {
+            $jenisList = JenisServis::all();
             $tiket = TiketServis::create([
                 'no_tiket' => $baru,
                 'cabang_id' => $cabangId,
                 'pelanggan_id' => $member?->id,
+                'jenis_servis_id' => $jenisList->isNotEmpty() ? $jenisList->first()->id : null,
                 'nama_pelanggan' => $member?->nama ?? 'Customer Demo',
                 'telepon_pelanggan' => $member?->telepon ?? '08000000000',
                 'jenis_hp' => 'Samsung A52 Demo',
@@ -462,6 +494,29 @@ class TransaksiDemoSeeder extends Seeder
                 'token_approval' => Str::random(64),
                 'tanggal_terima' => now()->subDays(2),
                 'teknisi_id' => $this->teknisi->id,
+            ]);
+
+            $produkPart = Produk::where('kategori', 'Baterai')->first() ?? Produk::first();
+            $skuPart = $produkPart?->skuVariants()->first();
+            TiketServisItem::create([
+                'tiket_servis_id' => $tiket->id,
+                'tipe' => 'part',
+                'produk_id' => $produkPart?->id,
+                'sku_variant_id' => $skuPart?->id,
+                'nama_item' => $produkPart?->nama ?? 'Baterai Double Power',
+                'qty' => 1,
+                'harga' => $produkPart?->harga_jual_retail ?? 165000,
+                'hpp' => $produkPart?->harga_beli ?? 85000,
+            ]);
+            TiketServisItem::create([
+                'tiket_servis_id' => $tiket->id,
+                'tipe' => 'jasa',
+                'produk_id' => null,
+                'sku_variant_id' => null,
+                'nama_item' => 'Jasa Ganti Baterai',
+                'qty' => 1,
+                'harga' => 50000,
+                'hpp' => 0,
             ]);
 
             // Transition to selesai via ServisService to trigger jurnal

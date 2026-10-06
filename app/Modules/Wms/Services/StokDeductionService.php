@@ -2,6 +2,8 @@
 
 namespace App\Modules\Wms\Services;
 
+use App\Modules\Omnichannel\Models\ChannelOrder;
+use App\Modules\Omnichannel\Services\ChannelSyncService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
@@ -125,6 +127,14 @@ class StokDeductionService
             'terjadi_at' => now(),
         ]);
 
+        // Auto-sync stok ke marketplace omnichannel (anti oversell race condition)
+        if ($referensiTipe !== ChannelOrder::class) {
+            try {
+                app(ChannelSyncService::class)->dispatchSyncStok($produkId, $stok->sku_variant_id);
+            } catch (\Throwable) {
+            }
+        }
+
         return $stok;
     }
 
@@ -202,6 +212,12 @@ class StokDeductionService
             'referensi_id' => $referensiId,
             'terjadi_at' => now(),
         ]);
+
+        // Auto-sync stok ke marketplace omnichannel
+        try {
+            app(ChannelSyncService::class)->dispatchSyncStok($produkId, $stok->sku_variant_id);
+        } catch (\Throwable) {
+        }
 
         return $stok;
     }

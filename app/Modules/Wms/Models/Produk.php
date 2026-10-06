@@ -4,6 +4,7 @@ namespace App\Modules\Wms\Models;
 
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\HargaTier;
+use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -141,6 +142,11 @@ class Produk extends Model
     public function nomorSeris(): HasMany
     {
         return $this->hasMany(NomorSeri::class);
+    }
+
+    public function transaksiItems(): HasMany
+    {
+        return $this->hasMany(TransaksiItem::class);
     }
 
     /**
@@ -284,5 +290,41 @@ class Produk extends Model
                     ->orWhere('model_kompatibel', 'like', "%{$term}%");
             }
         });
+    }
+
+    /**
+     * Urutkan produk berdasarkan ketersediaan stok (tersedia > habis) dan terlaris (total terjual terbanyak).
+     * Memudahkan kasir menemukan fast-moving item yang ready stock dan membantu pelanggan toko online.
+     */
+    public function scopeUrutKetersediaanDanTerlaris($query, ?int $gudangId = null, ?int $cabangId = null)
+    {
+        $stokSubquery = StokItem::query()
+            ->selectRaw('COALESCE(SUM(stok_items.jumlah), 0)')
+            ->whereColumn('stok_items.produk_id', 'produk.id');
+
+        if ($gudangId) {
+            $stokSubquery->where('stok_items.gudang_id', $gudangId);
+        } elseif ($cabangId) {
+            $stokSubquery->whereIn('stok_items.gudang_id', function ($gq) use ($cabangId) {
+                $gq->select('id')->from('gudang')->where('cabang_id', $cabangId);
+            });
+        }
+
+        $terjualSubquery = TransaksiItem::query()
+            ->selectRaw('COALESCE(SUM(transaksi_item.jumlah), 0)')
+            ->whereColumn('transaksi_item.produk_id', 'produk.id');
+
+        if (empty($query->getQuery()->columns)) {
+            $query->select('produk.*');
+        }
+
+        $query->selectSub($stokSubquery, 'stok_katalog')
+            ->selectSub($terjualSubquery, 'total_terjual');
+
+        return $query
+            ->orderByRaw('CASE WHEN ('.$stokSubquery->toSql().') > 0 THEN 1 ELSE 0 END DESC', $stokSubquery->getBindings())
+            ->orderByDesc('total_terjual')
+            ->orderByDesc('stok_katalog')
+            ->orderBy('produk.nama', 'asc');
     }
 }

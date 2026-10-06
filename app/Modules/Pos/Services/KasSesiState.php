@@ -116,20 +116,26 @@ class KasSesiState
             throw new \Exception('Tidak bisa menggunakan Kas Laci sebagai sumber dana');
         }
 
-        // [KAS-LACI] Balance-sufficiency check
-        // Bila modul akunting ada dan akun sudah memiliki mutasi jurnal, saldo harus cukup
-        if ($saldoAwal > 0 && $this->tableExists('jurnal_akuntansi_lines')) {
-            $hasMutasi = DB::table('jurnal_akuntansi_lines')
+        // [KAS-LACI] Balance-sufficiency check (scoped per cabang)
+        // Bila modul akunting ada dan akun sudah memiliki mutasi jurnal pada cabang ini, saldo harus cukup
+        if ($saldoAwal > 0 && $this->tableExists('jurnal_akuntansi')) {
+            $hasMutasi = DB::table('jurnal_akuntansi')
                 ->where('akun_coa_id', $akunSumber->id)
+                ->where('cabang_id', $cabangId)
                 ->exists();
 
             if ($hasMutasi) {
-                $saldoSumber = AkunCOA::withSaldo()->where('id', $akunSumber->id)->first();
-                $saldo = $saldoSumber->saldo_normal === 'debit'
-                    ? ($saldoSumber->saldo_debit ?? 0) - ($saldoSumber->saldo_kredit ?? 0)
-                    : ($saldoSumber->saldo_kredit ?? 0) - ($saldoSumber->saldo_debit ?? 0);
+                $saldoQuery = DB::table('jurnal_akuntansi')
+                    ->where('akun_coa_id', $akunSumber->id)
+                    ->where('cabang_id', $cabangId);
+                $debit = (float) $saldoQuery->sum('debit');
+                $kredit = (float) $saldoQuery->sum('kredit');
+                $saldo = $akunSumber->saldo_normal === 'debit'
+                    ? $debit - $kredit
+                    : $kredit - $debit;
 
-                if ($saldo < $saldoAwal) {
+                // Hanya validasi jika saldo akun tercatat positif tapi tidak mencukupi saldo awal
+                if ($saldo > 0 && $saldo < $saldoAwal) {
                     throw new \Exception(
                         "Sumber dana ({$akunSumber->nama}) tidak cukup: saldo Rp ".number_format($saldo, 0, ',', '.').
                         ', dibutuhkan Rp '.number_format($saldoAwal, 0, ',', '.')
@@ -157,7 +163,7 @@ class KasSesiState
             ]);
 
             // [KAS-LACI] Jurnal: D Kas Laci (110-04) / C {sumber dana} — dana berpindah ke laci
-            $this->postJurnalKas($cabangId, $saldoAwal, "Buka kas sesi #{$id} — sumber: {$akunSumberKode}", $akunSumberKode);
+            $this->postJurnalKas($cabangId, $saldoAwal, "Buka kas sesi #{$id} — sumber: {$akunSumberKode}", $akunSumberKode, $id, $userId);
 
             return $id;
         });
@@ -240,7 +246,7 @@ class KasSesiState
                 ]);
 
                 // Deposit-back: D {sumber} / C Kas Laci (laci → sumber)
-                $this->postJurnalDepositBack($cabangId, $saldoFisik, "Tutup kas sesi #{$sesi->id} — deposit ke {$akunSumberKode}", $akunSumberKode);
+                $this->postJurnalDepositBack($cabangId, $saldoFisik, "Tutup kas sesi #{$sesi->id} — deposit ke {$akunSumberKode}", $akunSumberKode, $sesi->id, $sesi->user_id);
 
                 $this->saranClockOut($sesi->user_id);
 
@@ -301,7 +307,7 @@ class KasSesiState
      * [KAS-LACI] Jurnal buka kas: D Kas Laci (110-04) / C {sumber dana}.
      * Dana berpindah dari sumber (Kas Besar/Bank/dll) ke laci kasir.
      */
-    private function postJurnalKas(int $cabangId, float $nominal, string $deskripsi, string $akunSumberKode = '110-01'): void
+    private function postJurnalKas(int $cabangId, float $nominal, string $deskripsi, string $akunSumberKode = '110-01', ?int $sesiId = null, ?int $userId = null): void
     {
         if ($nominal <= 0) {
             return;
@@ -327,7 +333,9 @@ class KasSesiState
                 ],
                 $deskripsi,
                 $cabangId,
-                auth()->id()
+                $userId ?? auth()->id(),
+                'kas_sesi',
+                $sesiId
             );
         } catch (\Throwable $e) {
             Log::error('Jurnal kas sesi gagal — sesi kas dibatalkan (fail-closed)', [
@@ -344,7 +352,7 @@ class KasSesiState
      * [KAS-LACI] Jurnal selisih kas pada Kas Laci (110-04) / Selisih Kas (520-07).
      * Public: dipanggil dari ApprovalService::selesaikanEntity saat disetujui.
      */
-    public function postJurnalSelisih(int $cabangId, float $selisih, string $deskripsi): void
+    public function postJurnalSelisih(int $cabangId, float $selisih, string $deskripsi, ?int $sesiId = null, ?int $userId = null): void
     {
         if (! $this->tableExists($this->jurnalTable)) {
             return;
@@ -371,7 +379,9 @@ class KasSesiState
                     ],
                 $deskripsi,
                 $cabangId,
-                auth()->id()
+                $userId ?? auth()->id(),
+                'kas_sesi',
+                $sesiId
             );
         } catch (\Throwable $e) {
             Log::error('Jurnal selisih kas gagal — sesi kas TIDAK ditutup (fail-closed)', [
@@ -388,7 +398,7 @@ class KasSesiState
      * [KAS-LACI] Jurnal deposit-back: D {sumber} / C Kas Laci (110-04).
      * Dana berpindah dari laci kembali ke sumber saat tutup kas.
      */
-    private function postJurnalDepositBack(int $cabangId, float $nominal, string $deskripsi, string $akunSumberKode = '110-01'): void
+    private function postJurnalDepositBack(int $cabangId, float $nominal, string $deskripsi, string $akunSumberKode = '110-01', ?int $sesiId = null, ?int $userId = null): void
     {
         if ($nominal <= 0) {
             return;
@@ -414,7 +424,9 @@ class KasSesiState
                 ],
                 $deskripsi,
                 $cabangId,
-                auth()->id()
+                $userId ?? auth()->id(),
+                'kas_sesi',
+                $sesiId
             );
         } catch (\Throwable $e) {
             Log::error('Jurnal deposit-back gagal', [
@@ -443,10 +455,10 @@ class KasSesiState
 
         DB::transaction(function () use ($sesi, $cabangId, $akunSumberKode) {
             if (abs((float) $sesi->selisih) > 0.01) {
-                $this->postJurnalSelisih($cabangId, (float) $sesi->selisih, "Selisih kas sesi #{$sesi->id} (disetujui)");
+                $this->postJurnalSelisih($cabangId, (float) $sesi->selisih, "Selisih kas sesi #{$sesi->id} (disetujui)", $sesi->id, $sesi->user_id);
             }
 
-            $this->postJurnalDepositBack($cabangId, (float) $sesi->saldo_akhir_fisik, "Tutup kas sesi #{$sesi->id} — deposit ke {$akunSumberKode}", $akunSumberKode);
+            $this->postJurnalDepositBack($cabangId, (float) $sesi->saldo_akhir_fisik, "Tutup kas sesi #{$sesi->id} — deposit ke {$akunSumberKode}", $akunSumberKode, $sesi->id, $sesi->user_id);
 
             DB::table($this->sesiTable)->where('id', $sesi->id)->update([
                 'status' => 'tutup',
@@ -536,16 +548,6 @@ class KasSesiState
                     ['akun_kode' => '110-04', 'debit' => 0, 'kredit' => $nominal],
                 ];
 
-            $jurnalService->post(
-                $noJurnal,
-                now(),
-                'kas',
-                $lines,
-                $deskripsiJurnal,
-                $cabangId,
-                $userId
-            );
-
             $mutasiId = DB::table('kas_mutasi_laci')->insertGetId([
                 'kas_sesi_id' => $sesi->id,
                 'cabang_id' => $cabangId,
@@ -558,6 +560,18 @@ class KasSesiState
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            $jurnalService->post(
+                $noJurnal,
+                now(),
+                'kas',
+                $lines,
+                $deskripsiJurnal,
+                $cabangId,
+                $userId,
+                'kas_mutasi_laci',
+                $mutasiId
+            );
 
             return [
                 'id' => $mutasiId,

@@ -3,6 +3,162 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-05 — Perbaikan Bug & Hardening Menu Approval Inbox (`approval-inbox.blade.php`) ✅
+
+- **Penyebab Utama & Solusi Error `format() on null`:**
+  - Baris 128 pada `resources/views/modules/workflow/livewire/approval-inbox.blade.php` memanggil `$request->actioned_at->format('d/m/Y H:i')` tanpa operator null-safe.
+  - Pada entitas approval yang statusnya bukan `pending` (seperti `disetujui` atau `ditolak`) namun `actioned_at` belum terisi/bernilai null (misal dari seeding, update manual, atau status migrasi), pemanggilan langsung tersebut memicu fatal error `Call to a member function format() on null`.
+  - Diperbaiki menggunakan null-safe operator `{{ $request->actioned_at?->format('d/m/Y H:i') ?? '-' }}` dan `{{ $request->created_at?->format('d/m/Y H:i') ?? '-' }}`.
+  - Ditambahkan penampil nama aktor penyetuju/penolak (`oleh {{ $request->actionedBy->name }}`) dan penampil catatan/alasan penolakan (`💬 {{ $request->catatan }}`).
+- **Hardening Model & Komponen Livewire (`ApprovalRequest`, `ApprovalInbox`):**
+  - Menambahkan model event lifecycle `booted()` pada `ApprovalRequest` sehingga bila status disimpan dengan nilai selain `pending` dan `actioned_at` masih `null`, sistem otomatis mengisi `actioned_at = now()`.
+  - Melakukan eager loading `actionedBy` di `ApprovalInbox` (`ApprovalRequest::with(['rule', 'requestedBy', 'actionedBy'])`) untuk mencegah potensi query N+1.
+  - Memperbaiki parsing error `ValidationException` pada `approveRequest` dan `rejectRequest` agar menampilkan pesan detail spesifik bukan teks generik *"The given data was invalid."*.
+  - Menambahkan invalidasi cache badge sidebar (`backoffice-approval-badge-*`) saat request disetujui atau ditolak sehingga badge jumlah approval di sidebar langsung ter-update seketika.
+  - Memperbaiki row legacy pada database staging yang memiliki status `!= pending` dengan `actioned_at` null.
+- **Pengujian & Verifikasi:**
+  - Pembuatan test suite `tests/Feature/ApprovalInboxNullSafeTest.php` (3 tests, 8 assertions: pass).
+  - Verifikasi seluruh test suite approval & workflow (`ApprovalEngineTest`, `ProcurementApprovalTest`, dll): 52 tests pass.
+  - Linter PSR-12 Laravel Pint: pass.
+  - Asset build Vite: pass.
+
+## 2026-10-05 — Review Mendalam & Hardening Menu Pengaturan & Sistem ✅
+
+- **Perbaikan Permission & Akses Menu (`RolesAndPermissionsSeeder`, `IntegrationSeeder`, Migrasi DB):**
+  - Mendaftarkan permission `kelola-sesi` yang sebelumnya absen dari seeder dan tabel permissions sehingga submenu *Sesi Perangkat* (`/app/keamanan/sesi`) tidak dapat diakses dan route melempar 403.
+  - Membuat migrasi `2026_10_05_030000_ensure_kelola_sesi_permission.php` yang otomatis memastikan permission `kelola-sesi` aktif dan diberikan ke role `super-admin`, `owner`, dan `admin-toko`.
+- **Hardening Livewire & Lifecycle Sesi (`SessionManagementPage`, `SessionManagementService`):**
+  - Memperbaiki fatal error Livewire 3: menghapus pemanggilan `$this->emitSelf('deviceLoggedOut')` yang tidak didukung dan menambahkan trait `Livewire\WithPagination` agar paginasi perangkat berfungsi mulus.
+  - Memperbaiki logika `logoutAll()` agar mengakhiri seluruh sesi perangkat aktif lainnya tanpa mematikan sesi perangkat aktif yang sedang digunakan saat itu.
+  - Mengintegrasikan pencatatan sesi perangkat otomatis saat login web backoffice (`routes/web.php` POST `/app/login`), verifikasi 2FA (`TwoFactorChallengeController`), dan API (`AuthController::login`), serta menandai sesi nonaktif saat logout (`AuthenticatedSessionController::destroy`).
+- **Guardrail Anti-Lockout & Optimasi Query (`SettingsRbac.php`):**
+  - Mencegah pengguna yang sedang login menonaktifkan akun sendiri atau mencabut role super-admin miliknya pada aksi `toggleUserActive()` dan `saveUser()`.
+  - Mencegah pengosongan permission pada role `super-admin` dan `owner` di `saveEditRolePermissions()`.
+  - Mengoptimalkan `getRolesProperty()` dengan eager loading `with('permissions')` untuk mengeliminasi query N+1 pada render matriks role.
+  - Memperbaiki komponen `SupplierScoreTable.php` dari `emitSelf` ke `dispatch`.
+- **Pengujian & Verifikasi:**
+  - Pembuatan test suite `tests/Feature/PengaturanSistemIntegrationTest.php` (4 tests, 23 assertions: pass).
+  - Verifikasi seluruh test suite keamanan & RBAC (`SessionManagementTest`, `CabangRbacEnforcementTest`): 100% pass.
+  - Linter PSR-12 Laravel Pint: pass.
+
+## 2026-10-05 — Optimalisasi Modul Reseller & Komisi (Dual-Flow Payout & Scoping) ✅
+
+- **Pemisahan Alur Payout Komisi (Dual-Flow Engine):**
+  - Mengeliminasi bug double-counting akuntansi pada `KomisiService::prosesApproval()`:
+    - **Komisi Karyawan (Internal)**: Saat disetujui, hanya berstatus `disetujui` dan dicatat ke log audit. TIDAK memposting jurnal `510-01/210-03` ataupun entri `Utang` fiktif, melainkan ditarik ke slip gaji Payroll bulanan dan dijurnal terpadu saat finalisasi payroll (`520-09` Beban Komisi Teknisi / `210-02` Hutang Gaji).
+    - **Komisi Reseller (Eksternal)**: Saat disetujui, memposting jurnal beban komisi `510-01` vs utang komisi `210-03` dan membuat baris `Utang` dagang ke partner/pelanggan terkait.
+  - Perbaikan `generateNoJurnal`: penambahan `$cabangId` wajib pada nomor jurnal komisi agar counter nomor jurnal unik per cabang dan tidak bentrok antar cabang.
+- **Model & Dashboard Enhancement (`Komisi`, `ResellerDashboard`, `ResellerController`):**
+  - Penambahan relasi `karyawan()` dan helper accessor `nama_penerima` & `referensi_doc` pada model `Komisi`.
+  - Filter tipe aktor (`reseller` vs `karyawan`) pada `ResellerController::indexKomisi()` dan `ResellerDashboard`.
+  - Tampilan tabel komisi menampilkan nama penerima akurat (bukan hanya pelanggan), badge pembeda sumber (Reseller Mitra vs Karyawan/Payroll), serta referensi dokumen terkait (Transaksi / Tiket Servis / Lead CRM).
+- **Integrasi Navigasi & Domain CRM (`layouts/backoffice.blade.php`, `crm-dashboard.blade.php`, `routes/web.php`):**
+  - Mengelompokkan menu **Mitra & Komisi Reseller** ke dalam submenu **Pelanggan & CRM** di sidebar backoffice (`/app/reseller` tetap dipertahankan dengan alias `/app/crm/reseller`).
+  - Menambahkan shortcut tombol *"🤝 Kelola Mitra & Komisi &rarr;"* pada toolbar CRM Dashboard.
+  - Memastikan state active dropdown accordion Alpine.js pada sidebar otomatis expand ke grup CRM saat user membuka halaman Reseller.
+- **Pengujian & Verifikasi:**
+  - Pembuatan test suite `tests/Feature/KomisiApprovalDualFlowTest.php` (3 test, 19 assertions: pass).
+  - Verifikasi kompatibilitas regression `KomisiMultiAktorTest` dan `CrossDomainGuardTest` (100% pass).
+
+## 2026-10-05 — Optimalisasi Modul Omnichannel & Kesiapan Integrasi Shopee Open API v2 ✅
+
+- **Arsitektur Shopee Open API v2 (`ShopeeAdapter`):**
+  - Implementasi URL Query HMAC-SHA256 signature sesuai spesifikasi resmi Shopee v2 (Public vs Shop APIs).
+  - Alur otorisasi toko OAuth 2.0: `getAuthUrl` (`/api/v2/shop/auth_partner`), `handleAuthCallback` (`/api/v2/auth/token/get`), `refreshAccessToken` (`/api/v2/auth/access_token/get`).
+  - Update stok & harga v2: `pushStock` (`/api/v2/product/update_stock`) mendukung payload bertingkat `item_id`, `model_id`, `seller_stock`.
+  - Fetch produk & variasi: `fetchProducts` (`/api/v2/product/get_item_list` + `get_item_base_info` + `get_model_list`).
+  - Verifikasi signature webhook notifikasi Shopee: `verifyWebhookSignature` via header `Authorization` HMAC-SHA256.
+- **Skema Database & Mapping Varian Produk:**
+  - Migrasi `2026_10_05_020000_add_variant_columns_to_channel_product_mapping`: tambah `sku_variant_id` (relasi `sku_variants`) dan `channel_model_id` (string variasi Shopee).
+  - Update `ChannelProductMapping` & `Channel` model (helper `isTokenExpired`, `shouldRefreshToken`).
+- **Orkestrasi Sinkronisasi & Anti Oversell (`ChannelSyncService` & `PushStockToChannelJob`):**
+  - Pembuatan `PushStockToChannelJob` (`ShouldQueue`, `ShouldBeUnique` per SKU) untuk eksekusi asinkron di database queue tanpa membebani request lifecycle (1GB RAM constraint).
+  - Integrasi hook otomatis mutasi stok di `StokDeductionService` (`kurangi()` & `kembalikan()`): mutasi stok kasir POS / gudang langsung memicu update stok ke channel aktif.
+  - Ingestion order masuk (`prosesOrderMasuk`): memotong stok gudang lokal secara idempoten, membuat baris `Transaksi` penjualan sumber channel, dan posting jurnal beban admin marketplace saat selesai.
+  - Refresh token terjadwal: task `refreshExpiredTokens` didaftarkan di scheduler Laravel setiap 2 jam.
+- **UI & Command Center (`OmnichannelCommandCenter`):**
+  - Tombol Otorisasi OAuth langsung ke Shopee Seller Center.
+  - Fitur "Auto-Match by SKU" untuk memetakan otomatis katalog lokal ke etalase Shopee.
+  - Kolom varian dan model ID pada tabel mapping produk.
+- **Pengujian & Verifikasi:**
+  - `tests/Feature/OmnichannelShopeeIntegrationTest.php` (8 test, 24 assertion pass): otorisasi, refresh token, webhook signature, push stok varian, order deduction idempotency, warehouse mutation sync.
+  - Seluruh test regression (`Nplus1P2Test`, `CrossDomainGuardTest`) 100% pass.
+
+
+## 2026-10-04 — Sistem Kecerdasan Diagnosa Neraca Otomatis & Fitur Matching Kas Real vs Aplikasi ✅
+
+- **Manajemen Neraca Tak Seimbang & Diagnosa Cerdas Otomatis (`DiagnosaNeracaService`):**
+  - Mesin diagnosa multi-modul yang memindai siklus transaksi:
+    1. Integritas Jurnal: Verifikasi double-entry (`debit == kredit`), akun COA terhapus/yatim.
+    2. Master COA: Deteksi tipe akun tidak baku (`aset`, `kewajiban`, `ekuitas`, `pendapatan`, `beban`).
+    3. POS Kasir: Transaksi selesai tanpa jurnal penjualan/kas.
+    4. Tiket Servis: Unit servis selesai tanpa jurnal pendapatan jasa/sparepart/piutang.
+    5. WMS / Pengadaan: Purchase order dan selisih stok opname fisik tanpa jurnal.
+    6. HR & Payroll: Slip periode berstatus final tanpa posting beban/utang gaji.
+    7. Kas Sesi Kasir: Sesi tutup dengan selisih fisik belum dibukukan.
+    8. Matching Kas: Selisih fisik kas vs buku besar belum disesuaikan.
+  - Perbaikan query audit transaksi POS & Servis:
+    - Menghapus `whereNull('deleted_at')` (tabel `transaksi` non-SoftDeletes).
+    - Memperluas pengecekan `referensi_tipe` agar mencakup FQCN model (`App\Modules\Pos\Models\Transaksi`, `App\Modules\Servis\Models\TiketServis`, `App\Modules\Wms\Models\PurchaseOrder`, `App\Modules\Wms\Models\StokOpname`) dan alias string pendek (`transaksi`, `tiket_servis`, dll).
+  - Ringkasan distribusi temuan & dampak nominal per departemen: Finance/Accounting, Kasir/POS, Service Advisor, Staff Gudang/WMS, HR/Payroll.
+  - Skor kesehatan akuntansi (0 - 100%) dan kesimpulan naratif audit cerdas.
+  - Tombol aksi otomatis perbaikan (*one-click auto-fix*) untuk menyeimbangkan nomor jurnal timpang atau membukukan selisih kas.
+- **Fitur Matching Kas Real vs Aplikasi (`KasMatching`):**
+  - Migration & Model `kas_matching` dengan audit trail aktivitas Spatie dan scope cabang.
+  - Tab & Modal "Matching Kas" di `/app/akunting`:
+    - Ringkasan saldo seluruh akun Kas & Bank aktif dari Buku Besar (GL) sistem.
+    - Modal opname kas: Pilihan akun, tanggal cut-off, toggle hitung pecahan uang kertas/logam, hitung live selisih nominal.
+    - Riwayat pencocokan kas fisik vs sistem beserta status (Cocok, Selisih, Disesuaikan).
+    - Posting jurnal penyesuaian selisih kas otomatis (`520-07` Beban Selisih Kas atau `430-01` Pendapatan Lain-lain vs Akun Kas).
+- **Pengujian & Verifikasi:**
+  - `tests/Feature/DiagnosaNeracaDanMatchingKasTest.php`: 3 passed, 22 assertions.
+  - `php artisan ute:rekonsiliasi`: 0 anomali across 9 categories (100% bersih, exit code 0).
+  - Code style: `./vendor/bin/pint` clean.
+
+## 2026-10-03 — Optimasi Penggajian (Payroll), Master Kompensasi Karyawan, dan Validasi Menyeluruh Akuntansi ✅
+
+- **Sumber Data & Konfigurasi Penggajian Terpadu:**
+  - Menghubungkan seluruh sumber komponen gaji ke antarmuka web di `/app/hr/payroll`:
+    - Gaji Pokok: Tabel `karyawan` (`gaji_pokok`).
+    - Tunjangan, Potongan, dan Bonus/Insentif Tetap: Tabel `karyawan_komponen_gaji` (`nominal_bulanan`, `is_aktif`).
+    - Komisi Teknisi: Dari tiket servis berstatus `selesai` (`tiket_servis`) dan aturan di `komisi_teknisi_rules`.
+    - Komisi Internal / Multi-Aktor: Dari engine tabel `komisi` berdasarkan rule di `komisi_skema` (`/app/hr/komisi-skema`).
+    - Potongan Disiplin & Absensi: Otomatis dihitung oleh `AbsensiService::potonganAbsen()` dari log kehadiran (`absensi_logs`) di `/app/hr/absensi`.
+- **UI Master Kompensasi Karyawan di PayrollPage:**
+  - Menambahkan tab **"Pengaturan Gaji & Komponen Karyawan"** di `/app/hr/payroll`:
+    - Daftar master karyawan beserta NIK, Nama, Jabatan, Cabang, Gaji Pokok, Tunjangan Aktif, Potongan Aktif, Estimasi Net Gaji, dan Status.
+    - Modal interaktif **"Pengaturan Kompensasi"**: edit Gaji Pokok per karyawan, tambah/hapus tunjangan, potongan, atau bonus (misal Uang Makan, Transport, BPJS, Kasbon), serta toggle aktif/nonaktif.
+- **UI Rincian Slip Gaji Karyawan:**
+  - Menambahkan modal pop-up **"Rincian Slip Gaji"** yang menampilkan rincian terperinci: Gaji Pokok, Tunjangan, Komisi Teknisi/Internal, Potongan (termasuk rincian potongan absensi), Total Take-Home Pay, dan verifikasi nomor jurnal posting GL.
+- **Perbaikan Bug Kalkulasi & Tanggal Payroll:**
+  - Mengoreksi penanganan string tanggal di `PayrollService::getOrCreatePeriode()` dan `hitungKomisiTeknisi()` dari `substr($periode.'-01', 0, 7)` menjadi format valid `Y-m-d` (`$periode.'-01'`).
+  - Menambahkan dukungan komponen tipe `bonus` pada `PayrollService::hitungTunjangan()` (`whereIn('tipe', ['tunjangan', 'bonus'])`).
+  - Menerapkan batas aman `max(0, $totalGaji)` pada `hitungKaryawan()` untuk mencegah nilai gaji negatif jika potongan melebihi penerimaan.
+- **Verifikasi:**
+  - `php artisan test tests/Feature/PayrollPageTest.php` passed (3 tests, 20 assertions).
+  - `php artisan test --filter=Payroll` passed (25 tests, 90 assertions).
+  - `php artisan ute:rekonsiliasi`: 0 anomali across 9 categories (100% bersih).
+
+## 2026-10-03 — Perbaikan Menyeluruh Manajemen Akuntansi, Jurnal Double-Entry, dan Rekonsiliasi Audit Trail ✅
+
+Audit mendalam dan sinkronisasi menyeluruh pada sistem akuntansi, subledger, dan audit trail Ute Parts ERP:
+- **JurnalService & Payroll:**
+  - Menambahkan sumber `'payroll-bayar'` ke `JurnalService::SUMBER_VALID` untuk mencegah exception validasi sumber pada pelunasan gaji.
+  - Memperbaiki kalkulasi posting jurnal payroll di `PayrollService::approvePayroll()`: memisahkan gaji pokok (`520-01`) dan komisi (`520-09`) agar tidak double-counting di GL, serta menyeimbangkan akun Utang Gaji (`210-02`) saat pelunasan (`bayarPayroll`).
+- **Resolusi Konflik COA 520-08:**
+  - Mengembalikan `520-08` untuk 'Selisih Stok (Opname)' (sesuai migrasi WMS & test opname) dan mendaftarkan `520-09` untuk 'Beban Komisi Teknisi' di `AkunCoaSeeder` serta alur HR.
+- **Kas Sesi & Kas Laci POS:**
+  - Mengoreksi pengecekan tabel `jurnal_akuntansi_lines` menjadi `jurnal_akuntansi` dan menambahkan scoping saldo per `cabang_id` di `KasSesiState::bukaKas()`.
+  - Mengaitkan `referensi_tipe: 'kas_sesi'` / `'kas_mutasi_laci'` dan `referensi_id` pada seluruh posting jurnal kas laci (`postJurnalKas`, `postJurnalSelisih`, `postJurnalDepositBack`, `catatMutasiLaci`) untuk menghilangkan jurnal tanpa referensi audit.
+- **Sinkronisasi Subledger Piutang & Transaksi POS Servis:**
+  - Menghubungkan pembuatan subledger `Piutang` saat tiket servis berstatus `selesai` (`onSelesai`) dan pelunasannya saat pembayaran kasir POS (`bayar()`).
+  - Mengaitkan transaksi kasir POS servis dengan tiket servis pada deskripsi jurnal pelunasan dan mengecualikan transaksi bertiket servis dari anomali tanpa jurnal di `RekonsiliasiAkunting`.
+- **Rekonsiliasi Audit Trail (php artisan ute:rekonsiliasi):**
+  - Mengoreksi deteksi nomor jurnal duplikat agar mengacu pada `jurnal_header` per cabang, bukan baris debit/kredit double-entry.
+  - Mem-backfill referensi dan user_id pada jurnal demo historis di staging MySQL.
+  - Melengkapi pasangan pergerakan `stock_mutation_log` untuk transaksi demo stok.
+  - Hasil audit `php artisan ute:rekonsiliasi`: **0 ANOMALI (100% BERSIH)** pada semua 9 kategori (Jurnal, Transaksi, PO, Payroll, Opname, Piutang/Utang, Stok Trail, Audit, Migrasi).
+
 ## 2026-09-28 — Refactor Navigasi Tab Horizontal & Responsivitas Mobile Seluruh Modul ✅
 
 Refactor menyeluruh pada sistem navigasi tab dan button action bar di semua modul dan sub-modul (WMS, RBAC/Pengaturan, Akunting, Reseller, Omnichannel, Marketplace Customer Account, HR, CRM, Report Builder, Drill Down, Workflow Approval, POS, dan Dashboard) untuk mencegah tab stacking, overcrowding, dan overlap pada layar sentuh mobile/tablet:

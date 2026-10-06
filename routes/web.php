@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
+use App\Modules\Akunting\Controllers\AkuntingController;
 use App\Modules\Akunting\Livewire\AkuntingDashboard;
 use App\Modules\Akunting\Livewire\AsetRegister;
 use App\Modules\Akunting\Livewire\LaporanPajak;
@@ -27,6 +28,7 @@ use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use App\Modules\Rbac\Livewire\SessionManagementPage;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\SessionManagementService;
 use App\Modules\Report\Livewire\DrillDownViewer;
 use App\Modules\Report\Livewire\ReportBuilder;
 use App\Modules\Reseller\Livewire\ResellerDashboard;
@@ -288,6 +290,19 @@ Route::post('/app/login', function (Request $request) {
         ]);
     }
 
+    // [F3-4] Catat sesi perangkat aktif
+    $deviceToken = (string) Str::uuid();
+    $userAgent = $request->userAgent() ?? '';
+    $deviceName = $userAgent ? Str::limit($userAgent, 40) : 'Web Browser';
+    app(SessionManagementService::class)->registerDevice(
+        auth()->id(),
+        $deviceName,
+        $deviceToken,
+        $request->ip(),
+        $userAgent
+    );
+    session(['device_token' => $deviceToken]);
+
     return redirect()->intended('/app/dashboard');
 })->middleware('throttle:10,1')->name('login.post');
 
@@ -355,6 +370,7 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
 
     // Reseller & Komisi Screen — RBAC: permission reseller.view
     Route::get('/reseller', ResellerDashboard::class)->name('reseller')->middleware('permission:reseller.view');
+    Route::get('/crm/reseller', fn () => redirect()->route('reseller'))->name('crm.reseller')->middleware('permission:reseller.view');
 
     // Akunting & Keuangan Screen
     // [B-10a / P0-2] sebelumnya hanya `auth` (grup parent) → Livewire bisa post
@@ -380,6 +396,8 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
 
     // Omnichannel Command Center Screen — RBAC: permission omnichannel.view
     Route::get('/omnichannel', OmnichannelCommandCenter::class)->name('omnichannel')->middleware('permission:omnichannel.view');
+    Route::get('/omnichannel/channels/{id}/auth-redirect', [OmnichannelController::class, 'authRedirect'])->name('omnichannel.auth.redirect')->middleware('permission:omnichannel.manage');
+    Route::get('/omnichannel/callback/{platform}', [OmnichannelController::class, 'authCallback'])->name('omnichannel.auth.callback');
 
     // Pengaturan & RBAC Screen — RBAC: permission pengaturan.manage|user.view
     Route::get('/pengaturan', SettingsRbac::class)->name('pengaturan')->middleware('permission:pengaturan.manage|user.view');
@@ -390,6 +408,9 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
     // [F2-4] BI Drill-down & Custom Report Builder
     Route::get('/laporan', ReportBuilder::class)->name('laporan')->middleware('permission:laporan.cabang');
     Route::get('/laporan/drill/{model}/{id?}', DrillDownViewer::class)->name('laporan.drill')->middleware('permission:laporan.cabang');
+    Route::get('/export/download', [AkuntingController::class, 'exportDownload'])
+        ->name('export.download')
+        ->middleware('permission:laporan.cabang');
 
     // [F2-3] Laporan Histori Nomor Seri (trace garansi) — RBAC: permission laporan.cabang (pola laporan existing)
     Route::get('/laporan/nomor-seri', LaporanNomorSeri::class)
@@ -437,4 +458,9 @@ Route::middleware('auth')->prefix('app/keamanan')->group(function () {
     Route::post('/dua-faktor/nonaktifkan', [TwoFactorSetupController::class, 'disable'])->name('two-factor.disable');
     Route::post('/dua-faktor/kode-cadangan', [TwoFactorSetupController::class, 'regenerateBackupCodes'])->name('two-factor.backup-codes');
     Route::get('/sesi', SessionManagementPage::class)->name('keamanan.sesi')->middleware('permission:kelola-sesi');
+});
+
+// Fallback web session download for export notifications
+Route::middleware(['web', 'auth', 'permission:laporan.cabang'])->group(function () {
+    Route::get('/api/akunting/export/download', [AkuntingController::class, 'exportDownload']);
 });

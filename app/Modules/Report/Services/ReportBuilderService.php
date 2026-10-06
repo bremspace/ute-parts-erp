@@ -12,6 +12,7 @@ use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Wms\Models\Brand;
@@ -22,8 +23,12 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\Rak;
+use App\Modules\Wms\Models\ReturnPembelian;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Models\StokOpname;
+use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\Supplier;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -122,6 +127,15 @@ class ReportBuilderService
         'supplier_id' => 'Supplier',
         'produk_id' => 'Produk',
         'akun_id' => 'Akun COA',
+        'akun_coa_id' => 'Akun COA',
+        'referensi_tipe' => 'Tipe Dokumen',
+        'referensi_id' => 'No Referensi',
+        'sku_variant_id' => 'Varian / SKU',
+        'jenis_servis_id' => 'Jenis Servis',
+        'nama_item' => 'Nama Item',
+        'qty' => 'Qty',
+        'hpp' => 'HPP (Rp)',
+        'harga' => 'Harga (Rp)',
         'rak_id' => 'Lokasi Rak',
         'kategori_id' => 'Kategori',
         'brand_id' => 'Brand',
@@ -158,17 +172,29 @@ class ReportBuilderService
         'metode_pembayaran' => 'Metode Pembayaran',
         'status' => 'Status',
         'catatan' => 'Catatan',
+        'catatan_admin' => 'Catatan Admin',
         'keterangan' => 'Keterangan',
         'tipe' => 'Tipe',
         'tanggal' => 'Tanggal',
+        'tanggal_terima' => 'Tanggal Terima',
+        'tanggal_selesai' => 'Tanggal Selesai',
+        'tanggal_diambil' => 'Tanggal Diambil',
         'jatuh_tempo' => 'Jatuh Tempo',
         'garansi' => 'Garansi',
         'imei' => 'IMEI',
         'tipe_device' => 'Tipe Perangkat',
+        'jenis_hp' => 'Tipe HP',
+        'seri_hp' => 'Seri HP',
+        'tipe_kunci' => 'Tipe Kunci',
+        'kunci_terenkripsi' => 'Kunci',
+        'alasan_estimasi' => 'Alasan Estimasi',
+        'token_approval' => 'Token Approval',
         'keluhan' => 'Keluhan',
         'kondisi_fisik' => 'Kondisi Fisik',
         'kelengkapan' => 'Kelengkapan',
         'nama' => 'Nama',
+        'nama_pelanggan' => 'Nama Pelanggan',
+        'telepon_pelanggan' => 'Telepon Pelanggan',
         'kode' => 'Kode',
         'sku' => 'SKU',
         'barcode' => 'Barcode',
@@ -177,9 +203,20 @@ class ReportBuilderService
         'telepon' => 'No Telepon',
         'no_hp' => 'No HP / WhatsApp',
         'email' => 'Email',
+        'jumlah_bayar' => 'Jumlah Bayar (Rp)',
+        'kembalian' => 'Kembalian (Rp)',
+        'diskon_nominal' => 'Diskon (Rp)',
+        'diskon_persen' => 'Diskon (%)',
+        'jumlah_dibayar' => 'Jumlah Dibayar (Rp)',
+        'kreditor_nama' => 'Nama Kreditor',
+        'jumlah_sebelum' => 'Jumlah Sebelum',
+        'jumlah_setelah' => 'Jumlah Setelah',
+        'sumber' => 'Sumber',
+        'deskripsi' => 'Deskripsi',
         'is_active' => 'Status Aktif',
         'shared' => 'Dibagikan Cabang',
         'created_at' => 'Waktu Dibuat',
+        'updated_at' => 'Waktu Diperbarui',
     ];
 
     /**
@@ -474,6 +511,9 @@ class ReportBuilderService
         $transaksiIds = [];
         $poIds = [];
         $tiketIds = [];
+        $skuVariantIds = [];
+        $jenisServisIds = [];
+        $refDocsByType = [];
 
         foreach ($rows as $row) {
             if (! is_array($row)) {
@@ -508,8 +548,10 @@ class ReportBuilderService
                 $produkIds[] = (int) $row['produk_id'];
             }
 
-            if (! empty($row['akun_id']) && is_numeric($row['akun_id'])) {
-                $akunIds[] = (int) $row['akun_id'];
+            foreach (['akun_id', 'akun_coa_id'] as $ak) {
+                if (! empty($row[$ak]) && is_numeric($row[$ak])) {
+                    $akunIds[] = (int) $row[$ak];
+                }
             }
 
             if (! empty($row['rak_id']) && is_numeric($row['rak_id'])) {
@@ -543,6 +585,18 @@ class ReportBuilderService
             if (! empty($row['tiket_servis_id']) && is_numeric($row['tiket_servis_id'])) {
                 $tiketIds[] = (int) $row['tiket_servis_id'];
             }
+
+            if (! empty($row['sku_variant_id']) && is_numeric($row['sku_variant_id'])) {
+                $skuVariantIds[] = (int) $row['sku_variant_id'];
+            }
+
+            if (! empty($row['jenis_servis_id']) && is_numeric($row['jenis_servis_id'])) {
+                $jenisServisIds[] = (int) $row['jenis_servis_id'];
+            }
+
+            if (! empty($row['referensi_tipe']) && ! empty($row['referensi_id']) && is_numeric($row['referensi_id'])) {
+                $refDocsByType[$row['referensi_tipe']][] = (int) $row['referensi_id'];
+            }
         }
 
         // Batch lookups
@@ -558,8 +612,8 @@ class ReportBuilderService
         })->all() : [];
         $gudangs = ! empty($gudangIds) ? Gudang::whereIn('id', array_unique($gudangIds))->pluck('nama', 'id')->all() : [];
         $suppliers = ! empty($supplierIds) ? Supplier::whereIn('id', array_unique($supplierIds))->pluck('nama', 'id')->all() : [];
-        $produks = ! empty($produkIds) ? Produk::whereIn('id', array_unique($produkIds))->pluck('nama', 'id')->all() : [];
-        $akuns = ! empty($akunIds) ? AkunCOA::whereIn('id', array_unique($akunIds))->get()->mapWithKeys(fn ($a) => [$a->id => ($a->kode ? $a->kode.' - ' : '').$a->nama])->all() : [];
+        $produks = ! empty($produkIds) ? Produk::whereIn('id', array_unique($produkIds))->get()->mapWithKeys(fn ($p) => [$p->id => $p]) : collect();
+        $akuns = ! empty($akunIds) ? AkunCOA::whereIn('id', array_unique($akunIds))->get()->mapWithKeys(fn ($a) => [$a->id => ($a->kode ? "[{$a->kode}] " : '').$a->nama])->all() : [];
         $raks = ! empty($rakIds) ? Rak::whereIn('id', array_unique($rakIds))->pluck('nama', 'id')->all() : [];
         $kategoris = ! empty($kategoriIds) ? KategoriProduk::whereIn('id', array_unique($kategoriIds))->pluck('nama', 'id')->all() : [];
         $brands = ! empty($brandIds) ? Brand::whereIn('id', array_unique($brandIds))->pluck('nama', 'id')->all() : [];
@@ -568,6 +622,56 @@ class ReportBuilderService
         $transaksis = ! empty($transaksiIds) ? Transaksi::whereIn('id', array_unique($transaksiIds))->pluck('no_transaksi', 'id')->all() : [];
         $pos = ! empty($poIds) ? PurchaseOrder::whereIn('id', array_unique($poIds))->pluck('no_po', 'id')->all() : [];
         $tikets = ! empty($tiketIds) ? TiketServis::whereIn('id', array_unique($tiketIds))->pluck('no_tiket', 'id')->all() : [];
+        $skuVariants = ! empty($skuVariantIds) ? SkuVariant::whereIn('id', array_unique($skuVariantIds))->get()->mapWithKeys(fn ($v) => [$v->id => $v]) : collect();
+        $jenisServis = ! empty($jenisServisIds) ? JenisServis::whereIn('id', array_unique($jenisServisIds))->pluck('nama', 'id')->all() : [];
+
+        // Batch lookup nomor referensi dokumen
+        $resolvedRefDocs = [];
+        foreach ($refDocsByType as $tipe => $ids) {
+            $uniqueIds = array_unique($ids);
+            if ($tipe === 'App\Modules\Pos\Models\Transaksi' || $tipe === 'Transaksi') {
+                $resolvedRefDocs[$tipe] = Transaksi::whereIn('id', $uniqueIds)->pluck('no_transaksi', 'id')->all();
+            } elseif ($tipe === 'App\Modules\Servis\Models\TiketServis' || $tipe === 'TiketServis') {
+                $resolvedRefDocs[$tipe] = TiketServis::whereIn('id', $uniqueIds)->pluck('no_tiket', 'id')->all();
+            } elseif ($tipe === 'App\Modules\Wms\Models\PurchaseOrder' || $tipe === 'PurchaseOrder') {
+                $resolvedRefDocs[$tipe] = PurchaseOrder::whereIn('id', $uniqueIds)->pluck('no_po', 'id')->all();
+            } elseif ($tipe === 'App\Modules\Wms\Models\StokOpname' || $tipe === 'StokOpname') {
+                $resolvedRefDocs[$tipe] = StokOpname::whereIn('id', $uniqueIds)->pluck('no_opname', 'id')->all();
+            } elseif ($tipe === 'App\Modules\Wms\Models\StokTransfer' || $tipe === 'StokTransfer') {
+                $resolvedRefDocs[$tipe] = StokTransfer::whereIn('id', $uniqueIds)->pluck('no_transfer', 'id')->all();
+            } elseif ($tipe === 'App\Modules\Wms\Models\ReturnPembelian' || $tipe === 'ReturnPembelian') {
+                $resolvedRefDocs[$tipe] = ReturnPembelian::whereIn('id', $uniqueIds)->pluck('no_return', 'id')->all();
+            } elseif ($tipe === 'App\Modules\Akunting\Models\Piutang' || $tipe === 'Piutang') {
+                $resolvedRefDocs[$tipe] = Piutang::whereIn('id', $uniqueIds)->pluck('no_piutang', 'id')->all();
+            } elseif ($tipe === 'App\Modules\Akunting\Models\Utang' || $tipe === 'Utang') {
+                $resolvedRefDocs[$tipe] = Utang::whereIn('id', $uniqueIds)->pluck('no_utang', 'id')->all();
+            } elseif (class_exists($tipe)) {
+                $resolvedRefDocs[$tipe] = $tipe::whereIn('id', $uniqueIds)->get()->mapWithKeys(function ($m) {
+                    $nomor = $m->no_transaksi ?? $m->no_tiket ?? $m->no_po ?? $m->no_opname ?? $m->no_transfer ?? $m->no_piutang ?? $m->no_utang ?? $m->no_jurnal ?? $m->nomor ?? null;
+
+                    return [$m->id => $nomor ?: class_basename($m)." #{$m->id}"];
+                })->all();
+            }
+        }
+
+        $refTipeMap = [
+            'App\Modules\Pos\Models\Transaksi' => 'Transaksi POS',
+            'App\Modules\Servis\Models\TiketServis' => 'Tiket Servis',
+            'App\Modules\Wms\Models\PurchaseOrder' => 'Purchase Order',
+            'App\Modules\Wms\Models\StokOpname' => 'Stok Opname',
+            'App\Modules\Wms\Models\StokTransfer' => 'Transfer Stok',
+            'App\Modules\Wms\Models\ReturnPembelian' => 'Retur Pembelian',
+            'App\Modules\Akunting\Models\Piutang' => 'Piutang Pelanggan',
+            'App\Modules\Akunting\Models\Utang' => 'Utang Supplier',
+            'App\Modules\Akunting\Models\JurnalAkuntansi' => 'Jurnal Akuntansi',
+            'kas_sesi' => 'Sesi Kasir',
+            'kas_mutasi_laci' => 'Mutasi Kas Laci',
+            'transaksi' => 'Transaksi POS',
+            'servis' => 'Tiket Servis',
+            'po' => 'Purchase Order',
+            'opname' => 'Stok Opname',
+            'transfer' => 'Transfer Stok',
+        ];
 
         $metodeMap = [
             'tunai' => 'Tunai',
@@ -598,6 +702,10 @@ class ReportBuilderService
             'diterima' => 'Diterima',
             'siap_diambil' => 'Siap Diambil',
             'bisa_diambil' => 'Siap Diambil',
+            'diambil' => 'Sudah Diambil',
+            'diagnosa' => 'Diagnosa',
+            'dikerjakan' => 'Sedang Dikerjakan',
+            'qc' => 'Quality Control (QC)',
             'lunas' => 'Lunas',
             'belum_lunas' => 'Belum Lunas',
         ];
@@ -605,11 +713,18 @@ class ReportBuilderService
         return array_map(function ($row) use (
             $cabangs, $users, $pelanggans, $gudangs, $suppliers,
             $produks, $akuns, $raks, $kategoris, $brands, $kualitas,
-            $tiers, $transaksis, $pos, $tikets, $metodeMap, $statusMap
+            $tiers, $transaksis, $pos, $tikets, $skuVariants, $jenisServis,
+            $resolvedRefDocs, $refTipeMap, $metodeMap, $statusMap
         ) {
             if (! is_array($row)) {
                 return $row;
             }
+
+            // Simpan raw values untuk lookup sekunder
+            $rawProdukId = $row['produk_id'] ?? null;
+            $rawSkuVariantId = $row['sku_variant_id'] ?? null;
+            $rawRefTipe = $row['referensi_tipe'] ?? null;
+            $rawRefId = $row['referensi_id'] ?? null;
 
             if (array_key_exists('cabang_id', $row)) {
                 $cid = $row['cabang_id'];
@@ -642,12 +757,34 @@ class ReportBuilderService
 
             if (array_key_exists('produk_id', $row)) {
                 $prid = $row['produk_id'];
-                $row['produk_id'] = $prid ? ($produks[$prid] ?? "Produk #{$prid}") : '-';
+                $pObj = $produks->get($prid);
+                $row['produk_id'] = $pObj ? $pObj->nama : ($prid ? "Produk #{$prid}" : '-');
             }
 
-            if (array_key_exists('akun_id', $row)) {
-                $aid = $row['akun_id'];
-                $row['akun_id'] = $aid ? ($akuns[$aid] ?? "Akun #{$aid}") : '-';
+            if (array_key_exists('sku_variant_id', $row)) {
+                $svid = $row['sku_variant_id'];
+                $svObj = $skuVariants->get($svid);
+                if ($svObj) {
+                    $varLabel = $svObj->nama_varian ?: 'Standar';
+                    if (! empty($svObj->sku)) {
+                        $varLabel .= ' ('.$svObj->sku.')';
+                    }
+                    $row['sku_variant_id'] = $varLabel;
+                } else {
+                    $row['sku_variant_id'] = $svid ? "Varian #{$svid}" : '-';
+                }
+            }
+
+            foreach (['akun_id', 'akun_coa_id'] as $ak) {
+                if (array_key_exists($ak, $row)) {
+                    $aid = $row[$ak];
+                    $row[$ak] = $aid ? ($akuns[$aid] ?? "Akun #{$aid}") : '-';
+                }
+            }
+
+            if (array_key_exists('jenis_servis_id', $row)) {
+                $jsid = $row['jenis_servis_id'];
+                $row['jenis_servis_id'] = $jsid ? ($jenisServis[$jsid] ?? "Jenis Servis #{$jsid}") : '-';
             }
 
             if (array_key_exists('rak_id', $row)) {
@@ -690,6 +827,41 @@ class ReportBuilderService
                 $row['tiket_servis_id'] = $tkid ? ($tikets[$tkid] ?? "Tiket #{$tkid}") : '-';
             }
 
+            // Referensi Tipe & Referensi ID
+            if (array_key_exists('referensi_tipe', $row)) {
+                $rt = $rawRefTipe;
+                if (! empty($rt)) {
+                    $row['referensi_tipe'] = $refTipeMap[$rt] ?? (class_exists($rt) ? class_basename($rt) : ucwords(str_replace('_', ' ', $rt)));
+                } else {
+                    $row['referensi_tipe'] = '-';
+                }
+            }
+
+            if (array_key_exists('referensi_id', $row)) {
+                $rid = $rawRefId;
+                if ($rid) {
+                    $docNo = $resolvedRefDocs[$rawRefTipe][$rid] ?? null;
+                    $row['referensi_id'] = $docNo ?: "Ref #{$rid}";
+                } else {
+                    $row['referensi_id'] = '-';
+                }
+            }
+
+            // Resolusi Barcode bila kosong
+            if (array_key_exists('barcode', $row)) {
+                $bc = trim((string) ($row['barcode'] ?? ''));
+                if ($bc === '' || $bc === '-') {
+                    $fallbackBc = null;
+                    if ($rawSkuVariantId && ($v = $skuVariants->get($rawSkuVariantId))) {
+                        $fallbackBc = $v->barcode;
+                    }
+                    if (! $fallbackBc && $rawProdukId && ($p = $produks->get($rawProdukId))) {
+                        $fallbackBc = $p->barcode;
+                    }
+                    $row['barcode'] = $fallbackBc ?: '-';
+                }
+            }
+
             // Metode Pembayaran
             foreach (['metode_bayar', 'metode_pembayaran'] as $mk) {
                 if (array_key_exists($mk, $row) && is_string($row[$mk])) {
@@ -705,6 +877,66 @@ class ReportBuilderService
 
             return $row;
         }, $rows);
+    }
+
+    /**
+     * Format baris data untuk diekspor ke berkas Excel / CSV.
+     * Menggunakan header berbahasa manusia sesuai UI/UX dan memformat tanggal, boolean,
+     * serta nominal angka secara konsisten.
+     */
+    public function formatRowsForExport(array $rows): array
+    {
+        if (empty($rows)) {
+            return [];
+        }
+
+        $formatted = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $exportRow = [];
+            foreach ($row as $key => $val) {
+                $headerLabel = self::COLUMN_LABELS[$key] ?? ucwords(str_replace('_', ' ', (string) $key));
+
+                if (is_bool($val)) {
+                    $exportRow[$headerLabel] = $val ? 'Ya' : 'Tidak';
+                } elseif (is_array($val)) {
+                    $exportRow[$headerLabel] = implode(', ', array_map('strval', $val));
+                } elseif (is_null($val) || $val === '') {
+                    $exportRow[$headerLabel] = '-';
+                } elseif (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}/', $val)) {
+                    $exportRow[$headerLabel] = date('d/m/Y H:i', strtotime($val));
+                } elseif (is_string($val) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $val)) {
+                    $exportRow[$headerLabel] = date('d/m/Y', strtotime($val));
+                } elseif (is_numeric($val)) {
+                    $keyStr = (string) $key;
+                    $bukanNominal = in_array($keyStr, ['id', 'kode', 'sku', 'barcode'])
+                        || str_ends_with($keyStr, '_id')
+                        || str_ends_with($keyStr, '_kode')
+                        || str_starts_with($keyStr, 'no_')
+                        || str_ends_with($keyStr, '_persen');
+
+                    if (! $bukanNominal && in_array($keyStr, [
+                        'debit', 'kredit', 'total_akhir', 'total_kotor', 'total_diskon', 'total_pajak',
+                        'harga_beli', 'harga_jual', 'harga_jual_retail', 'harga_satuan', 'subtotal',
+                        'nominal', 'sisa', 'estimasi_biaya', 'biaya_akhir', 'harga', 'hpp',
+                        'jumlah_bayar', 'kembalian', 'diskon_nominal', 'jumlah_dibayar',
+                    ])) {
+                        $exportRow[$headerLabel] = number_format((float) $val, 0, ',', '.');
+                    } else {
+                        $exportRow[$headerLabel] = $val;
+                    }
+                } else {
+                    $exportRow[$headerLabel] = $val;
+                }
+            }
+
+            $formatted[] = $exportRow;
+        }
+
+        return $formatted;
     }
 
     /**

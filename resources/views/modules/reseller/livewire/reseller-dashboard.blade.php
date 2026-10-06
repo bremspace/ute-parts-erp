@@ -70,16 +70,21 @@
 
     <!-- TAB: Komisi -->
     @if($activeTab === 'komisi')
-        <div class="flex items-center gap-2 mb-4">
+        <div class="flex items-center gap-2 mb-4 flex-wrap">
             <select wire:model.live="filterStatus" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium w-full sm:w-48 min-h-[44px]">
                 <option value="" class="bg-ink-900">Semua Status</option>
                 <option value="pending" class="bg-ink-900">Pending</option>
                 <option value="disetujui" class="bg-ink-900">Disetujui</option>
                 <option value="ditolak" class="bg-ink-900">Ditolak</option>
             </select>
+            <select wire:model.live="filterAktor" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium w-full sm:w-48 min-h-[44px]">
+                <option value="" class="bg-ink-900">Semua Aktor</option>
+                <option value="reseller" class="bg-ink-900">Reseller (Mitra)</option>
+                <option value="karyawan" class="bg-ink-900">Karyawan (Internal/Payroll)</option>
+            </select>
         </div>
 
-        <x-prism.data-table :headers="['', 'No. Komisi', 'Reseller', 'Transaksi', 'Jumlah Transaksi', 'Komisi', 'Status', 'Tanggal']">
+        <x-prism.data-table :headers="['', 'No. Komisi', 'Penerima Komisi', 'Tipe Aktor', 'Referensi', 'Jumlah Dasar', 'Komisi', 'Status', 'Tanggal']">
             @forelse($komisiList as $k)
                 <tr class="hover:bg-white/[0.02] transition-colors">
                     <td class="py-3.5 px-4">
@@ -88,8 +93,15 @@
                         @endif
                     </td>
                     <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $k->no_komisi }}</td>
-                    <td class="py-3.5 px-4 text-ink-200 font-medium">{{ $k->pelanggan?->nama }}</td>
-                    <td class="py-3.5 px-4 text-ink-400 text-xs">{{ $k->transaksi?->no_transaksi ?? '-' }}</td>
+                    <td class="py-3.5 px-4 text-ink-200 font-medium">{{ $k->nama_penerima }}</td>
+                    <td class="py-3.5 px-4">
+                        @if($k->aktor_tipe === 'karyawan')
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-primary/10 text-up-primary">Karyawan / Payroll</span>
+                        @else
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-accent/10 text-up-accent">Reseller Mitra</span>
+                        @endif
+                    </td>
+                    <td class="py-3.5 px-4 text-ink-400 text-xs font-mono">{{ $k->referensi_doc }}</td>
                     <td class="py-3.5 px-4 tabular-nums text-ink-200 text-xs">Rp {{ number_format($k->jumlah_transaksi, 0, ',', '.') }}</td>
                     <td class="py-3.5 px-4 tabular-nums font-bold text-up-accent">Rp {{ number_format($k->nominal_komisi, 0, ',', '.') }}</td>
                     <td class="py-3.5 px-4"><x-prism.status-pill :status="$k->status" /></td>
@@ -97,7 +109,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="py-12 text-center text-ink-400">
+                    <td colspan="9" class="py-12 text-center text-ink-400">
                         <svg class="w-10 h-10 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                         </svg>
@@ -117,7 +129,7 @@
                             <x-prism.status-pill :status="$k->status" />
                         </div>
                         <div class="flex justify-between text-xs">
-                            <span class="text-ink-300">{{ $k->pelanggan?->nama }}</span>
+                            <span class="text-ink-300">{{ $k->nama_penerima }}</span>
                             <span class="font-bold text-up-accent tabular-nums">Rp {{ number_format($k->nominal_komisi, 0, ',', '.') }}</span>
                         </div>
                     </div>

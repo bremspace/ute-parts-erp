@@ -60,6 +60,15 @@ class ApprovalRequest extends Model
         'actioned_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (ApprovalRequest $request) {
+            if ($request->status !== 'pending' && is_null($request->actioned_at)) {
+                $request->actioned_at = now();
+            }
+        });
+    }
+
     public function rule(): BelongsTo
     {
         return $this->belongsTo(ApprovalRule::class, 'approval_rule_id');

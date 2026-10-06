@@ -33,6 +33,11 @@
                     📢 Broadcast Promo
                 </x-prism.prism-button>
             @endcan
+            @can('reseller.view')
+                <a href="/app/reseller" class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-accent text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap min-h-[44px] cursor-pointer">
+                    🤝 Kelola Mitra & Komisi &rarr;
+                </a>
+            @endcan
         </div>
     </div>
 

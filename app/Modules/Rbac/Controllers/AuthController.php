@@ -4,10 +4,12 @@ namespace App\Modules\Rbac\Controllers;
 
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\SessionManagementService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -52,6 +54,19 @@ class AuthController extends Controller
             $data['cabang_id'] = $defaultCabang->id;
             $data['cabang_nama'] = $defaultCabang->nama;
         }
+
+        // [F3-4] Catat sesi perangkat
+        $deviceToken = (string) Str::uuid();
+        $userAgent = $request->userAgent() ?? '';
+        $deviceName = $userAgent ? Str::limit($userAgent, 40) : 'API Client';
+        app(SessionManagementService::class)->registerDevice(
+            $user->id,
+            $deviceName,
+            $deviceToken,
+            $request->ip(),
+            $userAgent
+        );
+        $data['device_token'] = $deviceToken;
 
         return $this->success($data, 'Login berhasil');
     }

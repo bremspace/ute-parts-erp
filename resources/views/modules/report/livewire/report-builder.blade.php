@@ -95,7 +95,7 @@
                         @if($exporting)
                             <span class="animate-pulse">Processing...</span>
                         @else
-                            Export (Queue)
+                            Export Data
                         @endif
                     </x-prism.prism-button>
                 </div>

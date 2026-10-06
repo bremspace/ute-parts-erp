@@ -2,10 +2,12 @@
 
 namespace App\Modules\Hr\Services;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KaryawanKomponenGaji;
 use App\Modules\Hr\Models\KomisiTeknisiRule;
+use App\Modules\Hr\Models\PayrollKomisiDetail;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
 use App\Modules\Reseller\Models\Komisi;
@@ -36,7 +38,12 @@ class PayrollService
     public function hitungDraft(string $periode): array
     {
         // Pastikan periode ada dulu
-        $this->getOrCreatePeriode($periode);
+        $periodeId = $this->getOrCreatePeriode($periode);
+        $periodeRecord = PayrollPeriode::find($periodeId);
+
+        if ($periodeRecord && $periodeRecord->status === PayrollPeriode::STATUS_DIBAYAR) {
+            throw new \DomainException("Periode {$periode} sudah dibayar. Tidak dapat dihitung ulang.");
+        }
 
         $karyawans = Karyawan::where('status_aktif', true)->get();
         $totalGaji = 0;
@@ -136,14 +143,23 @@ class PayrollService
         $periodeId = $this->getOrCreatePeriode($periode);
         $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
 
-        $totalGaji = $slips->sum('total_gaji');
-        $totalKomisi = $slips->sum('total_komisi');
+        $totalGaji = (float) $slips->sum('total_gaji');
+        $totalKomisi = (float) $slips->sum('total_komisi');
+        $bebanGajiPokok = max(0, $totalGaji - $totalKomisi);
 
-        // Post jurnal: debit Beban Gaji (520-01) + Beban Komisi (520-08) / kredit Hutang Gaji (210-02)
+        // Pastikan COA 520-09 ada untuk Beban Komisi Teknisi / Karyawan
+        AkunCOA::firstOrCreate(
+            ['kode' => '520-09'],
+            ['nama' => 'Beban Komisi Teknisi', 'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit', 'is_active' => true]
+        );
+
+        // Post jurnal: debit Beban Gaji (520-01) + Beban Komisi (520-09) / kredit Hutang Gaji (210-02)
+        // [AUDIT-FIX] total_gaji sudah memasukkan komisi, jadi 520-01 mencatat porsi gaji non-komisi
+        // agar tidak double-counting dan total kredit Utang Gaji persis sama dengan total_gaji.
         $lines = [
-            ['akun_kode' => '520-01', 'debit' => $totalGaji, 'kredit' => 0],
-            ['akun_kode' => '520-08', 'debit' => $totalKomisi, 'kredit' => 0],
-            ['akun_kode' => '210-02', 'debit' => 0, 'kredit' => $totalGaji + $totalKomisi],
+            ['akun_kode' => '520-01', 'debit' => $bebanGajiPokok, 'kredit' => 0],
+            ['akun_kode' => '520-09', 'debit' => $totalKomisi, 'kredit' => 0],
+            ['akun_kode' => '210-02', 'debit' => 0, 'kredit' => $totalGaji],
         ];
 
         $noJurnal = sprintf('JRL-PR-%s', $periode);
@@ -174,18 +190,23 @@ class PayrollService
      * DB::transaction, baru slip/perioda ditandai 'dibayar'. Jurnal gagal →
      * status tidak final (rollback total).
      */
-    public function bayarPayroll(string $periode): array
+    public function bayarPayroll(string $periode, string $akunKasKode = '110-01'): array
     {
         $periodeId = $this->getOrCreatePeriode($periode);
+        $periodeRecord = PayrollPeriode::find($periodeId);
 
-        return DB::transaction(function () use ($periode, $periodeId) {
-            // Jurnal pembayaran: debit Utang Gaji (210-02) / kredit Kas (110-01)
+        if ($periodeRecord && $periodeRecord->status === PayrollPeriode::STATUS_DIBAYAR) {
+            throw new \DomainException("Periode {$periode} sudah dibayar sebelumnya.");
+        }
+
+        return DB::transaction(function () use ($periode, $periodeId, $akunKasKode) {
+            // Jurnal pembayaran: debit Utang Gaji (210-02) / kredit Kas ($akunKasKode)
             $slips = PayrollSlip::where('payroll_periode_id', $periodeId)->get();
             $total = $slips->sum('total_gaji');
 
             $lines = [
                 ['akun_kode' => '210-02', 'debit' => $total, 'kredit' => 0],
-                ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => $total],
+                ['akun_kode' => $akunKasKode, 'debit' => 0, 'kredit' => $total],
             ];
 
             $noJurnal = sprintf('JRL-PR-BAYAR-%s', $periode);
@@ -206,7 +227,15 @@ class PayrollService
                 ->where('status', 'approved')
                 ->update(['status' => 'dibayar']);
 
-            PayrollPeriode::where('periode', $periode)->update(['status' => 'dibayar']);
+            PayrollPeriode::where('id', $periodeId)->update(['status' => 'dibayar']);
+
+            // Tandai komisi internal periode ini sebagai disetujui
+            $mulai = $periode.'-01 00:00:00';
+            $selesai = date('Y-m-t', strtotime($periode.'-01')).' 23:59:59';
+            Komisi::where('aktor_tipe', 'karyawan')
+                ->where('status', Komisi::STATUS_PENDING)
+                ->whereBetween('created_at', [$mulai, $selesai])
+                ->update(['status' => Komisi::STATUS_DISETUJUI]);
 
             return ['no_jurnal' => $noJurnal, 'total' => $total];
         }, 3);
@@ -224,7 +253,7 @@ class PayrollService
 
         return PayrollPeriode::create([
             'periode' => $periode,
-            'tanggal_mulai' => substr($periode.'-01', 0, 7),
+            'tanggal_mulai' => $periode.'-01',
             'tanggal_selesai' => date('Y-m-t', strtotime($periode.'-01')),
             'status' => 'draft',
         ])->id;
@@ -244,15 +273,17 @@ class PayrollService
         $tunjangan = $this->hitungTunjangan($karyawan->id);
         $potonganAbsen = app(AbsensiService::class)->potonganAbsen($karyawan->id, $periode);
         $potongan = $this->hitungPotongan($karyawan->id, $periode);
-        $komisiTeknisi = $this->hitungKomisiTeknisi($karyawan->id, $periode);
-        $komisiInternal = $this->hitungKomisiInternal($karyawan->id, $periode);
+        $resTeknisi = $this->hitungKomisiTeknisiWithDetails($karyawan, $periode);
+        $komisiTeknisi = $resTeknisi['total'];
+        $resInternal = $this->hitungKomisiInternalWithDetails($karyawan->id, $periode);
+        $komisiInternal = $resInternal['total'];
         $komisi = $komisiTeknisi + $komisiInternal;
 
-        $totalGaji = $pokok + $tunjangan - $potongan + $komisi;
+        $totalGaji = max(0, $pokok + $tunjangan - $potongan + $komisi);
 
         $periodeId = $this->getOrCreatePeriode($periode);
 
-        return PayrollSlip::updateOrCreate(
+        $slip = PayrollSlip::updateOrCreate(
             ['payroll_periode_id' => $periodeId, 'karyawan_id' => $karyawan->id],
             [
                 'gaji_pokok' => $pokok,
@@ -272,6 +303,20 @@ class PayrollService
                 ]),
             ]
         );
+
+        // Simpan rincian komisi ke payroll_komisi_detail
+        PayrollKomisiDetail::where('slip_id', $slip->id)->delete();
+        foreach (array_merge($resTeknisi['items'], $resInternal['items']) as $item) {
+            PayrollKomisiDetail::create([
+                'slip_id' => $slip->id,
+                'tiket_servis_id' => $item['tiket_id'],
+                'teknisi_id' => $karyawan->id,
+                'jenis' => $item['jenis'],
+                'nominal' => $item['nominal'],
+            ]);
+        }
+
+        return $slip;
     }
 
     /**
@@ -279,8 +324,8 @@ class PayrollService
      */
     protected function hitungTunjangan(int $karyawanId): float
     {
-        return KaryawanKomponenGaji::where('karyawan_id', $karyawanId)
-            ->where('tipe', 'tunjangan')
+        return (float) KaryawanKomponenGaji::where('karyawan_id', $karyawanId)
+            ->whereIn('tipe', ['tunjangan', 'bonus'])
             ->where('is_aktif', true)
             ->sum('nominal_bulanan');
     }
@@ -307,8 +352,17 @@ class PayrollService
     protected function hitungKomisiTeknisi(int $karyawanId, string $periode): float
     {
         $karyawan = Karyawan::find($karyawanId);
-        if (! $karyawan || $karyawan->jabatan !== 'teknisi') {
-            return 0;
+        if (! $karyawan) {
+            return 0.0;
+        }
+
+        return $this->hitungKomisiTeknisiWithDetails($karyawan, $periode)['total'];
+    }
+
+    protected function hitungKomisiTeknisiWithDetails(Karyawan $karyawan, string $periode): array
+    {
+        if ($karyawan->jabatan !== 'teknisi') {
+            return ['total' => 0.0, 'items' => []];
         }
 
         $rules = KomisiTeknisiRule::where('is_aktif', true)
@@ -319,15 +373,14 @@ class PayrollService
             ->get();
 
         $totalKomisi = 0;
-        $tanggalMulai = substr($periode.'-01', 0, 7);
+        $items = [];
+        $tanggalMulai = $periode.'-01';
         $tanggalSelesai = date('Y-m-t', strtotime($periode.'-01'));
 
         // [F3-8c] 1 tiket = 1 komisi di slip; engine menang, KomisiTeknisiRule
         // hanya utk tiket tanpa catatan engine (status pending/disetujui).
-        // Kolom komisi tdk punya trigger_tipe — tiket_servis_id NOT NULL hanya
-        // diisi utk row engine trigger tiket_servis (lihat KomisiService::catatKomisi).
         $tiketDibayarEngine = Komisi::where('aktor_tipe', 'karyawan')
-            ->where('aktor_id', $karyawanId)
+            ->where('aktor_id', $karyawan->id)
             ->whereNotNull('tiket_servis_id')
             ->whereIn('status', [Komisi::STATUS_PENDING, Komisi::STATUS_DISETUJUI])
             ->whereBetween('created_at', [$periode.'-01 00:00:00', $tanggalSelesai.' 23:59:59'])
@@ -344,15 +397,24 @@ class PayrollService
                 continue;
             }
             foreach ($rules as $rule) {
+                $nominal = 0.0;
                 if ($rule->jenis === 'per_tiket') {
-                    $totalKomisi += $rule->nominal;
+                    $nominal = (float) $rule->nominal;
                 } elseif ($rule->jenis === 'persen_nilai_servis') {
-                    $totalKomisi += ($t->estimasi_biaya ?? 0) * ($rule->persen / 100);
+                    $nominal = round((float) ($t->estimasi_biaya ?? 0) * ($rule->persen / 100), 2);
+                }
+                if ($nominal > 0) {
+                    $totalKomisi += $nominal;
+                    $items[] = [
+                        'tiket_id' => $t->id,
+                        'jenis' => 'servis',
+                        'nominal' => $nominal,
+                    ];
                 }
             }
         }
 
-        return round($totalKomisi, 2);
+        return ['total' => round($totalKomisi, 2), 'items' => $items];
     }
 
     /**
@@ -363,13 +425,33 @@ class PayrollService
      */
     protected function hitungKomisiInternal(int $karyawanId, string $periode): float
     {
+        return $this->hitungKomisiInternalWithDetails($karyawanId, $periode)['total'];
+    }
+
+    protected function hitungKomisiInternalWithDetails(int $karyawanId, string $periode): array
+    {
         $mulai = $periode.'-01';
         $selesai = date('Y-m-t', strtotime($mulai));
 
-        return round((float) Komisi::where('aktor_tipe', 'karyawan')
+        $komisis = Komisi::where('aktor_tipe', 'karyawan')
             ->where('aktor_id', $karyawanId)
             ->whereIn('status', ['pending', 'disetujui'])
             ->whereBetween('created_at', [$mulai.' 00:00:00', $selesai.' 23:59:59'])
-            ->sum('nominal_komisi'), 2);
+            ->get();
+
+        $total = 0.0;
+        $items = [];
+
+        foreach ($komisis as $kom) {
+            $nom = (float) $kom->nominal_komisi;
+            $total += $nom;
+            $items[] = [
+                'tiket_id' => $kom->tiket_servis_id,
+                'jenis' => $kom->tiket_servis_id ? 'servis_engine' : ($kom->lead_id ? 'lead_won' : 'penjualan'),
+                'nominal' => $nom,
+            ];
+        }
+
+        return ['total' => round($total, 2), 'items' => $items];
     }
 }

@@ -202,7 +202,7 @@ class KomisiService
         }
 
         $kandidat = match ($triggerTipe) {
-            'penjualan' => $this->kandidatPenjualan($pelanggan),
+            'penjualan' => $this->kandidatPenjualan($pelanggan, $entitas),
             'lead_won' => $this->kandidatLeadWon($pelanggan, $entitas),
             'tiket_servis' => $this->kandidatTiketServis($entitas),
         };
@@ -290,11 +290,11 @@ class KomisiService
 
     /**
      * Kandidat aktor penjualan: reseller (is_reseller), agen (via referral code),
-     * karyawan marketing pemilik lead (lead source).
+     * karyawan marketing pemilik lead (lead source), dan kasir POS.
      *
      * @return array<int, array{0: string, 1: int}>
      */
-    protected function kandidatPenjualan(?Pelanggan $pelanggan): array
+    protected function kandidatPenjualan(?Pelanggan $pelanggan, mixed $entitas = null): array
     {
         $kandidat = [];
 
@@ -310,6 +310,15 @@ class KomisiService
         $karyawan = $this->karyawanDariLead($pelanggan);
         if ($karyawan) {
             $kandidat[] = ['karyawan', (int) $karyawan->id];
+        }
+
+        if ($entitas instanceof Transaksi && $entitas->kasir_id) {
+            $karyawanKasir = Karyawan::where('user_id', $entitas->kasir_id)
+                ->where('status_aktif', true)
+                ->first();
+            if ($karyawanKasir && ! in_array(['karyawan', (int) $karyawanKasir->id], $kandidat, true)) {
+                $kandidat[] = ['karyawan', (int) $karyawanKasir->id];
+            }
         }
 
         return $kandidat;
@@ -611,7 +620,30 @@ class KomisiService
                 }
 
                 // Approve
-                $noJurnal = $this->jurnalService->generateNoJurnal('komisi', null);
+                if ($komisi->aktor_tipe === 'karyawan') {
+                    // [KOMISI-HR] Komisi karyawan internal tidak dijurnal ke Utang Dagang (210-03)
+                    // ataupun Beban Komisi Reseller (510-01), karena akan dicairkan via siklus Payroll bulanan
+                    // (dijurnal terpadu ke 520-09 Beban Komisi Teknisi / 210-02 Hutang Gaji saat finalisasi payroll).
+                    $komisi->update([
+                        'status' => 'disetujui',
+                        'approved_by_id' => $userId,
+                        'approved_at' => now(),
+                    ]);
+
+                    app(AuditService::class)->catat(
+                        'Komisi', 'approve', $komisi->id,
+                        "Komisi internal {$komisi->no_komisi} disetujui (dijadwalkan masuk slip payroll)",
+                        ['status' => 'pending'], ['status' => 'disetujui']
+                    );
+
+                    $approvedUtangIds[] = $komisi->id;
+
+                    continue;
+                }
+
+                // Komisi reseller (eksternal): jurnal Beban Komisi Reseller (510-01) vs Utang Komisi (210-03)
+                $cabangId = $komisi->transaksi?->cabang_id ?? session('cabang_id') ?? 1;
+                $noJurnal = $this->jurnalService->generateNoJurnal('komisi', $cabangId);
                 $this->jurnalService->post(
                     $noJurnal,
                     now(),
@@ -621,7 +653,7 @@ class KomisiService
                         ['akun_kode' => '210-03', 'debit' => 0, 'kredit' => (float) $komisi->nominal_komisi],   // Utang Komisi
                     ],
                     "Komisi disetujui — {$komisi->no_komisi}",
-                    $komisi->transaksi?->cabang_id,
+                    $cabangId,
                     $userId,
                     Komisi::class,
                     $komisi->id
@@ -636,8 +668,8 @@ class KomisiService
                     [
                         'no_utang' => $noUtang,
                         'pelanggan_id' => $komisi->pelanggan_id,
-                        'cabang_id' => $komisi->transaksi?->cabang_id, // [F2-5] stamp cabang utk export scoping
-                        'kreditor_nama' => $komisi->pelanggan?->nama,
+                        'cabang_id' => $cabangId,
+                        'kreditor_nama' => $komisi->pelanggan?->nama ?? 'Reseller #'.$komisi->pelanggan_id,
                         'jumlah' => (float) $komisi->nominal_komisi,
                         'jumlah_dibayar' => 0,
                         'status' => 'belum_lunas',

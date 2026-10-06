@@ -5,9 +5,11 @@ namespace App\Modules\Akunting\Livewire;
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Pos\Models\Transaksi;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 /**
@@ -133,22 +135,32 @@ class LaporanPajak extends Component
         });
     }
 
-    /** [F1-2] Export e-Faktur-ready via queue (async — jangan sinkron di request). */
-    public function exportPajak(): void
+    /** [F1-2] Export e-Faktur-ready via queue & unduh langsung. */
+    public function exportPajak()
     {
+        $userId = auth()->id();
+        $cabangId = session('cabang_id');
+
         dispatch(new ExportLaporanJob(
             jenis: 'pajak',
             periodeDari: $this->periodeDari,
             periodeSampai: $this->periodeSampai,
-            cabangId: session('cabang_id'),
+            cabangId: $cabangId,
             akunId: null,
-            userId: auth()->id()
+            userId: $userId
         ));
 
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Export laporan pajak dijadwalkan — notifikasi + link unduh muncul setelah selesai.',
+            'message' => 'Export laporan pajak selesai — berkas mulai diunduh.',
         ]);
+
+        $path = app(ExportLaporanService::class)->export(
+            'pajak', $this->periodeDari, $this->periodeSampai, $cabangId, null, 'xlsx', $userId
+        );
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, 'laporan-pajak-'.now()->format('Ymd-His').'.xlsx');
     }
 
     public function render()

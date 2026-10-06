@@ -7,12 +7,13 @@ document.addEventListener('alpine:init', () => {
         media: null,
 
         init() {
-            // Urutan: pref DB dari server > localStorage > default zona
-            const server = window.UTE_THEME || null;
+            // Prioritas: localStorage pengguna > pref DB dari server > default zona
+            // Jika user memilih tema di browser, localStorage memegang kendali aktif
             let stored = null;
             try { stored = localStorage.getItem('ute-theme'); } catch (e) { /* mode privat */ }
+            const server = window.UTE_THEME || null;
             const zoneDefault = window.UTE_ZONE === 'marketplace' ? 'light' : 'dark';
-            this.preference = server || stored || zoneDefault;
+            this.preference = stored || server || zoneDefault;
 
             this.media = window.matchMedia('(prefers-color-scheme: dark)');
             this.applyTheme(this.preference);

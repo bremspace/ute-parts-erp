@@ -427,12 +427,16 @@ class PosKasir extends Component
     public function getKembalianProperty(): float
     {
         if ($this->metodeBayar === 'tunai') {
-            return max(0.0, $this->jumlahBayar - $this->totalAkhir);
+            $bayar = (float) $this->parseNominal($this->jumlahBayar);
+
+            return max(0.0, $bayar - (float) $this->totalAkhir);
         }
         if ($this->metodeBayar === 'split') {
-            $totalBayar = $this->splitTunai + $this->splitNonTunai;
+            $tunai = (float) $this->parseNominal($this->splitTunai);
+            $nonTunai = (float) $this->parseNominal($this->splitNonTunai);
+            $totalBayar = $tunai + $nonTunai;
 
-            return max(0.0, $totalBayar - $this->totalAkhir);
+            return max(0.0, $totalBayar - (float) $this->totalAkhir);
         }
 
         return 0.0;
@@ -912,31 +916,25 @@ class PosKasir extends Component
 
         $this->resetComputedTotals();
         $this->recalcPajak();
-        $this->jumlahBayar = $this->totalAkhir;
-        $this->splitTunai = $this->totalAkhir;
-        $this->splitNonTunai = 0.0;
+        $this->jumlahBayar = $this->totalAkhir > 0 ? number_format($this->totalAkhir, 0, ',', '.') : '0';
+        $this->splitTunai = $this->totalAkhir > 0 ? number_format($this->totalAkhir, 0, ',', '.') : '0';
+        $this->splitNonTunai = '0';
         $this->showPaymentModal = true;
     }
 
     public function setQuickCash(float $nominal)
     {
-        $this->jumlahBayar = $nominal;
+        $this->jumlahBayar = number_format($nominal, 0, ',', '.');
     }
 
     public function updatedJumlahBayar($value): void
     {
-        $this->jumlahBayar = $this->parseNominal($value);
+        // Biarkan teks input apa adanya agar format pemisah ribuan tidak ter-reset saat mengetik
     }
 
-    public function updatedSplitTunai($value): void
-    {
-        $this->splitTunai = $this->parseNominal($value);
-    }
+    public function updatedSplitTunai($value): void {}
 
-    public function updatedSplitNonTunai($value): void
-    {
-        $this->splitNonTunai = $this->parseNominal($value);
-    }
+    public function updatedSplitNonTunai($value): void {}
 
     /**
      * [B-02/P0-1] Gate stok sebelum potong: seluruh item keranjang harus punya
@@ -988,6 +986,13 @@ class PosKasir extends Component
         $flexError = $this->validasiCartHargaFleksibel();
         if ($flexError) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $flexError]);
+
+            return;
+        }
+
+        // Validasi kasbon / piutang wajib memilih pelanggan
+        if ($this->metodeBayar === 'piutang' && empty($this->selectedCustomerId)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih pelanggan terlebih dahulu untuk transaksi kasbon / piutang']);
 
             return;
         }
@@ -2075,7 +2080,8 @@ class PosKasir extends Component
                 'tipeHps',
                 'kategoriRelasi',
                 'hargaTier',
-            ]);
+            ])
+            ->urutKetersediaanDanTerlaris($this->selectedGudangId, session('cabang_id'));
 
         if (! empty($this->search)) {
             $productsQuery->cariPintar($this->search);

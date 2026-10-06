@@ -99,13 +99,14 @@ class ResellerController extends Controller
         return $this->success($resellers, 'Daftar reseller berhasil diambil');
     }
 
-    // [API: RESELLER-02] Daftar komisi (filter status)
+    // [API: RESELLER-02] Daftar komisi (filter status & aktor)
     public function indexKomisi(Request $request)
     {
         $status = $request->query('status'); // pending, disetujui, ditolak
         $resellerId = $request->query('reseller_id');
+        $aktorTipe = $request->query('aktor_tipe'); // reseller, karyawan
 
-        $query = Komisi::with(['pelanggan', 'transaksi', 'approver'])
+        $query = Komisi::with(['pelanggan', 'transaksi', 'approver', 'karyawan', 'tiketServis', 'lead'])
             ->latest();
 
         if ($status) {
@@ -114,6 +115,10 @@ class ResellerController extends Controller
 
         if ($resellerId) {
             $query->where('pelanggan_id', $resellerId);
+        }
+
+        if ($aktorTipe) {
+            $query->where('aktor_tipe', $aktorTipe);
         }
 
         $page = $request->query('all', false)

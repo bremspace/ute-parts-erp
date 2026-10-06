@@ -161,13 +161,14 @@ class IntegrasiModulTest extends TestCase
             'produk_id' => $produk->id, 'jenis' => 'penjualan', 'perubahan' => -2,
         ]);
 
-        // ===== 2. JURNAL OTOMATIS POS (Kas + Pendapatan + HPP + Persediaan) =====
+        // ===== 2. JURNAL OTOMATIS POS (Kas/Kas Laci + Pendapatan + HPP + Persediaan) =====
         $journalCount = StokLog::count() >= 1;
         $this->assertGreaterThanOrEqual(1, $journalCount ? 1 : 0);
+        $akunKasId = AkunCOA::where('kode', '110-04')->first()?->id ?? AkunCOA::where('kode', '110-01')->first()->id;
         $this->assertDatabaseHas('jurnal_akuntansi', [
             'referensi_tipe' => Transaksi::class,
             'referensi_id' => $transaksi->id,
-            'akun_coa_id' => AkunCOA::where('kode', '110-01')->first()->id,
+            'akun_coa_id' => $akunKasId,
             'debit' => 200000,
         ]);
 

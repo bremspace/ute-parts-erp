@@ -1,3 +1,13 @@
+/* Reset Pengaman Anti-Overflow Mobile */
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
+*, ::before, ::after {
+    box-sizing: border-box;
+}
+
 :root {
     --up-primary: #5B4FE9;
     --up-primary-dark: #3B2FC9;
@@ -145,15 +155,118 @@ button:not(:disabled),
 
 /* [T-32] Tema terang: glass surface, input, dan scrollbar theme-aware */
 html[data-theme="light"] {
-    --up-glass-bg: rgba(255, 255, 255, 0.72);
-    --up-glass-border: rgba(15, 23, 42, 0.1);
-    --up-glass-shadow: 0 12px 32px 0 rgba(15, 23, 42, 0.12);
+    --up-glass-bg: rgba(255, 255, 255, 0.88);
+    --up-glass-border: rgba(15, 23, 42, 0.12);
+    --up-glass-shadow: 0 12px 32px 0 rgba(15, 23, 42, 0.08);
+}
+
+/* Base typography containment to prevent text overflow across cards and boxes */
+p, span, h1, h2, h3, h4, h5, h6, a, td, th, label, div {
+    overflow-wrap: break-word;
+}
+
+/* Ensure flex and grid children can shrink below content size instead of overflowing */
+.grid > *,
+.flex > * {
+    min-width: 0;
+}
+
+/* Responsive Table Wrapper Guard: prevent wide tables from breaking container boundaries */
+table {
+    border-collapse: collapse;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+html[data-theme="light"] .glass-panel {
+    background: var(--up-glass-bg);
+    border-color: var(--up-glass-border);
+    box-shadow: var(--up-glass-shadow);
 }
 
 html[data-theme="light"] .glass-input {
-    background: rgba(15, 23, 42, 0.06);
+    background: rgba(15, 23, 42, 0.04);
     border-color: rgba(15, 23, 42, 0.16);
-    color: #1E293B;
+    color: #0F172A;
+}
+
+html[data-theme="light"] select.glass-input option,
+html[data-theme="light"] select option {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+}
+
+/* Di mode terang, paksa background & text pada container panel dan modal yang menggunakan bg-ink-900 / dark backgrounds (KECUALI pada container dark-surface / tema gelap sengaja) */
+html[data-theme="light"] .bg-ink-900:not(select):not(option):not(.dark-surface):not([data-theme-surface="dark"]):not(.dark-surface *) {
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+}
+
+html[data-theme="light"] .bg-ink-950:not(select):not(option):not(.dark-surface):not([data-theme-surface="dark"]):not(.dark-surface *) {
+    background-color: #F8FAFC !important;
+    color: #0F172A !important;
+}
+
+/* Kontras teks putih di tema terang: teks yang di-hardcode text-white harus menjadi kontras gelap kecuali pada tombol/badge berwarna atau kontainer bertema gelap */
+html[data-theme="light"] *:not([class*="bg-up-"]):not([class*="bg-indigo-"]):not([class*="bg-blue-"]):not([class*="bg-emerald-"]):not([class*="bg-red-"]):not([class*="bg-green-"]):not([class*="bg-amber-"]):not([class*="bg-slate-8"]):not([class*="bg-slate-9"]):not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *).text-white {
+    color: #0F172A !important;
+}
+
+/* Kontainer dengan .dark-surface / [data-theme-surface="dark"] mempertahankan teks kontras putih & abu terang */
+.dark-surface,
+[data-theme-surface="dark"] {
+    color: #FFFFFF !important;
+}
+
+.dark-surface .text-white,
+[data-theme-surface="dark"] .text-white {
+    color: #FFFFFF !important;
+}
+
+.dark-surface .text-ink-100,
+[data-theme-surface="dark"] .text-ink-100 {
+    color: #F1F5F9 !important;
+}
+
+.dark-surface .text-ink-200,
+[data-theme-surface="dark"] .text-ink-200 {
+    color: #E2E8F0 !important;
+}
+
+.dark-surface .text-ink-300,
+[data-theme-surface="dark"] .text-ink-300 {
+    color: #CBD5E1 !important;
+}
+
+.dark-surface .text-ink-400,
+[data-theme-surface="dark"] .text-ink-400 {
+    color: #94A3B8 !important;
+}
+
+/* Pastikan placeholder dan subtext terbaca jelas di mode terang dan gelap */
+html[data-theme="light"] .text-ink-400 {
+    color: #475569 !important;
+}
+
+html[data-theme="light"] .text-ink-300 {
+    color: #334155 !important;
+}
+
+html[data-theme="dark"] .text-ink-400 {
+    color: #94A3B8 !important;
+}
+
+html[data-theme="dark"] .text-ink-300 {
+    color: #CBD5E1 !important;
+}
+
+html[data-theme="dark"] select option {
+    background: #0B1020 !important;
+    color: #F8FAFC !important;
 }
 
 html[data-theme="light"] .glass-input:focus {

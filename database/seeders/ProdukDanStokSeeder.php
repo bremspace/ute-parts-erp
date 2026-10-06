@@ -170,6 +170,15 @@ class ProdukDanStokSeeder extends Seeder
                 ]
             );
 
+            if (empty($produk->barcode)) {
+                $checksum = strtoupper(substr(md5($produk->id.$produk->nama), 0, 4));
+                $produk->update(['barcode' => sprintf('UTP-%05d-%s', $produk->id, $checksum)]);
+            }
+
+            if (empty($sku->barcode)) {
+                $sku->update(['barcode' => ($produk->barcode ?: 'UTP-'.$produk->id).'-'.$sku->id]);
+            }
+
             // Stock in Gudang Utama
             StokItem::firstOrCreate(
                 [

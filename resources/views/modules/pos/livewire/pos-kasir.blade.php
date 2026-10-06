@@ -12,19 +12,14 @@
 
         <!-- Top Toolbar: Search & Gudang Selector -->
         <div class="flex items-center gap-3 mb-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
-            <div class="flex-1 min-w-0 flex items-center gap-2">
-                <div class="flex-1 min-w-0">
-                    <x-prism.barcode-scan-input
-                        placeholder="Scan Barcode atau ketik nama/tipe HP (F2 / Kamera)..."
-                        model="search"
-                        wire:keydown.enter="scanEnter"
-                        :continuous="true"
-                        title="Kamera Scanner Barcode Kasir"
-                    />
-                </div>
-                <button wire:click="scanEnter"
-                        class="px-3.5 py-2.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/40 text-up-primary border border-up-primary/30 text-xs font-bold cursor-pointer active:scale-[0.97] transition-all whitespace-nowrap flex items-center gap-1 shadow-sm"
-                        title="Tambah dari barcode/SKU (Enter)">+ ADD</button>
+            <div class="flex-1 min-w-0">
+                <x-prism.barcode-scan-input
+                    placeholder="Scan Barcode atau ketik nama/tipe HP (F2 / Kamera)..."
+                    model="search"
+                    wire:keydown.enter="scanEnter"
+                    :continuous="true"
+                    title="Kamera Scanner Barcode Kasir"
+                />
             </div>
 
             <div class="w-full sm:w-48">
@@ -92,9 +87,16 @@
                         <div>
                             <!-- Header: Category & Stock -->
                             <div class="flex items-center justify-between mb-2 gap-1">
-                                <span class="text-[10px] uppercase font-semibold text-ink-400 truncate max-w-[100px]">
-                                    {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
-                                </span>
+                                <div class="flex items-center gap-1.5 truncate max-w-[140px]">
+                                    <span class="text-[10px] uppercase font-semibold text-ink-400 truncate">
+                                        {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
+                                    </span>
+                                    @if((int) ($prod->total_terjual ?? 0) > 0)
+                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 whitespace-nowrap" title="{{ $prod->total_terjual }} transaksi">
+                                            🔥 {{ $prod->total_terjual }} terjual
+                                        </span>
+                                    @endif
+                                </div>
                                 @if($stokKosong)
                                     {{-- [B-02/P0-1] Keterangan stok kosong — produk dikunci (tidak bisa dipilih) --}}
                                     <x-prism.status-pill status="batal">
@@ -296,6 +298,43 @@
                         'customer' => $customer,
                         'canHargaFleksibel' => $canHargaFleksibel,
                     ])
+
+                    <!-- Mobile Sesi Kas & Actions Shortcut -->
+                    <div class="pt-3 border-t border-white/5 space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            @if($kasAktif)
+                                <div class="flex items-center gap-1.5 text-up-mint">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-up-mint animate-pulse"></span>
+                                    <span>Kas aktif</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button wire:click="bukaMutasiKasModal('keluar')" class="text-[11px] font-bold text-up-accent hover:text-orange-400 cursor-pointer">± Mutasi Kas</button>
+                                    <span class="text-white/20">|</span>
+                                    <button wire:click="tutupKasModal" class="text-[11px] font-bold text-up-amber hover:text-up-red cursor-pointer">Tutup Kas</button>
+                                </div>
+                            @elseif($kasPendingApproval)
+                                <div class="flex items-center gap-1.5 text-up-amber">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-up-amber animate-pulse"></span>
+                                    <span>Review tutup kas</span>
+                                </div>
+                            @else
+                                <div class="flex items-center gap-1.5 text-up-amber">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-up-amber"></span>
+                                    <span>Kas belum dibuka</span>
+                                </div>
+                                <button wire:click="bukaKasModal" class="text-[11px] font-bold text-up-primary hover:text-indigo-400 cursor-pointer">Buka Kas</button>
+                            @endif
+                        </div>
+
+                        <div class="flex items-center justify-between pt-1 text-[11px]">
+                            <button wire:click="bukaBayarServisModal" class="text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer">
+                                <span>🔧 Bayar Servis</span>
+                            </button>
+                            <a href="/app/pos/riwayat" class="text-up-primary hover:text-indigo-300 font-semibold flex items-center gap-1 cursor-pointer">
+                                <span>📋 Riwayat Transaksi</span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -697,7 +736,7 @@
                         <label class="block text-xs font-semibold text-ink-300">Uang Diterima</label>
                         <input
                             type="text" inputmode="numeric" x-format-number
-                            wire:model.live="jumlahBayar"
+                            wire:model.live.debounce.300ms="jumlahBayar"
                             class="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold tabular-nums text-white min-h-[44px]"
                         />
 
@@ -721,11 +760,11 @@
                     <div class="space-y-3 mb-5">
                         <div>
                             <label class="block text-xs text-ink-300 mb-1">Nominal Tunai</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="splitTunai" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-bold tabular-nums min-h-[44px]" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="splitTunai" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-bold tabular-nums min-h-[44px]" />
                         </div>
                         <div>
                             <label class="block text-xs text-ink-300 mb-1">Nominal Non-Tunai</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="splitNonTunai" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-bold tabular-nums min-h-[44px]" />
+                            <input type="text" inputmode="numeric" x-format-number wire:model.live.debounce.300ms="splitNonTunai" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm font-bold tabular-nums min-h-[44px]" />
                         </div>
                     </div>
                 @elseif($metodeBayar === 'piutang')
@@ -735,6 +774,16 @@
                         </svg>
                         <strong class="block text-sm mb-1">Kasbon / Piutang</strong>
                         <span>Transaksi dicatat sebagai piutang pelanggan (jatuh tempo 30 hari). Akun <strong>Piutang Usaha</strong> otomatis ter-debit di jurnal.</span>
+                        @if(!$selectedCustomerId)
+                            <div class="mt-2.5 p-2 rounded-lg bg-up-red/20 text-up-red font-semibold border border-up-red/30 text-left flex items-center gap-2">
+                                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <span>Pelanggan belum dipilih! Pilih pelanggan di atas sebelum kasbon.</span>
+                            </div>
+                        @else
+                            <div class="mt-2 text-ink-200">
+                                Pelanggan: <strong class="text-white">{{ $customer?->nama }}</strong>
+                            </div>
+                        @endif
                     </div>
                 @else
                     <div class="p-4 rounded-xl bg-white/5 text-center text-xs text-ink-300 mb-5 border border-white/5">

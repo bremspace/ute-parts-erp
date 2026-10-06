@@ -7,6 +7,7 @@ use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -66,7 +67,7 @@ class OmnichannelCommandCenter extends Component
 
     public function getMappingsProperty(): Collection
     {
-        $query = ChannelProductMapping::with(['channel', 'produk'])
+        $query = ChannelProductMapping::with(['channel', 'produk', 'skuVariant'])
             ->latest();
 
         if ($this->mappingChannelId) {
@@ -173,14 +174,18 @@ class OmnichannelCommandCenter extends Component
         }
 
         foreach ($this->selectedProdukIds as $produkId) {
-            $produk = Produk::find($produkId);
+            $produk = Produk::with('skuVariants')->find($produkId);
+            $variant = $produk?->skuVariants()->first();
+
             ChannelProductMapping::updateOrCreate(
                 [
                     'channel_id' => $this->mappingChannelId,
                     'produk_id' => $produkId,
                 ],
                 [
-                    'channel_sku' => $produk?->skuVariants()->first()?->sku,
+                    'sku_variant_id' => $variant?->id,
+                    'channel_sku' => $variant?->sku ?? $produk?->kode_produk,
+                    'channel_item_id' => $variant?->sku ?? (string) $produkId,
                     'status' => 'tersinkron',
                 ]
             );
@@ -188,6 +193,76 @@ class OmnichannelCommandCenter extends Component
 
         $this->selectedProdukIds = [];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Mapping produk disimpan & stok siap sinkron']);
+    }
+
+    public function autoMatchAll()
+    {
+        if (! auth()->user()?->can('omnichannel.manage')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin mengelola mapping produk omnichannel.']);
+
+            return;
+        }
+
+        if (! $this->mappingChannelId) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih channel terlebih dahulu']);
+
+            return;
+        }
+
+        $channel = Channel::find($this->mappingChannelId);
+        $adapter = app(ChannelSyncService::class)->adapterFor($channel?->platform ?? '');
+        if (! $adapter) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Adapter channel tidak tersedia']);
+
+            return;
+        }
+
+        try {
+            $channelProducts = $adapter->fetchProducts($channel->kredensial ?? []);
+            $matched = 0;
+
+            foreach ($channelProducts as $cp) {
+                $sku = $cp['sku'] ?? null;
+                if (! $sku) {
+                    continue;
+                }
+
+                $variant = SkuVariant::with('produk')->where('sku', $sku)->first();
+                $produk = $variant?->produk ?: Produk::where('kode_produk', $sku)->first();
+
+                if ($produk) {
+                    ChannelProductMapping::updateOrCreate(
+                        [
+                            'channel_id' => $channel->id,
+                            'produk_id' => $produk->id,
+                        ],
+                        [
+                            'sku_variant_id' => $variant?->id,
+                            'channel_sku' => $sku,
+                            'channel_item_id' => (string) ($cp['item_id'] ?? ''),
+                            'channel_model_id' => null,
+                            'status' => 'tersinkron',
+                        ]
+                    );
+                    $matched++;
+                }
+            }
+
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Auto-match berhasil memetakan {$matched} produk"]);
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal auto-match: '.$e->getMessage()]);
+        }
+    }
+
+    public function startOAuth(int $channelId)
+    {
+        if (! auth()->user()?->can('omnichannel.manage')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin mengelola channel.']);
+
+            return;
+        }
+
+        return redirect()->route('omnichannel.auth.redirect', ['id' => $channelId]);
     }
 
     public function triggerSyncAll()

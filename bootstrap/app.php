@@ -9,6 +9,7 @@ use App\Modules\Akunting\Jobs\DepresiasiAsetJob;
 use App\Modules\Crm\Console\Commands\EksekusiBroadcastTerjadwal;
 use App\Modules\Crm\Console\Commands\RecalcTierCommand;
 use App\Modules\Hr\Jobs\HitungKpiBulananJob;
+use App\Modules\Omnichannel\Services\ChannelSyncService;
 use App\Modules\Wms\Jobs\CycleCountJob;
 use App\Modules\Wms\Jobs\ReorderOtomatisJob;
 use Illuminate\Console\Scheduling\Schedule;
@@ -100,6 +101,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->job(DepresiasiAsetJob::class)
             ->monthlyOn(1, '01:30')
             ->withoutOverlapping();
+
+        // Refresh token OAuth marketplace sebelum kedaluwarsa (tiap 2 jam)
+        $schedule->call(function () {
+            app(ChannelSyncService::class)->refreshExpiredTokens();
+        })->everyTwoHours()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

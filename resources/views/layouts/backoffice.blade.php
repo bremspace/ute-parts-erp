@@ -14,8 +14,9 @@
     <script>
         // [T-32] Bootstrap tema — terapkan sebelum cat pertama untuk mencegah FOUC
         (function () {
-            var pref = window.UTE_THEME;
-            if (!pref) { try { pref = localStorage.getItem('ute-theme'); } catch (e) {} }
+            var pref = null;
+            try { pref = localStorage.getItem('ute-theme'); } catch (e) {}
+            if (!pref) pref = window.UTE_THEME;
             if (!pref) pref = window.UTE_ZONE === 'marketplace' ? 'light' : 'dark';
             var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
             var root = document.documentElement;
@@ -75,8 +76,13 @@
                    lg:z-30"
             :class="[window.innerWidth < 768 ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : '']">
             <!-- Brand -->
-            <div class="sidebar-brand h-16 flex items-center px-6 border-b border-black/10 dark:border-white/5">
+            <div class="sidebar-brand h-16 flex items-center justify-between px-6 border-b border-black/10 dark:border-white/5">
                 <x-prism.logo size="md" :with-text="true" mode="dark" subtitle="Backoffice ERP" text-class="sidebar-brand-text" href="/app/dashboard" />
+                <button type="button" @click="sidebarOpen = false" class="md:hidden p-1.5 rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer" aria-label="Tutup menu">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
 
             <!-- Branch Context Badge -->
@@ -215,7 +221,7 @@
                     <button
                         type="button"
                         @click="toggleDropdown('crm')"
-                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/crm*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
+                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/crm*', 'app/reseller*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
                         title="Pelanggan & CRM"
                     >
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,6 +243,12 @@
                             <a href="/app/crm/leads" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/crm/leads*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/crm/leads*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
                                 <span>Pipeline Leads Kanban</span>
+                            </a>
+                        @endcan
+                        @can('reseller.view')
+                            <a href="/app/reseller" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/reseller*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/reseller*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
+                                <span>Mitra & Komisi Reseller</span>
                             </a>
                         @endcan
                     </div>
@@ -327,16 +339,6 @@
                         </svg>
                         <span class="sidebar-label">Omnichannel</span>
                         <span class="sidebar-badge ml-auto text-[9px] font-semibold text-up-mint bg-up-mint/10 border border-up-mint/20 px-1.5 py-0.5 rounded">Shopee</span>
-                    </a>
-                </div>
-
-                <!-- 9. Reseller & Komisi -->
-                <div class="sidebar-group">
-                    <a href="/app/reseller" title="Reseller & Komisi" class="sidebar-nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium {{ request()->is('app/reseller*') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-ink-50 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }} transition-all">
-                        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span class="sidebar-label">Reseller & Komisi</span>
                     </a>
                 </div>
 
@@ -612,7 +614,7 @@
             Alpine.data('sidebarManager', () => ({
                 sidebarOpen: false,
                 sidebarCollapsed: false,
-                activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/reseller*') ? 'reseller' : (request()->is('app/omnichannel*') ? 'omnichannel' : '')))))))) }}',
+                activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : ''))))))) }}',
 
                 init() {
                     try {

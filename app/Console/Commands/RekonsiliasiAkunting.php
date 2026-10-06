@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Reseller\Models\Komisi;
+use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\StokOpname;
@@ -323,13 +324,26 @@ class RekonsiliasiAkunting extends Command
         );
 
         // c. Nomor jurnal duplikat dalam satu cabang.
-        $duplikat = DB::table('jurnal_akuntansi')
-            ->select('cabang_id', 'no_jurnal')
-            ->selectRaw('COUNT(*) AS jml, MIN(id) AS id_min, MAX(id) AS id_maks')
-            ->groupBy('cabang_id', 'no_jurnal')
-            ->havingRaw('COUNT(*) > 1')
-            ->orderByDesc('jml')
-            ->get();
+        // Jika jurnal_header tersedia, periksa keunikan nomor jurnal per cabang dari header.
+        // Bila tanpa header, periksa nomor jurnal yang dipakai oleh multi-referensi berbeda (transaksi bisnis bentrok).
+        if (Schema::hasTable('jurnal_header')) {
+            $duplikat = DB::table('jurnal_header')
+                ->select('cabang_key as cabang_id', 'no_jurnal')
+                ->selectRaw('COUNT(*) AS jml, MIN(id) AS id_min, MAX(id) AS id_maks')
+                ->groupBy('cabang_key', 'no_jurnal')
+                ->havingRaw('COUNT(*) > 1')
+                ->orderByDesc('jml')
+                ->get();
+        } else {
+            $duplikat = DB::table('jurnal_akuntansi')
+                ->select('cabang_id', 'no_jurnal')
+                ->selectRaw('COUNT(DISTINCT referensi_id) AS jml, MIN(id) AS id_min, MAX(id) AS id_maks')
+                ->whereNotNull('referensi_id')
+                ->groupBy('cabang_id', 'no_jurnal')
+                ->havingRaw('COUNT(DISTINCT referensi_id) > 1')
+                ->orderByDesc('jml')
+                ->get();
+        }
         $this->catat(
             $kategori,
             'Nomor jurnal duplikat dalam satu cabang',
@@ -416,6 +430,8 @@ class RekonsiliasiAkunting extends Command
 
         $ekspresi = $this->ekspresiLike('jurnal_akuntansi.deskripsi', 'transaksi.no_transaksi');
 
+        $hasTiketServisCol = Schema::hasColumn('transaksi', 'tiket_servis_id');
+
         $tanpaJurnal = DB::table('transaksi')
             ->select('id', 'no_transaksi', 'status', 'total_akhir', 'sumber')
             ->whereIn('status', self::STATUS_TRANSAKSI_FINAL)
@@ -428,6 +444,15 @@ class RekonsiliasiAkunting extends Command
                 $sub->selectRaw('1')->from('jurnal_akuntansi')
                     ->where('jurnal_akuntansi.referensi_tipe', Transaksi::class)
                     ->whereRaw($ekspresi);
+            })
+            ->when($hasTiketServisCol, static function ($q): void {
+                // Untuk transaksi pelunasan servis, cek juga jurnal pada tiket servis terkait
+                $q->whereNotExists(static function ($sub): void {
+                    $sub->selectRaw('1')->from('jurnal_akuntansi')
+                        ->where('jurnal_akuntansi.referensi_tipe', TiketServis::class)
+                        ->whereNotNull('transaksi.tiket_servis_id')
+                        ->whereColumn('jurnal_akuntansi.referensi_id', 'transaksi.tiket_servis_id');
+                });
             })
             ->orderByDesc('id')
             ->get();

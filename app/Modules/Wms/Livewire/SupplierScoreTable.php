@@ -56,7 +56,7 @@ class SupplierScoreTable extends Component
 
     public function refresh(): void
     {
-        $this->emitSelf('refreshScores');
+        $this->dispatch('refreshScores');
     }
 
     public function render()

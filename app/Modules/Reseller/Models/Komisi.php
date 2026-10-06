@@ -5,6 +5,7 @@ namespace App\Modules\Reseller\Models;
 use App\Models\User;
 use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -65,5 +66,34 @@ class Komisi extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_id');
+    }
+
+    public function karyawan(): BelongsTo
+    {
+        return $this->belongsTo(Karyawan::class, 'aktor_id');
+    }
+
+    public function getNamaPenerimaAttribute(): string
+    {
+        if ($this->aktor_tipe === 'karyawan') {
+            return $this->karyawan?->nama ?? 'Karyawan #'.$this->aktor_id;
+        }
+
+        return $this->pelanggan?->nama ?? 'Reseller #'.($this->pelanggan_id ?? $this->aktor_id);
+    }
+
+    public function getReferensiDocAttribute(): string
+    {
+        if ($this->transaksi) {
+            return $this->transaksi->no_transaksi;
+        }
+        if ($this->tiketServis) {
+            return $this->tiketServis->no_tiket;
+        }
+        if ($this->lead) {
+            return 'Lead: '.($this->lead->judul ?? '#'.$this->lead_id);
+        }
+
+        return $this->keterangan ?? '-';
     }
 }

@@ -90,7 +90,7 @@ return new class extends Migration
             Schema::create('payroll_komisi_detail', function (Blueprint $table) {
                 $table->bigIncrements('id');
                 $table->foreignId('slip_id')->constrained('payroll_slip')->cascadeOnDelete();
-                $table->foreignId('tiket_servis_id')->constrained('tiket_servis')->cascadeOnDelete();
+                $table->foreignId('tiket_servis_id')->nullable()->constrained('tiket_servis')->cascadeOnDelete();
                 $table->foreignId('teknisi_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->string('jenis');
                 $table->decimal('nominal', 15, 2)->default(0);
