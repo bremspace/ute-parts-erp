@@ -31,12 +31,12 @@ class HrSeeder extends Seeder
             ]
         );
 
-        // Demo Karyawan — idempotent
+        // Karyawan terikat akun resmi UteParts — idempotent
         $users = [
-            ['email' => 'teknisi@uteparts.test', 'nama' => 'Teknisi Utama', 'jabatan' => 'teknisi'],
-            ['email' => 'kasir@uteparts.test', 'nama' => 'Kasir Utama', 'jabatan' => 'kasir'],
-            ['email' => 'admin@uteparts.test', 'nama' => 'Admin Gudang', 'jabatan' => 'admin'],
-            ['email' => 'marketing@uteparts.test', 'nama' => 'Marketing Utama', 'jabatan' => 'marketing'],
+            ['email' => 'teknisi@uteparts.id', 'nama' => 'Teknisi UteParts', 'jabatan' => 'teknisi'],
+            ['email' => 'kasir@uteparts.id', 'nama' => 'Kasir UteParts', 'jabatan' => 'kasir'],
+            ['email' => 'gudang@uteparts.id', 'nama' => 'Staff Gudang UteParts', 'jabatan' => 'admin'],
+            ['email' => 'marketing@uteparts.id', 'nama' => 'Marketing UteParts', 'jabatan' => 'marketing'],
         ];
 
         foreach ($users as $u) {

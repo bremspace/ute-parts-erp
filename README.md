@@ -158,6 +158,26 @@ Berkas konfigurasi QA:
 | `scripts/qa-auto.sh` | Pipeline QA otomatis satu perintah |
 | `scripts/qa-runner.sh` | Wrapper per tool dengan profil RAM |
 
+## Akun Bawaan Backoffice (Production & Staging)
+
+Seluruh akun default menggunakan domain `@uteparts.id` dengan password default: `Password123!`
+
+Akses login backoffice: `/app/login`
+
+| Role | Nama Akun | Email | Password Default | Hak Akses Utama |
+|------|-----------|-------|------------------|-----------------|
+| `super-admin` | Super Admin UteParts | `superadmin@uteparts.id` | `Password123!` | Akses penuh semua modul, pengaturan sistem & RBAC |
+| `owner` | Owner UteParts | `owner@uteparts.id` | `Password123!` | Akses penuh eksekutif & seluruh laporan |
+| `admin-toko` | Admin Toko UteParts | `admintoko@uteparts.id` | `Password123!` | POS, WMS cabang, Servis, CRM, audit log & approval |
+| `kasir` | Kasir UteParts | `kasir@uteparts.id` | `Password123!` | Layar kasir POS, sesi kas, cek stok & servis read-only |
+| `teknisi` | Teknisi UteParts | `teknisi@uteparts.id` | `Password123!` | Kanban servis, diagnosa, tiket servis & input part |
+| `staff-gudang` | Staff Gudang UteParts | `gudang@uteparts.id` | `Password123!` | WMS, penerimaan PO (GRN), transfer stok & cycle count |
+| `finance` | Finance UteParts | `finance@uteparts.id` | `Password123!` | Akunting, COA, jurnal, AP/AR, laporan laba-rugi/neraca, approval payroll & komisi |
+| `marketing` | Marketing UteParts | `marketing@uteparts.id` | `Password123!` | CRM, lead pipeline, program broadcast & skema tier |
+| `kelola-hr` | HR Manager UteParts | `hr@uteparts.id` | `Password123!` | Manajemen karyawan, shift absensi, KPI & payroll |
+
+> **Catatan Keamanan Production**: Segera ganti password bawaan setelah instalasi pertama atau konfigurasi autentikasi 2FA di `/app/keamanan/dua-faktor`.
+
 ## Dokumentasi
 
 | Dokumen | Isi |

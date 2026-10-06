@@ -14,8 +14,11 @@ class ReportSeeder extends Seeder
 
     public function run(): void
     {
-        // Create sample saved reports for demo users (idempotent)
-        $users = User::whereIn('email', ['admin@uteparts.test', 'finance@uteparts.test'])->get();
+        // User resmi UteParts (superadmin & finance)
+        $users = User::whereIn('email', ['superadmin@uteparts.id', 'finance@uteparts.id'])->get();
+        if ($users->isEmpty()) {
+            $users = User::whereHas('roles', fn ($q) => $q->whereIn('name', ['super-admin', 'finance']))->get();
+        }
 
         // Fallback global bila user belum punya relasi cabang
         $fallbackCabangId = Cabang::query()->first()?->id;
