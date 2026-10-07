@@ -774,7 +774,26 @@
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
                             <p class="text-[10px] text-ink-400 uppercase">Pelanggan</p>
                             <p class="text-sm font-bold text-white">{{ $selectedTiket->nama_pelanggan ?? $selectedTiket->pelanggan?->nama ?? 'Guest' }}</p>
-                            <p class="text-[11px] text-ink-400">{{ $selectedTiket->telepon_pelanggan ?? $selectedTiket->pelanggan?->telepon }}</p>
+                            @php
+                                $telpPelanggan = $selectedTiket->telepon_pelanggan ?? $selectedTiket->pelanggan?->telepon;
+                            @endphp
+                            @if($telpPelanggan)
+                                <div class="flex items-center gap-1.5 mt-0.5">
+                                    <span class="text-[11px] text-ink-400 font-mono">{{ $telpPelanggan }}</span>
+                                    <a
+                                        href="https://wa.me/{{ \App\Support\WhatsAppHelper::formatNomor($telpPelanggan) }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-[#25D366] hover:underline text-[10px] inline-flex items-center gap-0.5"
+                                        title="Buka Chat WhatsApp"
+                                    >
+                                        <span>WA</span>
+                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                    </a>
+                                </div>
+                            @else
+                                <p class="text-[11px] text-ink-500">-</p>
+                            @endif
                         </div>
                         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
                             <div class="flex items-center justify-between">
@@ -827,7 +846,60 @@
                                 @endif
                             </div>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            @php
+                                $telpTiket = $selectedTiket->telepon_pelanggan ?? $selectedTiket->pelanggan?->telepon;
+                                $namaTiket = $selectedTiket->nama_pelanggan ?? $selectedTiket->pelanggan?->nama ?? 'Pelanggan';
+                                $waTiketLink = null;
+                                if ($telpTiket) {
+                                    $tokenTiket = $selectedTiket->token_approval ?? '';
+                                    if ($selectedTiket->status === 'menunggu_approval' && $selectedTiket->estimasi_biaya) {
+                                        $draftWa = \App\Support\WhatsAppHelper::draftEstimasiServis(
+                                            $namaTiket,
+                                            $selectedTiket->no_tiket,
+                                            $selectedTiket->jenis_hp,
+                                            (float) $selectedTiket->estimasi_biaya,
+                                            $selectedTiket->alasan_estimasi ?? 'Pengerjaan modul',
+                                            $tokenTiket
+                                        );
+                                        $waTiketLink = \App\Support\WhatsAppHelper::buatLink($telpTiket, $draftWa);
+                                        $waLabel = 'Kirim Approval WA';
+                                    } elseif (in_array($selectedTiket->status, ['selesai', 'diambil'], true)) {
+                                        $draftWa = \App\Support\WhatsAppHelper::draftServisSelesai(
+                                            $namaTiket,
+                                            $selectedTiket->no_tiket,
+                                            $selectedTiket->jenis_hp,
+                                            (float) ($selectedTiket->biaya_total ?? $selectedTiket->estimasi_biaya ?? 0),
+                                            $tokenTiket
+                                        );
+                                        $waTiketLink = \App\Support\WhatsAppHelper::buatLink($telpTiket, $draftWa);
+                                        $waLabel = 'Kirim Kabar Selesai WA';
+                                    } elseif ($tokenTiket) {
+                                        $draftWa = \App\Support\WhatsAppHelper::draftTerimaServis(
+                                            $namaTiket,
+                                            $selectedTiket->no_tiket,
+                                            $selectedTiket->jenis_hp,
+                                            $tokenTiket
+                                        );
+                                        $waTiketLink = \App\Support\WhatsAppHelper::buatLink($telpTiket, $draftWa);
+                                        $waLabel = 'Kirim Nota WA';
+                                    }
+                                }
+                            @endphp
+
+                            @if($waTiketLink)
+                                <a
+                                    href="{{ $waTiketLink }}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-sm no-underline"
+                                    title="Kirim notifikasi via WhatsApp langsung (HP / Web)"
+                                >
+                                    <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.174.086.275.073.376-.044.101-.116.433-.506.549-.68.116-.173.231-.144.39-.086s1.011.477 1.184.564.289.13.332.203c.043.072.043.419-.101.824z"/></svg>
+                                    <span>{{ $waLabel ?? 'Kirim WA' }}</span>
+                                </a>
+                            @endif
+
                             <button
                                 type="button"
                                 wire:click="bukaStrukServis({{ $selectedTiket->id }})"

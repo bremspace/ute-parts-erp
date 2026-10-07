@@ -206,6 +206,7 @@ class RiwayatTransaksiIndex extends Component
                 'waktu' => $trx->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
                 'kasir' => $trx->kasir?->name ?? 'Kasir',
                 'pelanggan' => $trx->pelanggan?->nama ?? 'Pelanggan Umum',
+                'telepon' => $trx->pelanggan?->telepon ?? null,
                 'items' => $trx->items->map(fn ($it) => [
                     'nama' => $it->produk?->nama ?? 'Produk',
                     'qty' => (int) $it->jumlah,
@@ -241,6 +242,7 @@ class RiwayatTransaksiIndex extends Component
                 'waktu' => $tiket->tanggal_bayar?->format('d/m/Y H:i') ?? $tiket->tanggal_selesai?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
                 'kasir' => $tiket->transaksi?->kasir?->name ?? auth()->user()?->name ?? 'Kasir',
                 'pelanggan' => $tiket->pelanggan?->nama ?? $tiket->nama_pelanggan ?? 'Pelanggan Umum',
+                'telepon' => $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? null,
                 'items' => array_map(fn ($it) => [
                     'nama' => $it['nama'],
                     'qty' => (int) ($it['qty'] ?? 1),

@@ -926,6 +926,7 @@ class ServisBoard extends Component
             'waktu' => ($tiket->tanggal_bayar ?? $tiket->tanggal_terima ?? now())->format('d/m/Y H:i'),
             'kasir' => auth()->user()?->name ?? 'Kasir / Staf',
             'pelanggan' => $tiket->nama_pelanggan ?? $tiket->pelanggan?->nama ?? 'Pelanggan Umum',
+            'telepon' => $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? null,
             'tier' => 'Servis HP ('.$tiket->jenis_hp.')',
             'items' => $rincian['items'],
             'subtotal_jasa' => $rincian['total_jasa'],
