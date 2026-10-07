@@ -1,24 +1,67 @@
-name: Auto-Deploy ke VPS
+name: CI/CD Pipeline (Test & Auto-Deploy)
 
 on:
   push:
     branches: [main]
-  workflow_dispatch: # izinkan trigger manual dari tab Actions
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy ke VPS (CyberPanel)
+  # ==========================================
+  # TAHAP 1: CI (Continuous Integration / Test)
+  # ==========================================
+  test:
+    name: Run Automated Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     steps:
-      - name: Tampilkan info deploy
-        run: |
-          echo "Trigger: ${{ github.event.head_commit.message || 'manual' }}"
-          echo "Commit: ${{ github.sha }}"
+      - name: Checkout Kode
+        uses: actions/checkout@v4
 
-      # Aplikasi: enkripsi secret disimpan di repo.
-      - name: Jalankan script deploy di VPS via SSH
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, sqlite3, pdo_sqlite, bcmath, curl
+          coverage: none
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install NPM Dependencies & Build Assets
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Siapkan Environment Pengujian
+        run: |
+          cp .env.example .env.testing || cp .env.example .env
+          php artisan key:generate --env=testing
+
+      - name: Jalankan Unit & Feature Tests
+        run: php artisan test --colors=always
+
+  # ==========================================
+  # TAHAP 2: CD (Continuous Deployment ke VPS Root)
+  # Hanya jalan jika job 'test' SUKSES (lolos) dan event adalah push ke 'main'
+  # ==========================================
+  deploy:
+    name: Deploy ke VPS Production (Root)
+    needs: [test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Eksekusi Deploy di VPS via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -26,52 +69,54 @@ jobs:
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           timeout: 60s
-          command_timeout: 15m
-          script_stop: true   # berhenti & laporkan gagal bila salah satu command error
+          command_timeout: 10m
+          script_stop: true
           script: |
             set -euo pipefail
 
-            # Path project & PHP CLI — default untuk VPS mandiri (Ubuntu + Nginx + PHP-FPM).
-            # Kalau lokasi/panel-mu berbeda, isi VPS_PATH & PHP_BIN lewat GitHub Secrets.
-            DEPLOY_PATH="${VPS_PATH:-/var/www/ute-parts}"
-            PHP_BIN="${PHP_BIN:-/usr/bin/php8.4}"
+            DEPLOY_PATH="${VPS_PATH:-/var/www/test.uteparts.id-staging}"
+            PHP_BIN="${PHP_BIN:-/usr/bin/php}"
+            WEB_USER="${WEB_USER:-www-data}"
             QUEUE_NAME="${QUEUE_NAME:-ute-parts-queue}"
 
-            # User pemilik file web — auto-detect, bisa di-override lewat WEB_USER
-            if [ -z "${WEB_USER:-}" ]; then
-              if id -u lsadm >/dev/null 2>&1; then
-                WEB_USER="lsadm"       # CyberPanel / OpenLiteSpeed
-              elif id -u www-data >/dev/null 2>&1; then
-                WEB_USER="www-data"    # VPS standar (nginx / apache2)
-              else
-                WEB_USER="$(id -un)"
-              fi
-            fi
-            echo "Deploy ke $DEPLOY_PATH (web user: $WEB_USER, php: $PHP_BIN)"
+            echo "🚀 Memulai Deployment di: $DEPLOY_PATH"
 
-            # Cek folder project ada
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
-              echo "❌ Folder deploy tidak ditemukan: $DEPLOY_PATH"
-              echo "   Set VPS_PATH di GitHub Secrets bila lokasi project berbeda."
+              echo "❌ Direktori $DEPLOY_PATH bukan repositori git yang valid."
               exit 1
             fi
 
-            # Sinkronkan script deploy terbaru ke VPS
-            curl -fsSL \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Accept: application/vnd.github.raw" \
-              "https://api.github.com/repos/${{ github.repository }}/contents/deploy.sh" \
-              -o /tmp/ute-deploy.sh
-            chmod +x /tmp/ute-deploy.sh
-            cp /tmp/ute-deploy.sh "$DEPLOY_PATH/deploy.sh"
-            chown "$WEB_USER":"$WEB_USER" "$DEPLOY_PATH/deploy.sh" || true
+            cd "$DEPLOY_PATH"
 
-            # Eksekusi deploy (script ini aman: auto-rollback bila gagal)
-            echo "🚀 Menjalankan deploy ..."
-            DEPLOY_PATH="$DEPLOY_PATH" PHP_BIN="$PHP_BIN" QUEUE_NAME="$QUEUE_NAME" WEB_USER="$WEB_USER" \
-              bash "$DEPLOY_PATH/deploy.sh"
-            echo "✅ Deploy selesai"
+            # Ambil hash commit sebelum update (untuk rollback jika deploy crash)
+            PREV_COMMIT=$(git rev-parse HEAD)
 
-      - name: Laporkan status ke GitHub
-        if: failure()
-        run: echo "::error::Deploy gagal — VPS otomatis rollback ke versi sebelumnya. Cek /tmp/ute-deploy.log di server."
+            # Tarik commit terbaru
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Install dependencies produksi
+            composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+
+            # Jalankan migrasi database
+            "$PHP_BIN" artisan migrate --force
+
+            # Build asset UI
+            npm install --ignore-scripts --no-audit --no-fund
+            npm run build
+
+            # Refresh cache Laravel
+            "$PHP_BIN" artisan config:cache
+            "$PHP_BIN" artisan route:cache
+            "$PHP_BIN" artisan view:cache
+
+            # Set permission www-data
+            chown -R "$WEB_USER":"$WEB_USER" storage bootstrap/cache public/build
+            chmod -R 775 storage bootstrap/cache
+
+            # Restart queue worker supervisor jika tersedia
+            if command -v supervisorctl >/dev/null 2>&1; then
+              supervisorctl restart "$QUEUE_NAME" || true
+            fi
+
+            echo "✅ Deployment Sukses ke commit: $(git rev-parse --short HEAD)"
