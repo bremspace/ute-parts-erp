@@ -229,36 +229,6 @@
         </nav>
     </div>
 
-            @auth('customer')
-                <a href="{{ route('customer.account') }}"
-                   class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 active:scale-[0.93] {{ request()->routeIs('customer.account') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
-                    <div class="relative flex items-center justify-center">
-                        <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        @if(request()->routeIs('customer.account'))
-                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white shadow-[0_0_8px_rgba(91,79,233,1)]"></span>
-                        @endif
-                    </div>
-                    <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px]">Akun</span>
-                </a>
-            @else
-                <a href="{{ route('customer.login') }}"
-                   class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1.5 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 active:scale-[0.93] {{ request()->routeIs('customer.login') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
-                    <div class="relative flex items-center justify-center">
-                        <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                        </svg>
-                        @if(request()->routeIs('customer.login'))
-                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white shadow-[0_0_8px_rgba(91,79,233,1)]"></span>
-                        @endif
-                    </div>
-                    <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px]">Masuk</span>
-                </a>
-            @endauth
-        </nav>
-    </div>
-
     <!-- Footer: High-tech editorial trust badges + store info -->
     <footer class="mt-auto border-t border-ink-200/60 dark:border-white/[0.08] bg-white/70 dark:bg-ink-950 backdrop-blur-xl">
         <!-- Trust badges -->

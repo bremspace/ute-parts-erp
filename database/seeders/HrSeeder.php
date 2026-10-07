@@ -42,7 +42,7 @@ class HrSeeder extends Seeder
         foreach ($users as $u) {
             $user = User::updateOrCreate(
                 ['email' => $u['email']],
-                ['name' => $u['nama'], 'password' => bcrypt('password'), 'is_active' => true]
+                ['name' => $u['nama'], 'password' => Hash::make('Password123!'), 'is_active' => true]
             );
 
             // [FIX] Jangan hardcode cabang_id=1 — auto-increment bisa saja bukan 1

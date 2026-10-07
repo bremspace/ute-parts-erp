@@ -18,9 +18,9 @@ class CartService
         protected PricingService $pricingService
     ) {}
 
-    private function cartKey(?int $variantId): string
+    public function cartKey(int $produkId, ?int $variantId = null): string
     {
-        return $variantId ? 'v'.$variantId : 'p0';
+        return $variantId ? 'p'.$produkId.'_v'.$variantId : 'p'.$produkId;
     }
 
     public function all(): array
@@ -31,7 +31,7 @@ class CartService
     public function isi(int $produkId, ?int $variantId = null, int $qty = 1): array
     {
         $produk = Produk::findOrFail($produkId);
-        $key = $this->cartKey($variantId);
+        $key = $this->cartKey($produkId, $variantId);
 
         // Cek stok total tersedia
         $stokTotal = StokItem::where('produk_id', $produkId)
@@ -59,6 +59,7 @@ class CartService
         $pricing = $this->pricingService->resolve($produk, $customer, $variant);
 
         $cart[$key] = [
+            'key' => $key,
             'product_id' => $produkId,
             'variant_id' => $variantId,
             'name' => $produk->nama,
@@ -75,9 +76,8 @@ class CartService
         return $cart;
     }
 
-    public function updateQty(?int $variantId, int $qty): array
+    public function updateQty(string $key, int $qty): array
     {
-        $key = $this->cartKey($variantId);
         $cart = $this->all();
 
         if (! isset($cart[$key])) {
@@ -98,9 +98,8 @@ class CartService
         return $cart;
     }
 
-    public function hapus(?int $variantId): array
+    public function hapus(string $key): array
     {
-        $key = $this->cartKey($variantId);
         $cart = $this->all();
         unset($cart[$key]);
         Session::put('shop.cart', $cart);

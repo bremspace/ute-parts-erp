@@ -121,9 +121,6 @@
                                           class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary transition-all"></textarea>
                             </div>
                         </div>
-                                          class="w-full px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary transition-all"></textarea>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Order Summary Column -->
@@ -240,12 +237,12 @@
             @else
                 <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-5 sm:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-4">
                     <div class="space-y-4">
-                        @foreach($cart as $item)
+                        @foreach($cart as $itemKey => $item)
                             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 py-3.5 border-b border-ink-100/70 dark:border-white/[0.06] last:border-0 min-w-0 w-full">
                                 <div class="flex items-center gap-3 min-w-0 w-full sm:flex-1">
                                     <button
                                         type="button"
-                                        wire:click.prevent="hapus({{ $item['variant_id'] ?? 'null' }})"
+                                        wire:click.prevent="hapus('{{ $itemKey }}')"
                                         class="w-7 h-7 rounded-xl bg-ink-100/60 dark:bg-white/5 text-ink-400 hover:text-up-red hover:bg-up-red/10 flex items-center justify-center text-xs transition-colors cursor-pointer flex-shrink-0"
                                         title="Hapus dari keranjang">
                                         ✕
@@ -266,7 +263,7 @@
                                     <div class="flex items-center bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 rounded-2xl p-1 flex-shrink-0">
                                         <button
                                             type="button"
-                                            wire:click="updateQty({{ $item['variant_id'] ?? 'null' }}, {{ $item['qty'] - 1 }})"
+                                            wire:click="updateQty('{{ $itemKey }}', {{ $item['qty'] - 1 }})"
                                             class="w-7 h-7 rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
                                             −
                                         </button>
@@ -275,7 +272,7 @@
                                         </span>
                                         <button
                                             type="button"
-                                            wire:click="updateQty({{ $item['variant_id'] ?? 'null' }}, {{ $item['qty'] + 1 }})"
+                                            wire:click="updateQty('{{ $itemKey }}', {{ $item['qty'] + 1 }})"
                                             class="w-7 h-7 rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
                                             +
                                         </button>

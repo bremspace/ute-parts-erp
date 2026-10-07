@@ -1,24 +1,24 @@
 <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
     @if(!$customer)
-        <div class="text-center py-16 bg-white rounded-2xl border border-ink-100">
-            <h2 class="font-black text-ink-900 text-lg">Silakan Masuk</h2>
-            <p class="text-sm text-ink-500 mt-2">Login untuk melihat riwayat pesanan, servis, dan komisi Anda.</p>
-            <a href="{{ route('customer.login') }}" class="inline-block mt-5 px-6 py-3 rounded-xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors">Masuk</a>
+        <div class="text-center py-16 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-8 shadow-sm">
+            <h2 class="font-black text-ink-900 dark:text-white text-lg">Silakan Masuk</h2>
+            <p class="text-sm text-ink-500 dark:text-ink-400 mt-2">Login untuk melihat riwayat pesanan, servis, dan komisi Anda.</p>
+            <a href="{{ route('customer.login') }}" class="inline-block mt-5 px-6 py-3 rounded-2xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors shadow-md shadow-up-primary/20 min-h-[44px]">Masuk</a>
         </div>
     @else
         <!-- Profil header -->
-        <div class="bg-white rounded-2xl border border-ink-100 p-6 mb-6">
+        <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 mb-6 shadow-sm">
             <div class="flex items-center gap-4">
-                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-up-primary to-up-accent flex items-center justify-center text-white font-black text-xl">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-up-primary to-up-accent flex items-center justify-center text-white font-black text-xl shadow-md">
                     {{ substr($customer->nama, 0, 1) }}
                 </div>
-                <div class="flex-1">
-                    <h1 class="font-black text-ink-900 text-lg">{{ $customer->nama }}</h1>
-                    <p class="text-sm text-ink-500 font-mono">{{ $customer->telepon }}</p>
+                <div class="flex-1 min-w-0">
+                    <h1 class="font-black text-ink-900 dark:text-white text-lg truncate">{{ $customer->nama }}</h1>
+                    <p class="text-sm text-ink-500 dark:text-ink-400 font-mono">{{ $customer->telepon }}</p>
                 </div>
-                <div class="text-right">
+                <div class="text-right flex-shrink-0">
                     <x-prism.tier-badge :tier="$customer->tierMembership?->nama ?? ($customer->is_reseller ? 'Reseller' : 'Retail')" />
-                    <p class="text-xs text-ink-500 mt-2 tabular-nums">{{ $customer->poin_loyalty }} poin</p>
+                    <p class="text-xs text-ink-500 dark:text-ink-400 mt-2 tabular-nums">{{ $customer->poin_loyalty }} poin</p>
                 </div>
             </div>
 
@@ -65,7 +65,7 @@
         @if($activeTab === 'orders')
             <div class="space-y-3">
                 @forelse($orders as $o)
-                    <div class="bg-white rounded-2xl border border-ink-100 p-4">
+                    <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-5 shadow-sm">
                         <div class="flex items-center justify-between">
                             <div>
                                 <span class="font-mono text-up-primary font-bold text-sm">{{ $o->no_transaksi }}</span>
@@ -73,20 +73,20 @@
                             </div>
                             <x-prism.status-pill :status="$o->status" />
                         </div>
-                        <div class="mt-2 flex flex-wrap gap-1.5">
+                        <div class="mt-3 flex flex-wrap gap-1.5">
                             @foreach($o->items as $it)
-                                <span class="text-[11px] px-2 py-1 rounded-lg bg-up-ink-50 border border-ink-100 text-ink-600">{{ $it->produk?->nama }} ×{{ $it->jumlah }}</span>
+                                <span class="text-[11px] px-2.5 py-1 rounded-xl bg-up-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-ink-600 dark:text-ink-300">{{ $it->produk?->nama }} ×{{ $it->jumlah }}</span>
                             @endforeach
                         </div>
-                        <div class="flex justify-between items-center mt-3 pt-3 border-t border-ink-100">
-                            <span class="text-xs text-ink-500">{{ $o->cabang?->nama }}</span>
+                        <div class="flex justify-between items-center mt-3 pt-3 border-t border-ink-100 dark:border-white/10">
+                            <span class="text-xs text-ink-500 dark:text-ink-400">{{ $o->cabang?->nama }}</span>
                             <span class="font-black text-up-primary tabular-nums">Rp {{ number_format($o->total_akhir, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 @empty
-                    <div class="text-center py-14 bg-white rounded-2xl border border-ink-100">
-                        <p class="font-semibold text-ink-700">Belum ada pesanan</p>
-                        <a href="{{ route('shop') }}" class="inline-block mt-4 px-5 py-2.5 rounded-xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors">Mulai Belanja</a>
+                    <div class="text-center py-14 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
+                        <p class="font-semibold text-ink-700 dark:text-ink-300">Belum ada pesanan</p>
+                        <a href="{{ route('shop') }}" class="inline-block mt-4 px-5 py-2.5 rounded-2xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors min-h-[44px]">Mulai Belanja</a>
                     </div>
                 @endforelse
             </div>
@@ -96,20 +96,20 @@
         @if($activeTab === 'servis')
             <div class="space-y-3">
                 @forelse($servis as $sv)
-                    <div class="bg-white rounded-2xl border border-ink-100 p-4">
+                    <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-5 shadow-sm">
                         <div class="flex items-center justify-between">
                             <div>
                                 <span class="font-mono text-up-primary font-bold text-sm">{{ $sv->no_tiket }}</span>
-                                <span class="font-bold text-ink-900 ml-2 text-sm">{{ $sv->jenis_hp }}</span>
+                                <span class="font-bold text-ink-900 dark:text-white ml-2 text-sm">{{ $sv->jenis_hp }}</span>
                             </div>
                             <x-prism.status-pill :status="$sv->status" />
                         </div>
-                        <p class="text-xs text-ink-500 mt-2">{{ $sv->keluhan }}</p>
+                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-2">{{ $sv->keluhan }}</p>
                         @if($sv->estimasi_biaya !== null || $sv->status_pembayaran)
-                            <div class="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-ink-50 text-xs">
+                            <div class="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-ink-50 dark:border-white/5 text-xs">
                                 @if($sv->estimasi_biaya !== null)
-                                    <span class="text-ink-500">
-                                        Estimasi Biaya: <strong class="text-ink-900 tabular-nums">Rp {{ number_format($sv->estimasi_biaya, 0, ',', '.') }}</strong>
+                                    <span class="text-ink-500 dark:text-ink-400">
+                                        Estimasi Biaya: <strong class="text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($sv->estimasi_biaya, 0, ',', '.') }}</strong>
                                     </span>
                                 @endif
                                 @if($sv->status_pembayaran)
@@ -119,7 +119,7 @@
                                 @endif
                             </div>
                         @endif
-                        <div class="flex items-center justify-between mt-3 pt-3 border-t border-ink-100">
+                        <div class="flex items-center justify-between mt-3 pt-3 border-t border-ink-100 dark:border-white/10">
                             <span class="text-xs {{ $sv->garansi && $sv->garansi->active ? 'text-up-mint font-bold' : 'text-ink-400' }}">
                                 {{ $sv->garansi && $sv->garansi->active ? '🛡️ Dalam Garansi s.d ' . $sv->garansi->tanggal_berakhir->format('d/m/Y') : 'Garansi ' . ($sv->garansi ? 'habis' : 'belum ada') }}
                             </span>
@@ -129,8 +129,8 @@
                         </div>
                     </div>
                 @empty
-                    <div class="text-center py-14 bg-white rounded-2xl border border-ink-100">
-                        <p class="font-semibold text-ink-700">Belum ada servis</p>
+                    <div class="text-center py-14 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
+                        <p class="font-semibold text-ink-700 dark:text-ink-300">Belum ada servis</p>
                     </div>
                 @endforelse
             </div>
@@ -140,19 +140,19 @@
         @if($activeTab === 'komisi' && $customer->is_reseller)
             <div class="space-y-3">
                 @forelse($komisi as $k)
-                    <div class="bg-white rounded-2xl border border-ink-100 p-4">
+                    <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-5 shadow-sm">
                         <div class="flex items-center justify-between">
                             <span class="font-mono text-up-accent font-bold text-sm">{{ $k->no_komisi }}</span>
                             <x-prism.status-pill :status="$k->status" />
                         </div>
                         <div class="flex justify-between items-center mt-2">
-                            <span class="text-xs text-ink-500">{{ $k->keterangan }}</span>
+                            <span class="text-xs text-ink-500 dark:text-ink-400">{{ $k->keterangan }}</span>
                             <span class="font-black text-up-accent tabular-nums">Rp {{ number_format($k->nominal_komisi, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 @empty
-                    <div class="text-center py-14 bg-white rounded-2xl border border-ink-100">
-                        <p class="font-semibold text-ink-700">Belum ada komisi</p>
+                    <div class="text-center py-14 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
+                        <p class="font-semibold text-ink-700 dark:text-ink-300">Belum ada komisi</p>
                         <p class="text-xs text-ink-400 mt-1">Komisi otomatis terhitung dari transaksi atas nama Anda.</p>
                     </div>
                 @endforelse

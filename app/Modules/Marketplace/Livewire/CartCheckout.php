@@ -53,14 +53,14 @@ class CartCheckout extends Component
         return Cabang::where('is_active', true)->get();
     }
 
-    public function updateQty(?int $variantId, int $qty)
+    public function updateQty(string $key, int $qty)
     {
-        app(CartService::class)->updateQty($variantId, $qty);
+        app(CartService::class)->updateQty($key, $qty);
     }
 
-    public function hapus(?int $variantId)
+    public function hapus(string $key)
     {
-        app(CartService::class)->hapus($variantId);
+        app(CartService::class)->hapus($key);
     }
 
     public function lanjutCheckout()
