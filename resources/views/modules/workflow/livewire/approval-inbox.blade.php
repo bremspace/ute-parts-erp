@@ -35,7 +35,7 @@
         </div>
     @else
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="overflow-x-auto">
+            <x-prism.dual-scroll>
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-900">
                         <tr>
@@ -141,7 +141,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-prism.dual-scroll>
         </div>
 
         <div class="mt-4">

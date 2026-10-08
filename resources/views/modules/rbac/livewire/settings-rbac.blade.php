@@ -544,7 +544,7 @@
             <!-- SUB-TAB 1: KATEGORI -->
             @if($masterProdukSubTab === 'kategori')
                 <x-prism.glass-card title="Katalog Kategori Berjenjang" subtitle="Kelola kategori utama dan sub-kategori untuk pengelompokan produk">
-                    <div class="overflow-x-auto">
+                    <x-prism.dual-scroll>
                         <table class="w-full text-left text-xs text-ink-200">
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
@@ -602,13 +602,13 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
+                    </x-prism.dual-scroll>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 2: BRAND -->
             @elseif($masterProdukSubTab === 'brand')
                 <x-prism.glass-card title="Master Brand Produk" subtitle="Kelola merek produk suku cadang dan aksesoris">
-                    <div class="overflow-x-auto">
+                    <x-prism.dual-scroll>
                         <table class="w-full text-left text-xs text-ink-200">
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
@@ -644,13 +644,13 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
+                    </x-prism.dual-scroll>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 3: KUALITAS -->
             @elseif($masterProdukSubTab === 'kualitas')
                 <x-prism.glass-card title="Master Tingkat Kualitas" subtitle="Klasifikasi kualitas suku cadang (Original, Grade A, OEM, dll)">
-                    <div class="overflow-x-auto">
+                    <x-prism.dual-scroll>
                         <table class="w-full text-left text-xs text-ink-200">
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
@@ -686,13 +686,13 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
+                    </x-prism.dual-scroll>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 4: SATUAN -->
             @elseif($masterProdukSubTab === 'satuan')
                 <x-prism.glass-card title="Master Satuan Unit (UOM)" subtitle="Daftar satuan kuantitas barang inventaris (pcs, unit, box, set, dll)">
-                    <div class="overflow-x-auto">
+                    <x-prism.dual-scroll>
                         <table class="w-full text-left text-xs text-ink-200">
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
@@ -724,13 +724,13 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
+                    </x-prism.dual-scroll>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 5: KONDISI -->
             @elseif($masterProdukSubTab === 'kondisi')
                 <x-prism.glass-card title="Master Opsi Kondisi Produk" subtitle="Opsi kondisi barang yang muncul pada form registrasi dan katalog">
-                    <div class="overflow-x-auto">
+                    <x-prism.dual-scroll>
                         <table class="w-full text-left text-xs text-ink-200">
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
@@ -762,13 +762,13 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
+                    </x-prism.dual-scroll>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 6: TIPE HP -->
             @elseif($masterProdukSubTab === 'tipe_hp')
                 <x-prism.glass-card title="Master Tipe HP / Perangkat Kompatibel" subtitle="Database tipe perangkat untuk pemetaan kompatibilitas sparepart">
-                    <div class="overflow-x-auto">
+                    <x-prism.dual-scroll>
                         <table class="w-full text-left text-xs text-ink-200">
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
@@ -806,7 +806,7 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
+                    </x-prism.dual-scroll>
                 </x-prism.glass-card>
             @endif
         </div>

@@ -122,7 +122,7 @@
                     </select>
                 </div>
 
-                <div class="overflow-x-auto">
+                <x-prism.dual-scroll>
                     <table class="min-w-full divide-y divide-ink-100">
                         <thead class="bg-ink-50/50">
                             <tr>
@@ -172,7 +172,7 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
+                </x-prism.dual-scroll>
             </div>
         </div>
     </div>

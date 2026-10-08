@@ -18,7 +18,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable([
     'nama', 'slug', 'barcode', 'deskripsi', 'kategori', 'kategori_id', 'brand_kompatibel',
     'model_kompatibel', 'kondisi', 'satuan', 'harga_beli',
-    'harga_jual_retail', 'gambar', 'foto', 'meta_title', 'meta_description',
+    'metode_harga_beli', 'harga_jual_retail', 'margin_persen', 'gambar', 'foto', 'meta_title', 'meta_description',
     'kompatibilitas_hp', 'is_active',
     // [T-44]
     'brand_id', 'kualitas_id',
@@ -60,7 +60,9 @@ class Produk extends Model
         'is_active' => 'boolean',
         'sn' => 'boolean', // [F2-3] wajib SN di GRN/POS/servis
         'harga_beli' => 'decimal:2',
+        'metode_harga_beli' => 'string',
         'harga_jual_retail' => 'decimal:2',
+        'margin_persen' => 'decimal:2',
         'foto' => 'array', // [T-11]
         'kompatibilitas_hp' => 'array', // [T-11] terstruktur [{merk, model}]
         'is_ondemand' => 'boolean',

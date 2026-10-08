@@ -186,7 +186,7 @@
     <div class="glass-panel rounded-2xl border border-white/10 overflow-hidden shadow-xl">
         @if($activeTab === 'global')
             {{-- TAB 0: RIWAYAT TRANSAKSI GLOBAL --}}
-            <div class="overflow-x-auto">
+            <x-prism.dual-scroll>
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
@@ -313,11 +313,11 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
+            </x-prism.dual-scroll>
 
         @elseif($activeTab === 'pos')
             {{-- TAB 1: PENJUALAN KASIR POS --}}
-            <div class="overflow-x-auto">
+            <x-prism.dual-scroll>
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
@@ -376,11 +376,11 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
+            </x-prism.dual-scroll>
 
         @elseif($activeTab === 'servis')
             {{-- TAB 2: REKAP SERVIS SELESAI & LUNAS SECARA PENUH --}}
-            <div class="overflow-x-auto">
+            <x-prism.dual-scroll>
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
@@ -478,11 +478,11 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
+            </x-prism.dual-scroll>
 
         @elseif($activeTab === 'mutasi_kas')
             {{-- TAB 3: MUTASI KAS LACI --}}
-            <div class="overflow-x-auto">
+            <x-prism.dual-scroll>
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
@@ -535,7 +535,7 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
+            </x-prism.dual-scroll>
         @endif
 
         {{-- Pagination --}}

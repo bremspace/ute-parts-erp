@@ -443,37 +443,38 @@
 
     <!-- Stock Kritis & Transaksi Terkini -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Top Stok Kritis (Visual Barometer Gauge) -->
-        <x-prism.glass-card title="Stok Kritis" subtitle="Item di bawah ambang batas minimum">
+        <!-- Perubahan Harga Terbaru (dari GRN / Supplier) -->
+        <x-prism.glass-card title="Perubahan Harga Terbaru" subtitle="Harga beli masuk dari GRN barang datang">
             <div class="divide-y divide-white/5 max-h-80 overflow-y-auto pr-1 -mt-1">
-                @forelse($stokKritis['items'] as $item)
-                    @php
-                        $jumlah = (int) ($item->jumlah ?? 0);
-                        $min = max(1, (int) ($item->jumlah_minimum ?? 1));
-                        $ratio = min(100, round(($jumlah / $min) * 100));
-                        $isZero = $jumlah <= 0;
-                    @endphp
+                @forelse($perubahanHargaTerbaru['items'] as $item)
                     <div class="py-2.5 flex items-center justify-between gap-3">
                         <div class="min-w-0 flex-1">
-                            <p class="text-xs font-semibold text-white truncate">{{ $item->produk?->nama ?? '-' }}</p>
-                            <p class="text-[10px] text-ink-500 truncate">{{ $item->gudang?->nama ?? '-' }}</p>
-                            <div class="w-full h-1.5 bg-white/5 rounded-full mt-1.5 overflow-hidden">
-                                <div class="h-full rounded-full {{ $isZero ? 'bg-up-red' : ($ratio < 50 ? 'bg-up-accent' : 'bg-up-amber') }}" style="width: {{ max(5, $ratio) }}%"></div>
+                            <p class="text-xs font-semibold text-white truncate">{{ $item->produk_nama }}</p>
+                            <div class="flex items-center gap-1.5 mt-0.5 text-[10px] text-ink-400">
+                                <span class="tabular-nums">Rp {{ number_format($item->harga_lama, 0, ',', '.') }}</span>
+                                <span>&rarr;</span>
+                                <span class="tabular-nums font-medium text-white">Rp {{ number_format($item->harga_baru, 0, ',', '.') }}</span>
                             </div>
+                            <span class="block text-[9px] text-ink-500 mt-0.5">{{ $item->waktu }}</span>
                         </div>
                         <div class="text-right flex-shrink-0">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold tabular-nums {{ $isZero ? 'bg-up-red/20 text-up-red border border-up-red/30' : 'bg-up-amber/15 text-up-amber' }}">
-                                {{ $jumlah }} / {{ $min }}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold tabular-nums {{ $item->is_naik ? 'bg-up-red/15 text-up-red border border-up-red/30' : 'bg-up-mint/15 text-up-mint border border-up-mint/30' }}">
+                                <span>{{ $item->is_naik ? '+' : '' }}{{ number_format($item->persen, 1) }}%</span>
+                                <svg class="w-3 h-3 {{ $item->is_naik ? 'rotate-0' : 'rotate-180' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                                </svg>
                             </span>
-                            <span class="block text-[9px] text-ink-500 mt-0.5">{{ $isZero ? 'Habis Total' : 'Kritis' }}</span>
+                            <span class="block text-[9px] text-ink-400 mt-0.5 tabular-nums">
+                                {{ $item->is_naik ? '+' : '' }}Rp {{ number_format($item->selisih, 0, ',', '.') }}
+                            </span>
                         </div>
                     </div>
                 @empty
                     <div class="py-8 text-center">
-                        <div class="w-10 h-10 rounded-full bg-up-mint/10 border border-up-mint/20 text-up-mint mx-auto flex items-center justify-center">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <div class="w-10 h-10 rounded-full bg-white/5 border border-white/10 text-ink-400 mx-auto flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
-                        <p class="text-xs text-ink-400 font-medium mt-2">Semua stok berada dalam batas aman.</p>
+                        <p class="text-xs text-ink-400 font-medium mt-2">Belum ada perubahan harga beli dari penerimaan barang.</p>
                     </div>
                 @endforelse
             </div>
@@ -481,7 +482,7 @@
 
         <!-- Transaksi Terkini Feed -->
         <x-prism.glass-card class="lg:col-span-2" title="Aktivitas Transaksi Terkini" subtitle="Penjualan dan pesanan yang baru masuk di cabang">
-            <div class="overflow-x-auto -mt-1">
+            <x-prism.dual-scroll class="-mt-1">
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold border-b border-white/5">
@@ -526,7 +527,7 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
+            </x-prism.dual-scroll>
         </x-prism.glass-card>
     </div>
 

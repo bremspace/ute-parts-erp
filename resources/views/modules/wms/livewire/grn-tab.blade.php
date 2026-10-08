@@ -125,28 +125,29 @@
                         <div class="flex gap-2 items-center text-xs">
                             <div class="flex-1 min-w-0">
                                 <div class="font-bold text-white truncate">{{ $item['produk_nama'] ?? ('#'.$item['produk_id']) }}</div>
-                                @cansee('harga_beli')
-                                    <div class="text-ink-400 tabular-nums">
-                                        Harga Rp {{ number_format((float) ($item['harga_beli'] ?? 0), 0, ',', '.') }}
-                                    </div>
-@cannotsee('harga_beli')
-                                    <div class="text-ink-400 tabular-nums">
-                                        Harga —
-                                    </div>
-@endcansee
+                                <div class="text-[10px] text-ink-400">PO: {{ $item['qty_po'] ?? '-' }} pcs</div>
                             </div>
-                            <div class="w-20 text-center tabular-nums text-ink-300">
-                                <div class="text-[10px] text-ink-400">Qty PO</div>
-                                <div class="font-bold">{{ $item['qty_po'] ?? '-' }}</div>
+                            @cansee('harga_beli')
+                            <div class="w-32">
+                                <div class="text-[10px] text-ink-400 mb-0.5">Harga Beli Masuk</div>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="100"
+                                    wire:model="grnForm.item_qty.{{ $idx }}.harga_beli"
+                                    class="w-full px-2 py-1.5 rounded-xl glass-input text-xs tabular-nums text-right font-medium"
+                                    placeholder="Rp 0"
+                                />
                             </div>
-                            <div class="w-28">
+                            @endcansee
+                            <div class="w-24">
                                 <div class="text-[10px] text-ink-400 mb-0.5">Diterima</div>
                                 <input
                                     type="number"
                                     min="0"
                                     max="{{ $item['qty_po'] ?? 0 }}"
                                     wire:model.live="grnForm.item_qty.{{ $idx }}.qty_received"
-                                    class="w-full px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-center"
+                                    class="w-full px-2 py-1.5 rounded-xl glass-input text-xs tabular-nums text-center"
                                 />
                             </div>
                         </div>

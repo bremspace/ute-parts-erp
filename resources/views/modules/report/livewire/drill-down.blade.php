@@ -119,7 +119,7 @@
                     <h4 class="text-sm font-bold text-white mb-3">
                         Rincian {{ \App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST[$childModel] ?? $childModel }} ({{ count($childItems) }})
                     </h4>
-                    <div class="overflow-x-auto">
+                    <x-prism.dual-scroll>
                         <table class="w-full text-xs text-left border-collapse">
                             <thead>
                                 <tr class="bg-white/5">
@@ -142,7 +142,7 @@
                                 @endforeach
                             </tbody>
                         </table>
-                    </div>
+                    </x-prism.dual-scroll>
                 </div>
             @endif
 
@@ -160,7 +160,7 @@
                 @endcan
             </div>
             @if(count($items) > 0)
-                <div class="overflow-x-auto">
+                <x-prism.dual-scroll>
                     <table class="w-full text-xs text-left border-collapse">
                         <thead>
                             <tr class="bg-white/5">
@@ -183,7 +183,7 @@
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-prism.dual-scroll>
             @else
                 <div class="text-center py-8 text-ink-500 text-sm">
                     Tidak ada data. Pilih sumber data dari atas.

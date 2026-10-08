@@ -86,6 +86,8 @@ class PurchaseOrderService
                     smlReferensiId: $po->id
                 );
 
+                $this->produkService->sesuaikanHargaBeliAverage($item->produk_id, $qty, $harga);
+
                 $totalHpp += $harga * $qty;
             }
 

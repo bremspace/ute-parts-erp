@@ -59,7 +59,7 @@
         <div class="lg:col-span-2">
             <div class="glass-card p-5">
                 <h2 class="text-lg font-semibold text-ink-800 mb-4">Daftar Shift</h2>
-                <div class="overflow-x-auto">
+                <x-prism.dual-scroll>
                     <table class="min-w-full divide-y divide-ink-200 text-sm">
                         <thead class="bg-ink-50">
                             <tr>
@@ -95,7 +95,7 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
+                </x-prism.dual-scroll>
             </div>
         </div>
     </div>
@@ -144,7 +144,7 @@
         <div class="lg:col-span-2">
             <div class="glass-card p-5">
                 <h2 class="text-lg font-semibold text-ink-800 mb-4">Jadwal Bulan {{ $kpiPeriode }}</h2>
-                <div class="overflow-x-auto">
+                <x-prism.dual-scroll>
                     <table class="min-w-full divide-y divide-ink-200 text-sm">
                         <thead class="bg-ink-50">
                             <tr>
@@ -169,7 +169,7 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
+                </x-prism.dual-scroll>
             </div>
         </div>
     </div>
@@ -237,7 +237,7 @@
                         <option value="cuti">Cuti</option>
                     </select>
                 </div>
-                <div class="overflow-x-auto">
+                <x-prism.dual-scroll>
                     <table class="min-w-full divide-y divide-ink-200 text-sm">
                         <thead class="bg-ink-50">
                             <tr>
@@ -275,7 +275,7 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
+                </x-prism.dual-scroll>
             </div>
         </div>
     </div>
@@ -300,7 +300,7 @@
 
     <div class="glass-card p-5">
         <h2 class="text-lg font-semibold text-ink-800 mb-4">Hasil KPI {{ $kpiPeriode }}</h2>
-        <div class="overflow-x-auto">
+        <x-prism.dual-scroll>
             <table class="min-w-full divide-y divide-ink-200 text-sm">
                 <thead class="bg-ink-50">
                     <tr>
@@ -331,7 +331,7 @@
                     @endforelse
                 </tbody>
             </table>
-        </div>
+        </x-prism.dual-scroll>
     </div>
     @endif
 </div>

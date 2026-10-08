@@ -80,6 +80,10 @@ class ProdukTab extends Component
         'harga_fleksibel' => false,
         // [F2-3] Serial number tracking
         'sn' => false,
+        // [HARGA BELI & JUAL DINAMIS]
+        'metode_harga_beli' => 'average',
+        'margin_persen' => null,
+        'hitung_dari_margin' => false,
         // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
         'abc_class' => 'B',
         'reorder_point' => null,
@@ -185,6 +189,10 @@ class ProdukTab extends Component
             'harga_fleksibel' => false,
             // [F2-3]
             'sn' => false,
+            // [HARGA BELI & JUAL DINAMIS]
+            'metode_harga_beli' => 'average',
+            'margin_persen' => null,
+            'hitung_dari_margin' => false,
             // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
             'abc_class' => 'B',
             'reorder_point' => null,
@@ -206,14 +214,92 @@ class ProdukTab extends Component
         }
     }
 
+    public function updatedProdukFormMarginPersen($value): void
+    {
+        $margin = is_numeric($value) ? (float) $value : 0;
+        $hargaBeli = $this->parseNominal($this->produkForm['harga_beli'] ?? 0);
+        if ($hargaBeli > 0 && $margin > 0) {
+            $hargaJual = round($hargaBeli * (1 + ($margin / 100)));
+            $this->produkForm['harga_jual_retail'] = $hargaJual;
+            $this->produkForm['harga_tier']['retail']['nominal_tetap'] = $hargaJual;
+        }
+    }
+
+    public function updatedProdukFormHargaBeli($value): void
+    {
+        $hargaBeli = $this->parseNominal($value);
+        if (! empty($this->produkForm['hitung_dari_margin']) && ! empty($this->produkForm['margin_persen'])) {
+            $margin = (float) $this->produkForm['margin_persen'];
+            $hargaJual = round($hargaBeli * (1 + ($margin / 100)));
+            $this->produkForm['harga_jual_retail'] = $hargaJual;
+            $this->produkForm['harga_tier']['retail']['nominal_tetap'] = $hargaJual;
+        } elseif ($hargaBeli > 0 && ! empty($this->produkForm['harga_jual_retail'])) {
+            $hargaJual = $this->parseNominal($this->produkForm['harga_jual_retail']);
+            if ($hargaJual >= $hargaBeli) {
+                $this->produkForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
+            }
+        }
+    }
+
+    public function updatedProdukFormHitungDariMargin($value): void
+    {
+        if ($value && ! empty($this->produkForm['margin_persen'])) {
+            $this->updatedProdukFormMarginPersen($this->produkForm['margin_persen']);
+        }
+    }
+
     public function updatedProdukFormHargaJualRetail($value): void
     {
-        $this->produkForm['harga_tier']['retail']['nominal_tetap'] = $this->parseNominal($value);
+        $hargaJual = $this->parseNominal($value);
+        $this->produkForm['harga_tier']['retail']['nominal_tetap'] = $hargaJual;
+        $hargaBeli = $this->parseNominal($this->produkForm['harga_beli'] ?? 0);
+        if ($hargaBeli > 0 && empty($this->produkForm['hitung_dari_margin'])) {
+            $this->produkForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
+        }
+    }
+
+    public function updatedEditProdukFormMarginPersen($value): void
+    {
+        $margin = is_numeric($value) ? (float) $value : 0;
+        $hargaBeli = $this->parseNominal($this->editProdukForm['harga_beli'] ?? 0);
+        if ($hargaBeli > 0 && $margin > 0) {
+            $hargaJual = round($hargaBeli * (1 + ($margin / 100)));
+            $this->editProdukForm['harga_jual_retail'] = $hargaJual;
+            $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = $hargaJual;
+        }
+    }
+
+    public function updatedEditProdukFormHargaBeli($value): void
+    {
+        $hargaBeli = $this->parseNominal($value);
+        if (! empty($this->editProdukForm['hitung_dari_margin']) && ! empty($this->editProdukForm['margin_persen'])) {
+            $margin = (float) $this->editProdukForm['margin_persen'];
+            $hargaJual = round($hargaBeli * (1 + ($margin / 100)));
+            $this->editProdukForm['harga_jual_retail'] = $hargaJual;
+            $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = $hargaJual;
+        } elseif ($hargaBeli > 0 && ! empty($this->editProdukForm['harga_jual_retail'])) {
+            $hargaJual = $this->parseNominal($this->editProdukForm['harga_jual_retail']);
+            if ($hargaJual >= $hargaBeli) {
+                $this->editProdukForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
+            }
+        }
+    }
+
+    public function updatedEditProdukFormHitungDariMargin($value): void
+    {
+        if ($value && ! empty($this->editProdukForm['margin_persen'])) {
+            $this->updatedEditProdukFormMarginPersen($this->editProdukForm['margin_persen']);
+        }
     }
 
     public function updatedEditProdukFormHargaJualRetail($value): void
     {
-        $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = $this->parseNominal($value);
+        $hargaJual = $this->parseNominal($value);
+        $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = $hargaJual;
+        $hargaBeli = $this->parseNominal($this->editProdukForm['harga_beli'] ?? 0);
+        if ($hargaBeli > 0 && empty($this->editProdukForm['hitung_dari_margin'])) {
+            $this->editProdukForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
+        }
     }
 
     public function simpanProduk()
@@ -334,7 +420,9 @@ class ProdukTab extends Component
                 minStock: ! empty($this->produkForm['min_stock']) ? (int) $this->produkForm['min_stock'] : null,
                 maxStock: ! empty($this->produkForm['max_stock']) ? (int) $this->produkForm['max_stock'] : null,
                 isOndemand: (bool) ($this->produkForm['is_ondemand'] ?? false),
-                barcode: ! empty($this->produkForm['barcode']) ? trim($this->produkForm['barcode']) : null
+                barcode: ! empty($this->produkForm['barcode']) ? trim($this->produkForm['barcode']) : null,
+                metodeHargaBeli: $this->produkForm['metode_harga_beli'] ?? 'average',
+                marginPersen: ! empty($this->produkForm['margin_persen']) ? (float) $this->produkForm['margin_persen'] : null
             );
 
             $this->showProdukModal = false;
@@ -385,6 +473,9 @@ class ProdukTab extends Component
             'harga_tier' => $tierMap,
             'harga_fleksibel' => (bool) $p->harga_fleksibel,
             'sn' => (bool) $p->sn,
+            'metode_harga_beli' => $p->metode_harga_beli ?? 'manual',
+            'margin_persen' => $p->margin_persen !== null ? (float) $p->margin_persen : null,
+            'hitung_dari_margin' => $p->margin_persen !== null && (float) $p->margin_persen > 0,
             'deskripsi' => $p->deskripsi ?? '',
             // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
             'abc_class' => $p->abc_class ?: 'B',
@@ -492,7 +583,9 @@ class ProdukTab extends Component
                 minStock: ! empty($this->editProdukForm['min_stock']) ? (int) $this->editProdukForm['min_stock'] : null,
                 maxStock: ! empty($this->editProdukForm['max_stock']) ? (int) $this->editProdukForm['max_stock'] : null,
                 isOndemand: (bool) ($this->editProdukForm['is_ondemand'] ?? false),
-                barcode: isset($this->editProdukForm['barcode']) ? trim((string) $this->editProdukForm['barcode']) : null
+                barcode: isset($this->editProdukForm['barcode']) ? trim((string) $this->editProdukForm['barcode']) : null,
+                metodeHargaBeli: $this->editProdukForm['metode_harga_beli'] ?? 'manual',
+                marginPersen: ! empty($this->editProdukForm['margin_persen']) ? (float) $this->editProdukForm['margin_persen'] : null
             );
 
             $this->showEditProdukModal = false;

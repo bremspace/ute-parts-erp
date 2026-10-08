@@ -5,7 +5,7 @@
 <div class="w-full overflow-hidden rounded-2xl glass-panel min-h-24">
     @isset($mobileCards)
         <!-- Mode Desktop: Wide Table -->
-        <div class="hidden md:block overflow-x-auto">
+        <x-prism.dual-scroll class="hidden md:block">
             <table class="w-full text-left text-sm text-ink-100 border-collapse min-w-[480px]">
                 <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-400">
                     <tr>
@@ -18,7 +18,7 @@
                     {{ $slot }}
                 </tbody>
             </table>
-        </div>
+        </x-prism.dual-scroll>
 
         <!-- Mode Mobile: Dedicated Card List -->
         <div class="block md:hidden p-4 space-y-3">
@@ -26,7 +26,7 @@
         </div>
     @else
         <!-- Responsive Horizontal Scroll Table -->
-        <div class="overflow-x-auto -mx-1 sm:mx-0">
+        <x-prism.dual-scroll class="-mx-1 sm:mx-0">
             <table class="w-full text-left text-sm text-ink-100 border-collapse min-w-[540px]">
                 <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-400">
                     <tr>
@@ -39,7 +39,7 @@
                     {{ $slot }}
                 </tbody>
             </table>
-        </div>
+        </x-prism.dual-scroll>
     @endisset
 
     @isset($pagination)

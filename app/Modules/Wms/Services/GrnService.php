@@ -7,6 +7,7 @@ use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\RiwayatPerubahanHarga;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
@@ -44,14 +45,18 @@ class GrnService
 
     protected NomorSeriService $nomorSeriService;
 
+    protected ?ProdukService $produkService;
+
     public function __construct(
         JurnalService $jurnalService,
         ApprovalService $approvalService,
-        NomorSeriService $nomorSeriService
+        NomorSeriService $nomorSeriService,
+        ?ProdukService $produkService = null
     ) {
         $this->jurnalService = $jurnalService;
         $this->approvalService = $approvalService;
         $this->nomorSeriService = $nomorSeriService;
+        $this->produkService = $produkService ?? app(ProdukService::class);
     }
 
     /**
@@ -71,8 +76,9 @@ class GrnService
      *
      * @param  array<int|string, int>  $itemReceived  [kunci "produk|sku" (komposit) ATAU produk_id => qty]
      * @param  array<int|string, array<int, string>>  $snPerProduk  [kunci sama => [SN, ...]] — hanya utk produk sn=true
+     * @param  array<int|string, float>  $itemHargaBeli  [kunci sama => harga_beli aktual saat GRN]
      */
-    public function inputGudang(PurchaseOrder $po, array $itemReceived, ?int $userId = null, array $snPerProduk = []): Grn
+    public function inputGudang(PurchaseOrder $po, array $itemReceived, ?int $userId = null, array $snPerProduk = [], array $itemHargaBeli = []): Grn
     {
         $cabangId = $po->gudangTujuan?->cabang_id;
         if (! $cabangId) {
@@ -90,7 +96,7 @@ class GrnService
 
         $pemohon = ApprovalService::pemohon($userId ?? auth()->id());
 
-        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $pemohon, $cabangId) {
+        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $pemohon, $cabangId) {
             $itemData = [];
             $totalHpp = 0;
             $needsApproval = false;
@@ -122,17 +128,22 @@ class GrnService
                     $status = 'tolak';
                 }
 
+                $hargaBeliAktual = isset($itemHargaBeli[$kunci])
+                    ? (float) $itemHargaBeli[$kunci]
+                    : (isset($itemHargaBeli[$kodeProduk]) ? (float) $itemHargaBeli[$kodeProduk] : (float) $poItem->harga_beli);
+
                 $itemData[] = [
                     'produk_id' => $kodeProduk,
                     'sku_variant_id' => $poItem->sku_variant_id,
                     'qty_po' => $poQty,
                     'qty_received' => $receivedQty,
-                    'harga_beli' => (float) $poItem->harga_beli,
+                    'harga_beli' => $hargaBeliAktual,
+                    'harga_po' => (float) $poItem->harga_beli,
                     'status' => $status,
                     'sn' => $snList, // [F2-3] disimpan utk finalisasi (auto & approval)
                 ];
 
-                $totalHpp += $receivedQty * (float) $poItem->harga_beli;
+                $totalHpp += $receivedQty * $hargaBeliAktual;
 
                 if ($status !== 'lengkap') {
                     $needsApproval = true;
@@ -311,6 +322,45 @@ class GrnService
             }
 
             $this->tambahStok($grn, $item, $qty, $actionedBy, $noPo);
+
+            $produkId = (int) $item['produk_id'];
+            $hargaBeliMasuk = (float) ($item['harga_beli'] ?? 0);
+
+            // Deteksi & catat perubahan harga dari PO / harga master
+            $produk = Produk::find($produkId);
+            if ($produk && $hargaBeliMasuk > 0) {
+                $hargaBeliLama = (float) $produk->harga_beli;
+                $hargaPo = (float) ($item['harga_po'] ?? $hargaBeliLama);
+
+                // Perubahan harga: jika harga masuk berbeda dari harga PO atau harga master produk
+                if (abs($hargaBeliMasuk - $hargaPo) > 0.01 || abs($hargaBeliMasuk - $hargaBeliLama) > 0.01) {
+                    $baselineHarga = abs($hargaBeliMasuk - $hargaPo) > 0.01 ? $hargaPo : $hargaBeliLama;
+                    $selisih = $hargaBeliMasuk - $baselineHarga;
+                    $persen = $baselineHarga > 0 ? round(($selisih / $baselineHarga) * 100, 2) : 0;
+
+                    RiwayatPerubahanHarga::create([
+                        'produk_id' => $produkId,
+                        'cabang_id' => $grn->cabang_id,
+                        'sumber' => 'grn',
+                        'referensi_type' => Grn::class,
+                        'referensi_id' => $grn->id,
+                        'harga_lama' => $baselineHarga,
+                        'harga_baru' => $hargaBeliMasuk,
+                        'selisih' => $selisih,
+                        'persentase_perubahan' => $persen,
+                        'catatan' => "Harga masuk GRN {$grn->no_grn}: Rp ".number_format($hargaBeliMasuk, 0, ',', '.').' (sebelumnya Rp '.number_format($baselineHarga, 0, ',', '.').')',
+                        'user_id' => $actionedBy,
+                    ]);
+                }
+            }
+
+            if ($this->produkService) {
+                $this->produkService->sesuaikanHargaBeliAverage(
+                    $produkId,
+                    $qty,
+                    $hargaBeliMasuk
+                );
+            }
         }
 
         $grn->update(['status' => 'terima']);

@@ -500,7 +500,7 @@
 
             <!-- Tabel Riwayat Pencocokan Kas Real -->
             <x-prism.glass-card title="Riwayat Pencocokan &amp; Opname Kas Real" subtitle="Daftar audit rekonsiliasi kas fisik vs catatan buku besar sistem" circuit="true">
-                <div class="overflow-x-auto">
+                <x-prism.dual-scroll>
                     <table class="w-full text-xs text-left">
                         <thead>
                             <tr class="border-b border-white/10 text-ink-400 font-semibold uppercase text-[10px]">
@@ -566,7 +566,7 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
+                </x-prism.dual-scroll>
             </x-prism.glass-card>
         </div>
     @endif

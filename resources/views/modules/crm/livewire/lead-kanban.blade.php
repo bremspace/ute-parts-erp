@@ -113,7 +113,7 @@
     </div>
 
     <!-- ===== KANBAN BOARD ===== -->
-    <div class="overflow-x-auto pb-2 snap-x snap-mandatory scroll-smooth touch-pan-x" wire:loading.class="opacity-50 pointer-events-none" wire:target="search, filterSumber, filterAssignedTo, updateLead, createLead, deleteLead, convertLead">
+    <x-prism.dual-scroll class="pb-2 snap-x snap-mandatory scroll-smooth touch-pan-x" wire:loading.class="opacity-50 pointer-events-none" wire:target="search, filterSumber, filterAssignedTo, updateLead, createLead, deleteLead, convertLead">
         <div class="flex gap-4 min-w-max items-start px-0.5">
             @foreach($stages as $stageKey => $stageMeta)
                 @php($colLeads = $kanbanData[$stageKey] ?? collect())
@@ -243,7 +243,7 @@
                 </div>
             @endforeach
         </div>
-    </div>
+    </x-prism.dual-scroll>
 
     <!-- ===== MODAL: TAMBAH LEAD ===== -->
     @if($showCreateModal)

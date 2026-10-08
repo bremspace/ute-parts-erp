@@ -121,6 +121,7 @@ class GrnTab extends Component
             'grnForm.item_qty' => 'required|array|min:1',
             'grnForm.item_qty.*.produk_id' => 'required|integer',
             'grnForm.item_qty.*.qty_received' => 'required|integer|min:0',
+            'grnForm.item_qty.*.harga_beli' => 'nullable|numeric|min:0',
             'grnForm.item_qty.*.sn' => 'nullable|string', // [F2-3]
             'grnForm.catatan' => 'nullable|string',
         ]);
@@ -141,10 +142,14 @@ class GrnTab extends Component
             // [F2-3] Kumpulkan daftar SN + qty per baris — kunci komposit "produk|sku"
             // (P1-4: baris dgn produk sama + sku_variant berbeda tidak boleh tabrakan).
             $itemReceived = [];
+            $hargaPerProduk = [];
             $snPerProduk = [];
             foreach ($this->grnForm['item_qty'] as $row) {
                 $kunci = GrnService::kunciItem($row['produk_id'] ?? 0, $row['sku_variant_id'] ?? null);
                 $itemReceived[$kunci] = (int) ($row['qty_received'] ?? 0);
+                if (isset($row['harga_beli']) && $row['harga_beli'] !== null && $row['harga_beli'] !== '') {
+                    $hargaPerProduk[$kunci] = (float) $row['harga_beli'];
+                }
 
                 if ($row['sn_flag'] ?? false) {
                     $snPerProduk[$kunci] = app(NomorSeriService::class)
@@ -156,7 +161,8 @@ class GrnTab extends Component
                 $po,
                 $itemReceived,
                 auth()->id(),
-                $snPerProduk
+                $snPerProduk,
+                $hargaPerProduk
             );
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);

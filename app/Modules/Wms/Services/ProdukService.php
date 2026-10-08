@@ -69,9 +69,11 @@ class ProdukService
         ?int $minStock = null,
         ?int $maxStock = null,
         bool $isOndemand = false,
-        ?string $barcode = null
+        ?string $barcode = null,
+        string $metodeHargaBeli = 'average',
+        ?float $marginPersen = null
     ): Produk {
-        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode) {
+        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen) {
             $satuan = $satuanKode ?: 'pcs';
             $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
             if ($satuanKode && ! $satuanRef) {
@@ -146,7 +148,9 @@ class ProdukService
                 'kondisi' => in_array($kondisi, ['baru', 'oem', 'compatible'], true) ? $kondisi : 'baru',
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,
+                'metode_harga_beli' => in_array($metodeHargaBeli, ['manual', 'average'], true) ? $metodeHargaBeli : 'manual',
                 'harga_jual_retail' => $hargaJual,
+                'margin_persen' => $marginPersen !== null && $marginPersen >= 0 ? $marginPersen : null,
                 'gambar' => $fotoUtamaUrl,
                 'foto' => ! empty($foto) ? array_values($foto) : null,
                 'is_active' => true,
@@ -229,9 +233,11 @@ class ProdukService
         ?int $minStock = null,
         ?int $maxStock = null,
         ?bool $isOndemand = null,
-        ?string $barcode = null
+        ?string $barcode = null,
+        ?string $metodeHargaBeli = null,
+        ?float $marginPersen = null
     ): Produk {
-        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode) {
+        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen) {
             $produk = Produk::findOrFail($produkId);
 
             $satuan = $satuanKode ?: ($produk->satuan ?: 'pcs');
@@ -299,7 +305,9 @@ class ProdukService
                 'kondisi' => in_array($kondisi, ['baru', 'oem', 'compatible'], true) ? $kondisi : 'baru',
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,
+                'metode_harga_beli' => $metodeHargaBeli !== null && in_array($metodeHargaBeli, ['manual', 'average'], true) ? $metodeHargaBeli : $produk->metode_harga_beli,
                 'harga_jual_retail' => $hargaJual,
+                'margin_persen' => $marginPersen !== null ? ($marginPersen >= 0 ? $marginPersen : null) : $produk->margin_persen,
                 'gambar' => $fotoUtamaUrl ?? $produk->gambar,
                 'foto' => ! empty($foto) ? array_values($foto) : $produk->foto,
                 'harga_fleksibel' => $hargaFleksibel,
@@ -581,5 +589,55 @@ class ProdukService
 
             return $stok;
         });
+    }
+
+    /**
+     * Hitung Moving Average Cost (MAC) dan sesuaikan harga modal/beli produk otomatis.
+     * Jika margin_persen terisi, harga jual retail ikut disesuaikan otomatis.
+     */
+    public function sesuaikanHargaBeliAverage(int $produkId, int $qtyMasuk, float $hargaBeliMasuk): void
+    {
+        if ($qtyMasuk <= 0 || $hargaBeliMasuk <= 0) {
+            return;
+        }
+
+        $produk = Produk::whereKey($produkId)->lockForUpdate()->first();
+        if (! $produk || $produk->metode_harga_beli !== 'average') {
+            return;
+        }
+
+        $stokTotalSekarang = (int) StokItem::where('produk_id', $produkId)->sum('jumlah');
+        $stokLama = max(0, $stokTotalSekarang - $qtyMasuk);
+        $hargaBeliLama = (float) $produk->harga_beli;
+
+        if ($stokLama <= 0) {
+            $hargaBeliBaru = round($hargaBeliMasuk, 2);
+        } else {
+            $hargaBeliBaru = round((($stokLama * $hargaBeliLama) + ($qtyMasuk * $hargaBeliMasuk)) / ($stokLama + $qtyMasuk), 2);
+        }
+
+        $updateData = [
+            'harga_beli' => $hargaBeliBaru,
+        ];
+
+        if ($produk->margin_persen !== null && (float) $produk->margin_persen > 0) {
+            $hargaJualBaru = round($hargaBeliBaru * (1 + ((float) $produk->margin_persen / 100)));
+            $updateData['harga_jual_retail'] = $hargaJualBaru;
+
+            HargaTier::where('produk_id', $produk->id)
+                ->where('tipe', 'retail')
+                ->update(['nominal_tetap' => $hargaJualBaru]);
+        }
+
+        $produk->update($updateData);
+
+        $variant = $produk->skuVariants()->first();
+        if ($variant) {
+            $variantUpdate = ['harga_beli' => $hargaBeliBaru];
+            if (isset($updateData['harga_jual_retail'])) {
+                $variantUpdate['harga_jual_retail'] = $updateData['harga_jual_retail'];
+            }
+            $variant->update($variantUpdate);
+        }
     }
 }

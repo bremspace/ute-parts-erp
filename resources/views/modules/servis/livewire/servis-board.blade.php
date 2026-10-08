@@ -100,7 +100,7 @@
     @endif
 
     <!-- ===== KANBAN BOARD ===== -->
-    <div class="flex-1 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory scroll-smooth touch-pan-x">
+    <x-prism.dual-scroll class="flex-1 overflow-y-hidden pb-2 snap-x snap-mandatory scroll-smooth touch-pan-x">
         <div class="flex gap-3 sm:gap-4 h-full min-w-max px-0.5">
             @foreach($stateMachineColumns as $status => $col)
                 <div class="w-[82vw] sm:w-[320px] lg:w-[280px] snap-center flex-shrink-0 flex flex-col rounded-2xl glass-panel overflow-hidden"
@@ -247,7 +247,7 @@
                 </div>
             @endforeach
         </div>
-    </div>
+    </x-prism.dual-scroll>
 
     <!-- ===== PELANGGAN SAAT INI & PERMISSION GUARD ===== -->
 

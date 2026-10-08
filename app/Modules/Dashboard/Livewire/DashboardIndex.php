@@ -16,6 +16,7 @@ use App\Modules\Report\Services\ReportBuilderService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\RiwayatPerubahanHarga;
 use App\Modules\Wms\Models\StokItem;
 use Closure;
 use Illuminate\Support\Facades\Cache;
@@ -156,6 +157,43 @@ class DashboardIndex extends Component
         return [
             'total' => $cached['total'] ?? 0,
             'items' => $items,
+        ];
+    }
+
+    /**
+     * Perubahan harga beli terbaru dari GRN/supplier — scoped cabang.
+     */
+    public function getPerubahanHargaTerbaruProperty(): array
+    {
+        $cached = $this->cacheWidget('perubahan-harga-terbaru', self::TTL_LIVE, function (): array {
+            $cabangId = session('cabang_id');
+
+            $query = RiwayatPerubahanHarga::query()
+                ->with(['produk', 'referensi'])
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->latest()
+                ->limit(6);
+
+            $rawItems = $query->get();
+
+            return [
+                'total' => RiwayatPerubahanHarga::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->count(),
+                'items' => $rawItems->map(fn ($r) => [
+                    'id' => $r->id,
+                    'produk_nama' => $r->produk?->nama ?? '-',
+                    'harga_lama' => (float) $r->harga_lama,
+                    'harga_baru' => (float) $r->harga_baru,
+                    'selisih' => (float) $r->selisih,
+                    'persen' => (float) $r->persentase_perubahan,
+                    'waktu' => $r->created_at?->diffForHumans() ?? '-',
+                    'is_naik' => (float) $r->selisih > 0,
+                ])->all(),
+            ];
+        });
+
+        return [
+            'total' => $cached['total'] ?? 0,
+            'items' => collect($cached['items'] ?? [])->map(fn ($item) => (object) $item),
         ];
     }
 
@@ -670,6 +708,7 @@ class DashboardIndex extends Component
             'omzetHariIni' => $this->omzetHariIni,
             'antrianServis' => $this->antrianServis,
             'stokKritis' => $this->stokKritis,
+            'perubahanHargaTerbaru' => $this->perubahanHargaTerbaru,
             'piutangJatuhTempo' => $this->piutangJatuhTempo,
             'komisiPending' => $this->komisiPending,
             'transaksiTerbaru' => $this->transaksiTerbaru,

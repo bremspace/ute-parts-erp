@@ -144,7 +144,7 @@
                     return $v ?? '-';
                 };
             @endphp
-            <div class="mt-4 overflow-x-auto">
+            <x-prism.dual-scroll class="mt-4">
                 <table class="w-full text-xs text-left border-collapse">
                     <thead>
                         <tr class="bg-white/5">
@@ -163,7 +163,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-prism.dual-scroll>
         @endif
 
         @if($showResults && count($queryResults) === 0)

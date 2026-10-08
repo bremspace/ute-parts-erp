@@ -127,7 +127,8 @@
             {{-- Log Absensi --}}
             <div class="glass-card p-5 space-y-3">
                 <h3 class="text-sm font-bold uppercase tracking-wider text-ink-800 dark:text-ink-100">Riwayat Presensi Bulanan</h3>
-                <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                <x-prism.dual-scroll>
+                    <div class="max-h-96 overflow-y-auto">
                     <table class="min-w-full divide-y divide-ink-200 dark:divide-white/10 text-xs">
                         <thead class="bg-black/5 dark:bg-white/5 sticky top-0">
                             <tr>
@@ -163,13 +164,15 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
+                    </div>
+                </x-prism.dual-scroll>
             </div>
 
             {{-- KPI Saya --}}
             <div class="glass-card p-5 space-y-3">
                 <h3 class="text-sm font-bold uppercase tracking-wider text-ink-800 dark:text-ink-100">Capaian KPI Periode Ini</h3>
-                <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                <x-prism.dual-scroll>
+                    <div class="max-h-96 overflow-y-auto">
                     <table class="min-w-full divide-y divide-ink-200 dark:divide-white/10 text-xs">
                         <thead class="bg-black/5 dark:bg-white/5 sticky top-0">
                             <tr>
@@ -204,7 +207,8 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
+                    </div>
+                </x-prism.dual-scroll>
             </div>
         </div>
 

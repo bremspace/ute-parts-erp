@@ -130,7 +130,7 @@
 
         {{-- Tabel Slip Gaji --}}
         <div class="glass-card overflow-hidden">
-            <div class="overflow-x-auto">
+            <x-prism.dual-scroll>
                 <table class="min-w-full divide-y divide-ink-200 dark:divide-white/10">
                     <thead class="bg-black/5 dark:bg-white/5">
                         <tr>
@@ -201,7 +201,7 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
+            </x-prism.dual-scroll>
         </div>
     @endif
 
@@ -232,7 +232,7 @@
 
             {{-- Table Karyawan Master Compensation --}}
             <div class="glass-card overflow-hidden">
-                <div class="overflow-x-auto">
+                <x-prism.dual-scroll>
                     <table class="min-w-full divide-y divide-ink-200 dark:divide-white/10">
                         <thead class="bg-black/5 dark:bg-white/5">
                             <tr>
@@ -296,7 +296,7 @@
                             @endforelse
                         </tbody>
                     </table>
-                </div>
+                </x-prism.dual-scroll>
             </div>
         </div>
     @endif

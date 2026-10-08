@@ -60,6 +60,24 @@ class PoTab extends Component
     // [PROCUREMENT MODAL: ABC, ROP, Min-Max, JIT]
     public bool $showProcurementModal = false;
 
+    // [HISTORI PEMBELIAN SUPPLIER MODAL]
+    public bool $showHistoriModal = false;
+
+    public ?int $historiProdukId = null;
+
+    public ?string $historiProdukNama = '';
+
+    public array $historiPembelianData = [];
+
+    public array $historiStatistik = [];
+
+    // [ANALISIS ABC MODAL]
+    public bool $showAnalisisAbcModal = false;
+
+    public array $analisisAbcData = [];
+
+    public int $analisisAbcPeriode = 90;
+
     public array $procurementFilter = [
         'abc_class' => '',
         'only_reorder' => true,
@@ -212,9 +230,67 @@ class PoTab extends Component
     {
         $produk = Produk::find($this->poForm['items'][$idx]['produk_id']);
         if ($produk) {
-            $this->poForm['items'][$idx]['harga_beli'] = (float) $produk->harga_beli;
+            $supplierId = ! empty($this->poForm['supplier_id']) ? (int) $this->poForm['supplier_id'] : null;
+            $histori = app(ProcurementService::class)->getHistoriPembelian($produk->id, $supplierId);
+
+            if (! empty($histori['items'])) {
+                // Gunakan harga beli terakhir dari supplier ini (atau supplier sebelumnya)
+                $this->poForm['items'][$idx]['harga_beli'] = (float) $histori['items'][0]['harga_beli'];
+                $this->poForm['items'][$idx]['info_terakhir'] = 'Terakhir: Rp '.number_format($histori['items'][0]['harga_beli'], 0, ',', '.').' ('.$histori['items'][0]['supplier_nama'].')';
+            } else {
+                $this->poForm['items'][$idx]['harga_beli'] = (float) $produk->harga_beli;
+                $this->poForm['items'][$idx]['info_terakhir'] = null;
+            }
+
             $this->poForm['items'][$idx]['sku_variant_id'] = $produk->skuVariants()->first()?->id;
         }
+    }
+
+    public function bukaHistoriPembelian(int $produkId, ?string $produkNama = null): void
+    {
+        $produk = Produk::find($produkId);
+        if (! $produk) {
+            return;
+        }
+
+        $this->historiProdukId = $produk->id;
+        $this->historiProdukNama = $produkNama ?: $produk->nama;
+        $data = app(ProcurementService::class)->getHistoriPembelian($produkId);
+        $this->historiPembelianData = $data['items'];
+        $this->historiStatistik = $data['statistik'];
+        $this->showHistoriModal = true;
+    }
+
+    public function tutupHistoriPembelian(): void
+    {
+        $this->showHistoriModal = false;
+        $this->historiProdukId = null;
+        $this->historiProdukNama = '';
+        $this->historiPembelianData = [];
+        $this->historiStatistik = [];
+    }
+
+    public function bukaAnalisisAbcModal(): void
+    {
+        $cabangId = session('cabang_id');
+        $this->analisisAbcData = app(ProcurementService::class)->hitungAnalisisAbc($cabangId, $this->analisisAbcPeriode);
+        $this->showAnalisisAbcModal = true;
+    }
+
+    public function tutupAnalisisAbcModal(): void
+    {
+        $this->showAnalisisAbcModal = false;
+    }
+
+    public function terapkanAnalisisAbcSemua(): void
+    {
+        $cabangId = session('cabang_id');
+        $count = app(ProcurementService::class)->terapkanAnalisisAbc([], $cabangId, $this->analisisAbcPeriode);
+        $this->showAnalisisAbcModal = false;
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Analisis ABC & parameter ROP berhasil diterapkan ke {$count} produk aktif.",
+        ]);
     }
 
     public function simpanPo()

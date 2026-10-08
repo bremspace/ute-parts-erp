@@ -102,11 +102,23 @@
                         </td>
                         <td class="py-3.5 px-4 tabular-nums text-xs">
                             @cansee('harga_beli')
-                            <span class="text-ink-400">Beli</span> <span class="text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-ink-400">Beli</span>
+                                <span class="text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
+                                @if(($p->metode_harga_beli ?? 'manual') === 'average')
+                                    <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-bold border border-up-mint/30" title="Metode: Moving Average Otomatis dari PO">Avg</span>
+                                @endif
+                            </div>
                             @cannotsee('harga_beli')
                             <span class="text-ink-400">Beli</span> <span class="text-white font-semibold">—</span>
                             @endcansee
-                            <span class="block text-ink-400 mt-0.5">Jual</span> <span class="text-up-mint font-semibold">Rp {{ number_format($p->harga_jual_retail, 0, ',', '.') }}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                <span class="text-ink-400">Jual</span>
+                                <span class="text-up-mint font-semibold">Rp {{ number_format($p->harga_jual_retail, 0, ',', '.') }}</span>
+                                @if($p->margin_persen > 0)
+                                    <span class="text-[9px] text-ink-400 font-mono" title="Margin {{ $p->margin_persen }}%">+{{ (float) $p->margin_persen }}%</span>
+                                @endif
+                            </div>
                         </td>
                         <td class="py-3.5 px-4">
                             <x-prism.stock-gauge :stok="$stokTotal" :min="$p->stokItems->min('jumlah_minimum') ?? 2" />
@@ -271,14 +283,61 @@
                         <x-prism.searchable-multi-select model="produkForm.produk_kompatibel_ids" :options="$allProdukOptions" placeholder="Cari produk substitusi / pengganti..." />
                         <p class="text-[9px] text-ink-500 mt-1">Produk lain yang bisa saling menggantikan (part substitution)</p>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Beli (Rp) *</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                    <!-- Skema Harga Beli Dinamis & Harga Jual Margin -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-white">💰 Skema Harga Beli &amp; Harga Jual</span>
+                            <div class="flex items-center gap-2">
+                                <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-300 cursor-pointer">
+                                    <input type="radio" value="manual" wire:model.live="produkForm.metode_harga_beli" class="text-up-primary focus:ring-0">
+                                    <span>Beli Manual</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-up-mint cursor-pointer">
+                                    <input type="radio" value="average" wire:model.live="produkForm.metode_harga_beli" class="text-up-mint focus:ring-0">
+                                    <span>Otomatis (Moving Average PO)</span>
+                                </label>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Jual Retail (Rp) *</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_jual_retail" wire:change="produkHargaJualBerubah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-semibold text-ink-300">Harga Beli (Rp) *</label>
+                                    @if(($produkForm['metode_harga_beli'] ?? 'manual') === 'average')
+                                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-mint/20 text-up-mint font-bold">Auto-Avg PO</span>
+                                    @endif
+                                </div>
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                                <p class="text-[9px] text-ink-500 mt-1">
+                                    {{ ($produkForm['metode_harga_beli'] ?? 'manual') === 'average' ? 'Diperbarui otomatis saat terima PO/supplier (rata-rata tertimbang).' : 'Harga beli pokok tetap manual.' }}
+                                </p>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-semibold text-ink-300">Margin Jual (%)</label>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer">
+                                        <input type="checkbox" wire:model.live="produkForm.hitung_dari_margin" class="rounded bg-black/40 border-white/20 text-up-primary focus:ring-0 w-3 h-3">
+                                        <span class="text-[10px] text-up-primary font-bold">Hitung Jual</span>
+                                    </label>
+                                </div>
+                                <div class="relative">
+                                    <input type="number" step="0.5" min="0" max="1000" wire:model.live.debounce.300ms="produkForm.margin_persen" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums pr-8" />
+                                    <span class="absolute right-3 top-2.5 text-xs text-ink-400 font-bold">%</span>
+                                </div>
+                                <p class="text-[9px] text-ink-500 mt-1">Persentase keuntungan dari harga beli</p>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-semibold text-ink-300">Harga Jual Retail (Rp) *</label>
+                                    @if(!empty($produkForm['hitung_dari_margin']))
+                                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-primary/20 text-up-primary font-bold">Otomatis %</span>
+                                    @endif
+                                </div>
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_jual_retail" wire:change="produkHargaJualBerubah" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                                <p class="text-[9px] text-ink-500 mt-1">Harga jual ke konsumen akhir (retail)</p>
+                            </div>
                         </div>
                     </div>
 
@@ -585,7 +644,7 @@
                         @endif
 
                         @if(! empty($importPreview['sampel']))
-                            <div class="overflow-x-auto">
+                            <x-prism.dual-scroll>
                                 <table class="w-full text-[10px]">
                                     <thead>
                                         <tr class="text-ink-400 text-left border-b border-white/10">
@@ -615,7 +674,7 @@
                                         @endforeach
                                     </tbody>
                                 </table>
-                            </div>
+                            </x-prism.dual-scroll>
                             <p class="text-[10px] text-ink-500">Menampilkan 5 baris pertama — error lengkap ada di notifikasi setelah import.</p>
                         @endif
 
@@ -834,16 +893,63 @@
                         <p class="text-[9px] text-ink-500 mt-1">Produk lain yang bisa saling menggantikan</p>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Beli (Rp) *</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model="editProdukForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
-                            @error('editProdukForm.harga_beli') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                    <!-- Skema Harga Beli Dinamis & Harga Jual Margin -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-white">💰 Skema Harga Beli &amp; Harga Jual</span>
+                            <div class="flex items-center gap-2">
+                                <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-300 cursor-pointer">
+                                    <input type="radio" value="manual" wire:model.live="editProdukForm.metode_harga_beli" class="text-up-primary focus:ring-0">
+                                    <span>Beli Manual</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-up-mint cursor-pointer">
+                                    <input type="radio" value="average" wire:model.live="editProdukForm.metode_harga_beli" class="text-up-mint focus:ring-0">
+                                    <span>Otomatis (Moving Average PO)</span>
+                                </label>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Harga Jual Retail (Rp) *</label>
-                            <input type="text" inputmode="numeric" x-format-number wire:model="editProdukForm.harga_jual_retail" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
-                            @error('editProdukForm.harga_jual_retail') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-semibold text-ink-300">Harga Beli (Rp) *</label>
+                                    @if(($editProdukForm['metode_harga_beli'] ?? 'manual') === 'average')
+                                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-mint/20 text-up-mint font-bold">Auto-Avg PO</span>
+                                    @endif
+                                </div>
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live="editProdukForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                                @error('editProdukForm.harga_beli') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                                <p class="text-[9px] text-ink-500 mt-1">
+                                    {{ ($editProdukForm['metode_harga_beli'] ?? 'manual') === 'average' ? 'Diperbarui otomatis saat terima PO/supplier (rata-rata tertimbang).' : 'Harga beli pokok tetap manual.' }}
+                                </p>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-semibold text-ink-300">Margin Jual (%)</label>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer">
+                                        <input type="checkbox" wire:model.live="editProdukForm.hitung_dari_margin" class="rounded bg-black/40 border-white/20 text-up-primary focus:ring-0 w-3 h-3">
+                                        <span class="text-[10px] text-up-primary font-bold">Hitung Jual</span>
+                                    </label>
+                                </div>
+                                <div class="relative">
+                                    <input type="number" step="0.5" min="0" max="1000" wire:model.live.debounce.300ms="editProdukForm.margin_persen" placeholder="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums pr-8" />
+                                    <span class="absolute right-3 top-2.5 text-xs text-ink-400 font-bold">%</span>
+                                </div>
+                                <p class="text-[9px] text-ink-500 mt-1">Persentase keuntungan dari harga beli</p>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-semibold text-ink-300">Harga Jual Retail (Rp) *</label>
+                                    @if(!empty($editProdukForm['hitung_dari_margin']))
+                                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-primary/20 text-up-primary font-bold">Otomatis %</span>
+                                    @endif
+                                </div>
+                                <input type="text" inputmode="numeric" x-format-number wire:model.live="editProdukForm.harga_jual_retail" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
+                                @error('editProdukForm.harga_jual_retail') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                                <p class="text-[9px] text-ink-500 mt-1">Harga jual ke konsumen akhir (retail)</p>
+                            </div>
                         </div>
                     </div>
 

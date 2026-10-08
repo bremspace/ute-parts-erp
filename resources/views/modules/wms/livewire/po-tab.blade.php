@@ -1,6 +1,25 @@
 <div>
     <!-- TAB 4: PO & SUPPLIER [T-10] -->
         <div class="space-y-5">
+            <!-- Action Toolbar PO & WMS Procurement -->
+            <div class="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                <div>
+                    <h3 class="text-sm font-bold text-white tracking-wide">Daftar Purchase Order (PO)</h3>
+                    <p class="text-xs text-ink-400">Pengadaan barang ke supplier dengan tracking harga otomatis &amp; strategi reorder ABC</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button wire:click="openProcurementModal" class="px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97]" title="Rekomendasi Reorder Berdasarkan Stok & Demand">
+                        <span>📊</span> Rekomendasi Reorder
+                    </button>
+                    <button wire:click="bukaAnalisisAbcModal" class="px-3.5 py-2 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97]" title="Hitung Otomatis Strategi ABC Pareto & ROP">
+                        <span>⚡</span> Analisis ABC (Pareto)
+                    </button>
+                    <button wire:click="openPoModal" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.97]">
+                        + Buat PO
+                    </button>
+                </div>
+            </div>
+
             <!-- PO List -->
             <x-prism.data-table :headers="['No. PO', 'Supplier', 'Gudang Tujuan', 'Metode', 'Total', 'Dibayar', 'Jatuh Tempo', 'Status', 'Aksi']">
                 @forelse($poList as $po)
@@ -152,45 +171,57 @@
 
                 <div class="space-y-2 mb-4 max-h-56 overflow-y-auto pr-1">
                     @foreach($poForm['items'] as $idx => $item)
-                        <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
-                            <div class="flex-1 flex gap-1.5 items-center">
-                                <div class="flex-1 relative">
-                                    <input type="text"
-                                           wire:model="poForm.items.{{ $idx }}.produk_nama"
-                                           wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po' })"
-                                           class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px] cursor-pointer"
-                                           placeholder="Klik untuk cari produk..."
-                                           readonly>
-                                    @if($item['produk_id'])
-                                        <button type="button"
-                                                wire:click="$set('poForm.items.{{ $idx }}.produk_id', null); $set('poForm.items.{{ $idx }}.produk_nama', ''); $set('poForm.items.{{ $idx }}.sku_variant_id', null)"
-                                                class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                            </svg>
+                        <div class="flex flex-col gap-1 p-2 rounded-xl bg-white/[0.02] border border-white/5">
+                            <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+                                <div class="flex-1 flex gap-1.5 items-center">
+                                    <div class="flex-1 relative">
+                                        <input type="text"
+                                               wire:model="poForm.items.{{ $idx }}.produk_nama"
+                                               wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po' })"
+                                               class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px] cursor-pointer"
+                                               placeholder="Klik untuk cari produk..."
+                                               readonly>
+                                        @if($item['produk_id'])
+                                            <button type="button"
+                                                    wire:click="$set('poForm.items.{{ $idx }}.produk_id', null); $set('poForm.items.{{ $idx }}.produk_nama', ''); $set('poForm.items.{{ $idx }}.sku_variant_id', null); $set('poForm.items.{{ $idx }}.info_terakhir', null)"
+                                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                </svg>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    <button
+                                        type="button"
+                                        wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po' })"
+                                        class="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 text-xs min-h-[44px] flex items-center justify-center cursor-pointer shrink-0 transition"
+                                        title="Cari Produk Lengkap"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    @cansee('harga_beli')
+                                    <input type="text" inputmode="numeric" x-format-number wire:model="poForm.items.{{ $idx }}.harga_beli" class="w-full sm:w-28 px-2 py-2 rounded-xl glass-input text-xs tabular-nums min-h-[44px]" placeholder="Harga Beli" />
+                                    @cannotsee('harga_beli')
+                                    <input type="text" class="w-full sm:w-28 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed min-h-[44px]" placeholder="Harga (superadmin)" disabled />
+                                    @endcansee
+                                    <input type="number" wire:model="poForm.items.{{ $idx }}.jumlah" min="1" class="w-20 sm:w-16 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-center min-h-[44px]" placeholder="Qty" />
+                                    @if(!empty($item['produk_id']))
+                                        <button type="button" wire:click="bukaHistoriPembelian({{ $item['produk_id'] }}, '{{ addslashes($item['produk_nama'] ?? '') }}')" class="p-2 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/20 text-[10px] font-bold cursor-pointer min-h-[44px] flex items-center justify-center whitespace-nowrap" title="Lihat Histori Pembelian Supplier">
+                                            📊 Histori
                                         </button>
                                     @endif
+                                    <button wire:click="removePoItem({{ $idx }})" class="p-2 text-up-red cursor-pointer text-xs min-h-[44px] flex items-center justify-center">✕</button>
                                 </div>
-                                <button
-                                    type="button"
-                                    wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po' })"
-                                    class="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 text-xs min-h-[44px] flex items-center justify-center cursor-pointer shrink-0 transition"
-                                    title="Cari Produk Lengkap"
-                                >
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                    </svg>
-                                </button>
                             </div>
-                            <div class="flex items-center gap-2">
-                                @cansee('harga_beli')
-                                <input type="text" inputmode="numeric" x-format-number wire:model="poForm.items.{{ $idx }}.harga_beli" class="w-full sm:w-24 px-2 py-2 rounded-xl glass-input text-xs tabular-nums min-h-[44px]" placeholder="Harga" />
-                                @cannotsee('harga_beli')
-                                <input type="text" class="w-full sm:w-24 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed min-h-[44px]" placeholder="Harga (superadmin)" disabled />
-                                @endcansee
-                                <input type="number" wire:model="poForm.items.{{ $idx }}.jumlah" min="1" class="w-20 sm:w-16 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-center min-h-[44px]" placeholder="Qty" />
-                                <button wire:click="removePoItem({{ $idx }})" class="p-2 text-up-red cursor-pointer text-xs min-h-[44px] flex items-center justify-center">✕</button>
-                            </div>
+                            @if(!empty($item['info_terakhir']))
+                                <div class="text-[10px] text-up-mint font-medium px-1 flex items-center gap-1">
+                                    <span>ℹ️ {{ $item['info_terakhir'] }}</span>
+                                </div>
+                            @endif
                         </div>
                     @endforeach
                 </div>
@@ -617,15 +648,20 @@
                                         @endif
                                     </td>
                                     <td class="py-3 px-3.5 text-center">
-                                        @if($item['action'] === 'ORDER')
-                                            <button wire:click="terapkanKePo({{ $item['produk_id'] }}, {{ $item['recommended_order'] }})" class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/20 transition-all cursor-pointer whitespace-nowrap">
-                                                + Buat PO
+                                        <div class="flex items-center justify-center gap-1.5">
+                                            <button type="button" wire:click="bukaHistoriPembelian({{ $item['produk_id'] }}, '{{ addslashes($item['nama']) }}')" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white border border-white/5 text-[10px]" title="Histori Pembelian Supplier">
+                                                📊
                                             </button>
-                                        @else
-                                            <button wire:click="terapkanKePo({{ $item['produk_id'] }}, 1)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white font-semibold text-[10px] border border-white/5 transition-colors cursor-pointer">
-                                                Order Manual
-                                            </button>
-                                        @endif
+                                            @if($item['action'] === 'ORDER')
+                                                <button wire:click="terapkanKePo({{ $item['produk_id'] }}, {{ $item['recommended_order'] }})" class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/20 transition-all cursor-pointer whitespace-nowrap">
+                                                    + Buat PO
+                                                </button>
+                                            @else
+                                                <button wire:click="terapkanKePo({{ $item['produk_id'] }}, 1)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white font-semibold text-[10px] border border-white/5 transition-colors cursor-pointer">
+                                                    Order Manual
+                                                </button>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @empty
@@ -640,13 +676,260 @@
                 </div>
 
                 <!-- Footer Modal -->
-                <div class="flex items-center justify-between pt-4 border-t border-white/10 mt-3">
+                <div class="flex flex-wrap items-center justify-between pt-4 border-t border-white/10 mt-3 gap-2">
                     <span class="text-[11px] text-ink-500">
                         Rekomendasi dihitung secara realtime berdasarkan parameter ABC, ROP, Min-Max, dan order servis aktif.
                     </span>
-                    <button wire:click="closeProcurementModal" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
+                    <div class="flex items-center gap-2">
+                        <button wire:click="bukaAnalisisAbcModal" class="px-4 py-2.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 font-bold text-xs cursor-pointer">
+                            ⚡ Analisis Ulang ABC (Pareto)
+                        </button>
+                        <button wire:click="closeProcurementModal" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL HISTORI PEMBELIAN SUPPLIER -->
+    @if($showHistoriModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
+            <div class="w-full max-w-4xl glass-panel p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+                <!-- Header Modal -->
+                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl">📊</span>
+                            <h3 class="text-lg font-bold text-white tracking-wide">Histori Pembelian Supplier</h3>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                                Tracking Harga Beli
+                            </span>
+                        </div>
+                        <p class="text-xs text-ink-300 mt-1 font-semibold">
+                            Produk: <span class="text-white">{{ $historiProdukNama }}</span>
+                        </p>
+                    </div>
+                    <button wire:click="tutupHistoriPembelian" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Statistik Ringkasan Kartu -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <span class="text-[11px] font-semibold text-ink-400 block">Harga Terakhir</span>
+                        <span class="text-base sm:text-lg font-bold text-white tabular-nums">
+                            Rp {{ number_format($historiStatistik['harga_terakhir'] ?? 0, 0, ',', '.') }}
+                        </span>
+                        <span class="text-[9px] text-ink-500 block truncate mt-0.5">
+                            {{ $historiStatistik['supplier_terakhir'] ?? '-' }}
+                        </span>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/25">
+                        <span class="text-[11px] font-semibold text-up-mint block">Rata-rata (Weighted Avg)</span>
+                        <span class="text-base sm:text-lg font-bold text-up-mint tabular-nums">
+                            Rp {{ number_format($historiStatistik['harga_rata_rata'] ?? 0, 0, ',', '.') }}
+                        </span>
+                        <span class="text-[9px] text-up-mint/80 block mt-0.5">Moving Average PO</span>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <span class="text-[11px] font-semibold text-ink-400 block">Harga Terendah</span>
+                        <span class="text-base sm:text-lg font-bold text-white tabular-nums">
+                            Rp {{ number_format($historiStatistik['harga_terendah'] ?? 0, 0, ',', '.') }}
+                        </span>
+                        <span class="text-[9px] text-ink-500 block mt-0.5">Best Deal</span>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <span class="text-[11px] font-semibold text-ink-400 block">Total Qty Dibeli</span>
+                        <span class="text-base sm:text-lg font-bold text-white tabular-nums">
+                            {{ number_format($historiStatistik['total_qty'] ?? 0) }} unit
+                        </span>
+                        <span class="text-[9px] text-ink-500 block mt-0.5">
+                            Dari {{ $historiStatistik['total_transaksi'] ?? 0 }} PO
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Tabel Riwayat Transaksi -->
+                <div class="overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[45vh]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 bg-ink-950/95 backdrop-blur-sm z-10 border-b border-white/10">
+                            <tr class="text-ink-400 font-semibold text-[11px] uppercase tracking-wider">
+                                <th class="py-3 px-3.5">Tanggal</th>
+                                <th class="py-3 px-3">No. PO</th>
+                                <th class="py-3 px-3">Supplier</th>
+                                <th class="py-3 px-3 text-right">Qty</th>
+                                <th class="py-3 px-3 text-right">Harga Beli Satuan</th>
+                                <th class="py-3 px-3 text-right">Subtotal</th>
+                                <th class="py-3 px-3.5 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            @forelse($historiPembelianData as $h)
+                                <tr class="hover:bg-white/[0.02] transition-colors">
+                                    <td class="py-3 px-3.5 text-ink-300 font-mono">{{ $h['tanggal'] }}</td>
+                                    <td class="py-3 px-3 font-mono font-bold text-white">{{ $h['no_po'] }}</td>
+                                    <td class="py-3 px-3 text-ink-200">
+                                        <div class="font-semibold">{{ $h['supplier_nama'] }}</div>
+                                        <div class="text-[10px] text-ink-500">{{ $h['supplier_telepon'] }}</div>
+                                    </td>
+                                    <td class="py-3 px-3 text-right font-bold text-white tabular-nums">{{ number_format($h['jumlah']) }}</td>
+                                    <td class="py-3 px-3 text-right font-bold text-up-mint tabular-nums">
+                                        Rp {{ number_format($h['harga_beli'], 0, ',', '.') }}
+                                    </td>
+                                    <td class="py-3 px-3 text-right text-ink-200 tabular-nums">
+                                        Rp {{ number_format($h['subtotal'], 0, ',', '.') }}
+                                    </td>
+                                    <td class="py-3 px-3.5 text-center">
+                                        <x-prism.status-pill :status="str_replace('_','-',$h['status'])" />
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center text-ink-400">
+                                        Belum ada riwayat pembelian PO untuk produk ini.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer Modal -->
+                <div class="flex items-center justify-between pt-4 border-t border-white/10 mt-3">
+                    <span class="text-[11px] text-ink-500">
+                        Histori pembelian membantu verifikasi kewajaran penawaran harga supplier dan penyesuaian modal bergerak (moving average).
+                    </span>
+                    <button wire:click="tutupHistoriPembelian" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
                         Tutup
                     </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL ANALISIS ABC (PARETO 80/20) & STRATEGI WMS -->
+    @if($showAnalisisAbcModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
+            <div class="w-full max-w-5xl glass-panel p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+                <!-- Header Modal -->
+                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl">⚡</span>
+                            <h3 class="text-lg font-bold text-white tracking-wide">Analisis ABC (Pareto) &amp; Rekomendasi ROP / Min-Max</h3>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                                Strategi WMS Otomatis
+                            </span>
+                        </div>
+                        <p class="text-xs text-ink-400 mt-1">
+                            Sistem menghitung kontribusi omzet/pergerakan barang periode {{ $analisisAbcData['periode_hari'] ?? 90 }} hari terakhir dan merekomendasikan parameter reorder optimal.
+                        </p>
+                    </div>
+                    <button wire:click="tutupAnalisisAbcModal" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Parameter Info Bar -->
+                <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 my-3">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-ink-300 font-semibold">Periode Analisis:</span>
+                        <div class="flex items-center gap-1.5">
+                            @foreach([30, 60, 90, 180] as $hari)
+                                <button type="button" wire:click="$set('analisisAbcPeriode', {{ $hari }}); bukaAnalisisAbcModal()" class="px-2.5 py-1 rounded-lg text-xs font-bold {{ ($analisisAbcPeriode ?? 90) === $hari ? 'bg-up-primary text-white shadow-sm' : 'bg-white/5 text-ink-400 hover:text-white' }}">
+                                    {{ $hari }} Hari
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="text-right">
+                        <span class="text-[11px] text-ink-400">Total Omzet Pergerakan:</span>
+                        <span class="text-xs font-bold text-up-mint ml-1 tabular-nums">
+                            Rp {{ number_format($analisisAbcData['total_nilai'] ?? 0, 0, ',', '.') }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Tabel Hasil Analisis ABC -->
+                <div class="overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[48vh]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 bg-ink-950/95 backdrop-blur-sm z-10 border-b border-white/10">
+                            <tr class="text-ink-400 font-semibold text-[11px] uppercase tracking-wider">
+                                <th class="py-3 px-3.5">Produk</th>
+                                <th class="py-3 px-3 text-right">Qty Keluar</th>
+                                <th class="py-3 px-3 text-right">Nilai Omzet</th>
+                                <th class="py-3 px-3 text-center">Kelas Saat Ini</th>
+                                <th class="py-3 px-3 text-center">Rekomendasi ABC</th>
+                                <th class="py-3 px-3 text-right">Rekomendasi ROP</th>
+                                <th class="py-3 px-3 text-right">Rekomendasi Min-Max</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            @forelse($analisisAbcData['items'] ?? [] as $row)
+                                <tr class="hover:bg-white/[0.02] transition-colors {{ $row['rekomendasi_abc'] === 'A' ? 'bg-up-red/[0.02]' : '' }}">
+                                    <td class="py-3 px-3.5">
+                                        <div class="font-bold text-white">{{ $row['nama'] }}</div>
+                                        <div class="text-[10px] text-ink-400 flex items-center gap-1.5 mt-0.5">
+                                            <span>{{ $row['kategori'] ?? 'Umum' }}</span> •
+                                            <span>ADU: {{ $row['adu'] }}/hari</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-3 text-right tabular-nums font-bold text-white">
+                                        {{ number_format($row['qty_keluar']) }} {{ $row['satuan'] }}
+                                    </td>
+                                    <td class="py-3 px-3 text-right tabular-nums">
+                                        <div class="font-bold text-white">Rp {{ number_format($row['nilai_omzet'], 0, ',', '.') }}</div>
+                                        <div class="text-[10px] text-ink-500 font-mono">{{ $row['persen_kumulatif'] }}% kumulatif</div>
+                                    </td>
+                                    <td class="py-3 px-3 text-center">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ $row['current_abc'] === 'A' ? 'bg-up-red/15 text-up-red' : ($row['current_abc'] === 'C' ? 'bg-white/10 text-ink-300' : 'bg-up-primary/15 text-up-primary') }}">
+                                            Kelas {{ $row['current_abc'] }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-3 text-center">
+                                        <span class="px-2.5 py-1 rounded-lg text-xs font-black {{ $row['rekomendasi_abc'] === 'A' ? 'bg-up-red/25 text-up-red border border-up-red/40' : ($row['rekomendasi_abc'] === 'C' ? 'bg-white/15 text-ink-200 border border-white/20' : 'bg-up-primary/25 text-up-primary border border-up-primary/40') }}">
+                                            Kelas {{ $row['rekomendasi_abc'] }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-3 text-right tabular-nums font-bold text-white">
+                                        {{ $row['rekomendasi_rop'] }} {{ $row['satuan'] }}
+                                    </td>
+                                    <td class="py-3 px-3 text-right tabular-nums text-ink-300">
+                                        Min: <strong class="text-white">{{ $row['rekomendasi_min'] }}</strong> •
+                                        Max: <strong class="text-white">{{ $row['rekomendasi_max'] }}</strong>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center text-ink-400">
+                                        Belum ada data transaksi/mutasi untuk dianalisis.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer Modal -->
+                <div class="flex flex-wrap items-center justify-between pt-4 border-t border-white/10 mt-3 gap-3">
+                    <span class="text-[11px] text-ink-500">
+                        Penerapan akan memperbarui kolom <code>abc_class</code>, <code>reorder_point</code>, <code>min_stock</code>, dan <code>max_stock</code> seluruh produk aktif.
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <button wire:click="tutupAnalisisAbcModal" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
+                            Batal
+                        </button>
+                        <button wire:click="terapkanAnalisisAbcSemua" wire:confirm="Terapkan rekomendasi klasifikasi ABC &amp; ROP hasil analisis ke seluruh produk aktif?" class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer transition active:scale-[0.97]">
+                            ✓ Terapkan Strategi ABC &amp; ROP
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -241,4 +241,233 @@ class ProcurementService
             'breakdown' => $byClass,
         ];
     }
+
+    /**
+     * Ambil histori pembelian supplier per produk untuk tracking tren harga beli.
+     *
+     * @return array{items: array, statistik: array}
+     */
+    public function getHistoriPembelian(int $produkId, ?int $supplierId = null): array
+    {
+        $query = DB::table('purchase_order_item')
+            ->join('purchase_order', 'purchase_order.id', '=', 'purchase_order_item.purchase_order_id')
+            ->leftJoin('supplier', 'supplier.id', '=', 'purchase_order.supplier_id')
+            ->where('purchase_order_item.produk_id', $produkId)
+            ->when($supplierId, fn ($q) => $q->where('purchase_order.supplier_id', $supplierId))
+            ->select([
+                'purchase_order.id as po_id',
+                'purchase_order.no_po',
+                'purchase_order.created_at',
+                'purchase_order.status',
+                'purchase_order.metode_bayar',
+                'supplier.id as supplier_id',
+                'supplier.nama as supplier_nama',
+                'supplier.telepon as supplier_telepon',
+                'purchase_order_item.harga_beli',
+                'purchase_order_item.jumlah',
+                'purchase_order_item.subtotal',
+            ])
+            ->orderByDesc('purchase_order.created_at')
+            ->orderByDesc('purchase_order.id');
+
+        $rows = $query->limit(50)->get();
+
+        if ($rows->isEmpty()) {
+            return [
+                'items' => [],
+                'statistik' => [
+                    'total_transaksi' => 0,
+                    'total_qty' => 0,
+                    'harga_terakhir' => 0,
+                    'harga_terendah' => 0,
+                    'harga_tertinggi' => 0,
+                    'harga_rata_rata' => 0,
+                    'supplier_terakhir' => null,
+                ],
+            ];
+        }
+
+        $totalQty = (int) $rows->sum('jumlah');
+        $totalNilai = (float) $rows->sum('subtotal');
+        $hargaTerakhir = (float) $rows->first()->harga_beli;
+        $hargaTerendah = (float) $rows->min('harga_beli');
+        $hargaTertinggi = (float) $rows->max('harga_beli');
+        $weightedAvg = $totalQty > 0 ? round($totalNilai / $totalQty, 2) : $hargaTerakhir;
+
+        return [
+            'items' => $rows->map(function ($r) {
+                return [
+                    'po_id' => $r->po_id,
+                    'no_po' => $r->no_po,
+                    'tanggal' => $r->created_at ? date('d/m/Y H:i', strtotime($r->created_at)) : '-',
+                    'status' => $r->status,
+                    'metode_bayar' => $r->metode_bayar,
+                    'supplier_id' => $r->supplier_id,
+                    'supplier_nama' => $r->supplier_nama ?: 'Umum / Tanpa Nama',
+                    'supplier_telepon' => $r->supplier_telepon ?: '-',
+                    'harga_beli' => (float) $r->harga_beli,
+                    'jumlah' => (int) $r->jumlah,
+                    'subtotal' => (float) $r->subtotal,
+                ];
+            })->all(),
+            'statistik' => [
+                'total_transaksi' => $rows->count(),
+                'total_qty' => $totalQty,
+                'harga_terakhir' => $hargaTerakhir,
+                'harga_terendah' => $hargaTerendah,
+                'harga_tertinggi' => $hargaTertinggi,
+                'harga_rata_rata' => $weightedAvg,
+                'supplier_terakhir' => $rows->first()->supplier_nama,
+            ],
+        ];
+    }
+
+    /**
+     * Hitung analisis ABC (Pareto 80/20) dan rekomendasi ROP / Min-Max berdasarkan data pemakaian riil.
+     *
+     * @param  int  $periodeHari  Default 90 hari
+     */
+    public function hitungAnalisisAbc(?int $cabangId = null, int $periodeHari = 90): array
+    {
+        $since = now()->subDays($periodeHari);
+
+        // Agregasi mutasi keluar penjualan dan servis dari stock_mutation_log
+        $outflow = DB::table('stock_mutation_log')
+            ->join('gudang', 'gudang.id', '=', 'stock_mutation_log.gudang_id')
+            ->where('stock_mutation_log.terjadi_at', '>=', $since)
+            ->where('stock_mutation_log.delta', '<', 0)
+            ->when($cabangId, fn ($q) => $q->where('gudang.cabang_id', $cabangId))
+            ->groupBy('stock_mutation_log.produk_id')
+            ->select([
+                'stock_mutation_log.produk_id',
+                DB::raw('ABS(SUM(stock_mutation_log.delta)) as total_outflow_qty'),
+            ])
+            ->pluck('total_outflow_qty', 'produk_id');
+
+        $produks = DB::table('produk')
+            ->where('is_active', true)
+            ->select(['id', 'nama', 'barcode', 'kategori', 'satuan', 'harga_beli', 'harga_jual_retail', 'abc_class', 'reorder_point', 'min_stock', 'max_stock', 'is_ondemand'])
+            ->get();
+
+        $items = [];
+        $totalNilaiSemua = 0;
+
+        foreach ($produks as $p) {
+            $qtyKeluar = (int) ($outflow[$p->id] ?? 0);
+            $harga = (float) ($p->harga_jual_retail > 0 ? $p->harga_jual_retail : $p->harga_beli);
+            $nilaiOmzet = $qtyKeluar * $harga;
+            $totalNilaiSemua += $nilaiOmzet;
+
+            $items[] = [
+                'produk_id' => $p->id,
+                'nama' => $p->nama,
+                'barcode' => $p->barcode,
+                'kategori' => $p->kategori,
+                'satuan' => $p->satuan ?: 'pcs',
+                'harga_beli' => (float) $p->harga_beli,
+                'harga_jual_retail' => (float) $p->harga_jual_retail,
+                'current_abc' => $p->abc_class ?: 'B',
+                'current_rop' => $p->reorder_point,
+                'current_min' => $p->min_stock,
+                'current_max' => $p->max_stock,
+                'is_ondemand' => (bool) $p->is_ondemand,
+                'qty_keluar' => $qtyKeluar,
+                'nilai_omzet' => $nilaiOmzet,
+            ];
+        }
+
+        // Urutkan omzet menurun (Pareto analysis)
+        usort($items, fn ($a, $b) => $b['nilai_omzet'] <=> $a['nilai_omzet']);
+
+        $kumulatifNilai = 0;
+        $hasil = [];
+
+        foreach ($items as $item) {
+            $omzetSebelum = $kumulatifNilai;
+            $kumulatifNilai += $item['nilai_omzet'];
+            $persenKumulatif = $totalNilaiSemua > 0 ? round(($kumulatifNilai / $totalNilaiSemua) * 100, 2) : 100;
+            $persenSebelum = $totalNilaiSemua > 0 ? ($omzetSebelum / $totalNilaiSemua) * 100 : 0;
+
+            // Klasifikasi ABC Pareto:
+            // Kelas A: Kontributor omzet utama hingga mencapai threshold 80% (Fast Moving)
+            // Kelas B: Kontributor berikutnya antara 80% - 95% (Medium Moving)
+            // Kelas C: Kontributor ekor panjang (Long-tail / Slow Moving) atau 0 pergerakan
+            if ($item['qty_keluar'] <= 0) {
+                $rekomendasiAbc = 'C';
+            } elseif ($persenSebelum < 80.0) {
+                $rekomendasiAbc = 'A';
+            } elseif ($persenSebelum < 95.0) {
+                $rekomendasiAbc = 'B';
+            } else {
+                $rekomendasiAbc = 'C';
+            }
+
+            // Hitung ADU (Average Daily Usage)
+            $adu = $item['qty_keluar'] / max(1, $periodeHari);
+            $leadTimeHari = 7; // Standar lead time restock
+
+            // Rekomendasi WMS:
+            if ($rekomendasiAbc === 'A') {
+                $safetyStock = max(2, (int) ceil($adu * 7));
+                $rekRop = (int) ceil(($adu * $leadTimeHari) + $safetyStock);
+                $rekMin = $rekRop;
+                $rekMax = max($rekRop * 2, (int) ceil($rekRop + ($adu * 14)));
+            } elseif ($rekomendasiAbc === 'B') {
+                $safetyStock = max(1, (int) ceil($adu * 4));
+                $rekRop = (int) ceil(($adu * $leadTimeHari) + $safetyStock);
+                $rekMin = max(1, $rekRop);
+                $rekMax = max($rekMin * 2, (int) ceil($rekMin + ($adu * 10)));
+            } else {
+                $safetyStock = max(1, (int) ceil($adu * 2));
+                $rekRop = max(1, (int) ceil(($adu * $leadTimeHari) + $safetyStock));
+                $rekMin = max(1, (int) ceil($adu * 3));
+                $rekMax = max(2, (int) ceil($rekMin * 2));
+            }
+
+            $item['rekomendasi_abc'] = $rekomendasiAbc;
+            $item['rekomendasi_rop'] = $rekRop;
+            $item['rekomendasi_min'] = $rekMin;
+            $item['rekomendasi_max'] = $rekMax;
+            $item['adu'] = round($adu, 2);
+            $item['persen_kumulatif'] = $persenKumulatif;
+
+            $hasil[] = $item;
+        }
+
+        return [
+            'periode_hari' => $periodeHari,
+            'total_nilai' => $totalNilaiSemua,
+            'items' => $hasil,
+        ];
+    }
+
+    /**
+     * Terapkan rekomendasi analisis ABC ke database produk.
+     */
+    public function terapkanAnalisisAbc(array $produkIds = [], ?int $cabangId = null, int $periodeHari = 90): int
+    {
+        $analisis = $this->hitungAnalisisAbc($cabangId, $periodeHari);
+        $count = 0;
+
+        foreach ($analisis['items'] as $item) {
+            if (! empty($produkIds) && ! in_array($item['produk_id'], $produkIds, true)) {
+                continue;
+            }
+
+            if ($item['is_ondemand']) {
+                continue; // Jangan override parameter on-demand
+            }
+
+            Produk::where('id', $item['produk_id'])->update([
+                'abc_class' => $item['rekomendasi_abc'],
+                'reorder_point' => $item['rekomendasi_rop'],
+                'min_stock' => $item['rekomendasi_min'],
+                'max_stock' => $item['rekomendasi_max'],
+            ]);
+
+            $count++;
+        }
+
+        return $count;
+    }
 }
