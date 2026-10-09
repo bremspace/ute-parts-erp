@@ -19,19 +19,11 @@ class SetAssetUrl
      */
     public function handle(Request $request, Closure $next)
     {
-        $host = $request->getHttpHost(); // includes port when non-standard
+        $scheme = $request->isSecure() ? 'https' : 'http';
+        $host = $request->getHttpHost();
 
-        // Check if host is an IP address
-        if (filter_var($host, FILTER_VALIDATE_IP)) {
-            // IP access: use HTTP with IP
-            $scheme = $request->isSecure() ? 'https' : 'http';
-            Config::set('app.asset_url', "{$scheme}://{$host}");
-        } else {
-            // Domain access: use configured APP_URL (HTTPS)
-            if (config('app.url')) {
-                Config::set('app.asset_url', config('app.url'));
-            }
-        }
+        // Always align asset_url with current request scheme & host
+        Config::set('app.asset_url', "{$scheme}://{$host}");
 
         return $next($request);
     }
