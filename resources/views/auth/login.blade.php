@@ -46,19 +46,56 @@
                 </div>
             @endif
 
-            <form action="{{ route('login.post') }}" method="POST" class="space-y-4">
+            <form action="{{ route('login.post') }}" method="POST" class="space-y-4" x-data="{
+                rememberEmail: true,
+                savedEmail: '',
+                init() {
+                    const cached = localStorage.getItem('up_last_login_email');
+                    if (cached && !this.$refs.emailInput.value) {
+                        this.savedEmail = cached;
+                        this.$refs.emailInput.value = cached;
+                    }
+                },
+                saveHistory() {
+                    if (this.rememberEmail && this.$refs.emailInput.value) {
+                        localStorage.setItem('up_last_login_email', this.$refs.emailInput.value.trim());
+                    } else if (!this.rememberEmail) {
+                        localStorage.removeItem('up_last_login_email');
+                    }
+                },
+                clearHistory() {
+                    localStorage.removeItem('up_last_login_email');
+                    this.savedEmail = '';
+                    this.$refs.emailInput.value = '';
+                    this.$refs.emailInput.focus();
+                }
+            }" @submit="saveHistory">
                 @csrf
                 <div>
-                    <label for="email" class="block text-xs font-medium text-ink-300 mb-1.5">Email Staf</label>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label for="email" class="block text-xs font-medium text-ink-300">Email Staf</label>
+                        <template x-if="savedEmail">
+                            <button
+                                type="button"
+                                @click="clearHistory"
+                                class="text-[10px] text-ink-400 hover:text-up-red transition-colors cursor-pointer"
+                                title="Hapus riwayat email di perangkat ini"
+                            >
+                                Hapus riwayat
+                            </button>
+                        </template>
+                    </div>
                     <input
                         type="email"
                         id="email"
                         name="email"
+                        x-ref="emailInput"
                         required
                         autofocus
-                        placeholder="admin@uteparts.com"
+                        autocomplete="email"
+                        placeholder="nama@uteparts.id"
                         class="w-full px-4 py-3 rounded-xl glass-input text-sm"
-                        value="{{ old('email', 'admin@uteparts.com') }}"
+                        value="{{ old('email') }}"
                     />
                 </div>
 
@@ -71,10 +108,22 @@
                         id="password"
                         name="password"
                         required
+                        autocomplete="current-password"
                         placeholder="••••••••"
                         class="w-full px-4 py-3 rounded-xl glass-input text-sm"
-                        value="password"
+                        value=""
                     />
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            x-model="rememberEmail"
+                            class="rounded border-white/20 bg-white/5 text-up-primary focus:ring-up-primary/40 focus:ring-offset-0 w-3.5 h-3.5"
+                        >
+                        <span class="text-xs text-ink-400">Ingat email di perangkat ini</span>
+                    </label>
                 </div>
 
                 <div class="pt-2">
