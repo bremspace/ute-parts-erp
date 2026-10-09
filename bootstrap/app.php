@@ -57,6 +57,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sanctum SPA cookie-session auth on /api/* (T-32)
         $middleware->statefulApi();
 
+        // Trust proxies for Cloudflare / reverse proxy (T-28)
+        $middleware->trustProxies(at: '*');
+
         // Set dynamic asset URL based on request host (IP vs domain)
         $middleware->web(prepend: [SetAssetUrl::class]);
 
