@@ -22,6 +22,12 @@
         <div class="bg-white rounded-3xl shadow-xl shadow-ink-100/50 border border-ink-100 p-8 relative overflow-hidden">
             <div class="circuit-line absolute top-0 left-0 w-full h-[2px]"></div>
 
+            @if(session('info'))
+                <div class="mb-5 p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/20 text-up-primary text-xs font-semibold leading-relaxed">
+                    {{ session('info') }}
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="mb-5 p-3.5 rounded-xl bg-up-red/10 border border-up-red/20 text-up-red text-xs font-medium">{{ $errors->first() }}</div>
             @endif

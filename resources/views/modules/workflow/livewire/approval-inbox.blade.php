@@ -61,10 +61,18 @@
                                         </div>
                                         <div class="ml-4">
                                             <div class="text-sm font-medium text-gray-900 dark:text-white">
-                                                {{ $request->entity_type }} #{{ $request->entity_id }}
+                                                @if($request->entity_type === 'member')
+                                                    Member: {{ $request->payload_json['nama'] ?? ('#' . $request->entity_id) }}
+                                                @else
+                                                    {{ $request->entity_type }} #{{ $request->entity_id }}
+                                                @endif
                                             </div>
                                             <div class="text-xs text-gray-500 dark:text-gray-400">
-                                                Rule: {{ $request->rule?->approver_role }} (Lv{{ $request->rule?->level }})
+                                                @if($request->entity_type === 'member')
+                                                    HP: {{ $request->payload_json['telepon'] ?? '-' }} • Rule: {{ $request->rule?->approver_role }} (Lv{{ $request->rule?->level }})
+                                                @else
+                                                    Rule: {{ $request->rule?->approver_role }} (Lv{{ $request->rule?->level }})
+                                                @endif
                                             </div>
                                         </div>
                                     </div>

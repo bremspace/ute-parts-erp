@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
+use App\Models\User;
 use App\Modules\Akunting\Controllers\AkuntingController;
 use App\Modules\Akunting\Livewire\AkuntingDashboard;
 use App\Modules\Akunting\Livewire\AsetRegister;
@@ -40,6 +41,7 @@ use App\Modules\Wms\Livewire\LaporanNomorSeri;
 use App\Modules\Wms\Livewire\WmsDashboard;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Workflow\Livewire\ApprovalInbox;
+use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -181,6 +183,20 @@ Route::post('/login-pelanggan', function (Request $request) {
     ]);
 
     if (Auth::guard('customer')->attempt(['telepon' => $credentials['telepon'], 'password' => $credentials['password']])) {
+        $user = Auth::guard('customer')->user();
+        if (($user->status ?? 'aktif') === 'pending') {
+            Auth::guard('customer')->logout();
+
+            return back()->withErrors(['telepon' => 'Pendaftaran Anda sedang menunggu persetujuan (approval) dari owner. Silakan tunggu konfirmasi.']);
+        }
+
+        if (($user->status ?? 'aktif') === 'ditolak') {
+            $catatan = $user->catatan_approval ? " Alasan: {$user->catatan_approval}" : '';
+            Auth::guard('customer')->logout();
+
+            return back()->withErrors(['telepon' => 'Pendaftaran akun Anda ditolak oleh owner.'.$catatan]);
+        }
+
         return redirect()->intended('/checkout');
     }
 
@@ -200,11 +216,36 @@ Route::post('/daftar-pelanggan', function (Request $request) {
         'telepon' => $request->telepon,
         'password' => $request->password,
         'is_reseller' => false,
+        'status' => 'pending',
     ]);
 
-    Auth::guard('customer')->login($pelanggan);
+    // Ajukan ke workflow approval inbox owner
+    $approvalService = app(ApprovalService::class);
+    $pemohon = ApprovalService::pemohon();
 
-    return redirect('/checkout');
+    // Bila belum ada user di database (misal environment fresh test), buat fallback sistem user
+    if (! $pemohon) {
+        $systemUser = User::first() ?? User::factory()->create([
+            'email' => 'system@uteparts.id',
+            'name' => 'System Ute Parts',
+        ]);
+        $pemohon = $systemUser->id;
+    }
+
+    $approvalService->ajukan(
+        'member',
+        $pelanggan->id,
+        null,
+        [
+            'amount' => 0,
+            'nama' => $pelanggan->nama,
+            'telepon' => $pelanggan->telepon,
+            'keterangan' => 'Pendaftaran Member/Konsumen Baru',
+        ],
+        $pemohon
+    );
+
+    return redirect()->route('customer.login')->with('info', 'Pendaftaran berhasil dikirim. Akun member Anda sedang menunggu persetujuan (approval) dari owner sebelum dapat digunakan.');
 })->middleware('throttle:10,1')->name('customer.register.post');
 
 Route::post('/logout-pelanggan', function () {

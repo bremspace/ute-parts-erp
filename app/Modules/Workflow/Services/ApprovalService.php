@@ -3,6 +3,7 @@
 namespace App\Modules\Workflow\Services;
 
 use App\Models\User;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Services\KasSesiState;
@@ -220,6 +221,30 @@ class ApprovalService
                 $kasSesiState->finalizeTutupKasApproved((int) $request->entity_id);
             } else {
                 $kasSesiState->reopenKasRejected((int) $request->entity_id, $catatan);
+            }
+
+            return;
+        }
+
+        // [MEMBER APPROVAL] Pendaftaran member: disetujui → aktif; ditolak → status ditolak
+        if ($request->entity_type === 'member') {
+            $pelanggan = Pelanggan::find($request->entity_id);
+            if ($pelanggan) {
+                if ($status === 'disetujui') {
+                    $pelanggan->update([
+                        'status' => 'aktif',
+                        'catatan_approval' => $catatan,
+                        'approved_at' => now(),
+                        'approved_by' => $actionedBy,
+                    ]);
+                } else {
+                    $pelanggan->update([
+                        'status' => 'ditolak',
+                        'catatan_approval' => $catatan,
+                        'approved_at' => now(),
+                        'approved_by' => $actionedBy,
+                    ]);
+                }
             }
 
             return;

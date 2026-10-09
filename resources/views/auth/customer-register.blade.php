@@ -22,6 +22,10 @@
         <div class="bg-white rounded-3xl shadow-xl shadow-ink-100/50 border border-ink-100 p-8 relative overflow-hidden">
             <div class="circuit-line absolute top-0 left-0 w-full h-[2px]"></div>
 
+            <div class="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs">
+                <strong>Catatan:</strong> Pendaftaran member baru memerlukan verifikasi dan persetujuan (approval) owner sebelum akun aktif.
+            </div>
+
             @if($errors->any())
                 <div class="mb-5 p-3.5 rounded-xl bg-up-red/10 border border-up-red/20 text-up-red text-xs font-medium">
                     @foreach($errors->all() as $e)
