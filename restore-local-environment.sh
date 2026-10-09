@@ -102,24 +102,34 @@ if [ -f "opencode-migration-pack.tar.gz" ]; then
     echo -e "${GREEN}✓ .env berhasil disalin ke project root${NC}"
   fi
 
+  # Opsi SQLite otomatis untuk preview lokal langsung tanpa pusing setup MySQL
+  if [ -f "$TMP_EXTRACT/database-staging.sql" ]; then
+    echo -e "${GREEN}✓ Dump database MySQL terdeteksi (database-staging.sql)${NC}"
+    cp "$TMP_EXTRACT/database-staging.sql" ./database/staging-backup.sql
+  fi
+
   rm -rf "$TMP_EXTRACT"
 else
   echo -e "${RED}[PERINGATAN] File opencode-migration-pack.tar.gz tidak ditemukan di direktori ini!${NC}"
   echo "Salin file opencode-migration-pack.tar.gz dari VPS ke folder ini lalu jalankan ulang script ini."
 fi
 
-# 7. Setup Dependensi Project Laravel
+# 7. Setup Dependensi Project Laravel & Siap Preview
 echo -e "\n${YELLOW}[6/6] Memasang dependensi project (Composer & NPM)...${NC}"
 if [ -f "composer.json" ]; then
   composer install --no-interaction
   npm install
   npm run build
   php artisan key:generate --force || true
+  php artisan storage:link || true
 fi
 
 echo -e "\n${BOLD}${GREEN}====================================================${NC}"
 echo -e "${BOLD}${GREEN}   RESTORE SELESAI DENGAN SUKSES!                   ${NC}"
 echo -e "${BOLD}${GREEN}====================================================${NC}"
-echo -e "Untuk melanjutkan sesi opencode:"
-echo -e "  ${YELLOW}opencode${NC}  (atau buka TUI / Web GUI OpenCode)"
+echo -e "1. Untuk menjalankan preview web lokal:"
+echo -e "   Terminal 1: ${YELLOW}php artisan serve${NC}   -> http://127.0.0.1:8000"
+echo -e "   Terminal 2: ${YELLOW}npm run dev${NC}         -> Vite asset watch"
+echo -e "\n2. Untuk melanjutkan sesi OpenCode & OMO:"
+echo -e "   ${YELLOW}opencode${NC}"
 echo -e "Semua sesi obrolan lama, skills, agent OMO, dan MCP sudah aktif kembali."

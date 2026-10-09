@@ -45,6 +45,12 @@ if exist "temp_migration\project.env" (
     )
 )
 
+if exist "temp_migration\database-staging.sql" (
+    if not exist "database" mkdir database
+    copy temp_migration\database-staging.sql database\staging-backup.sql >nul
+    echo [OK] Dump database staging tersimpan di database\staging-backup.sql
+)
+
 rd /s /q temp_migration
 echo [OK] Data sesi chat, OMO config, skills berhasil dipulihkan.
 
@@ -82,12 +88,17 @@ if %errorlevel% equ 0 (
 
 call npm install
 call npm run build
+call php artisan storage:link >nul 2>nul
 
 echo.
 echo ====================================================
 echo    RESTORE SELESAI DENGAN SUKSES!
 echo ====================================================
-echo Untuk melanjutkan sesi percakapan, jalankan:
+echo 1. Untuk preview aplikasi web secara lokal:
+echo    Terminal 1: php artisan serve    (akses http://127.0.0.1:8000)
+echo    Terminal 2: npm run dev
+echo.
+echo 2. Untuk melanjutkan sesi OpenCode ^& OMO:
 echo    opencode
 echo.
 pause
