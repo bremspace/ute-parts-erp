@@ -10,6 +10,7 @@ use App\Modules\Crm\Console\Commands\EksekusiBroadcastTerjadwal;
 use App\Modules\Crm\Console\Commands\RecalcTierCommand;
 use App\Modules\Hr\Jobs\HitungKpiBulananJob;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
+use App\Modules\Servis\Console\Commands\CekBatasWaktuServisCommand;
 use App\Modules\Wms\Jobs\CycleCountJob;
 use App\Modules\Wms\Jobs\ReorderOtomatisJob;
 use Illuminate\Console\Scheduling\Schedule;
@@ -34,7 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withCommands(
-        commands: [RecalcTierCommand::class, EksekusiBroadcastTerjadwal::class, SidImportRaw::class],
+        commands: [RecalcTierCommand::class, EksekusiBroadcastTerjadwal::class, SidImportRaw::class, CekBatasWaktuServisCommand::class],
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Alias middleware Spatie Permission (dipakai semua route RBAC — PRD §3, Route middleware enforcement)
@@ -108,7 +109,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Refresh token OAuth marketplace sebelum kedaluwarsa (tiap 2 jam)
         $schedule->call(function () {
             app(ChannelSyncService::class)->refreshExpiredTokens();
-        })->everyTwoHours()->withoutOverlapping();
+        })->name('refresh-marketplace-tokens')->everyTwoHours()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

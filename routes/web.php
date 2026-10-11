@@ -77,6 +77,7 @@ Route::get('/tracking/{token}', function ($token) {
         'estimasiItems',
         'statusLogs' => fn ($q) => $q->orderBy('created_at', 'asc'),
         'items',
+        'progressList' => fn ($q) => $q->where('tampilkan_ke_konsumen', true)->orderBy('created_at', 'desc'),
     ])
         ->where('token_approval', $token)
         ->first();
@@ -87,6 +88,7 @@ Route::get('/tracking/{token}', function ($token) {
             'jenis_hp' => $tiket->jenis_hp,
             'seri_hp' => $tiket->seri_hp,
             'status' => $tiket->status,
+            'alasan_ditolak' => $tiket->alasan_ditolak,
             'keluhan' => $tiket->keluhan,
             'estimasi_biaya' => $tiket->estimasi_biaya,
             'token_approval' => $tiket->token_approval,
@@ -125,6 +127,21 @@ Route::get('/tracking/{token}', function ($token) {
                 'catatan' => $log->catatan,
                 'created_at' => $log->created_at?->format('d/m/Y H:i'),
             ])->toArray(),
+            'progress' => $tiket->progressList->map(fn ($p) => [
+                'id' => $p->id,
+                'persentase' => $p->persentase,
+                'judul' => $p->judul,
+                'deskripsi' => $p->deskripsi,
+                'foto' => $p->foto ?? [],
+                'waktu' => $p->created_at?->format('d/m/Y H:i'),
+            ])->toArray(),
+            'pengerjaan' => [
+                'batas_waktu_menit' => $tiket->batas_waktu_menit,
+                'pengerjaan_mulai_at' => $tiket->pengerjaan_mulai_at?->format('d/m/Y H:i'),
+                'pengerjaan_deadline_at' => $tiket->pengerjaan_deadline_at?->format('d/m/Y H:i'),
+                'is_overdue' => $tiket->pengerjaan_deadline_at && now()->greaterThan($tiket->pengerjaan_deadline_at) && in_array($tiket->status, ['dikerjakan', 'qc']),
+                'sisa_menit' => $tiket->pengerjaan_deadline_at && now()->lessThan($tiket->pengerjaan_deadline_at) ? (int) now()->diffInMinutes($tiket->pengerjaan_deadline_at) : 0,
+            ],
         ] : null,
     ]);
 })->name('servis.tracking');

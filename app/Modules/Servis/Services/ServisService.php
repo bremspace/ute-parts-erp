@@ -19,6 +19,7 @@ use App\Modules\Servis\Models\ServisStatusLog;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisEstimasiItem;
 use App\Modules\Servis\Models\TiketServisItem;
+use App\Modules\Servis\Models\TiketServisProgress;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
@@ -111,14 +112,20 @@ class ServisService
         $tiket = TiketServis::create([
             'no_tiket' => $noTiket,
             'cabang_id' => $cabangId,
+            'jenis_servis_id' => $data['jenis_servis_id'] ?? null,
             'pelanggan_id' => $data['pelanggan_id'] ?? null,
-            'nama_pelanggan' => $data['nama'] ?? null,
-            'telepon_pelanggan' => $data['telepon'] ?? null,
+            'nama_pelanggan' => $data['nama'] ?? ($data['nama_pelanggan'] ?? null),
+            'telepon_pelanggan' => $data['telepon'] ?? ($data['telepon_pelanggan'] ?? null),
             'jenis_hp' => $data['jenis_hp'],
             'seri_hp' => $data['seri_hp'] ?? null,
+            'tipe_kunci' => $data['tipe_kunci'] ?? null,
+            'kunci_terenkripsi' => is_array($data['kunci_terenkripsi'] ?? null)
+                ? implode('-', $data['kunci_terenkripsi'])
+                : ($data['kunci_terenkripsi'] ?? null),
             'keluhan' => $data['keluhan'],
             'kondisi_fisik' => $data['kondisi_fisik'] ?? null,
             'foto_unit' => $data['foto_unit'] ?? null,
+            'catatan_admin' => $data['catatan_booking'] ?? ($data['catatan_admin'] ?? null),
             'status' => 'diajukan_online',
             'sumber' => 'online',
             'token_approval' => Str::random(64),
@@ -201,8 +208,8 @@ class ServisService
                 throw new \Exception('Alasan wajib diisi saat melakukan override status');
             }
 
-            // [T-13] Guard transisi diambil: harus lunas
-            if ($statusBaru === 'diambil' && $tiket->status_pembayaran !== 'lunas') {
+            // [T-13] Guard transisi diambil: harus lunas (kecuali servis batal/ditolak tanpa perbaikan)
+            if ($statusBaru === 'diambil' && $statusLama !== 'ditolak' && $tiket->status_pembayaran !== 'lunas') {
                 throw new \Exception('Unit tidak dapat diserahkan/diambil sebelum pembayaran lunas');
             }
 
@@ -212,6 +219,7 @@ class ServisService
             match ($statusBaru) {
                 'menunggu_approval' => $this->onMenungguApproval($tiket),
                 'diterima' => $this->onDiterima($tiket),
+                'dikerjakan' => $this->onDikerjakan($tiket),
                 // [T-03] Pengembalian stok part saat tiket ditolak (belum ada
                 // jurnal onSelesai) — lihat onDitolak().
                 'ditolak' => $this->onDitolak($tiket),
@@ -287,7 +295,7 @@ class ServisService
      *     pelanggan tidak mati saat estimasi diedit ulang.
      *  4. Notifikasi dikirim SETELAH commit (tidak terkirim bila rollback).
      */
-    public function setEstimasi(TiketServis $tiket, float $biaya, string $alasan, User $user, array $items = []): TiketServis
+    public function setEstimasi(TiketServis $tiket, float $biaya, string $alasan, User $user, array $items = [], ?int $batasWaktuMenit = null, ?bool $autoCancelOverdue = null): TiketServis
     {
         $statusLama = $tiket->status;
 
@@ -302,7 +310,7 @@ class ServisService
             throw new \Exception("Transisi dari '{$statusLama}' ke 'menunggu_approval' tidak valid");
         }
 
-        DB::transaction(function () use ($tiket, $statusLama, &$biaya, $alasan, $user, $items) {
+        DB::transaction(function () use ($tiket, $statusLama, &$biaya, $alasan, $user, $items, $batasWaktuMenit, $autoCancelOverdue) {
             if (! empty($items)) {
                 TiketServisEstimasiItem::where('tiket_servis_id', $tiket->id)->delete();
 
@@ -364,11 +372,25 @@ class ServisService
                 }
             }
 
-            $tiket->update([
+            // Batas waktu pengerjaan: prioritas manual input saat estimasi -> master jenis_servis -> default tiket
+            $batasWaktuFinal = $batasWaktuMenit;
+            if ($batasWaktuFinal === null) {
+                $batasWaktuFinal = $tiket->batas_waktu_menit ?: ($tiket->jenisServis?->batas_waktu_menit ?? 120);
+            }
+
+            $autoCancelFinal = $autoCancelOverdue !== null
+                ? $autoCancelOverdue
+                : ($tiket->auto_cancel_overdue ?: ($tiket->jenisServis?->auto_cancel_jika_overdue ?? false));
+
+            $tiketUpdate = [
                 'estimasi_biaya' => $biaya,
                 'alasan_estimasi' => $alasan,
                 'status' => 'menunggu_approval',
-            ]);
+                'batas_waktu_menit' => $batasWaktuFinal,
+                'auto_cancel_overdue' => $autoCancelFinal,
+            ];
+
+            $tiket->update($tiketUpdate);
 
             // Token hanya bila belum ada — link yang sudah dibagikan tetap hidup.
             if (! $tiket->token_approval) {
@@ -805,6 +827,50 @@ class ServisService
     }
 
     /**
+     * Catat progress pengerjaan tiket oleh teknisi (dengan opsi foto & tampilkan ke tracking konsumen).
+     */
+    public function catatProgress(
+        TiketServis $tiket,
+        User $user,
+        int $persentase,
+        string $judul,
+        ?string $deskripsi = null,
+        array $foto = [],
+        bool $tampilkanKeKonsumen = true
+    ): TiketServisProgress {
+        return DB::transaction(function () use ($tiket, $user, $persentase, $judul, $deskripsi, $foto, $tampilkanKeKonsumen) {
+            $progress = TiketServisProgress::create([
+                'tiket_servis_id' => $tiket->id,
+                'user_id' => $user->id,
+                'persentase' => min(100, max(0, $persentase)),
+                'judul' => $judul,
+                'deskripsi' => $deskripsi,
+                'foto' => $foto,
+                'tampilkan_ke_konsumen' => $tampilkanKeKonsumen,
+            ]);
+
+            $this->logStatus(
+                $tiket,
+                $tiket->status,
+                $tiket->status,
+                $user,
+                'update_progress',
+                "Progress {$persentase}%: {$judul}"
+            );
+
+            // Jika ditampilkan ke konsumen & konsumen punya no WA, kirim notifikasi singkat
+            $telepon = $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon;
+            if ($tampilkanKeKonsumen && filled($telepon) && $tiket->token_approval) {
+                $trackingUrl = url("/tracking/{$tiket->token_approval}");
+                $pesan = "Progress Pengerjaan Servis {$tiket->no_tiket} ({$tiket->jenis_hp}): {$persentase}% - {$judul}. Pantau selengkapnya di {$trackingUrl}";
+                $this->notifService->kirim('wa', $telepon, 'Pembaruan Pengerjaan Servis', $pesan);
+            }
+
+            return $progress;
+        });
+    }
+
+    /**
      * Get tiket by token_approval (public tracking).
      */
     public function getByToken(string $token): TiketServis
@@ -832,6 +898,27 @@ class ServisService
 
         return $aksi === 'override'
             && ! in_array($statusBaru, ['disetujui', 'dikerjakan', 'qc'], true);
+    }
+
+    private function onDikerjakan(TiketServis $tiket): void
+    {
+        $batasMenit = $tiket->batas_waktu_menit ?: ($tiket->jenisServis?->batas_waktu_menit ?? 120);
+        $mulai = now();
+        $deadline = (clone $mulai)->addMinutes($batasMenit);
+
+        $tiket->update([
+            'batas_waktu_menit' => $batasMenit,
+            'pengerjaan_mulai_at' => $tiket->pengerjaan_mulai_at ?: $mulai,
+            'pengerjaan_deadline_at' => $deadline,
+        ]);
+
+        // Notifikasi ke teknisi jika ditugaskan
+        if ($tiket->teknisi_id && $tiket->teknisi) {
+            $pesanTeknisi = "Halo {$tiket->teknisi->name}, Anda mulai mengerjakan servis {$tiket->no_tiket} ({$tiket->jenis_hp}). Batas waktu pengerjaan: {$batasMenit} menit (Deadline: {$deadline->format('H:i')}). Pantau progres dan unggah pembaruan secara berkala.";
+            if ($tiket->teknisi->phone ?? false) {
+                $this->notifService->kirim('wa', $tiket->teknisi->phone, 'Tugas Pengerjaan Servis Dimulai', $pesanTeknisi);
+            }
+        }
     }
 
     private function onMenungguApproval(TiketServis $tiket): void
@@ -1035,7 +1122,22 @@ class ServisService
         }
 
         if (! $sudahDiposting) {
-            $tiket->update(['tanggal_selesai' => now()]);
+            $selesaiAt = now();
+            $mulaiAt = $tiket->pengerjaan_mulai_at;
+            $durasiMenit = $mulaiAt ? (int) $mulaiAt->diffInMinutes($selesaiAt) : null;
+            $deadline = $tiket->pengerjaan_deadline_at;
+
+            $statusSla = 'on_time';
+            if ($deadline && $selesaiAt->greaterThan($deadline)) {
+                $statusSla = 'overdue';
+            }
+
+            $tiket->update([
+                'tanggal_selesai' => $selesaiAt,
+                'pengerjaan_selesai_at' => $selesaiAt,
+                'durasi_pengerjaan_menit' => $durasiMenit,
+                'status_sla_kpi' => $statusSla,
+            ]);
         }
 
         // [F2-3] SN terkait tiket ini: kembali 'tersedia' — tautan riwayat

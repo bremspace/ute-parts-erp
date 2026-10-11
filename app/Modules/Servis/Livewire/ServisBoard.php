@@ -58,13 +58,22 @@ class ServisBoard extends Component
         'status',
         'status_pembayaran',
         'estimasi_biaya',
+        'batas_waktu_menit',
+        'pengerjaan_mulai_at',
+        'pengerjaan_deadline_at',
+        'status_sla_kpi',
         'created_at',
+        'updated_at',
+        'tanggal_diambil',
     ];
 
     // Search & filter
     public string $search = '';
 
     public string $filterStatus = ''; // empty = all
+
+    // [Kanban Histori] Manajemen Histori Transaksi di Kanban: '7_hari' (default), 'hari_ini', '30_hari', 'semua'
+    public string $periodeHistori = '7_hari';
 
     // Terima Unit Modal
     public bool $showTerimaModal = false;
@@ -97,6 +106,21 @@ class ServisBoard extends Component
 
     public array $photoInputs = [];
 
+    // Terima Unit Estimasi Langsung State
+    public bool $terimaSertakanEstimasi = false;
+
+    public array $terimaEstimasiItems = [];
+
+    public float $terimaEstimasiBiaya = 0;
+
+    public string $terimaEstimasiAlasan = '';
+
+    public string $terimaEstimasiMode = 'menunggu_approval'; // 'menunggu_approval' atau 'disetujui'
+
+    public ?int $terimaEstimasiBatasWaktu = null;
+
+    public bool $terimaEstimasiAutoCancel = false;
+
     // Detail Modal
     public ?int $selectedTiketId = null;
 
@@ -120,6 +144,41 @@ class ServisBoard extends Component
 
     public string $approveAlasan = '';
 
+    // [Workflow Ditolak] Retur / Batal Servis Modal
+    public bool $showBatalReturModal = false;
+
+    public ?int $batalReturTiketId = null;
+
+    public string $batalReturCatatan = '';
+
+    public float $batalReturBiaya = 0;
+
+    public string $batalReturMetode = 'tunai';
+
+    // [Intake Booking Online] Modal Pemeriksaan & Penerimaan Fisik
+    public bool $showIntakeBookingModal = false;
+
+    public ?int $intakeBookingTiketId = null;
+
+    public array $intakeForm = [
+        'tiket_id' => null,
+        'no_tiket' => '',
+        'nama_pelanggan' => '',
+        'telepon_pelanggan' => '',
+        'jenis_hp' => '',
+        'seri_hp' => '',
+        'jenis_servis_id' => null,
+        'keluhan' => '',
+        'tipe_kunci' => '',
+        'kunci_terenkripsi' => '',
+        'kondisi_fisik' => [],
+        'kelengkapan' => [],
+        'teknisi_id' => null,
+        'catatan_intake' => '',
+    ];
+
+    public array $intakePhotoInputs = [null, null, null];
+
     // Drag & drop target status
     public ?string $dropTargetStatus = null;
 
@@ -130,6 +189,26 @@ class ServisBoard extends Component
 
     // [T-09d] Form estimasi multi-baris (part & jasa)
     public array $estimasiItems = [];
+
+    // [KPI & Batas Waktu Estimasi]
+    public ?int $estimasiBatasWaktuMenit = null;
+
+    public bool $estimasiAutoCancelOverdue = false;
+
+    // [Progress Kerja Teknisi Modal]
+    public bool $showProgressModal = false;
+
+    public ?int $progressTiketId = null;
+
+    public int $progressPersentase = 50;
+
+    public string $progressJudul = '';
+
+    public string $progressDeskripsi = '';
+
+    public bool $progressTampilkanKonsumen = true;
+
+    public array $progressFoto = [];
 
     // Modal Pencarian Part Servis
     public bool $showCariPartModal = false;
@@ -195,6 +274,16 @@ class ServisBoard extends Component
                 $this->estimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
                 $this->recalculateEstimasiTotal();
             }
+        } elseif ($context === 'servis_terima_estimasi') {
+            if (isset($this->terimaEstimasiItems[$idx])) {
+                $this->terimaEstimasiItems[$idx]['produk_id'] = $produkId;
+                $this->terimaEstimasiItems[$idx]['produk_nama'] = $produk->nama;
+                $this->terimaEstimasiItems[$idx]['nama_item'] = $produk->nama;
+                $pelanggan = ! empty($this->terimaForm['pelanggan_id']) ? Pelanggan::find($this->terimaForm['pelanggan_id']) : null;
+                $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                $this->terimaEstimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
+                $this->recalculateTerimaEstimasiTotal();
+            }
         } elseif ($context === 'servis_pekerjaan') {
             if (isset($this->pekerjaanItems[$idx])) {
                 $this->pekerjaanItems[$idx]['produk_id'] = $produkId;
@@ -216,6 +305,17 @@ class ServisBoard extends Component
             $this->estimasiItems[$idx]['nama_item'] = '';
             $this->estimasiItems[$idx]['harga'] = 0;
             $this->recalculateEstimasiTotal();
+        }
+    }
+
+    public function resetTerimaEstimasiPartRow(int $idx): void
+    {
+        if (isset($this->terimaEstimasiItems[$idx])) {
+            $this->terimaEstimasiItems[$idx]['produk_id'] = null;
+            $this->terimaEstimasiItems[$idx]['produk_nama'] = '';
+            $this->terimaEstimasiItems[$idx]['nama_item'] = '';
+            $this->terimaEstimasiItems[$idx]['harga'] = 0;
+            $this->recalculateTerimaEstimasiTotal();
         }
     }
 
@@ -277,6 +377,14 @@ class ServisBoard extends Component
             $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
             $this->estimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? 0);
             $this->recalculateEstimasiTotal();
+        } elseif ($context === 'servis_terima_estimasi' && isset($this->terimaEstimasiItems[$idx])) {
+            $this->terimaEstimasiItems[$idx]['produk_id'] = $produkId;
+            $this->terimaEstimasiItems[$idx]['produk_nama'] = $produk->nama;
+            $this->terimaEstimasiItems[$idx]['nama_item'] = $produk->nama;
+            $pelanggan = ! empty($this->terimaForm['pelanggan_id']) ? Pelanggan::find($this->terimaForm['pelanggan_id']) : null;
+            $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+            $this->terimaEstimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? 0);
+            $this->recalculateTerimaEstimasiTotal();
         } elseif ($context === 'servis_pekerjaan' && isset($this->pekerjaanItems[$idx])) {
             $this->pekerjaanItems[$idx]['produk_id'] = $produkId;
             $this->pekerjaanItems[$idx]['produk_nama'] = $produk->nama;
@@ -411,7 +519,35 @@ class ServisBoard extends Component
 
         // Tahap 1: hanya `id` (baris sempit) → sort muat di sort buffer,
         // dan dengan index `created_at` jadi covering index scan (tanpa filesort).
-        $ids = (clone $base)->latest()->limit(100)->pluck('id');
+        // Manajemen Histori Transaksi:
+        // - Jika staf mencari (barcode/keyword): cari ke semua status tiket
+        // - Jika filter status aktif: ikuti filter status (+ periode jika 'diambil')
+        // - Papan utama: proses kerja aktif (status != 'diambil') selalu ditampilkan penuh
+        //   tanpa tenggelam oleh arsip lama, sedangkan kolom histori ('diambil') difilter
+        //   berdasarkan periode yang dipilih (default 7 hari terakhir).
+        if ($this->search) {
+            $ids = (clone $base)->latest()->limit(100)->pluck('id');
+        } elseif ($this->filterStatus) {
+            if ($this->filterStatus === 'diambil') {
+                $qHistori = clone $base;
+                $this->applyPeriodeHistoriFilter($qHistori);
+                $ids = $qHistori->latest()->limit(100)->pluck('id');
+            } else {
+                $ids = (clone $base)->latest()->limit(100)->pluck('id');
+            }
+        } else {
+            $activeIds = (clone $base)
+                ->where('status', '!=', 'diambil')
+                ->latest()
+                ->limit(150)
+                ->pluck('id');
+
+            $qHistori = (clone $base)->where('status', 'diambil');
+            $this->applyPeriodeHistoriFilter($qHistori);
+            $historyIds = $qHistori->latest()->limit(50)->pluck('id');
+
+            $ids = $activeIds->merge($historyIds)->unique()->values();
+        }
 
         // Tahap 2: hydrate row SEMPIT + eager load + withCount TANPA ORDER BY
         // (`whereIn` tidak memicu filesort), urutan dikembalikan di PHP.
@@ -441,6 +577,31 @@ class ServisBoard extends Component
         }
 
         return $grouped;
+    }
+
+    /**
+     * Filter periode untuk kolom histori transaksi ('diambil').
+     */
+    private function applyPeriodeHistoriFilter(Builder $query): void
+    {
+        match ($this->periodeHistori) {
+            'hari_ini' => $query->where(function (Builder $q) {
+                $today = now()->toDateString();
+                $q->where(fn ($sub) => $sub->whereNotNull('tanggal_diambil')->whereDate('tanggal_diambil', $today))
+                    ->orWhere(fn ($sub) => $sub->whereNull('tanggal_diambil')->whereDate('updated_at', $today));
+            }),
+            '30_hari' => $query->where(function (Builder $q) {
+                $since = now()->subDays(30)->startOfDay();
+                $q->where(fn ($sub) => $sub->whereNotNull('tanggal_diambil')->where('tanggal_diambil', '>=', $since))
+                    ->orWhere(fn ($sub) => $sub->whereNull('tanggal_diambil')->where('updated_at', '>=', $since));
+            }),
+            'semua' => null,
+            default => $query->where(function (Builder $q) { // '7_hari' default
+                $since = now()->subDays(7)->startOfDay();
+                $q->where(fn ($sub) => $sub->whereNotNull('tanggal_diambil')->where('tanggal_diambil', '>=', $since))
+                    ->orWhere(fn ($sub) => $sub->whereNull('tanggal_diambil')->where('updated_at', '>=', $since));
+            }),
+        };
     }
 
     /**
@@ -478,6 +639,121 @@ class ServisBoard extends Component
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => "Tiket {$tiket->no_tiket} berhasil dikonfirmasi dan masuk ke status Diterima.",
+        ]);
+    }
+
+    public function openIntakeBookingModal(int $tiketId): void
+    {
+        $tiket = $this->tiketScoped($tiketId);
+        $this->intakeBookingTiketId = $tiketId;
+        $this->intakeForm = [
+            'tiket_id' => $tiket->id,
+            'no_tiket' => $tiket->no_tiket,
+            'nama_pelanggan' => $tiket->nama_pelanggan ?? $tiket->pelanggan?->nama ?? '',
+            'telepon_pelanggan' => $tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? '',
+            'jenis_hp' => $tiket->jenis_hp,
+            'seri_hp' => $tiket->seri_hp ?? '',
+            'jenis_servis_id' => $tiket->jenis_servis_id,
+            'keluhan' => $tiket->keluhan,
+            'tipe_kunci' => $tiket->tipe_kunci ?? '',
+            'kunci_terenkripsi' => $tiket->kunci_terenkripsi ?? '',
+            'kondisi_fisik' => is_array($tiket->kondisi_fisik) ? $tiket->kondisi_fisik : [],
+            'kelengkapan' => [],
+            'teknisi_id' => $tiket->teknisi_id ?? auth()->id(),
+            'catatan_intake' => '',
+        ];
+        $this->intakePhotoInputs = [null, null, null];
+        $this->showIntakeBookingModal = true;
+    }
+
+    public function toggleIntakeKondisiFisik(string $check): void
+    {
+        $list = $this->intakeForm['kondisi_fisik'] ?? [];
+        if (in_array($check, $list, true)) {
+            $this->intakeForm['kondisi_fisik'] = array_values(array_diff($list, [$check]));
+        } else {
+            $this->intakeForm['kondisi_fisik'] = [...$list, $check];
+        }
+    }
+
+    public function toggleIntakeKelengkapan(string $item): void
+    {
+        $list = $this->intakeForm['kelengkapan'] ?? [];
+        if (in_array($item, $list, true)) {
+            $this->intakeForm['kelengkapan'] = array_values(array_diff($list, [$item]));
+        } else {
+            $this->intakeForm['kelengkapan'] = [...$list, $item];
+        }
+    }
+
+    public function handleIntakeFotoUpload(int $index, $content): void
+    {
+        if ($content) {
+            $this->intakePhotoInputs[$index] = $content;
+        }
+    }
+
+    public function removeIntakeFoto(int $index): void
+    {
+        $this->intakePhotoInputs[$index] = null;
+    }
+
+    public function simpanIntakeBooking(): void
+    {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin menerima unit servis')) {
+            return;
+        }
+
+        $this->validate([
+            'intakeForm.jenis_hp' => 'required|string|max:255',
+            'intakeForm.keluhan' => 'required|string',
+        ]);
+
+        $tiket = $this->tiketScoped($this->intakeBookingTiketId);
+
+        $foto = array_values(array_filter($this->intakePhotoInputs));
+
+        $kondisiFisik = $this->intakeForm['kondisi_fisik'] ?? [];
+        if (! empty($this->intakeForm['kelengkapan'])) {
+            $kondisiFisik[] = 'Kelengkapan: '.implode(', ', $this->intakeForm['kelengkapan']);
+        }
+
+        $catatanPemeriksaan = trim((string) ($this->intakeForm['catatan_intake'] ?? ''));
+        $kunciVal = $this->intakeForm['kunci_terenkripsi'] ?? '';
+        if (is_array($kunciVal)) {
+            $kunciVal = implode('-', $kunciVal);
+        }
+
+        $tiket->update([
+            'jenis_hp' => $this->intakeForm['jenis_hp'],
+            'seri_hp' => $this->intakeForm['seri_hp'] ?: null,
+            'jenis_servis_id' => $this->intakeForm['jenis_servis_id'] ?: null,
+            'teknisi_id' => $this->intakeForm['teknisi_id'] ?: null,
+            'tipe_kunci' => $this->intakeForm['tipe_kunci'] ?: null,
+            'kunci_terenkripsi' => $kunciVal ?: null,
+            'kondisi_fisik' => $kondisiFisik ?: null,
+            'foto_unit' => $foto ?: $tiket->foto_unit,
+            'tanggal_terima' => now(),
+            'catatan_admin' => $catatanPemeriksaan ?: $tiket->catatan_admin,
+        ]);
+
+        $alasanLog = 'Pemeriksaan fisik unit selesai, unit diterima oleh '.(auth()->user()?->name ?? 'staf');
+        if ($catatanPemeriksaan) {
+            $alasanLog .= " — Catatan: {$catatanPemeriksaan}";
+        }
+
+        app(ServisService::class)->updateStatus(
+            $tiket,
+            'diterima',
+            auth()->user(),
+            $alasanLog
+        );
+
+        $this->showIntakeBookingModal = false;
+        $this->selectedTiketId = $tiket->id;
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Unit fisik {$tiket->no_tiket} berhasil diperiksa & diterima di gerai.",
         ]);
     }
 
@@ -538,6 +814,13 @@ class ServisBoard extends Component
         ];
         $this->pelangganSearch = '';
         $this->photoInputs = [null, null, null];
+        $this->terimaSertakanEstimasi = false;
+        $this->terimaEstimasiItems = [];
+        $this->terimaEstimasiBiaya = 0;
+        $this->terimaEstimasiAlasan = '';
+        $this->terimaEstimasiMode = 'menunggu_approval';
+        $this->terimaEstimasiBatasWaktu = JenisServis::where('is_active', true)->first()?->batas_waktu_menit ?? 120;
+        $this->terimaEstimasiAutoCancel = JenisServis::where('is_active', true)->first()?->auto_cancel_jika_overdue ?? false;
         $this->showTerimaModal = true;
     }
 
@@ -624,9 +907,71 @@ class ServisBoard extends Component
 
         try {
             $tiket = app(ServisService::class)->terimaUnit($data, auth()->user());
+
+            // Jika estimasi langsung disertakan di form terima unit
+            if ($this->terimaSertakanEstimasi && ! empty($this->terimaEstimasiItems)) {
+                $cleanedItems = [];
+                foreach ($this->terimaEstimasiItems as $it) {
+                    $tipe = ($it['tipe'] ?? 'jasa') === 'part' ? 'part' : 'jasa';
+                    $qty = max(1, (int) ($it['qty'] ?? 1));
+                    $harga = max(0, $this->parseNominal($it['harga'] ?? 0));
+                    $nama = trim((string) ($it['nama_item'] ?? ''));
+
+                    if ($nama === '' && empty($it['produk_id']) && empty($it['jenis_servis_id']) && $harga <= 0) {
+                        continue;
+                    }
+
+                    $cleanedItems[] = [
+                        'tipe' => $tipe,
+                        'jenis_servis_id' => ! empty($it['jenis_servis_id']) ? (int) $it['jenis_servis_id'] : null,
+                        'produk_id' => ! empty($it['produk_id']) ? (int) $it['produk_id'] : null,
+                        'sku_variant_id' => ! empty($it['sku_variant_id']) ? (int) $it['sku_variant_id'] : null,
+                        'nama_item' => $nama ?: ($tipe === 'part' ? 'Sparepart' : 'Jasa Servis'),
+                        'qty' => $qty,
+                        'harga' => $harga,
+                        'subtotal' => $qty * $harga,
+                    ];
+                }
+
+                if (! empty($cleanedItems)) {
+                    $alasanEst = trim($this->terimaEstimasiAlasan) ?: 'Estimasi biaya awal saat terima unit fisik';
+
+                    // Transisi flow normal state machine: terima (diterima) -> diagnosa -> setEstimasi (menunggu_approval)
+                    $tiket = app(ServisService::class)->updateStatus(
+                        $tiket,
+                        'diagnosa',
+                        auth()->user(),
+                        'Mulai pemeriksaan diagnosa unit saat penerimaan'
+                    );
+
+                    $tiket = app(ServisService::class)->setEstimasi(
+                        $tiket,
+                        (float) $this->terimaEstimasiBiaya,
+                        $alasanEst,
+                        auth()->user(),
+                        $cleanedItems,
+                        $this->terimaEstimasiBatasWaktu,
+                        $this->terimaEstimasiAutoCancel
+                    );
+
+                    // Jika konsumen walk-in langsung setuju di tempat (misal ganti baterai/LCD langsung sepakat)
+                    if ($this->terimaEstimasiMode === 'disetujui') {
+                        $tiket = app(ServisService::class)->updateStatus(
+                            $tiket,
+                            'disetujui',
+                            auth()->user(),
+                            'Estimasi biaya langsung disetujui konsumen saat penerimaan unit di konter'
+                        );
+                    }
+                }
+            }
+
             $this->showTerimaModal = false;
             $this->selectedTiketId = $tiket->id;
-            $this->dispatch('alert', ['type' => 'success', 'message' => "Unit diterima — {$tiket->no_tiket}"]);
+            $msg = $this->terimaSertakanEstimasi
+                ? "Unit diterima & estimasi awal tersimpan ({$tiket->status}) — {$tiket->no_tiket}"
+                : "Unit diterima — {$tiket->no_tiket}";
+            $this->dispatch('alert', ['type' => 'success', 'message' => $msg]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
@@ -677,6 +1022,97 @@ class ServisBoard extends Component
         unset($this->estimasiItems[$idx]);
         $this->estimasiItems = array_values($this->estimasiItems);
         $this->recalculateEstimasiTotal();
+    }
+
+    // --- Terima Estimasi Langsung Helpers ---
+    public function toggleTerimaEstimasi(): void
+    {
+        $this->terimaSertakanEstimasi = ! $this->terimaSertakanEstimasi;
+        if ($this->terimaSertakanEstimasi && empty($this->terimaEstimasiItems)) {
+            $defaultJenisId = $this->terimaForm['jenis_servis_id'] ?: JenisServis::where('is_active', true)->first()?->id;
+            $defaultJenis = $defaultJenisId ? JenisServis::find($defaultJenisId) : null;
+            $hargaDefault = (float) ($defaultJenis?->biaya_jasa ?? 0);
+
+            $this->terimaEstimasiItems = [[
+                'tipe' => 'jasa',
+                'jenis_servis_id' => $defaultJenis?->id,
+                'produk_id' => null,
+                'nama_item' => $defaultJenis?->nama ?? 'Jasa Servis',
+                'qty' => 1,
+                'harga' => $hargaDefault,
+                'subtotal' => $hargaDefault,
+            ]];
+            $this->terimaEstimasiBiaya = $hargaDefault;
+        }
+    }
+
+    public function addTerimaEstimasiRow(string $tipe = 'jasa'): void
+    {
+        $this->terimaEstimasiItems[] = $this->estimasiRowBaru($tipe);
+        $this->recalculateTerimaEstimasiTotal();
+    }
+
+    public function removeTerimaEstimasiRow(int $idx): void
+    {
+        unset($this->terimaEstimasiItems[$idx]);
+        $this->terimaEstimasiItems = array_values($this->terimaEstimasiItems);
+        $this->recalculateTerimaEstimasiTotal();
+    }
+
+    public function updatedTerimaEstimasiItems($value, $key): void
+    {
+        $parts = explode('.', (string) $key);
+        $idx = (int) ($parts[0] ?? 0);
+        $field = $parts[1] ?? '';
+
+        if (! isset($this->terimaEstimasiItems[$idx])) {
+            return;
+        }
+
+        $row = &$this->terimaEstimasiItems[$idx];
+
+        if ($field === 'harga') {
+            $row['harga'] = $this->parseNominal($value);
+        } elseif ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
+            if ($value) {
+                $produk = Produk::find($value);
+                if ($produk) {
+                    $row['nama_item'] = $produk->nama;
+                    $pelanggan = ! empty($this->terimaForm['pelanggan_id']) ? Pelanggan::find($this->terimaForm['pelanggan_id']) : null;
+                    $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual ?? 0);
+                }
+            } else {
+                $row['nama_item'] = '';
+                $row['harga'] = 0;
+            }
+        } elseif ($field === 'jenis_servis_id' && ($row['tipe'] ?? '') === 'jasa') {
+            if ($value) {
+                $jenis = JenisServis::find($value);
+                if ($jenis) {
+                    $row['nama_item'] = $jenis->nama;
+                    $row['harga'] = (float) ($jenis->biaya_jasa ?? 0);
+                }
+            } else {
+                $row['nama_item'] = '';
+                $row['harga'] = 0;
+            }
+        }
+
+        $this->recalculateTerimaEstimasiTotal();
+    }
+
+    private function recalculateTerimaEstimasiTotal(): void
+    {
+        foreach ($this->terimaEstimasiItems as $i => $row) {
+            $qty = max(1, (int) ($row['qty'] ?? 1));
+            $harga = $this->parseNominal($row['harga'] ?? 0);
+            $this->terimaEstimasiItems[$i]['qty'] = $qty;
+            $this->terimaEstimasiItems[$i]['harga'] = $harga;
+            $this->terimaEstimasiItems[$i]['subtotal'] = $qty * $harga;
+        }
+
+        $this->terimaEstimasiBiaya = (float) array_sum(array_column($this->terimaEstimasiItems, 'subtotal'));
     }
 
     public function updatedEstimasiItems($value, $key): void
@@ -741,6 +1177,8 @@ class ServisBoard extends Component
         $tiket = $this->tiketScoped($tiketId);
         $this->estimasiTiketId = $tiketId;
         $this->estimasiAlasan = $tiket->alasan_estimasi ?: '';
+        $this->estimasiBatasWaktuMenit = $tiket->batas_waktu_menit ?: ($tiket->jenisServis?->batas_waktu_menit ?? 120);
+        $this->estimasiAutoCancelOverdue = $tiket->auto_cancel_overdue ?: ($tiket->jenisServis?->auto_cancel_jika_overdue ?? false);
 
         $existingItems = $tiket->estimasiItems()->get();
         if ($existingItems->isNotEmpty()) {
@@ -831,12 +1269,77 @@ class ServisBoard extends Component
                 (float) $this->estimasiBiaya,
                 $alasan,
                 auth()->user(),
-                $cleanedItems
+                $cleanedItems,
+                $this->estimasiBatasWaktuMenit,
+                $this->estimasiAutoCancelOverdue
             );
             $this->showEstimasiModal = false;
             $this->selectedTiketId = $tiket->id;
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Estimasi tersimpan, menunggu approval pelanggan']);
         } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    // --- Progress Pengerjaan Teknisi ---
+    public function openProgressModal(int $tiketId): void
+    {
+        $tiket = $this->tiketScoped($tiketId);
+        $this->progressTiketId = $tiketId;
+        $this->progressPersentase = 50;
+        $this->progressJudul = '';
+        $this->progressDeskripsi = '';
+        $this->progressTampilkanKonsumen = true;
+        $this->progressFoto = [];
+        $this->showProgressModal = true;
+    }
+
+    public function handleProgressFotoUpload($content): void
+    {
+        if ($content) {
+            $this->progressFoto[] = $content;
+        }
+    }
+
+    public function removeProgressFoto(int $index): void
+    {
+        unset($this->progressFoto[$index]);
+        $this->progressFoto = array_values($this->progressFoto);
+    }
+
+    public function simpanProgress(): void
+    {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin mencatat progress servis')) {
+            return;
+        }
+
+        if (! $this->progressTiketId) {
+            return;
+        }
+
+        $tiket = $this->tiketScoped($this->progressTiketId);
+
+        $this->validate([
+            'progressPersentase' => 'required|integer|min:0|max:100',
+            'progressJudul' => 'required|string|min:3|max:100',
+            'progressDeskripsi' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            app(ServisService::class)->catatProgress(
+                $tiket,
+                auth()->user(),
+                $this->progressPersentase,
+                $this->progressJudul,
+                $this->progressDeskripsi,
+                $this->progressFoto,
+                $this->progressTampilkanKonsumen
+            );
+
+            $this->showProgressModal = false;
+            $this->selectedTiketId = $tiket->id;
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Progress {$this->progressPersentase}% berhasil disimpan & diunggah"]);
+        } catch (\Throwable $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
     }
@@ -860,6 +1363,55 @@ class ServisBoard extends Component
 
         $this->updateStatus($tiket->id, $statusBaru, $this->approveAlasan ?: ($action === 'approve' ? 'Pelanggan menyetujui estimasi' : 'Estimasi ditolak'));
         $this->showApproveModal = false;
+    }
+
+    public function openBatalReturModal(int $tiketId): void
+    {
+        $tiket = $this->tiketScoped($tiketId);
+        $this->batalReturTiketId = $tiketId;
+        $this->batalReturCatatan = 'Servis dibatalkan setelah estimasi ditolak. Unit dirakit kembali dan diserahkan kepada konsumen.';
+        $this->batalReturBiaya = 0;
+        $this->batalReturMetode = 'tunai';
+        $this->showBatalReturModal = true;
+    }
+
+    public function prosesBatalRetur(): void
+    {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin mengubah status tiket servis')) {
+            return;
+        }
+
+        $tiket = $this->tiketScoped($this->batalReturTiketId);
+
+        $alasan = trim($this->batalReturCatatan) ?: 'Unit diserahkan kembali ke pelanggan tanpa perbaikan';
+
+        try {
+            app(ServisService::class)->updateStatus($tiket, 'diambil', auth()->user(), $alasan);
+            $this->showBatalReturModal = false;
+            $this->selectedTiketId = $tiket->id;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Servis ditutup: Unit {$tiket->no_tiket} telah diserahkan kembali kepada pelanggan.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function revisiEstimasiDitolak(int $tiketId): void
+    {
+        if (! $this->boleh('servis.update-status', 'Anda tidak punya izin mengubah status tiket servis')) {
+            return;
+        }
+
+        $tiket = $this->tiketScoped($tiketId);
+
+        try {
+            app(ServisService::class)->updateStatus($tiket, 'diagnosa', auth()->user(), 'Revisi estimasi perbaikan setelah penolakan pelanggan');
+            $this->openEstimasiModal($tiketId);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     // --- Pembayaran Servis ---

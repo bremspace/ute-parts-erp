@@ -9,7 +9,7 @@
             Booking Servis Gadget Presisi
         </h1>
         <p class="text-xs sm:text-sm text-ink-500 dark:text-ink-400 max-w-lg mx-auto leading-relaxed">
-            Diagnostik cepat oleh teknisi tersertifikasi dengan suku cadang bergaransi resmi. Tidak perlu antre, konfirmasi instan via sistem.
+            Diagnostik cepat oleh teknisi tersertifikasi dengan suku cadang bergaransi resmi. Pengajuan online terverifikasi langsung saat serah terima unit di konter.
         </p>
     </div>
 
@@ -45,10 +45,38 @@
                 </div>
             </div>
 
-            <!-- Step 2: Detail Unit Gadget -->
+            <!-- Step 2: Kategori Layanan & Estimasi Kerusakan -->
             <div class="space-y-4 pt-4 border-t border-ink-100/80 dark:border-white/10">
                 <div class="flex items-center gap-3">
                     <span class="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-ink-900 dark:text-white">Kategori Kerusakan / Layanan</h3>
+                </div>
+
+                <div class="pl-0 sm:pl-9 space-y-1.5">
+                    <label for="jenis_servis_id" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
+                        Kategori Layanan Utama
+                    </label>
+                    <div class="relative w-full min-w-0">
+                        <select id="jenis_servis_id" wire:model="jenis_servis_id"
+                                class="w-full min-w-0 max-w-full truncate appearance-none px-4 py-3 pr-8 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm font-medium text-ink-900 dark:text-white outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px] cursor-pointer">
+                            <option value="">-- Pilih Kategori Layanan (Opsional) --</option>
+                            @foreach($jenisServisList as $js)
+                                <option value="{{ $js->id }}">{{ $js->nama }} @if($js->biaya_jasa > 0) (Mulai Rp {{ number_format($js->biaya_jasa, 0, ',', '.') }}) @endif</option>
+                            @endforeach
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-ink-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Identifikasi Gadget & Keluhan -->
+            <div class="space-y-4 pt-4 border-t border-ink-100/80 dark:border-white/10">
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
                     <h3 class="text-sm font-bold uppercase tracking-wider text-ink-900 dark:text-white">Identifikasi Gadget</h3>
                 </div>
 
@@ -65,7 +93,7 @@
 
                     <div class="space-y-1.5 min-w-0">
                         <label for="seri_hp" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
-                            Warna / Seri / Kapasitas (Opsional)
+                            Warna / Seri / IMEI (Opsional)
                         </label>
                         <input type="text" id="seri_hp" wire:model="seri_hp"
                                placeholder="Contoh: Sierra Blue 128GB"
@@ -85,32 +113,157 @@
                 </div>
             </div>
 
-            <!-- Step 3: Informasi Pemilik / Kontak -->
+            <!-- Step 4: Kunci Layar Gadget -->
             <div class="space-y-4 pt-4 border-t border-ink-100/80 dark:border-white/10">
                 <div class="flex items-center gap-3">
-                    <span class="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
-                    <h3 class="text-sm font-bold uppercase tracking-wider text-ink-900 dark:text-white">Data Pemilik & Kontak Notifikasi</h3>
+                    <span class="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 text-xs font-bold flex items-center justify-center flex-shrink-0">4</span>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-ink-900 dark:text-white">Kunci Layar Gadget (Opsional)</h3>
                 </div>
 
-                <div class="pl-0 sm:pl-9 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="space-y-1.5 min-w-0">
-                        <label for="nama" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
-                            Nama Pemilik <span class="text-up-red">*</span>
-                        </label>
-                        <input type="text" id="nama" wire:model="nama"
-                               placeholder="Nama lengkap Anda"
-                               class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
-                        @error('nama') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                <div class="pl-0 sm:pl-9 space-y-3">
+                    <p class="text-xs text-ink-500 dark:text-ink-400">
+                        Untuk mempermudah pengujian fitur speaker, mikrofon, kamera, dan sensor setelah perbaikan:
+                    </p>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        @foreach([
+                            '' => 'Tidak Ada',
+                            'pola' => 'Pola Layar',
+                            'pin' => 'PIN Angka',
+                            'password' => 'Password',
+                        ] as $val => $lbl)
+                            <label class="flex items-center gap-2 p-3 rounded-2xl border cursor-pointer transition-all {{ $tipe_kunci === $val ? 'bg-up-primary/10 border-up-primary text-up-primary font-bold' : 'bg-ink-50 dark:bg-ink-950 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300' }}">
+                                <input type="radio" wire:model.live="tipe_kunci" value="{{ $val }}" class="text-up-primary focus:ring-up-primary" />
+                                <span class="text-xs">{{ $lbl }}</span>
+                            </label>
+                        @endforeach
                     </div>
 
-                    <div class="space-y-1.5 min-w-0">
-                        <label for="telepon" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
-                            WhatsApp / Nomor Telepon Aktif <span class="text-up-red">*</span>
+                    @if($tipe_kunci === 'pola')
+                        <div class="mt-3 p-4 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10">
+                            <x-pattern-lock wire-model="kunci_terenkripsi" :dark="false" />
+                        </div>
+                    @elseif($tipe_kunci === 'pin' || $tipe_kunci === 'password')
+                        <div class="mt-2" x-data="{ showPass: false }">
+                            <div class="relative">
+                                <input
+                                    :type="showPass ? 'text' : 'password'"
+                                    wire:model="kunci_terenkripsi"
+                                    placeholder="Masukkan {{ strtoupper($tipe_kunci) }} — aman terenkripsi"
+                                    class="w-full px-4 py-3 pr-10 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10"
+                                />
+                                <button
+                                    type="button"
+                                    @click="showPass = !showPass"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-700 dark:hover:text-white text-sm"
+                                >
+                                    <span x-show="!showPass">👁️</span>
+                                    <span x-show="showPass" style="display: none;">🔒</span>
+                                </button>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Step 5: Checklist Kondisi Fisik & Kelengkapan Awal -->
+            <div class="space-y-4 pt-4 border-t border-ink-100/80 dark:border-white/10">
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 text-xs font-bold flex items-center justify-center flex-shrink-0">5</span>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-ink-900 dark:text-white">Kondisi Fisik & Kelengkapan Awal</h3>
+                </div>
+
+                <div class="pl-0 sm:pl-9 space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-2">
+                            Kondisi Fisik Unit Saat Ini (Pilih yang sesuai):
                         </label>
-                        <input type="text" id="telepon" wire:model="telepon"
-                               placeholder="Contoh: 081234567890"
-                               class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
-                        @error('telepon') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            @foreach([
+                                'Layar lecet / retak',
+                                'Layar blank / garis',
+                                'Bodi / bezel dent baret',
+                                'Backdoor pecah / renggang',
+                                'Tombol keras / macet',
+                                'Pernah kena air / lembap',
+                            ] as $kf)
+                                <label class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs transition-colors {{ in_array($kf, $kondisi_fisik) ? 'bg-up-amber/10 border-up-amber text-up-amber font-semibold' : 'bg-ink-50 dark:bg-ink-950 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300' }}">
+                                    <input type="checkbox" wire:click="toggleKondisiFisik('{{ $kf }}')" {{ in_array($kf, $kondisi_fisik) ? 'checked' : '' }} class="rounded text-up-primary focus:ring-up-primary" />
+                                    <span>{{ $kf }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-2">
+                            Kelengkapan yang Dibawa Saat Drop-Off:
+                        </label>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            @foreach([
+                                'Unit Batangan / Saja',
+                                'Kabel / Charger',
+                                'Dus / Box',
+                                'SIM Tray / SIM Card',
+                            ] as $kel)
+                                <label class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs transition-colors {{ in_array($kel, $kelengkapan) ? 'bg-up-mint/10 border-up-mint text-up-mint font-semibold' : 'bg-ink-50 dark:bg-ink-950 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300' }}">
+                                    <input type="checkbox" wire:click="toggleKelengkapan('{{ $kel }}')" {{ in_array($kel, $kelengkapan) ? 'checked' : '' }} class="rounded text-up-mint focus:ring-up-mint" />
+                                    <span>{{ $kel }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 6: Informasi Pemilik & Jadwal Rencana Kunjungan -->
+            <div class="space-y-4 pt-4 border-t border-ink-100/80 dark:border-white/10">
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 text-xs font-bold flex items-center justify-center flex-shrink-0">6</span>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-ink-900 dark:text-white">Kontak Pemilik & Jadwal Kunjungan</h3>
+                </div>
+
+                <div class="pl-0 sm:pl-9 space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="space-y-1.5 min-w-0">
+                            <label for="nama" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
+                                Nama Pemilik <span class="text-up-red">*</span>
+                            </label>
+                            <input type="text" id="nama" wire:model="nama"
+                                   placeholder="Nama lengkap Anda"
+                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                            @error('nama') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="space-y-1.5 min-w-0">
+                            <label for="telepon" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
+                                WhatsApp / Nomor Telepon Aktif <span class="text-up-red">*</span>
+                            </label>
+                            <input type="text" id="telepon" wire:model="telepon"
+                                   placeholder="Contoh: 081234567890"
+                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                            @error('telepon') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="space-y-1.5 min-w-0">
+                            <label for="rencana_datang" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
+                                Rencana Hari & Jam Drop-Off (Opsional)
+                            </label>
+                            <input type="text" id="rencana_datang" wire:model="rencana_datang"
+                                   placeholder="Contoh: Hari ini jam 15:00 / Besok pagi"
+                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                        </div>
+
+                        <div class="space-y-1.5 min-w-0">
+                            <label for="catatan" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">
+                                Catatan Tambahan (Opsional)
+                            </label>
+                            <input type="text" id="catatan" wire:model="catatan"
+                                   placeholder="Catatan khusus untuk teknisi..."
+                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -130,7 +283,7 @@
                     <svg class="w-3.5 h-3.5 text-up-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
-                    <span>Tidak ada biaya jika setelah dicek unit dibatalkan servis</span>
+                    <span>Pengecekan fisik ulang akan dilakukan langsung bersama teknisi saat unit diserahkan di konter</span>
                 </div>
             </div>
         </form>

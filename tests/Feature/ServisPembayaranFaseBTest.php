@@ -131,7 +131,7 @@ class ServisPembayaranFaseBTest extends TestCase
         $this->assertSame('tunai', $tiketLunas->metode_pembayaran);
         $this->assertNotNull($tiketLunas->no_jurnal_bayar);
 
-        $kas = AkunCOA::where('kode', '110-01')->firstOrFail();
+        $kas = AkunCOA::whereIn('kode', ['110-04', '110-01'])->orderByRaw("CASE WHEN kode = '110-04' THEN 1 ELSE 2 END")->firstOrFail();
         $piutang = AkunCOA::where('kode', '120-01')->firstOrFail();
 
         // Cek jurnal pelunasan

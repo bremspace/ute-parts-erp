@@ -26,6 +26,8 @@ class KpiService
      */
     public const RUMUS_WHITELIST = [
         'tiket_selesai' => ['teknisi'],
+        'sla_servis_ontime' => ['teknisi'],
+        'rata_durasi_servis' => ['teknisi'],
         'transaksi_kasir' => ['kasir'],
         'selisih_kas' => ['kasir'],
         'lead_won' => ['marketing'],
@@ -101,6 +103,14 @@ class KpiService
                 ->where('status', 'selesai')
                 ->whereBetween('tanggal_selesai', [$mulai, $selesai])
                 ->count(),
+            'sla_servis_ontime' => (float) TiketServis::where('teknisi_id', $userId)
+                ->where('status_sla_kpi', 'on_time')
+                ->whereBetween('tanggal_selesai', [$mulai, $selesai])
+                ->count(),
+            'rata_durasi_servis' => (float) (TiketServis::where('teknisi_id', $userId)
+                ->whereNotNull('durasi_pengerjaan_menit')
+                ->whereBetween('tanggal_selesai', [$mulai, $selesai])
+                ->avg('durasi_pengerjaan_menit') ?? 0),
             'transaksi_kasir' => DB::table('transaksi')
                 ->where('kasir_id', $userId)
                 ->where('status', 'selesai')
@@ -138,6 +148,18 @@ class KpiService
             }
 
             return round(max(0, 100 - ($nilai / $target * 100)), 2);
+        }
+
+        if ($rumus === 'rata_durasi_servis') {
+            // Durasi makin cepat makin bagus terhadap target maks durasi
+            if ($target <= 0) {
+                return 100;
+            }
+            if ($nilai <= 0) {
+                return 100;
+            }
+
+            return round(min(120, max(0, ($target / $nilai) * 100)), 2);
         }
 
         if ($target <= 0) {

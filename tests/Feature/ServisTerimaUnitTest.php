@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
@@ -237,7 +238,56 @@ class ServisTerimaUnitTest extends TestCase
         Livewire::test(ServisBoard::class)
             ->call('openTerimaModal')
             ->set('terimaForm.tipe_kunci', 'pola')
-            ->assertSee('Klik urutan titik pola (1-9):')
-            ->assertSeeHtml('terimaForm.kunci_terenkripsi.0');
+            ->assertSee('Geser / swipe pola antar titik (seperti di HP Android):')
+            ->assertSee('Urutan Titik (1-9)');
+    }
+
+    public function test_terima_unit_dengan_estimasi_langsung_dan_approval_di_tempat(): void
+    {
+        $user = $this->buatUser('admin-toko', 'admin-terima-est@test.com');
+        $this->actingAs($user, 'web');
+
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081299887766',
+        ]);
+
+        Livewire::test(ServisBoard::class)
+            ->call('openTerimaModal')
+            ->set('terimaForm.pelanggan_id', $pelanggan->id)
+            ->set('terimaForm.nama_pelanggan', $pelanggan->nama)
+            ->set('terimaForm.telepon_pelanggan', $pelanggan->telepon)
+            ->set('terimaForm.jenis_hp', 'iPhone 11')
+            ->set('terimaForm.keluhan', 'Ganti LCD dan Baterai')
+            ->call('toggleTerimaEstimasi')
+            ->set('terimaEstimasiItems', [
+                [
+                    'tipe' => 'jasa',
+                    'jenis_servis_id' => null,
+                    'produk_id' => null,
+                    'nama_item' => 'Jasa Pasang LCD',
+                    'qty' => 1,
+                    'harga' => 100000,
+                    'subtotal' => 100000,
+                ],
+                [
+                    'tipe' => 'part',
+                    'jenis_servis_id' => null,
+                    'produk_id' => null,
+                    'nama_item' => 'LCD OEM iPhone 11',
+                    'qty' => 1,
+                    'harga' => 450000,
+                    'subtotal' => 450000,
+                ],
+            ])
+            ->set('terimaEstimasiBiaya', 550000)
+            ->set('terimaEstimasiMode', 'disetujui')
+            ->call('simpanTerima')
+            ->assertDispatched('alert');
+
+        $tiket = TiketServis::where('jenis_hp', 'iPhone 11')->firstOrFail();
+        $this->assertSame('disetujui', $tiket->status);
+        $this->assertEquals(550000, (float) $tiket->estimasi_biaya);
+        $this->assertCount(2, $tiket->estimasiItems);
     }
 }

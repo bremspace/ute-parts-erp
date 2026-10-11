@@ -9,7 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['nama', 'kode', 'durasi_garansi_hari', 'kategori', 'estimasi_durasi', 'biaya_jasa', 'butuh_part', 'is_part_original', 'is_active'])]
+#[Fillable([
+    'nama', 'kode', 'durasi_garansi_hari', 'kategori', 'estimasi_durasi', 'biaya_jasa',
+    'batas_waktu_menit', 'peringatan_menit', 'auto_cancel_jika_overdue',
+    'butuh_part', 'is_part_original', 'is_active',
+])]
 class JenisServis extends Model
 {
     use CatatAktivitas;
@@ -25,6 +29,9 @@ class JenisServis extends Model
     protected $casts = [
         'durasi_garansi_hari' => 'integer',
         'estimasi_durasi' => 'integer',
+        'batas_waktu_menit' => 'integer',
+        'peringatan_menit' => 'integer',
+        'auto_cancel_jika_overdue' => 'boolean',
         'biaya_jasa' => 'float',
         'is_part_original' => 'boolean',
         'butuh_part' => 'boolean',

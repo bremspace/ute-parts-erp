@@ -19,7 +19,9 @@ use Spatie\Activitylog\Support\LogOptions;
     'no_tiket', 'cabang_id', 'transaksi_id', 'jenis_servis_id', 'pelanggan_id', 'teknisi_id',
     'nama_pelanggan', 'telepon_pelanggan', 'jenis_hp', 'seri_hp', 'tipe_kunci', 'kunci_terenkripsi',
     'keluhan', 'kondisi_fisik', 'foto_unit', 'status', 'sumber', 'estimasi_biaya',
-    'alasan_estimasi', 'token_approval', 'tanggal_terima', 'tanggal_selesai',
+    'alasan_estimasi', 'batas_waktu_menit', 'auto_cancel_overdue', 'pengerjaan_mulai_at',
+    'pengerjaan_deadline_at', 'pengerjaan_selesai_at', 'durasi_pengerjaan_menit',
+    'status_sla_kpi', 'warning_overdue_sent_at', 'token_approval', 'tanggal_terima', 'tanggal_selesai',
     'tanggal_diambil', 'catatan_admin',
     'status_pembayaran', 'tanggal_bayar', 'metode_pembayaran', 'no_jurnal_bayar',
 ])]
@@ -39,6 +41,13 @@ class TiketServis extends Model
         'kondisi_fisik' => 'array',
         'foto_unit' => 'array',
         'estimasi_biaya' => 'decimal:2',
+        'batas_waktu_menit' => 'integer',
+        'auto_cancel_overdue' => 'boolean',
+        'durasi_pengerjaan_menit' => 'integer',
+        'pengerjaan_mulai_at' => 'datetime',
+        'pengerjaan_deadline_at' => 'datetime',
+        'pengerjaan_selesai_at' => 'datetime',
+        'warning_overdue_sent_at' => 'datetime',
         'tanggal_terima' => 'datetime',
         'tanggal_selesai' => 'datetime',
         'tanggal_diambil' => 'datetime',
@@ -89,6 +98,77 @@ class TiketServis extends Model
     public function estimasiItems(): HasMany
     {
         return $this->hasMany(TiketServisEstimasiItem::class);
+    }
+
+    public function progressList(): HasMany
+    {
+        return $this->hasMany(TiketServisProgress::class)->latest();
+    }
+
+    public function getAlasanDitolakAttribute(): ?string
+    {
+        return $this->statusLogs()->where('status_ke', 'ditolak')->latest()->value('alasan');
+    }
+
+    public function getTerjemahanPolaAttribute(): ?array
+    {
+        if ($this->tipe_kunci !== 'pola' || empty($this->kunci_terenkripsi)) {
+            return null;
+        }
+
+        $raw = is_array($this->kunci_terenkripsi)
+            ? $this->kunci_terenkripsi
+            : explode('-', str_replace(' ', '', (string) $this->kunci_terenkripsi));
+
+        $sequence = array_values(array_filter(array_map('intval', $raw), fn ($n) => $n >= 1 && $n <= 9));
+        if (empty($sequence)) {
+            return null;
+        }
+
+        $dotLabels = [
+            1 => ['label' => 'Kiri Atas', 'row' => 0, 'col' => 0],
+            2 => ['label' => 'Tengah Atas', 'row' => 0, 'col' => 1],
+            3 => ['label' => 'Kanan Atas', 'row' => 0, 'col' => 2],
+            4 => ['label' => 'Kiri Tengah', 'row' => 1, 'col' => 0],
+            5 => ['label' => 'Tengah (Pusat)', 'row' => 1, 'col' => 1],
+            6 => ['label' => 'Kanan Tengah', 'row' => 1, 'col' => 2],
+            7 => ['label' => 'Kiri Bawah', 'row' => 2, 'col' => 0],
+            8 => ['label' => 'Tengah Bawah', 'row' => 2, 'col' => 1],
+            9 => ['label' => 'Kanan Bawah', 'row' => 2, 'col' => 2],
+        ];
+
+        $posisi = array_map(fn ($id) => $dotLabels[$id]['label'] ?? "Titik {$id}", $sequence);
+
+        $arah = [];
+        for ($i = 0; $i < count($sequence) - 1; $i++) {
+            $from = $dotLabels[$sequence[$i]] ?? null;
+            $to = $dotLabels[$sequence[$i + 1]] ?? null;
+            if (! $from || ! $to) {
+                continue;
+            }
+            $dRow = $to['row'] - $from['row'];
+            $dCol = $to['col'] - $from['col'];
+
+            $dir = match (true) {
+                $dRow === 0 && $dCol > 0 => 'Kanan ➔',
+                $dRow === 0 && $dCol < 0 => 'Kiri ⬅',
+                $dRow > 0 && $dCol === 0 => 'Bawah ⬇',
+                $dRow < 0 && $dCol === 0 => 'Atas ⬆',
+                $dRow > 0 && $dCol > 0 => 'Serong Kanan-Bawah ↘',
+                $dRow > 0 && $dCol < 0 => 'Serong Kiri-Bawah ↙',
+                $dRow < 0 && $dCol > 0 => 'Serong Kanan-Atas ↗',
+                $dRow < 0 && $dCol < 0 => 'Serong Kiri-Atas ↖',
+                default => "{$sequence[$i]} ke {$sequence[$i + 1]}",
+            };
+            $arah[] = "{$sequence[$i]}➔{$sequence[$i + 1]} ({$dir})";
+        }
+
+        return [
+            'urutan' => implode(' ➔ ', $sequence),
+            'posisi' => implode(' ➔ ', $posisi),
+            'arah' => ! empty($arah) ? implode(' • ', $arah) : (count($sequence) === 1 ? 'Mulai di '.$dotLabels[$sequence[0]]['label'] : '-'),
+            'sequence' => $sequence,
+        ];
     }
 
     public function transaksi(): BelongsTo

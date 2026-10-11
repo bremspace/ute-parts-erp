@@ -8,6 +8,7 @@
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
+    @livewireStyles
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col items-center justify-start p-4 md:p-8 relative selection:bg-indigo-600 selection:text-white">
@@ -91,15 +92,23 @@
 
                 <!-- Status Ditolak Banner -->
                 @if($tiket['status'] === 'ditolak')
-                    <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800">
+                    <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 space-y-1">
                         <div class="flex items-center gap-2 font-bold text-sm">
                             <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
                             Estimasi Ditolak
                         </div>
-                        <p class="text-xs text-rose-700 mt-1">
-                            Pengerjaan perbaikan dihentikan karena estimasi biaya ditolak. Silakan hubungi cabang untuk informasi pengambilan unit.
+                        <p class="text-xs text-rose-700">
+                            Pengerjaan perbaikan dihentikan karena estimasi biaya ditolak oleh Anda.
+                        </p>
+                        @if(!empty($tiket['alasan_ditolak']))
+                            <div class="text-xs text-rose-900 bg-rose-100/70 p-2.5 rounded-xl border border-rose-200/80 mt-1.5">
+                                <span class="font-semibold">Alasan Penolakan:</span> "{{ $tiket['alasan_ditolak'] }}"
+                            </div>
+                        @endif
+                        <p class="text-[11px] text-rose-600 mt-1">
+                            Silakan datang ke gerai untuk mengambil kembali unit gadget Anda atau hubungi admin cabang jika ingin berkonsultasi opsi perbaikan alternatif.
                         </p>
                     </div>
                 @endif
@@ -200,25 +209,183 @@
                         @endif
 
                         <!-- Tombol Aksi Persetujuan -->
-                        <div class="pt-2 flex flex-col sm:flex-row gap-3">
-                            <form action="{{ route('servis.tracking.approve', $tiket['token_approval']) }}" method="POST" class="flex-1">
-                                @csrf
-                                <input type="hidden" name="alasan" value="Disetujui oleh pelanggan via web tracking">
-                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-up-mint hover:bg-teal-600 text-ink-950 font-bold text-sm shadow-lg shadow-up-mint/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Setujui Estimasi & Lanjutkan Perbaikan
-                                </button>
-                            </form>
+                        <div x-data="{ showRejectModal: false }" class="pt-2">
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <form action="{{ route('servis.tracking.approve', $tiket['token_approval']) }}" method="POST" class="flex-1">
+                                    @csrf
+                                    <input type="hidden" name="alasan" value="Disetujui oleh pelanggan via web tracking">
+                                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-up-mint hover:bg-teal-600 text-ink-950 font-bold text-sm shadow-lg shadow-up-mint/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Setujui Estimasi & Lanjutkan Perbaikan
+                                    </button>
+                                </form>
 
-                            <form action="{{ route('servis.tracking.reject', $tiket['token_approval']) }}" method="POST" class="sm:w-auto" onsubmit="return confirm('Apakah Anda yakin ingin menolak estimasi perbaikan ini?')">
-                                @csrf
-                                <input type="hidden" name="alasan" value="Ditolak oleh pelanggan via web tracking">
-                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-semibold text-sm transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
+                                <button type="button" @click="showRejectModal = true" class="sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-semibold text-sm transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
                                     Tolak Estimasi
                                 </button>
-                            </form>
+                            </div>
+
+                            <!-- Modal Konfirmasi Penolakan & Alasan -->
+                            <div x-show="showRejectModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+                                <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" @click="showRejectModal = false"></div>
+                                <div class="flex min-h-full items-center justify-center p-4">
+                                    <div class="relative bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 text-left">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                                                <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                                </svg>
+                                                Tolak Estimasi Biaya
+                                            </h4>
+                                            <button type="button" @click="showRejectModal = false" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+                                        </div>
+
+                                        <p class="text-xs text-slate-600">
+                                            Jika Anda menolak estimasi ini, pengerjaan servis tidak akan dilanjutkan. Mohon berikan alasan penolakan agar teknisi kami dapat mengevaluasi atau memproses pengembalian unit.
+                                        </p>
+
+                                        <form action="{{ route('servis.tracking.reject', $tiket['token_approval']) }}" method="POST" class="space-y-4" x-data="{ alasanPilihan: '', alasanCustom: '' }">
+                                            @csrf
+                                            <div>
+                                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">Pilih Alasan Penolakan</label>
+                                                <div class="space-y-1.5 mb-2">
+                                                    @foreach([
+                                                        'Biaya perbaikan melebihi anggaran / budget',
+                                                        'Ingin mempertimbangkan atau membandingkan dulu',
+                                                        'Waktu pengerjaan terlalu lama',
+                                                        'Unit berencana diganti baru',
+                                                        'Lainnya (tulis alasan kustom di bawah)'
+                                                    ] as $opsi)
+                                                        <label class="flex items-center gap-2 p-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs transition-colors">
+                                                            <input
+                                                                type="radio"
+                                                                name="opsi_radio"
+                                                                value="{{ $opsi }}"
+                                                                x-model="alasanPilihan"
+                                                                @change="if (alasanPilihan !== 'Lainnya (tulis alasan kustom di bawah)') { alasanCustom = alasanPilihan; }"
+                                                                class="text-rose-600 focus:ring-rose-500"
+                                                            />
+                                                            <span class="text-slate-700 font-medium">{{ $opsi }}</span>
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+
+                                                <label class="block text-xs font-semibold text-slate-700 mb-1">Rincian / Catatan Alasan</label>
+                                                <textarea
+                                                    name="alasan"
+                                                    rows="2"
+                                                    required
+                                                    x-model="alasanCustom"
+                                                    placeholder="Tuliskan catatan alasan penolakan..."
+                                                    class="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
+                                                ></textarea>
+                                            </div>
+
+                                            <div class="flex justify-end gap-2 pt-2">
+                                                <button type="button" @click="showRejectModal = false" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">
+                                                    Batal
+                                                </button>
+                                                <button type="submit" class="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow cursor-pointer">
+                                                    Konfirmasi Tolak
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Status & Batas Waktu Pengerjaan Teknisi (Live Monitoring) -->
+                @if(in_array($tiket['status'], ['dikerjakan', 'qc']) && !empty($tiket['pengerjaan']['pengerjaan_mulai_at']))
+                    <div class="p-4 rounded-2xl {{ $tiket['pengerjaan']['is_overdue'] ? 'bg-rose-50 border border-rose-200' : 'bg-indigo-50/60 border border-indigo-100' }}">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center {{ $tiket['pengerjaan']['is_overdue'] ? 'bg-rose-500 text-white' : 'bg-indigo-600 text-white' }} shadow-sm">
+                                    <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <h4 class="text-xs font-bold uppercase tracking-wider {{ $tiket['pengerjaan']['is_overdue'] ? 'text-rose-900' : 'text-indigo-950' }}">
+                                            {{ $tiket['pengerjaan']['is_overdue'] ? 'Pengerjaan Melewati Batas Waktu (Overdue)' : 'Sedang Dalam Pengerjaan Teknisi' }}
+                                        </h4>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold {{ $tiket['pengerjaan']['is_overdue'] ? 'bg-rose-200 text-rose-800' : 'bg-indigo-200/80 text-indigo-800' }}">
+                                            SLA: {{ $tiket['pengerjaan']['batas_waktu_menit'] }} Menit
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5">
+                                        Mulai: <span class="font-medium text-slate-700">{{ $tiket['pengerjaan']['pengerjaan_mulai_at'] }}</span>
+                                        @if(!empty($tiket['pengerjaan']['pengerjaan_deadline_at']))
+                                            • Target Selesai: <span class="font-medium text-slate-700">{{ $tiket['pengerjaan']['pengerjaan_deadline_at'] }}</span>
+                                        @endif
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                @if($tiket['pengerjaan']['is_overdue'])
+                                    <span class="text-xs font-bold text-rose-600 bg-rose-100 px-2.5 py-1 rounded-lg">Waktu Habis</span>
+                                @else
+                                    <span class="text-xs font-bold text-indigo-700 bg-indigo-100/70 px-2.5 py-1 rounded-lg tabular-nums">
+                                        Sisa Waktu: ~{{ $tiket['pengerjaan']['sisa_menit'] }} Menit
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                <!-- Progres Pengerjaan Transparan (Foto & Update Teknisi) -->
+                @if(!empty($tiket['progress']))
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                Progres Pengerjaan Unit Real-Time
+                            </h3>
+                            <span class="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full tabular-nums">
+                                {{ $tiket['progress'][0]['persentase'] }}% Selesai
+                            </span>
+                        </div>
+
+                        <!-- Progress Bar Keseluruhan -->
+                        <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: {{ $tiket['progress'][0]['persentase'] }}%"></div>
+                        </div>
+
+                        <!-- Timeline Log Progress -->
+                        <div class="space-y-3">
+                            @foreach($tiket['progress'] as $p)
+                                <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-sm space-y-2">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 tabular-nums">
+                                                {{ $p['persentase'] }}%
+                                            </span>
+                                            <span class="font-bold text-slate-800">{{ $p['judul'] }}</span>
+                                        </div>
+                                        <span class="text-slate-400 text-[11px] tabular-nums">{{ $p['waktu'] }}</span>
+                                    </div>
+
+                                    @if($p['deskripsi'])
+                                        <p class="text-xs text-slate-600 pl-1">{{ $p['deskripsi'] }}</p>
+                                    @endif
+
+                                    @if(!empty($p['foto']))
+                                        <div class="flex flex-wrap gap-2 pt-1">
+                                            @foreach($p['foto'] as $fotoItem)
+                                                <a href="{{ $fotoItem }}" target="_blank" class="block w-20 h-20 rounded-lg overflow-hidden border border-slate-200 hover:opacity-90 transition-opacity">
+                                                    <img src="{{ $fotoItem }}" alt="Foto Progress" class="w-full h-full object-cover">
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
                         </div>
                     </div>
                 @endif
@@ -352,5 +519,7 @@
             <a href="{{ route('shop') }}" class="hover:text-indigo-600 transition-colors">← Kembali ke Halaman Utama</a>
         </p>
     </div>
+
+    @livewireScripts
 </body>
 </html>

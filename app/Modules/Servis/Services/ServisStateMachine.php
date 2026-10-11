@@ -26,12 +26,13 @@ class ServisStateMachine
         'dikerjakan' => ['qc'],
         'qc' => ['selesai'],
         'selesai' => ['diambil'],
-        'ditolak' => ['diagnosa'], // re-estimasi
+        'ditolak' => ['diagnosa', 'diambil', 'batal'], // re-estimasi atau unit diambil/batal
+        'batal' => ['diambil'],
     ];
 
     private const STATUS_VALID = [
         'diajukan_online', 'diterima', 'diagnosa', 'menunggu_approval',
-        'disetujui', 'ditolak', 'dikerjakan', 'qc', 'selesai', 'diambil',
+        'disetujui', 'ditolak', 'dikerjakan', 'qc', 'selesai', 'diambil', 'batal',
     ];
 
     /**
@@ -75,6 +76,7 @@ class ServisStateMachine
             'diterima' => ['label' => 'Diterima',       'color' => 'ink-400'],
             'diagnosa' => ['label' => 'Diagnosa',       'color' => 'up-primary'],
             'menunggu_approval' => ['label' => 'Menunggu Approval', 'color' => 'up-amber'],
+            'ditolak' => ['label' => 'Estimasi Ditolak', 'color' => 'up-red'],
             'disetujui' => ['label' => 'Disetujui',      'color' => 'up-mint'],
             'dikerjakan' => ['label' => 'Dikerjakan',     'color' => 'up-primary'],
             'qc' => ['label' => 'QC',             'color' => 'up-accent'],
