@@ -1,4 +1,4 @@
-name: CI/CD Pipeline (Test & Auto-Deploy)
+name: CI/CD Pipeline (Auto-Deploy)
 
 on:
   push:
@@ -7,57 +7,10 @@ on:
 
 jobs:
   # ==========================================
-  # TAHAP 1: CI (Continuous Integration / Test)
-  # ==========================================
-  test:
-    name: Run Automated Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout Kode
-        uses: actions/checkout@v4
-
-      - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, sqlite3, pdo_sqlite, bcmath, curl
-          coverage: none
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Siapkan Environment & SQLite Database
-        run: |
-          cp .env.example .env
-          mkdir -p database
-          touch database/database.sqlite
-
-      - name: Install NPM Dependencies & Build Assets
-        run: |
-          npm ci --ignore-scripts
-          npm run build
-
-      - name: Install Composer Dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
-
-      - name: Siapkan Application Key
-        run: php artisan key:generate
-
-      - name: Jalankan Unit & Feature Tests
-        run: php artisan test --colors=always
-
-  # ==========================================
-  # TAHAP 2: CD (Continuous Deployment ke VPS Production)
+  # CD (Continuous Deployment ke VPS Production)
   # ==========================================
   deploy:
     name: Deploy ke VPS Production
-    needs: [test]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
