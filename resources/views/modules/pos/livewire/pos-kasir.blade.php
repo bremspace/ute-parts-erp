@@ -1,5 +1,5 @@
 <div
-    class="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8.5rem)]"
+    class="flex flex-col lg:flex-row gap-4 h-[calc(100dvh-8.5rem)]"
     x-data="{ cartOpen: false, flexSet: {} }"
     @keydown.window.f4.prevent="$wire.openPaymentModal()"
     @keydown.window.f6.prevent="$wire.tahanTransaksi()"
@@ -841,66 +841,68 @@
                             Belum ada transaksi tercatat hari ini di cabang ini.
                         </div>
                     @else
-                        <table class="w-full text-left text-xs">
-                            <thead>
-                                <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider">
-                                    <th class="pb-3 px-3">No Transaksi</th>
-                                    <th class="pb-3 px-3">Waktu</th>
-                                    <th class="pb-3 px-3">Kasir</th>
-                                    <th class="pb-3 px-3">Pelanggan</th>
-                                    <th class="pb-3 px-3 text-right">Total</th>
-                                    <th class="pb-3 px-3">Metode</th>
-                                    <th class="pb-3 px-3">Status</th>
-                                    <th class="pb-3 px-3 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                @foreach($riwayatTransaksiHariIni as $trx)
-                                    <tr class="hover:bg-white/[0.02] transition-colors">
-                                        <td class="py-3 px-3 font-mono font-bold text-white">{{ $trx->no_transaksi }}</td>
-                                        <td class="py-3 px-3 text-ink-300 tabular-nums">{{ $trx->created_at?->format('H:i:s') }}</td>
-                                        <td class="py-3 px-3 text-ink-200">{{ $trx->kasir?->name ?? '-' }}</td>
-                                        <td class="py-3 px-3 text-ink-200">{{ $trx->pelanggan?->nama ?? 'Umum' }}</td>
-                                        <td class="py-3 px-3 text-right font-bold text-white tabular-nums">Rp {{ number_format($trx->total_akhir, 0, ',', '.') }}</td>
-                                        <td class="py-3 px-3 uppercase text-[10px] text-ink-300 font-bold">{{ $trx->metode_bayar }}</td>
-                                        <td class="py-3 px-3">
-                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $trx->status === 'selesai' ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : ($trx->status === 'dibatalkan' ? 'bg-up-red/10 text-up-red border border-up-red/20' : 'bg-up-amber/10 text-up-amber border border-up-amber/20') }}">
-                                                {{ ucfirst($trx->status) }}
-                                            </span>
-                                        </td>
-                                        <td class="py-3 px-3 text-right whitespace-nowrap">
-                                            <div class="flex items-center justify-end gap-1.5">
-                                                <button
-                                                    wire:click="lihatDetailTransaksi({{ $trx->id }})"
-                                                    class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-100 font-semibold text-[11px] transition-colors border border-white/10 cursor-pointer"
-                                                    title="Lihat Struk / Detail Barang"
-                                                >
-                                                    Detail
-                                                </button>
-                                                @if($trx->status === 'selesai')
-                                                    <button
-                                                        wire:click="bukaModalRetur({{ $trx->id }})"
-                                                        class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red font-bold text-[11px] transition-colors border border-up-red/20 cursor-pointer"
-                                                        title="Proses Retur Barang Penjualan"
-                                                    >
-                                                        Retur
-                                                    </button>
-                                                @endif
-                                                @can('lihat-audit-log')
-                                                    <button
-                                                        wire:click="bukaRiwayat('transaksi', {{ $trx->id }})"
-                                                        class="px-2 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary font-bold text-[11px] transition-colors border border-up-primary/20 cursor-pointer"
-                                                        title="Lihat Log Mutasi Transaksi"
-                                                    >
-                                                        Audit Log
-                                                    </button>
-                                                @endcan
-                                            </div>
-                                        </td>
+                        <div class="overflow-x-auto min-w-full">
+                            <table class="w-full text-left text-xs whitespace-nowrap">
+                                <thead>
+                                    <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider">
+                                        <th class="pb-3 px-3">No Transaksi</th>
+                                        <th class="pb-3 px-3">Waktu</th>
+                                        <th class="pb-3 px-3">Kasir</th>
+                                        <th class="pb-3 px-3">Pelanggan</th>
+                                        <th class="pb-3 px-3 text-right">Total</th>
+                                        <th class="pb-3 px-3">Metode</th>
+                                        <th class="pb-3 px-3">Status</th>
+                                        <th class="pb-3 px-3 text-right">Aksi</th>
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @foreach($riwayatTransaksiHariIni as $trx)
+                                        <tr class="hover:bg-white/[0.02] transition-colors">
+                                            <td class="py-3 px-3 font-mono font-bold text-white">{{ $trx->no_transaksi }}</td>
+                                            <td class="py-3 px-3 text-ink-300 tabular-nums">{{ $trx->created_at?->format('H:i:s') }}</td>
+                                            <td class="py-3 px-3 text-ink-200">{{ $trx->kasir?->name ?? '-' }}</td>
+                                            <td class="py-3 px-3 text-ink-200">{{ $trx->pelanggan?->nama ?? 'Umum' }}</td>
+                                            <td class="py-3 px-3 text-right font-bold text-white tabular-nums">Rp {{ number_format($trx->total_akhir, 0, ',', '.') }}</td>
+                                            <td class="py-3 px-3 uppercase text-[10px] text-ink-300 font-bold">{{ $trx->metode_bayar }}</td>
+                                            <td class="py-3 px-3">
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $trx->status === 'selesai' ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : ($trx->status === 'dibatalkan' ? 'bg-up-red/10 text-up-red border border-up-red/20' : 'bg-up-amber/10 text-up-amber border border-up-amber/20') }}">
+                                                    {{ ucfirst($trx->status) }}
+                                                </span>
+                                            </td>
+                                            <td class="py-3 px-3 text-right whitespace-nowrap">
+                                                <div class="flex items-center justify-end gap-1.5">
+                                                    <button
+                                                        wire:click="lihatDetailTransaksi({{ $trx->id }})"
+                                                        class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-100 font-semibold text-[11px] transition-colors border border-white/10 cursor-pointer"
+                                                        title="Lihat Struk / Detail Barang"
+                                                    >
+                                                        Detail
+                                                    </button>
+                                                    @if($trx->status === 'selesai')
+                                                        <button
+                                                            wire:click="bukaModalRetur({{ $trx->id }})"
+                                                            class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red font-bold text-[11px] transition-colors border border-up-red/20 cursor-pointer"
+                                                            title="Proses Retur Barang Penjualan"
+                                                        >
+                                                            Retur
+                                                        </button>
+                                                    @endif
+                                                    @can('lihat-audit-log')
+                                                        <button
+                                                            wire:click="bukaRiwayat('transaksi', {{ $trx->id }})"
+                                                            class="px-2 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary font-bold text-[11px] transition-colors border border-up-primary/20 cursor-pointer"
+                                                            title="Lihat Log Mutasi Transaksi"
+                                                        >
+                                                            Audit Log
+                                                        </button>
+                                                    @endcan
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                     @endif
                 </div>
 

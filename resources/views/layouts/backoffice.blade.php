@@ -74,7 +74,7 @@
                    transition-transform duration-200 ease-out
                    md:static md:inset-auto md:z-30 md:translate-x-0 md:transform-none
                    lg:z-30"
-            :class="[window.innerWidth < 768 ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : '']">
+            :class="[isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : '']">
             <!-- Brand -->
             <div class="sidebar-brand h-16 flex items-center justify-between px-6 border-b border-black/10 dark:border-white/5">
                 <x-prism.logo size="md" :with-text="true" mode="dark" subtitle="Backoffice ERP" text-class="sidebar-brand-text" href="/app/dashboard" />
@@ -446,9 +446,9 @@
                             class="lg:hidden p-2 rounded-lg text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink-100 dark:hover:text-white transition-colors cursor-pointer flex-shrink-0"
                             aria-label="Toggle menu"
                             aria-expanded="false"
-                            :aria-expanded="(window.innerWidth < 768 ? sidebarOpen : sidebarCollapsed).toString()">
+                            :aria-expanded="(isMobile ? sidebarOpen : sidebarCollapsed).toString()">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                             :class="{ 'rotate-90': (window.innerWidth < 768 ? sidebarOpen : sidebarCollapsed) }">
+                             :class="{ 'rotate-90': (isMobile ? sidebarOpen : sidebarCollapsed) }">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
@@ -615,23 +615,26 @@
             Alpine.data('sidebarManager', () => ({
                 sidebarOpen: false,
                 sidebarCollapsed: false,
+                isMobile: window.innerWidth < 768,
                 activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : ''))))))) }}',
 
                 init() {
+                    this.isMobile = window.innerWidth < 768;
                     try {
                         this.sidebarCollapsed = localStorage.getItem('ute-sidebar-md-collapsed') === '1';
                     } catch (e) { /* mode privat — default expanded */ }
                     
                     // Handle resize: close drawer on mobile when resizing to tablet/desktop
                     window.addEventListener('resize', () => {
-                        if (window.innerWidth >= 768) {
+                        this.isMobile = window.innerWidth < 768;
+                        if (!this.isMobile) {
                             this.sidebarOpen = false;
                         }
                     });
                 },
 
                 toggleSidebar() {
-                    if (window.innerWidth < 768) {
+                    if (this.isMobile) {
                         this.sidebarOpen = !this.sidebarOpen;
                     } else {
                         this.sidebarCollapsed = !this.sidebarCollapsed;
