@@ -31,6 +31,12 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - name: Siapkan Environment & SQLite Database
+        run: |
+          cp .env.example .env
+          mkdir -p database
+          touch database/database.sqlite
+
       - name: Install NPM Dependencies & Build Assets
         run: |
           npm ci --ignore-scripts
@@ -39,10 +45,8 @@ jobs:
       - name: Install Composer Dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
 
-      - name: Siapkan Environment Pengujian
-        run: |
-          cp .env.example .env.testing || cp .env.example .env
-          php artisan key:generate --env=testing
+      - name: Siapkan Application Key
+        run: php artisan key:generate
 
       - name: Jalankan Unit & Feature Tests
         run: php artisan test --colors=always
