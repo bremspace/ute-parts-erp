@@ -98,6 +98,7 @@
                         <button
                             type="button"
                             class="sidebar-branch-ganti text-[11px] text-up-primary hover:text-indigo-400 font-medium cursor-pointer"
+                            @click="$dispatch('open-branch-modal')"
                             onclick="window.dispatchEvent(new CustomEvent('open-branch-modal'))"
                         >
                             Ganti

@@ -95,9 +95,14 @@ export default defineConfig({
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
                 // Offline fallback: pastikan /offline.html ter-precache & dipakai utk navigasi (T-31)
                 navigateFallback: '/offline.html',
-                navigateFallbackDenylist: [/^\/api\//, /^\/build\//],
+                navigateFallbackDenylist: [/^\/api\//, /^\/build\//, /^\/livewire/],
                 additionalManifestEntries: [{ url: '/offline.html', revision: null }],
                 runtimeCaching: [
+                    {
+                        // Jangan cache endpoint Livewire di service worker
+                        urlPattern: /\/livewire/i,
+                        handler: 'NetworkOnly',
+                    },
                     {
                         // Aset CSS/JS (non-precache): stale-while-revalidate sesuai AC T-31
                         urlPattern: /\.(?:css|js|mjs)$/i,
