@@ -74,7 +74,11 @@ class AppServiceProvider extends ServiceProvider
         // terkunci, jadi registrasi ini tidak mengambil hak mereka.
         Livewire::addPersistentMiddleware(PermissionMiddleware::class);
 
-        // [F3-1] Refresh permission cache idempotent
-        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+        // [F3-1] Refresh permission cache idempotent (skip jika tabel cache belum ada / saat composer dump)
+        try {
+            app()[PermissionRegistrar::class]->forgetCachedPermissions();
+        } catch (\Throwable $e) {
+            // Abaikan saat booting tanpa database/migrasi (mis. composer install/package:discover di CI)
+        }
     }
 }
