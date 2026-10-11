@@ -3,8 +3,6 @@ name: CI/CD Pipeline (Test & Auto-Deploy)
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -50,11 +48,10 @@ jobs:
         run: php artisan test --colors=always
 
   # ==========================================
-  # TAHAP 2: CD (Continuous Deployment ke VPS Root)
-  # Hanya jalan jika job 'test' SUKSES (lolos) dan event adalah push ke 'main'
+  # TAHAP 2: CD (Continuous Deployment ke VPS Production)
   # ==========================================
   deploy:
-    name: Deploy ke VPS Production (Root)
+    name: Deploy ke VPS Production
     needs: [test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -74,10 +71,10 @@ jobs:
           script: |
             set -euo pipefail
 
-            DEPLOY_PATH="${VPS_PATH:-/var/www/test.uteparts.id-staging}"
-            PHP_BIN="${PHP_BIN:-/usr/bin/php}"
+            DEPLOY_PATH="${VPS_PATH:-/var/www/uteparts.id}"
+            PHP_BIN="${PHP_BIN:-/usr/bin/php8.4}"
             WEB_USER="${WEB_USER:-www-data}"
-            QUEUE_NAME="${QUEUE_NAME:-ute-parts-queue}"
+            QUEUE_NAME="${QUEUE_NAME:-ute-parts-prod-queue}"
 
             echo "🚀 Memulai Deployment di: $DEPLOY_PATH"
 
@@ -88,7 +85,7 @@ jobs:
 
             cd "$DEPLOY_PATH"
 
-            # Ambil hash commit sebelum update (untuk rollback jika deploy crash)
+            # Ambil hash commit sebelum update
             PREV_COMMIT=$(git rev-parse HEAD)
 
             # Tarik commit terbaru
@@ -110,11 +107,11 @@ jobs:
             "$PHP_BIN" artisan route:cache
             "$PHP_BIN" artisan view:cache
 
-            # Set permission www-data
+            # Set permission
             chown -R "$WEB_USER":"$WEB_USER" storage bootstrap/cache public/build
             chmod -R 775 storage bootstrap/cache
 
-            # Restart queue worker supervisor jika tersedia
+            # Restart queue worker supervisor
             if command -v supervisorctl >/dev/null 2>&1; then
               supervisorctl restart "$QUEUE_NAME" || true
             fi
