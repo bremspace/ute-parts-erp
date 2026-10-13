@@ -366,6 +366,7 @@ Route::post('/app/login', function (Request $request) {
     if ($intended && (str_contains($intended, '/account') || str_contains($intended, '/cart') || str_contains($intended, '/checkout'))) {
         session()->forget('url.intended');
     }
+
     return redirect()->intended('/app/dashboard');
 })->middleware('throttle:10,1')->name('login.post');
 
