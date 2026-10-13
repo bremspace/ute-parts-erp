@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Models\UserPreference;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Models\HargaTier;
@@ -51,7 +52,40 @@ class ProdukTab extends Component
 
     public ?int $filterBrandId = null;
 
+    public ?int $filterKualitasId = null;
+
+    public ?int $filterTipeHpId = null;
+
+    public ?string $filterBrandKompatibel = null;
+
+    public ?string $filterModelKompatibel = null;
+
+    public ?string $filterKondisi = null;
+
+    public ?string $filterSatuan = null;
+
+    public ?string $filterAbcClass = null;
+
+    public bool $filterHanyaReadyStok = false;
+
     public string $filterTierHarga = 'retail'; // retail, reseller, agen, atau tier_{id}
+
+    // Filter toggle preferences (checkbox custom)
+    public array $visibleFilters = [
+        'kategori' => true,
+        'brand' => true,
+        'kualitas' => false,
+        'tipe_hp' => false,
+        'brand_kompatibel' => false,
+        'model_kompatibel' => false,
+        'kondisi' => false,
+        'satuan' => false,
+        'abc_class' => false,
+        'stok' => false,
+        'tier' => true,
+    ];
+
+    public bool $showCustomFilterSettings = false;
 
     // Foto Uploads (Tambah Produk)
     public $fotoUploads = [];
@@ -157,6 +191,87 @@ class ProdukTab extends Component
         $cabangId = session('cabang_id');
         if ($cabangId) {
             $this->filterGudangId = Gudang::where('cabang_id', $cabangId)->value('id');
+        }
+
+        $this->loadUserPreferences();
+    }
+
+    public function loadUserPreferences(): void
+    {
+        $userId = auth()->id();
+        if ($userId) {
+            $pref = UserPreference::getPref($userId, 'wms_produk_tab_custom_filters');
+            if (is_array($pref)) {
+                $this->visibleFilters = array_merge($this->visibleFilters, $pref);
+            }
+        }
+    }
+
+    public function toggleFilter(string $key): void
+    {
+        if (array_key_exists($key, $this->visibleFilters)) {
+            $this->visibleFilters[$key] = ! $this->visibleFilters[$key];
+            if (! $this->visibleFilters[$key]) {
+                match ($key) {
+                    'kategori' => $this->filterKategoriId = null,
+                    'brand' => $this->filterBrandId = null,
+                    'kualitas' => $this->filterKualitasId = null,
+                    'tipe_hp' => $this->filterTipeHpId = null,
+                    'brand_kompatibel' => $this->filterBrandKompatibel = null,
+                    'model_kompatibel' => $this->filterModelKompatibel = null,
+                    'kondisi' => $this->filterKondisi = null,
+                    'satuan' => $this->filterSatuan = null,
+                    'abc_class' => $this->filterAbcClass = null,
+                    'stok' => $this->filterHanyaReadyStok = false,
+                    'tier' => $this->filterTierHarga = 'retail',
+                    default => null,
+                };
+                $this->resetPage();
+            }
+            $this->simpanPreferensi();
+        }
+    }
+
+    public function resetCustomFilters(): void
+    {
+        $this->visibleFilters = [
+            'kategori' => true,
+            'brand' => true,
+            'kualitas' => false,
+            'tipe_hp' => false,
+            'brand_kompatibel' => false,
+            'model_kompatibel' => false,
+            'kondisi' => false,
+            'satuan' => false,
+            'abc_class' => false,
+            'stok' => false,
+            'tier' => true,
+        ];
+
+        $this->filterKategoriId = null;
+        $this->filterBrandId = null;
+        $this->filterKualitasId = null;
+        $this->filterTipeHpId = null;
+        $this->filterBrandKompatibel = null;
+        $this->filterModelKompatibel = null;
+        $this->filterKondisi = null;
+        $this->filterSatuan = null;
+        $this->filterAbcClass = null;
+        $this->filterHanyaReadyStok = false;
+        $this->filterTierHarga = 'retail';
+        $this->resetPage();
+
+        $userId = auth()->id();
+        if ($userId) {
+            UserPreference::setPref($userId, 'wms_produk_tab_custom_filters', $this->visibleFilters);
+        }
+    }
+
+    protected function simpanPreferensi(): void
+    {
+        $userId = auth()->id();
+        if ($userId) {
+            UserPreference::setPref($userId, 'wms_produk_tab_custom_filters', $this->visibleFilters);
         }
     }
 
@@ -1142,6 +1257,46 @@ class ProdukTab extends Component
         $this->resetPage();
     }
 
+    public function updatingFilterKualitasId()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterTipeHpId()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterBrandKompatibel()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterModelKompatibel()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterKondisi()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterSatuan()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterAbcClass()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterHanyaReadyStok()
+    {
+        $this->resetPage();
+    }
+
     /**
      * Ekspor daftar master produk sebagai pricelist (Excel / CSV)
      * berdasarkan filter tier harga (retail, reseller, agen, atau tier membership CRM).
@@ -1305,10 +1460,51 @@ class ProdukTab extends Component
             }
         }
 
-        $produks = Produk::with(['skuVariants', 'stokItems.gudang', 'brand', 'kualitas', 'tipeHps', 'kategoriRelasi'])
-            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch))
-            ->when(! empty($selectedKategoriIds), fn ($q) => $q->whereIn('kategori_id', $selectedKategoriIds))
-            ->when($this->filterBrandId, fn ($q) => $q->where('brand_id', $this->filterBrandId))
+        $query = Produk::with(['skuVariants', 'stokItems.gudang', 'brand', 'kualitas', 'tipeHps', 'kategoriRelasi'])
+            ->withSum('stokItems as total_stok', 'jumlah')
+            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch));
+
+        if ($this->visibleFilters['kategori'] && ! empty($selectedKategoriIds)) {
+            $query->whereIn('kategori_id', $selectedKategoriIds);
+        }
+
+        if ($this->visibleFilters['brand'] && $this->filterBrandId) {
+            $query->where('brand_id', $this->filterBrandId);
+        }
+
+        if ($this->visibleFilters['kualitas'] && $this->filterKualitasId) {
+            $query->where('kualitas_id', $this->filterKualitasId);
+        }
+
+        if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
+            $query->whereHas('tipeHps', fn ($q) => $q->where('tipe_hp.id', $this->filterTipeHpId));
+        }
+
+        if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
+            $query->where('brand_kompatibel', $this->filterBrandKompatibel);
+        }
+
+        if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
+            $query->where('model_kompatibel', $this->filterModelKompatibel);
+        }
+
+        if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
+            $query->where('kondisi', $this->filterKondisi);
+        }
+
+        if ($this->visibleFilters['satuan'] && $this->filterSatuan) {
+            $query->where('satuan', $this->filterSatuan);
+        }
+
+        if ($this->visibleFilters['abc_class'] && $this->filterAbcClass) {
+            $query->where('abc_class', $this->filterAbcClass);
+        }
+
+        if ($this->visibleFilters['stok'] && $this->filterHanyaReadyStok) {
+            $query->whereHas('stokItems', fn ($q) => $q->where('jumlah', '>', 0));
+        }
+
+        $produks = $query
             ->orderBy('nama')
             ->paginate(12);
 

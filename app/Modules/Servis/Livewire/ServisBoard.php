@@ -7,7 +7,6 @@ use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
-use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
@@ -195,6 +194,8 @@ class ServisBoard extends Component
 
     public bool $estimasiAutoCancelOverdue = false;
 
+    public ?int $estimasiDurasiGaransiCustom = null;
+
     // [Progress Kerja Teknisi Modal]
     public bool $showProgressModal = false;
 
@@ -270,7 +271,7 @@ class ServisBoard extends Component
                 $this->estimasiItems[$idx]['nama_item'] = $produk->nama;
                 $tiket = $this->estimasiTiketId ? $this->tiketScopedOrNull($this->estimasiTiketId) : null;
                 $pelanggan = $tiket?->pelanggan;
-                $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
                 $this->estimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
                 $this->recalculateEstimasiTotal();
             }
@@ -280,7 +281,7 @@ class ServisBoard extends Component
                 $this->terimaEstimasiItems[$idx]['produk_nama'] = $produk->nama;
                 $this->terimaEstimasiItems[$idx]['nama_item'] = $produk->nama;
                 $pelanggan = ! empty($this->terimaForm['pelanggan_id']) ? Pelanggan::find($this->terimaForm['pelanggan_id']) : null;
-                $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
                 $this->terimaEstimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
                 $this->recalculateTerimaEstimasiTotal();
             }
@@ -291,7 +292,7 @@ class ServisBoard extends Component
                 $this->pekerjaanItems[$idx]['nama_item'] = $produk->nama;
                 $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
                 $pelanggan = $tiket?->pelanggan;
-                $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+                $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
                 $this->pekerjaanItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
             }
         }
@@ -374,7 +375,7 @@ class ServisBoard extends Component
             $this->estimasiItems[$idx]['nama_item'] = $produk->nama;
             $tiket = $this->estimasiTiketId ? $this->tiketScopedOrNull($this->estimasiTiketId) : null;
             $pelanggan = $tiket?->pelanggan;
-            $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+            $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
             $this->estimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? 0);
             $this->recalculateEstimasiTotal();
         } elseif ($context === 'servis_terima_estimasi' && isset($this->terimaEstimasiItems[$idx])) {
@@ -382,7 +383,7 @@ class ServisBoard extends Component
             $this->terimaEstimasiItems[$idx]['produk_nama'] = $produk->nama;
             $this->terimaEstimasiItems[$idx]['nama_item'] = $produk->nama;
             $pelanggan = ! empty($this->terimaForm['pelanggan_id']) ? Pelanggan::find($this->terimaForm['pelanggan_id']) : null;
-            $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+            $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
             $this->terimaEstimasiItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? 0);
             $this->recalculateTerimaEstimasiTotal();
         } elseif ($context === 'servis_pekerjaan' && isset($this->pekerjaanItems[$idx])) {
@@ -391,7 +392,7 @@ class ServisBoard extends Component
             $this->pekerjaanItems[$idx]['nama_item'] = $produk->nama;
             $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
             $pelanggan = $tiket?->pelanggan;
-            $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
+            $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
             $this->pekerjaanItems[$idx]['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? 0);
         }
 
@@ -1072,15 +1073,24 @@ class ServisBoard extends Component
         $row = &$this->terimaEstimasiItems[$idx];
 
         if ($field === 'harga') {
-            $row['harga'] = $this->parseNominal($value);
+            if ($this->canEditHargaPart || ($row['tipe'] ?? 'jasa') !== 'part') {
+                $row['harga'] = $this->parseNominal($value);
+            } else {
+                if (! empty($row['produk_id'])) {
+                    $produk = Produk::find($row['produk_id']);
+                    $pelanggan = ! empty($this->terimaForm['pelanggan_id']) ? Pelanggan::find($this->terimaForm['pelanggan_id']) : null;
+                    $resolved = $produk ? app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan) : null;
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk?->harga_jual_retail ?? $produk?->harga_jual ?? 0);
+                }
+            }
         } elseif ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
             if ($value) {
                 $produk = Produk::find($value);
                 if ($produk) {
                     $row['nama_item'] = $produk->nama;
                     $pelanggan = ! empty($this->terimaForm['pelanggan_id']) ? Pelanggan::find($this->terimaForm['pelanggan_id']) : null;
-                    $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
-                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual ?? 0);
+                    $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
                 }
             } else {
                 $row['nama_item'] = '';
@@ -1128,7 +1138,17 @@ class ServisBoard extends Component
         $row = &$this->estimasiItems[$idx];
 
         if ($field === 'harga') {
-            $row['harga'] = $this->parseNominal($value);
+            if ($this->canEditHargaPart || ($row['tipe'] ?? 'jasa') !== 'part') {
+                $row['harga'] = $this->parseNominal($value);
+            } else {
+                if (! empty($row['produk_id'])) {
+                    $produk = Produk::find($row['produk_id']);
+                    $tiket = $this->estimasiTiketId ? $this->tiketScopedOrNull($this->estimasiTiketId) : null;
+                    $pelanggan = $tiket?->pelanggan;
+                    $resolved = $produk ? app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan) : null;
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk?->harga_jual_retail ?? $produk?->harga_jual ?? 0);
+                }
+            }
         } elseif ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
             if ($value) {
                 $produk = Produk::find($value);
@@ -1136,8 +1156,8 @@ class ServisBoard extends Component
                     $row['nama_item'] = $produk->nama;
                     $tiket = $this->estimasiTiketId ? $this->tiketScopedOrNull($this->estimasiTiketId) : null;
                     $pelanggan = $tiket?->pelanggan;
-                    $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
-                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual ?? 0);
+                    $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
                 }
             } else {
                 $row['nama_item'] = '';
@@ -1179,6 +1199,7 @@ class ServisBoard extends Component
         $this->estimasiAlasan = $tiket->alasan_estimasi ?: '';
         $this->estimasiBatasWaktuMenit = $tiket->batas_waktu_menit ?: ($tiket->jenisServis?->batas_waktu_menit ?? 120);
         $this->estimasiAutoCancelOverdue = $tiket->auto_cancel_overdue ?: ($tiket->jenisServis?->auto_cancel_jika_overdue ?? false);
+        $this->estimasiDurasiGaransiCustom = $tiket->durasi_garansi_custom !== null ? (int) $tiket->durasi_garansi_custom : null;
 
         $existingItems = $tiket->estimasiItems()->get();
         if ($existingItems->isNotEmpty()) {
@@ -1271,7 +1292,8 @@ class ServisBoard extends Component
                 auth()->user(),
                 $cleanedItems,
                 $this->estimasiBatasWaktuMenit,
-                $this->estimasiAutoCancelOverdue
+                $this->estimasiAutoCancelOverdue,
+                $this->estimasiDurasiGaransiCustom
             );
             $this->showEstimasiModal = false;
             $this->selectedTiketId = $tiket->id;
@@ -1591,7 +1613,17 @@ class ServisBoard extends Component
         $row = &$this->pekerjaanItems[$idx];
 
         if ($field === 'harga') {
-            $row['harga'] = $this->parseNominal($value);
+            if ($this->canEditHargaPart || ($row['tipe'] ?? 'jasa') !== 'part') {
+                $row['harga'] = $this->parseNominal($value);
+            } else {
+                if (! empty($row['produk_id'])) {
+                    $produk = Produk::find($row['produk_id']);
+                    $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
+                    $pelanggan = $tiket?->pelanggan;
+                    $resolved = $produk ? app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan) : null;
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk?->harga_jual_retail ?? $produk?->harga_jual ?? 0);
+                }
+            }
         } elseif ($field === 'produk_id' && ($row['tipe'] ?? '') === 'part') {
             if ($value) {
                 $produk = Produk::find($value);
@@ -1599,8 +1631,8 @@ class ServisBoard extends Component
                     $row['nama_item'] = $produk->nama;
                     $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
                     $pelanggan = $tiket?->pelanggan;
-                    $resolved = app(PricingService::class)->resolve($produk, $pelanggan);
-                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual ?? 0);
+                    $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
+                    $row['harga'] = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
                 }
             }
         }
@@ -1689,6 +1721,11 @@ class ServisBoard extends Component
         return false;
     }
 
+    public function getCanEditHargaPartProperty(): bool
+    {
+        return isSuperAdminOrOwner();
+    }
+
     public function getProdukEstimasiListProperty()
     {
         // Produk: tidak perlu lagi load semua produk ke dropdown.
@@ -1709,6 +1746,7 @@ class ServisBoard extends Component
             'groupedTikets' => $this->groupedTikets,
             'selectedTiket' => $this->selectedTiket,
             'fotoCount' => $this->fotoCount,
+            'canEditHargaPart' => $this->canEditHargaPart,
             'pelangganCariServis' => $this->pelangganCariServis,
             'bookingOnline' => $this->bookingOnline,
             'cariPartResults' => $this->cariPartResults,

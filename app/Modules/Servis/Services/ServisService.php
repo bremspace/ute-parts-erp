@@ -5,8 +5,10 @@ namespace App\Modules\Servis\Services;
 use App\Models\User;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
@@ -295,7 +297,7 @@ class ServisService
      *     pelanggan tidak mati saat estimasi diedit ulang.
      *  4. Notifikasi dikirim SETELAH commit (tidak terkirim bila rollback).
      */
-    public function setEstimasi(TiketServis $tiket, float $biaya, string $alasan, User $user, array $items = [], ?int $batasWaktuMenit = null, ?bool $autoCancelOverdue = null): TiketServis
+    public function setEstimasi(TiketServis $tiket, float $biaya, string $alasan, User $user, array $items = [], ?int $batasWaktuMenit = null, ?bool $autoCancelOverdue = null, ?int $durasiGaransiCustom = null): TiketServis
     {
         $statusLama = $tiket->status;
 
@@ -310,7 +312,7 @@ class ServisService
             throw new \Exception("Transisi dari '{$statusLama}' ke 'menunggu_approval' tidak valid");
         }
 
-        DB::transaction(function () use ($tiket, $statusLama, &$biaya, $alasan, $user, $items, $batasWaktuMenit, $autoCancelOverdue) {
+        DB::transaction(function () use ($tiket, $statusLama, &$biaya, $alasan, $user, $items, $batasWaktuMenit, $autoCancelOverdue, $durasiGaransiCustom) {
             if (! empty($items)) {
                 TiketServisEstimasiItem::where('tiket_servis_id', $tiket->id)->delete();
 
@@ -335,8 +337,8 @@ class ServisService
                         }
 
                         if ($harga === null && $produk) {
-                            $resolved = $pricingService->resolve($produk, $tiket->pelanggan, $variant);
-                            $harga = (float) ($resolved['harga'] ?? $produk->harga_jual ?? 0);
+                            $resolved = $this->resolveHargaPartDefault($produk, $tiket->pelanggan, $variant);
+                            $harga = (float) ($resolved['harga'] ?? $produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
                         }
                     } elseif ($tipe === 'jasa') {
                         $jenisServis = $jenisServisId ? JenisServis::find($jenisServisId) : null;
@@ -389,6 +391,10 @@ class ServisService
                 'batas_waktu_menit' => $batasWaktuFinal,
                 'auto_cancel_overdue' => $autoCancelFinal,
             ];
+
+            if ($durasiGaransiCustom !== null) {
+                $tiketUpdate['durasi_garansi_custom'] = $durasiGaransiCustom;
+            }
 
             $tiket->update($tiketUpdate);
 
@@ -449,6 +455,71 @@ class ServisService
         return $statusLama === 'ditolak'
             && ServisStateMachine::dapatTransisi('ditolak', 'diagnosa')
             && ServisStateMachine::dapatTransisi('diagnosa', 'menunggu_approval');
+    }
+
+    /**
+     * Resolusi harga default part servis ke harga reseller/agen.
+     */
+    public function resolveHargaPartDefault(Produk $produk, ?Pelanggan $pelanggan = null, ?SkuVariant $variant = null): array
+    {
+        // 1. Jika pelanggan sudah memiliki tier khusus atau reseller/agen, gunakan resolusi CRM pelanggan
+        if ($pelanggan && ($pelanggan->tier_membership_id || $pelanggan->is_reseller || in_array($pelanggan->tipe_konsumen, ['reseller', 'agen'], true))) {
+            return app(PricingService::class)->resolve($produk, $pelanggan, $variant);
+        }
+
+        // 2. Default servis: cari harga reseller via HargaTier
+        $hargaDasar = $variant && $variant->harga_jual_retail !== null
+            ? (float) $variant->harga_jual_retail
+            : (float) ($produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
+
+        $query = HargaTier::where('produk_id', $produk->id);
+        if ($variant && $variant->id) {
+            $query->where(function ($q) use ($variant) {
+                $q->whereNull('sku_variant_id')->orWhere('sku_variant_id', $variant->id);
+            });
+        }
+        $rows = $query->get();
+
+        // Cari baris tipe_konsumen = reseller atau is_reseller = true
+        $resellerTier = $rows->first(fn ($r) => $r->tipe_konsumen === 'reseller' || $r->is_reseller === true);
+        if ($resellerTier) {
+            if ($resellerTier->nominal_tetap !== null && (float) $resellerTier->nominal_tetap > 0) {
+                return [
+                    'harga' => (float) $resellerTier->nominal_tetap,
+                    'harga_dasar' => $hargaDasar,
+                    'diskon_nominal' => max(0, $hargaDasar - (float) $resellerTier->nominal_tetap),
+                    'alasan' => 'Harga Default Part Servis (Reseller)',
+                    'tier' => 'Reseller',
+                ];
+            }
+            if ($resellerTier->persen_diskon !== null && (float) $resellerTier->persen_diskon > 0) {
+                $diskon = round(($hargaDasar * (float) $resellerTier->persen_diskon) / 100, 2);
+
+                return [
+                    'harga' => max(0, $hargaDasar - $diskon),
+                    'harga_dasar' => $hargaDasar,
+                    'diskon_nominal' => $diskon,
+                    'alasan' => "Diskon Reseller {$resellerTier->persen_diskon}%",
+                    'tier' => 'Reseller',
+                ];
+            }
+            if ($resellerTier->harga !== null && (float) $resellerTier->harga > 0) {
+                return [
+                    'harga' => (float) $resellerTier->harga,
+                    'harga_dasar' => $hargaDasar,
+                    'diskon_nominal' => max(0, $hargaDasar - (float) $resellerTier->harga),
+                    'alasan' => 'Harga Khusus Reseller',
+                    'tier' => 'Reseller',
+                ];
+            }
+        }
+
+        // Fallback via dummy reseller pelanggan
+        $dummyReseller = new Pelanggan;
+        $dummyReseller->is_reseller = true;
+        $dummyReseller->tipe_konsumen = 'reseller';
+
+        return app(PricingService::class)->resolve($produk, $dummyReseller, $variant);
     }
 
     /**
@@ -1144,21 +1215,39 @@ class ServisService
         // (tiket_servis_id & tiket_servis_item_id) TETAP disimpan utk trace garansi.
         app(NomorSeriService::class)->lepasServis((int) $tiket->id);
 
-        // Auto-create garansi dari konfigurasi jenis servis
-        $durasiHari = 30; // default
-        if ($tiket->jenisServis) {
-            $durasiHari = $tiket->jenisServis->durasi_garansi_hari;
-        }
+        $itemsServis = $tiket->items()->whereNull('dibatalkan_at')->get();
+        $sparepartsLegacy = $tiket->spareparts()->whereNull('dibatalkan_at')->get();
 
-        Garansi::updateOrCreate(
-            ['tiket_servis_id' => $tiket->id],
-            [
-                'durasi_hari' => $durasiHari,
-                'tanggal_mulai' => now()->toDateString(),
-                'tanggal_berakhir' => now()->addDays($durasiHari)->toDateString(),
-                'keterangan' => "Garansi {$durasiHari} hari — Servis {$tiket->no_tiket}",
-            ]
-        );
+        $hasPart = $itemsServis->where('tipe', 'part')->isNotEmpty()
+            || $sparepartsLegacy->isNotEmpty()
+            || $tiket->estimasiItems()->where('tipe', 'part')->exists();
+
+        // Aturan garansi servis: jika pengerjaan HANYA jasa tanpa part/sparepart, tidak ada kartu garansi (durasi 0 / skip garansi)
+        if ($hasPart) {
+            $durasiHari = 30; // default
+            if ($tiket->durasi_garansi_custom !== null && (int) $tiket->durasi_garansi_custom >= 0) {
+                $durasiHari = (int) $tiket->durasi_garansi_custom;
+            } elseif ($tiket->jenisServis) {
+                $durasiHari = $tiket->jenisServis->durasi_garansi_hari;
+            }
+
+            if ($durasiHari > 0) {
+                Garansi::updateOrCreate(
+                    ['tiket_servis_id' => $tiket->id],
+                    [
+                        'durasi_hari' => $durasiHari,
+                        'tanggal_mulai' => now()->toDateString(),
+                        'tanggal_berakhir' => now()->addDays($durasiHari)->toDateString(),
+                        'keterangan' => "Garansi {$durasiHari} hari — Servis {$tiket->no_tiket}",
+                    ]
+                );
+            } else {
+                Garansi::where('tiket_servis_id', $tiket->id)->delete();
+            }
+        } else {
+            // Hanya pengerjaan jasa: tidak terbit garansi
+            Garansi::where('tiket_servis_id', $tiket->id)->delete();
+        }
 
         // [T-01] Jurnal (dan komisi) sudah pernah dipost untuk tiket ini →
         // jangan post lagi. `tanggal_selesai` TIDAK ditimpa (tetap waktu selesai

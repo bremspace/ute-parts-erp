@@ -4,14 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Livewire\ServisBoard;
+use App\Modules\Servis\Models\Garansi;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Models\TiketServisEstimasiItem;
+use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
+use Database\Seeders\AkunCoaSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -29,6 +33,8 @@ class ServisBoardEstimasiKunciTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->seed(AkunCoaSeeder::class);
 
         $this->cabang = Cabang::create([
             'nama' => 'Cabang Estimasi Test',
@@ -235,5 +241,157 @@ class ServisBoardEstimasiKunciTest extends TestCase
             ->assertSet('pekerjaanItems.0.nama_item', 'Jasa Analisa Mesin')
             ->assertSet('pekerjaanItems.1.nama_item', 'IC Power')
             ->assertSet('pekerjaanItems.1.qty', 2);
+    }
+
+    public function test_harga_part_default_reseller_dan_proteksi_edit(): void
+    {
+        $produk = Produk::create([
+            'nama' => 'Baterai iPhone 12',
+            'slug' => 'baterai-iphone-12',
+            'harga_beli' => 100000,
+            'harga_jual_retail' => 250000,
+            'is_active' => true,
+        ]);
+
+        HargaTier::create([
+            'produk_id' => $produk->id,
+            'tipe_konsumen' => 'reseller',
+            'harga' => 180000,
+            'nominal_tetap' => 180000,
+        ]);
+
+        // 1. Cek resolusi harga via ServisService
+        $resolved = app(ServisService::class)->resolveHargaPartDefault($produk);
+        $this->assertEquals(180000, $resolved['harga']);
+
+        // 2. User teknisi (bukan owner/super-admin) tidak bisa edit harga part
+        $teknisi = User::create([
+            'name' => 'Teknisi Joko',
+            'email' => 'teknisi-joko@example.com',
+            'password' => bcrypt('password'),
+            'is_active' => true,
+        ]);
+        $teknisi->assignRole('teknisi');
+        $teknisi->givePermissionTo('servis.view', 'servis.create', 'servis.update-status');
+        $teknisi->cabangs()->attach($this->cabang->id);
+
+        $this->actingAs($teknisi, 'web');
+
+        $tiket = TiketServis::create([
+            'cabang_id' => $this->cabang->id,
+            'no_tiket' => 'SRV-TEST-PART-RESELLER',
+            'nama_pelanggan' => 'Pelanggan Biasa',
+            'telepon_pelanggan' => '0899999999',
+            'jenis_hp' => 'iPhone 12',
+            'keluhan' => 'Baterai drop',
+            'status' => 'diagnosa',
+            'tanggal_terima' => now(),
+        ]);
+
+        Livewire::test(ServisBoard::class)
+            ->call('openEstimasiModal', $tiket->id)
+            ->call('addEstimasiRow', 'part')
+            ->set('estimasiItems.1.produk_id', $produk->id)
+            ->assertSet('estimasiItems.1.harga', 180000)
+            // Coba teknisi ubah manual harga part -> tetap 180000 (terproteksi)
+            ->set('estimasiItems.1.harga', 220000)
+            ->assertSet('estimasiItems.1.harga', 180000)
+            ->assertSet('canEditHargaPart', false);
+
+        // 3. User super-admin bisa ubah manual harga part
+        $this->actingAs($this->admin, 'web');
+        Livewire::test(ServisBoard::class)
+            ->call('openEstimasiModal', $tiket->id)
+            ->call('addEstimasiRow', 'part')
+            ->set('estimasiItems.1.produk_id', $produk->id)
+            ->assertSet('estimasiItems.1.harga', 180000)
+            ->set('estimasiItems.1.harga', 220000)
+            ->assertSet('estimasiItems.1.harga', 220000)
+            ->assertSet('canEditHargaPart', true);
+    }
+
+    public function test_garansi_custom_dan_aturan_jasa_tanpa_garansi(): void
+    {
+        $this->actingAs($this->admin, 'web');
+
+        $jenisServis = JenisServis::create([
+            'nama' => 'Pembersihan Port Audio',
+            'kode' => 'CLN-01',
+            'biaya_jasa' => 50000,
+            'durasi_garansi_hari' => 14,
+            'is_active' => true,
+        ]);
+
+        $tiketJasa = TiketServis::create([
+            'cabang_id' => $this->cabang->id,
+            'no_tiket' => 'SRV-TEST-JASA-ONLY',
+            'nama_pelanggan' => 'Konsumen Jasa',
+            'telepon_pelanggan' => '0877777777',
+            'jenis_hp' => 'Samsung A52',
+            'keluhan' => 'Port kotor',
+            'status' => 'diagnosa',
+            'tanggal_terima' => now(),
+        ]);
+
+        // Simpan estimasi hanya jasa
+        Livewire::test(ServisBoard::class)
+            ->call('openEstimasiModal', $tiketJasa->id)
+            ->set('estimasiItems.0.jenis_servis_id', $jenisServis->id)
+            ->call('simpanEstimasi');
+
+        $tiketJasa->refresh();
+        $servisService = app(ServisService::class);
+        $servisService->updateStatus($tiketJasa, 'disetujui');
+        $tiketJasa->refresh();
+        $servisService->updateStatus($tiketJasa, 'dikerjakan');
+        $tiketJasa->refresh();
+        $servisService->updateStatus($tiketJasa, 'qc');
+        $tiketJasa->refresh();
+        $servisService->updateStatus($tiketJasa, 'selesai');
+
+        // Servis khusus jasa: Garansi TIDAK diterbitkan
+        $this->assertNull(Garansi::where('tiket_servis_id', $tiketJasa->id)->first());
+
+        // Tiket kedua dengan part dan garansi custom 45 hari
+        $produk = Produk::create([
+            'nama' => 'Konektor Cas A52',
+            'slug' => 'konektor-cas-a52',
+            'harga_beli' => 20000,
+            'harga_jual_retail' => 70000,
+            'is_active' => true,
+        ]);
+
+        $tiketPart = TiketServis::create([
+            'cabang_id' => $this->cabang->id,
+            'no_tiket' => 'SRV-TEST-PART-CUSTOM',
+            'nama_pelanggan' => 'Konsumen Part',
+            'telepon_pelanggan' => '0866666666',
+            'jenis_hp' => 'Samsung A52',
+            'keluhan' => 'Tidak bisa cas',
+            'status' => 'diagnosa',
+            'tanggal_terima' => now(),
+        ]);
+
+        Livewire::test(ServisBoard::class)
+            ->call('openEstimasiModal', $tiketPart->id)
+            ->call('addEstimasiRow', 'part')
+            ->set('estimasiItems.1.produk_id', $produk->id)
+            ->set('estimasiDurasiGaransiCustom', 45)
+            ->call('simpanEstimasi');
+
+        $tiketPart->refresh();
+        $this->assertEquals(45, $tiketPart->durasi_garansi_custom);
+
+        $servisService->updateStatus($tiketPart, 'disetujui');
+        $tiketPart->refresh();
+        $servisService->updateStatus($tiketPart, 'dikerjakan');
+        $tiketPart->refresh();
+        $servisService->updateStatus($tiketPart, 'qc');
+        $tiketPart->refresh();
+        $servisService->updateStatus($tiketPart, 'selesai');
+
+        $garansi = Garansi::where('tiket_servis_id', $tiketPart->id)->first();
+        $this->assertNotNull($garansi);
+        $this->assertEquals(45, $garansi->durasi_hari);
     }
 }

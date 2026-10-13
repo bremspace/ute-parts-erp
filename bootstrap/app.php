@@ -83,8 +83,14 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->onOneServer();
 
-        // [F1-6] Backup database harian 02:00 (mysqldump gzip, rotasi 7 hari)
+        // [F1-6] Backup database harian 02:00 (mysqldump gzip, rotasi 7 hari) + siang 13:00
         $schedule->command('ute:backup')->dailyAt('02:00');
+        $schedule->command('ute:backup')->dailyAt('13:00');
+
+        // Health-check & self-healing auto-recovery tiap 10 menit
+        $schedule->command('ute:db-health-check --auto-restore')
+            ->everyTenMinutes()
+            ->withoutOverlapping();
 
         // [F1-5] Reorder otomatis harian 03:00 (queue: stok < minimum → usulan PO)
         $schedule->job(ReorderOtomatisJob::class)->dailyAt('03:00');

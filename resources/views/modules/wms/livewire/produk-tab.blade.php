@@ -2,48 +2,195 @@
     <!-- TAB 1b: MASTER PRODUK -->
         <div class="space-y-4">
             <!-- Search & Filters -->
-            <div class="flex flex-col md:flex-row gap-3">
-                <div class="flex-1">
-                    <x-prism.barcode-scan-input placeholder="Cari produk: nama, brand, model, SKU, barcode..." model="produkSearch" title="Scan Barcode Master Produk" />
-                </div>
-                <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
-                    <select wire:model.live="filterKategoriId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
-                        <option value="">Semua Kategori</option>
-                        @foreach($kategoriTree as $parent)
-                            <option value="{{ $parent->id }}" class="bg-ink-900 font-bold text-white">{{ $parent->nama }}</option>
-                            @foreach($parent->children as $child)
-                                <option value="{{ $child->id }}" class="bg-ink-900 text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
-                            @endforeach
-                        @endforeach
-                    </select>
-
-                    <select wire:model.live="filterBrandId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
-                        <option value="">Semua Brand</option>
-                        @foreach($brands as $b)
-                            <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
-                        @endforeach
-                    </select>
-
-                    <!-- Filter Tier Harga Pricelist & Export -->
-                    <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 p-1 rounded-xl">
-                        <select wire:model.live="filterTierHarga" class="px-2.5 py-1.5 rounded-lg bg-black/40 border-0 text-xs font-medium text-white min-h-[36px] outline-none cursor-pointer" title="Pilih tier harga untuk ekspor pricelist">
-                            <option value="retail" class="bg-ink-900 text-white">Tier: Retail Standar</option>
-                            <option value="reseller" class="bg-ink-900 text-white">Tier: Reseller</option>
-                            <option value="agen" class="bg-ink-900 text-white">Tier: Agen</option>
-                            @foreach($tierMemberships as $tm)
-                                <option value="tier_{{ $tm->id }}" class="bg-ink-900 text-white">Tier CRM: {{ $tm->nama }}</option>
-                            @endforeach
-                        </select>
-                        <button type="button" wire:click="exportPricelist('xlsx')" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary/80 text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist format Excel">
-                            Excel
+            <div class="space-y-2">
+                <div class="flex flex-col md:flex-row gap-3">
+                    <div class="flex-1">
+                        <x-prism.barcode-scan-input placeholder="Cari produk: nama, brand, model, SKU, barcode..." model="produkSearch" title="Scan Barcode Master Produk" />
+                    </div>
+                    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
+                        <!-- Tombol Atur Filter Kustom -->
+                        <button type="button"
+                                wire:click="$toggle('showCustomFilterSettings')"
+                                class="px-2.5 py-2 rounded-xl border border-white/10 text-xs font-medium text-ink-300 hover:text-white hover:bg-white/5 transition flex items-center gap-1.5 min-h-[44px]"
+                                title="Atur checkbox filter kustom">
+                            <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                            </svg>
+                            <span class="hidden sm:inline">Filter</span>
                         </button>
-                        <button type="button" wire:click="exportPricelist('csv')" class="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist format CSV">
-                            CSV
+
+                        @if($visibleFilters['kategori'] ?? true)
+                            <select wire:model.live="filterKategoriId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Semua Kategori</option>
+                                @foreach($kategoriTree as $parent)
+                                    <option value="{{ $parent->id }}" class="bg-ink-900 font-bold text-white">{{ $parent->nama }}</option>
+                                    @foreach($parent->children as $child)
+                                        <option value="{{ $child->id }}" class="bg-ink-900 text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                                    @endforeach
+                                @endforeach
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['brand'] ?? true)
+                            <select wire:model.live="filterBrandId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Semua Brand</option>
+                                @foreach($brands as $b)
+                                    <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['kualitas'] ?? false)
+                            <select wire:model.live="filterKualitasId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Semua Kualitas</option>
+                                @foreach($kualitasList as $k)
+                                    <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['tipe_hp'] ?? false)
+                            <select wire:model.live="filterTipeHpId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Semua Tipe HP</option>
+                                @foreach($tipeHpList as $th)
+                                    <option value="{{ $th->id }}" class="bg-ink-900">{{ $th->merk }} - {{ $th->model }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['brand_kompatibel'] ?? false)
+                            <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Brand Kompatibel</option>
+                                @foreach($brandKompatibelList as $bk)
+                                    <option value="{{ $bk }}" class="bg-ink-900">{{ $bk }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['model_kompatibel'] ?? false)
+                            <select wire:model.live="filterModelKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Model Kompatibel</option>
+                                @foreach($modelKompatibelList as $mk)
+                                    <option value="{{ $mk }}" class="bg-ink-900">{{ $mk }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['kondisi'] ?? false)
+                            <select wire:model.live="filterKondisi" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Semua Kondisi</option>
+                                @foreach($kondisiList as $kd)
+                                    <option value="{{ $kd['kode'] }}" class="bg-ink-900">{{ $kd['nama'] }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['satuan'] ?? false)
+                            <select wire:model.live="filterSatuan" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Semua Satuan</option>
+                                @foreach($satuanUnits as $su)
+                                    <option value="{{ $su->kode }}" class="bg-ink-900">{{ $su->nama }} ({{ $su->kode }})</option>
+                                @endforeach
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['abc_class'] ?? false)
+                            <select wire:model.live="filterAbcClass" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                                <option value="">Kelas ABC</option>
+                                <option value="A" class="bg-ink-900">Kelas A</option>
+                                <option value="B" class="bg-ink-900">Kelas B</option>
+                                <option value="C" class="bg-ink-900">Kelas C</option>
+                            </select>
+                        @endif
+
+                        @if($visibleFilters['stok'] ?? false)
+                            <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ink-900/60 border border-white/10 text-xs text-ink-200 cursor-pointer select-none min-h-[44px]">
+                                <input type="checkbox" wire:model.live="filterHanyaReadyStok" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Ready Stok</span>
+                            </label>
+                        @endif
+
+                        @if($visibleFilters['tier'] ?? true)
+                            <!-- Filter Tier Harga Pricelist & Export -->
+                            <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 p-1 rounded-xl">
+                                <select wire:model.live="filterTierHarga" class="px-2.5 py-1.5 rounded-lg bg-black/40 border-0 text-xs font-medium text-white min-h-[36px] outline-none cursor-pointer" title="Pilih tier harga untuk ekspor pricelist">
+                                    <option value="retail" class="bg-ink-900 text-white">Tier: Retail Standar</option>
+                                    <option value="reseller" class="bg-ink-900 text-white">Tier: Reseller</option>
+                                    <option value="agen" class="bg-ink-900 text-white">Tier: Agen</option>
+                                    @foreach($tierMemberships as $tm)
+                                        <option value="tier_{{ $tm->id }}" class="bg-ink-900 text-white">Tier CRM: {{ $tm->nama }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="button" wire:click="exportPricelist('xlsx')" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary/80 text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist format Excel">
+                                    Excel
+                                </button>
+                                <button type="button" wire:click="exportPricelist('csv')" class="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist format CSV">
+                                    CSV
+                                </button>
+                            </div>
+                        @endif
+
+                        <span class="text-[11px] text-ink-400 pl-1 whitespace-nowrap">{{ $produks->total() }} produk</span>
+                    </div>
+                </div>
+
+                <!-- Custom Filter Preferences Drawer -->
+                @if($showCustomFilterSettings)
+                    <div class="p-3 bg-white/[0.03] border border-white/10 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="text-xs font-semibold text-ink-300">Tampilkan Filter:</span>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-kategori-{{ ($visibleFilters['kategori'] ?? true) ? '1' : '0' }}" wire:click="toggleFilter('kategori')" @checked($visibleFilters['kategori'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Kategori</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-brand-{{ ($visibleFilters['brand'] ?? true) ? '1' : '0' }}" wire:click="toggleFilter('brand')" @checked($visibleFilters['brand'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Brand</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-kualitas-{{ ($visibleFilters['kualitas'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('kualitas')" @checked($visibleFilters['kualitas'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Kualitas</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-tipe_hp-{{ ($visibleFilters['tipe_hp'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('tipe_hp')" @checked($visibleFilters['tipe_hp'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Tipe HP</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-brand_kompatibel-{{ ($visibleFilters['brand_kompatibel'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('brand_kompatibel')" @checked($visibleFilters['brand_kompatibel'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Brand Kompatibel</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-model_kompatibel-{{ ($visibleFilters['model_kompatibel'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('model_kompatibel')" @checked($visibleFilters['model_kompatibel'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Model Kompatibel</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-kondisi-{{ ($visibleFilters['kondisi'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('kondisi')" @checked($visibleFilters['kondisi'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Kondisi</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-satuan-{{ ($visibleFilters['satuan'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('satuan')" @checked($visibleFilters['satuan'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Satuan</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-abc_class-{{ ($visibleFilters['abc_class'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('abc_class')" @checked($visibleFilters['abc_class'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Kelas ABC</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-stok-{{ ($visibleFilters['stok'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('stok')" @checked($visibleFilters['stok'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Ready Stok</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-tier-{{ ($visibleFilters['tier'] ?? true) ? '1' : '0' }}" wire:click="toggleFilter('tier')" @checked($visibleFilters['tier'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Tier & Export</span>
+                            </label>
+                        </div>
+                        <button type="button"
+                                wire:click="resetCustomFilters"
+                                class="text-xs text-up-red hover:underline cursor-pointer">
+                            Reset ke Default
                         </button>
                     </div>
-
-                    <span class="text-[11px] text-ink-400 pl-1 whitespace-nowrap">{{ $produks->total() }} produk</span>
-                </div>
+                @endif
             </div>
 
             <x-prism.data-table :headers="['Produk', 'SKU / Barcode', 'Harga Beli/Jual', 'Stok Total', 'Gudang', 'Aksi']">

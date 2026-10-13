@@ -71,6 +71,8 @@ class PosStokSinkronTest extends TestCase
         // COA wajib utk JurnalService::post (jalur POS)
         foreach ([
             '110-01' => ['Kas', 'aset', 'kas', 'debit'],
+            '110-02' => ['Bank', 'aset', 'kas', 'debit'],
+            '110-04' => ['Kas Laci', 'aset', 'kas', 'debit'],
             '120-01' => ['Piutang Usaha', 'aset', 'piutang_usaha', 'debit'],
             '130-01' => ['Persediaan', 'aset', 'persediaan', 'debit'],
             '220-01' => ['PPN Keluaran', 'kewajiban', 'pajak', 'kredit'],

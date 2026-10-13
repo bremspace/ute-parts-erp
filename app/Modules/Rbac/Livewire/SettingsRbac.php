@@ -54,7 +54,7 @@ class SettingsRbac extends Component
      */
     private const PERM_JENIS_SERVIS = ['pengaturan.manage', 'servis.manage'];
 
-    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak
+    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, database
 
     // [T-22] Strategi Loyalitas (editable tanpa deploy, non-retroaktif)
     public array $loyalitasForm = [

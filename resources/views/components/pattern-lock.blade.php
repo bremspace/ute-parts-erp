@@ -159,7 +159,7 @@
 
     <!-- Area Kanvas Pola Interaktif -->
     <div class="flex flex-col sm:flex-row gap-4 items-center sm:items-start justify-center">
-        <div class="relative w-64 h-64 sm:w-60 sm:h-60 rounded-2xl {{ $dark ? 'bg-ink-950/80 border border-white/10' : 'bg-slate-100/90 border border-slate-200' }} shadow-inner flex items-center justify-center p-2 touch-none">
+        <div class="relative w-64 h-64 sm:w-60 sm:h-60 rounded-2xl {{ $dark ? 'bg-ink-950 border-2 border-up-primary/40' : 'bg-slate-100 border-2 border-up-primary/40' }} shadow-xl flex items-center justify-center p-2 touch-none">
             <svg
                 x-ref="svgCanvas"
                 viewBox="0 0 300 300"
@@ -170,22 +170,28 @@
                 @pointerup="endDrag($event)"
                 @pointercancel="endDrag($event)"
             >
+                <defs>
+                    <filter id="glow-pola" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#8B5CF6" flood-opacity="0.8"/>
+                    </filter>
+                </defs>
                 <!-- Grid background lines (decorative subtle) -->
-                <line x1="50" y1="50" x2="250" y2="50" stroke="{{ $dark ? '#ffffff08' : '#00000008' }}" stroke-dasharray="4,4" />
-                <line x1="50" y1="150" x2="250" y2="150" stroke="{{ $dark ? '#ffffff08' : '#00000008' }}" stroke-dasharray="4,4" />
-                <line x1="50" y1="250" x2="250" y2="250" stroke="{{ $dark ? '#ffffff08' : '#00000008' }}" stroke-dasharray="4,4" />
-                <line x1="50" y1="50" x2="50" y2="250" stroke="{{ $dark ? '#ffffff08' : '#00000008' }}" stroke-dasharray="4,4" />
-                <line x1="150" y1="50" x2="150" y2="250" stroke="{{ $dark ? '#ffffff08' : '#00000008' }}" stroke-dasharray="4,4" />
-                <line x1="250" y1="50" x2="250" y2="250" stroke="{{ $dark ? '#ffffff08' : '#00000008' }}" stroke-dasharray="4,4" />
+                <line x1="50" y1="50" x2="250" y2="50" stroke="{{ $dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)' }}" stroke-dasharray="4,4" />
+                <line x1="50" y1="150" x2="250" y2="150" stroke="{{ $dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)' }}" stroke-dasharray="4,4" />
+                <line x1="50" y1="250" x2="250" y2="250" stroke="{{ $dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)' }}" stroke-dasharray="4,4" />
+                <line x1="50" y1="50" x2="50" y2="250" stroke="{{ $dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)' }}" stroke-dasharray="4,4" />
+                <line x1="150" y1="50" x2="150" y2="250" stroke="{{ $dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)' }}" stroke-dasharray="4,4" />
+                <line x1="250" y1="50" x2="250" y2="250" stroke="{{ $dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)' }}" stroke-dasharray="4,4" />
 
                 <!-- Polyline connecting selected dots -->
                 <polyline
                     :points="polylinePoints"
                     fill="none"
-                    stroke="#5B4FE9"
-                    stroke-width="6"
+                    stroke="#8B5CF6"
+                    stroke-width="7"
                     stroke-linecap="round"
                     stroke-linejoin="round"
+                    filter="url(#glow-pola)"
                     class="transition-all"
                 />
 
@@ -196,11 +202,11 @@
                         :y1="lastDot.y"
                         :x2="currentPos.x"
                         :y2="currentPos.y"
-                        stroke="#8B5CF6"
-                        stroke-width="4"
+                        stroke="#A78BFA"
+                        stroke-width="5"
                         stroke-linecap="round"
                         stroke-dasharray="6,4"
-                        opacity="0.8"
+                        opacity="0.9"
                     />
                 </template>
 
@@ -209,34 +215,35 @@
                     <g :transform="`translate(${dot.x}, ${dot.y})`" class="cursor-pointer" @click="clickDot(dot.id)">
                         <!-- Outer Touch Area Ring -->
                         <circle
-                            r="32"
+                            r="34"
                             fill="transparent"
                         />
 
                         <!-- Outer Visual Ring -->
                         <circle
-                            r="22"
-                            :fill="sequence.includes(dot.id) ? 'rgba(91, 79, 233, 0.25)' : '{{ $dark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)' }}'"
-                            :stroke="sequence.includes(dot.id) ? '#5B4FE9' : '{{ $dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)' }}'"
-                            stroke-width="2"
+                            r="24"
+                            :fill="sequence.includes(dot.id) ? 'rgba(139, 92, 246, 0.35)' : '{{ $dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' }}'"
+                            :stroke="sequence.includes(dot.id) ? '#8B5CF6' : '{{ $dark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)' }}'"
+                            stroke-width="2.5"
                         />
 
                         <!-- Inner Core Dot -->
                         <circle
-                            r="8"
-                            :fill="sequence.includes(dot.id) ? '#FFFFFF' : '{{ $dark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.35)' }}'"
-                            :class="sequence.includes(dot.id) ? 'drop-shadow-[0_0_8px_rgba(91,79,233,1)]' : ''"
+                            r="10"
+                            :fill="sequence.includes(dot.id) ? '#FFFFFF' : '{{ $dark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)' }}'"
+                            :stroke="sequence.includes(dot.id) ? '#7C3AED' : 'none'"
+                            stroke-width="2"
                         />
 
                         <!-- Step Order Badge if visited -->
                         <template x-if="sequence.includes(dot.id)">
-                            <g transform="translate(12, -12)">
-                                <circle r="9" fill="#E8873B" />
+                            <g transform="translate(14, -14)">
+                                <circle r="11" fill="#EA580C" stroke="#FFFFFF" stroke-width="1.5" />
                                 <text
                                     text-anchor="middle"
-                                    dy="3.5"
+                                    dy="4"
                                     fill="#FFFFFF"
-                                    font-size="10"
+                                    font-size="11"
                                     font-weight="bold"
                                     x-text="sequence.indexOf(dot.id) + 1"
                                 ></text>
@@ -247,9 +254,9 @@
                         <template x-if="!sequence.includes(dot.id)">
                             <text
                                 text-anchor="middle"
-                                dy="3.5"
-                                fill="{{ $dark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.25)' }}"
-                                font-size="10"
+                                dy="4"
+                                fill="{{ $dark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)' }}"
+                                font-size="11"
                                 font-weight="bold"
                                 x-text="dot.id"
                             ></text>

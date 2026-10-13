@@ -7,7 +7,7 @@
                 $wire.set('activeTab', 'users');
             } else if (modul === 'master' && !['master_produk', 'master'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'master_produk');
-            } else if (modul === 'bisnis' && !['loyalitas', 'pajak'].includes(@js($activeTab))) {
+            } else if (modul === 'bisnis' && !['loyalitas', 'pajak', 'database'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'loyalitas');
             }
         }
@@ -15,7 +15,7 @@
     x-init="$watch('$wire.activeTab', value => {
         if (['users', 'role', 'cabang'].includes(value)) subModul = 'akses';
         else if (['master_produk', 'master'].includes(value)) subModul = 'master';
-        else if (['loyalitas', 'pajak'].includes(value)) subModul = 'bisnis';
+        else if (['loyalitas', 'pajak', 'database'].includes(value)) subModul = 'bisnis';
     })"
 >
     <!-- Header with 2-Tier Sub-Modul Tabs and Actions (No Overlapping on Mobile/Desktop) -->
@@ -109,6 +109,14 @@
                     >
                         ⚖️ Pajak & PPN
                     </button>
+                    @if(isSuperAdminOrOwner())
+                    <button
+                        wire:click="$set('activeTab', 'database')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'database' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        💾 Basis Data & Backup
+                    </button>
+                    @endif
                 </div>
             </div>
 
@@ -856,6 +864,10 @@
                 <p class="text-[10px] text-ink-500 mt-3">Kelola di Modul Akunting → COA (editable terbatas super-admin/finance).</p>
             </x-prism.glass-card>
         </div>
+    @endif
+
+    @if($activeTab === 'database' && isSuperAdminOrOwner())
+        @livewire(\App\Modules\Rbac\Livewire\DatabaseManagement::class)
     @endif
 
     <!-- MODAL: USER -->

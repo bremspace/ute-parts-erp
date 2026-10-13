@@ -19,9 +19,15 @@ use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\RiwayatPerubahanHarga;
 use App\Modules\Wms\Models\StokItem;
 use Closure;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Component;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * Backoffice Dashboard (DASH-01: widget sesuai role).
@@ -29,6 +35,40 @@ use Livewire\Component;
  */
 class DashboardIndex extends Component
 {
+    /** Filter periode penjualan dashboard */
+    public string $periodePenjualan = 'today';
+
+    public string $penjualanCustomDari = '';
+
+    public string $penjualanCustomSampai = '';
+
+    public string $penjualanSearch = '';
+
+    public string $penjualanFilterSumber = '';
+
+    public string $penjualanFilterStatus = '';
+
+    // Modal detail transaksi untuk tracking instan
+    public bool $showDetailTransaksiModal = false;
+
+    public ?array $selectedDetailTransaksi = null;
+
+    /** Panel kustomisasi layout widget dashboard */
+    public bool $showLayoutCustomizerModal = false;
+
+    /**
+     * Konfigurasi widget default (urutan & status tampil).
+     * Disinkronkan dengan localStorage user browser via Alpine.js.
+     */
+    public array $defaultWidgetConfig = [
+        'kpi_metrics' => ['label' => '4 Kartu KPI Utama (Omzet, Servis, Stok Kritis, Piutang)', 'visible' => true, 'order' => 1],
+        'analisis_penjualan' => ['label' => 'Data & Analisis Penjualan Dinamis (Filter, Tracking, Export)', 'visible' => true, 'order' => 2],
+        'charts_omzet_kategori' => ['label' => 'Tren Omzet 30 Hari & Komposisi Produk', 'visible' => true, 'order' => 3],
+        'operational_funnel' => ['label' => 'Pipeline Status Servis & Analisis Umur Piutang', 'visible' => true, 'order' => 4],
+        'feed_transaksi_harga' => ['label' => 'Perubahan Harga & Aktivitas Transaksi Terkini', 'visible' => true, 'order' => 5],
+        'role_specific' => ['label' => 'Widget Khusus Peran/Role (Kasir, Finance, Marketing, Gudang)', 'visible' => true, 'order' => 6],
+    ];
+
     /**
      * Status transaksi yang DIHITUNG masuk omzet/klaim "selesai":
      * - 'selesai'  → transaksi POS / selesai pengiriman
@@ -302,6 +342,259 @@ class DashboardIndex extends Component
     public function getDrillDownUrl(string $model, int $id): string
     {
         return route('laporan.drill', ['model' => $model, 'id' => $id]);
+    }
+
+    /** Resolve rentang tanggal berdasarkan filter periode penjualan */
+    public function resolvePeriodePenjualan(): array
+    {
+        return match ($this->periodePenjualan) {
+            'yesterday' => [
+                'dari' => now()->subDay()->startOfDay(),
+                'sampai' => now()->subDay()->endOfDay(),
+                'label' => 'Kemarin ('.now()->subDay()->isoFormat('D MMMM Y').')',
+            ],
+            'this_week' => [
+                'dari' => now()->startOfWeek(),
+                'sampai' => now()->endOfWeek(),
+                'label' => 'Minggu Ini ('.now()->startOfWeek()->format('d/m').' - '.now()->endOfWeek()->format('d/m/Y').')',
+            ],
+            'last_week' => [
+                'dari' => now()->subWeek()->startOfWeek(),
+                'sampai' => now()->subWeek()->endOfWeek(),
+                'label' => 'Minggu Lalu ('.now()->subWeek()->startOfWeek()->format('d/m').' - '.now()->subWeek()->endOfWeek()->format('d/m/Y').')',
+            ],
+            'this_month' => [
+                'dari' => now()->startOfMonth(),
+                'sampai' => now()->endOfMonth(),
+                'label' => 'Bulan Ini ('.now()->isoFormat('MMMM Y').')',
+            ],
+            'last_month' => [
+                'dari' => now()->subMonth()->startOfMonth(),
+                'sampai' => now()->subMonth()->endOfMonth(),
+                'label' => 'Bulan Lalu ('.now()->subMonth()->isoFormat('MMMM Y').')',
+            ],
+            'custom' => [
+                'dari' => $this->penjualanCustomDari ? Carbon::parse($this->penjualanCustomDari)->startOfDay() : now()->startOfDay(),
+                'sampai' => $this->penjualanCustomSampai ? Carbon::parse($this->penjualanCustomSampai)->endOfDay() : now()->endOfDay(),
+                'label' => 'Kustom ('.($this->penjualanCustomDari ?: now()->toDateString()).' s/d '.($this->penjualanCustomSampai ?: now()->toDateString()).')',
+            ],
+            default => [
+                'dari' => now()->startOfDay(),
+                'sampai' => now()->endOfDay(),
+                'label' => 'Hari Ini ('.now()->isoFormat('D MMMM Y').')',
+            ],
+        };
+    }
+
+    /** Base query transaksi penjualan sesuai cabang dan filter */
+    private function queryPenjualanFiltered()
+    {
+        $periode = $this->resolvePeriodePenjualan();
+        $cabangId = session('cabang_id');
+
+        return Transaksi::with(['pelanggan', 'kasir', 'cabang'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->whereBetween('created_at', [$periode['dari'], $periode['sampai']])
+            ->when($this->penjualanFilterSumber, fn ($q) => $q->where('sumber', $this->penjualanFilterSumber))
+            ->when($this->penjualanFilterStatus, fn ($q) => $q->where('status', $this->penjualanFilterStatus))
+            ->when($this->penjualanSearch, function ($q) {
+                $search = '%'.$this->penjualanSearch.'%';
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('no_transaksi', 'like', $search)
+                        ->orWhereHas('pelanggan', fn ($p) => $p->where('nama', 'like', $search)->orWhere('telepon', 'like', $search))
+                        ->orWhereHas('kasir', fn ($k) => $k->where('name', 'like', $search));
+                });
+            });
+    }
+
+    /** Agregat data penjualan terfilter untuk widget dashboard */
+    public function getDataPenjualanProperty(): array
+    {
+        $periode = $this->resolvePeriodePenjualan();
+        $cabangId = session('cabang_id');
+
+        $suffix = '-p'.$this->periodePenjualan
+            .'-d'.($periode['dari']?->format('YmdHi') ?? '')
+            .'-s'.($periode['sampai']?->format('YmdHi') ?? '')
+            .'-sub'.($this->penjualanFilterSumber ?: 'all')
+            .'-st'.($this->penjualanFilterStatus ?: 'all')
+            .'-q'.md5($this->penjualanSearch);
+
+        return $this->cacheWidget('penjualan-filter', self::TTL_LIVE, function () use ($periode): array {
+            $baseQuery = $this->queryPenjualanFiltered();
+
+            $totalSemuaTrx = (clone $baseQuery)->count();
+            $omzetSelesai = (float) (clone $baseQuery)->whereIn('status', self::STATUS_OMZET)->sum('total_akhir');
+            $trxSelesai = (clone $baseQuery)->whereIn('status', self::STATUS_OMZET)->count();
+            $omzetPending = (float) (clone $baseQuery)->where('status', 'pending')->sum('total_akhir');
+            $trxPending = (clone $baseQuery)->where('status', 'pending')->count();
+            $trxBatal = (clone $baseQuery)->where('status', 'dibatalkan')->count();
+
+            $totalDiskon = (float) (clone $baseQuery)->whereIn('status', self::STATUS_OMZET)->sum('diskon_nominal');
+            $totalPajak = (float) (clone $baseQuery)->whereIn('status', self::STATUS_OMZET)->sum('pajak_nominal');
+
+            // Breakdown metode pembayaran omzet selesai
+            $byMetode = (clone $baseQuery)
+                ->whereIn('status', self::STATUS_OMZET)
+                ->selectRaw('COALESCE(metode_bayar, "lainnya") as metode, SUM(total_akhir) as total, COUNT(*) as jml')
+                ->groupBy('metode')
+                ->get()
+                ->map(fn ($r) => [
+                    'metode' => strtoupper($r->metode ?? 'TUNAI'),
+                    'total' => (float) $r->total,
+                    'jml' => (int) $r->jml,
+                ])->all();
+
+            // Breakdown sumber penjualan (pos, marketplace, website, servis)
+            $bySumber = (clone $baseQuery)
+                ->whereIn('status', self::STATUS_OMZET)
+                ->selectRaw('COALESCE(sumber, "pos") as src, SUM(total_akhir) as total, COUNT(*) as jml')
+                ->groupBy('src')
+                ->get()
+                ->map(fn ($r) => [
+                    'sumber' => ucfirst($r->src ?? 'POS'),
+                    'total' => (float) $r->total,
+                    'jml' => (int) $r->jml,
+                ])->all();
+
+            // List item transaksi terbaru untuk tracking instan (maksimal 15 item teratas)
+            $items = (clone $baseQuery)
+                ->latest()
+                ->limit(15)
+                ->get()
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'no_transaksi' => $t->no_transaksi,
+                    'sumber' => $t->sumber,
+                    'pelanggan_nama' => $t->pelanggan?->nama ?? 'Umum',
+                    'kasir_nama' => $t->kasir?->name ?? '-',
+                    'cabang_nama' => $t->cabang?->nama ?? '-',
+                    'waktu' => $t->created_at?->format('d/m/Y H:i') ?? '-',
+                    'total_akhir' => (float) $t->total_akhir,
+                    'metode_bayar' => strtoupper($t->metode_bayar ?? 'TUNAI'),
+                    'status' => $t->status,
+                ])->all();
+
+            return [
+                'periode_label' => $periode['label'],
+                'total_trx' => $totalSemuaTrx,
+                'omzet_selesai' => $omzetSelesai,
+                'trx_selesai' => $trxSelesai,
+                'omzet_pending' => $omzetPending,
+                'trx_pending' => $trxPending,
+                'trx_batal' => $trxBatal,
+                'total_diskon' => $totalDiskon,
+                'total_pajak' => $totalPajak,
+                'by_metode' => $byMetode,
+                'by_sumber' => $bySumber,
+                'items' => $items,
+            ];
+        }, $suffix);
+    }
+
+    /** Buka modal tracking & detail transaksi */
+    public function lihatDetailTransaksi(int $id): void
+    {
+        $cabangId = session('cabang_id');
+        $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'cabang', 'tiketServis'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->findOrFail($id);
+
+        $this->selectedDetailTransaksi = [
+            'id' => $trx->id,
+            'no_transaksi' => $trx->no_transaksi,
+            'sumber' => $trx->sumber,
+            'waktu' => $trx->created_at?->format('d/m/Y H:i:s') ?? '-',
+            'kasir' => $trx->kasir?->name ?? 'Kasir',
+            'pelanggan' => $trx->pelanggan?->nama ?? 'Pelanggan Umum',
+            'telepon' => $trx->pelanggan?->telepon ?? '-',
+            'cabang' => $trx->cabang?->nama ?? '-',
+            'metode_bayar' => strtoupper($trx->metode_bayar ?? 'TUNAI'),
+            'subtotal' => (float) $trx->subtotal,
+            'diskon' => (float) $trx->diskon_nominal,
+            'pajak' => (float) $trx->pajak_nominal,
+            'total' => (float) $trx->total_akhir,
+            'bayar' => (float) $trx->jumlah_bayar,
+            'kembalian' => (float) $trx->kembalian,
+            'status' => $trx->status,
+            'catatan' => $trx->catatan ?? '-',
+            'no_tiket' => $trx->tiketServis?->no_tiket,
+            'items' => $trx->items->map(fn ($it) => [
+                'nama' => $it->produk?->nama ?? 'Produk',
+                'sku' => $it->produk?->sku ?? '-',
+                'qty' => (int) $it->jumlah,
+                'harga' => (float) $it->harga_satuan,
+                'subtotal' => (float) $it->subtotal,
+            ])->toArray(),
+        ];
+
+        $this->showDetailTransaksiModal = true;
+    }
+
+    public function tutupDetailTransaksiModal(): void
+    {
+        $this->showDetailTransaksiModal = false;
+        $this->selectedDetailTransaksi = null;
+    }
+
+    /** Export data transaksi sesuai filter ke Excel */
+    public function exportPenjualanExcel()
+    {
+        $query = $this->queryPenjualanFiltered()->with(['items.produk']);
+        $transaksis = $query->orderBy('created_at')->limit(5000)->get();
+
+        $rows = [];
+        // Array baris data langsung
+        foreach ($transaksis as $t) {
+            $rincianItem = $t->items->map(fn ($it) => ($it->produk?->nama ?? 'Item').' ('.(int) $it->jumlah.'x @ Rp '.number_format($it->harga_satuan, 0, ',', '.').')')->implode('; ');
+
+            $rows[] = [
+                $t->no_transaksi,
+                $t->created_at?->format('d/m/Y H:i:s') ?? '-',
+                strtoupper($t->sumber ?? 'POS'),
+                $t->cabang?->nama ?? '-',
+                $t->pelanggan?->nama ?? 'Umum',
+                $t->kasir?->name ?? '-',
+                strtoupper($t->status),
+                strtoupper($t->metode_bayar ?? 'TUNAI'),
+                (float) $t->subtotal,
+                (float) $t->diskon_nominal,
+                (float) $t->pajak_nominal,
+                (float) $t->total_akhir,
+                $rincianItem ?: '-',
+            ];
+        }
+
+        $headings = ['NO TRANSAKSI', 'TANGGAL & WAKTU', 'SUMBER', 'CABANG', 'PELANGGAN', 'KASIR', 'STATUS', 'METODE BAYAR', 'SUBTOTAL', 'DISKON', 'PAJAK', 'TOTAL AKHIR', 'RINCIAN PRODUK / SKU'];
+
+        $userId = auth()->id() ?? 0;
+        $periode = $this->resolvePeriodePenjualan();
+        $filename = $userId.'_penjualan_'.Str::slug($this->periodePenjualan).'_'.now()->format('Ymd-His').'.xlsx';
+        $path = 'exports/'.$filename;
+
+        Excel::store(new class($headings, $rows) implements FromArray, WithHeadings
+        {
+            public function __construct(private array $headings, private array $rows) {}
+
+            public function headings(): array
+            {
+                return $this->headings;
+            }
+
+            public function array(): array
+            {
+                return $this->rows;
+            }
+        }, $path, 'local');
+
+        $fullPath = Storage::disk('local')->path($path);
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Export penjualan ('.$periode['label'].') berhasil diunduh.',
+        ]);
+
+        return response()->download($fullPath, 'laporan-penjualan-'.$this->periodePenjualan.'-'.now()->format('Ymd-His').'.xlsx');
     }
 
     /** Get available drill-down models from whitelist */
@@ -719,6 +1012,8 @@ class DashboardIndex extends Component
             'chartStokKritis' => $this->chartStokKritis,
             'currentRole' => $this->role,
             'drillDownModels' => $this->getDrillDownModels(),
+            'dataPenjualan' => $this->dataPenjualan,
+            'defaultWidgetConfig' => $this->defaultWidgetConfig,
         ] + $widgetData)->layout('layouts.backoffice', ['header' => 'Dashboard']);
     }
 }

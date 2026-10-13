@@ -274,7 +274,7 @@ class Produk extends Model
                         });
                 });
 
-            // 4. Pencarian teks nama, brand, model kompatibel
+            // 4. Pencarian teks nama, brand, model kompatibel, kategori, kondisi, satuan
             $words = array_values(array_filter(preg_split('/\s+/', $term), fn ($w) => strlen($w) > 0));
             if (count($words) > 1) {
                 $sub->orWhere(function ($multiQ) use ($words) {
@@ -282,14 +282,28 @@ class Produk extends Model
                         $multiQ->where(function ($wordQ) use ($word) {
                             $wordQ->where('nama', 'like', "%{$word}%")
                                 ->orWhere('brand_kompatibel', 'like', "%{$word}%")
-                                ->orWhere('model_kompatibel', 'like', "%{$word}%");
+                                ->orWhere('model_kompatibel', 'like', "%{$word}%")
+                                ->orWhere('kategori', 'like', "%{$word}%")
+                                ->orWhere('kondisi', 'like', "%{$word}%")
+                                ->orWhere('satuan', 'like', "%{$word}%")
+                                ->orWhere('deskripsi', 'like', "%{$word}%")
+                                ->orWhereHas('brand', fn ($bq) => $bq->where('nama', 'like', "%{$word}%"))
+                                ->orWhereHas('kualitas', fn ($kq) => $kq->where('nama', 'like', "%{$word}%"))
+                                ->orWhereHas('kategoriRelasi', fn ($cq) => $cq->where('nama', 'like', "%{$word}%"));
                         });
                     }
                 });
             } else {
                 $sub->orWhere('nama', 'like', "%{$term}%")
                     ->orWhere('brand_kompatibel', 'like', "%{$term}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$term}%");
+                    ->orWhere('model_kompatibel', 'like', "%{$term}%")
+                    ->orWhere('kategori', 'like', "%{$term}%")
+                    ->orWhere('kondisi', 'like', "%{$term}%")
+                    ->orWhere('satuan', 'like', "%{$term}%")
+                    ->orWhere('deskripsi', 'like', "%{$term}%")
+                    ->orWhereHas('brand', fn ($bq) => $bq->where('nama', 'like', "%{$term}%"))
+                    ->orWhereHas('kualitas', fn ($kq) => $kq->where('nama', 'like', "%{$term}%"))
+                    ->orWhereHas('kategoriRelasi', fn ($cq) => $cq->where('nama', 'like', "%{$term}%"));
             }
         });
     }
@@ -327,6 +341,6 @@ class Produk extends Model
             ->orderByRaw('CASE WHEN ('.$stokSubquery->toSql().') > 0 THEN 1 ELSE 0 END DESC', $stokSubquery->getBindings())
             ->orderByDesc('total_terjual')
             ->orderByDesc('stok_katalog')
-            ->orderBy('produk.nama', 'asc');
+            ->orderBy('produk.id', 'asc');
     }
 }

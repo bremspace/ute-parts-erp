@@ -10,7 +10,7 @@
         <!-- PWA Install Prompt Micro-Banner (POS) -->
         <x-prism.pwa-install-prompt variant="banner" class="mb-2 flex-shrink-0" />
 
-        <!-- Top Toolbar: Search & Gudang Selector -->
+        <!-- Top Toolbar: Search, Filter Toggle & Gudang Selector -->
         <div class="flex items-center gap-3 mb-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
             <div class="flex-1 min-w-0">
                 <x-prism.barcode-scan-input
@@ -21,6 +21,17 @@
                     title="Kamera Scanner Barcode Kasir"
                 />
             </div>
+
+            <!-- Tombol Atur Filter Preferensi -->
+            <button type="button"
+                    wire:click="$toggle('showCustomFilterSettings')"
+                    class="px-3 py-2.5 rounded-xl border border-white/10 text-xs font-semibold text-ink-300 hover:text-white hover:bg-white/5 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer min-h-[42px]"
+                    title="Atur checkbox filter kustom">
+                <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                </svg>
+                <span class="hidden sm:inline">Filter</span>
+            </button>
 
             <div class="w-full sm:w-48">
                 <select
@@ -35,6 +46,174 @@
                 </select>
             </div>
         </div>
+
+        <!-- Custom Filter Preferences Drawer -->
+        @if($showCustomFilterSettings)
+            <div class="p-3 mb-2 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <span class="text-xs font-semibold text-ink-300">Tampilkan Filter:</span>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-kategori-{{ $visibleFilters['kategori'] ? '1' : '0' }}" wire:click="toggleFilter('kategori')" @checked($visibleFilters['kategori']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Kategori</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-brand-{{ $visibleFilters['brand'] ? '1' : '0' }}" wire:click="toggleFilter('brand')" @checked($visibleFilters['brand']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Brand</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-kualitas-{{ $visibleFilters['kualitas'] ? '1' : '0' }}" wire:click="toggleFilter('kualitas')" @checked($visibleFilters['kualitas']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Kualitas</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-tipe_hp-{{ $visibleFilters['tipe_hp'] ? '1' : '0' }}" wire:click="toggleFilter('tipe_hp')" @checked($visibleFilters['tipe_hp']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Tipe HP</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-brand_kompatibel-{{ $visibleFilters['brand_kompatibel'] ? '1' : '0' }}" wire:click="toggleFilter('brand_kompatibel')" @checked($visibleFilters['brand_kompatibel']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Brand Kompatibel</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-model_kompatibel-{{ $visibleFilters['model_kompatibel'] ? '1' : '0' }}" wire:click="toggleFilter('model_kompatibel')" @checked($visibleFilters['model_kompatibel']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Model Kompatibel</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-kondisi-{{ $visibleFilters['kondisi'] ? '1' : '0' }}" wire:click="toggleFilter('kondisi')" @checked($visibleFilters['kondisi']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Kondisi</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-satuan-{{ $visibleFilters['satuan'] ? '1' : '0' }}" wire:click="toggleFilter('satuan')" @checked($visibleFilters['satuan']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Satuan</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-abc_class-{{ $visibleFilters['abc_class'] ? '1' : '0' }}" wire:click="toggleFilter('abc_class')" @checked($visibleFilters['abc_class']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Kelas ABC</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:key="pos-chk-stok-{{ $visibleFilters['stok'] ? '1' : '0' }}" wire:click="toggleFilter('stok')" @checked($visibleFilters['stok']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                        <span>Hanya Ready Stok</span>
+                    </label>
+                </div>
+                <button type="button"
+                        wire:click="resetCustomFilters"
+                        class="text-xs text-up-red hover:underline cursor-pointer">
+                    Reset ke Default
+                </button>
+            </div>
+        @endif
+
+        <!-- Active Filter Bar Dinamis -->
+        @if(collect($visibleFilters)->contains(true))
+            <div class="flex items-center gap-2.5 flex-wrap mb-2 flex-shrink-0">
+                @if($visibleFilters['kategori'])
+                    <div class="w-36 sm:w-44">
+                        <select wire:model.live="filterKategoriId" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Semua Kategori</option>
+                            @foreach($kategoriList as $parent)
+                                <option value="{{ $parent->id }}" class="font-bold text-white bg-ink-900">{{ $parent->nama }}</option>
+                                @foreach($parent->children as $child)
+                                    <option value="{{ $child->id }}" class="text-ink-300 bg-ink-900">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                                @endforeach
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['brand'])
+                    <div class="w-32 sm:w-36">
+                        <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Semua Brand</option>
+                            @foreach($brandList as $b)
+                                <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['kualitas'])
+                    <div class="w-32 sm:w-36">
+                        <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Semua Kualitas</option>
+                            @foreach($kualitasList as $k)
+                                <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['tipe_hp'])
+                    <div class="w-36 sm:w-44">
+                        <select wire:model.live="filterTipeHpId" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Semua Tipe HP</option>
+                            @foreach($tipeHpList as $th)
+                                <option value="{{ $th->id }}" class="bg-ink-900">{{ $th->merk }} - {{ $th->model }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['brand_kompatibel'])
+                    <div class="w-36 sm:w-44">
+                        <select wire:model.live="filterBrandKompatibel" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Brand Kompatibel</option>
+                            @foreach($brandKompatibelList as $bk)
+                                <option value="{{ $bk }}" class="bg-ink-900">{{ $bk }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['model_kompatibel'])
+                    <div class="w-36 sm:w-44">
+                        <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Model Kompatibel</option>
+                            @foreach($modelKompatibelList as $mk)
+                                <option value="{{ $mk }}" class="bg-ink-900">{{ $mk }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['kondisi'])
+                    <div class="w-28 sm:w-36">
+                        <select wire:model.live="filterKondisi" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Semua Kondisi</option>
+                            @foreach($kondisiList as $kd)
+                                <option value="{{ $kd['kode'] }}" class="bg-ink-900">{{ $kd['nama'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['satuan'])
+                    <div class="w-28 sm:w-36">
+                        <select wire:model.live="filterSatuan" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Semua Satuan</option>
+                            @foreach($satuanList as $su)
+                                <option value="{{ $su->kode }}" class="bg-ink-900">{{ $su->nama }} ({{ $su->kode }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['abc_class'])
+                    <div class="w-28 sm:w-32">
+                        <select wire:model.live="filterAbcClass" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
+                            <option value="">Kelas ABC</option>
+                            <option value="A" class="bg-ink-900">Kelas A</option>
+                            <option value="B" class="bg-ink-900">Kelas B</option>
+                            <option value="C" class="bg-ink-900">Kelas C</option>
+                        </select>
+                    </div>
+                @endif
+
+                @if($visibleFilters['stok'])
+                    <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs text-ink-200 cursor-pointer select-none">
+                        <input type="checkbox" wire:model.live="filterHanyaReadyStok" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-up-mint/30">
+                        <span>Hanya Ready Stok</span>
+                    </label>
+                @endif
+            </div>
+        @endif
 
         <!-- [T-51] Desktop Keyboard Shortcuts Visual Hint Bar (hidden on mobile) -->
         <div class="hidden lg:flex items-center gap-2 mb-3 text-[11px] text-ink-400">

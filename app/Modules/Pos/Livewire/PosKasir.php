@@ -2,11 +2,13 @@
 
 namespace App\Modules\Pos\Livewire;
 
+use App\Models\UserPreference;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
@@ -19,10 +21,15 @@ use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ParsesNominal;
@@ -55,6 +62,43 @@ class PosKasir extends Component
 
     // Search & Filter state
     public string $search = '';
+
+    // Filter values
+    public ?int $filterKategoriId = null;
+
+    public ?int $filterBrandId = null;
+
+    public ?int $filterKualitasId = null;
+
+    public ?int $filterTipeHpId = null;
+
+    public ?string $filterBrandKompatibel = null;
+
+    public ?string $filterModelKompatibel = null;
+
+    public ?string $filterKondisi = null;
+
+    public ?string $filterSatuan = null;
+
+    public ?string $filterAbcClass = null;
+
+    public bool $filterHanyaReadyStok = false;
+
+    // Filter toggle preferences (checkbox custom)
+    public array $visibleFilters = [
+        'kategori' => false,
+        'brand' => false,
+        'kualitas' => false,
+        'tipe_hp' => false,
+        'brand_kompatibel' => false,
+        'model_kompatibel' => false,
+        'kondisi' => false,
+        'satuan' => false,
+        'abc_class' => false,
+        'stok' => false,
+    ];
+
+    public bool $showCustomFilterSettings = false;
 
     // [B-02/P1-5] Batas katalog yang dimuat (load-more "Muat lebih banyak")
     public int $batasProduk = self::BATAS_PRODUK_AWAL;
@@ -210,6 +254,8 @@ class PosKasir extends Component
             $this->selectedGudangId = Gudang::where('cabang_id', $cabangId)->value('id');
         }
 
+        $this->loadUserPreferences();
+
         // [T-09] Deteksi sesi kas terbuka utk user/cabang
         $this->checkKasSesi();
 
@@ -227,6 +273,137 @@ class PosKasir extends Component
         } elseif (request()->has('tiket_servis_id')) {
             $this->bukaBayarServisModal((int) request()->query('tiket_servis_id'));
         }
+    }
+
+    public function loadUserPreferences(): void
+    {
+        $userId = auth()->id();
+        if ($userId) {
+            $pref = UserPreference::getPref($userId, 'pos_kasir_custom_filters');
+            if (is_array($pref)) {
+                $this->visibleFilters = array_merge($this->visibleFilters, $pref);
+            }
+        }
+    }
+
+    public function updatedVisibleFilters(): void
+    {
+        $this->simpanPreferensi();
+    }
+
+    public function toggleFilter(string $key): void
+    {
+        if (array_key_exists($key, $this->visibleFilters)) {
+            $this->visibleFilters[$key] = ! $this->visibleFilters[$key];
+            if (! $this->visibleFilters[$key]) {
+                match ($key) {
+                    'kategori' => $this->filterKategoriId = null,
+                    'brand' => $this->filterBrandId = null,
+                    'kualitas' => $this->filterKualitasId = null,
+                    'tipe_hp' => $this->filterTipeHpId = null,
+                    'brand_kompatibel' => $this->filterBrandKompatibel = null,
+                    'model_kompatibel' => $this->filterModelKompatibel = null,
+                    'kondisi' => $this->filterKondisi = null,
+                    'satuan' => $this->filterSatuan = null,
+                    'abc_class' => $this->filterAbcClass = null,
+                    'stok' => $this->filterHanyaReadyStok = false,
+                    default => null,
+                };
+                $this->batasProduk = self::BATAS_PRODUK_AWAL;
+            }
+            $this->simpanPreferensi();
+        }
+    }
+
+    public function resetCustomFilters(): void
+    {
+        $this->visibleFilters = [
+            'kategori' => false,
+            'brand' => false,
+            'kualitas' => false,
+            'tipe_hp' => false,
+            'brand_kompatibel' => false,
+            'model_kompatibel' => false,
+            'kondisi' => false,
+            'satuan' => false,
+            'abc_class' => false,
+            'stok' => false,
+        ];
+
+        $this->filterKategoriId = null;
+        $this->filterBrandId = null;
+        $this->filterKualitasId = null;
+        $this->filterTipeHpId = null;
+        $this->filterBrandKompatibel = null;
+        $this->filterModelKompatibel = null;
+        $this->filterKondisi = null;
+        $this->filterSatuan = null;
+        $this->filterAbcClass = null;
+        $this->filterHanyaReadyStok = false;
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+
+        $userId = auth()->id();
+        if ($userId) {
+            UserPreference::setPref($userId, 'pos_kasir_custom_filters', $this->visibleFilters);
+        }
+    }
+
+    protected function simpanPreferensi(): void
+    {
+        $userId = auth()->id();
+        if ($userId) {
+            UserPreference::setPref($userId, 'pos_kasir_custom_filters', $this->visibleFilters);
+        }
+    }
+
+    public function updatedFilterKategoriId(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterBrandId(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterKualitasId(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterTipeHpId(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterBrandKompatibel(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterModelKompatibel(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterKondisi(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterSatuan(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterAbcClass(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
+    public function updatedFilterHanyaReadyStok(): void
+    {
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
     }
 
     /**
@@ -2083,11 +2260,64 @@ class PosKasir extends Component
                 'tipeHps',
                 'kategoriRelasi',
                 'hargaTier',
+                'brand',
+                'kualitas',
             ])
             ->urutKetersediaanDanTerlaris($this->selectedGudangId, session('cabang_id'));
 
         if (! empty($this->search)) {
             $productsQuery->cariPintar($this->search);
+        }
+
+        if ($this->visibleFilters['kategori'] && $this->filterKategoriId) {
+            $kat = KategoriProduk::with('children')->find($this->filterKategoriId);
+            $katIds = $kat ? array_merge([$kat->id], $kat->children->pluck('id')->all()) : [$this->filterKategoriId];
+            $productsQuery->whereIn('kategori_id', $katIds);
+        }
+
+        if ($this->visibleFilters['brand'] && $this->filterBrandId) {
+            $productsQuery->where('brand_id', $this->filterBrandId);
+        }
+
+        if ($this->visibleFilters['kualitas'] && $this->filterKualitasId) {
+            $productsQuery->where('kualitas_id', $this->filterKualitasId);
+        }
+
+        if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
+            $productsQuery->whereHas('tipeHps', fn ($q) => $q->where('tipe_hp.id', $this->filterTipeHpId));
+        }
+
+        if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
+            $productsQuery->where('brand_kompatibel', $this->filterBrandKompatibel);
+        }
+
+        if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
+            $productsQuery->where('model_kompatibel', $this->filterModelKompatibel);
+        }
+
+        if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
+            $productsQuery->where('kondisi', $this->filterKondisi);
+        }
+
+        if ($this->visibleFilters['satuan'] && $this->filterSatuan) {
+            $productsQuery->where('satuan', $this->filterSatuan);
+        }
+
+        if ($this->visibleFilters['abc_class'] && $this->filterAbcClass) {
+            $productsQuery->where('abc_class', $this->filterAbcClass);
+        }
+
+        if ($this->visibleFilters['stok'] && $this->filterHanyaReadyStok) {
+            $productsQuery->whereHas('stokItems', function ($q) {
+                $q->where('jumlah', '>', 0);
+                if ($this->selectedGudangId) {
+                    $q->where('gudang_id', $this->selectedGudangId);
+                } elseif ($cabangId = session('cabang_id')) {
+                    $q->whereIn('gudang_id', function ($gq) use ($cabangId) {
+                        $gq->select('id')->from('gudang')->where('cabang_id', $cabangId);
+                    });
+                }
+            });
         }
 
         // [B-02/P1-5] Load-more: ambil batas+1 utk tahu masih ada sisanya
@@ -2105,6 +2335,35 @@ class PosKasir extends Component
 
         // [B-02/P0-2] Peta stok katalog — kriteria sama dgn addToCart (satu query)
         $stokPerProduk = $this->petaStokKatalog($products);
+
+        $brandKompatibelList = TipeHp::where('is_active', true)
+            ->distinct()
+            ->pluck('merk')
+            ->merge(Brand::where('is_active', true)->pluck('nama'))
+            ->merge(Produk::whereNotNull('brand_kompatibel')->where('brand_kompatibel', '!=', '')->distinct()->pluck('brand_kompatibel'))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        $modelKompatibelList = TipeHp::where('is_active', true)
+            ->distinct()
+            ->pluck('model')
+            ->merge(Produk::whereNotNull('model_kompatibel')->where('model_kompatibel', '!=', '')->distinct()->pluck('model_kompatibel'))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        $config = app(KonfigurasiService::class);
+        $kondisiList = $config->get('master_produk_kondisi_list') ?? [
+            ['kode' => 'baru', 'nama' => 'Baru'],
+            ['kode' => 'oem', 'nama' => 'OEM'],
+            ['kode' => 'compatible', 'nama' => 'Compatible'],
+            ['kode' => 'bekas', 'nama' => 'Bekas / Copotan'],
+        ];
 
         // Explicitly pass all data needed by the view
         return view('modules.pos.livewire.pos-kasir', [
@@ -2133,6 +2392,14 @@ class PosKasir extends Component
             'snCari' => $this->snCari,
             'snItemKey' => $this->snItemKey,
             'daftarServisSiapBayar' => $this->daftarServisSiapBayar,
+            'kategoriList' => KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get(),
+            'brandList' => Brand::where('is_active', true)->orderBy('nama')->get(),
+            'kualitasList' => KualitasProduk::where('is_active', true)->orderBy('nama')->get(),
+            'tipeHpList' => TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get(),
+            'brandKompatibelList' => $brandKompatibelList,
+            'modelKompatibelList' => $modelKompatibelList,
+            'kondisiList' => $kondisiList,
+            'satuanList' => SatuanUnit::where('is_active', true)->orderBy('nama')->get(),
         ])->layout('layouts.backoffice', ['header' => 'Kasir Point of Sale (POS)']);
     }
 }

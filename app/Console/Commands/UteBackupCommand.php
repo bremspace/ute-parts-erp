@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Modules\Notifikasi\Services\NotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
@@ -21,7 +22,8 @@ class UteBackupCommand extends Command
 {
     protected $signature = 'ute:backup
         {--connection= : Koneksi database di config/database.php (default: koneksi aktif)}
-        {--keep-days=7 : Hari penyimpanan backup sebelum dirotasi}';
+        {--keep-days=7 : Hari penyimpanan backup sebelum dirotasi}
+        {--cloud= : Disk storage cloud tujuan sinkronisasi (opsional, contoh: s3, gcs)}';
 
     protected $description = 'Backup database MySQL ke gzip di storage/app/backups (rotasi 7 hari) — F1-6';
 
@@ -49,6 +51,22 @@ class UteBackupCommand extends Command
             $hapus = $this->rotateBackups($dir, max(1, (int) $this->option('keep-days')));
             $ukuran = is_file($target) ? (int) filesize($target) : 0;
 
+            // Sinkronisasi cloud jika opsi --cloud diisi
+            $cloudDisk = $this->option('cloud');
+            $cloudNote = '';
+            if ($cloudDisk) {
+                try {
+                    $cloudStream = fopen($target, 'r');
+                    if ($cloudStream) {
+                        Storage::disk($cloudDisk)->put('backups/'.basename($target), $cloudStream);
+                        fclose($cloudStream);
+                        $cloudNote = " (tersinkron ke cloud disk: {$cloudDisk})";
+                    }
+                } catch (Throwable $ce) {
+                    $cloudNote = " (gagal sinkron cloud: {$ce->getMessage()})";
+                }
+            }
+
             // Notifikasi via queue — jangan biarkan kegagalan notif mengubah
             // status backup yang sebenarnya berhasil.
             try {
@@ -57,12 +75,13 @@ class UteBackupCommand extends Command
                     null,
                     'Backup Database Berhasil',
                     sprintf(
-                        'Backup database berhasil: %s (%s). Rotasi: %d file lama dihapus.',
+                        'Backup database berhasil: %s (%s)%s. Rotasi: %d file lama dihapus.',
                         basename($target),
                         $this->formatUkuran($ukuran),
+                        $cloudNote,
                         $hapus,
                     ),
-                    ['file' => basename($target), 'ukuran' => $ukuran, 'dihapus' => $hapus],
+                    ['file' => basename($target), 'ukuran' => $ukuran, 'dihapus' => $hapus, 'cloud' => $cloudDisk],
                 );
             } catch (Throwable $e) {
                 report($e);

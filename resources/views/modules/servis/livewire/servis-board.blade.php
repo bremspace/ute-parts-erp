@@ -665,7 +665,8 @@
                                                         x-format-number
                                                         wire:model.live.debounce.350ms="terimaEstimasiItems.{{ $idx }}.harga"
                                                         placeholder="0"
-                                                        class="w-full px-2 py-1 rounded-lg glass-input text-xs font-bold tabular-nums"
+                                                        @if(($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) readonly @endif
+                                                        class="w-full px-2 py-1 rounded-lg glass-input text-xs font-bold tabular-nums {{ (($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) ? 'opacity-80 bg-white/5 cursor-not-allowed' : '' }}"
                                                     />
                                                 </div>
                                                 <div class="col-span-5 text-right font-bold text-white tabular-nums">
@@ -899,7 +900,8 @@
                                                 x-format-number
                                                 wire:model.live.debounce.350ms="estimasiItems.{{ $idx }}.harga"
                                                 placeholder="0"
-                                                class="w-full px-2 py-1 rounded-lg glass-input text-xs font-bold tabular-nums"
+                                                @if(($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) readonly @endif
+                                                class="w-full px-2 py-1 rounded-lg glass-input text-xs font-bold tabular-nums {{ (($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) ? 'opacity-80 bg-white/5 cursor-not-allowed' : '' }}"
                                             />
                                         </div>
                                         <div class="col-span-5 text-right font-bold text-white tabular-nums">
@@ -934,7 +936,7 @@
                             </svg>
                             SLA & Batas Waktu Pengerjaan Teknisi
                         </span>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
                             <div>
                                 <label class="block text-[11px] font-medium text-ink-300 mb-1">Batas Waktu (Menit)</label>
                                 <input
@@ -945,7 +947,18 @@
                                     placeholder="Contoh: 120"
                                     class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold"
                                 />
-                                <span class="text-[10px] text-ink-500 mt-0.5 block">Diambil dari master jasa atau sesuaikan manual</span>
+                                <span class="text-[10px] text-ink-500 mt-0.5 block">Diambil dari master jasa atau sesuaikan</span>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-ink-300 mb-1">Garansi Custom (Hari)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    wire:model="estimasiDurasiGaransiCustom"
+                                    placeholder="Default master (cth: 30)"
+                                    class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold"
+                                />
+                                <span class="text-[10px] text-ink-500 mt-0.5 block">Kosongkan utk default. Khusus jasa: tanpa garansi.</span>
                             </div>
                             <div>
                                 <label class="block text-[11px] font-medium text-ink-300 mb-1">Jika Batas Waktu Habis</label>
@@ -1427,16 +1440,30 @@
                                     
                                     <div class="flex flex-col sm:flex-row gap-4 items-center">
                                         <!-- SVG Visual Pola dengan Jalur Penghubung -->
-                                        <div class="w-44 h-44 rounded-xl bg-ink-950 border border-white/10 p-2 flex-shrink-0">
+                                        <div class="w-48 h-48 rounded-2xl bg-ink-950 border-2 border-up-primary/40 shadow-xl p-2 flex-shrink-0">
                                             <svg viewBox="0 0 300 300" class="w-full h-full">
+                                                <defs>
+                                                    <filter id="detail-glow-pola" x="-20%" y="-20%" width="140%" height="140%">
+                                                        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#8B5CF6" flood-opacity="0.8"/>
+                                                    </filter>
+                                                </defs>
+                                                <!-- Grid background lines -->
+                                                <line x1="50" y1="50" x2="250" y2="50" stroke="rgba(255, 255, 255, 0.15)" stroke-dasharray="4,4" />
+                                                <line x1="50" y1="150" x2="250" y2="150" stroke="rgba(255, 255, 255, 0.15)" stroke-dasharray="4,4" />
+                                                <line x1="50" y1="250" x2="250" y2="250" stroke="rgba(255, 255, 255, 0.15)" stroke-dasharray="4,4" />
+                                                <line x1="50" y1="50" x2="50" y2="250" stroke="rgba(255, 255, 255, 0.15)" stroke-dasharray="4,4" />
+                                                <line x1="150" y1="50" x2="150" y2="250" stroke="rgba(255, 255, 255, 0.15)" stroke-dasharray="4,4" />
+                                                <line x1="250" y1="50" x2="250" y2="250" stroke="rgba(255, 255, 255, 0.15)" stroke-dasharray="4,4" />
+
                                                 @if(!empty($polyString))
                                                     <polyline
                                                         points="{{ $polyString }}"
                                                         fill="none"
-                                                        stroke="#5B4FE9"
-                                                        stroke-width="6"
+                                                        stroke="#8B5CF6"
+                                                        stroke-width="7"
                                                         stroke-linecap="round"
                                                         stroke-linejoin="round"
+                                                        filter="url(#detail-glow-pola)"
                                                     />
                                                 @endif
                                                 @for($i = 1; $i <= 9; $i++)
@@ -1447,22 +1474,24 @@
                                                     @endphp
                                                     <g transform="translate({{ $cx }}, {{ $cy }})">
                                                         <circle
-                                                            r="20"
-                                                            fill="{{ $order !== null ? 'rgba(91, 79, 233, 0.3)' : 'rgba(255, 255, 255, 0.04)' }}"
-                                                            stroke="{{ $order !== null ? '#5B4FE9' : 'rgba(255, 255, 255, 0.15)' }}"
-                                                            stroke-width="2"
+                                                            r="24"
+                                                            fill="{{ $order !== null ? 'rgba(139, 92, 246, 0.35)' : 'rgba(255, 255, 255, 0.08)' }}"
+                                                            stroke="{{ $order !== null ? '#8B5CF6' : 'rgba(255, 255, 255, 0.3)' }}"
+                                                            stroke-width="2.5"
                                                         />
                                                         <circle
-                                                            r="8"
-                                                            fill="{{ $order !== null ? '#FFFFFF' : 'rgba(255, 255, 255, 0.4)' }}"
+                                                            r="10"
+                                                            fill="{{ $order !== null ? '#FFFFFF' : 'rgba(255, 255, 255, 0.7)' }}"
+                                                            stroke="{{ $order !== null ? '#7C3AED' : 'none' }}"
+                                                            stroke-width="2"
                                                         />
                                                         @if($order !== null)
-                                                            <g transform="translate(10, -10)">
-                                                                <circle r="8" fill="#E8873B" />
-                                                                <text text-anchor="middle" dy="3" fill="#FFFFFF" font-size="9" font-weight="bold">{{ $order }}</text>
+                                                            <g transform="translate(14, -14)">
+                                                                <circle r="11" fill="#EA580C" stroke="#FFFFFF" stroke-width="1.5" />
+                                                                <text text-anchor="middle" dy="4" fill="#FFFFFF" font-size="11" font-weight="bold">{{ $order }}</text>
                                                             </g>
                                                         @else
-                                                            <text text-anchor="middle" dy="3.5" fill="rgba(255, 255, 255, 0.3)" font-size="10" font-weight="bold">{{ $i }}</text>
+                                                            <text text-anchor="middle" dy="4" fill="rgba(255, 255, 255, 0.5)" font-size="11" font-weight="bold">{{ $i }}</text>
                                                         @endif
                                                     </g>
                                                 @endfor
@@ -1716,7 +1745,7 @@
                                     </div>
                                     <input type="text" wire:model="pekerjaanItems.{{ $idx }}.nama_item" placeholder="Nama item" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
                                     <input type="number" wire:model="pekerjaanItems.{{ $idx }}.qty" min="1" placeholder="Qty" class="col-span-1 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
-                                    <input type="text" inputmode="numeric" x-format-number wire:model="pekerjaanItems.{{ $idx }}.harga" placeholder="Harga" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium tabular-nums" />
+                                    <input type="text" inputmode="numeric" x-format-number wire:model="pekerjaanItems.{{ $idx }}.harga" placeholder="Harga" @if(($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) readonly @endif class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium tabular-nums {{ (($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) ? 'opacity-80 bg-white/5 cursor-not-allowed' : '' }}" />
                                     <button wire:click="removePekerjaanRow({{ $idx }})" class="col-span-1 text-up-red hover:text-white text-sm cursor-pointer" title="Hapus baris">✕</button>
                                 </div>
                                 {{-- [F2-3] SN utk produk sn=true — wajib, jumlah = qty --}}
