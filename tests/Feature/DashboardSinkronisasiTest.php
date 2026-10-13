@@ -266,6 +266,32 @@ class DashboardSinkronisasiTest extends TestCase
         $this->assertCount(1, $stok['items']);
     }
 
+    public function test_widget_analisis_penjualan_filter_periode_tidak_menyebabkan_dashboard_kosong(): void
+    {
+        [$user, $cabangAktif] = $this->authed(['super-admin']);
+
+        $this->buatTrx($cabangAktif->id, 'selesai', 150000, $user->id);
+
+        $component = Livewire::test(DashboardIndex::class);
+        $component->assertSee('Data & Analisis Penjualan');
+
+        // Klik periode Minggu Ini
+        $component->call('setPeriodePenjualan', 'this_week');
+        $component->assertSet('periodePenjualan', 'this_week');
+        $component->assertSee('Data & Analisis Penjualan');
+        $component->assertSee('Minggu Ini');
+
+        // Pastikan tidak ada x-cloak yang merusak render / menyembunyikan dashboard
+        $html = $component->html();
+        $this->assertStringNotContainsString('x-cloak', $html, 'x-cloak tidak boleh ada di widget dashboard agar UI tidak kosong saat update');
+
+        // Klik periode Bulan Ini
+        $component->call('setPeriodePenjualan', 'this_month');
+        $component->assertSet('periodePenjualan', 'this_month');
+        $component->assertSee('Data & Analisis Penjualan');
+        $component->assertSee('Bulan Ini');
+    }
+
     private function produk(string $slug): Produk
     {
         return Produk::create([

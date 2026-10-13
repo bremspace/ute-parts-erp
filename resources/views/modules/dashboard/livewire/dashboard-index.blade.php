@@ -154,12 +154,12 @@
     </div>
 
     <!-- Main Dynamic Widgets Container (Flex Col dengan CSS Order dinamis) -->
-    <div class="flex flex-col space-y-6">
+    <div class="flex flex-col gap-6">
 
     <!-- 1. 4 KPI Metrics Utama -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 transition-all duration-200"
-         x-show="layoutConfig.kpi_metrics?.visible"
-         x-cloak
+    <div wire:key="widget-kpi-metrics"
+         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 transition-all duration-200"
+         x-show="layoutConfig?.kpi_metrics?.visible !== false"
          :style="'order: ' + (widgetOrder.indexOf('kpi_metrics') + 1)"
          data-widget-key="kpi_metrics">
         <!-- 1. Omzet Hari Ini -->
@@ -240,9 +240,9 @@
     </div>
 
     <!-- 2. Charts Row: Tren Omzet 30 Hari (Smooth SVG Spline) & Donut Kategori -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-all duration-200"
-         x-show="layoutConfig.charts_omzet_kategori?.visible"
-         x-cloak
+    <div wire:key="widget-charts-omzet-kategori"
+         class="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-all duration-200"
+         x-show="layoutConfig?.charts_omzet_kategori?.visible !== false"
          :style="'order: ' + (widgetOrder.indexOf('charts_omzet_kategori') + 1)"
          data-widget-key="charts_omzet_kategori">
         <!-- Tren Omzet 30 Hari -->
@@ -442,9 +442,9 @@
     </div>
 
     <!-- 3. Operational Visual Funnels: Status Servis & Piutang Aging Risk Matrix -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-200"
-         x-show="layoutConfig.operational_funnel?.visible"
-         x-cloak
+    <div wire:key="widget-operational-funnel"
+         class="grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-200"
+         x-show="layoutConfig?.operational_funnel?.visible !== false"
          :style="'order: ' + (widgetOrder.indexOf('operational_funnel') + 1)"
          data-widget-key="operational_funnel">
         <!-- 1. Pipeline Tahap Servis Aktif (Kanban Funnel) -->
@@ -558,9 +558,9 @@
     </div>
 
     <!-- 4. Stock Kritis & Transaksi Terkini -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-all duration-200"
-         x-show="layoutConfig.feed_transaksi_harga?.visible"
-         x-cloak
+    <div wire:key="widget-feed-transaksi-harga"
+         class="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-all duration-200"
+         x-show="layoutConfig?.feed_transaksi_harga?.visible !== false"
          :style="'order: ' + (widgetOrder.indexOf('feed_transaksi_harga') + 1)"
          data-widget-key="feed_transaksi_harga">
         <!-- Perubahan Harga Terbaru (dari GRN / Supplier) -->
@@ -652,9 +652,9 @@
     </div>
 
     <!-- 5. Widget Analisis & Tracking Penjualan Interaktif -->
-    <div class="transition-all duration-200"
-         x-show="layoutConfig.analisis_penjualan?.visible"
-         x-cloak
+    <div wire:key="widget-analisis-penjualan"
+         class="transition-all duration-200"
+         x-show="layoutConfig?.analisis_penjualan?.visible !== false"
          :style="'order: ' + (widgetOrder.indexOf('analisis_penjualan') + 1)"
          data-widget-key="analisis_penjualan">
         <x-prism.glass-card title="Data & Analisis Penjualan" subtitle="{{ $dataPenjualan['periode_label'] ?? 'Hari Ini' }}">
@@ -663,31 +663,31 @@
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pb-4 border-b border-white/5">
                 <!-- Pills Pilihan Periode Dinamis -->
                 <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 text-xs">
-                    <button type="button" wire:click="$set('periodePenjualan', 'today')"
+                    <button type="button" wire:click="setPeriodePenjualan('today')"
                         class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'today' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Hari Ini
                     </button>
-                    <button type="button" wire:click="$set('periodePenjualan', 'yesterday')"
+                    <button type="button" wire:click="setPeriodePenjualan('yesterday')"
                         class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'yesterday' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Kemarin
                     </button>
-                    <button type="button" wire:click="$set('periodePenjualan', 'this_week')"
+                    <button type="button" wire:click="setPeriodePenjualan('this_week')"
                         class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'this_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Minggu Ini
                     </button>
-                    <button type="button" wire:click="$set('periodePenjualan', 'last_week')"
+                    <button type="button" wire:click="setPeriodePenjualan('last_week')"
                         class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'last_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Minggu Lalu
                     </button>
-                    <button type="button" wire:click="$set('periodePenjualan', 'this_month')"
+                    <button type="button" wire:click="setPeriodePenjualan('this_month')"
                         class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'this_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Bulan Ini
                     </button>
-                    <button type="button" wire:click="$set('periodePenjualan', 'last_month')"
+                    <button type="button" wire:click="setPeriodePenjualan('last_month')"
                         class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'last_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Bulan Lalu
                     </button>
-                    <button type="button" wire:click="$set('periodePenjualan', 'custom')"
+                    <button type="button" wire:click="setPeriodePenjualan('custom')"
                         class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'custom' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Kustom
                     </button>
@@ -854,7 +854,7 @@
                         </thead>
                         <tbody class="divide-y divide-white/5">
                             @forelse($dataPenjualan['items'] ?? [] as $item)
-                                <tr class="hover:bg-white/[0.02] transition-colors">
+                                <tr wire:key="penjualan-row-{{ $item['id'] }}" class="hover:bg-white/[0.02] transition-colors">
                                     <td class="py-2.5 font-mono font-semibold text-white">
                                         {{ $item['no_transaksi'] }}
                                     </td>
@@ -1014,9 +1014,9 @@
     @endif
 
     <!-- 6. Widgets Khusus Role (Kasir, Finance, Super-Admin, Marketing, Staff Gudang) -->
-    <div class="space-y-6 transition-all duration-200"
-         x-show="layoutConfig.role_specific?.visible"
-         x-cloak
+    <div wire:key="widget-role-specific"
+         class="space-y-6 transition-all duration-200"
+         x-show="layoutConfig?.role_specific?.visible !== false"
          :style="'order: ' + (widgetOrder.indexOf('role_specific') + 1)"
          data-widget-key="role_specific">
     @role('kasir')
@@ -1185,7 +1185,7 @@
     </div>
     <!-- Modal Kustomisasi Layout & Urutan Widget Dashboard -->
     <div x-show="showCustomizer"
-         x-cloak
+         style="display: none;"
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
          @keydown.escape.window="showCustomizer = false">
         <div class="relative w-full max-w-lg bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl p-4 sm:p-6 text-white max-h-[90vh] overflow-y-auto"

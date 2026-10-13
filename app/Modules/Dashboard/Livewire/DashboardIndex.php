@@ -344,6 +344,31 @@ class DashboardIndex extends Component
         return route('laporan.drill', ['model' => $model, 'id' => $id]);
     }
 
+    /** Set periode penjualan secara aman */
+    public function setPeriodePenjualan(string $periode): void
+    {
+        $allowed = ['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month', 'custom'];
+        if (in_array($periode, $allowed, true)) {
+            $this->periodePenjualan = $periode;
+        }
+    }
+
+    /** Parse tanggal kustom dengan fallback aman */
+    private function parseCustomDate(?string $date, bool $isStart): Carbon
+    {
+        if (empty($date)) {
+            return $isStart ? now()->startOfDay() : now()->endOfDay();
+        }
+
+        try {
+            $parsed = Carbon::parse($date);
+
+            return $isStart ? $parsed->startOfDay() : $parsed->endOfDay();
+        } catch (\Throwable) {
+            return $isStart ? now()->startOfDay() : now()->endOfDay();
+        }
+    }
+
     /** Resolve rentang tanggal berdasarkan filter periode penjualan */
     public function resolvePeriodePenjualan(): array
     {
@@ -374,8 +399,8 @@ class DashboardIndex extends Component
                 'label' => 'Bulan Lalu ('.now()->subMonth()->isoFormat('MMMM Y').')',
             ],
             'custom' => [
-                'dari' => $this->penjualanCustomDari ? Carbon::parse($this->penjualanCustomDari)->startOfDay() : now()->startOfDay(),
-                'sampai' => $this->penjualanCustomSampai ? Carbon::parse($this->penjualanCustomSampai)->endOfDay() : now()->endOfDay(),
+                'dari' => $this->parseCustomDate($this->penjualanCustomDari, true),
+                'sampai' => $this->parseCustomDate($this->penjualanCustomSampai, false),
                 'label' => 'Kustom ('.($this->penjualanCustomDari ?: now()->toDateString()).' s/d '.($this->penjualanCustomSampai ?: now()->toDateString()).')',
             ],
             default => [
@@ -1014,6 +1039,14 @@ class DashboardIndex extends Component
             'drillDownModels' => $this->getDrillDownModels(),
             'dataPenjualan' => $this->dataPenjualan,
             'defaultWidgetConfig' => $this->defaultWidgetConfig,
+            'periodePenjualan' => $this->periodePenjualan,
+            'penjualanCustomDari' => $this->penjualanCustomDari,
+            'penjualanCustomSampai' => $this->penjualanCustomSampai,
+            'penjualanSearch' => $this->penjualanSearch,
+            'penjualanFilterSumber' => $this->penjualanFilterSumber,
+            'penjualanFilterStatus' => $this->penjualanFilterStatus,
+            'showDetailTransaksiModal' => $this->showDetailTransaksiModal,
+            'selectedDetailTransaksi' => $this->selectedDetailTransaksi,
         ] + $widgetData)->layout('layouts.backoffice', ['header' => 'Dashboard']);
     }
 }
