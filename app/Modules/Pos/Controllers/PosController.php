@@ -36,6 +36,7 @@ class PosController extends Controller
     public function products(Request $request)
     {
         $gudangId = $request->query('gudang_id', session('gudang_id'));
+        $cabangId = $request->query('cabang_id', session('cabang_id'));
         $customerId = $request->query('customer_id');
 
         // [T-07] Mode ringkas utk autocomplete/debounce: ?q= atau ?query= → payload kecil, limit 10
@@ -50,23 +51,13 @@ class PosController extends Controller
             $pelanggan = $customerId ? Pelanggan::with('tierMembership')->find($customerId) : null;
 
             $rawProducts = $query->limit(10)->get();
-            $productIds = $rawProducts->pluck('id')->all();
-
-            $stokMap = ($gudangId && ! empty($productIds))
-                ? StokItem::whereIn('produk_id', $productIds)
-                    ->where('gudang_id', $gudangId)
-                    ->groupBy('produk_id')
-                    ->selectRaw('produk_id, SUM(jumlah) as total')
-                    ->pluck('total', 'produk_id')
-                    ->all()
-                : [];
 
             $items = $rawProducts->map(fn ($product) => [
                 'id' => $product->id,
                 'nama' => $product->nama,
                 'sku' => $product->skuVariants->first()?->sku,
                 'harga' => (float) $this->pricingService->resolve($product, $pelanggan)['harga'],
-                'stok' => (int) ($stokMap[$product->id] ?? 0),
+                'stok' => (int) ($product->stok_katalog ?? 0),
                 'foto' => $product->foto[0] ?? $product->gambar,
             ]);
 

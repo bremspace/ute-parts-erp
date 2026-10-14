@@ -457,78 +457,94 @@
          class="lg:w-[420px] lg:flex-shrink-0 lg:flex lg:flex-col lg:h-full">
 
         <!-- Mobile: Floating Cart Bar (Sticky Bottom, 44px+ touch targets) -->
-        <div class="lg:hidden fixed inset-x-2 z-30 flex items-center gap-2 p-2 rounded-2xl bg-ink-900/95 dark:bg-ink-950/95 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl"
-             style="bottom: calc(3.5rem + max(env(safe-area-inset-bottom, 0px), 0.5rem));">
-            <button @click="cartPanelOpen = !cartPanelOpen"
-                    type="button"
-                    class="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-900 dark:text-white min-h-[44px] cursor-pointer"
-                    :aria-expanded="cartPanelOpen"
-                    aria-label="Buka ringkasan keranjang">
-                <div class="flex items-center gap-2.5">
-                    <div class="relative">
-                        <svg class="w-5 h-5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                        </svg>
-                        <span class="absolute -top-1.5 -right-2 px-1.5 py-0.2 rounded-full bg-up-primary text-white text-[10px] font-bold tabular-nums">
-                            {{ count($cart) }}
-                        </span>
-                    </div>
-                    <span class="text-xs font-semibold">Keranjang</span>
-                </div>
-                <span class="text-xs font-bold text-up-mint tabular-nums">
-                    Rp {{ number_format($totalAkhir, 0, ',', '.') }}
-                </span>
-            </button>
-            @if(count($cart) > 0)
-                <button wire:click="openPaymentModal"
+        <div class="lg:hidden fixed inset-x-3 z-35 flex items-center justify-center pointer-events-none"
+             style="bottom: calc(4.75rem + max(env(safe-area-inset-bottom, 0px), 0.25rem));">
+            <div class="w-full max-w-sm pointer-events-auto flex items-center gap-2 p-1.5 rounded-2xl bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-2xl border border-ink-200/80 dark:border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_16px_36px_rgba(0,0,0,0.6)]">
+                <button @click="cartPanelOpen = !cartPanelOpen"
                         type="button"
-                        class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer">
-                    <span>Bayar</span>
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
+                        class="flex-1 flex items-center justify-between px-3.5 py-2 rounded-xl bg-ink-100/70 hover:bg-ink-100 dark:bg-white/5 dark:hover:bg-white/10 text-ink-900 dark:text-white min-h-[44px] transition-colors cursor-pointer"
+                        :aria-expanded="cartPanelOpen"
+                        aria-label="Buka ringkasan keranjang">
+                    <div class="flex items-center gap-2.5">
+                        <div class="relative flex items-center justify-center">
+                            <div class="w-8 h-8 rounded-lg bg-up-primary/10 dark:bg-up-primary/20 flex items-center justify-center text-up-primary">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                </svg>
+                            </div>
+                            <span class="absolute -top-1.5 -right-2 px-1.5 py-0.5 rounded-full bg-up-primary text-white text-[10px] font-bold tabular-nums shadow-sm shadow-up-primary/40">
+                                {{ count($cart) }}
+                            </span>
+                        </div>
+                        <div class="flex flex-col text-left">
+                            <span class="text-xs font-bold leading-tight">Keranjang</span>
+                            <span class="text-[10px] text-ink-500 dark:text-ink-400 font-medium">{{ count($cart) }} item</span>
+                        </div>
+                    </div>
+                    <span class="text-xs sm:text-sm font-bold text-up-mint tabular-nums">
+                        Rp {{ number_format($totalAkhir, 0, ',', '.') }}
+                    </span>
                 </button>
-            @endif
+                @if(count($cart) > 0)
+                    <button wire:click="openPaymentModal"
+                            type="button"
+                            class="px-4 py-2 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:from-teal-500 hover:to-up-mint text-ink-950 font-bold text-xs shadow-md shadow-up-mint/25 active:scale-[0.96] min-h-[44px] flex items-center gap-1.5 cursor-pointer transition-all">
+                        <span>Bayar</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                    </button>
+                @endif
+            </div>
         </div>
 
         <!-- Mobile: Bottom Sheet Overlay + Panel -->
         <div x-show="cartPanelOpen && window.innerWidth < 1024"
-             x-transition:enter="transition-opacity ease-linear duration-150"
+             x-transition:enter="transition-opacity ease-linear duration-200"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
              x-transition:leave="transition-opacity ease-linear duration-150"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             class="fixed inset-0 bg-black/60 z-50 lg:hidden"
+             class="fixed inset-0 bg-ink-950/70 backdrop-blur-sm z-50 lg:hidden"
              @click="cartPanelOpen = false"
              aria-hidden="true"></div>
 
         <aside x-show="cartPanelOpen && window.innerWidth < 1024"
-               x-transition:enter="transition-transform ease-out duration-200"
+               x-transition:enter="transition-transform ease-out duration-250"
                x-transition:enter-start="translate-y-full"
                x-transition:enter-end="translate-y-0"
-               x-transition:leave="transition-transform ease-in duration-150"
+               x-transition:leave="transition-transform ease-in duration-200"
                x-transition:leave-start="translate-y-0"
                x-transition:leave-end="translate-y-full"
-               class="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] lg:hidden"
+               class="fixed bottom-0 left-0 right-0 z-50 max-h-[88vh] lg:hidden"
                @click.outside="cartPanelOpen = false"
                style="padding-bottom: env(safe-area-inset-bottom, 0);">
-            <div class="bg-ink-900 border-t border-black/10 dark:border-white/10 rounded-t-3xl p-4 shadow-2xl max-h-[85vh] flex flex-col">
+            <div class="bg-white dark:bg-[#0B1120] border-t border-x border-ink-200/80 dark:border-white/10 rounded-t-3xl p-4 sm:p-5 shadow-2xl max-h-[88vh] flex flex-col">
                 <!-- Drag Handle -->
-                <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-3"></div>
-                <div class="flex items-center justify-between mb-3 pb-2 border-b border-black/10 dark:border-white/10">
-                    <h3 class="text-base font-bold text-ink-900 dark:text-white">Keranjang & Pelanggan</h3>
+                <div class="w-12 h-1.5 bg-ink-300 dark:bg-white/20 rounded-full mx-auto mb-3.5"></div>
+                
+                <!-- Drawer Header -->
+                <div class="flex items-center justify-between mb-3 pb-3 border-b border-ink-200/60 dark:border-white/10">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-base font-bold text-ink-900 dark:text-white">Keranjang Penjualan</h3>
+                        <span class="px-2 py-0.5 rounded-full bg-up-primary/10 dark:bg-up-primary/20 text-up-primary text-[11px] font-bold tabular-nums">
+                            {{ count($cart) }} item
+                        </span>
+                    </div>
                     <button @click="cartPanelOpen = false"
-                            class="p-2 text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
+                            class="p-2 text-ink-400 hover:text-ink-900 dark:hover:text-white rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                            aria-label="Tutup keranjang">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
+
                 <!-- Customer Picker in Mobile Sheet -->
-                <div class="mb-3 pb-3 border-b border-white/5">
+                <div class="mb-3 pb-3 border-b border-ink-200/60 dark:border-white/10">
                     <div class="flex items-center justify-between mb-1.5">
-                        <label class="text-[11px] font-semibold text-ink-300 uppercase">Pelanggan</label>
+                        <label class="text-[11px] font-semibold text-ink-600 dark:text-ink-300 uppercase tracking-wider">Pelanggan / Member</label>
                         @if($customer)
                             <x-prism.tier-badge :tier="$customer->tierMembership?->nama ?? ($customer->is_reseller ? 'Reseller' : 'Retail')" />
                         @endif
@@ -536,7 +552,7 @@
                     <select
                         wire:model.live="selectedCustomerId"
                         wire:change="setPelanggan($event.target.value)"
-                        class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
+                        class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"
                     >
                         <option value="" class="bg-ink-900">Pelanggan Umum (Tanpa Member)</option>
                         @foreach($customers as $c)
@@ -544,7 +560,9 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="flex-1 overflow-y-auto space-y-3">
+
+                <!-- Scrollable Cart Content -->
+                <div class="flex-1 overflow-y-auto space-y-3 pr-0.5">
                     @include('modules.pos.livewire.partials.cart-content', [
                         'cart' => $cart,
                         'total' => $total,
@@ -555,7 +573,7 @@
                     ])
 
                     <!-- Mobile Sesi Kas & Actions Shortcut -->
-                    <div class="pt-3 border-t border-white/5 space-y-2">
+                    <div class="pt-3 border-t border-ink-200/60 dark:border-white/5 space-y-2">
                         <div class="flex items-center justify-between text-xs">
                             @if($kasAktif)
                                 <div class="flex items-center gap-1.5 text-up-mint">
@@ -564,7 +582,7 @@
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <button wire:click="bukaMutasiKasModal('keluar')" class="text-[11px] font-bold text-up-accent hover:text-orange-400 cursor-pointer">± Mutasi Kas</button>
-                                    <span class="text-white/20">|</span>
+                                    <span class="text-ink-300 dark:text-white/20">|</span>
                                     <button wire:click="tutupKasModal" class="text-[11px] font-bold text-up-amber hover:text-up-red cursor-pointer">Tutup Kas</button>
                                 </div>
                             @elseif($kasPendingApproval)
@@ -582,10 +600,10 @@
                         </div>
 
                         <div class="flex items-center justify-between pt-1 text-[11px]">
-                            <button wire:click="bukaBayarServisModal" class="text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer">
+                            <button wire:click="bukaBayarServisModal" class="text-blue-500 dark:text-blue-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer">
                                 <span>🔧 Bayar Servis</span>
                             </button>
-                            <a href="/app/pos/riwayat" class="text-up-primary hover:text-indigo-300 font-semibold flex items-center gap-1 cursor-pointer">
+                            <a href="/app/pos/riwayat" class="text-up-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer">
                                 <span>📋 Riwayat Transaksi</span>
                             </a>
                         </div>
@@ -595,11 +613,11 @@
         </aside>
 
         <!-- Desktop: Side Panel Content -->
-        <div class="hidden lg:flex lg:flex-col lg:h-full lg:bg-ink-900 lg:border lg:border-white/5 lg:rounded-3xl lg:p-5 lg:overflow-hidden lg:shadow-2xl">
+        <div class="hidden lg:flex lg:flex-col lg:h-full lg:bg-white lg:dark:bg-[#0F172A]/70 lg:backdrop-blur-md lg:border lg:border-ink-200/60 lg:dark:border-white/5 lg:rounded-2xl lg:p-5 lg:overflow-hidden lg:shadow-sm">
             <!-- Customer Selector -->
-            <div class="mb-4 pb-3.5 border-b border-white/5 flex-shrink-0">
+            <div class="mb-4 pb-3.5 border-b border-ink-200/60 dark:border-white/5 flex-shrink-0">
                 <div class="flex items-center justify-between mb-2">
-                    <label class="text-xs font-semibold text-ink-300 uppercase tracking-wider">Pelanggan / Member</label>
+                    <label class="text-xs font-semibold text-ink-600 dark:text-ink-300 uppercase tracking-wider">Pelanggan / Member</label>
                     @if($customer)
                         <x-prism.tier-badge :tier="$customer->tierMembership?->nama ?? ($customer->is_reseller ? 'Reseller' : 'Retail')" />
                     @endif
@@ -625,7 +643,7 @@
                     @if($selectedCustomerId)
                         <button
                             wire:click="setPelanggan(null)"
-                            class="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white text-xs"
+                            class="px-2.5 py-2 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white text-xs transition-colors cursor-pointer"
                             title="Reset Pelanggan"
                         >
                             ✕
@@ -689,10 +707,10 @@
                             this.flexHarga = '{{ number_format($item['harga'] ?? 0, 0, '', '') }}';
                         }
                     }"
-                    class="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-3"
+                    class="p-3 rounded-xl bg-ink-50/70 dark:bg-white/[0.03] border border-ink-200/60 dark:border-white/5 flex items-center justify-between gap-3 transition-colors"
                 >
                     <div class="flex-1 min-w-0">
-                        <h5 class="text-xs font-semibold text-white truncate">{{ $item['nama'] }}</h5>
+                        <h5 class="text-xs font-semibold text-ink-900 dark:text-white truncate">{{ $item['nama'] }}</h5>
                         <div class="flex items-center gap-2 mt-0.5 text-[11px] flex-wrap">
                             @if(isset($item['flex']) && $item['flex'])
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-up-amber/20 text-up-amber text-[10px] font-medium border border-up-amber/30">
@@ -700,7 +718,7 @@
                                 </span>
                             @endif
                             @if($item['varian'] !== 'Standar')
-                                <span class="px-1.5 py-0.2 rounded bg-white/5 text-ink-300 text-[10px]">{{ $item['varian'] }}</span>
+                                <span class="px-1.5 py-0.2 rounded bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 text-[10px]">{{ $item['varian'] }}</span>
                             @endif
                             {{-- [B-02/P0-1] Badge stok habis per item (bukan backorder) --}}
                             @if(($item['stok_max'] ?? 1) <= 0)
@@ -711,8 +729,8 @@
                         <div class="flex items-center gap-2 mt-1 flex-wrap">
                             @if(isset($item['flex']) && $item['flex'])
                                 <span
-                                    :class="flexSet['{{ $key }}'] ? 'text-white' : 'text-up-amber'"
-                                    class="tabular-nums font-medium text-xs"
+                                    :class="flexSet['{{ $key }}'] ? 'text-ink-900 dark:text-white' : 'text-up-amber'"
+                                    class="tabular-nums font-semibold text-xs"
                                 >
                                     Rp {{ number_format($item['harga'], 0, ',', '.') }}
                                 </span>
@@ -730,7 +748,7 @@
                                         Atur Harga
                                     </button>
                                 @else
-                                    <span class="px-2 py-1 rounded-lg text-[10px] font-medium text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed" title="Akses superadmin diperlukan">
+                                    <span class="px-2 py-1 rounded-lg text-[10px] font-medium text-ink-500 bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 cursor-not-allowed" title="Akses superadmin diperlukan">
                                         Atur Harga
                                     </span>
                                 @endif
@@ -746,11 +764,11 @@
                                     x-transition:leave-end="opacity-0 transform -translate-y-1"
                                     @click.outside="flexOpen = false"
                                     @keydown.escape="flexOpen = false"
-                                    class="absolute z-20 mt-1 min-w-[200px] glass-panel p-3 rounded-xl border border-white/10 shadow-lg"
+                                    class="absolute z-20 mt-1 min-w-[200px] glass-panel p-3 rounded-xl border border-black/10 dark:border-white/10 shadow-lg"
                                     style="max-width: 240px;"
                                     x-cloak
                                 >
-                                    <label class="block text-[10px] font-semibold text-ink-300 mb-1.5">Harga Jual (Rp)</label>
+                                    <label class="block text-[10px] font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Harga Jual (Rp)</label>
                                     <input
                                         type="text"
                                         inputmode="numeric"
@@ -759,13 +777,13 @@
                                         @keydown.enter.prevent="saveFlexHarga('{{ $key }}')"
                                         x-ref="flexInput"
                                         placeholder="0"
-                                        class="w-full px-3 py-2 rounded-lg glass-input text-sm font-bold tabular-nums text-white"
+                                        class="w-full px-3 py-2 rounded-lg glass-input text-sm font-bold tabular-nums text-ink-900 dark:text-white"
                                         aria-label="Harga jual fleksibel"
                                     />
                                     @if(canSeeField('harga_beli'))
-                                    <p class="text-[10px] text-up-amber/80 mt-1.5">Min: Rp {{ number_format($item['harga_beli'] ?? $item['harga'], 0, ',', '.') }}</p>
+                                    <p class="text-[10px] text-up-amber/90 mt-1.5">Min: Rp {{ number_format($item['harga_beli'] ?? $item['harga'], 0, ',', '.') }}</p>
 @else
-                                    <p class="text-[10px] text-up-amber/80 mt-1.5">Min: —</p>
+                                    <p class="text-[10px] text-up-amber/90 mt-1.5">Min: —</p>
 @endif
                                     <div class="flex gap-2 mt-2.5">
                                         <button
@@ -778,14 +796,14 @@
                                         <button
                                             type="button"
                                             @click="flexOpen = false"
-                                            class="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[40px] border border-white/5"
+                                            class="flex-1 py-2 rounded-lg bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[40px] border border-black/5 dark:border-white/5"
                                         >
                                             Batal
                                         </button>
                                     </div>
                                 </div>
                             @else
-                                <span class="tabular-nums">Rp {{ number_format($item['harga'], 0, ',', '.') }}</span>
+                                <span class="tabular-nums font-semibold text-ink-700 dark:text-ink-300">Rp {{ number_format($item['harga'], 0, ',', '.') }}</span>
                             @endif
                         </div>
 
@@ -797,16 +815,16 @@
                     <div class="flex items-center gap-1.5 flex-shrink-0">
                         <button
                             wire:click="updateQty('{{ $key }}', -1)"
-                            class="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-[background-color,transform] duration-100 active:scale-95 cursor-pointer"
+                            class="w-7 h-7 rounded-lg bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all active:scale-95 cursor-pointer"
                         >
                             -
                         </button>
-                        <span class="w-8 text-center text-xs font-bold text-white tabular-nums">
+                        <span class="w-8 text-center text-xs font-bold text-ink-900 dark:text-white tabular-nums">
                             {{ $item['qty'] }}
                         </span>
                         <button
                             wire:click="updateQty('{{ $key }}', 1)"
-                            class="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-[background-color,transform] duration-100 active:scale-95 cursor-pointer"
+                            class="w-7 h-7 rounded-lg bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all active:scale-95 cursor-pointer"
                         >
                             +
                         </button>
@@ -814,12 +832,12 @@
 
                     <!-- Line Subtotal & Delete -->
                     <div class="text-right min-w-[70px] flex-shrink-0">
-                        <span class="text-xs font-bold text-white tabular-nums block">
+                        <span class="text-xs font-bold text-ink-900 dark:text-white tabular-nums block">
                             Rp {{ number_format($item['subtotal'], 0, ',', '.') }}
                         </span>
                         <button
                             wire:click="removeFromCart('{{ $key }}')"
-                            class="text-[10px] text-up-red/70 hover:text-up-red transition-colors"
+                            class="text-[10px] text-up-red/70 hover:text-up-red font-medium transition-colors cursor-pointer"
                         >
                             Hapus
                         </button>
@@ -827,21 +845,21 @@
                 </div>
             @empty
                 <div class="h-full flex flex-col items-center justify-center text-center text-ink-400 py-12">
-                    <svg class="w-10 h-10 mb-2 opacity-20 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-10 h-10 mb-2 opacity-20 text-ink-900 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
-                    <p class="text-xs">Keranjang belanja kosong</p>
+                    <p class="text-xs font-medium text-ink-600 dark:text-ink-400">Keranjang belanja kosong</p>
                     <span class="text-[10px] text-ink-500 mt-1">Pilih produk di sebelah kiri atau tekan F2</span>
                 </div>
             @endforelse
         </div>
 
         <!-- Summary & Actions Area (Fixed at bottom) -->
-        <div class="border-t border-white/5 pt-4 flex-shrink-0 space-y-3">
-            <div class="space-y-1.5 text-xs text-ink-300">
+        <div class="border-t border-ink-200/60 dark:border-white/5 pt-4 flex-shrink-0 space-y-3">
+            <div class="space-y-1.5 text-xs text-ink-600 dark:text-ink-300">
                 <div class="flex justify-between">
                     <span>Subtotal</span>
-                    <span class="font-semibold text-white tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
+                    <span class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
                 </div>
                 @if($diskonNominal > 0 || $diskonPersen > 0)
                     <div class="flex justify-between text-up-mint">
@@ -850,14 +868,14 @@
                     </div>
                 @endif
                 @if($pajakNominal > 0)
-                    <div class="flex justify-between text-ink-300">
+                    <div class="flex justify-between text-ink-600 dark:text-ink-300">
                         <span>{{ $pajakNama ?? 'PPN' }} ({{ $ppnPersen }}%)</span>
-                        <span class="font-semibold text-white tabular-nums">+ Rp {{ number_format($pajakNominal, 0, ',', '.') }}</span>
+                        <span class="font-semibold text-ink-900 dark:text-white tabular-nums">+ Rp {{ number_format($pajakNominal, 0, ',', '.') }}</span>
                     </div>
                 @endif
-                <div class="flex justify-between text-base font-bold text-white pt-2 border-t border-white/10">
+                <div class="flex justify-between items-center text-base font-bold text-ink-900 dark:text-white pt-2 border-t border-ink-200/60 dark:border-white/10">
                     <span>Total Akhir</span>
-                    <span class="text-up-mint text-xl tabular-nums">Rp {{ number_format($totalAkhir, 0, ',', '.') }}</span>
+                    <span class="text-up-mint text-xl tabular-nums font-black">Rp {{ number_format($totalAkhir, 0, ',', '.') }}</span>
                 </div>
             </div>
 
@@ -866,26 +884,28 @@
                 <button
                     type="button"
                     wire:click="clearCart"
-                    class="py-3 px-2 rounded-xl bg-white/5 hover:bg-up-red/20 text-ink-400 hover:text-up-red font-semibold text-xs transition-[background-color,color,transform] duration-100 border border-white/5 flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[44px] active:scale-[0.97]"
+                    class="py-2.5 px-2 rounded-xl bg-ink-100 hover:bg-up-red/15 dark:bg-white/5 dark:hover:bg-up-red/20 text-ink-600 hover:text-up-red dark:text-ink-400 dark:hover:text-up-red font-semibold text-xs transition-colors border border-ink-200/60 dark:border-white/5 flex flex-col items-center justify-center gap-0.5 cursor-pointer min-h-[44px] active:scale-[0.97]"
                 >
-                    <span>Batal (ESC)</span>
+                    <span>Batal</span>
+                    <span class="text-[10px] font-mono text-ink-400 dark:text-ink-500">ESC</span>
                 </button>
 
                 <button
                     type="button"
                     wire:click="tahanTransaksi"
-                    class="py-3 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white font-semibold text-xs transition-[background-color,color,transform] duration-100 border border-white/5 flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[44px] active:scale-[0.97]"
+                    class="py-2.5 px-2 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 hover:text-ink-900 dark:text-ink-300 dark:hover:text-white font-semibold text-xs transition-colors border border-ink-200/60 dark:border-white/5 flex flex-col items-center justify-center gap-0.5 cursor-pointer min-h-[44px] active:scale-[0.97]"
                 >
-                    <span>Tahan (F6)</span>
+                    <span>Tahan</span>
+                    <span class="text-[10px] font-mono text-ink-400 dark:text-ink-500">F6</span>
                 </button>
 
                 <button
                     type="button"
                     wire:click="openPaymentModal"
-                    class="py-3 px-2 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark hover:to-indigo-700 text-white font-bold text-xs shadow-sm shadow-up-primary/25 transition-[background-color,box-shadow,transform] duration-100 border border-white/20 flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 min-h-[44px]"
+                    class="py-2.5 px-2 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-all border border-up-primary/40 flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 min-h-[44px]"
                 >
                     <span>BAYAR</span>
-                    <span class="text-[10px] font-mono text-white/70">F4</span>
+                    <span class="text-[10px] font-mono text-white/80">F4</span>
                 </button>
             </div>
 
@@ -900,7 +920,7 @@
                         <button wire:click="bukaMutasiKasModal('keluar')" class="text-[11px] font-bold text-up-accent hover:text-orange-400 cursor-pointer flex items-center gap-1" title="Catat Kas Masuk / Keluar Laci">
                             <span>± Mutasi Kas</span>
                         </button>
-                        <span class="text-white/20">|</span>
+                        <span class="text-ink-300 dark:text-white/20">|</span>
                         <button wire:click="tutupKasModal" class="text-[11px] font-bold text-up-amber hover:text-up-red cursor-pointer">Tutup Kas</button>
                     </div>
                 @elseif($kasPendingApproval)
@@ -919,18 +939,18 @@
             </div>
 
             <!-- [T-03] Panel transaksi ditahan & Riwayat Transaksi & Bayar Servis -->
-            <div class="pt-2 border-t border-white/5 flex items-center justify-between">
-                <button wire:click="$toggle('showDitahanPanel')" class="text-[11px] font-semibold text-ink-400 hover:text-white flex items-center gap-1 cursor-pointer">
+            <div class="pt-2 border-t border-ink-200/60 dark:border-white/5 flex items-center justify-between">
+                <button wire:click="$toggle('showDitahanPanel')" class="text-[11px] font-semibold text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white flex items-center gap-1 cursor-pointer">
                     <span>{{ $showDitahanPanel ? '▼' : '▶' }}</span>
                     Ditahan ({{ $ditahanList->count() }})
                 </button>
                 <div class="flex items-center gap-2.5">
-                    <button wire:click="bukaBayarServisModal" class="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer" title="Proses Pelunasan Servis di Kasir">
+                    <button wire:click="bukaBayarServisModal" class="text-[11px] font-bold text-blue-500 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer" title="Proses Pelunasan Servis di Kasir">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
                         <span>Bayar Servis</span>
                     </button>
-                    <span class="text-white/20">|</span>
-                    <a href="/app/pos/riwayat" class="text-[11px] font-semibold text-up-primary hover:text-indigo-300 flex items-center gap-1 cursor-pointer">
+                    <span class="text-ink-300 dark:text-white/20">|</span>
+                    <a href="/app/pos/riwayat" class="text-[11px] font-semibold text-up-primary hover:underline flex items-center gap-1 cursor-pointer">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span>Riwayat Transaksi</span>
                     </a>
@@ -939,12 +959,12 @@
             @if($showDitahanPanel && $ditahanList->isNotEmpty())
                 <div class="mt-2 space-y-1.5 max-h-44 overflow-y-auto">
                     @foreach($ditahanList as $dt)
-                        <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white/[0.03] border border-white/5 text-[11px]">
+                        <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-ink-50 dark:bg-white/[0.03] border border-ink-200/60 dark:border-white/5 text-[11px]">
                             <div class="min-w-0">
-                                <span class="font-mono text-white truncate block">{{ $dt->no_transaksi }}</span>
-                                <span class="text-ink-400">Rp <span class="tabular-nums">{{ number_format($dt->total_akhir, 0, ',', '.') }}</span> · {{ $dt->kasir?->name }}</span>
+                                <span class="font-mono text-ink-900 dark:text-white truncate block">{{ $dt->no_transaksi }}</span>
+                                <span class="text-ink-500 dark:text-ink-400">Rp <span class="tabular-nums">{{ number_format($dt->total_akhir, 0, ',', '.') }}</span> · {{ $dt->kasir?->name }}</span>
                             </div>
-                            <button wire:click="resumeDitahan({{ $dt->id }})" class="px-2.5 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold cursor-pointer whitespace-nowrap">Lanjutkan</button>
+                            <button wire:click="resumeDitahan({{ $dt->id }})" class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary font-bold cursor-pointer whitespace-nowrap">Lanjutkan</button>
                         </div>
                     @endforeach
                 </div>

@@ -57,13 +57,13 @@
     <div class="flex-1 flex overflow-hidden relative">
         <!-- Mobile Sidebar Overlay (hanya < md — drawer) -->
         <div x-show="sidebarOpen"
-             x-transition:enter="transition-opacity ease-linear duration-150"
+             x-transition:enter="transition-opacity ease-linear duration-200"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
              x-transition:leave="transition-opacity ease-linear duration-150"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             class="fixed inset-0 bg-black/60 z-40 md:hidden sidebar-backdrop"
+             class="fixed inset-0 bg-ink-950/70 backdrop-blur-sm z-40 md:hidden sidebar-backdrop"
              @click="sidebarOpen = false"
              aria-hidden="true"
              :class="{ 'open': sidebarOpen }"></div>
@@ -75,15 +75,15 @@
              < 768px  : drawer slide-in + backdrop (hamburger)
              >= 768px : auto-collapse icon-rail + fluid hover expand (zero layout shift) -->
         <aside
-            class="w-64 bg-white dark:bg-[#0F172A] border-r border-ink-200/80 dark:border-white/5 flex flex-col flex-shrink-0
-                   fixed inset-y-0 left-0 z-50 transform-gpu
+            class="w-64 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border-r border-ink-200/60 dark:border-white/5 flex flex-col flex-shrink-0
+                   fixed inset-y-0 left-0 z-50 transform-gpu shadow-xl md:shadow-none
                    transition-[width,transform] duration-200 ease-out
                    md:inset-auto md:z-30 md:translate-x-0 md:transform-none"
             :class="[isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : 'md:static']">
             <!-- Brand -->
-            <div class="sidebar-brand h-16 flex items-center justify-between px-6 border-b border-ink-200/80 dark:border-white/5">
+            <div class="sidebar-brand h-16 flex items-center justify-between px-5 border-b border-ink-200/60 dark:border-white/5">
                 <x-prism.logo size="md" :with-text="true" mode="auto" subtitle="Backoffice ERP" text-class="sidebar-brand-text" href="/app/dashboard" />
-                <button type="button" @click="sidebarOpen = false" class="md:hidden p-1.5 rounded-lg text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer" aria-label="Tutup menu">
+                <button type="button" @click="sidebarOpen = false" class="md:hidden p-1.5 rounded-xl text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer" aria-label="Tutup menu">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -91,18 +91,18 @@
             </div>
 
             <!-- Branch Context Badge -->
-            <div class="sidebar-branch px-4 py-3 border-b border-ink-200/80 dark:border-white/5 bg-ink-50/60 dark:bg-white/[0.02]">
+            <div class="sidebar-branch px-4 py-2.5 border-b border-ink-200/60 dark:border-white/5 bg-ink-100/40 dark:bg-white/[0.02]">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2 overflow-hidden">
-                        <span class="w-2 h-2 rounded-full bg-up-mint flex-shrink-0"></span>
-                        <span class="sidebar-branch-label text-xs font-semibold text-ink-900 dark:text-white truncate">
+                        <span class="w-2 h-2 rounded-full bg-up-mint flex-shrink-0 ring-4 ring-up-mint/20"></span>
+                        <span class="sidebar-branch-label text-xs font-semibold text-ink-800 dark:text-ink-200 truncate tracking-tight">
                             {{ session('cabang_nama', 'Cabang Pusat (CBG-01)') }}
                         </span>
                     </div>
                     @if(auth()->check() && auth()->user()->daftarCabangAkses()->count() > 1)
                         <button
                             type="button"
-                            class="sidebar-branch-ganti text-[11px] text-up-primary hover:text-indigo-400 font-medium cursor-pointer"
+                            class="sidebar-branch-ganti text-[11px] font-semibold text-up-primary hover:text-indigo-400 cursor-pointer transition-colors"
                             @click="$dispatch('open-branch-modal')"
                             onclick="window.dispatchEvent(new CustomEvent('open-branch-modal'))"
                         >
@@ -417,22 +417,22 @@
             </nav>
 
             <!-- User Footer -->
-            <div class="sidebar-user p-4 border-t border-black/10 dark:border-white/5 bg-ink-850">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-9 h-9 rounded-full bg-up-primary/20 border border-up-primary/40 flex items-center justify-center font-bold text-up-primary text-sm flex-shrink-0">
+            <div class="sidebar-user p-3 border-t border-ink-200/60 dark:border-white/5 bg-ink-100/40 dark:bg-white/[0.02]">
+                <div class="flex items-center justify-between gap-2.5 p-1 rounded-2xl transition-colors">
+                    <div class="flex items-center gap-3 overflow-hidden min-w-0">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-up-primary to-indigo-500 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm shadow-up-primary/20">
                             {{ substr(auth()->user()?->name ?? 'A', 0, 1) }}
                         </div>
                         <div class="sidebar-user-meta overflow-hidden">
-                            <p class="text-sm font-semibold text-ink-900 dark:text-white truncate">{{ auth()->user()?->name ?? 'Staff Kasir' }}</p>
-                            <p class="text-[11px] text-ink-500 dark:text-ink-400 capitalize truncate">{{ auth()->user()?->getRoleNames()->first() ?? 'Admin Toko' }}</p>
+                            <p class="text-xs font-bold text-ink-900 dark:text-ink-100 truncate tracking-tight">{{ auth()->user()?->name ?? 'Staff Kasir' }}</p>
+                            <p class="text-[11px] text-ink-500 dark:text-ink-400 font-medium capitalize truncate">{{ auth()->user()?->getRoleNames()->first() ?? 'Admin Toko' }}</p>
                         </div>
                     </div>
 
                     <form action="{{ route('logout') }}" method="POST" class="flex-shrink-0">
                         @csrf
-                        <button type="submit" title="Logout" aria-label="Logout" class="p-2.5 text-ink-400 hover:text-up-red rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button type="submit" title="Keluar / Logout" aria-label="Keluar / Logout" class="p-2 text-ink-400 hover:text-up-red rounded-xl hover:bg-up-red/10 dark:hover:bg-up-red/15 transition-[color,background-color] cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                             </svg>
                         </button>

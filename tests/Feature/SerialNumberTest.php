@@ -72,6 +72,7 @@ class SerialNumberTest extends TestCase
         // COA wajib utk JurnalService::post (GRN, POS, servis)
         foreach ([
             '110-01' => ['Kas', 'aset', 'kas', 'debit'],
+            '110-02' => ['Bank', 'aset', 'bank', 'debit'],
             '120-01' => ['Piutang Usaha', 'aset', 'piutang_usaha', 'debit'],
             '130-01' => ['Persediaan', 'aset', 'persediaan', 'debit'],
             '210-01' => ['Utang Usaha', 'kewajiban', 'utang_usaha', 'kredit'],
