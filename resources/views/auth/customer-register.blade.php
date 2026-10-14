@@ -10,16 +10,13 @@
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-up-ink-50 text-ink-900 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-up-primary/20 rounded-full blur-[128px] pointer-events-none"></div>
-    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-up-accent/15 rounded-full blur-[128px] pointer-events-none"></div>
-
+<body class="bg-[#F8FAFC] text-ink-900 font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
     <div class="w-full max-w-md relative z-10">
         <div class="text-center mb-8 flex justify-center">
             <x-prism.logo size="lg" layout="vertical" mode="light" title="Daftar Gratis" subtitle="Satu langkah cepat — cuma butuh nomor HP" :href="route('shop')" />
         </div>
 
-        <div class="bg-white rounded-3xl shadow-xl shadow-ink-100/50 border border-ink-100 p-8 relative overflow-hidden">
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-8 relative overflow-hidden">
             <div class="circuit-line absolute top-0 left-0 w-full h-[2px]"></div>
 
             <div class="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-xs">
@@ -39,18 +36,18 @@
                 <div>
                     <label for="nama" class="block text-xs font-semibold text-ink-700 mb-1.5">Nama Lengkap</label>
                     <input type="text" id="nama" name="nama" required autofocus placeholder="Nama Anda"
-                        class="w-full px-4 py-3 rounded-xl bg-up-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
                 </div>
                 <div>
                     <label for="telepon" class="block text-xs font-semibold text-ink-700 mb-1.5">Nomor HP</label>
                     <input type="text" id="telepon" name="telepon" required placeholder="08xx-xxxx-xxxx"
-                        class="w-full px-4 py-3 rounded-xl bg-up-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
                     <p class="text-[11px] text-ink-400 mt-1">Nomor ini dipakai untuk login & verifikasi OTP (menyusul).</p>
                 </div>
                 <div>
                     <label for="password" class="block text-xs font-semibold text-ink-700 mb-1.5">Kata Sandi</label>
                     <input type="password" id="password" name="password" required minlength="6" placeholder="Minimal 6 karakter"
-                        class="w-full px-4 py-3 rounded-xl bg-up-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
                 </div>
 
                 <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark text-white font-bold text-sm shadow-lg shadow-up-primary/25 transition-[transform,background-color] duration-150 cursor-pointer active:scale-[0.97] min-h-[44px]">

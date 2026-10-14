@@ -29,7 +29,7 @@
                     </label>
                     <div class="relative w-full min-w-0">
                         <select id="cabang_id" wire:model="cabang_id"
-                                class="w-full min-w-0 max-w-full truncate appearance-none px-4 py-3 pr-8 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm font-medium text-ink-900 dark:text-white outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px] cursor-pointer">
+                                class="w-full min-w-0 max-w-full truncate appearance-none px-4 py-3 pr-8 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm font-medium text-ink-900 dark:text-white outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
                             <option value="">-- Pilih Cabang --</option>
                             @foreach($cabangs as $cabang)
                                 <option value="{{ $cabang->id }}">{{ $cabang->nama }} ({{ $cabang->kota ?? $cabang->alamat ?? 'Utama' }})</option>
@@ -58,7 +58,7 @@
                     </label>
                     <div class="relative w-full min-w-0">
                         <select id="jenis_servis_id" wire:model="jenis_servis_id"
-                                class="w-full min-w-0 max-w-full truncate appearance-none px-4 py-3 pr-8 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm font-medium text-ink-900 dark:text-white outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px] cursor-pointer">
+                                class="w-full min-w-0 max-w-full truncate appearance-none px-4 py-3 pr-8 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm font-medium text-ink-900 dark:text-white outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
                             <option value="">-- Pilih Kategori Layanan (Opsional) --</option>
                             @foreach($jenisServisList as $js)
                                 <option value="{{ $js->id }}">{{ $js->nama }} @if($js->biaya_jasa > 0) (Mulai Rp {{ number_format($js->biaya_jasa, 0, ',', '.') }}) @endif</option>
@@ -87,7 +87,7 @@
                         </label>
                         <input type="text" id="jenis_hp" wire:model="jenis_hp"
                                placeholder="Contoh: iPhone 13 Pro / Samsung S22"
-                               class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                               class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140 min-h-[44px]" />
                         @error('jenis_hp') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                     </div>
 
@@ -97,7 +97,7 @@
                         </label>
                         <input type="text" id="seri_hp" wire:model="seri_hp"
                                placeholder="Contoh: Sierra Blue 128GB"
-                               class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                               class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140 min-h-[44px]" />
                         @error('seri_hp') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
@@ -108,7 +108,7 @@
                     </label>
                     <textarea id="keluhan" wire:model="keluhan" rows="3"
                               placeholder="Ceritakan kendala: misal layar pecah & blank hitam, baterai cepat panas, port charging longgar..."
-                              class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all"></textarea>
+                              class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140"></textarea>
                     @error('keluhan') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                 </div>
             </div>
@@ -132,7 +132,7 @@
                             'pin' => 'PIN Angka',
                             'password' => 'Password',
                         ] as $val => $lbl)
-                            <label class="flex items-center gap-2 p-3 rounded-2xl border cursor-pointer transition-all {{ $tipe_kunci === $val ? 'bg-up-primary/10 border-up-primary text-up-primary font-bold' : 'bg-ink-50 dark:bg-ink-950 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300' }}">
+                            <label class="flex items-center gap-2 p-3 rounded-2xl border cursor-pointer transition-[background-color,border-color,color] duration-140 {{ $tipe_kunci === $val ? 'bg-up-primary/10 border-up-primary text-up-primary font-bold' : 'bg-ink-50 dark:bg-ink-950 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300' }}">
                                 <input type="radio" wire:model.live="tipe_kunci" value="{{ $val }}" class="text-up-primary focus:ring-up-primary" />
                                 <span class="text-xs">{{ $lbl }}</span>
                             </label>
@@ -231,7 +231,7 @@
                             </label>
                             <input type="text" id="nama" wire:model="nama"
                                    placeholder="Nama lengkap Anda"
-                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140 min-h-[44px]" />
                             @error('nama') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                         </div>
 
@@ -241,7 +241,7 @@
                             </label>
                             <input type="text" id="telepon" wire:model="telepon"
                                    placeholder="Contoh: 081234567890"
-                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140 min-h-[44px]" />
                             @error('telepon') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -253,7 +253,7 @@
                             </label>
                             <input type="text" id="rencana_datang" wire:model="rencana_datang"
                                    placeholder="Contoh: Hari ini jam 15:00 / Besok pagi"
-                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140 min-h-[44px]" />
                         </div>
 
                         <div class="space-y-1.5 min-w-0">
@@ -262,7 +262,7 @@
                             </label>
                             <input type="text" id="catatan" wire:model="catatan"
                                    placeholder="Catatan khusus untuk teknisi..."
-                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-all min-h-[44px]" />
+                                   class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/10 transition-[border-color,box-shadow] duration-140 min-h-[44px]" />
                         </div>
                     </div>
                 </div>
@@ -272,7 +272,7 @@
             <div class="pl-0 sm:pl-9 pt-4 space-y-4">
                 <button
                     type="submit"
-                    class="w-full py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm tracking-tight shadow-[0_8px_24px_rgba(91,79,233,0.3)] transition-all duration-200 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
+                    class="w-full py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm tracking-tight shadow-sm shadow-up-primary/25 transition-[background-color,transform] duration-140 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
                     <span>Ajukan Tiket Servis Sekarang</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />

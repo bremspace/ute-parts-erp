@@ -99,7 +99,7 @@ class ProdukTab extends Component
     public array $produkForm = [
         'nama' => '', 'barcode' => '', 'kategori' => '', 'kategori_id' => null, 'brand_kompatibel' => '', 'model_kompatibel' => '',
         'kondisi' => 'baru', 'harga_beli' => 0, 'harga_jual_retail' => 0,
-        'sku' => '', 'gudang_id' => null, 'stok_awal' => 0, 'stok_minimum' => 0,
+        'sku' => '', 'gudang_id' => null, 'rak_id' => null, 'stok_awal' => 0, 'stok_minimum' => 0,
         'deskripsi' => '',
         // [T-44]
         'brand_id' => null, 'kualitas_id' => null, 'satuan_kode' => 'pcs',
@@ -132,6 +132,10 @@ class ProdukTab extends Component
     public ?int $editProdukId = null;
 
     public array $editProdukForm = [];
+
+    public array $editStokItems = [];
+
+    public array $editStokRaks = [];
 
     public array $editFotoExisting = [];
 
@@ -537,7 +541,8 @@ class ProdukTab extends Component
                 isOndemand: (bool) ($this->produkForm['is_ondemand'] ?? false),
                 barcode: ! empty($this->produkForm['barcode']) ? trim($this->produkForm['barcode']) : null,
                 metodeHargaBeli: $this->produkForm['metode_harga_beli'] ?? 'average',
-                marginPersen: ! empty($this->produkForm['margin_persen']) ? (float) $this->produkForm['margin_persen'] : null
+                marginPersen: ! empty($this->produkForm['margin_persen']) ? (float) $this->produkForm['margin_persen'] : null,
+                rakId: ! empty($this->produkForm['rak_id']) ? (int) $this->produkForm['rak_id'] : null
             );
 
             $this->showProdukModal = false;
@@ -602,7 +607,39 @@ class ProdukTab extends Component
 
         $this->editFotoExisting = $p->galeri_foto;
         $this->editFotoUploads = [];
+
+        // Load lokasi rak & stok per gudang untuk produk ini
+        $stokList = StokItem::with(['gudang', 'rak'])
+            ->where('produk_id', $p->id)
+            ->get();
+
+        $this->editStokItems = $stokList->map(function ($si) {
+            return [
+                'id' => $si->id,
+                'gudang_id' => $si->gudang_id,
+                'gudang_nama' => $si->gudang?->nama ?? '-',
+                'jumlah' => $si->jumlah,
+                'rak_id' => $si->rak_id,
+                'rak_nama' => $si->rak ? $si->rak->nama.' ('.$si->rak->kode.')' : '— Belum diset',
+            ];
+        })->toArray();
+
+        $this->editStokRaks = [];
+        foreach ($this->editStokItems as $item) {
+            $this->editStokRaks[$item['id']] = $item['rak_id'];
+        }
+
         $this->showEditProdukModal = true;
+    }
+
+    public function simpanRakStokItem(int $stokItemId, ?int $rakId = null): void
+    {
+        $stok = StokItem::find($stokItemId);
+        if ($stok) {
+            $val = $rakId ?? ($this->editStokRaks[$stokItemId] ?? null);
+            $stok->update(['rak_id' => $val ?: null]);
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Lokasi rak produk berhasil diperbarui']);
+        }
     }
 
     public function setFotoUtama(int $index)
@@ -702,6 +739,13 @@ class ProdukTab extends Component
                 metodeHargaBeli: $this->editProdukForm['metode_harga_beli'] ?? 'manual',
                 marginPersen: ! empty($this->editProdukForm['margin_persen']) ? (float) $this->editProdukForm['margin_persen'] : null
             );
+
+            // Simpan perubahan lokasi rak stok per gudang
+            if (! empty($this->editStokRaks)) {
+                foreach ($this->editStokRaks as $stokId => $rId) {
+                    StokItem::where('id', $stokId)->update(['rak_id' => $rId ?: null]);
+                }
+            }
 
             $this->showEditProdukModal = false;
             $this->editFotoUploads = [];
@@ -1460,7 +1504,7 @@ class ProdukTab extends Component
             }
         }
 
-        $query = Produk::with(['skuVariants', 'stokItems.gudang', 'brand', 'kualitas', 'tipeHps', 'kategoriRelasi'])
+        $query = Produk::with(['skuVariants', 'stokItems.gudang', 'stokItems.rak', 'brand', 'kualitas', 'tipeHps', 'kategoriRelasi'])
             ->withSum('stokItems as total_stok', 'jumlah')
             ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch));
 

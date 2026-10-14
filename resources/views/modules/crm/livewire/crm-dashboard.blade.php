@@ -66,10 +66,10 @@
                 </td>
                 <td class="py-3.5 px-4">
                     <div class="flex items-center gap-1.5">
-                        <button wire:click="$set('selectedCustomerId', {{ $c->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-up-primary/20 hover:text-white text-ink-300 font-semibold text-[11px] transition-all cursor-pointer">Detail 360°</button>
-                        <button wire:click="openEditPelangganModal({{ $c->id }})" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-up-mint hover:text-white transition text-xs cursor-pointer" title="Edit Pelanggan">✏️</button>
+                        <button wire:click="$set('selectedCustomerId', {{ $c->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-up-primary/20 hover:text-white text-ink-300 font-semibold text-[11px] transition-[background-color,color] duration-140 cursor-pointer active:scale-95">Detail 360°</button>
+                        <button wire:click="openEditPelangganModal({{ $c->id }})" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-up-mint hover:text-white transition text-xs cursor-pointer active:scale-95" title="Edit Pelanggan">✏️</button>
                         @if(isSuperAdminOrOwner())
-                            <button wire:click="hapusPelanggan({{ $c->id }})" wire:confirm="Yakin ingin menghapus pelanggan '{{ $c->nama }}'?" class="p-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 transition text-xs cursor-pointer" title="Hapus Pelanggan">🗑️</button>
+                            <button wire:click="hapusPelanggan({{ $c->id }})" wire:confirm="Yakin ingin menghapus pelanggan '{{ $c->nama }}'?" class="p-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 transition text-xs cursor-pointer active:scale-95" title="Hapus Pelanggan">🗑️</button>
                         @endif
                     </div>
                 </td>
@@ -99,7 +99,7 @@
                         <span class="text-ink-400">Belanja 12 bln</span>
                         <span class="font-bold text-white tabular-nums">Rp {{ number_format($c->total_belanja_12bulan, 0, ',', '.') }}</span>
                     </div>
-                    <button wire:click="$set('selectedCustomerId', {{ $c->id }})" class="w-full py-2 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary font-bold text-[11px] transition-all cursor-pointer">Lihat Detail 360°</button>
+                    <button wire:click="$set('selectedCustomerId', {{ $c->id }})" class="w-full py-2 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary font-bold text-[11px] transition-[background-color,color] duration-140 cursor-pointer active:scale-[0.98]">Lihat Detail 360°</button>
                 </div>
             @endforeach
         </x-slot:mobileCards>
@@ -256,7 +256,7 @@
                                     <span class="font-bold tabular-nums">{{ number_format($selectedCustomer['progress_tier'], 1) }}%</span>
                                 </div>
                                 <div class="h-2.5 rounded-full bg-white/5 overflow-hidden border border-white/10">
-                                    <div class="h-full rounded-full bg-gradient-to-r from-up-primary via-indigo-500 to-up-accent transition-all"
+                                    <div class="h-full rounded-full bg-gradient-to-r from-up-primary via-indigo-500 to-up-accent transition-[width] duration-500"
                                          style="width: {{ $selectedCustomer['progress_tier'] }}%"></div>
                                 </div>
                                 <p class="text-[11px] text-up-amber mt-1.5">Sisa belanja menuju tier berikutnya: <strong class="tabular-nums">Rp {{ number_format($selectedCustomer['sisa_belanja'], 0, ',', '.') }}</strong></p>

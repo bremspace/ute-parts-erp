@@ -9,38 +9,48 @@ html, body {
 }
 
 :root {
-    --up-primary: #5B4FE9;
-    --up-primary-dark: #3B2FC9;
-    --up-accent: #E8873B;
-    --up-mint: #1FBF8F;
-    --up-amber: #F5A623;
+    /* [Refactor 2026] Modern Minimalist Precision: Calm Indigo & Clean Emerald */
+    --up-primary: #4F46E5;
+    --up-primary-dark: #3730A3;
+    --up-accent: #D97706;
+    --up-mint: #10B981;
+    --up-amber: #F59E0B;
     --up-red: #EF4444;
 
-    --up-ink-950: #070A14;
-    --up-ink-900: #0B1020;
-    --up-ink-850: #0E152B;
-    --up-ink-800: #141D3A;
-    --up-ink-700: #1E2B54;
-    --up-ink-600: #334375;
+    /* Dark Spectrum (Deep Obsidian Slate - calm, pitch-safe, zero harsh glare) */
+    --up-ink-950: #090D16;
+    --up-ink-900: #0F172A;
+    --up-ink-850: #141E33;
+    --up-ink-800: #1E293B;
+    --up-ink-700: #334155;
+    --up-ink-600: #475569;
     --up-ink-500: #64748B;
     --up-ink-400: #94A3B8;
-    --up-ink-100: #E2E8F0;
-    --up-ink-50: #F6F7FB;
+    --up-ink-100: #F1F5F9;
+    --up-ink-50: #F8FAFC;
 
-    --up-gradient-signature: linear-gradient(135deg, #5B4FE9 0%, #8B7CF6 45%, #E8873B 100%);
-    --up-gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%);
+    --up-gradient-signature: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
+    --up-gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
 
-    --up-glass-bg: rgba(14, 21, 43, 0.75);
+    --up-glass-bg: rgba(15, 23, 42, 0.85);
     --up-glass-border: rgba(255, 255, 255, 0.08);
-    --up-glass-border-hover: rgba(91, 79, 233, 0.4);
-    --up-glass-shadow: 0 12px 32px 0 rgba(0, 0, 0, 0.37);
+    --up-glass-border-hover: rgba(99, 102, 241, 0.35);
+    --up-glass-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
 
-    /* [T-48] Emil Kowalski Easing & Motion tokens */
+    /* [T-48] Emil Kowalski Easing & Motion tokens (Snappy, direct, no lag) */
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-out-tactile: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
     --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
-    --duration-fast: 160ms;
-    --duration-normal: 240ms;
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    --duration-fast: 120ms;
+    --duration-normal: 180ms;
+
+    /* [DESIGN.md] Enterprise Elevation Shadows */
+    --shadow-dark-surface: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 16px -2px rgba(0, 0, 0, 0.3);
+    --shadow-dark-popover: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 28px -4px rgba(0, 0, 0, 0.5);
+    --shadow-light-surface: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 2px 12px -2px rgba(15, 23, 42, 0.04);
+    --shadow-light-popover: 0 0 0 1px rgba(15, 23, 42, 0.08), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
 }
 
 /* Glass surface classes */
@@ -80,14 +90,31 @@ button:not(:disabled):active,
 [role="button"]:not([aria-disabled="true"]):active,
 .btn-tactile:not(:disabled):active {
     transform: scale(0.97);
-    transition: transform 80ms var(--ease-out);
+    transition: transform 100ms var(--ease-out-tactile);
 }
 
 /* Transition for pressable elements */
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
 .btn-tactile:not(:disabled) {
-    transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+    transition: transform var(--duration-fast) var(--ease-out-tactile), background-color var(--duration-fast) var(--ease-out-tactile), border-color var(--duration-fast) var(--ease-out-tactile), color var(--duration-fast) var(--ease-out-tactile), box-shadow var(--duration-fast) var(--ease-out-tactile);
+}
+
+/* Popover & modal origin-aware helpers */
+.origin-trigger {
+    transform-origin: var(--transform-origin, center);
+}
+
+.modal-center {
+    transform-origin: center center;
+}
+
+/* Mobile Safe Areas Utility */
+.pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.pt-safe {
+    padding-top: env(safe-area-inset-top, 0);
 }
 
 /* [T-30] Mobile touch-friendly form elements */
@@ -105,6 +132,21 @@ button:not(:disabled),
     button, [role="button"], .btn-touch {
         min-height: 44px;
         min-width: 44px;
+    }
+}
+
+/* Accessible motion reduction */
+@media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    button:not(:disabled):active,
+    [role="button"]:not([aria-disabled="true"]):active,
+    .btn-tactile:not(:disabled):active {
+        transform: none !important;
     }
 }
 
@@ -153,16 +195,48 @@ button:not(:disabled),
     background: rgba(91, 79, 233, 0.6);
 }
 
-/* [T-32] Tema terang: glass surface, input, dan scrollbar theme-aware */
-html[data-theme="light"] {
-    --up-glass-bg: rgba(255, 255, 255, 0.88);
-    --up-glass-border: rgba(15, 23, 42, 0.12);
-    --up-glass-shadow: 0 12px 32px 0 rgba(15, 23, 42, 0.08);
+/* ===== [Font Size Switcher 2026] Ergonomic & Fluid Root Typography Scaling ===== */
+html[data-font-size="sm"] {
+    font-size: 15px;
+}
+html[data-font-size="md"],
+html:not([data-font-size]) {
+    font-size: 16px;
+}
+html[data-font-size="lg"] {
+    font-size: 17.25px;
+}
+html[data-font-size="xl"] {
+    font-size: 18.5px;
+}
+
+/* [T-32 & Update 2026] Tema terang ergonomis: kanvas soft-slate, surface putih bersih, anti-glare shift panjang */
+html[data-theme="light"],
+html:not(.dark) {
+    --up-glass-bg: #FFFFFF;
+    --up-glass-border: #E2E8F0;
+    --up-glass-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 3px 12px -2px rgba(15, 23, 42, 0.04);
+}
+
+html[data-theme="light"] body,
+html:not(.dark) body {
+    background-color: #F1F5F9;
+    color: #1E293B;
 }
 
 /* Base typography containment to prevent text overflow across cards and boxes */
 p, span, h1, h2, h3, h4, h5, h6, a, td, th, label, div {
     overflow-wrap: break-word;
+}
+
+/* [Apple Design §15 & Emil Kowalski] Optical Typography & Refined Tracking */
+h1, h2, h3 {
+    letter-spacing: -0.025em;
+}
+
+.tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
 }
 
 /* Ensure flex and grid children can shrink below content size instead of overflowing */
@@ -182,43 +256,78 @@ table {
     -webkit-overflow-scrolling: touch;
 }
 
-html[data-theme="light"] .glass-panel {
+html[data-theme="light"] .glass-panel,
+html:not(.dark) .glass-panel {
     background: var(--up-glass-bg);
     border-color: var(--up-glass-border);
     box-shadow: var(--up-glass-shadow);
-}
-
-html[data-theme="light"] .glass-input {
-    background: rgba(15, 23, 42, 0.04);
-    border-color: rgba(15, 23, 42, 0.16);
     color: #0F172A;
 }
 
-html[data-theme="light"] select.glass-input option,
-html[data-theme="light"] select option {
-    background: #FFFFFF !important;
+html[data-theme="light"] .glass-panel h1,
+html[data-theme="light"] .glass-panel h2,
+html[data-theme="light"] .glass-panel h3,
+html[data-theme="light"] .glass-panel h4,
+html[data-theme="light"] .glass-panel h5,
+html[data-theme="light"] .glass-panel h6,
+html:not(.dark) .glass-panel h1,
+html:not(.dark) .glass-panel h2,
+html:not(.dark) .glass-panel h3,
+html:not(.dark) .glass-panel h4,
+html:not(.dark) .glass-panel h5,
+html:not(.dark) .glass-panel h6 {
+    color: #0F172A;
+}
+
+html[data-theme="light"] .glass-input,
+html:not(.dark) .glass-input {
+    background: #FFFFFF;
+    border-color: rgba(15, 23, 42, 0.15);
     color: #0F172A !important;
 }
 
-/* Di mode terang, paksa background & text pada container panel dan modal yang menggunakan bg-ink-900 / dark backgrounds (KECUALI pada container dark-surface / tema gelap sengaja) */
-html[data-theme="light"] .bg-ink-900:not(select):not(option):not(.dark-surface):not([data-theme-surface="dark"]):not(.dark-surface *) {
-    background-color: #FFFFFF !important;
-    color: #0F172A !important;
+html.dark .glass-input,
+html[data-theme="dark"] .glass-input {
+    color: #F8FAFC !important;
 }
 
-html[data-theme="light"] .bg-ink-950:not(select):not(option):not(.dark-surface):not([data-theme-surface="dark"]):not(.dark-surface *) {
-    background-color: #F8FAFC !important;
-    color: #0F172A !important;
+html[data-theme="light"] .glass-input::placeholder,
+html:not(.dark) .glass-input::placeholder {
+    color: #94A3B8;
 }
 
-/* Kontras teks putih di tema terang: teks yang di-hardcode text-white harus menjadi kontras gelap kecuali pada tombol/badge berwarna atau kontainer bertema gelap */
-html[data-theme="light"] *:not([class*="bg-up-"]):not([class*="bg-indigo-"]):not([class*="bg-blue-"]):not([class*="bg-emerald-"]):not([class*="bg-red-"]):not([class*="bg-green-"]):not([class*="bg-amber-"]):not([class*="bg-slate-8"]):not([class*="bg-slate-9"]):not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *).text-white {
+html[data-theme="light"] .glass-input:focus,
+html:not(.dark) .glass-input:focus {
+    background: #FFFFFF;
+    border-color: var(--up-primary);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+}
+
+select option {
+    background: #FFFFFF;
+    color: #0F172A;
+}
+
+html.dark select option,
+html[data-theme="dark"] select option {
+    background: #0F172A;
+    color: #F8FAFC;
+}
+
+/* Safety Fallback: Kontras teks putih yang tidak memiliki variant dark: di tema terang */
+html[data-theme="light"]:not(.dark) table td.text-white:not([class*="bg-"]),
+html[data-theme="light"]:not(.dark) table td > span.text-white:not([class*="bg-"]),
+html:not(.dark) table td.text-white:not([class*="bg-"]),
+html:not(.dark) table td > span.text-white:not([class*="bg-"]),
+html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-white,
+html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-white {
     color: #0F172A !important;
 }
 
 /* Kontainer dengan .dark-surface / [data-theme-surface="dark"] mempertahankan teks kontras putih & abu terang */
 .dark-surface,
 [data-theme-surface="dark"] {
+    background: linear-gradient(180deg, #0F172A 0%, #0B0F19 100%) !important;
     color: #FFFFFF !important;
 }
 
@@ -247,86 +356,104 @@ html[data-theme="light"] *:not([class*="bg-up-"]):not([class*="bg-indigo-"]):not
     color: #94A3B8 !important;
 }
 
-/* Pastikan placeholder dan subtext terbaca jelas di mode terang dan gelap */
-html[data-theme="light"] .text-ink-400 {
-    color: #475569 !important;
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
-html[data-theme="light"] .text-ink-300 {
-    color: #334155 !important;
+html[data-theme="light"] ::-webkit-scrollbar-track,
+html:not(.dark) ::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.03);
 }
 
-html[data-theme="dark"] .text-ink-400 {
-    color: #94A3B8 !important;
+html[data-theme="light"] ::-webkit-scrollbar-thumb,
+html:not(.dark) ::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.18);
+    border-radius: 9999px;
 }
 
-html[data-theme="dark"] .text-ink-300 {
-    color: #CBD5E1 !important;
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover,
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 23, 42, 0.35);
 }
 
-html[data-theme="dark"] select option {
-    background: #0B1020 !important;
-    color: #F8FAFC !important;
-}
-
-html[data-theme="light"] .glass-input:focus {
-    background: rgba(255, 255, 255, 0.95);
-    border-color: var(--up-primary);
-    box-shadow: 0 0 0 2px rgba(91, 79, 233, 0.25);
-}
-
-html[data-theme="light"] ::-webkit-scrollbar-track {
-    background: rgba(15, 23, 42, 0.05);
-}
-
-html[data-theme="light"] ::-webkit-scrollbar-thumb {
-    background: rgba(15, 23, 42, 0.22);
-}
-
-html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-    background: rgba(15, 23, 42, 0.45);
-}
-
-/* ===== [T-46] Sidebar kolapsibel — HANYA rentang md (768-1023px) =====
-   Di lg (>=1024) sidebar selalu penuh; di <768 berupa drawer.
-   Kelas .sidebar-collapsed dipasang Alpine saat toggle md. */
-@media (min-width: 768px) and (max-width: 1023.9px) {
-    .sidebar-collapsed {
-        width: 5rem !important;
+/* ===== [T-46 & Update 2026] Sidebar PC: Auto-Collapse (Icon-Rail) + Fluid Hover Expand =====
+   Murni CSS transition di GPU: Zero layout shift pada main content, responsif, dan ringan */
+@media (min-width: 768px) {
+    /* Spacer penahan flow dokumen desktop */
+    .sidebar-spacer {
+        display: none;
+        width: 5rem;
+        flex-shrink: 0;
+    }
+    .sidebar-spacer.is-collapsed {
+        display: block;
     }
 
-    .sidebar-collapsed .sidebar-nav-link {
+    aside.sidebar-collapsed {
+        width: 5rem !important;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 45;
+        overflow-x: hidden;
+        transition: width 220ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 220ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    /* Saat kursor diarahkan ke area sidebar collapsed: Auto-Expand melebar dengan halus */
+    aside.sidebar-collapsed:hover {
+        width: 16rem !important;
+        box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(15, 23, 42, 0.08);
+    }
+    html.dark aside.sidebar-collapsed:hover {
+        box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    /* Saat collapsed DAN kursor TIDAK di-hover: sembunyikan label & submenu (hanya icon rail) */
+    aside.sidebar-collapsed:not(:hover) .sidebar-nav-link {
         justify-content: center;
         padding-inline: 0;
         gap: 0;
     }
 
-    .sidebar-collapsed .sidebar-label,
-    .sidebar-collapsed .sidebar-badge,
-    .sidebar-collapsed .sidebar-brand-text,
-    .sidebar-collapsed .sidebar-branch-label,
-    .sidebar-collapsed .sidebar-branch-ganti,
-    .sidebar-collapsed .sidebar-user-meta,
-    .sidebar-collapsed .sidebar-chevron,
-    .sidebar-collapsed .sidebar-submenu {
+    aside.sidebar-collapsed:not(:hover) .sidebar-label,
+    aside.sidebar-collapsed:not(:hover) .sidebar-badge,
+    aside.sidebar-collapsed:not(:hover) .sidebar-brand-text,
+    aside.sidebar-collapsed:not(:hover) .sidebar-branch-label,
+    aside.sidebar-collapsed:not(:hover) .sidebar-branch-ganti,
+    aside.sidebar-collapsed:not(:hover) .sidebar-user-meta,
+    aside.sidebar-collapsed:not(:hover) .sidebar-chevron,
+    aside.sidebar-collapsed:not(:hover) .sidebar-submenu {
         display: none !important;
     }
 
-    .sidebar-collapsed .sidebar-brand {
+    aside.sidebar-collapsed:not(:hover) .sidebar-brand {
         justify-content: center;
         padding-inline: 0;
     }
 
-    .sidebar-collapsed .sidebar-branch {
+    aside.sidebar-collapsed:not(:hover) .sidebar-branch {
         justify-content: center;
         padding-inline: 0.5rem;
     }
 
-    .sidebar-collapsed .sidebar-user {
+    aside.sidebar-collapsed:not(:hover) .sidebar-user {
         padding: 0.75rem 0.5rem;
     }
 
-    .sidebar-collapsed .sidebar-user > div {
+    aside.sidebar-collapsed:not(:hover) .sidebar-user > div {
         flex-direction: column;
         align-items: center;
         gap: 0.5rem;
@@ -334,11 +461,55 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
         height: 100%;
     }
 
-    .sidebar-collapsed .sidebar-user form {
+    aside.sidebar-collapsed:not(:hover) .sidebar-user form {
         display: flex;
     }
 
-    .sidebar-collapsed nav {
+    aside.sidebar-collapsed:not(:hover) nav {
+        padding-inline: 0.75rem;
+    }
+
+    /* Saat kursor hover ke aside: tampilkan teks label & brand dengan animasi halus */
+    aside.sidebar-collapsed:hover .sidebar-label,
+    aside.sidebar-collapsed:hover .sidebar-badge,
+    aside.sidebar-collapsed:hover .sidebar-brand-text,
+    aside.sidebar-collapsed:hover .sidebar-branch-label,
+    aside.sidebar-collapsed:hover .sidebar-branch-ganti,
+    aside.sidebar-collapsed:hover .sidebar-user-meta,
+    aside.sidebar-collapsed:hover .sidebar-chevron,
+    aside.sidebar-collapsed:hover .sidebar-submenu {
+        display: flex !important;
+        animation: fade-in 140ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    aside.sidebar-collapsed:hover .sidebar-nav-link {
+        justify-content: flex-start;
+        padding-inline: 0.875rem;
+        gap: 0.75rem;
+    }
+
+    aside.sidebar-collapsed:hover .sidebar-brand {
+        justify-content: space-between;
+        padding-inline: 1.5rem;
+    }
+
+    aside.sidebar-collapsed:hover .sidebar-branch {
+        justify-content: space-between;
+        padding-inline: 1rem;
+    }
+
+    aside.sidebar-collapsed:hover .sidebar-user {
+        padding: 0.75rem 1rem;
+    }
+
+    aside.sidebar-collapsed:hover .sidebar-user > div {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.75rem;
+        justify-content: space-between;
+    }
+
+    aside.sidebar-collapsed:hover nav {
         padding-inline: 0.75rem;
     }
 }

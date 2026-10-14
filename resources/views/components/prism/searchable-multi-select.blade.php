@@ -45,11 +45,11 @@
 >
     <!-- Container displaying badges + input -->
     <div
-        class="min-h-[42px] px-3 py-1.5 rounded-xl glass-input text-xs flex flex-wrap items-center gap-1.5 cursor-pointer border border-white/10 hover:border-white/20 transition-colors"
+        class="min-h-[42px] px-3 py-1.5 rounded-xl glass-input text-xs flex flex-wrap items-center gap-1.5 cursor-pointer border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 transition-colors"
         @click="open = true; $nextTick(() => $refs.searchInput?.focus())"
     >
         <template x-for="item in selectedLabels" :key="item.id">
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-up-primary/20 text-up-primary border border-up-primary/30 text-[11px] font-medium">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-up-primary/15 text-up-primary border border-up-primary/30 text-[11px] font-medium">
                 <span x-text="item.label"></span>
                 <button
                     type="button"
@@ -67,7 +67,7 @@
             type="text"
             x-model="search"
             placeholder="{{ $placeholder }}"
-            class="flex-1 min-w-[120px] bg-transparent outline-none text-white text-xs py-1"
+            class="flex-1 min-w-[120px] bg-transparent outline-none text-ink-900 dark:text-white text-xs py-1"
             @keydown.escape="open = false"
         />
 
@@ -87,14 +87,14 @@
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="opacity-100 scale-100"
         x-transition:leave-end="opacity-0 scale-95"
-        class="absolute z-50 left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-xl bg-ink-950/95 backdrop-blur-md border border-white/10 shadow-2xl p-1.5 space-y-0.5"
+        class="absolute z-50 left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-xl bg-white dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-1.5 space-y-0.5"
         style="display: none;"
     >
         <template x-for="opt in filteredOptions" :key="opt.id">
             <div
                 @click="toggle(opt.id)"
-                class="px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs cursor-pointer hover:bg-white/10 transition-colors"
-                :class="isSelected(opt.id) ? 'bg-up-primary/25 text-white font-semibold' : 'text-ink-200'"
+                class="px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                :class="isSelected(opt.id) ? 'bg-up-primary/15 text-up-primary dark:text-white font-semibold' : 'text-ink-700 dark:text-ink-200'"
             >
                 <span x-text="opt.label"></span>
                 <span x-show="isSelected(opt.id)" class="text-up-mint font-bold text-xs">✓</span>

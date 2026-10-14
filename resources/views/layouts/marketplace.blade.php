@@ -12,7 +12,7 @@
         window.UTE_THEME = null;
     </script>
     <script>
-        // [T-32] Bootstrap tema — terapkan sebelum cat pertama untuk mencegah FOUC
+        // [T-32] Bootstrap tema & ukuran font — terapkan sebelum cat pertama untuk mencegah FOUC
         (function () {
             var pref = null;
             try { pref = localStorage.getItem('ute-theme'); } catch (e) {}
@@ -22,12 +22,16 @@
             var root = document.documentElement;
             root.dataset.theme = dark ? 'dark' : 'light';
             root.classList.toggle('dark', dark);
+
+            var size = 'md';
+            try { size = localStorage.getItem('ute-font-size') || 'md'; } catch (e) {}
+            root.dataset.fontSize = size;
         })();
     </script>
 
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <meta name="theme-color" content="#5B4FE9">
+    <meta name="theme-color" content="#4F46E5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Ute Parts">
@@ -43,11 +47,11 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="bg-up-ink-50 dark:bg-ink-950 text-ink-900 dark:text-ink-100 font-sans antialiased min-h-screen flex flex-col overflow-x-clip selection:bg-up-primary selection:text-white"
+<body class="bg-[#F1F5F9] dark:bg-[#090D16] text-ink-900 dark:text-ink-100 font-sans antialiased min-h-screen flex flex-col overflow-x-clip selection:bg-up-primary selection:text-white"
       style="padding-bottom: env(safe-area-inset-bottom, 0);">
 
-    <!-- Top Bar: Apple-inspired frosted glass bar with refined typography & micro-details -->
-    <header class="bg-white/75 dark:bg-ink-950/75 backdrop-blur-2xl border-b border-ink-100/80 dark:border-white/[0.08] sticky top-0 z-40 transition-colors duration-200 shadow-[0_2px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    <!-- Top Bar: Apple-inspired frosted glass chrome with optical typography -->
+    <header class="bg-white/85 dark:bg-[#090D16]/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] sticky top-0 z-40 transition-colors duration-200 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]"
         style="padding-top: env(safe-area-inset-top, 0);">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-3">
             <!-- Brand -->
@@ -65,14 +69,14 @@
             <!-- Nav -->
             <nav class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 <a href="{{ route('shop') }}"
-                   class="min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-all duration-200 active:scale-[0.97] inline-flex items-center gap-1.5 {{ request()->is('shop') || request()->is('shop/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100/60 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
+                   class="min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] inline-flex items-center gap-1.5 {{ request()->is('shop') || request()->is('shop/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
                     <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                     <span class="hidden sm:inline">Katalog</span>
                 </a>
                 <a href="{{ route('servis.booking') }}"
-                   class="min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-all duration-200 active:scale-[0.97] inline-flex items-center gap-1.5 {{ request()->routeIs('servis.booking') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100/60 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
+                   class="min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] inline-flex items-center gap-1.5 {{ request()->routeIs('servis.booking') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
                     <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
@@ -81,14 +85,14 @@
 
                 <!-- Cart -->
                 <a href="{{ route('cart') }}"
-                   class="relative min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-all duration-200 active:scale-[0.97] flex items-center gap-2 {{ request()->is('cart') || request()->is('checkout') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100/60 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}"
+                   class="relative min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] flex items-center gap-2 {{ request()->is('cart') || request()->is('checkout') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}"
                    aria-label="Keranjang belanja">
                     <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                     <span class="hidden sm:inline">Keranjang</span>
                     @if(session('shop.cart') && array_sum(array_column(session('shop.cart'), 'qty')) > 0)
-                        <span class="px-1.5 py-0.2 min-w-[20px] h-5 rounded-full bg-up-primary text-white text-[10px] font-bold tabular-nums inline-flex items-center justify-center shadow-[0_2px_8px_rgba(91,79,233,0.5)] animate-scale-in">
+                        <span class="px-1.5 py-0.2 min-w-[20px] h-5 rounded-full bg-up-primary text-white text-[10px] font-bold tabular-nums inline-flex items-center justify-center shadow-sm shadow-up-primary/30 animate-scale-in">
                             {{ array_sum(array_column(session('shop.cart'), 'qty')) }}
                         </span>
                     @endif
@@ -96,10 +100,43 @@
 
                 <div class="h-5 w-px bg-ink-200/60 dark:bg-white/10 mx-0.5 hidden sm:block"></div>
 
+                <!-- [2026] Font Size Switcher -->
+                <div class="relative" x-data="fontSizeManager()" @click.outside="open = false">
+                    <button type="button" @click="open = !open"
+                            title="Ukuran font tampilan" aria-label="Ukuran font tampilan"
+                            class="min-h-[44px] min-w-[44px] p-2 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5 transition-[background-color,color,transform] duration-140 active:scale-[0.95] cursor-pointer flex items-center justify-center flex-shrink-0 gap-0.5">
+                        <span class="font-bold text-xs tracking-tighter">A<span class="text-[10px] font-normal">A</span></span>
+                    </button>
+
+                    <div x-show="open" x-cloak
+                         x-transition:enter="transition ease-out duration-120"
+                         x-transition:enter-start="opacity-0 scale-95"
+                         x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-100"
+                         x-transition:leave-start="opacity-100 scale-100"
+                         x-transition:leave-end="opacity-0 scale-95"
+                         class="absolute right-0 mt-2 w-48 py-2 rounded-2xl bg-white dark:bg-[#0F172A] border border-ink-200/80 dark:border-white/10 shadow-xl z-50">
+                        <div class="px-3 py-1 text-[11px] font-semibold text-ink-400 uppercase tracking-wider">
+                            Ukuran Font
+                        </div>
+                        <template x-for="item in sizes" :key="item.id">
+                            <button type="button" @click="setSize(item.id)"
+                                    class="w-full px-3 py-2 text-left text-xs flex items-center justify-between transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                                    :class="size === item.id ? 'font-bold text-up-primary' : 'text-ink-700 dark:text-ink-300'">
+                                <div class="flex items-center gap-2">
+                                    <span x-text="item.label"></span>
+                                    <span class="text-[10px] text-ink-400 font-mono" x-text="'(' + item.px + ')'"></span>
+                                </div>
+                                <span x-show="size === item.id" class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- Theme Toggle -->
                 <button type="button" x-data="themeManager()" @click="cycleTheme()"
                         title="Ganti mode tampilan" aria-label="Ganti mode tampilan"
-                        class="min-h-[44px] min-w-[44px] p-2.5 rounded-full text-ink-500 hover:text-ink-950 hover:bg-ink-100/60 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5 transition-all duration-200 active:scale-[0.95] cursor-pointer flex items-center justify-center flex-shrink-0">
+                        class="min-h-[44px] min-w-[44px] p-2.5 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5 transition-[background-color,color,transform] duration-140 active:scale-[0.95] cursor-pointer flex items-center justify-center flex-shrink-0">
                     <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'dark'" x-cloak>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
                     </svg>
@@ -114,7 +151,7 @@
                 <!-- Customer / Login -->
                 @auth('customer')
                     <a href="{{ route('customer.account') }}"
-                       class="min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-300 hover:bg-ink-100/60 dark:hover:bg-white/5 transition-all duration-200 active:scale-[0.97] flex items-center gap-1.5 sm:gap-2 flex-shrink-0"
+                       class="min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-300 hover:bg-ink-100/60 dark:hover:bg-white/5 transition-[background-color,color,transform] duration-140 active:scale-[0.97] flex items-center gap-1.5 sm:gap-2 flex-shrink-0"
                        aria-label="Akun saya">
                         <span class="w-7 h-7 rounded-full bg-gradient-to-tr from-up-primary to-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-sm flex-shrink-0">
                             {{ substr(auth('customer')->user()->nama, 0, 1) }}
@@ -124,7 +161,7 @@
                     <form action="{{ route('customer.logout') }}" method="POST" class="flex-shrink-0">
                         @csrf
                         <button type="submit"
-                                class="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-full text-xs font-semibold text-ink-400 hover:text-up-red hover:bg-up-red/10 transition-all duration-200 active:scale-[0.97] cursor-pointer inline-flex items-center gap-1"
+                                class="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-full text-xs font-semibold text-ink-400 hover:text-up-red hover:bg-up-red/10 transition-[background-color,color,transform] duration-140 active:scale-[0.97] cursor-pointer inline-flex items-center gap-1"
                                 aria-label="Keluar">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
@@ -134,7 +171,7 @@
                     </form>
                 @else
                     <a href="{{ route('customer.login') }}"
-                       class="min-h-[44px] px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white dark:bg-white/10 dark:text-white dark:hover:bg-white dark:hover:text-ink-950 transition-all duration-200 active:scale-[0.97] inline-flex items-center gap-1 sm:gap-1.5 shadow-sm flex-shrink-0"
+                       class="min-h-[44px] px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white dark:bg-white/10 dark:text-white dark:hover:bg-white dark:hover:text-ink-950 transition-[background-color,color,transform] duration-140 active:scale-[0.97] inline-flex items-center gap-1 sm:gap-1.5 shadow-sm flex-shrink-0"
                        aria-label="Masuk">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
@@ -156,35 +193,35 @@
          style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.25rem);">
         <nav class="pointer-events-auto bg-white/90 dark:bg-ink-950/90 backdrop-blur-2xl border border-ink-200/90 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] rounded-full px-2 py-1 flex items-center justify-between gap-0.5 sm:gap-1 max-w-xs sm:max-w-sm w-full mx-auto">
             <a href="{{ route('shop') }}"
-               class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 active:scale-[0.93] {{ request()->is('shop') || request()->is('shop/*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+               class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('shop') || request()->is('shop/*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                 <div class="relative flex items-center justify-center">
-                    <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                     @if(request()->is('shop') || request()->is('shop/*'))
-                        <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white shadow-[0_0_8px_rgba(91,79,233,1)]"></span>
+                        <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white"></span>
                     @endif
                 </div>
                 <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Katalog</span>
             </a>
 
             <a href="{{ route('servis.booking') }}"
-               class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 active:scale-[0.93] {{ request()->routeIs('servis.booking') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+               class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->routeIs('servis.booking') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                 <div class="relative flex items-center justify-center">
-                    <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                     @if(request()->routeIs('servis.booking'))
-                        <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white shadow-[0_0_8px_rgba(91,79,233,1)]"></span>
+                        <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white"></span>
                     @endif
                 </div>
                 <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Booking</span>
             </a>
 
             <a href="{{ route('cart') }}"
-               class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 active:scale-[0.93] {{ request()->is('cart') || request()->is('checkout') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+               class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('cart') || request()->is('checkout') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                 <div class="relative flex items-center justify-center">
-                    <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                     @if(session('shop.cart') && array_sum(array_column(session('shop.cart'), 'qty')) > 0)
@@ -193,7 +230,7 @@
                         </span>
                     @endif
                     @if(request()->is('cart') || request()->is('checkout'))
-                        <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white shadow-[0_0_8px_rgba(91,79,233,1)]"></span>
+                        <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white"></span>
                     @endif
                 </div>
                 <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Keranjang</span>
@@ -201,26 +238,26 @@
 
             @auth('customer')
                 <a href="{{ route('customer.account') }}"
-                   class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 active:scale-[0.93] {{ request()->routeIs('customer.account') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+                   class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->routeIs('customer.account') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                     <div class="relative flex items-center justify-center">
-                        <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                         @if(request()->routeIs('customer.account'))
-                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white shadow-[0_0_8px_rgba(91,79,233,1)]"></span>
+                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white"></span>
                         @endif
                     </div>
                     <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Akun</span>
                 </a>
             @else
                 <a href="{{ route('customer.login') }}"
-                   class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 active:scale-[0.93] {{ request()->routeIs('customer.login') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+                   class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->routeIs('customer.login') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                     <div class="relative flex items-center justify-center">
-                        <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                         </svg>
                         @if(request()->routeIs('customer.login'))
-                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white shadow-[0_0_8px_rgba(91,79,233,1)]"></span>
+                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary dark:bg-white"></span>
                         @endif
                     </div>
                     <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Masuk</span>

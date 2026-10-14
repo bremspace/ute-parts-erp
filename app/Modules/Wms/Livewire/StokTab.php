@@ -30,12 +30,27 @@ class StokTab extends Component
 
     public ?int $filterGudangId = null;
 
+    public ?int $filterRakId = null;
+
     // [T-12] Rak management
     public bool $showRakModal = false;
 
     public ?int $editRakId = null;
 
     public array $rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
+
+    // Ubah Lokasi Rak per Stok Item
+    public bool $showUbahRakModal = false;
+
+    public ?int $ubahRakStokId = null;
+
+    public ?int $selectedRakId = null;
+
+    public string $ubahRakProdukNama = '';
+
+    public string $ubahRakGudangNama = '';
+
+    public array $ubahRakPilihan = [];
 
     public function mount()
     {
@@ -130,6 +145,34 @@ class StokTab extends Component
         $this->rakForm = ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''];
     }
 
+    public function bukaUbahRak(int $stokId): void
+    {
+        $stok = StokItem::with(['produk', 'gudang', 'rak'])->findOrFail($stokId);
+        $this->ubahRakStokId = $stok->id;
+        $this->selectedRakId = $stok->rak_id;
+        $this->ubahRakProdukNama = $stok->produk?->nama ?? '-';
+        $this->ubahRakGudangNama = $stok->gudang?->nama ?? '-';
+        $this->ubahRakPilihan = Rak::where('gudang_id', $stok->gudang_id)
+            ->where('is_active', true)
+            ->orderBy('nama')
+            ->get(['id', 'nama', 'kode'])
+            ->toArray();
+        $this->showUbahRakModal = true;
+    }
+
+    public function simpanUbahRak(): void
+    {
+        if (! $this->ubahRakStokId) {
+            return;
+        }
+
+        $stok = StokItem::findOrFail($this->ubahRakStokId);
+        $stok->update(['rak_id' => $this->selectedRakId ?: null]);
+        $this->showUbahRakModal = false;
+        $this->ubahRakStokId = null;
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Lokasi rak berhasil diperbarui']);
+    }
+
     public function hapusRak(int $id): void
     {
         $user = auth()->user();
@@ -210,13 +253,17 @@ class StokTab extends Component
             : null;
 
         // Stok Query
-        $stokQuery = StokItem::with(['produk', 'skuVariant', 'gudang.cabang']);
+        $stokQuery = StokItem::with(['produk', 'skuVariant', 'gudang.cabang', 'rak']);
         if ($filterGudangId) {
             $stokQuery->where('gudang_id', $filterGudangId);
         } elseif ($cabangId) {
             // [B-03/P1-6] Fallback scoping: tanpa gudang terpilih → tetap batasi
             // stok ke gudang-gudang cabang aktif (jangan bocor lintas cabang)
             $stokQuery->whereHas('gudang', fn ($q) => $q->where('cabang_id', $cabangId));
+        }
+
+        if ($this->filterRakId) {
+            $stokQuery->where('rak_id', $this->filterRakId);
         }
         if (! empty($this->search)) {
             $s = $this->search;

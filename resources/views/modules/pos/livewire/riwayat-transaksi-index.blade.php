@@ -2,7 +2,7 @@
     {{-- Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h1 class="text-xl sm:text-2xl font-bold text-ink-50 dark:text-white">Riwayat Transaksi</h1>
+            <h1 class="text-xl sm:text-2xl font-bold text-ink-900 dark:text-white">Riwayat Transaksi</h1>
             <p class="text-xs sm:text-sm text-ink-400 mt-1">
                 Pusat riwayat transaksi global, penjualan kasir POS, rekap servis gadget selesai, dan mutasi kas laci.
             </p>
@@ -65,25 +65,25 @@
     <div class="flex flex-wrap items-center gap-2 border-b border-white/10 pb-2">
         <button
             wire:click="$set('activeTab', 'global')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'global' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'global' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <span>Semua Transaksi (Global)</span>
         </button>
         <button
             wire:click="$set('activeTab', 'pos')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'pos' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/30' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'pos' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
             <span>Penjualan Kasir POS</span>
         </button>
         <button
             wire:click="$set('activeTab', 'servis')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'servis' ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/30' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'servis' ? 'bg-up-mint text-white shadow-sm shadow-up-mint/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
             <span>Rekap Servis Selesai & Lunas</span>
         </button>
         <button
             wire:click="$set('activeTab', 'mutasi_kas')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 {{ $activeTab === 'mutasi_kas' ? 'bg-up-accent text-white shadow-lg shadow-up-accent/30' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'mutasi_kas' ? 'bg-up-accent text-white shadow-sm shadow-up-accent/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <span>Mutasi Kas Laci (In / Out)</span>
         </button>

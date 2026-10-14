@@ -109,75 +109,138 @@
     {{-- MODAL: INPUT GRN [F2-2] --}}
     @if($showGrnModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-xl glass-panel p-6 rounded-3xl relative">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Input GRN (Penerimaan Barang)</h3>
+            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative max-h-[92vh] flex flex-col">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10 shrink-0">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Input GRN (Penerimaan Barang)</h3>
+                        <p class="text-xs text-ink-400">Scan barcode atau ketik qty barang yang diterima dari supplier</p>
+                    </div>
                     <button wire:click="cancelGrnModal" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
                 </div>
 
-                <div class="mb-3 flex items-center justify-between">
-                    <span class="text-xs font-bold text-ink-300 uppercase">Item Diterima</span>
-                    <span class="text-[10px] text-ink-400">Qty diterima wajib ≤ qty PO — selisih → approval</span>
+                {{-- Barcode Scanner Input Bar --}}
+                <div class="mb-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2 shrink-0">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-bold text-ink-200 flex items-center gap-1.5">
+                            <span class="text-up-primary">📷</span> Scan Barcode Barang Masuk
+                        </span>
+                        <button type="button" wire:click="terimaSemuaItem" class="text-[10px] text-up-mint hover:underline font-bold cursor-pointer">
+                            ⚡ Terima Semua Lengkap (Max)
+                        </button>
+                    </div>
+                    <x-prism.barcode-scan-input
+                        placeholder="Scan Barcode / SKU produk (F2) untuk hitung penerimaan..."
+                        model="barcodeInput"
+                        title="Scan Barcode Penerimaan Barang (GRN)"
+                        continuous="true"
+                    />
                 </div>
 
-                <div class="space-y-2 mb-4 max-h-64 overflow-y-auto pr-1">
-                    @foreach($grnForm['item_qty'] as $idx => $item)
-                        <div class="flex gap-2 items-center text-xs">
-                            <div class="flex-1 min-w-0">
-                                <div class="font-bold text-white truncate">{{ $item['produk_nama'] ?? ('#'.$item['produk_id']) }}</div>
-                                <div class="text-[10px] text-ink-400">PO: {{ $item['qty_po'] ?? '-' }} pcs</div>
-                            </div>
-                            @cansee('harga_beli')
-                            <div class="w-32">
-                                <div class="text-[10px] text-ink-400 mb-0.5">Harga Beli Masuk</div>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="100"
-                                    wire:model="grnForm.item_qty.{{ $idx }}.harga_beli"
-                                    class="w-full px-2 py-1.5 rounded-xl glass-input text-xs tabular-nums text-right font-medium"
-                                    placeholder="Rp 0"
-                                />
-                            </div>
-                            @endcansee
-                            <div class="w-24">
-                                <div class="text-[10px] text-ink-400 mb-0.5">Diterima</div>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="{{ $item['qty_po'] ?? 0 }}"
-                                    wire:model.live="grnForm.item_qty.{{ $idx }}.qty_received"
-                                    class="w-full px-2 py-1.5 rounded-xl glass-input text-xs tabular-nums text-center"
-                                />
-                            </div>
-                        </div>
+                <div class="mb-2 flex items-center justify-between shrink-0">
+                    <span class="text-xs font-bold text-ink-300 uppercase tracking-wide">Daftar Item PO</span>
+                    <span class="text-[10px] text-ink-400">Qty diterima wajib ≤ qty PO — selisih memicu approval</span>
+                </div>
 
-                        {{-- [F2-3] Input SN utk produk sn=true — jumlah wajib = qty diterima --}}
-                        @if($item['sn_flag'] ?? false)
-                            <div class="pt-1 pb-2">
-                                <div class="flex items-center justify-between mb-1">
-                                    <span class="text-[10px] font-bold text-up-accent uppercase">Nomor Seri (wajib)</span>
-                                    <span class="text-[10px] text-ink-400 tabular-nums">Jumlah SN harus = qty diterima</span>
+                <div class="space-y-2.5 mb-4 overflow-y-auto pr-1 flex-1">
+                    @foreach($grnForm['item_qty'] as $idx => $item)
+                        @php
+                            $poQ = (int) ($item['qty_po'] ?? 0);
+                            $rcvQ = (int) ($item['qty_received'] ?? 0);
+                            $isFull = $rcvQ >= $poQ && $poQ > 0;
+                            $isPartial = $rcvQ > 0 && $rcvQ < $poQ;
+                        @endphp
+                        <div class="p-3 rounded-xl border {{ $isFull ? 'bg-up-mint/5 border-up-mint/20' : ($isPartial ? 'bg-up-amber/5 border-up-amber/20' : 'bg-white/[0.02] border-white/5') }} space-y-2">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-bold text-white flex items-center gap-1.5 flex-wrap">
+                                        <span>{{ $item['produk_nama'] ?? ('#'.$item['produk_id']) }}</span>
+                                        @if($isFull)
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-up-mint/20 text-up-mint border border-up-mint/30">Lengkap</span>
+                                        @elseif($isPartial)
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-up-amber/20 text-up-amber border border-up-amber/30">Parsial</span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[11px] text-ink-400 font-mono mt-0.5 flex gap-2 flex-wrap">
+                                        <span>PO: <b class="text-ink-200">{{ $poQ }}</b> pcs</span>
+                                        @if(!empty($item['sku'])) <span>SKU: {{ $item['sku'] }}</span> @endif
+                                        @if(!empty($item['barcode'])) <span>Barcode: {{ $item['barcode'] }}</span> @endif
+                                    </div>
                                 </div>
-                                <textarea
-                                    wire:model="grnForm.item_qty.{{ $idx }}.sn"
-                                    rows="2"
-                                    placeholder="Satu SN per baris (boleh pisah koma) — scan/ tempel di sini"
-                                    class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono"
-                                ></textarea>
+
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    @cansee('harga_beli')
+                                    <div class="w-28">
+                                        <div class="text-[10px] text-ink-400 mb-0.5">Harga Beli</div>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="100"
+                                            wire:model="grnForm.item_qty.{{ $idx }}.harga_beli"
+                                            class="w-full px-2 py-1.5 rounded-lg glass-input text-xs tabular-nums text-right font-medium"
+                                            placeholder="Rp 0"
+                                        />
+                                    </div>
+                                    @endcansee
+
+                                    <!-- Lokasi Rak Dropdown -->
+                                    <div class="w-36">
+                                        <div class="text-[10px] text-ink-400 mb-0.5">Lokasi Rak</div>
+                                        <select wire:model="grnForm.item_qty.{{ $idx }}.rak_id" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-mono">
+                                            <option value="">— Tanpa Rak —</option>
+                                            @foreach($gudangRaks as $r)
+                                                <option value="{{ $r['id'] }}" class="bg-ink-900">{{ $r['nama'] }} ({{ $r['kode'] }})</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <!-- Qty Received & Quick Buttons -->
+                                    <div>
+                                        <div class="text-[10px] text-ink-400 mb-0.5">Diterima</div>
+                                        <div class="flex items-center gap-1">
+                                            <button type="button" wire:click="tambahQtyItem({{ $idx }}, -1)" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 font-bold text-xs flex items-center justify-center cursor-pointer active:scale-95">-</button>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="{{ $poQ }}"
+                                                wire:model.live="grnForm.item_qty.{{ $idx }}.qty_received"
+                                                class="w-16 px-1.5 py-1 rounded-lg glass-input text-xs tabular-nums text-center font-bold {{ $isFull ? 'text-up-mint' : 'text-white' }}"
+                                            />
+                                            <button type="button" wire:click="tambahQtyItem({{ $idx }}, 1)" class="w-7 h-7 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs flex items-center justify-center cursor-pointer active:scale-95">+</button>
+                                            <button type="button" wire:click="setItemLengkap({{ $idx }})" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-semibold text-ink-300 cursor-pointer" title="Set Sesuai Qty PO">Full</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        @endif
+
+                            {{-- [F2-3] Input SN utk produk sn=true — jumlah wajib = qty diterima --}}
+                            @if($item['sn_flag'] ?? false)
+                                <div class="pt-2 border-t border-white/5">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-[10px] font-bold text-up-accent uppercase flex items-center gap-1">
+                                            <span>🔢</span> Nomor Seri (Wajib diisi sesuai qty diterima)
+                                        </span>
+                                        <span class="text-[10px] text-ink-400 tabular-nums">Jumlah SN: {{ count(array_filter(preg_split('/[\r\n,]+/', (string) ($item['sn'] ?? '')))) }} / {{ $rcvQ }}</span>
+                                    </div>
+                                    <textarea
+                                        wire:model="grnForm.item_qty.{{ $idx }}.sn"
+                                        rows="2"
+                                        placeholder="Scan atau tempel serial number (pisahkan per baris atau koma)"
+                                        class="w-full px-3 py-1.5 rounded-lg glass-input text-xs font-mono"
+                                    ></textarea>
+                                </div>
+                            @endif
+                        </div>
                     @endforeach
                 </div>
 
-                <div class="mb-4">
-                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Catatan</label>
-                    <textarea wire:model="grnForm.catatan" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" placeholder="Opsional — mis. selisih kemasan"></textarea>
+                <div class="mb-4 shrink-0">
+                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Catatan Penerimaan</label>
+                    <textarea wire:model="grnForm.catatan" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs" placeholder="Opsional — misal nomor surat jalan, kondisi kemasan, atau catatan selisih"></textarea>
                 </div>
 
-                <div class="flex gap-3">
+                <div class="flex gap-3 shrink-0">
                     <button wire:click="cancelGrnModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanGrn" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan GRN</button>
+                    <button wire:click="simpanGrn" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-primary/25">Simpan GRN</button>
                 </div>
             </div>
         </div>
@@ -240,6 +303,7 @@
                             <thead class="bg-white/5 text-ink-400 font-semibold border-b border-white/5">
                                 <tr>
                                     <th class="py-2 px-3">Produk</th>
+                                    <th class="py-2 px-3 text-center">Lokasi Rak</th>
                                     <th class="py-2 px-3 text-center">Qty PO</th>
                                     <th class="py-2 px-3 text-center">Qty Diterima</th>
                                     <th class="py-2 px-3 text-center">Status</th>
@@ -253,6 +317,16 @@
                                             @cansee('harga_beli')
                                                 <div class="text-[10px] text-ink-400 tabular-nums">@ Rp {{ number_format((float) ($item['harga_beli'] ?? 0), 0, ',', '.') }}</div>
                                             @endcansee
+                                        </td>
+                                        <td class="py-2 px-3 text-center">
+                                            @if(!empty($item['rak_id']))
+                                                @php $rk = \App\Modules\Wms\Models\Rak::find($item['rak_id']); @endphp
+                                                <span class="px-2 py-0.5 rounded-md bg-up-primary/10 text-up-primary border border-up-primary/20 font-mono text-[10px] font-bold">
+                                                    🏷️ {{ $rk ? $rk->nama . ' (' . $rk->kode . ')' : '#' . $item['rak_id'] }}
+                                                </span>
+                                            @else
+                                                <span class="text-ink-500 font-mono text-[11px]">—</span>
+                                            @endif
                                         </td>
                                         <td class="py-2 px-3 text-center tabular-nums text-ink-300">{{ $item['qty_po'] ?? '-' }}</td>
                                         <td class="py-2 px-3 text-center tabular-nums font-bold text-white">{{ $item['qty_received'] ?? 0 }}</td>

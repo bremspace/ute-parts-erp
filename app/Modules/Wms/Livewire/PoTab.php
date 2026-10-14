@@ -397,12 +397,26 @@ class PoTab extends Component
 
     public function terimaPo(int $id): void
     {
-        // [F2-2] Penerimaan langsung DITUTUP — wajib lewat GRN agar tidak ada
-        // double stok / double jurnal (PO diterima ganda via tab + GRN).
-        unset($id);
+        $po = PurchaseOrder::find($id);
+        if (! $po) {
+            return;
+        }
+
+        if ($po->status !== 'dikirim') {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "PO {$po->no_po} berstatus '{$po->status}'. Hanya PO berstatus 'dikirim' yang dapat diterima via GRN.",
+            ]);
+
+            return;
+        }
+
+        // Pindah ke tab GRN dan buka modal input GRN untuk PO ini
+        $this->dispatch('wms-pindah-tab', tab: 'grn');
+        $this->dispatch('buka-grn-po', poId: $id);
         $this->dispatch('alert', [
-            'type' => 'error',
-            'message' => 'Penerimaan barang wajib lewat GRN — buka tab GRN untuk menerima PO ini.',
+            'type' => 'info',
+            'message' => "Membuka penerimaan GRN untuk PO {$po->no_po}",
         ]);
     }
 

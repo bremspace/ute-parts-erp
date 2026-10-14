@@ -11,10 +11,7 @@
     @livewireStyles
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col items-center justify-start p-4 md:p-8 relative selection:bg-indigo-600 selection:text-white">
-    <div class="fixed -top-40 -left-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-[128px] pointer-events-none"></div>
-    <div class="fixed -bottom-40 -right-40 w-96 h-96 bg-orange-500/10 rounded-full blur-[128px] pointer-events-none"></div>
-
+<body class="bg-[#F8FAFC] text-slate-900 font-sans antialiased min-h-screen flex flex-col items-center justify-start p-4 md:p-8 relative selection:bg-indigo-600 selection:text-white">
     <div class="w-full max-w-2xl relative z-10 my-auto">
         <!-- Brand Header -->
         <div class="text-center mb-6 flex justify-center">
@@ -141,7 +138,7 @@
                                 $isCurrent = $i === $currentIdx;
                             @endphp
                             <div class="flex flex-col items-center text-center">
-                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-[background-color,color,box-shadow] duration-140
                                     {{ $isCurrent ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40 ring-4 ring-indigo-100' :
                                        ($isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400 border border-slate-200') }}">
                                     @if($isCompleted)
@@ -214,7 +211,7 @@
                                 <form action="{{ route('servis.tracking.approve', $tiket['token_approval']) }}" method="POST" class="flex-1">
                                     @csrf
                                     <input type="hidden" name="alasan" value="Disetujui oleh pelanggan via web tracking">
-                                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-up-mint hover:bg-teal-600 text-ink-950 font-bold text-sm shadow-lg shadow-up-mint/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
+                                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-up-mint hover:bg-teal-600 text-ink-950 font-bold text-sm shadow-sm shadow-up-mint/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] cursor-pointer">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                                         </svg>
@@ -354,7 +351,7 @@
 
                         <!-- Progress Bar Keseluruhan -->
                         <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                            <div class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: {{ $tiket['progress'][0]['persentase'] }}%"></div>
+                            <div class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-2.5 rounded-full transition-[width] duration-500" style="width: {{ $tiket['progress'][0]['persentase'] }}%"></div>
                         </div>
 
                         <!-- Timeline Log Progress -->
@@ -480,7 +477,7 @@
                             href="{{ $waLinkAdmin }}"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs shadow-md transition-all cursor-pointer no-underline"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs shadow-md transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer no-underline"
                             title="Chat WhatsApp Cabang untuk konsultasi atau tanya info servis"
                         >
                             <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.174.086.275.073.376-.044.101-.116.433-.506.549-.68.116-.173.231-.144.39-.086s1.011.477 1.184.564.289.13.332.203c.043.072.043.419-.101.824z"/></svg>

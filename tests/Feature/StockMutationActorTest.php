@@ -67,10 +67,12 @@ class StockMutationActorTest extends TestCase
 
         $this->seed(RolesAndPermissionsSeeder::class);
 
-        // COA wajib untuk JurnalService::post (opname 130-01/520-08, GRN 130-01/210-01)
+        // COA wajib untuk JurnalService::post (opname 130-01/520-08, GRN 130-01/210-01/110-01, stok awal 310-01)
         foreach ([
+            '110-01' => ['Kas', 'aset', 'kas_bank', 'debit'],
             '130-01' => ['Persediaan', 'aset', 'persediaan', 'debit'],
             '210-01' => ['Utang Usaha', 'kewajiban', 'utang_usaha', 'kredit'],
+            '310-01' => ['Modal Pemilik', 'ekuitas', 'modal', 'kredit'],
             '520-08' => ['Selisih Stok', 'beban', 'hpp', 'debit'],
         ] as $kode => [$nama, $tipe, $kelompok, $saldo]) {
             AkunCOA::firstOrCreate(['kode' => $kode], [

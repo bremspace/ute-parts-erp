@@ -25,14 +25,14 @@
                                 <button
                                     type="button"
                                     wire:click="bukaDetail({{ $opn->id }})"
-                                    class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-semibold text-xs transition-all cursor-pointer"
+                                    class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-semibold text-xs transition-[background-color,color] duration-140 cursor-pointer active:scale-95"
                                 >
                                     Detail
                                 </button>
                                 @if($opn->status === 'menunggu_approval')
                                     <button
                                         wire:click="approveOpname({{ $opn->id }})"
-                                        class="px-3 py-1 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs transition-all shadow-md shadow-up-mint/20 cursor-pointer"
+                                        class="px-3 py-1 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs transition-[opacity,transform] duration-100 active:scale-95 shadow-md shadow-up-mint/20 cursor-pointer"
                                     >
                                         Approve & Sesuaikan
                                     </button>

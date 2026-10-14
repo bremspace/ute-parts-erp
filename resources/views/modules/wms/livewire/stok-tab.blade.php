@@ -20,6 +20,17 @@
                     </select>
                 </div>
 
+                <div class="w-full sm:w-48">
+                    <select wire:model.live="filterRakId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono">
+                        <option value="" class="bg-ink-900">Semua Rak</option>
+                        @foreach($raks as $rk)
+                            @if(!$filterGudangId || $rk->gudang_id == $filterGudangId)
+                                <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->nama }} ({{ $rk->kode }})</option>
+                            @endif
+                        @endforeach
+                    </select>
+                </div>
+
                 <!-- [F2-5] Export laporan stok (queue) -->
                 <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
                     @can('laporan.cabang')
@@ -30,7 +41,7 @@
             </div>
 
             <!-- DataTable Dual-Mode -->
-            <x-prism.data-table :headers="['Produk & SKU', 'Kategori', 'Kompatibilitas', 'Gudang', 'Harga Retail', 'Stok', 'Status', '']">
+            <x-prism.data-table :headers="['Produk & SKU', 'Kategori', 'Kompatibilitas', 'Gudang', 'Lokasi Rak', 'Harga Retail', 'Stok', 'Status', '']">
                 @forelse($stokItems as $stok)
                     <tr class="hover:bg-white/[0.02] transition-colors">
                         <td class="py-3.5 px-4 font-semibold text-white">
@@ -42,6 +53,16 @@
                         <td class="py-3.5 px-4 text-ink-300 text-xs uppercase">{{ $stok->produk?->kategori ?? '-' }}</td>
                         <td class="py-3.5 px-4 text-ink-300 text-xs">{{ $stok->produk?->brand_kompatibel }} {{ $stok->produk?->model_kompatibel }}</td>
                         <td class="py-3.5 px-4 text-ink-300 text-xs font-medium">{{ $stok->gudang?->nama }}</td>
+                        <td class="py-3.5 px-4 text-xs font-mono">
+                            @if($stok->rak)
+                                <span class="px-2 py-0.5 rounded-lg bg-up-primary/10 text-up-primary border border-up-primary/20 font-bold inline-flex items-center gap-1">
+                                    🏷️ {{ $stok->rak->nama }} ({{ $stok->rak->kode }})
+                                </span>
+                            @else
+                                <span class="text-ink-500 italic text-[11px]">— Belum diset</span>
+                            @endif
+                            <button wire:click="bukaUbahRak({{ $stok->id }})" class="ml-1.5 text-[10px] text-ink-400 hover:text-white underline cursor-pointer" title="Ubah Lokasi Rak">Ubah</button>
+                        </td>
                         <td class="py-3.5 px-4 text-white font-semibold tabular-nums text-xs">
                             Rp {{ number_format($stok->produk?->harga_jual_retail ?? 0, 0, ',', '.') }}
                         </td>
@@ -59,7 +80,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="py-12 text-center text-ink-400">
+                        <td colspan="9" class="py-12 text-center text-ink-400">
                             Tidak ada item stok yang cocok dengan kriteria pencarian
                         </td>
                     </tr>
@@ -76,8 +97,17 @@
                                 </div>
                                 <x-prism.stock-gauge :stok="$stok->jumlah" :min="$stok->jumlah_minimum" />
                             </div>
-                            <div class="flex justify-between items-center text-xs pt-2 border-t border-white/5">
+                            <div class="flex justify-between items-center text-xs pt-1 border-t border-white/5">
                                 <span class="text-ink-400">{{ $stok->gudang?->nama }}</span>
+                                <div class="flex items-center gap-1 font-mono text-[11px]">
+                                    <span class="{{ $stok->rak ? 'text-up-primary font-bold' : 'text-ink-500' }}">
+                                        {{ $stok->rak ? '🏷️ ' . $stok->rak->nama . ' (' . $stok->rak->kode . ')' : '— Belum diset' }}
+                                    </span>
+                                    <button wire:click="bukaUbahRak({{ $stok->id }})" class="text-[10px] text-ink-400 hover:text-white underline cursor-pointer">Ubah</button>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-ink-400">Harga Retail:</span>
                                 <span class="font-bold text-white tabular-nums">Rp {{ number_format($stok->produk?->harga_jual_retail ?? 0, 0, ',', '.') }}</span>
                             </div>
                         </div>
@@ -155,6 +185,38 @@
                     @empty
                         <p class="text-xs text-ink-500 text-center py-4">Belum ada rak.</p>
                     @endforelse
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: UBAH LOKASI RAK STOK ITEM -->
+    @if($showUbahRakModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+                    <div>
+                        <h3 class="text-base font-bold text-white">Atur Lokasi Rak</h3>
+                        <p class="text-xs text-ink-400">{{ $ubahRakProdukNama }} — {{ $ubahRakGudangNama }}</p>
+                    </div>
+                    <button wire:click="$set('showUbahRakModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+
+                <div class="space-y-4 mb-5">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Pilih Rak / Bin Penempatan</label>
+                        <select wire:model="selectedRakId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono">
+                            <option value="" class="bg-ink-900">— Tanpa Rak (Kosong) —</option>
+                            @foreach($ubahRakPilihan as $r)
+                                <option value="{{ $r['id'] }}" class="bg-ink-900">{{ $r['nama'] }} ({{ $r['kode'] }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button wire:click="$set('showUbahRakModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="simpanUbahRak" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer shadow-lg shadow-up-primary/25">Simpan Lokasi</button>
                 </div>
             </div>
         </div>

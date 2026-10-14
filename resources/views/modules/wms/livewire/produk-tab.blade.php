@@ -1,4 +1,10 @@
-<div>
+<div x-data="{
+        wmsViewMode: localStorage.getItem('ute-wms-view-mode') || 'table',
+        setWmsView(mode) {
+            this.wmsViewMode = mode;
+            try { localStorage.setItem('ute-wms-view-mode', mode); } catch (e) {}
+        }
+     }">
     <!-- TAB 1b: MASTER PRODUK -->
         <div class="space-y-4">
             <!-- Search & Filters -->
@@ -131,6 +137,30 @@
                         @endif
 
                         <span class="text-[11px] text-ink-400 pl-1 whitespace-nowrap">{{ $produks->total() }} produk</span>
+
+                        <!-- View Switcher (Table vs Grid) -->
+                        <div class="inline-flex items-center p-0.5 rounded-xl bg-white/5 border border-white/10 ml-auto">
+                            <button type="button"
+                                    @click="setWmsView('table')"
+                                    :class="wmsViewMode === 'table' ? 'bg-up-primary text-white shadow-sm font-bold' : 'text-ink-400 hover:text-white'"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-[background-color,color] duration-140 cursor-pointer"
+                                    title="Tampilan Tabel">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                                <span>Tabel</span>
+                            </button>
+                            <button type="button"
+                                    @click="setWmsView('grid')"
+                                    :class="wmsViewMode === 'grid' ? 'bg-up-primary text-white shadow-sm font-bold' : 'text-ink-400 hover:text-white'"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-[background-color,color] duration-140 cursor-pointer"
+                                    title="Tampilan Grid Kartu">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                </svg>
+                                <span>Grid</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -193,7 +223,9 @@
                 @endif
             </div>
 
-            <x-prism.data-table :headers="['Produk', 'SKU / Barcode', 'Harga Beli/Jual', 'Stok Total', 'Gudang', 'Aksi']">
+            <!-- 1. Table View -->
+            <div x-show="wmsViewMode === 'table'">
+            <x-prism.data-table :headers="['Produk', 'SKU / Barcode', 'Harga Beli/Jual', 'Stok Total', 'Gudang & Lokasi Rak', 'Aksi']">
                 @forelse($produks as $p)
                     @php
                         $stokTotal = $p->stokItems->sum('jumlah');
@@ -210,9 +242,9 @@
                                     @endif
                                 </div>
                                 <div>
-                                    <span class="font-semibold text-white block">{{ $p->nama }}</span>
+                                    <span class="font-semibold text-ink-900 dark:text-white block">{{ $p->nama }}</span>
                                     <span class="block text-[10px] text-ink-400">
-                                        <strong class="text-ink-200">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</strong> · {{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}
+                                        <strong class="text-ink-700 dark:text-ink-200">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</strong> · {{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}
                                     </span>
                                     <span class="flex gap-1 mt-1 flex-wrap">
                                         @if($p->brand)
@@ -250,14 +282,14 @@
                         <td class="py-3.5 px-4 tabular-nums text-xs">
                             @cansee('harga_beli')
                             <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="text-ink-400">Beli</span>
-                                <span class="text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
+                                <span class="text-ink-500 dark:text-ink-400">Beli</span>
+                                <span class="text-ink-900 dark:text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
                                 @if(($p->metode_harga_beli ?? 'manual') === 'average')
                                     <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-bold border border-up-mint/30" title="Metode: Moving Average Otomatis dari PO">Avg</span>
                                 @endif
                             </div>
                             @cannotsee('harga_beli')
-                            <span class="text-ink-400">Beli</span> <span class="text-white font-semibold">—</span>
+                            <span class="text-ink-500 dark:text-ink-400">Beli</span> <span class="text-ink-900 dark:text-white font-semibold">—</span>
                             @endcansee
                             <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
                                 <span class="text-ink-400">Jual</span>
@@ -270,8 +302,28 @@
                         <td class="py-3.5 px-4">
                             <x-prism.stock-gauge :stok="$stokTotal" :min="$p->stokItems->min('jumlah_minimum') ?? 2" />
                         </td>
-                        <td class="py-3.5 px-4 text-ink-300 text-xs">
-                            {{ $p->stokItems->map(fn($si) => $si->gudang?->nama)->filter()->unique()->join(', ') ?: '-' }}
+                        <td class="py-3.5 px-4 text-xs">
+                            @if($p->stokItems->isNotEmpty())
+                                <div class="space-y-1">
+                                    @foreach($p->stokItems as $si)
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="text-ink-300 font-medium">{{ $si->gudang?->nama ?? '-' }}</span>
+                                            <span class="text-ink-400 font-bold tabular-nums">({{ $si->jumlah }})</span>
+                                            @if($si->rak)
+                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-up-primary/10 border border-up-primary/20 text-up-primary text-[10px] font-bold">
+                                                    🏷️ {{ $si->rak->nama }} ({{ $si->rak->kode }})
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-ink-500 text-[10px]">
+                                                    Tanpa Rak
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <span class="text-ink-500 text-xs">-</span>
+                            @endif
                         </td>
                         <td class="py-3.5 px-4">
                             <div class="flex items-center gap-1.5 flex-nowrap">
@@ -283,7 +335,7 @@
                                         🗑️ Hapus
                                     </button>
                                 @endif
-                                <button wire:click="orderPo({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[11px] transition-all cursor-pointer whitespace-nowrap active:scale-[0.97]" title="Buat PO untuk produk ini">
+                                <button wire:click="orderPo({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[11px] transition-[background-color,transform] duration-100 cursor-pointer whitespace-nowrap active:scale-[0.97]" title="Buat PO untuk produk ini">
                                     📦 Order PO
                                 </button>
                                 <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-[11px] cursor-pointer whitespace-nowrap active:scale-[0.97]">
@@ -303,6 +355,92 @@
                     </tr>
                 @endforelse
             </x-prism.data-table>
+            </div>
+
+            <!-- 2. Grid View -->
+            <div x-show="wmsViewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5" x-cloak>
+                @forelse($produks as $p)
+                    @php
+                        $stokTotal = $p->stokItems->sum('jumlah');
+                        $skuPertama = $p->skuVariants->first()?->sku;
+                    @endphp
+                    <div class="glass-panel p-4 rounded-2xl border border-white/5 hover:border-white/15 transition-[border-color,box-shadow] duration-140 flex flex-col justify-between group">
+                        <div class="space-y-3">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="w-14 h-14 rounded-xl overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
+                                    @if($p->thumbnail_url)
+                                        <img src="{{ $p->thumbnail_url }}" alt="{{ $p->nama }}" class="w-full h-full object-cover" loading="lazy">
+                                    @else
+                                        <span class="text-xl text-ink-500">📦</span>
+                                    @endif
+                                </div>
+                                <div class="text-right flex flex-col items-end">
+                                    <x-prism.stock-gauge :stok="$stokTotal" :min="$p->stok_minimum" />
+                                    <span class="text-[10px] text-ink-400 font-mono mt-1">{{ $skuPertama ?? '-' }}</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="font-bold text-sm text-white group-hover:text-up-primary transition-colors line-clamp-2 leading-snug">
+                                    {{ $p->nama }}
+                                </h4>
+                                <p class="text-[10px] text-ink-400 mt-1 truncate">
+                                    {{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }} · {{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}
+                                </p>
+                            </div>
+
+                            <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs">
+                                <div>
+                                    <span class="text-[9px] text-ink-500 uppercase block font-semibold">Beli</span>
+                                    <span class="text-ink-300 font-medium">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-[9px] text-ink-500 uppercase block font-semibold">Jual</span>
+                                    <span class="font-bold text-up-mint">Rp {{ number_format($p->harga_jual_retail, 0, ',', '.') }}</span>
+                                </div>
+                            </div>
+
+                            <div class="p-2 rounded-xl bg-white/[0.02] border border-white/5 text-[10px] space-y-1">
+                                <span class="text-ink-500 font-semibold uppercase block text-[9px] flex items-center gap-1">
+                                    <span>📍</span> Lokasi Rak &amp; Gudang:
+                                </span>
+                                @if($p->stokItems->isNotEmpty())
+                                    <div class="space-y-0.5 max-h-24 overflow-y-auto">
+                                        @foreach($p->stokItems as $si)
+                                            <div class="flex items-center justify-between gap-1 text-ink-300 text-[10px]">
+                                                <span class="truncate max-w-[120px]">{{ $si->gudang?->nama ?? '-' }} ({{ $si->jumlah }})</span>
+                                                @if($si->rak)
+                                                    <span class="text-up-primary font-bold shrink-0">🏷️ {{ $si->rak->kode }}</span>
+                                                @else
+                                                    <span class="text-ink-500 shrink-0">Tanpa Rak</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="text-ink-500 block text-[10px]">Belum ada stok gudang</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="pt-3 mt-3 border-t border-white/5 flex items-center justify-between gap-2">
+                            <button wire:click="orderPo({{ $p->id }})" class="px-2 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary text-[10px] font-bold border border-up-primary/20 cursor-pointer">
+                                📦 PO
+                            </button>
+                            <div class="flex items-center gap-1">
+                                <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 text-up-mint text-[10px] font-bold border border-up-mint/20 cursor-pointer">
+                                    ✏️ Edit
+                                </button>
+                                <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="p-1 rounded-lg bg-white/5 text-ink-300 border border-white/10 text-[10px]" title="Cetak Barcode">
+                                    🖨️
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                @empty
+                    <div class="col-span-full py-12 text-center text-ink-400">Belum ada produk.</div>
+                @endforelse
+            </div>
 
             <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-ink-400">
                 @if(auth()->user()?->hasRole('super-admin'))
@@ -498,7 +636,7 @@
                             @can('atur-harga-fleksibel')
                                 <label class="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" wire:model.defer="produkForm.harga_fleksibel" class="sr-only peer" />
-                                    <div class="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-up-amber/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-amber"></div>
+                                    <div class="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-up-amber/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-[background-color,border-color,transform] after:duration-140 peer-checked:bg-up-amber"></div>
                                 </label>
                             @else
                                 <span class="px-2.5 py-1 rounded-lg text-[10px] font-medium text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed" title="Khusus superadmin">
@@ -517,7 +655,7 @@
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" wire:model.defer="produkForm.sn" class="sr-only peer" />
-                                <div class="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-up-mint/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-mint"></div>
+                                <div class="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-up-mint/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-[background-color,border-color,transform] after:duration-140 peer-checked:bg-up-mint"></div>
                             </label>
                         </div>
                     </div>
@@ -556,13 +694,27 @@
                     @if(auth()->user()?->hasRole('super-admin'))
                         <div class="p-3.5 rounded-xl bg-up-accent/10 border border-up-accent/30">
                             <p class="text-xs font-bold text-up-accent mb-2">Stok Awal (Pembelian) — opsional</p>
-                            <div class="grid grid-cols-2 gap-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
                                     <label class="block text-xs font-semibold text-ink-300 mb-1">Gudang Tujuan</label>
-                                    <select wire:model="produkForm.gudang_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                    <select wire:model.live="produkForm.gudang_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                         <option value="" class="bg-ink-900">— Tanpa stok awal —</option>
                                         @foreach($gudangs as $g)
                                             <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->kode }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1">Lokasi Rak Penempatan</label>
+                                    <select wire:model="produkForm.rak_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" @if(empty($produkForm['gudang_id'])) disabled @endif>
+                                        <option value="" class="bg-ink-900">— Tanpa Rak / Pilih Rak —</option>
+                                        @php
+                                            $filteredRaks = !empty($produkForm['gudang_id'])
+                                                ? $raks->where('gudang_id', $produkForm['gudang_id'])
+                                                : $raks;
+                                        @endphp
+                                        @foreach($filteredRaks as $rk)
+                                            <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->nama }} ({{ $rk->kode }}) @if(empty($produkForm['gudang_id']) && $rk->gudang) - {{ $rk->gudang->nama }} @endif</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -662,14 +814,14 @@
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-2">Pilih Format Sumber Data</label>
                             <div class="grid grid-cols-2 gap-2">
-                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all {{ $importFormat === 'standar' ? 'bg-up-primary/15 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}">
+                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-[background-color,border-color,color] duration-140 {{ $importFormat === 'standar' ? 'bg-up-primary/15 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}">
                                     <input type="radio" wire:model.live="importFormat" value="standar" class="accent-up-primary" />
                                     <div>
                                         <div class="text-xs font-bold leading-none">Template Standar UteParts</div>
                                         <div class="text-[10px] text-ink-400 mt-1">Format Excel baku dengan kolom lengkap</div>
                                     </div>
                                 </label>
-                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all {{ $importFormat === 'sid_retail' ? 'bg-up-primary/15 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}">
+                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-[background-color,border-color,color] duration-140 {{ $importFormat === 'sid_retail' ? 'bg-up-primary/15 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}">
                                     <input type="radio" wire:model.live="importFormat" value="sid_retail" class="accent-up-primary" />
                                     <div>
                                         <div class="text-xs font-bold leading-none">Export SID Retail Pro</div>
@@ -1182,6 +1334,43 @@
                                 <input type="number" wire:model="editProdukForm.max_stock" min="0" placeholder="Batas Atas Order" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Lokasi Rak per Gudang Penyimpanan -->
+                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <p class="text-xs font-bold text-ink-200">🏷️ Lokasi Rak &amp; Gudang Penyimpanan</p>
+                            <span class="text-[10px] text-ink-400">Atur penempatan rak per gudang</span>
+                        </div>
+
+                        @if(!empty($editStokItems))
+                            <div class="space-y-2">
+                                @foreach($editStokItems as $si)
+                                    @php
+                                        $raksForGudang = $raks->where('gudang_id', $si['gudang_id']);
+                                    @endphp
+                                    <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                        <div>
+                                            <span class="font-bold text-white text-xs block">🏢 {{ $si['gudang_nama'] }}</span>
+                                            <span class="text-[10px] text-ink-400">Stok: <strong class="text-up-mint tabular-nums">{{ $si['jumlah'] }}</strong> unit</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <select wire:model="editStokRaks.{{ $si['id'] }}" class="px-2.5 py-1.5 rounded-xl glass-input text-xs font-medium min-w-[180px]">
+                                                <option value="" class="bg-ink-900">— Tanpa Rak —</option>
+                                                @foreach($raksForGudang as $rk)
+                                                    <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->nama }} ({{ $rk->kode }})</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="button" wire:click="simpanRakStokItem({{ $si['id'] }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 text-xs font-bold cursor-pointer whitespace-nowrap active:scale-95" title="Simpan lokasi rak untuk gudang ini">
+                                                💾 Simpan Rak
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="text-[11px] text-ink-500">Belum ada data inventori/gudang untuk produk ini. Stok dan lokasi rak akan terbentuk saat GRN atau penambahan stok.</p>
+                        @endif
                     </div>
 
                     <!-- Galeri Foto Existing & Kelola Foto -->

@@ -65,13 +65,13 @@
         </svg>
     </div>
 
-    <!-- Input Box -->
+    <!-- Input Box: text-base on mobile to avoid iOS Safari auto-zoom -->
     <input
         type="text"
         data-barcode-input="true"
         placeholder="{{ $placeholder }}"
         {{ $model ? "wire:model.live.debounce.250ms={$model}" : '' }}
-        {{ $attributes->merge(['class' => 'w-full pl-11 pr-20 py-2.5 rounded-xl glass-input text-base sm:text-sm font-medium placeholder-ink-400 focus:ring-2 focus:ring-up-primary/30 transition-all']) }}
+        {{ $attributes->merge(['class' => 'w-full pl-11 pr-20 py-2.5 rounded-xl glass-input text-base sm:text-sm font-medium placeholder-ink-400 focus:ring-2 focus:ring-up-primary/30 transition-[border-color,box-shadow,background-color] duration-140']) }}
         x-ref="barcodeInput"
         @keydown.window.f2.prevent="$refs.barcodeInput.focus(); $refs.barcodeInput.select()"
     />
@@ -82,7 +82,7 @@
         <button
             type="button"
             @click="openCamera()"
-            class="px-2 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary hover:text-white border border-up-primary/30 flex items-center gap-1 text-[11px] font-semibold cursor-pointer active:scale-95 transition-all shadow-sm"
+            class="px-2 py-1 min-h-[36px] sm:min-h-0 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary hover:text-white border border-up-primary/30 flex items-center gap-1 text-[11px] font-semibold cursor-pointer active:scale-95 transition-[transform,background-color,color] duration-100 shadow-sm"
             title="Buka Kamera HP / Web untuk scan barcode"
         >
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

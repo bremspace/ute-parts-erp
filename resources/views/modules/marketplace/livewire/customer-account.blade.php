@@ -23,19 +23,19 @@
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 text-center">
-                <button wire:click="$set('activeTab', 'orders')" class="p-3 rounded-xl bg-up-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 hover:border-up-primary transition-[transform,border-color] active:scale-[0.98] cursor-pointer text-left min-h-[44px]">
+                <button wire:click="$set('activeTab', 'orders')" class="p-3 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 hover:border-up-primary transition-[transform,border-color] active:scale-[0.98] cursor-pointer text-left min-h-[44px]">
                     <p class="font-black text-ink-900 dark:text-white tabular-nums text-lg">{{ $orders->count() }}</p>
                     <p class="text-[10px] text-ink-400 uppercase font-semibold">Pesanan</p>
                 </button>
-                <button wire:click="$set('activeTab', 'servis')" class="p-3 rounded-xl bg-up-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 hover:border-up-primary transition-[transform,border-color] active:scale-[0.98] cursor-pointer text-left min-h-[44px]">
+                <button wire:click="$set('activeTab', 'servis')" class="p-3 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 hover:border-up-primary transition-[transform,border-color] active:scale-[0.98] cursor-pointer text-left min-h-[44px]">
                     <p class="font-black text-ink-900 dark:text-white tabular-nums text-lg">{{ $servis->count() }}</p>
                     <p class="text-[10px] text-ink-400 uppercase font-semibold">Servis</p>
                 </button>
-                <button wire:click="$set('activeTab', 'membership')" class="p-3 rounded-xl bg-up-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 hover:border-up-primary transition-[transform,border-color] active:scale-[0.98] cursor-pointer text-left min-h-[44px]">
+                <button wire:click="$set('activeTab', 'membership')" class="p-3 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 hover:border-up-primary transition-[transform,border-color] active:scale-[0.98] cursor-pointer text-left min-h-[44px]">
                     <p class="font-black text-up-primary tabular-nums text-lg">{{ number_format($customer->poin_loyalty ?? 0, 0, ',', '.') }}</p>
                     <p class="text-[10px] text-ink-400 uppercase font-semibold">Poin Loyalty</p>
                 </button>
-                <button wire:click="$set('activeTab', '{{ $customer->is_reseller ? 'komisi' : 'membership' }}')" class="p-3 rounded-xl bg-up-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 hover:border-up-primary transition-[transform,border-color] active:scale-[0.98] cursor-pointer text-left min-h-[44px]">
+                <button wire:click="$set('activeTab', '{{ $customer->is_reseller ? 'komisi' : 'membership' }}')" class="p-3 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 hover:border-up-primary transition-[transform,border-color] active:scale-[0.98] cursor-pointer text-left min-h-[44px]">
                     <p class="font-black {{ $customer->is_reseller ? 'text-up-accent' : 'text-up-mint' }} tabular-nums text-lg truncate">
                         {{ $customer->is_reseller ? 'Rp ' . number_format($komisi->where('status', 'disetujui')->sum('nominal_komisi') + $komisi->where('status', 'pending')->sum('nominal_komisi'), 0, ',', '.') : 'Rp ' . number_format((float) ($customer->total_belanja_12bulan ?? 0), 0, ',', '.') }}
                     </p>
@@ -75,7 +75,7 @@
                         </div>
                         <div class="mt-3 flex flex-wrap gap-1.5">
                             @foreach($o->items as $it)
-                                <span class="text-[11px] px-2.5 py-1 rounded-xl bg-up-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-ink-600 dark:text-ink-300">{{ $it->produk?->nama }} ×{{ $it->jumlah }}</span>
+                                <span class="text-[11px] px-2.5 py-1 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-ink-600 dark:text-ink-300">{{ $it->produk?->nama }} ×{{ $it->jumlah }}</span>
                             @endforeach
                         </div>
                         <div class="flex justify-between items-center mt-3 pt-3 border-t border-ink-100 dark:border-white/10">
@@ -196,7 +196,7 @@
                                     <span class="font-bold text-up-primary tabular-nums">{{ $membershipInfo['progress'] }}%</span>
                                 </div>
                                 <div class="w-full h-2 rounded-full bg-ink-100 dark:bg-white/10 overflow-hidden">
-                                    <div class="h-full bg-gradient-to-r from-up-primary to-up-mint rounded-full transition-all duration-300" style="width: {{ $membershipInfo['progress'] }}%"></div>
+                                    <div class="h-full bg-gradient-to-r from-up-primary to-up-mint rounded-full transition-[width] duration-500" style="width: {{ $membershipInfo['progress'] }}%"></div>
                                 </div>
                                 <p class="text-[11px] text-ink-400 mt-2">
                                     Belanja <strong class="text-ink-800 dark:text-ink-200 tabular-nums">Rp {{ number_format($membershipInfo['kekurangan'], 0, ',', '.') }}</strong> lagi untuk naik tingkat.
@@ -223,7 +223,7 @@
                             </p>
                         </div>
 
-                        <div class="mt-4 p-3.5 rounded-xl bg-up-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-xs space-y-1.5">
+                        <div class="mt-4 p-3.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-xs space-y-1.5">
                             <p class="font-bold text-ink-900 dark:text-white">💡 Cara Perolehan Poin:</p>
                             <p class="text-ink-500 dark:text-ink-400">
                                 Setiap kelipatan <strong class="text-ink-800 dark:text-ink-200">Rp 1.000</strong> belanja = <strong>1 poin dasar</strong> × multiplier tier (<strong class="text-up-primary">{{ $membershipInfo['poinMultiplier'] }}x</strong>).
@@ -242,7 +242,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <!-- Level Retail / Dasar -->
-                        <div class="p-4 rounded-xl border {{ !$membershipInfo['currentTier'] && !$customer->is_reseller ? 'border-up-primary bg-up-primary/5 ring-2 ring-up-primary/20' : 'border-ink-100 dark:border-white/10 bg-up-ink-50 dark:bg-white/5' }}">
+                        <div class="p-4 rounded-xl border {{ !$membershipInfo['currentTier'] && !$customer->is_reseller ? 'border-up-primary bg-up-primary/5 ring-2 ring-up-primary/20' : 'border-ink-100 dark:border-white/10 bg-ink-50 dark:bg-white/5' }}">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="font-black text-ink-900 dark:text-white text-sm">Retail</span>
                                 @if(!$membershipInfo['currentTier'] && !$customer->is_reseller)
@@ -261,7 +261,7 @@
                             @php
                                 $isCurrent = $membershipInfo['currentTier']?->id === $tier->id;
                             @endphp
-                            <div class="p-4 rounded-xl border {{ $isCurrent ? 'border-up-primary bg-up-primary/5 ring-2 ring-up-primary/20' : 'border-ink-100 dark:border-white/10 bg-up-ink-50 dark:bg-white/5' }}">
+                            <div class="p-4 rounded-xl border {{ $isCurrent ? 'border-up-primary bg-up-primary/5 ring-2 ring-up-primary/20' : 'border-ink-100 dark:border-white/10 bg-ink-50 dark:bg-white/5' }}">
                                 <div class="flex items-center justify-between mb-2">
                                     <span class="font-black text-ink-900 dark:text-white text-sm">{{ $tier->nama }}</span>
                                     @if($isCurrent)

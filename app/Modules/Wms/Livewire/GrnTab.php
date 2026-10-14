@@ -4,12 +4,17 @@ namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Grn;
+use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\Rak;
+use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\GrnService;
 use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -34,6 +39,10 @@ class GrnTab extends Component
     public bool $sudahPeringatPoDipotong = false;
 
     public bool $showGrnModal = false;
+
+    public string $barcodeInput = '';
+
+    public array $gudangRaks = [];
 
     public array $grnForm = [
         'po_id' => null,
@@ -65,9 +74,15 @@ class GrnTab extends Component
         $this->detailGrnId = null;
     }
 
+    #[On('buka-grn-po')]
+    public function onBukaGrnPo(int $poId): void
+    {
+        $this->openGrnModal($poId);
+    }
+
     public function openGrnModal(int $poId): void
     {
-        $po = PurchaseOrder::with(['items.produk', 'gudangTujuan'])->findOrFail($poId);
+        $po = PurchaseOrder::with(['items.produk.skuVariants', 'items.skuVariant', 'gudangTujuan'])->findOrFail($poId);
 
         // [P0-4] Hanya PO 'dikirim' yang boleh menerima GRN
         if ($po->status !== 'dikirim') {
@@ -79,27 +94,153 @@ class GrnTab extends Component
         // [P1-1] Scope cabang — PO harus milik cabang aktif di session
         $this->tolakJikaBukanCabang($po->gudangTujuan?->cabang_id, 'PO bukan milik cabang aktif');
 
+        $this->gudangRaks = Rak::where('gudang_id', $po->gudang_tujuan_id)
+            ->where('is_active', true)
+            ->orderBy('nama')
+            ->get(['id', 'nama', 'kode'])
+            ->toArray();
+
         $itemForms = [];
         foreach ($po->items as $poItem) {
+            $prod = $poItem->produk;
+            $var = $poItem->skuVariant;
+
+            // Cari rak default dari stok yang sudah ada di gudang tujuan
+            $stokExisting = StokItem::where('produk_id', $poItem->produk_id)
+                ->where('gudang_id', $po->gudang_tujuan_id)
+                ->first();
+
             $itemForms[] = [
                 'produk_id' => $poItem->produk_id,
-                'produk_nama' => $poItem->produk?->nama ?? ('#'.$poItem->produk_id),
+                'produk_nama' => $prod?->nama ?? ('#'.$poItem->produk_id),
+                'barcode' => $prod?->barcode ?: ($var?->barcode ?: ''),
+                'sku' => $var?->sku ?: '',
                 'sku_variant_id' => $poItem->sku_variant_id,
                 'harga_beli' => (float) $poItem->harga_beli,
                 'qty_po' => (int) $poItem->jumlah,
                 'qty_received' => 0,
+                'rak_id' => $stokExisting?->rak_id,
                 // [F2-3] SN wajib utk produk sn=true
-                'sn_flag' => (bool) ($poItem->produk?->sn ?? false),
+                'sn_flag' => (bool) ($prod?->sn ?? false),
                 'sn' => '',
             ];
         }
 
+        $this->barcodeInput = '';
         $this->grnForm = [
             'po_id' => $poId,
             'item_qty' => $itemForms,
             'catatan' => '',
         ];
         $this->showGrnModal = true;
+    }
+
+    public function scanBarcodeDirect(string $code): void
+    {
+        $this->prosesBarcode($code);
+    }
+
+    public function prosesBarcode(?string $code = null): void
+    {
+        $barcode = trim($code ?: $this->barcodeInput);
+        $this->barcodeInput = '';
+
+        if (empty($barcode) || empty($this->grnForm['item_qty'])) {
+            return;
+        }
+
+        $matchedIndex = null;
+        foreach ($this->grnForm['item_qty'] as $idx => $item) {
+            if (! empty($item['barcode']) && strcasecmp($item['barcode'], $barcode) === 0) {
+                $matchedIndex = $idx;
+                break;
+            }
+            if (! empty($item['sku']) && strcasecmp($item['sku'], $barcode) === 0) {
+                $matchedIndex = $idx;
+                break;
+            }
+        }
+
+        if ($matchedIndex === null) {
+            $prod = Produk::where('barcode', $barcode)->first();
+            if (! $prod) {
+                $varian = SkuVariant::where('barcode', $barcode)->orWhere('sku', $barcode)->first();
+                if ($varian) {
+                    $prod = $varian->produk;
+                }
+            }
+
+            if ($prod) {
+                foreach ($this->grnForm['item_qty'] as $idx => $item) {
+                    if ((int) $item['produk_id'] === (int) $prod->id) {
+                        $matchedIndex = $idx;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($matchedIndex === null) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Barcode/SKU '{$barcode}' tidak ditemukan pada item PO ini!",
+            ]);
+            $this->dispatch('ute:barcode-not-found');
+
+            return;
+        }
+
+        $item = &$this->grnForm['item_qty'][$matchedIndex];
+        $qtyPo = (int) $item['qty_po'];
+        $currentReceived = (int) $item['qty_received'];
+
+        if ($currentReceived >= $qtyPo) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Item '{$item['produk_nama']}' sudah diterima lengkap ({$qtyPo}/{$qtyPo} pcs).",
+            ]);
+            $this->dispatch('ute:barcode-beep', ['success' => false]);
+
+            return;
+        }
+
+        $item['qty_received'] = $currentReceived + 1;
+
+        if ($item['sn_flag'] ?? false) {
+            if (strcasecmp($barcode, $item['barcode'] ?? '') !== 0 && strcasecmp($barcode, $item['sku'] ?? '') !== 0) {
+                $existingSn = trim($item['sn'] ?? '');
+                $item['sn'] = $existingSn === '' ? $barcode : $existingSn."\n".$barcode;
+            }
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "✓ Scan berhasil: {$item['produk_nama']} ({$item['qty_received']}/{$qtyPo} pcs)",
+        ]);
+        $this->dispatch('ute:barcode-beep', ['success' => true]);
+    }
+
+    public function terimaSemuaItem(): void
+    {
+        foreach ($this->grnForm['item_qty'] as $idx => $item) {
+            $this->grnForm['item_qty'][$idx]['qty_received'] = (int) $item['qty_po'];
+        }
+    }
+
+    public function setItemLengkap(int $idx): void
+    {
+        if (isset($this->grnForm['item_qty'][$idx])) {
+            $this->grnForm['item_qty'][$idx]['qty_received'] = (int) $this->grnForm['item_qty'][$idx]['qty_po'];
+        }
+    }
+
+    public function tambahQtyItem(int $idx, int $delta = 1): void
+    {
+        if (isset($this->grnForm['item_qty'][$idx])) {
+            $max = (int) $this->grnForm['item_qty'][$idx]['qty_po'];
+            $current = (int) $this->grnForm['item_qty'][$idx]['qty_received'];
+            $this->grnForm['item_qty'][$idx]['qty_received'] = max(0, min($max, $current + $delta));
+        }
     }
 
     public function cancelGrnModal(): void
@@ -144,11 +285,16 @@ class GrnTab extends Component
             $itemReceived = [];
             $hargaPerProduk = [];
             $snPerProduk = [];
+            $itemRakId = [];
             foreach ($this->grnForm['item_qty'] as $row) {
                 $kunci = GrnService::kunciItem($row['produk_id'] ?? 0, $row['sku_variant_id'] ?? null);
                 $itemReceived[$kunci] = (int) ($row['qty_received'] ?? 0);
                 if (isset($row['harga_beli']) && $row['harga_beli'] !== null && $row['harga_beli'] !== '') {
                     $hargaPerProduk[$kunci] = (float) $row['harga_beli'];
+                }
+
+                if (! empty($row['rak_id'])) {
+                    $itemRakId[$kunci] = (int) $row['rak_id'];
                 }
 
                 if ($row['sn_flag'] ?? false) {
@@ -162,7 +308,8 @@ class GrnTab extends Component
                 $itemReceived,
                 auth()->id(),
                 $snPerProduk,
-                $hargaPerProduk
+                $hargaPerProduk,
+                $itemRakId
             );
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);

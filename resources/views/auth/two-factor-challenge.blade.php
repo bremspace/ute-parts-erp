@@ -13,11 +13,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-ink-950 text-ink-100 font-sans antialiased min-h-screen flex items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
-    <!-- Ambient Background Glow -->
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-up-primary/30 rounded-full blur-[128px] pointer-events-none"></div>
-    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-up-accent/20 rounded-full blur-[128px] pointer-events-none"></div>
-
+<body class="bg-[#090D16] text-ink-100 font-sans antialiased min-h-screen flex items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
     <div class="w-full max-w-md relative z-10">
         <div class="text-center mb-8 flex justify-center">
             <x-prism.logo size="lg" layout="vertical" mode="dark" title="Verifikasi Dua Faktor" subtitle="Masukkan kode dari aplikasi authenticator Anda" />

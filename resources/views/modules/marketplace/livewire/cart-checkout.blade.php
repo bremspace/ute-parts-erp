@@ -33,11 +33,11 @@
 
             <div class="flex flex-wrap gap-3 justify-center pt-2">
                 <a href="{{ route('customer.account') }}"
-                   class="px-6 py-3.5 rounded-2xl bg-ink-900 text-white dark:bg-white dark:text-ink-950 font-bold text-xs hover:opacity-90 transition-all min-h-[44px] flex items-center active:scale-[0.97]">
+                   class="px-6 py-3.5 rounded-2xl bg-ink-900 text-white dark:bg-white dark:text-ink-950 font-bold text-xs hover:opacity-90 transition-[opacity,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97]">
                     Lihat Status Pesanan
                 </a>
                 <a href="{{ route('shop') }}"
-                   class="px-6 py-3.5 rounded-2xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-all min-h-[44px] flex items-center active:scale-[0.97]">
+                   class="px-6 py-3.5 rounded-2xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-[background-color,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97]">
                     Lanjut Belanja
                 </a>
             </div>
@@ -76,7 +76,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('metodeAmbil', 'ambil_ke_toko')"
-                                    class="flex-1 p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer active:scale-[0.98] {{ $metodeAmbil === 'ambil_ke_toko' ? 'border-up-primary bg-up-primary/5 dark:bg-up-primary/10' : 'border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
+                                    class="flex-1 p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-[border-color,background-color,transform] duration-140 cursor-pointer active:scale-[0.98] {{ $metodeAmbil === 'ambil_ke_toko' ? 'border-up-primary bg-up-primary/5 dark:bg-up-primary/10' : 'border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
                                     <div class="text-lg">🏬</div>
                                     <div class="font-bold text-ink-900 dark:text-white text-xs sm:text-sm mt-1">Ambil di Toko</div>
                                     <div class="text-[11px] text-ink-400 mt-0.5">Bebas biaya ongkir</div>
@@ -84,7 +84,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('metodeAmbil', 'pengiriman')"
-                                    class="flex-1 p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer active:scale-[0.98] {{ $metodeAmbil === 'pengiriman' ? 'border-up-primary bg-up-primary/5 dark:bg-up-primary/10' : 'border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
+                                    class="flex-1 p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-[border-color,background-color,transform] duration-140 cursor-pointer active:scale-[0.98] {{ $metodeAmbil === 'pengiriman' ? 'border-up-primary bg-up-primary/5 dark:bg-up-primary/10' : 'border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
                                     <div class="text-lg">🚚</div>
                                     <div class="font-bold text-ink-900 dark:text-white text-xs sm:text-sm mt-1">Kirim Ekspedisi</div>
                                     <div class="text-[11px] text-ink-400 mt-0.5">Integrasi kurir Biteship</div>
@@ -98,7 +98,7 @@
                                 </label>
                                 <div class="relative w-full min-w-0">
                                     <select wire:model.live="selectedCabangId"
-                                            class="w-full min-w-0 max-w-full truncate appearance-none px-4 py-3 pr-8 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm font-semibold text-ink-900 dark:text-white outline-none focus:border-up-primary transition-all min-h-[44px] cursor-pointer">
+                                            class="w-full min-w-0 max-w-full truncate appearance-none px-4 py-3 pr-8 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm font-semibold text-ink-900 dark:text-white outline-none focus:border-up-primary transition-[border-color] duration-140 min-h-[44px] cursor-pointer">
                                         @foreach($cabangs as $c)
                                             <option value="{{ $c->id }}">{{ $c->nama }} ({{ $c->kota ?? $c->alamat }})</option>
                                         @endforeach
@@ -118,7 +118,7 @@
                                 </label>
                                 <textarea wire:model="catatan" rows="2"
                                           placeholder="Contoh: Saya ambil siang ini sekitar jam 2..."
-                                          class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary transition-all"></textarea>
+                                          class="w-full min-w-0 px-4 py-3 rounded-2xl bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-base sm:text-sm text-ink-900 dark:text-white placeholder-ink-400 outline-none focus:border-up-primary transition-[border-color] duration-140"></textarea>
                             </div>
                         </div>
                     </div>
@@ -165,7 +165,7 @@
                             <button
                                 type="button"
                                 wire:click="placeOrder"
-                                class="w-full py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-[0_8px_24px_rgba(91,79,233,0.3)] transition-all duration-200 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
+                                class="w-full py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-sm shadow-up-primary/25 transition-[background-color,transform] duration-140 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
                                 <span>Konfirmasi & Buat Pesanan</span>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -190,11 +190,11 @@
                     </div>
                     <div class="flex flex-wrap gap-3 justify-center pt-2">
                         <a href="{{ route('customer.login') }}"
-                           class="px-6 py-3.5 rounded-2xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-all min-h-[44px] flex items-center active:scale-[0.97]">
+                           class="px-6 py-3.5 rounded-2xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-[background-color,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97]">
                             Masuk Akun
                         </a>
                         <a href="{{ route('customer.register') }}"
-                           class="px-6 py-3.5 rounded-2xl bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-white font-bold text-xs hover:bg-ink-200 transition-all min-h-[44px] flex items-center active:scale-[0.97]">
+                           class="px-6 py-3.5 rounded-2xl bg-ink-100 dark:bg-white/10 text-ink-800 dark:text-white font-bold text-xs hover:bg-ink-200 transition-[background-color,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97]">
                             Daftar Pelanggan Baru
                         </a>
                     </div>
@@ -230,7 +230,7 @@
                         </p>
                     </div>
                     <a href="{{ route('shop') }}"
-                       class="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-all min-h-[44px] active:scale-[0.97]">
+                       class="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-[background-color,transform] duration-140 min-h-[44px] active:scale-[0.97]">
                         <span>Jelajahi Katalog Sparepart</span>
                     </a>
                 </div>
@@ -305,7 +305,7 @@
                     <button
                         type="button"
                         wire:click="lanjutCheckout"
-                        class="w-full sm:w-auto px-10 py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-[0_8px_24px_rgba(91,79,233,0.3)] transition-all duration-200 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
+                        class="w-full sm:w-auto px-10 py-4 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-sm shadow-up-primary/25 transition-[background-color,transform] duration-140 cursor-pointer active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2">
                         <span>Lanjutkan ke Pengambilan & Pembayaran</span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />

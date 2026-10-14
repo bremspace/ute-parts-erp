@@ -71,9 +71,10 @@ class ProdukService
         bool $isOndemand = false,
         ?string $barcode = null,
         string $metodeHargaBeli = 'average',
-        ?float $marginPersen = null
+        ?float $marginPersen = null,
+        ?int $rakId = null
     ): Produk {
-        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen) {
+        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $rakId) {
             $satuan = $satuanKode ?: 'pcs';
             $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
             if ($satuanKode && ! $satuanRef) {
@@ -192,12 +193,13 @@ class ProdukService
                     $stokAwal,
                     $hargaBeli,
                     "Stok awal produk baru {$nama}",
-                    $userId
+                    $userId,
+                    $rakId
                 );
             } elseif ($gudangId) {
                 StokItem::firstOrCreate(
                     ['produk_id' => $produk->id, 'sku_variant_id' => $variant->id, 'gudang_id' => $gudangId],
-                    ['jumlah' => 0, 'jumlah_minimum' => $stokMinimum]
+                    ['jumlah' => 0, 'jumlah_minimum' => $stokMinimum, 'rak_id' => $rakId]
                 );
             }
 
@@ -424,7 +426,7 @@ class ProdukService
             $sebelum = (int) $stok->jumlah;
             $setelah = $sebelum + $qty;
 
-            $stok->update(['jumlah' => $setelah]);
+            $stok->update(['jumlah' => $setelah] + ($rakId ? ['rak_id' => $rakId] : []));
 
             StokLog::create([
                 'gudang_id' => $gudangId,

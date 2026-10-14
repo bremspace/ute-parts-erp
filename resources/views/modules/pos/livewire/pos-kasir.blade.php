@@ -1,6 +1,14 @@
 <div
     class="flex flex-col lg:flex-row gap-4 h-[calc(100dvh-8.5rem)]"
-    x-data="{ cartOpen: false, flexSet: {} }"
+    x-data="{
+        cartOpen: false,
+        flexSet: {},
+        posViewMode: localStorage.getItem('ute-pos-view-mode') || 'grid',
+        setPosView(mode) {
+            this.posViewMode = mode;
+            try { localStorage.setItem('ute-pos-view-mode', mode); } catch (e) {}
+        }
+    }"
     @keydown.window.f4.prevent="$wire.openPaymentModal()"
     @keydown.window.f6.prevent="$wire.tahanTransaksi()"
     @keydown.window.escape.prevent="$wire.clearCart()"
@@ -215,25 +223,38 @@
             </div>
         @endif
 
-        <!-- [T-51] Desktop Keyboard Shortcuts Visual Hint Bar (hidden on mobile) -->
-        <div class="hidden lg:flex items-center gap-2 mb-3 text-[11px] text-ink-400">
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
-                <kbd class="text-up-primary font-bold">F2</kbd> Cari/Scan
-            </span>
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
-                <kbd class="text-up-mint font-bold">F4</kbd> Bayar
-            </span>
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
-                <kbd class="text-up-amber font-bold">F6</kbd> Tahan
-            </span>
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
-                <kbd class="text-up-red font-bold">ESC</kbd> Reset Keranjang
-            </span>
+        <!-- [T-51] Desktop Keyboard Shortcuts & View Mode Switcher -->
+        <div class="hidden lg:flex items-center justify-between gap-2 mb-3 text-[11px] text-ink-400">
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
+                    <kbd class="text-up-primary font-bold">F2</kbd> Cari/Scan
+                </span>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
+                    <kbd class="text-up-mint font-bold">F4</kbd> Bayar
+                </span>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
+                    <kbd class="text-up-amber font-bold">F6</kbd> Tahan
+                </span>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
+                    <kbd class="text-up-red font-bold">ESC</kbd> Reset Keranjang
+                </span>
+            </div>
+
+            <!-- Kasir View Mode Switcher -->
+            <div class="inline-flex items-center p-0.5 rounded-lg bg-black/10 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                <button type="button" @click="setPosView('grid')" :class="posViewMode === 'grid' ? 'bg-white/15 text-white font-bold' : 'text-ink-400 hover:text-white'" class="px-2 py-1 rounded text-[10px] cursor-pointer">
+                    Grid
+                </button>
+                <button type="button" @click="setPosView('list')" :class="posViewMode === 'list' ? 'bg-white/15 text-white font-bold' : 'text-ink-400 hover:text-white'" class="px-2 py-1 rounded text-[10px] cursor-pointer">
+                    List Cepat
+                </button>
+            </div>
         </div>
 
-        <!-- Product Grid -->
+        <!-- Product Grid & List Container -->
         <div class="flex-1 overflow-y-auto pr-1">
-            <div class="grid grid-cols-1 xxs:grid-cols-2 xl:grid-cols-3 gap-3">
+            <!-- Mode 1: Grid -->
+            <div x-show="posViewMode === 'grid'" class="grid grid-cols-1 xxs:grid-cols-2 xl:grid-cols-3 gap-3">
                 @forelse($products as $prod)
                     @php
                         // [B-02/P0-2] Stok kartu = kriteria SAMA dgn addToCart (agregat produk+gudang)
@@ -260,7 +281,7 @@
                             role="button"
                             wire:click="addToCart({{ $prod->id }})"
                             title="{{ $prod->nama }} — stok {{ $stokTotal }} unit. Klik untuk menambah ke keranjang."
-                            class="glass-panel glass-panel-hover p-3.5 rounded-2xl flex flex-col justify-between cursor-pointer border border-white/5 transition-all select-none group"
+                            class="glass-panel glass-panel-hover p-3.5 rounded-2xl flex flex-col justify-between cursor-pointer border border-white/5 transition-[border-color,box-shadow,transform] duration-140 select-none group active:scale-[0.98]"
                         @endif
                     >
                         <div>
@@ -339,7 +360,7 @@
                                     </svg>
                                 </span>
                             @else
-                                <span class="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-ink-300 group-hover:bg-up-primary group-hover:text-white transition-all text-xs">
+                                <span class="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-ink-300 group-hover:bg-up-primary group-hover:text-white transition-[background-color,color] duration-140 text-xs">
                                     +
                                 </span>
                             @endif
@@ -370,6 +391,50 @@
                     </div>
                 @endif
             </div>
+
+            <!-- Mode 2: List Cepat Kasir -->
+            <div x-show="posViewMode === 'list'" class="space-y-1.5" x-cloak>
+                @forelse($products as $prod)
+                    @php
+                        $stokTotal = $stokPerProduk[$prod->id] ?? (\App\Modules\Pos\Livewire\PosKasir::STOK_TANPA_GUDANG);
+                        $stokKosong = $stokTotal <= 0;
+                        $pricing = app(\App\Modules\Pos\Services\PricingService::class)->resolve($prod, $customer);
+                    @endphp
+                    <div
+                        wire:key="product-list-{{ $prod->id }}"
+                        @if($stokKosong)
+                            class="px-3.5 py-2.5 rounded-xl border border-white/5 bg-ink-900/60 opacity-50 flex items-center justify-between gap-3 cursor-not-allowed select-none"
+                        @else
+                            wire:click="addToCart({{ $prod->id }})"
+                            class="px-3.5 py-2.5 rounded-xl border border-white/5 bg-ink-900/80 hover:bg-white/5 hover:border-up-primary/40 flex items-center justify-between gap-3 cursor-pointer select-none transition-colors group active:scale-[0.99]"
+                        @endif
+                    >
+                        <div class="min-w-0 flex items-center gap-3">
+                            <span class="w-2 h-2 rounded-full flex-shrink-0 {{ $stokKosong ? 'bg-up-red' : 'bg-up-mint' }}"></span>
+                            <div class="truncate">
+                                <h4 class="text-xs font-semibold text-white group-hover:text-up-primary transition-colors truncate">
+                                    {{ $prod->nama }}
+                                </h4>
+                                <span class="text-[10px] text-ink-400 font-mono">{{ $prod->sku }}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-4 flex-shrink-0">
+                            <span class="text-xs font-semibold tabular-nums {{ $stokKosong ? 'text-up-red' : 'text-ink-300' }}">
+                                {{ $stokKosong ? 'Habis' : $stokTotal . ' unit' }}
+                            </span>
+                            <span class="text-xs sm:text-sm font-bold text-up-mint tabular-nums">
+                                Rp {{ number_format($pricing['harga'], 0, ',', '.') }}
+                            </span>
+                            <button type="button" class="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-xs text-ink-300 group-hover:bg-up-primary group-hover:text-white" :disabled="{{ $stokKosong ? 'true' : 'false' }}">
+                                +
+                            </button>
+                        </div>
+                    </div>
+                @empty
+                    <div class="py-8 text-center text-xs text-ink-500">Tidak ada produk ditemukan.</div>
+                @endforelse
+            </div>
         </div>
     </div>
 
@@ -385,7 +450,7 @@
              style="bottom: calc(3.5rem + max(env(safe-area-inset-bottom, 0px), 0.5rem));">
             <button @click="cartPanelOpen = !cartPanelOpen"
                     type="button"
-                    class="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-50 dark:text-white min-h-[44px] cursor-pointer"
+                    class="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-900 dark:text-white min-h-[44px] cursor-pointer"
                     :aria-expanded="cartPanelOpen"
                     aria-label="Buka ringkasan keranjang">
                 <div class="flex items-center gap-2.5">
@@ -441,7 +506,7 @@
                 <!-- Drag Handle -->
                 <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mb-3"></div>
                 <div class="flex items-center justify-between mb-3 pb-2 border-b border-black/10 dark:border-white/10">
-                    <h3 class="text-base font-bold text-ink-50 dark:text-white">Keranjang & Pelanggan</h3>
+                    <h3 class="text-base font-bold text-ink-900 dark:text-white">Keranjang & Pelanggan</h3>
                     <button @click="cartPanelOpen = false"
                             class="p-2 text-ink-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -695,7 +760,7 @@
                                         <button
                                             type="button"
                                             @click="saveFlexHarga('{{ $key }}')"
-                                            class="flex-1 py-2 rounded-lg bg-up-amber hover:opacity-90 text-ink-950 font-bold text-xs transition-all cursor-pointer min-h-[40px]"
+                                            class="flex-1 py-2 rounded-lg bg-up-amber hover:opacity-90 text-ink-950 font-bold text-xs transition-[opacity,transform] duration-100 active:scale-[0.98] cursor-pointer min-h-[40px]"
                                         >
                                             Simpan
                                         </button>
@@ -721,7 +786,7 @@
                     <div class="flex items-center gap-1.5 flex-shrink-0">
                         <button
                             wire:click="updateQty('{{ $key }}', -1)"
-                            class="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer"
+                            class="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-[background-color,transform] duration-100 active:scale-95 cursor-pointer"
                         >
                             -
                         </button>
@@ -730,7 +795,7 @@
                         </span>
                         <button
                             wire:click="updateQty('{{ $key }}', 1)"
-                            class="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer"
+                            class="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-xs font-bold transition-[background-color,transform] duration-100 active:scale-95 cursor-pointer"
                         >
                             +
                         </button>
@@ -790,7 +855,7 @@
                 <button
                     type="button"
                     wire:click="clearCart"
-                    class="py-3 px-2 rounded-xl bg-white/5 hover:bg-up-red/20 text-ink-400 hover:text-up-red font-semibold text-xs transition-all border border-white/5 flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[44px]"
+                    class="py-3 px-2 rounded-xl bg-white/5 hover:bg-up-red/20 text-ink-400 hover:text-up-red font-semibold text-xs transition-[background-color,color,transform] duration-100 border border-white/5 flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[44px] active:scale-[0.97]"
                 >
                     <span>Batal (ESC)</span>
                 </button>
@@ -798,7 +863,7 @@
                 <button
                     type="button"
                     wire:click="tahanTransaksi"
-                    class="py-3 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white font-semibold text-xs transition-all border border-white/5 flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[44px]"
+                    class="py-3 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white font-semibold text-xs transition-[background-color,color,transform] duration-100 border border-white/5 flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[44px] active:scale-[0.97]"
                 >
                     <span>Tahan (F6)</span>
                 </button>
@@ -806,7 +871,7 @@
                 <button
                     type="button"
                     wire:click="openPaymentModal"
-                    class="py-3 px-2 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark hover:to-indigo-700 text-white font-bold text-xs shadow-lg shadow-up-primary/30 transition-all border border-white/20 flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 min-h-[44px]"
+                    class="py-3 px-2 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark hover:to-indigo-700 text-white font-bold text-xs shadow-sm shadow-up-primary/25 transition-[background-color,box-shadow,transform] duration-100 border border-white/20 flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-95 min-h-[44px]"
                 >
                     <span>BAYAR</span>
                     <span class="text-[10px] font-mono text-white/70">F4</span>
@@ -985,7 +1050,7 @@
                     <button
                         type="button"
                         wire:click="processTransaction"
-                        class="w-full sm:flex-2 py-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-sm transition-[transform,opacity] active:scale-[0.97] shadow-lg shadow-up-mint/20 cursor-pointer min-h-[44px]"
+                        class="w-full sm:flex-2 py-3 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-sm transition-[transform,opacity] active:scale-[0.97] shadow-sm shadow-up-mint/20 cursor-pointer min-h-[44px]"
                     >
                         Konfirmasi & Cetak Struk
                     </button>
@@ -1350,13 +1415,13 @@
                     <button
                         type="button"
                         wire:click="$set('mutasiJenis', 'keluar')"
-                        class="py-2 text-xs font-bold rounded-lg transition-all cursor-pointer {{ $mutasiJenis === 'keluar' ? 'bg-up-accent text-white shadow-lg' : 'text-ink-400 hover:text-white' }}">
+                        class="py-2 text-xs font-bold rounded-lg transition-[background-color,color,box-shadow] duration-140 cursor-pointer {{ $mutasiJenis === 'keluar' ? 'bg-up-accent text-white shadow-lg' : 'text-ink-400 hover:text-white' }}">
                         Pengeluaran (Kas Keluar)
                     </button>
                     <button
                         type="button"
                         wire:click="$set('mutasiJenis', 'masuk')"
-                        class="py-2 text-xs font-bold rounded-lg transition-all cursor-pointer {{ $mutasiJenis === 'masuk' ? 'bg-up-mint text-ink-950 shadow-lg' : 'text-ink-400 hover:text-white' }}">
+                        class="py-2 text-xs font-bold rounded-lg transition-[background-color,color,box-shadow] duration-140 cursor-pointer {{ $mutasiJenis === 'masuk' ? 'bg-up-mint text-ink-950 shadow-lg' : 'text-ink-400 hover:text-white' }}">
                         Pemasukan (Kas Masuk)
                     </button>
                 </div>

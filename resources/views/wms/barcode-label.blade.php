@@ -22,7 +22,7 @@
 </head>
 <body>
     <div class="no-print" style="padding:16px; font-family: Arial;">
-        <a href="javascript:window.print()" style="background:#5B4FE9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">🖨️ Cetak Label ({{ $produks->count() }} produk)</a>
+        <a href="javascript:window.print()" style="background:#4F46E5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold;">🖨️ Cetak Label ({{ $produks->count() }} produk)</a>
         <a href="javascript:history.back()" style="margin-left:10px;color:#555;">← Kembali</a>
     </div>
 

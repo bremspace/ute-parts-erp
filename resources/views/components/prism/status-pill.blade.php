@@ -34,9 +34,9 @@ $config = match(strtolower($status)) {
         'label' => ucfirst($status),
     ],
     default => [
-        'bg' => 'bg-white/10',
-        'text' => 'text-ink-100',
-        'border' => 'border-white/15',
+        'bg' => 'bg-black/5 dark:bg-white/10',
+        'text' => 'text-ink-700 dark:text-ink-200',
+        'border' => 'border-black/10 dark:border-white/15',
         'dot' => 'bg-ink-400',
         'label' => ucfirst($status),
     ],

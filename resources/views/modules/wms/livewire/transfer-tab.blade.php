@@ -30,21 +30,21 @@
                                 <button
                                     type="button"
                                     wire:click="bukaDetail({{ $trf->id }})"
-                                    class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-semibold text-xs transition-all cursor-pointer"
+                                    class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-semibold text-xs transition-[background-color,color] duration-140 cursor-pointer active:scale-95"
                                 >
                                     Detail
                                 </button>
                                 @if($trf->status === 'draft')
                                     <button
                                         wire:click="kirimTransfer({{ $trf->id }})"
-                                        class="px-3 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-semibold text-xs transition-all cursor-pointer"
+                                        class="px-3 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-semibold text-xs transition-[background-color,transform] duration-100 active:scale-95 cursor-pointer"
                                     >
                                         Kirim
                                     </button>
                                 @elseif($trf->status === 'dikirim')
                                     <button
                                         wire:click="terimaTransfer({{ $trf->id }})"
-                                        class="px-3 py-1 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs transition-all cursor-pointer"
+                                        class="px-3 py-1 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs transition-[opacity,transform] duration-100 active:scale-95 cursor-pointer"
                                     >
                                         Konfirmasi Terima
                                     </button>

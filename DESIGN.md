@@ -1,229 +1,162 @@
 ---
-name: Ute Prism
-description: Precision glassmorphism & electronics aesthetic for high-speed POS, service lifecycle, and mobile sparepart marketplace
+name: Ute Prism Enterprise
+description: Precision high-density operational aesthetic and fluid touch commerce for multi-branch hardware retail & repair lifecycle
 colors:
   primary: "#5B4FE9"
-  primary-dark: "#3B2FC9"
+  primary-hover: "#493ED9"
+  primary-active: "#3B2FC9"
   accent: "#E8873B"
   mint: "#1FBF8F"
   amber: "#F5A623"
   red: "#EF4444"
+  # Dark Spectrum (Backoffice Default - OLED/Neutral Slate)
   ink-950: "#070A14"
   ink-900: "#0B1020"
   ink-850: "#0E152B"
   ink-800: "#141D3A"
   ink-700: "#1E2B54"
   ink-600: "#334375"
+  # Neutral Light & Muted
   ink-500: "#64748B"
   ink-400: "#94A3B8"
-  ink-100: "#E2E8F0"
-  ink-50: "#F6F7FB"
+  ink-300: "#CBD5E1"
+  ink-200: "#E2E8F0"
+  ink-100: "#F1F5F9"
+  ink-50: "#F8FAFC"
+  white: "#FFFFFF"
 typography:
   display:
-    fontFamily: "Sora, Instrument Sans, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Plus Jakarta Sans, Instrument Sans, -apple-system, sans-serif"
     fontWeight: 700
-    lineHeight: 1.1
-    letterSpacing: "-0.02em"
+    lineHeight: 1.15
+    letterSpacing: "-0.025em"
   headline:
-    fontFamily: "Sora, Instrument Sans, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Plus Jakarta Sans, Instrument Sans, -apple-system, sans-serif"
     fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: "-0.01em"
+    lineHeight: 1.25
+    letterSpacing: "-0.015em"
   title:
     fontFamily: "Instrument Sans, ui-sans-serif, system-ui, sans-serif"
     fontWeight: 600
     lineHeight: 1.3
   body:
-    fontFamily: "Instrument Sans, Inter, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Instrument Sans, Inter, -apple-system, sans-serif"
     fontWeight: 400
     lineHeight: 1.5
-  label:
-    fontFamily: "Instrument Sans, ui-sans-serif, system-ui, sans-serif"
-    fontWeight: 500
-    lineHeight: 1.4
+    letterSpacing: "0em"
+  numbers:
+    fontFamily: "Instrument Sans, Inter, monospace"
+    fontVariantNumeric: "tabular-nums"
+    letterSpacing: "-0.01em"
 rounded:
+  xs: "4px"
   sm: "6px"
   md: "10px"
-  lg: "16px"
+  lg: "14px"
   xl: "20px"
   full: "9999px"
-spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "16px"
-  lg: "24px"
-  xl: "32px"
-components:
-  button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "#FFFFFF"
-    rounded: "{rounded.lg}"
-    padding: "10px 20px"
-  button-primary-hover:
-    backgroundColor: "{colors.primary-dark}"
-  button-accent:
-    backgroundColor: "{colors.accent}"
-    textColor: "#FFFFFF"
-    rounded: "{rounded.lg}"
-    padding: "10px 20px"
+elevation:
+  dark-surface: "0 0 0 1px rgba(255, 255, 255, 0.06), 0 8px 24px -4px rgba(0, 0, 0, 0.4)"
+  dark-popover: "0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 36px -6px rgba(0, 0, 0, 0.6)"
+  light-surface: "0 0 0 1px rgba(15, 23, 42, 0.06), 0 4px 20px -2px rgba(15, 23, 42, 0.04)"
+  light-popover: "0 0 0 1px rgba(15, 23, 42, 0.08), 0 16px 32px -4px rgba(15, 23, 42, 0.08)"
+motion:
+  ease-out-tactile: "cubic-bezier(0.23, 1, 0.32, 1)"
+  ease-drawer: "cubic-bezier(0.32, 0.72, 0, 1)"
+  press-duration: "100ms"
+  dialog-duration: "200ms"
 ---
 
-# Design System: Ute Prism
+# Design System: Ute Prism Enterprise
 
-## Overview
-**Ute Prism** memadukan presisi hardware/elektronika modern: panel kaca berlapis terstruktur (*glassmorphism*), aksen sirkuit halus (*circuit lines*), dan *tactile feedback* responsif untuk kecepatan kasir POS, lifecycle tiket servis, serta katalog sparepart pelanggan. Dibangun di atas TALL Stack (Tailwind CSS 4, Alpine.js, Laravel Livewire, Blade).
+## 1. Filosofi & Karakter Visual
 
-Sistem melayani 2 zona antarmuka utama:
-1. **Backoffice ERP/POS (`/app/*`):** Desktop-first, density tinggi, default *dark mode* (`--up-ink-900`) untuk kenyamanan teknisi/kasir, kontrol multi-cabang terisolasi, audit log, dan navigasi modular lengkap (Akunting, CRM, Dashboard, HR, Notifikasi, Omnichannel, POS, RBAC, Report, Reseller, Servis, Webhook, WMS, Workflow).
-2. **Marketplace Publik (`/` storefront):** Mobile-first, card padding lega, default *light mode*, responsive bottom navigation bar, touch-friendly checkout, Biteship ongkir selector, dan Duitku payment badge.
+**Ute Prism Enterprise** adalah sistem desain antarmuka berskala produksi untuk operasional toko fisik, teknisi reparasi, logistik, dan e-commerce suku cadang. Desain mengadopsi prinsip:
+- **Restrained Craft:** Menghindari elemen dekoratif berlebih. Blur dan material tembus cahaya diaplikasikan fungsional sebagai pembeda level kedalaman (elevation), bukan sekadar kosmetik.
+- **Physical Feel (Tactile):** Respon interaksi tombol dan dialog meniru mekanika hardware instan tanpa jeda perceptif.
+- **Data Densitas Tinggi Namun Teratur:** Backoffice memaksimalkan pemanfaatan ruang layar untuk efisiensi input, sementara Storefront memberikan ruang sentuh jempol (thumb-zone) yang lega.
 
 ---
 
-## 1. Arsitektur Zona Antarmuka
+## 2. Arsitektur Lintas Perangkat (Universal Ergonomics)
 
-### A. Backoffice (`/app/*`)
-- **Target Pengguna:** Kasir, teknisi servis, staf gudang (WMS), akuntan, supervisor, manajer cabang, superadmin.
-- **Strategi Layout:** Desktop-first (1024px+ optimal), responsive graceful degradation ke tablet & mobile.
-- **Theme Default:** Dark Mode (`bg-[#070A14]` / surface `bg-[#0B1020]`).
-- **Elemen Shell:**
-  - **Top Navigation Bar:** Multi-cabang switcher (`cabang_id` scope indicator), notifikasi queue indicator, profile switch, theme toggle (ADR 0008).
-  - **Sidebar Modular:** Navigasi 15 modul bisnis terkelompok secara hierarkis dengan badge status notifikasi/pending approvals.
-  - **Floating Action & Summary Bar (Mobile/Tablet View):** Di viewport kecil, aksi utama (Simpan, Bayar, Cetak, Filter) dan summary bar (Total Kas, Status Tiket) melayang di atas batas bawah layar dengan safe-area offset.
-  - **Audit Log Drawer / Trail:** Jejak modifikasi data dan aktor perubahan dapat diakses pada setiap record utama.
+### A. Large Screen / Desktop PC (≥ 1024px)
+- **POS Kasir:** Dual-pane view permanen (Kiri: Grid produk & search scanner; Kanan: Cart, multi-payment calculation, hotkeys F2/F4/F6/Esc).
+- **Backoffice Navigation:** Sidebar expanded modular atau icon rail kolapsibel (disimpan di `localStorage`).
+- **Data Table:** Sticky header padat, zebra striping tipis (`rgba(255,255,255,0.015)` dark), aksi row terlihat saat hover, kolom angka selalu `text-right tabular-nums`.
 
-### B. Marketplace Storefront (`/`)
-- **Target Pengguna:** Reseller, bengkel mitra, dan pelanggan ritel sparepart.
-- **Strategi Layout:** Mobile-first (375px - 430px optimal viewport), scale up ke desktop catalog grid.
-- **Theme Default:** Light Mode (`bg-[#F8FAFC]` / surface `bg-white` 72% glass opacity).
-- **Elemen Shell:**
-  - **Sticky Header:** Search bar ekspresif, pill filter kategori cepat, keranjang belanja counter.
-  - **Bottom Navigation Bar (Mobile):** Navigasi jempol (Home, Katalog, Pesanan, Akun Reseller/Member) dengan touch target 48×48px dan `pb-[env(safe-area-inset-bottom)]`.
-  - **Touch-Friendly Checkout:**
-    - Alamat & kalkulator ongkir kurir terintegrasi Biteship (multi-origin cabang terdekat).
-    - Status badge & kanal pembayaran Duitku (QRIS, VA, E-Wallet).
+### B. Tablet / POS Terminal Touchscreen (768px - 1023px)
+- **Sidebar:** Berubah otomatis menjadi icon rail atau off-canvas drawer untuk memaksimalkan area kerja teknisi dan kasir.
+- **Touch Sizing:** Seluruh target sentuh otomatis dinaikkan ke minimal **44×44px**.
+- **Servis Board:** Kanban kolom dapat di-swipe secara horizontal dengan snapping halus (`scroll-snap-type: x mandatory`).
+
+### C. Smartphone / Mobile Web (375px - 430px)
+- **Storefront Marketplace:**
+  - Sticky header dengan pencarian cepat dan keranjang belanja mengambang.
+  - Floating Bottom Navigation Bar (Home, Booking, Keranjang, Akun) terikat ke `env(safe-area-inset-bottom)`.
+  - Transisi modal menggunakan **Bottom Sheet (Drawer)** yang dapat digeser (drag to dismiss) dengan batas kecepatan flick/velocity (Emil framework: velocity > 0.11 memicu dismiss instan).
+- **Pencegahan Zoom iOS:** Seluruh `<input>`, `<select>`, dan form kontrol menggunakan ukuran minimal `16px` (`text-base` pada mobile) untuk mencegah viewport auto-zoom Safari.
 
 ---
 
-## 2. Color System & Tokens
+## 3. Motion & Animation Decision Rules (Emil Kowalski Standard)
 
-### Core Palette
-- **Primary (`#5B4FE9` - Electric Indigo):** Aksi primer, focus rings, link aktif, brand accents.
-- **Primary Dark (`#3B2FC9`):** State hover/active tombol primer.
-- **Accent (`#E8873B` - Solder Copper):** Komisi reseller, tier customer (Gold/Platinum), highlight promosi.
-- **Mint (`#1FBF8F` - Signal Mint):** Transaksi sukses/lunas, stok aman, indikator servis selesai, sinyal webhook/printer aktif.
-- **Amber (`#F5A623`):** Peringatan stok menipis, servis menunggu persetujuan (approval pending), workflow review.
-- **Red (`#EF4444`):** Validasi error, stok habis/kritis, transaksi dibatalkan, tiket servis ditolak.
-
-### Ink & Neutral Spectrum
-- **Dark Mode (Backoffice default):**
-  - App Canvas: `#070A14` (`ink-950`)
-  - Elevated Surface: `#0B1020` (`ink-900`) / `#0E152B` (`ink-850`)
-  - Border Glass: `rgba(255, 255, 255, 0.08)`
-  - Text Primary: `#F6F7FB` (`ink-50`)
-  - Text Muted: `#94A3B8` (`ink-400`) / `#64748B` (`ink-500`)
-- **Light Mode (Marketplace default):**
-  - Canvas: `#F8FAFC`
-  - Elevated Surface: `#FFFFFF` (opacity 72% + blur)
-  - Border Glass: `rgba(15, 23, 42, 0.1)`
-  - Text Primary: `#0F172A`
-  - Text Muted: `#64748B`
+### A. Aturan Waktu & Easing
+1. **Tombol & Aksi Sentuh:**
+   - Feedback tekan: `:active { transform: scale(0.97); }`
+   - Durasi: `100ms` - `140ms` dengan `transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1)`.
+2. **Modal & Dialog:**
+   - Masuk: `opacity: 0; transform: scale(0.96);` menuju `opacity: 1; transform: scale(1);`.
+   - Durasi: Maksimal `180ms - 220ms` (`ease-out`).
+   - Dilarang keras memulai animasi dari `scale(0)`.
+3. **Dropdown & Popover:**
+   - Wajib menggunakan `transform-origin` dinamis sesuai titik tombol trigger.
+   - Durasi: `150ms` `ease-out`.
+4. **Keyboard-Triggered Actions:**
+   - Operasi shortcut kasir (F2, F4, Enter) dilarang memiliki animasi buka-tutup lambat. Dialog pembayaran kasir harus muncul instan (<80ms) agar tidak memperlambat antrean toko.
+5. **Aksesibilitas Gerak:**
+   - Hormati `@media (prefers-reduced-motion: reduce)` dengan mematikan semua transformasi spasial (`transform`), hanya mempertahankan transisi `opacity` lembut.
 
 ---
 
-## 3. Typography & Numerical Rules
+## 4. Format Keuangan & Numerik (Mandatori Non-Negotiable)
 
-### Font Families
-- **Display & Headings:** `Sora` atau `Instrument Sans` (modern, geometric, kesan presisi hardware).
-- **Body & Controls:** `Instrument Sans` / `Inter` (keterbacaan prima, optimal di resolusi tinggi/rendah).
-
-### Format Angka & Keuangan (Mandatori)
-- **Aturan `tabular-nums`:** Wajib diterapkan (`font-variant-numeric: tabular-nums` / class Tailwind `.tabular-nums`) pada:
-  - Nominal mata uang (Rupiah dengan pemisah ribuan titik sesuai ADR 0011, contoh: `Rp 1.250.000`).
-  - Kuantitas stok gudang (WMS) dan jumlah keranjang POS.
-  - Kode SKU, Barcode, nomor resi, nomor seri part.
-  - Nomor jurnal akuntansi dan nomor tiket servis (`SRV-202610-0001`).
-  - Timestamp jam/menit transaksi.
-- Mencegah pergeseran lebar kolom (layout shifting) saat data angka berubah dinamis via Livewire polling atau kalkulasi POS realtime.
+1. **Tabular Figures:**
+   - Seluruh elemen yang menampilkan angka harga, kuantitas stok, nomor SKU, nomor tiket servis (`SRV-XXXXXXXX`), nomor jurnal, dan jam wajib memiliki kelas `.tabular-nums`.
+2. **Pemisah Ribuan Titik (Format Indonesia):**
+   - Mengikuti ADR 0011: Format nominal Rupiah menggunakan titik sebagai pemisah ribuan (contoh: `Rp 1.450.000`), bukan koma.
+3. **Alignment Tabel:**
+   - Kolom nama dan teks: Rata Kiri (`text-left`).
+   - Kolom stok, kuantitas, harga, total, status keuangan: Rata Kanan (`text-right`).
+   - Kolom status pill & badge: Rata Tengah (`text-center`).
 
 ---
 
-## 4. Spesifikasi Komponen (Ute Prism UI)
+## 5. Komponen Standar Ute Prism Enterprise
 
-### A. Surface & Buttons
-- **`GlassCard`:** Kontainer berlapis `backdrop-blur-md`, subtle border highlight (`border-white/10` dark, `border-slate-200/60` light), sudut lengkung `rounded-xl` atau `rounded-2xl`.
-- **`PrismButton`:** Tombol tactile presisi dengan feedback `:active:scale-[0.97]` dan transisi eksplisit `160ms cubic-bezier(0.23, 1, 0.32, 1)`. Varian: Primary (Indigo), Accent (Copper), Danger (Red), Ghost/Outline.
-- **`TierBadge`:** Badge klasifikasi tier customer/reseller (Standard, Silver, Gold, Platinum) dengan aksen gradasi tembaga dan border mikro.
-- **`StatusPill`:** Indikator status terstandarisasi dengan kontras rasio WCAG AA minimal 4.5:1. Dilengkapi dot indicator opsional.
-- **`StockGauge`:** Barometer visual level stok produk (Merah = Kritis, Kuning = Menipis, Mint = Aman).
-- **`Toast` & `ConfirmDialog`:** Feedback asinkron Livewire tanpa blocking layar kasir; dialog konfirmasi non-destruktif vs destruktif dengan keyboard trigger (Enter/Esc).
-
-### B. Data Table, Filter Bar & Drilldown Viewer
-- **`DataTable`:**
-  - Header sticky dengan background padat saat scrolling.
-  - Baris zebra striping halus (`even:bg-white/[0.02]` dark).
-  - Column alignment: Teks rata kiri, angka/finansial rata kanan (`text-right tabular-nums`), aksi rata tengah.
-  - Touch-safe horizontal overflow wrapper (`overflow-x-auto`).
-- **Filter Periode Terintegrasi:**
-  - Kontrol rentang tanggal kompak: `Tanggal Mulai` — `Tanggal Akhir` berdampingan dengan shortcut periode (Hari Ini, 7 Hari, Bulan Ini).
-  - Tombol aksi filter terpadu: `Terapkan` & `Reset` berdampingan tanpa makan ruang vertikal berlebih.
-- **Drilldown Viewer UI:**
-  - Dual Mode: Tabel Ringkasan (Agregat) dan Detail Modal/Drawer Drilldown.
-  - **Kurasi Kolom Bisnis:** Menampilkan label human-readable terkurasi (contoh: *Nomor Jurnal*, *Akun COA*, *Cabang*, *Debet*, *Kredit*). Dilarang keras membocorkan metadata internal ORM/Eloquent (`id`, `created_at_epoch`, `deleted_at`, foreign key mentah).
-- **Aturan Action Button Export:**
-  - Tombol Export (Excel / CSV / PDF) **hanya diizinkan** pada view data yang telah terkurasi (contoh: di Drilldown Viewer atau Master Produk per tier harga).
-  - Tombol export dilarang ditempatkan pada form query builder mentah atau dump table tak terstruktur.
-  - Memanfaatkan async export queue (ADR / constraints 1GB RAM) untuk mencegah timeout server.
-
-### C. POS (Point of Sale) Screen
-- **Dual-Pane Kasir Layout:** Kiri = Catalog/Barcode search & quick grid; Kanan = Keranjang transaksi, subtotal, diskon, tombol bayar.
-- **`BarcodeScanInput`:**
-  - Input field autofocus dengan listener keydown instan (intersep input hardware scanner barcode).
-  - Indikator status visual (indigo glow saat idle, mint pulse saat barcode terdeteksi).
-- **Quick Payment Calculator:** Numpad virtual + pecahan uang cepat (Rp 20.000, Rp 50.000, Rp 100.000, Uang Pas) dengan kalkulasi kembalian realtime tabular-nums.
-- **Park / Hold Modal:** Fitur simpan sementara keranjang transaksi saat pelanggan mengambil barang tambahan, dengan recall instan via satu sentuhan.
-- **Thermal Print Layout (ADR 0009):** View cetak struk ESC/POS monokrom 58mm / 80mm presisi, auto-cut trigger, tanpa elemen web styling non-thermal.
-
-### D. Servis Kanban & Lifecycle
-- **Board Kolom State Machine:**
-  - Menunggu (`status: menunggu` - Amber)
-  - Proses / Estimasi (`status: proses` - Indigo)
-  - Selesai (`status: selesai` - Mint)
-  - Dibatalkan / Ditolak (`status: dibatalkan` - Red)
-- **Strict Transition Guard:** Tidak ada pergeseran kartu mundur kecuali dilakukan via role admin/supervisor dengan modal alasan override.
-- **Part vs Jasa Itemization:** Visualisasi pembeda jelas antara item sparepart (disertai indikator potong stok gudang) dan item jasa servis teknisi.
-- **Public Approval Token View:** Halaman ringkas mobile-friendly untuk pelanggan menyetujui estimasi biaya via token tautan tanpa harus login ke sistem.
+| Komponen | Spesifikasi Visual Dark Mode | Spesifikasi Visual Light Mode | Interaksi & State |
+| :--- | :--- | :--- | :--- |
+| **`GlassCard`** | Background `rgba(14, 21, 43, 0.75)`, border `rgba(255,255,255,0.06)`, radius `rounded-xl`. | Background `rgba(255,255,255,0.92)`, border `rgba(15,23,42,0.06)`, radius `rounded-xl`. | Hover elevation ringan bila bertindak sebagai tautan/kartu interaktif. |
+| **`PrismButton`** | Solid Electric Indigo (`#5B4FE9`), hover `#493ED9`, active scale `0.97`. | Solid Electric Indigo (`#5B4FE9`), teks putih, active scale `0.97`. | Non-disabled cursor pointer, transisi transform spesifik. |
+| **`StatusPill`** | Background opacity `15%`, border tint `30%`, teks terang dengan kontras WCAG AA ≥ 4.5:1. | Background opacity `12%`, teks pekat terbaca jelas. | Dot indikator opsional berkedip hanya untuk status kritis/proses. |
+| **`StockGauge`** | Barometer visual: Hijau Mint (`≥ min*2`), Kuning Amber (`≤ min`), Merah Kritis (`0`). | Sama dengan versi dark. | Tooltip rincian unit stok riil per gudang/cabang. |
+| **`DataTable`** | Dual-scroll horizontal bila overflow, sticky header latar pekat `bg-ink-900`. | Sticky header `bg-white`, zebra striping halus `bg-slate-50/50`. | Baris transisi hover `bg-white/[0.03]` tanpa pergeseran layout. |
+| **`BarcodeScanInput`** | Border glow Electric Indigo saat fokus, mint flash 120ms saat scan sukses. | Border glow Electric Indigo saat fokus, mint flash 120ms saat scan sukses. | Autofocus aman, listener hardware scanner terisolasi. |
 
 ---
 
-## 5. Theme System & Ergonomi (ADR 0008, 0010)
-
-### Strategi Tema
-- Menggunakan strategi kelas Tailwind `dark:`.
-- Sinkronisasi dwiarah: Tersimpan di `localStorage` klien dan tersinkronisasi ke preferensi user di database saat login.
-- Backoffice default `dark:`, Storefront default `light:` (tetap menghormati toggle pengguna).
-
-### Ergonomi Mobile & Sentuh
-- **Minimum Touch Target:** Area sentuh interaktif minimal **44×44px** (tombol kasir, nav link, row expander, checkbox).
-- **Mencegah Auto-Zoom iOS:** Seluruh input teks, select, dan barcode input memiliki font-size minimal **16px (1rem)** di layar mobile (`text-base`).
-- **Safe-Area Insets:** Elemen sticky/fixed wajib menerapkan:
-  - Header: `pt-[env(safe-area-inset-top)]`
-  - Bottom Bar / Floating Bar: `pb-[env(safe-area-inset-bottom)]`
-
----
-
-## 6. Do's and Don'ts
+## 6. Do's and Don'ts (Quality Bar)
 
 ### DO
-- **DO:** Gunakan `tabular-nums` untuk semua angka rupiah, stok, jam, nomor transaksi, dan kuantitas.
-- **DO:** Gunakan format ribuan titik khas Indonesia (ADR 0011) di seluruh layer tampilan pengguna.
-- **DO:** Pastikan dropdown cabang pada backoffice selalu terlihat jelas agar operator sadar scope cabang aktif.
-- **DO:** Terapkan transisi micro-interaction cepat (<200ms) dengan feedback tactile `:active:scale-[0.97]` pada tombol.
-- **DO:** Sediakan empty states yang informatif dan ramah saat hasil filter atau pencarian barcode kosong.
+- Gunakan kurva bezier kustom `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)`.
+- Pastikan area sentuh tombol aksi utama minimal 44×44px di seluruh breakpoint.
+- Selalu cantumkan label status cabang aktif pada header atau sidebar backoffice.
+- Berikan empty-state visual yang elegan dan jelas saat data tabel atau pencarian kosong.
+- Gunakan drawer/bottom-sheet native gesture saat diakses lewat mobile.
 
 ### DON'T
-- **DON'T:** JANGAN gunakan `transition: all`. Tentukan properti transisi secara spesifik (`transform`, `opacity`, `background-color`, `border-color`).
-- **DON'T:** JANGAN gunakan motif dekoratif circuit line di dalam baris data table atau invoice thermal. Hanya izinkan di background hero, divider login, atau watermarking status.
-- **DON'T:** JANGAN mengekspos ID database mentah atau properti ORM di UI Drilldown / tabel audit log.
-- **DON'T:** JANGAN letakkan tombol export di luar view data yang terkurasi.
-- **DON'T:** JANGAN izinkan transisi status tiket servis bergerak mundur secara bebas di UI Kanban.
-- **DON'T:** JANGAN biarkan input form di bawah 16px pada viewport mobile yang memicu zoom otomatis iOS.
+- DILARANG menggunakan `transition: all`. Tentukan properti eksplisit (`transition: transform 120ms ease-out, opacity 120ms ease-out`).
+- DILARANG menggunakan `transform: scale(0)` untuk transisi masuk elemen.
+- DILARANG menggunakan animasi lambat (>200ms) untuk alur kerja transaksi kasir atau scanning barcode.
+- DILARANG menggunakan font berukuran di bawah 16px untuk elemen input pada layar mobile.
+- DILARANG membocorkan ID foreign key internal atau timestamp database mentah di antarmuka publik atau drilldown viewer.

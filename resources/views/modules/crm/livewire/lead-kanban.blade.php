@@ -102,7 +102,7 @@
                     <div class="flex items-center gap-2 text-[11px]">
                         <span class="w-24 truncate text-ink-300">{{ $stageMeta['label'] }}</span>
                         <div class="flex-1 h-3 rounded bg-white/5 overflow-hidden border border-white/5">
-                            <div class="h-full {{ $barClass }} transition-all duration-500"
+                            <div class="h-full {{ $barClass }} transition-[width] duration-500"
                                  style="width: {{ max(2, (int) round(($count / $maxCount) * 100)) }}%"></div>
                         </div>
                         <span class="tabular-nums text-white font-semibold w-6 text-right">{{ $count }}</span>
@@ -209,7 +209,7 @@
                                 @if($lead->stage === 'won' && ! $lead->pelanggan_id)
                                     <button type="button"
                                             wire:click="confirmConvert({{ $lead->id }})"
-                                            class="w-full mt-2.5 py-1.5 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 border border-up-mint/30 text-up-mint font-bold text-[10px] transition-all cursor-pointer">
+                                            class="w-full mt-2.5 py-1.5 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 border border-up-mint/30 text-up-mint font-bold text-[10px] transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer">
                                         ⇄ Konversi ke Pelanggan
                                     </button>
                                 @endif
@@ -219,13 +219,13 @@
                                     <button type="button"
                                             wire:click="openEditModal({{ $lead->id }})"
                                             @click="pendingStage = null"
-                                            class="px-2 py-1 rounded-md bg-white/5 hover:bg-up-primary/20 hover:text-white text-ink-300 font-semibold text-[10px] transition-all cursor-pointer"
+                                            class="px-2 py-1 rounded-md bg-white/5 hover:bg-up-primary/20 hover:text-white text-ink-300 font-semibold text-[10px] transition-[background-color,color] duration-140 cursor-pointer active:scale-95"
                                             title="Edit lead">
                                         ✎ Edit
                                     </button>
                                     <button type="button"
                                             wire:click="confirmDelete({{ $lead->id }})"
-                                            class="px-2 py-1 rounded-md bg-white/5 hover:bg-up-red/20 hover:text-up-red text-ink-400 font-semibold text-[10px] transition-all cursor-pointer"
+                                            class="px-2 py-1 rounded-md bg-white/5 hover:bg-up-red/20 hover:text-up-red text-ink-400 font-semibold text-[10px] transition-[background-color,color] duration-140 cursor-pointer active:scale-95"
                                             title="Hapus lead">
                                         🗑 Hapus
                                     </button>

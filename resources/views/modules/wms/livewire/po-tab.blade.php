@@ -42,9 +42,10 @@
                                     <button wire:click="konfirmasiUsulan({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-accent hover:brightness-110 text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Konfirmasi</button>
                                 @elseif($po->status === 'draft')
                                     <button wire:click="kirimPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Kirim</button>
-                                    <button wire:click="terimaPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-mint text-ink-950 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Terima</button>
                                 @elseif($po->status === 'dikirim')
-                                    <button wire:click="terimaPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-mint text-ink-950 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Terima</button>
+                                    <button wire:click="terimaPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97] inline-flex items-center gap-1" title="Input GRN Penerimaan Barang">
+                                        📦 Terima (GRN)
+                                    </button>
                                 @endif
                                 <button wire:click="bukaDetailPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Detail</button>
                                 @if($po->status === 'diterima' && $po->sisa > 0)
@@ -653,7 +654,7 @@
                                                 📊
                                             </button>
                                             @if($item['action'] === 'ORDER')
-                                                <button wire:click="terapkanKePo({{ $item['produk_id'] }}, {{ $item['recommended_order'] }})" class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/20 transition-all cursor-pointer whitespace-nowrap">
+                                                <button wire:click="terapkanKePo({{ $item['produk_id'] }}, {{ $item['recommended_order'] }})" class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/20 transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer whitespace-nowrap">
                                                     + Buat PO
                                                 </button>
                                             @else

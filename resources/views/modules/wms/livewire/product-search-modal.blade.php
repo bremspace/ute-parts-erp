@@ -24,13 +24,13 @@
 
         <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
             <div x-show="show"
-                 x-transition:enter="ease-out duration-300"
-                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave="ease-in duration-200"
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 class="relative transform overflow-hidden rounded-3xl glass-panel border border-white/10 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-3xl bg-[#0e1017]/95 text-white">
+                 x-transition:enter="ease-out duration-150"
+                 x-transition:enter-start="opacity-0 scale-[0.97]"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="ease-in duration-100"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-[0.97]"
+                 class="relative transform overflow-hidden rounded-3xl glass-panel border border-white/10 text-left shadow-2xl transition-[opacity,transform] sm:my-8 sm:w-full sm:max-w-3xl bg-[#0e1017]/95 text-white">
 
                 <!-- Header -->
                 <div class="px-6 pt-6 pb-4 border-b border-white/10 flex items-center justify-between">

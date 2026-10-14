@@ -9,7 +9,7 @@
             <h2 class="text-lg font-bold text-ink-900 dark:text-white">Komponen Tidak Ditemukan</h2>
             <p class="text-xs text-ink-500 dark:text-ink-400">Item ini mungkin telah diarsipkan atau dipindahkan.</p>
             <a href="{{ route('shop') }}"
-               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 font-semibold text-xs transition-all active:scale-[0.97]">
+               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 font-semibold text-xs transition-[background-color,transform] duration-140 active:scale-[0.97]">
                 <span>Kembali ke Katalog</span>
             </a>
         </div>
@@ -35,7 +35,7 @@
                 <!-- Main Stage Canvas -->
                 <div class="aspect-square bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/90 dark:border-white/[0.08] flex items-center justify-center overflow-hidden relative shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
                     <template x-if="activeFoto">
-                        <img :src="activeFoto" alt="{{ $produk->nama }}" class="w-full h-full object-cover transition-all duration-300">
+                        <img :src="activeFoto" alt="{{ $produk->nama }}" class="w-full h-full object-cover transition-opacity duration-200">
                     </template>
                     <template x-if="!activeFoto">
                         <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-8 text-center">
@@ -55,7 +55,7 @@
                                 type="button"
                                 x-on:click="activeFoto = '{{ $item['url'] }}'"
                                 :class="activeFoto === '{{ $item['url'] }}' ? 'ring-2 ring-up-primary dark:ring-white scale-100 opacity-100' : 'opacity-60 hover:opacity-100 scale-95'"
-                                class="w-14 sm:w-18 h-14 sm:h-18 rounded-2xl overflow-hidden border border-ink-200/80 dark:border-white/10 flex-shrink-0 transition-all duration-200 cursor-pointer bg-white dark:bg-ink-900"
+                                class="w-14 sm:w-18 h-14 sm:h-18 rounded-2xl overflow-hidden border border-ink-200/80 dark:border-white/10 flex-shrink-0 transition-[opacity,transform] duration-140 cursor-pointer bg-white dark:bg-ink-900"
                             >
                                 <img src="{{ $item['thumb'] ?? $item['url'] }}" alt="Thumbnail" class="w-full h-full object-cover">
                             </button>
@@ -142,7 +142,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('selectedVariantId', {{ $v->id }})"
-                                    class="px-4 py-2.5 rounded-2xl border text-xs font-semibold transition-all duration-200 cursor-pointer active:scale-[0.96] flex items-center gap-2 {{ $selectedVariantId === $v->id ? 'border-ink-900 bg-ink-900 text-white dark:border-white dark:bg-white dark:text-ink-950 shadow-sm' : 'border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 bg-white dark:bg-ink-900 hover:border-ink-400' }}"
+                                    class="px-4 py-2.5 rounded-2xl border text-xs font-semibold transition-[background-color,border-color,color,transform] duration-140 cursor-pointer active:scale-[0.96] flex items-center gap-2 {{ $selectedVariantId === $v->id ? 'border-ink-900 bg-ink-900 text-white dark:border-white dark:bg-white dark:text-ink-950 shadow-sm' : 'border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 bg-white dark:bg-ink-900 hover:border-ink-400' }}"
                                 >
                                     <span>{{ $v->nama_varian }}</span>
                                     <span class="text-[10px] opacity-60 tabular-nums">({{ $vStok }})</span>
@@ -179,7 +179,7 @@
 
                     <div class="pt-5">
                         <div class="flex items-center gap-1.5 text-xs font-semibold {{ $stokTotal > 0 ? 'text-up-mint' : 'text-up-red' }}">
-                            <span class="w-2 h-2 rounded-full {{ $stokTotal > 0 ? 'bg-up-mint shadow-[0_0_8px_rgba(31,191,143,0.8)]' : 'bg-up-red' }}"></span>
+                            <span class="w-2 h-2 rounded-full {{ $stokTotal > 0 ? 'bg-up-mint' : 'bg-up-red' }}"></span>
                             <span>{{ $stokTotal > 0 ? $stokTotal . ' unit tersedia' : 'Stok habis' }}</span>
                         </div>
                         <p class="text-[11px] text-ink-400">Siap diproses hari ini</p>
@@ -192,7 +192,7 @@
                         type="button"
                         wire:click="addToCart"
                         {{ $stokTotal <= 0 ? 'disabled' : '' }}
-                        class="flex-1 py-4 px-6 rounded-2xl font-bold text-sm tracking-tight transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-up-primary hover:bg-up-primary-dark text-white shadow-[0_8px_24px_rgba(91,79,233,0.3)] active:scale-[0.97] min-h-[48px] flex items-center justify-center gap-2"
+                        class="flex-1 py-4 px-6 rounded-2xl font-bold text-sm tracking-tight transition-[background-color,transform] duration-140 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-up-primary hover:bg-up-primary-dark text-white shadow-sm shadow-up-primary/25 active:scale-[0.97] min-h-[48px] flex items-center justify-center gap-2"
                     >
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -201,7 +201,7 @@
                     </button>
                     @if(auth('customer')->user())
                         <a href="{{ route('checkout') }}"
-                           class="px-8 py-4 rounded-2xl font-bold text-sm bg-ink-900 text-white dark:bg-white dark:text-ink-950 hover:opacity-90 transition-all duration-200 cursor-pointer min-h-[48px] flex items-center justify-center active:scale-[0.97] shadow-sm">
+                           class="px-8 py-4 rounded-2xl font-bold text-sm bg-ink-900 text-white dark:bg-white dark:text-ink-950 hover:opacity-90 transition-[opacity,transform] duration-140 cursor-pointer min-h-[48px] flex items-center justify-center active:scale-[0.97] shadow-sm">
                             Beli Langsung
                         </a>
                     @endif
@@ -252,7 +252,7 @@
                         <div class="space-y-2">
                             @foreach($produk->produkKompatibel as $pk)
                                 <a href="{{ route('shop.detail', $pk->slug) }}"
-                                   class="flex items-center justify-between p-3 rounded-2xl border border-ink-100/80 dark:border-white/10 bg-white dark:bg-ink-900 hover:border-up-primary/40 transition-all duration-200 group min-w-0 gap-2">
+                                   class="flex items-center justify-between p-3 rounded-2xl border border-ink-100/80 dark:border-white/10 bg-white dark:bg-ink-900 hover:border-up-primary/40 transition-[border-color,background-color] duration-140 group min-w-0 gap-2">
                                     <div class="flex items-center gap-3 min-w-0 flex-1">
                                         <div class="w-11 h-11 rounded-xl overflow-hidden bg-ink-50 dark:bg-ink-950 flex-shrink-0">
                                             @if($pk->thumbnail_url ?: $pk->gambar)
@@ -310,7 +310,7 @@
                 type="button"
                 wire:click="addToCart"
                 {{ $stokTotal <= 0 ? 'disabled' : '' }}
-                class="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-up-primary hover:bg-up-primary-dark text-white shadow-md active:scale-[0.96] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 min-h-[44px] flex-shrink-0"
+                class="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-up-primary hover:bg-up-primary-dark text-white shadow-md active:scale-[0.96] transition-[background-color,transform] duration-140 flex items-center gap-1.5 cursor-pointer disabled:opacity-40 min-h-[44px] flex-shrink-0"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />

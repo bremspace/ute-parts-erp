@@ -9,7 +9,7 @@ $styles = match($tierLower) {
     'gold' => 'bg-gradient-to-r from-amber-400 to-amber-600 text-ink-950 font-bold shadow-md shadow-amber-500/20 border border-amber-300/50',
     'silver' => 'bg-gradient-to-r from-slate-400 to-slate-500 text-white font-semibold border border-slate-300/30',
     'reseller' => 'bg-gradient-to-r from-up-accent to-amber-500 text-white font-bold shadow-md shadow-up-accent/20 border border-up-accent/40',
-    default => 'bg-white/10 text-ink-400 border border-white/10',
+    default => 'bg-black/5 dark:bg-white/10 text-ink-600 dark:text-ink-300 border border-black/10 dark:border-white/10',
 };
 @endphp
 

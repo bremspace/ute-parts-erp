@@ -159,7 +159,7 @@
                 <button
                     type="button"
                     @click="webPrint58()"
-                    class="w-full py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-xs shadow-lg shadow-up-mint/20 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 transition-all"
+                    class="w-full py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-xs shadow-sm shadow-up-mint/25 cursor-pointer min-h-[42px] flex items-center justify-center gap-2 transition-[opacity,transform] duration-100 active:scale-[0.98]"
                     title="Cetak struk 58mm presisi tanpa margin via USB / Browser dialog"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
@@ -172,7 +172,7 @@
                         type="button"
                         @click="printStruk58()"
                         :disabled="isPrinting"
-                        class="flex-1 py-2 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-[11px] border border-up-mint/30 cursor-pointer min-h-[38px] flex items-center justify-center gap-1 transition-all disabled:opacity-50"
+                        class="flex-1 py-2 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-[11px] border border-up-mint/30 cursor-pointer min-h-[38px] flex items-center justify-center gap-1 transition-[background-color,transform] duration-100 active:scale-[0.98] disabled:opacity-50"
                         title="Cetak via Bluetooth BLE tanpa driver"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
@@ -182,7 +182,7 @@
                     <button
                         type="button"
                         @click="webPrint80()"
-                        class="flex-1 py-2 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-[11px] border border-white/10 cursor-pointer min-h-[38px] flex items-center justify-center gap-1 transition-all"
+                        class="flex-1 py-2 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-[11px] border border-white/10 cursor-pointer min-h-[38px] flex items-center justify-center gap-1 transition-[background-color,transform] duration-100 active:scale-[0.98]"
                         title="Cetak format lebar 80mm"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -202,7 +202,7 @@
                         href="{{ $waLink }}"
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="w-full py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs shadow-md shadow-[#25D366]/20 cursor-pointer min-h-[40px] flex items-center justify-center gap-2 transition-all no-underline"
+                        class="w-full py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs shadow-md shadow-[#25D366]/20 cursor-pointer min-h-[40px] flex items-center justify-center gap-2 transition-[background-color,transform] duration-100 active:scale-[0.98] no-underline"
                         title="Buka WhatsApp langsung (Aplikasi di HP / WhatsApp Web di PC) dengan draft pesan struk belanja siap kirim"
                     >
                         <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.174.086.275.073.376-.044.101-.116.433-.506.549-.68.116-.173.231-.144.39-.086s1.011.477 1.184.564.289.13.332.203c.043.072.043.419-.101.824z"/></svg>

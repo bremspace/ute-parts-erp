@@ -111,7 +111,7 @@
                                     <button
                                         type="button"
                                         @click="saveFlexHarga('{{ $key }}')"
-                                        class="flex-1 py-2 rounded-lg bg-up-amber hover:opacity-90 text-ink-950 font-bold text-xs transition-all cursor-pointer min-h-[40px]"
+                                        class="flex-1 py-2 rounded-lg bg-up-amber hover:opacity-90 text-ink-950 font-bold text-xs transition-[opacity,transform] duration-100 active:scale-[0.98] cursor-pointer min-h-[40px]"
                                     >
                                         Simpan
                                     </button>
@@ -138,7 +138,7 @@
                     <div class="flex items-center gap-1.5">
                         <button
                             wire:click="updateQty('{{ $key }}', -1)"
-                            class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
+                            class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-sm font-bold transition-[background-color,transform] duration-100 cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
                             aria-label="Kurangi jumlah">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4" />
@@ -147,7 +147,7 @@
                         <span class="w-7 text-center text-sm font-bold tabular-nums text-white">{{ $item['qty'] }}</span>
                         <button
                             wire:click="updateQty('{{ $key }}', 1)"
-                            class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
+                            class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center text-sm font-bold transition-[background-color,transform] duration-100 cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
                             aria-label="Tambah jumlah">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
@@ -155,7 +155,7 @@
                         </button>
                         <button
                             wire:click="removeFromCart('{{ $key }}')"
-                            class="w-8 h-8 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red flex items-center justify-center transition-all cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
+                            class="w-8 h-8 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red flex items-center justify-center transition-[background-color,transform] duration-100 cursor-pointer active:scale-95 min-h-[36px] min-w-[36px]"
                             aria-label="Hapus item">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
@@ -217,7 +217,7 @@
         </button>
         <button
             wire:click="openPaymentModal"
-            class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-md cursor-pointer min-h-[44px]"
+            class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-sm shadow-up-primary/25 cursor-pointer min-h-[44px]"
         >
             Bayar (F4)
         </button>
@@ -226,16 +226,16 @@
     <!-- Transaction Hold Buttons -->
     <div class="flex gap-2 pt-2 border-t border-white/5">
         <button
-            wire:click="holdTransaction"
+            wire:click="tahanTransaksi"
             class="flex-1 py-3 rounded-xl bg-up-amber/15 hover:bg-up-amber/25 text-up-amber border border-up-amber/30 font-semibold text-sm cursor-pointer min-h-[44px]"
         >
             Tahan (F6)
         </button>
         <button
-            wire:click="showHeldTransactions"
+            wire:click="$toggle('showDitahanPanel')"
             class="flex-1 py-3 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 font-semibold text-sm cursor-pointer min-h-[44px]"
         >
-            Ditahan
+            Ditahan ({{ count($ditahanList ?? []) }})
         </button>
     </div>
 </div>

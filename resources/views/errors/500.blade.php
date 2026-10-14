@@ -10,9 +10,7 @@
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-ink-950 text-ink-100 font-sans antialiased min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-up-red/20 rounded-full blur-[128px] pointer-events-none"></div>
-
+<body class="bg-[#090D16] text-ink-100 font-sans antialiased min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
     <div class="w-full max-w-md relative z-10 text-center">
         <div class="mb-5 flex justify-center">
             <x-prism.logo size="md" :with-text="true" mode="dark" subtitle="Pemulihan Sistem" :href="url('/')" />

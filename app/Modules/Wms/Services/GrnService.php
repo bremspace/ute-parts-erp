@@ -77,8 +77,9 @@ class GrnService
      * @param  array<int|string, int>  $itemReceived  [kunci "produk|sku" (komposit) ATAU produk_id => qty]
      * @param  array<int|string, array<int, string>>  $snPerProduk  [kunci sama => [SN, ...]] — hanya utk produk sn=true
      * @param  array<int|string, float>  $itemHargaBeli  [kunci sama => harga_beli aktual saat GRN]
+     * @param  array<int|string, int|null>  $itemRakId  [kunci sama => rak_id tujuan penerimaan]
      */
-    public function inputGudang(PurchaseOrder $po, array $itemReceived, ?int $userId = null, array $snPerProduk = [], array $itemHargaBeli = []): Grn
+    public function inputGudang(PurchaseOrder $po, array $itemReceived, ?int $userId = null, array $snPerProduk = [], array $itemHargaBeli = [], array $itemRakId = []): Grn
     {
         $cabangId = $po->gudangTujuan?->cabang_id;
         if (! $cabangId) {
@@ -96,7 +97,7 @@ class GrnService
 
         $pemohon = ApprovalService::pemohon($userId ?? auth()->id());
 
-        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $pemohon, $cabangId) {
+        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $itemRakId, $pemohon, $cabangId) {
             $itemData = [];
             $totalHpp = 0;
             $needsApproval = false;
@@ -132,6 +133,10 @@ class GrnService
                     ? (float) $itemHargaBeli[$kunci]
                     : (isset($itemHargaBeli[$kodeProduk]) ? (float) $itemHargaBeli[$kodeProduk] : (float) $poItem->harga_beli);
 
+                $rakId = isset($itemRakId[$kunci])
+                    ? ($itemRakId[$kunci] ? (int) $itemRakId[$kunci] : null)
+                    : (isset($itemRakId[$kodeProduk]) ? ($itemRakId[$kodeProduk] ? (int) $itemRakId[$kodeProduk] : null) : null);
+
                 $itemData[] = [
                     'produk_id' => $kodeProduk,
                     'sku_variant_id' => $poItem->sku_variant_id,
@@ -141,6 +146,7 @@ class GrnService
                     'harga_po' => (float) $poItem->harga_beli,
                     'status' => $status,
                     'sn' => $snList, // [F2-3] disimpan utk finalisasi (auto & approval)
+                    'rak_id' => $rakId,
                 ];
 
                 $totalHpp += $receivedQty * $hargaBeliAktual;
@@ -462,7 +468,11 @@ class GrnService
 
             $sebelum = (int) $stok->jumlah;
             $setelah = $sebelum + $qty;
-            $stok->update(['jumlah' => $setelah]);
+            $updateStok = ['jumlah' => $setelah];
+            if (! empty($item['rak_id'])) {
+                $updateStok['rak_id'] = (int) $item['rak_id'];
+            }
+            $stok->update($updateStok);
         } catch (QueryException $e) {
             if ($this->kunciDuplikat($e)) {
                 throw new \Exception('Data stok gudang utk barang ini sudah ada (duplikat) — muat ulang halaman lalu coba lagi');
@@ -472,6 +482,7 @@ class GrnService
         }
 
         $harga = (float) ($item['harga_beli'] ?? 0);
+        $catatanRak = ! empty($item['rak_id']) ? " (Rak: #{$item['rak_id']})" : '';
 
         StokLog::create([
             'gudang_id' => $grn->gudang_id,
@@ -484,7 +495,7 @@ class GrnService
             'jumlah_sebelum' => $sebelum,
             'perubahan' => $qty,
             'jumlah_setelah' => $setelah,
-            'catatan' => "GRN {$grn->no_grn} — {$qty} x Rp ".number_format($harga, 0, ',', '.')." (PO {$noPo})",
+            'catatan' => "GRN {$grn->no_grn} — {$qty} x Rp ".number_format($harga, 0, ',', '.')." (PO {$noPo}){$catatanRak}",
         ]);
 
         // [B-10i] user_id = petugas yang mem-finalize GRN ($actionedBy, sama dgn

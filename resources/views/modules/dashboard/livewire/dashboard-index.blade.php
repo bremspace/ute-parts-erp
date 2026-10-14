@@ -92,7 +92,7 @@
         }
      }">
     @php
-        $palette = ['#5B4FE9', '#1FBF8F', '#F5A623', '#E8873B', '#38BDF8', '#EC4899', '#A855F7'];
+        $palette = ['#4F46E5', '#10B981', '#F59E0B', '#D97706', '#38BDF8', '#EC4899', '#A855F7'];
 
         $hour = (int) now()->format('H');
         $salam = match(true) {
@@ -322,9 +322,9 @@
                     <svg viewBox="0 0 {{ $svgW }} {{ $svgH }}" class="w-full h-full overflow-visible">
                         <defs>
                             <linearGradient id="omzetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="#5B4FE9" stop-opacity="0.45" />
-                                <stop offset="80%" stop-color="#5B4FE9" stop-opacity="0.05" />
-                                <stop offset="100%" stop-color="#5B4FE9" stop-opacity="0.0" />
+                                <stop offset="0%" stop-color="#4F46E5" stop-opacity="0.35" />
+                                <stop offset="80%" stop-color="#4F46E5" stop-opacity="0.05" />
+                                <stop offset="100%" stop-color="#4F46E5" stop-opacity="0.0" />
                             </linearGradient>
                         </defs>
 
@@ -337,14 +337,14 @@
 
                         @if(!empty($areaD))
                             <path d="{{ $areaD }}" fill="url(#omzetGrad)" />
-                            <path d="{{ $lineD }}" fill="none" stroke="#5B4FE9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="{{ $lineD }}" fill="none" stroke="#4F46E5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
                         @endif
 
                         <template x-for="(pt, idx) in points" :key="idx">
                             <g>
                                 <rect :x="pt.x - 10" y="0" width="20" height="{{ $svgH }}" fill="transparent" class="cursor-pointer" x-on:mouseenter="setActive(idx)" />
                                 <line x1="0" y1="{{ $padY }}" x2="0" y2="{{ $svgH - $padY }}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="2 2" :transform="'translate(' + pt.x + ', 0)'" x-show="activeIdx === idx" />
-                                <circle :cx="pt.x" :cy="pt.y" r="5" fill="#5B4FE9" stroke="#ffffff" stroke-width="2" x-show="activeIdx === idx" />
+                                <circle :cx="pt.x" :cy="pt.y" r="5" fill="#4F46E5" stroke="#ffffff" stroke-width="2" x-show="activeIdx === idx" />
                             </g>
                         </template>
                     </svg>

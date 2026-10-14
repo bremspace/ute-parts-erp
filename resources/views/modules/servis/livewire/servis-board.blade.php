@@ -63,7 +63,7 @@
 
     <!-- ===== ANTREAN BOOKING ONLINE ===== -->
     @if(count($bookingOnline ?? []) > 0)
-        <div class="mb-2.5 flex-shrink-0 p-3 rounded-2xl bg-up-amber/10 border border-up-amber/30 transition-all">
+        <div class="mb-2.5 flex-shrink-0 p-3 rounded-2xl bg-up-amber/10 border border-up-amber/30 transition-[opacity,transform] duration-140">
             <div class="flex items-center justify-between cursor-pointer select-none" @click="bookingOpen = !bookingOpen">
                 <div class="flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-up-amber animate-pulse"></span>
@@ -99,7 +99,7 @@
                                 <button
                                     type="button"
                                     wire:click="openIntakeBookingModal({{ $b->id }})"
-                                    class="px-3 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-sm shadow-up-primary/30"
+                                    class="px-3 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-[background-color,transform] duration-100 shadow-sm shadow-up-primary/30"
                                     title="Lakukan pemeriksaan fisik unit, cek kondisi, dan serah terima resmi"
                                 >
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,7 +110,7 @@
                                 <button
                                     type="button"
                                     wire:click="konfirmasiBookingOnline({{ $b->id }})"
-                                    class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white text-xs font-medium border border-white/10 cursor-pointer active:scale-95 transition-all"
+                                    class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white text-xs font-medium border border-white/10 cursor-pointer active:scale-95 transition-[background-color,color,transform] duration-100"
                                     title="Terima langsung tanpa form inspeksi"
                                 >
                                     Terima Cepat
@@ -256,7 +256,7 @@
                                         <button
                                             type="button"
                                             wire:click="revisiEstimasiDitolak({{ $tiket->id }})"
-                                            class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 shadow-sm shadow-up-primary/20"
+                                            class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer flex items-center gap-1 shadow-sm shadow-up-primary/20"
                                             title="Ubah status ke Diagnosa untuk ajukan revisi estimasi"
                                         >
                                             Revisi Estimasi
@@ -264,7 +264,7 @@
                                         <button
                                             type="button"
                                             wire:click="openBatalReturModal({{ $tiket->id }})"
-                                            class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red text-up-red hover:text-white font-bold text-[10px] border border-up-red/30 transition-all cursor-pointer flex items-center gap-1"
+                                            class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red text-up-red hover:text-white font-bold text-[10px] border border-up-red/30 transition-[background-color,color,transform] duration-100 active:scale-[0.98] cursor-pointer flex items-center gap-1"
                                             title="Batalkan servis dan serahkan unit kembali ke pelanggan"
                                         >
                                             Kembalikan Unit
@@ -277,13 +277,13 @@
                                                 <button
                                                     type="button"
                                                     wire:click="openEstimasiModal({{ $tiket->id }})"
-                                                    class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] transition-all cursor-pointer"
+                                                    class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer"
                                                 >+ Estimasi</button>
                                             @elseif($ns === 'disetujui' || $ns === 'ditolak')
                                                 <button
                                                     type="button"
                                                     wire:click="openApproveModal({{ $tiket->id }})"
-                                                    class="px-2.5 py-1 rounded-lg {{ $ns === 'disetujui' ? 'bg-up-mint hover:opacity-90 text-ink-950' : 'bg-up-red hover:opacity-90 text-white' }} font-bold text-[10px] transition-all cursor-pointer"
+                                                    class="px-2.5 py-1 rounded-lg {{ $ns === 'disetujui' ? 'bg-up-mint hover:opacity-90 text-ink-950' : 'bg-up-red hover:opacity-90 text-white' }} font-bold text-[10px] transition-[opacity,transform] duration-100 active:scale-[0.98] cursor-pointer"
                                                 >{{ $ns === 'disetujui' ? 'Setujui' : 'Tolak' }}</button>
                                             @else
                                                 @php
@@ -300,7 +300,7 @@
                                                 <button
                                                     type="button"
                                                     wire:click="updateStatus({{ $tiket->id }}, '{{ $ns }}')"
-                                                    class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white font-semibold text-[10px] border border-white/10 transition-all cursor-pointer"
+                                                    class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white font-semibold text-[10px] border border-white/10 transition-[background-color,color,transform] duration-100 active:scale-[0.98] cursor-pointer"
                                                 >{{ $label }}</button>
                                             @endif
                                         @endforeach
@@ -445,7 +445,7 @@
                                 <button
                                     type="button"
                                     @class([
-                                        'px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer active:scale-95',
+                                        'px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-[background-color,color,border-color,transform] duration-100 cursor-pointer active:scale-95',
                                         'bg-up-primary text-white border-up-primary' => in_array($check, $terimaForm['kondisi_fisik'] ?? [], true),
                                         'bg-white/5 text-ink-300 border-white/10 hover:bg-white/10' => !in_array($check, $terimaForm['kondisi_fisik'] ?? [], true),
                                     ])
@@ -1069,7 +1069,7 @@
                                 </div>
                             @endforeach
 
-                            <button type="button" @click="pickFile" class="w-16 h-16 rounded-xl border border-dashed border-white/20 hover:border-up-primary bg-white/5 hover:bg-white/10 flex flex-col items-center justify-center text-ink-400 hover:text-white transition-all cursor-pointer">
+                            <button type="button" @click="pickFile" class="w-16 h-16 rounded-xl border border-dashed border-white/20 hover:border-up-primary bg-white/5 hover:bg-white/10 flex flex-col items-center justify-center text-ink-400 hover:text-white transition-[background-color,border-color,color] duration-140 cursor-pointer">
                                 <span class="text-base leading-none font-bold">+</span>
                                 <span class="text-[9px] mt-0.5">Foto</span>
                             </button>
@@ -1186,7 +1186,7 @@
                                 <button
                                     type="button"
                                     wire:click="revisiEstimasiDitolak({{ $selectedTiket->id }})"
-                                    class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm shadow-up-primary/30 transition-all active:scale-95"
+                                    class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm shadow-up-primary/30 transition-[background-color,transform] duration-100 active:scale-95"
                                 >
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                     Revisi Estimasi (Diagnosa Ulang)
@@ -1194,7 +1194,7 @@
                                 <button
                                     type="button"
                                     wire:click="openBatalReturModal({{ $selectedTiket->id }})"
-                                    class="px-3 py-1.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                                    class="px-3 py-1.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-[background-color,color,transform] duration-100 active:scale-95"
                                 >
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"></path></svg>
                                     Batalkan Servis & Kembalikan Unit (Pengambilan)
@@ -1339,7 +1339,7 @@
                                     href="{{ $waTiketLink }}"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-sm no-underline"
+                                    class="px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer inline-flex items-center gap-1.5 shadow-sm no-underline"
                                     title="Kirim notifikasi via WhatsApp langsung (HP / Web)"
                                 >
                                     <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.174.086.275.073.376-.044.101-.116.433-.506.549-.68.116-.173.231-.144.39-.086s1.011.477 1.184.564.289.13.332.203c.043.072.043.419-.101.824z"/></svg>
@@ -1350,7 +1350,7 @@
                             <button
                                 type="button"
                                 wire:click="bukaStrukServis({{ $selectedTiket->id }})"
-                                class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white border border-white/10 font-bold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
+                                class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white border border-white/10 font-bold text-xs transition-[background-color,color,transform] duration-100 active:scale-[0.98] cursor-pointer inline-flex items-center gap-1.5"
                                 title="Cetak struk thermal 58mm / nota servis"
                             >
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
@@ -1359,7 +1359,7 @@
                         @if($selectedTiket->status_pembayaran !== 'lunas' && in_array($selectedTiket->status, ['selesai', 'diambil'], true))
                             <a
                                 href="/app/pos?bayar_servis_id={{ $selectedTiket->id }}"
-                                class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-all cursor-pointer self-start sm:self-auto inline-flex items-center gap-1.5 shadow-sm"
+                                class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer self-start sm:self-auto inline-flex items-center gap-1.5 shadow-sm"
                             >
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                                 <span>Bayar di Kasir POS</span>
@@ -1605,7 +1605,7 @@
                                     <button
                                         type="button"
                                         wire:click="openProgressModal({{ $selectedTiket->id }})"
-                                        class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] shadow cursor-pointer transition-all"
+                                        class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] shadow cursor-pointer transition-[background-color,transform] duration-100 active:scale-95"
                                     >
                                         + Unggah Progress & Foto
                                     </button>
@@ -1651,7 +1651,7 @@
                                 </span>
                             </div>
                             <div class="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                                <div class="bg-gradient-to-r from-up-primary to-up-mint h-2 rounded-full transition-all" style="width: {{ $selectedTiket->progressList->first()?->persentase }}%"></div>
+                                <div class="bg-gradient-to-r from-up-primary to-up-mint h-2 rounded-full transition-[width] duration-300" style="width: {{ $selectedTiket->progressList->first()?->persentase }}%"></div>
                             </div>
                             <div class="space-y-2 mt-2 max-h-48 overflow-y-auto pr-1">
                                 @foreach($selectedTiket->progressList as $pr)
@@ -1849,7 +1849,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('bayarMetode', '{{ $metode }}')"
-                                    class="p-3 rounded-xl border text-left transition-all cursor-pointer {{ $bayarMetode === $metode ? 'bg-up-primary/20 border-up-primary text-white font-bold' : 'bg-white/[0.02] border-white/5 text-ink-300 hover:bg-white/[0.05]' }}"
+                                    class="p-3 rounded-xl border text-left transition-[background-color,border-color,color] duration-140 cursor-pointer {{ $bayarMetode === $metode ? 'bg-up-primary/20 border-up-primary text-white font-bold' : 'bg-white/[0.02] border-white/5 text-ink-300 hover:bg-white/[0.05]' }}"
                                 >
                                     <div class="text-xs">{{ $label }}</div>
                                 </button>
@@ -1873,14 +1873,14 @@
                         <button
                             type="button"
                             wire:click="$set('showBayarModal', false)"
-                            class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs transition-all cursor-pointer"
+                            class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs transition-[background-color,color] duration-140 cursor-pointer"
                         >
                             Batal
                         </button>
                         <button
                             type="button"
                             wire:click="prosesBayar"
-                            class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-all cursor-pointer"
+                            class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer"
                         >
                             Konfirmasi Pembayaran Lunas
                         </button>
@@ -1926,7 +1926,7 @@
                     @forelse($cariPartResults as $product)
                         <button type="button"
                                 wire:click="pilihPartServis({{ $product->id }})"
-                                class="w-full flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-up-primary/30 transition-all cursor-pointer text-left group">
+                                class="w-full flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 hover:border-up-primary/30 transition-[background-color,border-color,transform] duration-100 active:scale-[0.99] cursor-pointer text-left group">
                             <div class="flex-1 min-w-0">
                                 <p class="text-xs font-semibold text-white group-hover:text-up-primary truncate">{{ $product->nama }}</p>
                                 <p class="text-[10px] text-ink-400 mt-0.5">
@@ -2147,7 +2147,7 @@
                     <button
                         type="button"
                         wire:click="simpanIntakeBooking"
-                        class="px-5 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-all shadow-md shadow-up-primary/30 cursor-pointer flex items-center gap-1.5 active:scale-95"
+                        class="px-5 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-[background-color,transform] duration-100 shadow-md shadow-up-primary/30 cursor-pointer flex items-center gap-1.5 active:scale-95"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                         Simpan & Terima Fisik Unit
@@ -2196,7 +2196,7 @@
                         <button
                             type="button"
                             wire:click="prosesBatalRetur"
-                            class="px-5 py-2.5 rounded-xl bg-up-red hover:bg-rose-700 text-white font-bold text-xs transition-all shadow-md shadow-up-red/30 cursor-pointer flex items-center gap-1.5 active:scale-95"
+                            class="px-5 py-2.5 rounded-xl bg-up-red hover:bg-rose-700 text-white font-bold text-xs transition-[background-color,transform] duration-100 shadow-md shadow-up-red/30 cursor-pointer flex items-center gap-1.5 active:scale-95"
                         >
                             Konfirmasi Serah Terima & Tutup Tiket
                         </button>

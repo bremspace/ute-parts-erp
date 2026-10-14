@@ -26,7 +26,7 @@
                 <button
                     type="button"
                     @click="setSubModul('inventori')"
-                    :class="subModul === 'inventori' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-400 hover:text-ink-100 dark:hover:text-white'"
+                    :class="subModul === 'inventori' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
                     class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
                 >
                     <span>📦</span>
@@ -35,7 +35,7 @@
                 <button
                     type="button"
                     @click="setSubModul('operasional')"
-                    :class="subModul === 'operasional' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-400 hover:text-ink-100 dark:hover:text-white'"
+                    :class="subModul === 'operasional' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
                     class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
                 >
                     <span>🔄</span>
@@ -44,7 +44,7 @@
                 <button
                     type="button"
                     @click="setSubModul('pengadaan')"
-                    :class="subModul === 'pengadaan' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-400 hover:text-ink-100 dark:hover:text-white'"
+                    :class="subModul === 'pengadaan' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
                     class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
                 >
                     <span>🚚</span>

@@ -26,7 +26,7 @@
                 <button
                     type="button"
                     @click="setSubModul('akses')"
-                    :class="subModul === 'akses' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-400 hover:text-ink-100 dark:hover:text-white'"
+                    :class="subModul === 'akses' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
                     class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
                 >
                     <span>👥</span>
@@ -35,7 +35,7 @@
                 <button
                     type="button"
                     @click="setSubModul('master')"
-                    :class="subModul === 'master' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-400 hover:text-ink-100 dark:hover:text-white'"
+                    :class="subModul === 'master' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
                     class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
                 >
                     <span>📦</span>
@@ -44,7 +44,7 @@
                 <button
                     type="button"
                     @click="setSubModul('bisnis')"
-                    :class="subModul === 'bisnis' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-400 hover:text-ink-100 dark:hover:text-white'"
+                    :class="subModul === 'bisnis' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
                     class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
                 >
                     <span>⚖️</span>
@@ -391,7 +391,7 @@
                             </div>
 
                             <!-- Sakelar Status Pajak -->
-                            <div class="p-4 rounded-xl {{ $pajakForm['enabled'] ? 'bg-up-primary/10 border-up-primary/30' : 'bg-white/[0.02] border-white/5' }} border transition-all">
+                            <div class="p-4 rounded-xl {{ $pajakForm['enabled'] ? 'bg-up-primary/10 border-up-primary/30' : 'bg-white/[0.02] border-white/5' }} border transition-[background-color,border-color] duration-140">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm font-bold text-white flex items-center gap-2">
@@ -408,7 +408,7 @@
                                     </div>
                                     <label class="relative inline-flex items-center cursor-pointer">
                                         <input type="checkbox" wire:model.live="pajakForm.enabled" class="sr-only peer">
-                                        <div class="w-11 h-6 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-mint"></div>
+                                        <div class="w-11 h-6 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-[background-color,border-color,transform] after:duration-140 peer-checked:bg-up-mint"></div>
                                     </label>
                                 </div>
                             </div>
@@ -434,13 +434,13 @@
                                     <div class="md:col-span-2">
                                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Sistem Perhitungan Pajak</label>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <label class="p-3.5 rounded-xl border cursor-pointer transition-all {{ $pajakForm['mode'] === 'exclusive' ? 'border-up-primary bg-up-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/5' }}">
+                                            <label class="p-3.5 rounded-xl border cursor-pointer transition-[background-color,border-color] duration-140 {{ $pajakForm['mode'] === 'exclusive' ? 'border-up-primary bg-up-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/5' }}">
                                                 <input type="radio" wire:model="pajakForm.mode" value="exclusive" class="sr-only">
                                                 <p class="text-xs font-bold text-white">Tax-Exclusive (Tambahan)</p>
                                                 <p class="text-[11px] text-ink-400 mt-1">Harga katalog adalah DPP murni. Pajak ditambahkan di akhir kasir (Total = Harga + Pajak).</p>
                                             </label>
 
-                                            <label class="p-3.5 rounded-xl border cursor-pointer transition-all {{ $pajakForm['mode'] === 'inclusive' ? 'border-up-primary bg-up-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/5' }}">
+                                            <label class="p-3.5 rounded-xl border cursor-pointer transition-[background-color,border-color] duration-140 {{ $pajakForm['mode'] === 'inclusive' ? 'border-up-primary bg-up-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/5' }}">
                                                 <input type="radio" wire:model="pajakForm.mode" value="inclusive" class="sr-only">
                                                 <p class="text-xs font-bold text-white">Tax-Inclusive (Sudah Termasuk)</p>
                                                 <p class="text-[11px] text-ink-400 mt-1">Harga katalog sudah termasuk pajak. Pajak dihitung mundur dari nilai bayar konsumen.</p>

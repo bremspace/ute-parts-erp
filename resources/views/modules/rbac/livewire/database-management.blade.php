@@ -19,7 +19,7 @@
 
         <div class="flex items-center gap-2">
             <button type="button" wire:click="openResetModal"
-                class="px-4 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 border border-up-red/30 text-up-red text-xs font-bold transition-all duration-150 active:scale-[0.97] flex items-center gap-2 shadow-sm min-h-[44px]">
+                class="px-4 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 border border-up-red/30 text-up-red text-xs font-bold transition-[background-color,border-color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 shadow-sm min-h-[44px]">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                 </svg>
@@ -63,7 +63,7 @@
 
                 <div class="pt-2 flex justify-end">
                     <button type="button" wire:click="buatBackup" wire:loading.attr="disabled"
-                        class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-bold shadow-md transition-all duration-150 active:scale-[0.97] flex items-center gap-2 min-h-[44px]">
+                        class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-bold shadow-md transition-[background-color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 min-h-[44px]">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
                         </svg>
@@ -131,7 +131,7 @@
                                 <div class="inline-flex items-center gap-1.5">
                                     <!-- Download ke Perangkat Klien -->
                                     <button type="button" wire:click="downloadBackup('{{ $b['filename'] }}')"
-                                        class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition-all"
+                                        class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition-[background-color,color] duration-140 active:scale-95 cursor-pointer"
                                         title="Download ke Laptop/PC ini">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -140,7 +140,7 @@
 
                                     <!-- Restore Server -->
                                     <button type="button" wire:click="openRestoreModal('{{ $b['filename'] }}')"
-                                        class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/30 text-up-primary font-bold text-[11px] transition-all"
+                                        class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/30 text-up-primary font-bold text-[11px] transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer"
                                         title="Pulihkan database dari berkas ini">
                                         Restore
                                     </button>
@@ -148,7 +148,7 @@
                                     <!-- Hapus -->
                                     <button type="button" wire:click="hapusBackup('{{ $b['filename'] }}')"
                                         wire:confirm="Yakin ingin menghapus berkas backup ini dari server?"
-                                        class="p-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red transition-all"
+                                        class="p-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red transition-[background-color,color] duration-140 active:scale-95 cursor-pointer"
                                         title="Hapus berkas">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -201,7 +201,7 @@
                         Batal
                     </button>
                     <button type="button" wire:click="eksekusiRestore" wire:loading.attr="disabled"
-                        class="px-4 py-2 rounded-xl bg-up-amber hover:bg-amber-600 text-gray-900 text-xs font-bold shadow-md transition-all">
+                        class="px-4 py-2 rounded-xl bg-up-amber hover:bg-amber-600 text-gray-900 text-xs font-bold shadow-md transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer">
                         <span wire:loading.remove wire:target="eksekusiRestore">Ya, Pulihkan Database</span>
                         <span wire:loading wire:target="eksekusiRestore">Memulihkan...</span>
                     </button>
@@ -260,7 +260,7 @@
                         Batal
                     </button>
                     <button type="button" wire:click="eksekusiReset" wire:loading.attr="disabled"
-                        class="px-4 py-2 rounded-xl bg-up-red hover:bg-red-600 text-white text-xs font-bold shadow-md transition-all">
+                        class="px-4 py-2 rounded-xl bg-up-red hover:bg-red-600 text-white text-xs font-bold shadow-md transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer">
                         <span wire:loading.remove wire:target="eksekusiReset">Ya, Eksekusi Safe Reset</span>
                         <span wire:loading wire:target="eksekusiReset">Memproses Reset...</span>
                     </button>

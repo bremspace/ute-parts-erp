@@ -2,19 +2,19 @@
     'headers' => [],
 ])
 
-<div class="w-full overflow-hidden rounded-2xl glass-panel min-h-24">
+<div class="w-full overflow-hidden rounded-2xl glass-panel min-h-24 shadow-sm">
     @isset($mobileCards)
         <!-- Mode Desktop: Wide Table -->
         <x-prism.dual-scroll class="hidden md:block">
-            <table class="w-full text-left text-sm text-ink-100 border-collapse min-w-[480px]">
-                <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-400">
+            <table class="w-full text-left text-sm text-ink-800 dark:text-ink-100 border-collapse min-w-[480px]">
+                <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-500 dark:text-ink-400 sticky top-0 z-10 backdrop-blur-md">
                     <tr>
                         @foreach($headers as $header)
-                            <th class="py-3.5 px-4 font-semibold">{{ $header }}</th>
+                            <th class="py-3.5 px-4 font-semibold whitespace-nowrap">{{ $header }}</th>
                         @endforeach
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-black/5 dark:divide-white/5">
+                <tbody class="divide-y divide-black/5 dark:divide-white/5 [&>tr]:transition-colors [&>tr]:duration-100 hover:[&>tr]:bg-black/[0.02] dark:hover:[&>tr]:bg-white/[0.02]">
                     {{ $slot }}
                 </tbody>
             </table>
@@ -27,15 +27,15 @@
     @else
         <!-- Responsive Horizontal Scroll Table -->
         <x-prism.dual-scroll class="-mx-1 sm:mx-0">
-            <table class="w-full text-left text-sm text-ink-100 border-collapse min-w-[540px]">
-                <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-400">
+            <table class="w-full text-left text-sm text-ink-800 dark:text-ink-100 border-collapse min-w-[540px]">
+                <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-500 dark:text-ink-400 sticky top-0 z-10 backdrop-blur-md">
                     <tr>
                         @foreach($headers as $header)
                             <th class="py-3.5 px-3 sm:px-4 font-semibold whitespace-nowrap">{{ $header }}</th>
                         @endforeach
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-black/5 dark:divide-white/5">
+                <tbody class="divide-y divide-black/5 dark:divide-white/5 [&>tr]:transition-colors [&>tr]:duration-100 hover:[&>tr]:bg-black/[0.02] dark:hover:[&>tr]:bg-white/[0.02]">
                     {{ $slot }}
                 </tbody>
             </table>

@@ -13,11 +13,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-ink-950 text-ink-100 font-sans antialiased min-h-screen flex items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
-    <!-- Ambient Background Glow & Gradient Signature -->
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-up-primary/30 rounded-full blur-[128px] pointer-events-none"></div>
-    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-up-accent/20 rounded-full blur-[128px] pointer-events-none"></div>
-
+<body class="bg-[#090D16] text-ink-100 font-sans antialiased min-h-screen flex items-center justify-center p-4 relative overflow-hidden selection:bg-up-primary selection:text-white">
     <!-- Login Card Container -->
     <div class="w-full max-w-md relative z-10">
         <!-- Logo & Title -->
@@ -26,7 +22,7 @@
         </div>
 
         <!-- Glass Card -->
-        <div class="glass-panel p-8 rounded-3xl relative overflow-hidden border border-white/10 shadow-2xl">
+        <div class="bg-[#0F172A]/90 backdrop-blur-2xl p-8 rounded-3xl relative overflow-hidden border border-white/10 shadow-2xl">
             <div class="circuit-line absolute top-0 left-0 w-full h-[2px]"></div>
 
             <h2 class="text-lg font-semibold text-white mb-6">Masuk ke Backoffice</h2>
