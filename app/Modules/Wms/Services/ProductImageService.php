@@ -58,6 +58,24 @@ class ProductImageService
             throw new \RuntimeException('Gagal memuat gambar: format tidak didukung oleh GD');
         }
 
+        // Auto-orientasi foto dari kamera smartphone berdasarkan EXIF
+        if (($mime === 'image/jpeg' || $mime === 'image/jpg') && function_exists('exif_read_data')) {
+            $exif = @exif_read_data($realPath);
+            $orientation = $exif['Orientation'] ?? null;
+            if ($orientation) {
+                $rotated = match ((int) $orientation) {
+                    3 => imagerotate($srcImage, 180, 0),
+                    6 => imagerotate($srcImage, -90, 0),
+                    8 => imagerotate($srcImage, 90, 0),
+                    default => null,
+                };
+                if ($rotated) {
+                    imagedestroy($srcImage);
+                    $srcImage = $rotated;
+                }
+            }
+        }
+
         $origWidth = imagesx($srcImage);
         $origHeight = imagesy($srcImage);
 
@@ -71,29 +89,41 @@ class ProductImageService
         $relPathThumb = "{$folder}/{$random}_thumb.webp";
 
         $storageDisk = Storage::disk($disk);
-        $storageDisk->makeDirectory($folder);
-
         $absPathFull = $storageDisk->path($relPathFull);
         $absPathThumb = $storageDisk->path($relPathThumb);
 
+        // Pastikan direktori tujuan tersedia dan dapat ditulis
+        $targetDir = dirname($absPathFull);
+        if (! is_dir($targetDir)) {
+            @mkdir($targetDir, 0775, true);
+        }
+
         // 1. Generate Full Size Image (Max 800x800)
         $fullImage = $this->resizeProporsional($srcImage, $origWidth, $origHeight, self::MAX_FULL_WIDTH, self::MAX_FULL_HEIGHT);
-        imagewebp($fullImage, $absPathFull, self::FULL_QUALITY);
+        $savedFull = @imagewebp($fullImage, $absPathFull, self::FULL_QUALITY);
         imagedestroy($fullImage);
 
         // 2. Generate Thumbnail Image (Max 250x250)
         $thumbImage = $this->resizeProporsional($srcImage, $origWidth, $origHeight, self::MAX_THUMB_WIDTH, self::MAX_THUMB_HEIGHT);
-        imagewebp($thumbImage, $absPathThumb, self::THUMB_QUALITY);
+        $savedThumb = @imagewebp($thumbImage, $absPathThumb, self::THUMB_QUALITY);
         imagedestroy($thumbImage);
 
         imagedestroy($srcImage);
 
-        $fullSize = file_exists($absPathFull) ? filesize($absPathFull) : 0;
-        $thumbSize = file_exists($absPathThumb) ? filesize($absPathThumb) : 0;
+        if (! $savedFull || ! file_exists($absPathFull) || filesize($absPathFull) === 0) {
+            throw new \RuntimeException('Gagal menyimpan file gambar WebP ke storage');
+        }
+
+        if (! $savedThumb || ! file_exists($absPathThumb) || filesize($absPathThumb) === 0) {
+            throw new \RuntimeException('Gagal menyimpan thumbnail WebP ke storage');
+        }
+
+        $fullSize = filesize($absPathFull);
+        $thumbSize = filesize($absPathThumb);
 
         return [
-            'url' => Storage::disk($disk)->url($relPathFull),
-            'thumb' => Storage::disk($disk)->url($relPathThumb),
+            'url' => '/storage/'.$relPathFull,
+            'thumb' => '/storage/'.$relPathThumb,
             'path' => $relPathFull,
             'thumb_path' => $relPathThumb,
             'size' => (int) $fullSize,

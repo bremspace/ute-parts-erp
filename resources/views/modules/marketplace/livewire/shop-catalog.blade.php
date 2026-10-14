@@ -348,15 +348,15 @@
                             <img src="{{ $thumbImg }}"
                                  alt="{{ $p->nama }}"
                                  loading="lazy"
-                                 class="aspect-square w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105">
-                        @else
-                            <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center">
-                                <svg class="w-8 sm:w-10 h-8 sm:h-10 stroke-[1.25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                                </svg>
-                                <span class="text-[9px] mt-1 font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">Ute Parts</span>
-                            </div>
+                                 class="aspect-square w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105"
+                                 onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');">
                         @endif
+                        <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-4 text-center {{ $thumbImg ? 'hidden' : '' }}">
+                            <svg class="w-8 sm:w-10 h-8 sm:h-10 stroke-[1.25]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                            </svg>
+                            <span class="text-[9px] mt-1 font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">Ute Parts</span>
+                        </div>
 
                         <!-- Badges top row -->
                         <div class="absolute top-2 inset-x-2 flex items-center justify-between pointer-events-none overflow-hidden gap-1">
@@ -446,12 +446,12 @@
                 <a href="{{ route('shop.detail', $p->slug) }}"
                    class="group bg-white dark:bg-ink-900 rounded-2xl border border-ink-200/80 dark:border-white/[0.08] hover:border-up-primary/40 dark:hover:border-up-primary/50 shadow-sm p-3 sm:p-4 flex items-center justify-between gap-4 transition-[border-color,box-shadow,transform] duration-140 active:scale-[0.99]">
                     <div class="flex items-center gap-3.5 min-w-0 flex-1">
-                        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-ink-50 dark:bg-ink-950 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-ink-50 dark:bg-ink-950 flex-shrink-0 overflow-hidden flex items-center justify-center relative">
                             @if($thumbImg)
-                                <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" class="w-full h-full object-cover">
-                            @else
-                                <span class="text-xs font-bold text-ink-400">PART</span>
+                                <img src="{{ $thumbImg }}" alt="{{ $p->nama }}" class="w-full h-full object-cover"
+                                     onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                             @endif
+                            <span class="text-xs font-bold text-ink-400 items-center justify-center w-full h-full" style="{{ $thumbImg ? 'display:none;' : 'display:flex;' }}">PART</span>
                         </div>
                         <div class="min-w-0 flex-1 space-y-1">
                             <div class="flex items-center gap-2 text-[10px] text-ink-500">

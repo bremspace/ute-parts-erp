@@ -320,12 +320,12 @@
 
                             <!-- Product Thumbnail & Details -->
                             <div class="flex gap-2.5">
-                                <div class="w-12 h-12 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex-shrink-0 flex items-center justify-center">
+                                <div class="w-12 h-12 rounded-xl overflow-hidden bg-white/5 border border-white/10 flex-shrink-0 flex items-center justify-center relative">
                                     @if($prod->thumbnail_url ?: $prod->gambar)
-                                        <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" loading="lazy" class="w-full h-full object-cover">
-                                    @else
-                                        <span class="text-[9px] font-bold text-ink-400">UTE</span>
+                                        <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" loading="lazy" class="w-full h-full object-cover"
+                                             onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                                     @endif
+                                    <span class="text-[9px] font-bold text-ink-400 items-center justify-center w-full h-full" style="{{ ($prod->thumbnail_url ?: $prod->gambar) ? 'display:none;' : 'display:flex;' }}">UTE</span>
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <h4 @class([

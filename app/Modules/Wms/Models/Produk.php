@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -152,6 +153,55 @@ class Produk extends Model
     }
 
     /**
+     * Normalisasi URL foto agar selalu adaptif terhadap domain, skema (HTTP/HTTPS),
+     * dan port aktif, serta dapat memverifikasi keberadaan file di storage.
+     */
+    public static function formatFotoUrl(?string $url, bool $checkFileExists = false): ?string
+    {
+        if (empty($url)) {
+            return null;
+        }
+
+        $trimmed = trim($url);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        // Data URI atau blob (preview client-side)
+        if (str_starts_with($trimmed, 'data:') || str_starts_with($trimmed, 'blob:')) {
+            return $trimmed;
+        }
+
+        // Ekstrak path storage relatif jika URL merupakan link storage
+        $relStoragePath = null;
+        if (str_starts_with($trimmed, '/storage/')) {
+            $relStoragePath = substr($trimmed, 9);
+        } elseif (str_starts_with($trimmed, 'storage/')) {
+            $relStoragePath = substr($trimmed, 8);
+        } elseif (preg_match('#https?://[^/]+/storage/(.+)#i', $trimmed, $m)) {
+            $relStoragePath = $m[1];
+        } elseif (! str_starts_with($trimmed, 'http://') && ! str_starts_with($trimmed, 'https://') && ! str_starts_with($trimmed, '/')) {
+            $relStoragePath = $trimmed;
+        }
+
+        if ($relStoragePath !== null) {
+            $cleanPath = ltrim(urldecode($relStoragePath), '/');
+            if ($checkFileExists && ! Storage::disk('public')->exists($cleanPath)) {
+                return null;
+            }
+
+            return '/storage/'.$cleanPath;
+        }
+
+        // URL eksternal: upgrade http ke https jika halaman saat ini berjalan di https
+        if (request()?->isSecure() && str_starts_with($trimmed, 'http://')) {
+            return preg_replace('/^http:/i', 'https:', $trimmed);
+        }
+
+        return $trimmed;
+    }
+
+    /**
      * URL Foto Utama (WebP atau fallback ke gambar atau null).
      */
     public function getFotoUtamaAttribute(): ?string
@@ -159,19 +209,19 @@ class Produk extends Model
         if (is_array($this->foto) && count($this->foto) > 0) {
             foreach ($this->foto as $f) {
                 if (is_array($f) && ! empty($f['is_primary']) && ! empty($f['url'])) {
-                    return $f['url'];
+                    return self::formatFotoUrl($f['url']);
                 }
             }
             $pertama = $this->foto[0];
             if (is_array($pertama) && ! empty($pertama['url'])) {
-                return $pertama['url'];
+                return self::formatFotoUrl($pertama['url']);
             }
             if (is_string($pertama)) {
-                return $pertama;
+                return self::formatFotoUrl($pertama);
             }
         }
 
-        return $this->gambar ?: null;
+        return self::formatFotoUrl($this->gambar ?: null);
     }
 
     /**
@@ -182,25 +232,29 @@ class Produk extends Model
         if (is_array($this->foto) && count($this->foto) > 0) {
             foreach ($this->foto as $f) {
                 if (is_array($f) && ! empty($f['is_primary'])) {
-                    return $f['thumb'] ?? $f['url'] ?? null;
+                    $target = $f['thumb'] ?? $f['url'] ?? null;
+
+                    return self::formatFotoUrl($target);
                 }
             }
             $pertama = $this->foto[0];
             if (is_array($pertama)) {
-                return $pertama['thumb'] ?? $pertama['url'] ?? null;
+                $target = $pertama['thumb'] ?? $pertama['url'] ?? null;
+
+                return self::formatFotoUrl($target);
             }
             if (is_string($pertama)) {
-                return $pertama;
+                return self::formatFotoUrl($pertama);
             }
         }
 
-        return $this->gambar ?: null;
+        return self::formatFotoUrl($this->gambar ?: null);
     }
 
     /**
      * Normalisasi Galeri Foto untuk UI Marketplace & Backoffice.
      *
-     * @return array<int, array{url: string, thumb: string, is_primary: bool}>
+     * @return array<int, array{url: string, thumb: string, path: ?string, thumb_path: ?string, is_primary: bool}>
      */
     public function getGaleriFotoAttribute(): array
     {
@@ -208,27 +262,43 @@ class Produk extends Model
         if (is_array($this->foto)) {
             foreach ($this->foto as $index => $item) {
                 if (is_array($item) && ! empty($item['url'])) {
-                    $hasil[] = [
-                        'url' => $item['url'],
-                        'thumb' => $item['thumb'] ?? $item['url'],
-                        'is_primary' => (bool) ($item['is_primary'] ?? ($index === 0)),
-                    ];
+                    $url = self::formatFotoUrl($item['url']);
+                    $thumb = self::formatFotoUrl($item['thumb'] ?? $item['url']);
+                    if ($url) {
+                        $hasil[] = [
+                            'url' => $url,
+                            'thumb' => $thumb ?? $url,
+                            'path' => $item['path'] ?? null,
+                            'thumb_path' => $item['thumb_path'] ?? null,
+                            'is_primary' => (bool) ($item['is_primary'] ?? ($index === 0)),
+                        ];
+                    }
                 } elseif (is_string($item) && $item !== '') {
-                    $hasil[] = [
-                        'url' => $item,
-                        'thumb' => $item,
-                        'is_primary' => $index === 0,
-                    ];
+                    $url = self::formatFotoUrl($item);
+                    if ($url) {
+                        $hasil[] = [
+                            'url' => $url,
+                            'thumb' => $url,
+                            'path' => null,
+                            'thumb_path' => null,
+                            'is_primary' => $index === 0,
+                        ];
+                    }
                 }
             }
         }
 
         if (empty($hasil) && $this->gambar) {
-            $hasil[] = [
-                'url' => $this->gambar,
-                'thumb' => $this->gambar,
-                'is_primary' => true,
-            ];
+            $url = self::formatFotoUrl($this->gambar);
+            if ($url) {
+                $hasil[] = [
+                    'url' => $url,
+                    'thumb' => $url,
+                    'path' => null,
+                    'thumb_path' => null,
+                    'is_primary' => true,
+                ];
+            }
         }
 
         return $hasil;

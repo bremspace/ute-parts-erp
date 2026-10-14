@@ -234,12 +234,12 @@
                     <tr class="hover:bg-white/[0.02] transition-colors">
                         <td class="py-3.5 px-4">
                             <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-xl overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
+                                <div class="w-12 h-12 rounded-xl overflow-hidden bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 shrink-0 flex items-center justify-center relative">
                                     @if($p->thumbnail_url)
-                                        <img src="{{ $p->thumbnail_url }}" alt="{{ $p->nama }}" class="w-full h-full object-cover" loading="lazy">
-                                    @else
-                                        <span class="text-lg text-ink-500">📦</span>
+                                        <img src="{{ $p->thumbnail_url }}" alt="{{ $p->nama }}" class="w-full h-full object-cover" loading="lazy"
+                                             onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                                     @endif
+                                    <span class="text-lg text-ink-500 items-center justify-center w-full h-full" style="{{ $p->thumbnail_url ? 'display:none;' : 'display:flex;' }}">📦</span>
                                 </div>
                                 <div>
                                     <span class="font-semibold text-ink-900 dark:text-white block">{{ $p->nama }}</span>
@@ -367,12 +367,12 @@
                     <div class="glass-panel p-4 rounded-2xl border border-white/5 hover:border-white/15 transition-[border-color,box-shadow] duration-140 flex flex-col justify-between group">
                         <div class="space-y-3">
                             <div class="flex items-start justify-between gap-2">
-                                <div class="w-14 h-14 rounded-xl overflow-hidden bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
+                                <div class="w-14 h-14 rounded-xl overflow-hidden bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 shrink-0 flex items-center justify-center relative">
                                     @if($p->thumbnail_url)
-                                        <img src="{{ $p->thumbnail_url }}" alt="{{ $p->nama }}" class="w-full h-full object-cover" loading="lazy">
-                                    @else
-                                        <span class="text-xl text-ink-500">📦</span>
+                                        <img src="{{ $p->thumbnail_url }}" alt="{{ $p->nama }}" class="w-full h-full object-cover" loading="lazy"
+                                             onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                                     @endif
+                                    <span class="text-xl text-ink-500 items-center justify-center w-full h-full" style="{{ $p->thumbnail_url ? 'display:none;' : 'display:flex;' }}">📦</span>
                                 </div>
                                 <div class="text-right flex flex-col items-end">
                                     <x-prism.stock-gauge :stok="$stokTotal" :min="$p->stok_minimum" />
@@ -1380,8 +1380,12 @@
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 @foreach($editFotoExisting as $idx => $f)
                                     <div class="rounded-xl overflow-hidden border {{ !empty($f['is_primary']) ? 'border-up-mint ring-1 ring-up-mint' : 'border-white/10' }} bg-black/40 p-1.5 space-y-1.5">
-                                        <div class="w-full aspect-square rounded-lg overflow-hidden bg-black/60 relative">
-                                            <img src="{{ $f['thumb'] ?? $f['url'] }}" class="w-full h-full object-cover">
+                                        <div class="w-full aspect-square rounded-lg overflow-hidden bg-black/60 relative flex items-center justify-center">
+                                            <img src="{{ $f['thumb'] ?? $f['url'] }}" class="w-full h-full object-cover"
+                                                 onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+                                            <div class="items-center justify-center w-full h-full text-ink-500 text-center p-1" style="display:none;">
+                                                <span class="text-[10px]">⚠️ Rusak</span>
+                                            </div>
                                             @if(!empty($f['is_primary']))
                                                 <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-up-mint text-ink-950 font-black text-[8px] uppercase tracking-wider">Utama</span>
                                             @endif

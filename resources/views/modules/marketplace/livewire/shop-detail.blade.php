@@ -35,7 +35,8 @@
                 <!-- Main Stage Canvas -->
                 <div class="aspect-square bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/90 dark:border-white/[0.08] flex items-center justify-center overflow-hidden relative shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
                     <template x-if="activeFoto">
-                        <img :src="activeFoto" alt="{{ $produk->nama }}" class="w-full h-full object-cover transition-opacity duration-200">
+                        <img :src="activeFoto" alt="{{ $produk->nama }}" class="w-full h-full object-cover transition-opacity duration-200"
+                             @error="activeFoto = null">
                     </template>
                     <template x-if="!activeFoto">
                         <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-8 text-center">
@@ -254,12 +255,12 @@
                                 <a href="{{ route('shop.detail', $pk->slug) }}"
                                    class="flex items-center justify-between p-3 rounded-2xl border border-ink-100/80 dark:border-white/10 bg-white dark:bg-ink-900 hover:border-up-primary/40 transition-[border-color,background-color] duration-140 group min-w-0 gap-2">
                                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                                        <div class="w-11 h-11 rounded-xl overflow-hidden bg-ink-50 dark:bg-ink-950 flex-shrink-0">
+                                        <div class="w-11 h-11 rounded-xl overflow-hidden bg-ink-50 dark:bg-ink-950 flex-shrink-0 flex items-center justify-center relative">
                                             @if($pk->thumbnail_url ?: $pk->gambar)
-                                                <img src="{{ $pk->thumbnail_url ?: $pk->gambar }}" alt="{{ $pk->nama }}" class="w-full h-full object-cover">
-                                            @else
-                                                <div class="w-full h-full flex items-center justify-center text-ink-300 text-xs font-bold">P</div>
+                                                <img src="{{ $pk->thumbnail_url ?: $pk->gambar }}" alt="{{ $pk->nama }}" class="w-full h-full object-cover"
+                                                     onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
                                             @endif
+                                            <div class="w-full h-full items-center justify-center text-ink-300 text-xs font-bold" style="{{ ($pk->thumbnail_url ?: $pk->gambar) ? 'display:none;' : 'display:flex;' }}">P</div>
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <p class="text-xs font-bold text-ink-900 dark:text-white group-hover:text-up-primary transition-colors truncate">{{ $pk->nama }}</p>
