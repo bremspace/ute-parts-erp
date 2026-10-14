@@ -1,0 +1,70 @@
+{
+  "id": "/app/",
+  "name": "Ute Parts — ERP & Kasir POS",
+  "short_name": "Ute ERP",
+  "description": "Sistem Operasional ERP, Kasir POS, Gudang WMS & Servis HP",
+  "start_url": "/app/dashboard",
+  "scope": "/app/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070A14",
+  "theme_color": "#070A14",
+  "lang": "id",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-erp.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Kasir POS",
+      "short_name": "POS",
+      "description": "Buka kasir transaksi penjualan",
+      "url": "/app/pos",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Gudang & Stok",
+      "short_name": "WMS",
+      "description": "Kelola stok & mutasi barang",
+      "url": "/app/wms",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Servis HP",
+      "short_name": "Servis",
+      "description": "Manajemen tiket servis",
+      "url": "/app/servis",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Ringkasan performa cabang",
+      "url": "/app/dashboard",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -11,6 +11,10 @@ Need PWA for "installable on any device". POS kasir is primary use case.
 - `manifest.json` + service worker (stale-while-revalidate for assets, network-first for API)
 - Works offline for cached pages
 - No push notifications, no background sync, no offline POS transactions
+- **Dual PWA Multi-Scope (2026-10)**:
+  - Consumer PWA: `manifest.json` (Scope `/`, Start URL `/`, icon standard)
+  - Backoffice ERP PWA: `manifest-backoffice.json` (Scope `/app/`, Start URL `/app/dashboard`, icon dengan badge ERP, Screen Wake Lock untuk POS)
+  - Memungkinkan staf menginstall PWA Backoffice dan PWA Toko berdampingan di satu perangkat.
 
 ## Consequences
 ### Positive

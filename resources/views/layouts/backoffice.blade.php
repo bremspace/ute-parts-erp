@@ -29,14 +29,14 @@
         })();
     </script>
 
-    <!-- PWA Meta Tags -->
-    <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <meta name="theme-color" content="#4F46E5">
+    <!-- PWA Meta Tags for Backoffice ERP -->
+    <link rel="manifest" href="{{ asset('manifest-backoffice.json') }}">
+    <meta name="theme-color" content="#070A14">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Ute Parts">
+    <meta name="apple-mobile-web-app-title" content="Ute ERP">
     <link rel="apple-touch-icon" href="{{ asset('icons/icon-192x192.png') }}">
-    <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon.svg') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('icons/icon-erp.svg') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
 
     <title>{{ $title ?? 'Backoffice ERP/POS' }} — Ute Parts</title>
@@ -535,7 +535,7 @@
             </header>
 
             <!-- Page Content -->
-            <main class="flex-1 overflow-y-auto p-3 lg:p-6 pb-20 md:pb-6 bg-transparent">
+            <main class="flex-1 overflow-y-auto p-3 lg:p-6 pb-24 md:pb-6 bg-transparent">
                 {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out) --}}
                 @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
                     <div class="mb-4 p-3.5 rounded-xl bg-up-amber/15 border border-up-amber/30 text-up-amber text-sm font-medium flex items-center justify-between gap-3 flex-wrap">
@@ -549,61 +549,62 @@
                 {{ $slot }}
             </main>
 
-            <!-- [T-49] Backoffice Mobile Bottom Quick Nav (md:hidden) -->
-            <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white/95 dark:bg-ink-950/95 backdrop-blur-xl border-t border-ink-200/80 dark:border-white/10 z-30 px-2 py-1.5 flex items-center justify-around shadow-[0_-4px_16px_rgba(0,0,0,0.05)] dark:shadow-none"
-                 style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);">
-                <a href="/app/dashboard" class="group relative flex flex-col items-center justify-center min-h-[44px] min-w-[54px] px-2 py-1 rounded-xl text-[11px] font-semibold transition-[transform,color] duration-150 active:scale-[0.97] {{ request()->is('app/dashboard') ? 'text-up-primary' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white' }}">
-                    <div class="relative">
-                        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                        @if(request()->is('app/dashboard'))
-                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary"></span>
-                        @endif
-                    </div>
-                    <span>Home</span>
-                </a>
-                <a href="/app/pos" class="group relative flex flex-col items-center justify-center min-h-[44px] min-w-[54px] px-2 py-1 rounded-xl text-[11px] font-semibold transition-[transform,color] duration-150 active:scale-[0.97] {{ request()->is('app/pos*') ? 'text-up-primary' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white' }}">
-                    <div class="relative">
-                        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        @if(request()->is('app/pos*'))
-                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary"></span>
-                        @endif
-                    </div>
-                    <span>Kasir</span>
-                </a>
-                <a href="/app/servis" class="group relative flex flex-col items-center justify-center min-h-[44px] min-w-[54px] px-2 py-1 rounded-xl text-[11px] font-semibold transition-[transform,color] duration-150 active:scale-[0.97] {{ request()->is('app/servis*') ? 'text-up-primary' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white' }}">
-                    <div class="relative">
-                        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        @if(request()->is('app/servis*'))
-                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary"></span>
-                        @endif
-                    </div>
-                    <span>Servis</span>
-                </a>
-                <a href="/app/wms" class="group relative flex flex-col items-center justify-center min-h-[44px] min-w-[54px] px-2 py-1 rounded-xl text-[11px] font-semibold transition-[transform,color] duration-150 active:scale-[0.97] {{ request()->is('app/wms*') ? 'text-up-primary' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white' }}">
-                    <div class="relative">
-                        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                        @if(request()->is('app/wms*'))
-                            <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-up-primary"></span>
-                        @endif
-                    </div>
-                    <span>WMS</span>
-                </a>
-                <button type="button" @click="sidebarOpen = true" class="flex flex-col items-center justify-center min-h-[44px] min-w-[54px] px-2 py-1 rounded-xl text-[11px] font-semibold text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white transition-[transform,color] duration-150 active:scale-[0.97] cursor-pointer">
-                    <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                    <span>Menu</span>
-                </button>
-            </nav>
+            <!-- Backoffice Floating Pill Mobile Dock (md:hidden) -->
+            <div class="md:hidden fixed bottom-3 inset-x-0 w-full flex justify-center px-4 z-40 pointer-events-none"
+                 style="padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.25rem);">
+                <nav class="pointer-events-auto bg-white/90 dark:bg-ink-950/90 backdrop-blur-2xl border border-ink-200/90 dark:border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] rounded-full px-2 py-1 flex items-center justify-between gap-0.5 sm:gap-1 max-w-sm w-full mx-auto">
+                    <a href="/app/dashboard"
+                       class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('app/dashboard') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+                        <div class="relative flex items-center justify-center">
+                            <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                        </div>
+                        <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Home</span>
+                    </a>
+
+                    <a href="/app/pos"
+                       class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('app/pos*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+                        <div class="relative flex items-center justify-center">
+                            <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Kasir</span>
+                    </a>
+
+                    <a href="/app/servis"
+                       class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('app/servis*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+                        <div class="relative flex items-center justify-center">
+                            <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </div>
+                        <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Servis</span>
+                    </a>
+
+                    <a href="/app/wms"
+                       class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('app/wms*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
+                        <div class="relative flex items-center justify-center">
+                            <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                        </div>
+                        <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">WMS</span>
+                    </a>
+
+                    <button type="button" @click="sidebarOpen = true"
+                            class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white transition-[background-color,color,transform] duration-140 active:scale-[0.93] cursor-pointer">
+                        <div class="relative flex items-center justify-center">
+                            <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </div>
+                        <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Menu</span>
+                    </button>
+                </nav>
+            </div>
         </div>
     </div>
 

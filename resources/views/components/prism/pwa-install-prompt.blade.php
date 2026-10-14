@@ -12,8 +12,8 @@
                     </svg>
                 </div>
                 <div class="min-w-0">
-                    <p class="font-medium text-white truncate">Pasang Ute Parts di layar utama</p>
-                    <p class="text-[11px] text-ink-300 hidden sm:block truncate">Akses kasir POS & data gudang lebih cepat dan praktis.</p>
+                    <p class="font-medium text-white truncate">Pasang <span x-text="appName"></span> di layar utama</p>
+                    <p class="text-[11px] text-ink-300 hidden sm:block truncate" x-text="appName === 'Ute ERP' ? 'Akses kasir POS & data gudang lebih cepat dan praktis.' : 'Akses katalog sparepart & booking servis lebih cepat.'"></p>
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
@@ -42,7 +42,7 @@
             type="button"
             @click="promptInstall()"
             class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 border border-up-primary/30 text-up-primary hover:text-white text-xs font-semibold transition-[transform,background-color,color] duration-150 active:scale-[0.97] cursor-pointer shadow-sm min-h-[38px]"
-            title="Pasang Ute Parts sebagai aplikasi mandiri"
+            :title="'Pasang ' + appName + ' sebagai aplikasi mandiri'"
         >
             <svg class="w-3.5 h-3.5 text-up-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

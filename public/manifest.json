@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Ute Parts — ERP, POS & Marketplace",
+  "name": "Ute Parts — Sparepart & Servis",
   "short_name": "Ute Parts",
-  "description": "ERP, POS & Marketplace untuk sparepart & servis HP",
+  "description": "Marketplace sparepart & booking servis HP",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,7 +10,7 @@
   "background_color": "#070A14",
   "theme_color": "#5B4FE9",
   "lang": "id",
-  "categories": ["business", "shopping"],
+  "categories": ["shopping", "business"],
   "icons": [
     {
       "src": "/icons/icon.svg",
@@ -45,24 +45,31 @@
   ],
   "shortcuts": [
     {
-      "name": "Kasir POS",
-      "short_name": "POS",
-      "description": "Buka kasir point of sale",
-      "url": "/app/pos",
+      "name": "Katalog Sparepart",
+      "short_name": "Katalog",
+      "description": "Cari sparepart HP",
+      "url": "/shop",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Gudang (WMS)",
-      "short_name": "WMS",
-      "description": "Kelola stok & mutasi gudang",
-      "url": "/app/wms",
+      "name": "Booking Servis",
+      "short_name": "Booking",
+      "description": "Jadwalkan servis HP",
+      "url": "/servis/booking",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Servis",
-      "short_name": "Servis",
-      "description": "Tiket servis & status pengerjaan",
-      "url": "/app/servis",
+      "name": "Keranjang Belanja",
+      "short_name": "Keranjang",
+      "description": "Lihat keranjang belanja",
+      "url": "/cart",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Lacak Servis",
+      "short_name": "Lacak",
+      "description": "Status pengerjaan servis",
+      "url": "/servis/tracking",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ]

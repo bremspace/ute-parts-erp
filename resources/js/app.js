@@ -96,6 +96,7 @@ window.pwaInstaller = function () {
         canInstall: false,
         installed: false,
         dismissed: false,
+        appName: window.UTE_ZONE === 'backoffice' ? 'Ute ERP' : 'Ute Parts',
         init() {
             if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
                 this.installed = true;
@@ -114,7 +115,7 @@ window.pwaInstaller = function () {
                 this.installed = true;
                 this.canInstall = false;
                 window.deferredPWAInstallPrompt = null;
-                showToast('Ute Parts berhasil dipasang!', 'success');
+                showToast(`${this.appName} berhasil dipasang di layar utama!`, 'success');
             });
         },
         async promptInstall() {
@@ -130,6 +131,50 @@ window.pwaInstaller = function () {
         dismiss() {
             this.dismissed = true;
             sessionStorage.setItem('pwa-prompt-dismissed', 'true');
+        }
+    };
+};
+
+// Screen Wake Lock API (Kasir POS & Servis)
+window.screenWakeLock = function () {
+    return {
+        isSupported: 'wakeLock' in navigator,
+        isActive: false,
+        sentinel: null,
+        init() {
+            document.addEventListener('visibilitychange', async () => {
+                if (this.isActive && document.visibilityState === 'visible') {
+                    await this.request();
+                }
+            });
+        },
+        async toggle() {
+            if (!this.isSupported) return;
+            if (this.isActive) {
+                await this.release();
+            } else {
+                await this.request();
+            }
+        },
+        async request() {
+            try {
+                this.sentinel = await navigator.wakeLock.request('screen');
+                this.isActive = true;
+                this.sentinel.addEventListener('release', () => {
+                    this.isActive = false;
+                });
+                showToast('Layar dikunci agar tetap menyala', 'info');
+            } catch (err) {
+                this.isActive = false;
+            }
+        },
+        async release() {
+            if (this.sentinel) {
+                await this.sentinel.release();
+                this.sentinel = null;
+            }
+            this.isActive = false;
+            showToast('Kunci layar dilepas (mode hemat daya)', 'info');
         }
     };
 };

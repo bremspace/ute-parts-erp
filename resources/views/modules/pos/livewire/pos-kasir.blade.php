@@ -41,6 +41,17 @@
                 <span class="hidden sm:inline">Filter</span>
             </button>
 
+            <!-- Screen Wake Lock Toggle (Kasir PWA) -->
+            <div x-data="screenWakeLock()" x-init="init()" x-show="isSupported" class="flex-shrink-0" x-cloak>
+                <button type="button" @click="toggle()"
+                        :class="isActive ? 'bg-up-amber/20 border-up-amber/40 text-up-amber' : 'border-white/10 text-ink-400 hover:text-white hover:bg-white/5'"
+                        class="px-2.5 py-2.5 rounded-xl border text-xs font-semibold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer min-h-[42px]"
+                        :title="isActive ? 'Layar Terus Menyala (Aktif)' : 'Kunci Layar Tetap Menyala (PWA Kasir)'">
+                    <span class="text-xs" x-text="isActive ? '☀️' : '🌙'"></span>
+                    <span class="hidden xl:inline text-[11px]" x-text="isActive ? 'Layar Aktif' : 'Standby'"></span>
+                </button>
+            </div>
+
             <div class="w-full sm:w-48">
                 <select
                     wire:model.live="selectedGudangId"

@@ -22,7 +22,7 @@ export default defineConfig({
             // Laravel tidak punya HTML build-time, jadi tidak ada <script> ter-inject;
             // registrasi runtime tetap SATU: import virtual:pwa-register di resources/js/app.js.
             injectRegister: 'script-defer',
-            includeAssets: ['favicon.ico', 'robots.txt', 'icons/icon.svg', 'icons/icon-maskable.svg', 'icons/icon-192x192.png', 'icons/icon-512x512.png'],
+            includeAssets: ['favicon.ico', 'robots.txt', 'icons/icon.svg', 'icons/icon-erp.svg', 'icons/icon-maskable.svg', 'icons/icon-192x192.png', 'icons/icon-512x512.png', 'manifest-backoffice.json'],
             manifest: {
                 id: '/',
                 name: 'Ute Parts — ERP, POS & Marketplace',
