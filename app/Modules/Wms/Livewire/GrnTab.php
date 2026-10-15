@@ -110,14 +110,26 @@ class GrnTab extends Component
                 ->where('gudang_id', $po->gudang_tujuan_id)
                 ->first();
 
+            $konversi = max(0.0001, (float) ($poItem->konversi ?? 1));
+            $satuanNama = $poItem->satuan ?: ($prod?->satuan ?: 'pcs');
+            $qtyPoSatuan = (float) $poItem->jumlah;
+            $rawJumlahDasar = (float) ($poItem->jumlah_dasar ?? 0);
+            $qtyPoDasar = $rawJumlahDasar > 0
+                ? (int) round($rawJumlahDasar)
+                : (int) round($qtyPoSatuan * $konversi);
+
             $itemForms[] = [
                 'produk_id' => $poItem->produk_id,
                 'produk_nama' => $prod?->nama ?? ('#'.$poItem->produk_id),
+                'satuan' => $satuanNama,
+                'satuan_dasar' => $prod?->satuan ?: 'pcs',
+                'konversi' => $konversi,
                 'barcode' => $prod?->barcode ?: ($var?->barcode ?: ''),
                 'sku' => $var?->sku ?: '',
                 'sku_variant_id' => $poItem->sku_variant_id,
                 'harga_beli' => (float) $poItem->harga_beli,
-                'qty_po' => (int) $poItem->jumlah,
+                'qty_po' => $qtyPoSatuan,
+                'qty_po_dasar' => $qtyPoDasar,
                 'qty_received' => 0,
                 'rak_id' => $stokExisting?->rak_id,
                 // [F2-3] SN wajib utk produk sn=true

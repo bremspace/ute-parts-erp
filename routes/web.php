@@ -51,26 +51,48 @@ Route::get('/', fn () => redirect('/shop'));
 Route::get('/shop', ShopPage::class)->name('shop');
 Route::get('/shop/{slug}', ShopPage::class)->name('shop.detail');
 
-// Tracking servis publik (PRD §4.3: link status via token, tanpa login)
+// Tracking servis publik (PRD §4.3: link status via token, dengan verifikasi 5 digit no HP atau login)
 Route::match(['GET', 'POST'], '/tracking', function (Request $request) {
+    $servisService = app(ServisService::class);
     $query = trim((string) $request->input('q', $request->query('q', '')));
+    $noHp = trim((string) $request->input('no_hp', ''));
+
     if ($query !== '') {
-        $tiket = TiketServis::where('token_approval', $query)
+        $tiket = TiketServis::with('pelanggan')
+            ->where('token_approval', $query)
             ->orWhere('no_tiket', $query)
             ->first();
 
-        if ($tiket && ! empty($tiket->token_approval)) {
+        if (! $tiket || empty($tiket->token_approval)) {
+            return redirect()->to(url('/tracking'))->with('error', "Tiket atau token '{$query}' tidak ditemukan. Silakan periksa kembali nomor tiket Anda.");
+        }
+
+        if ($servisService->isTrackingAuthorized($tiket)) {
             return redirect()->to(url('/tracking/'.$tiket->token_approval));
         }
 
-        return redirect()->to(url('/tracking'))->with('error', "Tiket atau token '{$query}' tidak ditemukan. Silakan periksa kembali nomor tiket Anda.");
+        if ($noHp !== '') {
+            if ($servisService->verifyTrackingPhone($tiket, $noHp)) {
+                session()->put('tracking_verified_'.$tiket->token_approval, true);
+
+                return redirect()->to(url('/tracking/'.$tiket->token_approval));
+            }
+
+            return redirect()->to(url('/tracking'))
+                ->withInput()
+                ->with('error', '5 digit terakhir nomor HP tidak cocok dengan data tiket servis.');
+        }
+
+        return redirect()->to(url('/tracking/'.$tiket->token_approval));
     }
 
-    return view('servis.tracking-publik', ['tiket' => null]);
+    return view('servis.tracking-publik', ['tiket' => null, 'perluVerifikasi' => false]);
 })->name('servis.tracking.search');
 
 Route::get('/tracking/{token}', function ($token) {
+    $servisService = app(ServisService::class);
     $tiket = TiketServis::with([
+        'pelanggan',
         'garansi',
         'cabang',
         'jenisServis',
@@ -82,8 +104,27 @@ Route::get('/tracking/{token}', function ($token) {
         ->where('token_approval', $token)
         ->first();
 
+    if (! $tiket) {
+        return redirect()->to(url('/tracking'))->with('error', 'Tiket servis tidak ditemukan.');
+    }
+
+    if (! $servisService->isTrackingAuthorized($tiket)) {
+        return view('servis.tracking-publik', [
+            'tiket' => null,
+            'perluVerifikasi' => true,
+            'token' => $token,
+            'tiketSummary' => [
+                'no_tiket' => $tiket->no_tiket,
+                'jenis_hp' => $tiket->jenis_hp,
+                'seri_hp' => $tiket->seri_hp,
+                'cabang' => $tiket->cabang?->nama,
+            ],
+        ]);
+    }
+
     return view('servis.tracking-publik', [
-        'tiket' => $tiket ? [
+        'perluVerifikasi' => false,
+        'tiket' => [
             'no_tiket' => $tiket->no_tiket,
             'jenis_hp' => $tiket->jenis_hp,
             'seri_hp' => $tiket->seri_hp,
@@ -142,13 +183,46 @@ Route::get('/tracking/{token}', function ($token) {
                 'is_overdue' => $tiket->pengerjaan_deadline_at && now()->greaterThan($tiket->pengerjaan_deadline_at) && in_array($tiket->status, ['dikerjakan', 'qc']),
                 'sisa_menit' => $tiket->pengerjaan_deadline_at && now()->lessThan($tiket->pengerjaan_deadline_at) ? (int) now()->diffInMinutes($tiket->pengerjaan_deadline_at) : 0,
             ],
-        ] : null,
+        ],
     ]);
 })->name('servis.tracking');
 
+Route::post('/tracking/{token}/verify', function (Request $request, $token) {
+    $servisService = app(ServisService::class);
+    $tiket = TiketServis::with('pelanggan')->where('token_approval', $token)->first();
+
+    if (! $tiket) {
+        return redirect()->to(url('/tracking'))->with('error', 'Tiket servis tidak ditemukan.');
+    }
+
+    $noHp = (string) $request->input('no_hp', '');
+    if ($servisService->verifyTrackingPhone($tiket, $noHp)) {
+        session()->put('tracking_verified_'.$token, true);
+
+        return redirect()->to(url('/tracking/'.$token))->with('success', 'Verifikasi berhasil.');
+    }
+
+    return redirect()->to(url('/tracking/'.$token))->with('error', '5 digit terakhir nomor HP tidak cocok. Silakan coba lagi.');
+})->name('servis.tracking.verify');
+
 Route::post('/tracking/{token}/approve', function (Request $request, $token) {
+    $servisService = app(ServisService::class);
+    $tiket = TiketServis::with('pelanggan')->where('token_approval', $token)->first();
+
+    if (! $tiket) {
+        return redirect()->to(url('/tracking'))->with('error', 'Tiket servis tidak ditemukan.');
+    }
+
+    if (! $servisService->isTrackingAuthorized($tiket)) {
+        if ($request->has('no_hp') && $servisService->verifyTrackingPhone($tiket, (string) $request->input('no_hp'))) {
+            session()->put('tracking_verified_'.$token, true);
+        } else {
+            return redirect()->to(url('/tracking/'.$token))->with('error', 'Silakan verifikasi nomor HP terlebih dahulu.');
+        }
+    }
+
     try {
-        app(ServisService::class)->approveByToken(
+        $servisService->approveByToken(
             $token,
             'approve',
             $request->input('alasan', 'Disetujui oleh pelanggan via web tracking')
@@ -161,8 +235,23 @@ Route::post('/tracking/{token}/approve', function (Request $request, $token) {
 })->name('servis.tracking.approve');
 
 Route::post('/tracking/{token}/reject', function (Request $request, $token) {
+    $servisService = app(ServisService::class);
+    $tiket = TiketServis::with('pelanggan')->where('token_approval', $token)->first();
+
+    if (! $tiket) {
+        return redirect()->to(url('/tracking'))->with('error', 'Tiket servis tidak ditemukan.');
+    }
+
+    if (! $servisService->isTrackingAuthorized($tiket)) {
+        if ($request->has('no_hp') && $servisService->verifyTrackingPhone($tiket, (string) $request->input('no_hp'))) {
+            session()->put('tracking_verified_'.$token, true);
+        } else {
+            return redirect()->to(url('/tracking/'.$token))->with('error', 'Silakan verifikasi nomor HP terlebih dahulu.');
+        }
+    }
+
     try {
-        app(ServisService::class)->approveByToken(
+        $servisService->approveByToken(
             $token,
             'reject',
             $request->input('alasan', 'Ditolak oleh pelanggan via web tracking')
@@ -295,6 +384,10 @@ Route::get('/print-barcode', function (Request $request) {
 
 // ===== Zona Backoffice (internal staff, dark mode) =====
 Route::get('/app/login', function () {
+    if (Auth::check()) {
+        return redirect('/app/dashboard');
+    }
+
     return view('auth.login');
 })->name('login');
 
@@ -361,9 +454,9 @@ Route::post('/app/login', function (Request $request) {
     );
     session(['device_token' => $deviceToken]);
 
-    // [FIX-INTENDED] Backoffice staff selalu diarahkan ke dashboard staff, jangan lempar ke url customer /account
+    // [FIX-INTENDED] Backoffice staff selalu diarahkan ke dashboard staff, jangan lempar ke url customer / non-app
     $intended = session()->get('url.intended');
-    if ($intended && (str_contains($intended, '/account') || str_contains($intended, '/cart') || str_contains($intended, '/checkout'))) {
+    if ($intended && ! str_contains($intended, '/app/')) {
         session()->forget('url.intended');
     }
 

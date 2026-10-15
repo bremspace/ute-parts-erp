@@ -161,7 +161,10 @@
                                         @endif
                                     </div>
                                     <div class="text-[11px] text-ink-400 font-mono mt-0.5 flex gap-2 flex-wrap">
-                                        <span>PO: <b class="text-ink-200">{{ $poQ }}</b> pcs</span>
+                                        <span>PO: <b class="text-ink-200">{{ $poQ }}</b> {{ $item['satuan'] ?? 'pcs' }}</span>
+                                        @if((float)($item['konversi'] ?? 1) > 1)
+                                            <span class="text-amber-300">(= {{ $poQ * (float)$item['konversi'] }} {{ $item['satuan_dasar'] ?? 'pcs' }})</span>
+                                        @endif
                                         @if(!empty($item['sku'])) <span>SKU: {{ $item['sku'] }}</span> @endif
                                         @if(!empty($item['barcode'])) <span>Barcode: {{ $item['barcode'] }}</span> @endif
                                     </div>
@@ -195,7 +198,7 @@
 
                                     <!-- Qty Received & Quick Buttons -->
                                     <div>
-                                        <div class="text-[10px] text-ink-400 mb-0.5">Diterima</div>
+                                        <div class="text-[10px] text-ink-400 mb-0.5">Diterima ({{ $item['satuan'] ?? 'pcs' }})</div>
                                         <div class="flex items-center gap-1">
                                             <button type="button" wire:click="tambahQtyItem({{ $idx }}, -1)" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 font-bold text-xs flex items-center justify-center cursor-pointer active:scale-95">-</button>
                                             <input
@@ -208,6 +211,11 @@
                                             <button type="button" wire:click="tambahQtyItem({{ $idx }}, 1)" class="w-7 h-7 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs flex items-center justify-center cursor-pointer active:scale-95">+</button>
                                             <button type="button" wire:click="setItemLengkap({{ $idx }})" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-semibold text-ink-300 cursor-pointer" title="Set Sesuai Qty PO">Full</button>
                                         </div>
+                                        @if((float)($item['konversi'] ?? 1) > 1 && $rcvQ > 0)
+                                            <div class="text-[9px] text-up-mint mt-0.5 text-center font-medium">
+                                                = {{ $rcvQ * (float)$item['konversi'] }} {{ $item['satuan_dasar'] ?? 'pcs' }}
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -328,8 +336,18 @@
                                                 <span class="text-ink-500 font-mono text-[11px]">—</span>
                                             @endif
                                         </td>
-                                        <td class="py-2 px-3 text-center tabular-nums text-ink-300">{{ $item['qty_po'] ?? '-' }}</td>
-                                        <td class="py-2 px-3 text-center tabular-nums font-bold text-white">{{ $item['qty_received'] ?? 0 }}</td>
+                                        <td class="py-2 px-3 text-center tabular-nums text-ink-300">
+                                            {{ $item['qty_po'] ?? '-' }} {{ $item['satuan'] ?? 'pcs' }}
+                                            @if((float)($item['konversi'] ?? 1) > 1)
+                                                <div class="text-[10px] text-ink-500">({{ ((float)($item['qty_po'] ?? 0)) * (float)$item['konversi'] }} pcs)</div>
+                                            @endif
+                                        </td>
+                                        <td class="py-2 px-3 text-center tabular-nums font-bold text-white">
+                                            {{ $item['qty_received'] ?? 0 }} {{ $item['satuan'] ?? 'pcs' }}
+                                            @if((float)($item['konversi'] ?? 1) > 1)
+                                                <div class="text-[10px] text-up-mint">({{ ((float)($item['qty_received'] ?? 0)) * (float)$item['konversi'] }} pcs)</div>
+                                            @endif
+                                        </td>
                                         <td class="py-2 px-3 text-center">
                                             <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ ($item['status'] ?? '') === 'lengkap' ? 'bg-up-mint/10 text-up-mint' : 'bg-up-amber/10 text-up-amber' }}">
                                                 {{ $item['status'] ?? 'selisih' }}

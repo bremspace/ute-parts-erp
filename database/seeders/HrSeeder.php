@@ -12,6 +12,7 @@ use App\Modules\Reseller\Models\KomisiSkema;
 use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class HrSeeder extends Seeder
 {

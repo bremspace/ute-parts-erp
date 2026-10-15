@@ -69,16 +69,29 @@ class PurchaseOrderService
             $totalHpp = 0;
 
             foreach ($po->items as $item) {
-                $harga = (float) $item->harga_beli;
-                $qty = (int) $item->jumlah;
+                $konversi = max(0.0001, (float) ($item->konversi ?? 1));
+                $qtySatuan = (float) $item->jumlah;
+                $rawJumlahDasar = (float) ($item->jumlah_dasar ?? 0);
+                $qtyDasar = $rawJumlahDasar > 0
+                    ? (int) round($rawJumlahDasar)
+                    : (int) round($qtySatuan * $konversi);
+                $hargaSatuanPo = (float) $item->harga_beli;
+                $hargaPerBaseUnit = round($hargaSatuanPo / $konversi, 2);
+                $subtotalItem = (float) $item->subtotal ?: ($hargaSatuanPo * $qtySatuan);
+
+                $satuanLabel = $item->satuan ?: ($item->produk?->satuan ?: 'pcs');
+                $keteranganItem = "Terima PO {$po->no_po} item {$item->produk?->nama}";
+                if ($konversi > 1) {
+                    $keteranganItem .= " ({$qtySatuan} {$satuanLabel} = {$qtyDasar} {$item->produk?->satuan})";
+                }
 
                 $this->produkService->tambahStokPembelian(
                     $item->produk_id,
                     $item->sku_variant_id,
                     $po->gudang_tujuan_id,
-                    $qty,
-                    $harga,
-                    "Terima PO {$po->no_po} item {$item->produk?->nama}",
+                    $qtyDasar,
+                    $hargaPerBaseUnit,
+                    $keteranganItem,
                     $userId,
                     postJurnal: false, // jurnal agregat diposting di bawah (hindari dobel posting)
                     smlSumber: 'po:receive', // [T-40] SOT: mutasi masuk via penerimaan PO
@@ -86,9 +99,9 @@ class PurchaseOrderService
                     smlReferensiId: $po->id
                 );
 
-                $this->produkService->sesuaikanHargaBeliAverage($item->produk_id, $qty, $harga);
+                $this->produkService->sesuaikanHargaBeliAverage($item->produk_id, $qtyDasar, $hargaPerBaseUnit);
 
-                $totalHpp += $harga * $qty;
+                $totalHpp += $subtotalItem;
             }
 
             // Jurnal

@@ -46,7 +46,72 @@
             </div>
         @endif
 
-        @if($tiket)
+        @if($perluVerifikasi ?? false)
+            <!-- Form Verifikasi 5 Digit No HP -->
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 md:p-8 text-center max-w-md mx-auto">
+                <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center mb-4 shadow-sm">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+
+                <h3 class="font-bold text-slate-900 text-lg">Verifikasi Keamanan Tracking</h3>
+                <p class="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
+                    Untuk melindungi privasi data perbaikan, silakan masukkan <span class="font-bold text-slate-700">5 digit terakhir nomor HP</span> yang didaftarkan saat servis unit ini.
+                </p>
+
+                @if(!empty($tiketSummary))
+                    <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mb-5 text-left text-xs space-y-1.5">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-500">Nomor Tiket:</span>
+                            <span class="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{{ $tiketSummary['no_tiket'] }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-500">Unit:</span>
+                            <span class="font-medium text-slate-800">{{ $tiketSummary['jenis_hp'] }} {{ $tiketSummary['seri_hp'] ?? '' }}</span>
+                        </div>
+                        @if(!empty($tiketSummary['cabang']))
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-500">Cabang:</span>
+                                <span class="text-slate-600">{{ $tiketSummary['cabang'] }}</span>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                <form action="{{ route('servis.tracking.verify', $token) }}" method="POST" class="space-y-4">
+                    @csrf
+                    <div>
+                        <label for="no_hp" class="block text-xs font-semibold text-slate-700 text-left mb-1.5">
+                            5 Digit Terakhir No. HP
+                        </label>
+                        <input
+                            type="text"
+                            id="no_hp"
+                            name="no_hp"
+                            inputmode="numeric"
+                            pattern="\d*"
+                            maxlength="5"
+                            placeholder="Contoh: 56789"
+                            required
+                            autofocus
+                            class="w-full text-center tracking-[0.3em] font-mono text-lg font-bold px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
+                        />
+                    </div>
+
+                    <button type="submit" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-colors cursor-pointer">
+                        Verifikasi & Lihat Tracking
+                    </button>
+                </form>
+
+                <div class="mt-5 pt-4 border-t border-slate-100 text-xs text-slate-500">
+                    Memiliki akun terdaftar?
+                    <a href="{{ route('customer.login') }}" class="font-semibold text-indigo-600 hover:underline">
+                        Login ke akun web
+                    </a>
+                </div>
+            </div>
+        @elseif($tiket)
             <!-- Main Tracking Card -->
             <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 md:p-8 space-y-6">
                 <!-- Header Info -->
@@ -488,27 +553,71 @@
             </div>
         @else
             <!-- Form Pencarian & Tracking Servis -->
-            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-8 text-center">
+            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 md:p-8 text-center max-w-lg mx-auto">
                 <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center mb-3">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </div>
                 <h3 class="font-bold text-slate-800 text-lg">Lacak Status Servis Gadget</h3>
-                <p class="text-sm text-slate-500 mt-1 max-w-sm mx-auto mb-6">
-                    Masukkan Nomor Tiket Servis Anda (contoh: SRV-ONL-... atau SRV-...) atau Token Approval untuk melihat perkembangan perbaikan.
+                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto mb-6">
+                    Masukkan nomor tiket servis dan 5 digit terakhir nomor HP yang didaftarkan untuk memantau perbaikan.
                 </p>
 
-                <form action="{{ route('servis.tracking.search') }}" method="POST" class="max-w-md mx-auto space-y-3">
+                <form action="{{ route('servis.tracking.search') }}" method="POST" class="space-y-3.5 text-left">
                     @csrf
-                    <div class="flex gap-2">
-                        <input type="text" name="q" placeholder="Nomor Tiket atau Token Servis" required autofocus
-                               class="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600" />
-                        <button type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-colors cursor-pointer">
-                            Lacak
-                        </button>
+                    <div>
+                        <label for="search_q" class="block text-xs font-semibold text-slate-700 mb-1">
+                            Nomor Tiket atau Token Servis <span class="text-rose-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="search_q"
+                            name="q"
+                            value="{{ old('q', request('q')) }}"
+                            placeholder="Contoh: SRV-2026-0001 atau token"
+                            required
+                            autofocus
+                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
+                        />
                     </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="search_no_hp" class="block text-xs font-semibold text-slate-700">
+                                5 Digit Terakhir No. HP Terdaftar
+                            </label>
+                            @if(auth('customer')->check() || auth('web')->check())
+                                <span class="text-[11px] text-emerald-600 font-medium">✓ Akun login terdeteksi</span>
+                            @endif
+                        </div>
+                        <input
+                            type="text"
+                            id="search_no_hp"
+                            name="no_hp"
+                            inputmode="numeric"
+                            pattern="\d*"
+                            maxlength="5"
+                            value="{{ old('no_hp') }}"
+                            placeholder="Contoh: 56789 (opsional jika sudah login)"
+                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
+                        />
+                    </div>
+
+                    <button type="submit" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-colors cursor-pointer">
+                        Lacak Status Servis
+                    </button>
                 </form>
+
+                @if(!auth('customer')->check() && !auth('web')->check())
+                    <div class="mt-5 pt-4 border-t border-slate-100 text-xs text-slate-500">
+                        Punya akun terdaftar di web?
+                        <a href="{{ route('customer.login') }}" class="font-semibold text-indigo-600 hover:underline">
+                            Login di sini
+                        </a>
+                        untuk tracking otomatis.
+                    </div>
+                @endif
             </div>
         @endif
 

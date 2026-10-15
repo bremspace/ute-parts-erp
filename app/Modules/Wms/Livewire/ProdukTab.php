@@ -118,6 +118,7 @@ class ProdukTab extends Component
         'metode_harga_beli' => 'average',
         'margin_persen' => null,
         'hitung_dari_margin' => false,
+        'multi_satuan' => [],
         // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
         'abc_class' => 'B',
         'reorder_point' => null,
@@ -312,6 +313,7 @@ class ProdukTab extends Component
             'metode_harga_beli' => 'average',
             'margin_persen' => null,
             'hitung_dari_margin' => false,
+            'multi_satuan' => [],
             // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
             'abc_class' => 'B',
             'reorder_point' => null,
@@ -542,7 +544,8 @@ class ProdukTab extends Component
                 barcode: ! empty($this->produkForm['barcode']) ? trim($this->produkForm['barcode']) : null,
                 metodeHargaBeli: $this->produkForm['metode_harga_beli'] ?? 'average',
                 marginPersen: ! empty($this->produkForm['margin_persen']) ? (float) $this->produkForm['margin_persen'] : null,
-                rakId: ! empty($this->produkForm['rak_id']) ? (int) $this->produkForm['rak_id'] : null
+                rakId: ! empty($this->produkForm['rak_id']) ? (int) $this->produkForm['rak_id'] : null,
+                multiSatuan: $this->produkForm['multi_satuan'] ?? []
             );
 
             $this->showProdukModal = false;
@@ -575,6 +578,8 @@ class ProdukTab extends Component
             }
         }
 
+        $existingCodes = SatuanUnit::pluck('kode')->map(fn ($k) => strtolower($k))->all();
+
         $this->editProdukForm = [
             'nama' => $p->nama,
             'barcode' => $p->barcode ?? '',
@@ -596,6 +601,21 @@ class ProdukTab extends Component
             'metode_harga_beli' => $p->metode_harga_beli ?? 'manual',
             'margin_persen' => $p->margin_persen !== null ? (float) $p->margin_persen : null,
             'hitung_dari_margin' => $p->margin_persen !== null && (float) $p->margin_persen > 0,
+            'multi_satuan' => $p->satuanKonversi->map(function ($sk) use ($existingCodes) {
+                return [
+                    'id' => $sk->id,
+                    'satuan_kode' => $sk->satuan_kode,
+                    'satuan_asal' => $sk->satuan_asal,
+                    'pengali' => (float) $sk->pengali + 0,
+                    'faktor_konversi' => (float) $sk->faktor_konversi + 0,
+                    'harga_beli' => $sk->harga_beli !== null ? (float) $sk->harga_beli : null,
+                    'harga_jual' => $sk->harga_jual !== null ? (float) $sk->harga_jual : null,
+                    'barcode' => $sk->barcode ?? '',
+                    'is_satuan_beli' => (bool) $sk->is_satuan_beli,
+                    'is_satuan_jual' => (bool) $sk->is_satuan_jual,
+                    'is_custom' => ! in_array(strtolower($sk->satuan_kode), $existingCodes, true),
+                ];
+            })->toArray(),
             'deskripsi' => $p->deskripsi ?? '',
             // [PROCUREMENT: ABC, ROP, Min-Max, JIT]
             'abc_class' => $p->abc_class ?: 'B',
@@ -737,7 +757,8 @@ class ProdukTab extends Component
                 isOndemand: (bool) ($this->editProdukForm['is_ondemand'] ?? false),
                 barcode: isset($this->editProdukForm['barcode']) ? trim((string) $this->editProdukForm['barcode']) : null,
                 metodeHargaBeli: $this->editProdukForm['metode_harga_beli'] ?? 'manual',
-                marginPersen: ! empty($this->editProdukForm['margin_persen']) ? (float) $this->editProdukForm['margin_persen'] : null
+                marginPersen: ! empty($this->editProdukForm['margin_persen']) ? (float) $this->editProdukForm['margin_persen'] : null,
+                multiSatuan: $this->editProdukForm['multi_satuan'] ?? []
             );
 
             // Simpan perubahan lokasi rak stok per gudang
@@ -753,6 +774,112 @@ class ProdukTab extends Component
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
+    }
+
+    public function addMultiSatuan(string $target = 'create'): void
+    {
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        $base = $this->{$formKey}['satuan_kode'] ?? 'pcs';
+
+        $currentRows = $this->{$formKey}['multi_satuan'] ?? [];
+        $lastRow = ! empty($currentRows) ? end($currentRows) : null;
+        $satuanAsal = ! empty($lastRow['satuan_kode']) ? $lastRow['satuan_kode'] : $base;
+
+        $this->{$formKey}['multi_satuan'][] = [
+            'satuan_kode' => '',
+            'satuan_asal' => $satuanAsal,
+            'pengali' => 10,
+            'faktor_konversi' => 10,
+            'harga_beli' => null,
+            'harga_jual' => null,
+            'barcode' => '',
+            'is_satuan_beli' => empty($currentRows),
+            'is_satuan_jual' => false,
+            'is_custom' => false,
+        ];
+
+        $this->hitungKonversiMultiSatuan($target);
+    }
+
+    public function pilihSatuanUnit(string $target, int $index, string $val): void
+    {
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        if ($val === '__custom__') {
+            $this->{$formKey}['multi_satuan'][$index]['is_custom'] = true;
+            $this->{$formKey}['multi_satuan'][$index]['satuan_kode'] = '';
+        } else {
+            $this->{$formKey}['multi_satuan'][$index]['is_custom'] = false;
+            $this->{$formKey}['multi_satuan'][$index]['satuan_kode'] = strtolower(trim($val));
+            $this->hitungKonversiMultiSatuan($target);
+        }
+    }
+
+    public function batalCustomSatuan(string $target, int $index): void
+    {
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        $this->{$formKey}['multi_satuan'][$index]['is_custom'] = false;
+        $this->{$formKey}['multi_satuan'][$index]['satuan_kode'] = '';
+        $this->hitungKonversiMultiSatuan($target);
+    }
+
+    public function toggleSatuanBeli(string $target, int $index): void
+    {
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        $current = ! empty($this->{$formKey}['multi_satuan'][$index]['is_satuan_beli']);
+        foreach ($this->{$formKey}['multi_satuan'] as $i => $row) {
+            $this->{$formKey}['multi_satuan'][$i]['is_satuan_beli'] = ($i === $index && ! $current);
+        }
+    }
+
+    public function removeMultiSatuan(int $index, string $target = 'create'): void
+    {
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        unset($this->{$formKey}['multi_satuan'][$index]);
+        $this->{$formKey}['multi_satuan'] = array_values($this->{$formKey}['multi_satuan']);
+        $this->hitungKonversiMultiSatuan($target);
+    }
+
+    public function hitungKonversiMultiSatuan(string $target = 'create'): void
+    {
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        $base = strtolower(trim($this->{$formKey}['satuan_kode'] ?? 'pcs')) ?: 'pcs';
+
+        $factors = [$base => 1.0];
+
+        if (empty($this->{$formKey}['multi_satuan'])) {
+            return;
+        }
+
+        foreach ($this->{$formKey}['multi_satuan'] as $idx => $row) {
+            $kode = strtolower(trim($row['satuan_kode'] ?? ''));
+            $asal = strtolower(trim($row['satuan_asal'] ?? $base)) ?: $base;
+
+            if ($asal === $kode) {
+                $asal = $base;
+                $this->{$formKey}['multi_satuan'][$idx]['satuan_asal'] = $base;
+            }
+
+            $pengali = max(0.0001, (float) ($row['pengali'] ?? 1));
+
+            $parentFactor = $factors[$asal] ?? 1.0;
+            $faktorKonversi = round($pengali * $parentFactor, 4);
+
+            if ($kode) {
+                $factors[$kode] = $faktorKonversi;
+            }
+
+            $this->{$formKey}['multi_satuan'][$idx]['faktor_konversi'] = $faktorKonversi;
+        }
+    }
+
+    public function updatedProdukFormSatuanKode($value): void
+    {
+        $this->hitungKonversiMultiSatuan('create');
+    }
+
+    public function updatedEditProdukFormSatuanKode($value): void
+    {
+        $this->hitungKonversiMultiSatuan('edit');
     }
 
     public function hapusProduk(int $produkId): void

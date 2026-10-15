@@ -136,6 +136,12 @@ class TwoFactorChallengeController extends Controller
         );
         session(['device_token' => $deviceToken]);
 
+        // [FIX-INTENDED] Backoffice staff selalu diarahkan ke dashboard staff, jangan lempar ke url customer / non-app
+        $intended = session()->get('url.intended');
+        if ($intended && ! str_contains($intended, '/app/')) {
+            session()->forget('url.intended');
+        }
+
         return redirect()->intended('/app/dashboard');
     }
 

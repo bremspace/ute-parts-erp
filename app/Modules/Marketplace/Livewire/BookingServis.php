@@ -113,6 +113,7 @@ class BookingServis extends Component
 
         $tiket = $servisService->bookingOnline($payload);
 
+        session()->put('tracking_verified_'.$tiket->token_approval, true);
         session()->flash('success', 'Booking servis berhasil diajukan! Simpan halaman ini untuk memantau status perbaikan Anda.');
 
         return redirect()->to(url('/tracking/'.$tiket->token_approval));

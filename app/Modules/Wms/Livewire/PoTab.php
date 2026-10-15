@@ -140,7 +140,7 @@ class PoTab extends Component
     {
         $this->poForm = [
             'supplier_id' => null, 'gudang_tujuan_id' => null, 'metode_bayar' => 'kredit', 'akun_kas_bank' => '110-01', 'jatuh_tempo' => '',
-            'items' => [['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1]],
+            'items' => [['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'satuan' => 'pcs', 'konversi' => 1, 'jumlah_dasar' => 1, 'daftar_satuan' => [], 'harga_beli' => 0, 'jumlah' => 1]],
         ];
         $this->showPoModal = true;
     }
@@ -173,7 +173,17 @@ class PoTab extends Component
 
     public function addPoItem()
     {
-        $this->poForm['items'][] = ['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'harga_beli' => 0, 'jumlah' => 1];
+        $this->poForm['items'][] = [
+            'produk_id' => null,
+            'produk_nama' => '',
+            'sku_variant_id' => null,
+            'satuan' => 'pcs',
+            'konversi' => 1,
+            'jumlah_dasar' => 1,
+            'daftar_satuan' => [],
+            'harga_beli' => 0,
+            'jumlah' => 1,
+        ];
     }
 
     public function removePoItem(int $idx)
@@ -228,22 +238,78 @@ class PoTab extends Component
 
     public function poProdukDipilih(int $idx)
     {
-        $produk = Produk::find($this->poForm['items'][$idx]['produk_id']);
+        $produk = Produk::with('satuanKonversi')->find($this->poForm['items'][$idx]['produk_id']);
         if ($produk) {
             $supplierId = ! empty($this->poForm['supplier_id']) ? (int) $this->poForm['supplier_id'] : null;
             $histori = app(ProcurementService::class)->getHistoriPembelian($produk->id, $supplierId);
 
             if (! empty($histori['items'])) {
                 // Gunakan harga beli terakhir dari supplier ini (atau supplier sebelumnya)
-                $this->poForm['items'][$idx]['harga_beli'] = (float) $histori['items'][0]['harga_beli'];
-                $this->poForm['items'][$idx]['info_terakhir'] = 'Terakhir: Rp '.number_format($histori['items'][0]['harga_beli'], 0, ',', '.').' ('.$histori['items'][0]['supplier_nama'].')';
+                $baseHarga = (float) $histori['items'][0]['harga_beli'];
+                $this->poForm['items'][$idx]['info_terakhir'] = 'Terakhir: Rp '.number_format($baseHarga, 0, ',', '.').' ('.$histori['items'][0]['supplier_nama'].')';
             } else {
-                $this->poForm['items'][$idx]['harga_beli'] = (float) $produk->harga_beli;
+                $baseHarga = (float) $produk->harga_beli;
                 $this->poForm['items'][$idx]['info_terakhir'] = null;
             }
 
+            $daftarSatuan = $produk->getDaftarSatuan();
+            $this->poForm['items'][$idx]['daftar_satuan'] = $daftarSatuan;
+
+            // Prioritaskan satuan beli jika ada
+            $satuanBeli = $produk->satuanKonversi->firstWhere('is_satuan_beli', true);
+            $satuanKode = $satuanBeli?->satuan_kode ?: ($produk->satuan ?: 'pcs');
+            $satuanData = collect($daftarSatuan)->firstWhere('satuan_kode', $satuanKode) ?: $daftarSatuan[0];
+
+            $konversi = max(0.0001, (float) ($satuanData['faktor_konversi'] ?? 1));
+            $this->poForm['items'][$idx]['satuan'] = $satuanData['satuan_kode'];
+            $this->poForm['items'][$idx]['konversi'] = $konversi;
+
+            if (! empty($satuanData['harga_beli']) && empty($satuanData['is_dasar'])) {
+                $this->poForm['items'][$idx]['harga_beli'] = (float) $satuanData['harga_beli'];
+            } else {
+                $this->poForm['items'][$idx]['harga_beli'] = round($baseHarga * $konversi, 2);
+            }
+
+            $jumlah = (float) ($this->poForm['items'][$idx]['jumlah'] ?? 1);
+            $this->poForm['items'][$idx]['jumlah_dasar'] = round($jumlah * $konversi, 2);
             $this->poForm['items'][$idx]['sku_variant_id'] = $produk->skuVariants()->first()?->id;
         }
+    }
+
+    public function onPoSatuanChanged(int $idx): void
+    {
+        if (! isset($this->poForm['items'][$idx])) {
+            return;
+        }
+
+        $item = &$this->poForm['items'][$idx];
+        $produkId = $item['produk_id'] ?? null;
+        if (! $produkId) {
+            return;
+        }
+
+        $produk = Produk::with('satuanKonversi')->find($produkId);
+        if (! $produk) {
+            return;
+        }
+
+        $daftarSatuan = ! empty($item['daftar_satuan']) ? $item['daftar_satuan'] : $produk->getDaftarSatuan();
+        $satuanDipilih = $item['satuan'] ?? ($produk->satuan ?: 'pcs');
+        $satuanData = collect($daftarSatuan)->firstWhere('satuan_kode', $satuanDipilih)
+            ?: collect($daftarSatuan)->firstWhere('satuan_kode', $produk->satuan)
+            ?: ['faktor_konversi' => 1, 'harga_beli' => (float) $produk->harga_beli, 'satuan_kode' => $satuanDipilih];
+
+        $konversi = max(0.0001, (float) ($satuanData['faktor_konversi'] ?? 1));
+        $item['konversi'] = $konversi;
+
+        if (! empty($satuanData['harga_beli']) && empty($satuanData['is_dasar'])) {
+            $item['harga_beli'] = (float) $satuanData['harga_beli'];
+        } else {
+            $item['harga_beli'] = round((float) $produk->harga_beli * $konversi, 2);
+        }
+
+        $jumlah = (float) ($item['jumlah'] ?? 1);
+        $item['jumlah_dasar'] = round($jumlah * $konversi, 2);
     }
 
     public function bukaHistoriPembelian(int $produkId, ?string $produkNama = null): void
@@ -332,13 +398,20 @@ class PoTab extends Component
 
         foreach ($this->poForm['items'] as $i) {
             $harga = $this->parseNominal($i['harga_beli'] ?? 0);
+            $jumlah = (float) ($i['jumlah'] ?? 1);
+            $konversi = max(0.0001, (float) ($i['konversi'] ?? 1));
+            $jumlahDasar = round($jumlah * $konversi, 2);
+
             PurchaseOrderItem::create([
                 'purchase_order_id' => $po->id,
                 'produk_id' => $i['produk_id'],
                 'sku_variant_id' => $i['sku_variant_id'] ?? null,
+                'satuan' => $i['satuan'] ?? null,
+                'konversi' => $konversi,
                 'harga_beli' => $harga,
-                'jumlah' => (int) ($i['jumlah'] ?? 1),
-                'subtotal' => $harga * (int) ($i['jumlah'] ?? 1),
+                'jumlah' => $jumlah,
+                'jumlah_dasar' => $jumlahDasar,
+                'subtotal' => $harga * $jumlah,
             ]);
         }
 

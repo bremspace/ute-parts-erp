@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Services\ServisService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -196,5 +197,158 @@ class ServisTrackingKonsumenTest extends TestCase
                 'status' => 'diterima',
             ],
         ]);
+    }
+
+    public function test_guest_membuka_tracking_tiket_bertelepon_memerlukan_verifikasi_5_digit(): void
+    {
+        $tiket = $this->servisService->terimaUnit([
+            'cabang_id' => $this->cabang->id,
+            'nama_pelanggan' => 'Budi Santoso',
+            'telepon_pelanggan' => '081234567890',
+            'jenis_hp' => 'iPhone 13 Pro',
+            'keluhan' => 'Layar bergaris',
+        ], $this->user);
+
+        // Guest tanpa session / login mengakses tracking
+        $response = $this->get('/tracking/'.$tiket->token_approval);
+
+        $response->assertStatus(200);
+        $response->assertSee('Verifikasi Keamanan Tracking');
+        $response->assertSee('5 Digit Terakhir No. HP');
+        // Data sensitif / keluhan / status pengerjaan tidak boleh tampil sebelum verifikasi
+        $response->assertDontSee('Layar bergaris');
+    }
+
+    public function test_verifikasi_5_digit_nomor_hp_gagal_jika_salah(): void
+    {
+        $tiket = $this->servisService->terimaUnit([
+            'cabang_id' => $this->cabang->id,
+            'nama_pelanggan' => 'Budi Santoso',
+            'telepon_pelanggan' => '081234567890',
+            'jenis_hp' => 'iPhone 13 Pro',
+            'keluhan' => 'Layar bergaris',
+        ], $this->user);
+
+        $response = $this->post('/tracking/'.$tiket->token_approval.'/verify', [
+            'no_hp' => '12345',
+        ]);
+
+        $response->assertRedirect('/tracking/'.$tiket->token_approval);
+        $response->assertSessionHas('error');
+    }
+
+    public function test_verifikasi_5_digit_nomor_hp_berhasil_dan_membuka_detail_tracking(): void
+    {
+        $tiket = $this->servisService->terimaUnit([
+            'cabang_id' => $this->cabang->id,
+            'nama_pelanggan' => 'Budi Santoso',
+            'telepon_pelanggan' => '081234567890',
+            'jenis_hp' => 'iPhone 13 Pro',
+            'keluhan' => 'Layar bergaris',
+        ], $this->user);
+
+        $response = $this->post('/tracking/'.$tiket->token_approval.'/verify', [
+            'no_hp' => '67890',
+        ]);
+
+        $response->assertRedirect('/tracking/'.$tiket->token_approval);
+        $response->assertSessionHas('success');
+
+        // Buka kembali tracking setelah session tersimpan
+        $responsePage = $this->get('/tracking/'.$tiket->token_approval);
+        $responsePage->assertStatus(200);
+        $responsePage->assertSee('iPhone 13 Pro');
+        $responsePage->assertSee('Layar bergaris');
+        $responsePage->assertDontSee('Verifikasi Keamanan Tracking');
+    }
+
+    public function test_tracking_search_dengan_5_digit_no_hp_langsung_terverifikasi(): void
+    {
+        $tiket = $this->servisService->terimaUnit([
+            'cabang_id' => $this->cabang->id,
+            'nama_pelanggan' => 'Budi Santoso',
+            'telepon_pelanggan' => '081234567890',
+            'jenis_hp' => 'Samsung S22',
+            'keluhan' => 'Speaker rusak',
+        ], $this->user);
+
+        // Submit search dengan no_tiket dan 5 digit terakhir no HP yang benar
+        $response = $this->post('/tracking', [
+            'q' => $tiket->no_tiket,
+            'no_hp' => '67890',
+        ]);
+
+        $response->assertRedirect('/tracking/'.$tiket->token_approval);
+
+        // Halaman detail harus langsung terbuka tanpa form verifikasi
+        $detail = $this->get('/tracking/'.$tiket->token_approval);
+        $detail->assertSee('Samsung S22');
+        $detail->assertSee('Speaker rusak');
+    }
+
+    public function test_pelanggan_login_bisa_akses_tracking_langsung_tanpa_verifikasi(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Ahmad Customer',
+            'telepon' => '085678901234',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $tiket = $this->servisService->terimaUnit([
+            'cabang_id' => $this->cabang->id,
+            'pelanggan_id' => $pelanggan->id,
+            'telepon_pelanggan' => '085678901234',
+            'jenis_hp' => 'Asus ROG Phone',
+            'keluhan' => 'Panas berlebih',
+        ], $this->user);
+
+        // Login sebagai customer
+        $this->actingAs($pelanggan, 'customer');
+
+        $response = $this->get('/tracking/'.$tiket->token_approval);
+        $response->assertStatus(200);
+        $response->assertSee('Asus ROG Phone');
+        $response->assertSee('Panas berlebih');
+        $response->assertDontSee('Verifikasi Keamanan Tracking');
+    }
+
+    public function test_staff_login_bisa_akses_tracking_langsung_tanpa_verifikasi(): void
+    {
+        $tiket = $this->servisService->terimaUnit([
+            'cabang_id' => $this->cabang->id,
+            'nama_pelanggan' => 'Pelanggan Umum',
+            'telepon_pelanggan' => '087711223344',
+            'jenis_hp' => 'Google Pixel 7',
+            'keluhan' => 'Mati lampu layar',
+        ], $this->user);
+
+        // Login sebagai staff backoffice
+        $this->actingAs($this->user, 'web');
+
+        $response = $this->get('/tracking/'.$tiket->token_approval);
+        $response->assertStatus(200);
+        $response->assertSee('Google Pixel 7');
+        $response->assertSee('Mati lampu layar');
+        $response->assertDontSee('Verifikasi Keamanan Tracking');
+    }
+
+    public function test_approve_estimasi_ditolak_jika_belum_verifikasi_no_hp(): void
+    {
+        $tiket = $this->servisService->terimaUnit([
+            'cabang_id' => $this->cabang->id,
+            'nama_pelanggan' => 'Eko',
+            'telepon_pelanggan' => '081299887766',
+            'jenis_hp' => 'Realme GT',
+            'keluhan' => 'Ganti baterai',
+        ], $this->user);
+
+        $tiket = $this->servisService->updateStatus($tiket, 'diagnosa', $this->user, 'Mulai');
+        $tiket = $this->servisService->setEstimasi($tiket, 200000, 'Baterai baru', $this->user);
+
+        // Guest mencoba approve tanpa verifikasi
+        $response = $this->post('/tracking/'.$tiket->token_approval.'/approve');
+        $response->assertRedirect('/tracking/'.$tiket->token_approval);
+        $response->assertSessionHas('error');
+        $this->assertEquals('menunggu_approval', $tiket->fresh()->status);
     }
 }

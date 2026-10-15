@@ -209,7 +209,17 @@
                                     @cannotsee('harga_beli')
                                     <input type="text" class="w-full sm:w-28 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed min-h-[44px]" placeholder="Harga (superadmin)" disabled />
                                     @endcansee
-                                    <input type="number" wire:model="poForm.items.{{ $idx }}.jumlah" min="1" class="w-20 sm:w-16 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-center min-h-[44px]" placeholder="Qty" />
+                                    <input type="number" wire:model="poForm.items.{{ $idx }}.jumlah" wire:change="onPoSatuanChanged({{ $idx }})" min="1" class="w-16 sm:w-14 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-center min-h-[44px]" placeholder="Qty" />
+
+                                    <!-- Satuan Dropdown -->
+                                    <select wire:model="poForm.items.{{ $idx }}.satuan"
+                                            wire:change="onPoSatuanChanged({{ $idx }})"
+                                            class="px-2 py-2 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 min-h-[44px] cursor-pointer">
+                                        @foreach($item['daftar_satuan'] ?? [['satuan_kode' => ($item['satuan'] ?? 'pcs')]] as $ds)
+                                            <option value="{{ $ds['satuan_kode'] }}" class="bg-ink-900">{{ $ds['satuan_kode'] }}</option>
+                                        @endforeach
+                                    </select>
+
                                     @if(!empty($item['produk_id']))
                                         <button type="button" wire:click="bukaHistoriPembelian({{ $item['produk_id'] }}, '{{ addslashes($item['produk_nama'] ?? '') }}')" class="p-2 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/20 text-[10px] font-bold cursor-pointer min-h-[44px] flex items-center justify-center whitespace-nowrap" title="Lihat Histori Pembelian Supplier">
                                             📊 Histori
@@ -218,6 +228,11 @@
                                     <button wire:click="removePoItem({{ $idx }})" class="p-2 text-up-red cursor-pointer text-xs min-h-[44px] flex items-center justify-center">✕</button>
                                 </div>
                             </div>
+                            @if((float)($item['konversi'] ?? 1) > 1)
+                                <div class="text-[10px] text-amber-300 font-medium px-1 flex items-center gap-1.5">
+                                    <span>📦 1 {{ $item['satuan'] }} = {{ (float)($item['konversi'] ?? 1) + 0 }} {{ $item['daftar_satuan'][0]['satuan_kode'] ?? 'pcs' }} &rarr; Total: <strong class="text-white tabular-nums">{{ (float)($item['jumlah'] ?? 1) * (float)($item['konversi'] ?? 1) }}</strong> {{ $item['daftar_satuan'][0]['satuan_kode'] ?? 'pcs' }}</span>
+                                </div>
+                            @endif
                             @if(!empty($item['info_terakhir']))
                                 <div class="text-[10px] text-up-mint font-medium px-1 flex items-center gap-1">
                                     <span>ℹ️ {{ $item['info_terakhir'] }}</span>
@@ -411,12 +426,17 @@
                                         </td>
                                         <td class="py-2.5 px-3 text-right tabular-nums text-ink-200">
                                             @cansee('harga_beli')
-                                                Rp {{ number_format((float) $item->harga_beli, 0, ',', '.') }}
+                                                Rp {{ number_format((float) $item->harga_beli, 0, ',', '.') }}<span class="text-[10px] text-ink-400">/{{ $item->satuan ?: ($item->produk?->satuan ?: 'pcs') }}</span>
                                             @cannotsee('harga_beli')
                                                 —
                                             @endcansee
                                         </td>
-                                        <td class="py-2.5 px-3 text-center tabular-nums font-bold text-white">{{ $item->jumlah }}</td>
+                                        <td class="py-2.5 px-3 text-center tabular-nums text-white">
+                                            <span class="font-bold">{{ (float)$item->jumlah + 0 }} {{ $item->satuan ?: ($item->produk?->satuan ?: 'pcs') }}</span>
+                                            @if((float)($item->konversi ?? 1) > 1)
+                                                <div class="text-[10px] text-ink-400">({{ (float)($item->jumlah_dasar ?: ($item->jumlah * $item->konversi)) + 0 }} {{ $item->produk?->satuan ?: 'pcs' }})</div>
+                                            @endif
+                                        </td>
                                         <td class="py-2.5 px-3 text-right tabular-nums font-bold text-white">
                                             @cansee('harga_beli')
                                                 Rp {{ number_format((float) $item->subtotal, 0, ',', '.') }}

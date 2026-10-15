@@ -951,6 +951,65 @@ class ServisService
             ->firstOrFail();
     }
 
+    /**
+     * Cek apakah tracking servis diizinkan:
+     * 1. Staf backoffice login di web
+     * 2. Pelanggan terkait login di web (id atau nomor HP cocok)
+     * 3. Tiket tidak memiliki nomor HP terdaftar (< 5 digit)
+     * 4. Session telah diverifikasi untuk tiket/token ini
+     */
+    public function isTrackingAuthorized(TiketServis $tiket): bool
+    {
+        if (auth('web')->check()) {
+            return true;
+        }
+
+        $ticketPhone = (string) ($tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? '');
+        $ticketDigits = preg_replace('/\D/', '', $ticketPhone);
+
+        if (strlen($ticketDigits) < 5) {
+            return true;
+        }
+
+        if (auth('customer')->check()) {
+            $customer = auth('customer')->user();
+            if ($tiket->pelanggan_id && (int) $tiket->pelanggan_id === (int) $customer->id) {
+                return true;
+            }
+
+            $custDigits = preg_replace('/\D/', '', (string) $customer->telepon);
+            if ($custDigits !== '' && substr($custDigits, -5) === substr($ticketDigits, -5)) {
+                return true;
+            }
+        }
+
+        if (session('tracking_verified_'.$tiket->token_approval) === true) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Verifikasi 5 digit terakhir nomor HP tiket servis.
+     */
+    public function verifyTrackingPhone(TiketServis $tiket, string $input): bool
+    {
+        $ticketPhone = (string) ($tiket->telepon_pelanggan ?? $tiket->pelanggan?->telepon ?? '');
+        $ticketDigits = preg_replace('/\D/', '', $ticketPhone);
+
+        if (strlen($ticketDigits) < 5) {
+            return true;
+        }
+
+        $inputDigits = preg_replace('/\D/', '', $input);
+        if (strlen($inputDigits) < 5) {
+            return false;
+        }
+
+        return substr($ticketDigits, -5) === substr($inputDigits, -5);
+    }
+
     // --- Private side-effect methods ---
 
     /**

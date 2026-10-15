@@ -72,9 +72,10 @@ class ProdukService
         ?string $barcode = null,
         string $metodeHargaBeli = 'average',
         ?float $marginPersen = null,
-        ?int $rakId = null
+        ?int $rakId = null,
+        array $multiSatuan = []
     ): Produk {
-        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $rakId) {
+        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $rakId, $multiSatuan) {
             $satuan = $satuanKode ?: 'pcs';
             $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
             if ($satuanKode && ! $satuanRef) {
@@ -203,6 +204,10 @@ class ProdukService
                 );
             }
 
+            if (! empty($multiSatuan)) {
+                $this->simpanMultiSatuan($produk, $multiSatuan, $satuan);
+            }
+
             return $produk;
         });
     }
@@ -237,9 +242,10 @@ class ProdukService
         ?bool $isOndemand = null,
         ?string $barcode = null,
         ?string $metodeHargaBeli = null,
-        ?float $marginPersen = null
+        ?float $marginPersen = null,
+        ?array $multiSatuan = null
     ): Produk {
-        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen) {
+        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $multiSatuan) {
             $produk = Produk::findOrFail($produkId);
 
             $satuan = $satuanKode ?: ($produk->satuan ?: 'pcs');
@@ -342,8 +348,68 @@ class ProdukService
                 }
             }
 
+            if ($multiSatuan !== null) {
+                $this->simpanMultiSatuan($produk, $multiSatuan, $satuan);
+            }
+
             return $produk->fresh();
         });
+    }
+
+    /**
+     * Simpan multi satuan konversi bertingkat per produk.
+     * Cth: 1 box = 10 pcs, 1 karton = 10 box (= 100 pcs).
+     */
+    public function simpanMultiSatuan(Produk $produk, array $multiSatuan, ?string $baseSatuan = null): void
+    {
+        $base = strtolower(trim($baseSatuan ?: ($produk->satuan ?: 'pcs')));
+        $produk->satuanKonversi()->delete();
+
+        $factors = [$base => 1.0];
+
+        foreach ($multiSatuan as $idx => $row) {
+            $kode = trim($row['satuan_kode'] ?? '');
+            if (! $kode || strtolower($kode) === $base) {
+                continue;
+            }
+
+            $asal = strtolower(trim($row['satuan_asal'] ?? $base));
+            if (! $asal) {
+                $asal = $base;
+            }
+
+            $pengali = max(0.0001, (float) ($row['pengali'] ?? 1));
+            $parentFactor = $factors[$asal] ?? 1.0;
+            $faktorKonversi = round($pengali * $parentFactor, 4);
+            $factors[strtolower($kode)] = $faktorKonversi;
+
+            // Daftarkan ke master satuan_unit agar terpusat dan tidak duplikat
+            SatuanUnit::firstOrCreate(
+                ['kode' => strtolower($kode)],
+                ['nama' => ucfirst($kode), 'is_active' => true]
+            );
+
+            $hargaBeli = isset($row['harga_beli']) && $row['harga_beli'] !== '' && $row['harga_beli'] !== null
+                ? (float) $row['harga_beli']
+                : null;
+
+            $hargaJual = isset($row['harga_jual']) && $row['harga_jual'] !== '' && $row['harga_jual'] !== null
+                ? (float) $row['harga_jual']
+                : null;
+
+            $produk->satuanKonversi()->create([
+                'satuan_kode' => $kode,
+                'satuan_asal' => $asal,
+                'pengali' => $pengali,
+                'faktor_konversi' => $faktorKonversi,
+                'harga_beli' => $hargaBeli,
+                'harga_jual' => $hargaJual,
+                'barcode' => ! empty($row['barcode']) ? trim($row['barcode']) : null,
+                'is_satuan_beli' => (bool) ($row['is_satuan_beli'] ?? false),
+                'is_satuan_jual' => (bool) ($row['is_satuan_jual'] ?? false),
+                'urutan' => (int) ($row['urutan'] ?? ($idx + 1)),
+            ]);
+        }
     }
 
     /**

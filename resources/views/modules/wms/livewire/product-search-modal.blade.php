@@ -299,6 +299,11 @@
                                                     {{ $product->kualitas->nama }}
                                                 </span>
                                             @endif
+                                            @if($product->satuanKonversi && $product->satuanKonversi->isNotEmpty())
+                                                <span class="inline-flex items-center rounded-md bg-up-primary/10 text-up-primary border border-up-primary/20 px-2 py-0.5 text-[11px]" title="{{ $product->satuanKonversi->map(fn($sk) => $sk->keterangan_konversi)->join(' | ') }}">
+                                                    +{{ $product->satuanKonversi->count() }} Satuan ({{ $product->satuanKonversi->pluck('satuan_kode')->join(', ') }})
+                                                </span>
+                                            @endif
                                         </div>
                                     </div>
                                     <div class="flex flex-col items-end shrink-0">

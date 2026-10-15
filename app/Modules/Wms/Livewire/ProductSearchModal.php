@@ -266,6 +266,7 @@ class ProductSearchModal extends Component
                 'brand',
                 'kategoriRelasi',
                 'kualitas',
+                'satuanKonversi',
             ])
             ->withSum('stokItems as total_stok', 'jumlah')
             ->where('is_active', true);

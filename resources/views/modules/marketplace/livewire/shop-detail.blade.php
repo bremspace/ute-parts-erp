@@ -36,7 +36,7 @@
                 <div class="aspect-square bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/90 dark:border-white/[0.08] flex items-center justify-center overflow-hidden relative shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
                     <template x-if="activeFoto">
                         <img :src="activeFoto" alt="{{ $produk->nama }}" class="w-full h-full object-cover transition-opacity duration-200"
-                             @error="activeFoto = null">
+                             x-on:error="activeFoto = null">
                     </template>
                     <template x-if="!activeFoto">
                         <div class="flex flex-col items-center justify-center text-ink-300 dark:text-ink-600 p-8 text-center">

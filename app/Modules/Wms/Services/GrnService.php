@@ -113,12 +113,15 @@ class GrnService
                     throw new \Exception("Qty diterima melebihi qty PO untuk produk ID {$kodeProduk} (PO: {$poQty}, diterima: {$receivedQty})");
                 }
 
+                $konversi = max(0.0001, (float) ($poItem->konversi ?? 1));
+                $receivedQtyDasar = (int) round($receivedQty * $konversi);
+
                 // [F2-3] Validasi SN sebelum GRN dibuat — jumlah ≠ qty / dobel / sudah
                 // terdaftar → Exception Indonesia, tidak ada GRN/approval/stok side effect.
                 $snList = [];
                 if ($receivedQty > 0 && ($poItem->produk?->sn ?? false)) {
                     $snList = array_values($snPerProduk[$kunci] ?? $snPerProduk[$kodeProduk] ?? []);
-                    $this->nomorSeriService->validasiUntukGrn((int) $kodeProduk, $snList, $receivedQty);
+                    $this->nomorSeriService->validasiUntukGrn((int) $kodeProduk, $snList, $receivedQtyDasar);
                 }
 
                 if ($receivedQty >= $poQty) {
@@ -140,8 +143,11 @@ class GrnService
                 $itemData[] = [
                     'produk_id' => $kodeProduk,
                     'sku_variant_id' => $poItem->sku_variant_id,
+                    'satuan' => $poItem->satuan ?: ($poItem->produk?->satuan ?: 'pcs'),
+                    'konversi' => $konversi,
                     'qty_po' => $poQty,
                     'qty_received' => $receivedQty,
+                    'qty_received_dasar' => $receivedQtyDasar,
                     'harga_beli' => $hargaBeliAktual,
                     'harga_po' => (float) $poItem->harga_beli,
                     'status' => $status,
@@ -271,6 +277,9 @@ class GrnService
             if ($qty <= 0) {
                 continue;
             }
+            $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+            $qtyDasar = (int) round($qty * $konversi);
+
             $snList = array_values($item['sn'] ?? []);
             $produk = Produk::find($item['produk_id'] ?? null);
             if ($produk?->sn) {
@@ -278,7 +287,7 @@ class GrnService
                 // approval stuck) — ValidationException → pesan Indonesia, transaksi rollback,
                 // request tetap pending dgn pesan bersih utk approver.
                 try {
-                    $this->nomorSeriService->validasiUntukGrn((int) $produk->id, $snList, $qty);
+                    $this->nomorSeriService->validasiUntukGrn((int) $produk->id, $snList, $qtyDasar);
                 } catch (\Exception $e) {
                     throw ValidationException::withMessages([
                         'msg' => str_contains($e->getMessage(), 'sudah terdaftar')
@@ -327,21 +336,26 @@ class GrnService
                 continue;
             }
 
-            $this->tambahStok($grn, $item, $qty, $actionedBy, $noPo);
+            $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+            $qtyDasar = (int) round($qty * $konversi);
+
+            $this->tambahStok($grn, $item, $qtyDasar, $actionedBy, $noPo);
 
             $produkId = (int) $item['produk_id'];
             $hargaBeliMasuk = (float) ($item['harga_beli'] ?? 0);
+            $hargaBeliPerBase = round($hargaBeliMasuk / $konversi, 2);
 
             // Deteksi & catat perubahan harga dari PO / harga master
             $produk = Produk::find($produkId);
             if ($produk && $hargaBeliMasuk > 0) {
                 $hargaBeliLama = (float) $produk->harga_beli;
                 $hargaPo = (float) ($item['harga_po'] ?? $hargaBeliLama);
+                $hargaPoPerBase = round($hargaPo / $konversi, 2);
 
                 // Perubahan harga: jika harga masuk berbeda dari harga PO atau harga master produk
-                if (abs($hargaBeliMasuk - $hargaPo) > 0.01 || abs($hargaBeliMasuk - $hargaBeliLama) > 0.01) {
-                    $baselineHarga = abs($hargaBeliMasuk - $hargaPo) > 0.01 ? $hargaPo : $hargaBeliLama;
-                    $selisih = $hargaBeliMasuk - $baselineHarga;
+                if (abs($hargaBeliPerBase - $hargaPoPerBase) > 0.01 || abs($hargaBeliPerBase - $hargaBeliLama) > 0.01) {
+                    $baselineHarga = abs($hargaBeliPerBase - $hargaPoPerBase) > 0.01 ? $hargaPoPerBase : $hargaBeliLama;
+                    $selisih = $hargaBeliPerBase - $baselineHarga;
                     $persen = $baselineHarga > 0 ? round(($selisih / $baselineHarga) * 100, 2) : 0;
 
                     RiwayatPerubahanHarga::create([
@@ -351,10 +365,10 @@ class GrnService
                         'referensi_type' => Grn::class,
                         'referensi_id' => $grn->id,
                         'harga_lama' => $baselineHarga,
-                        'harga_baru' => $hargaBeliMasuk,
+                        'harga_baru' => $hargaBeliPerBase,
                         'selisih' => $selisih,
                         'persentase_perubahan' => $persen,
-                        'catatan' => "Harga masuk GRN {$grn->no_grn}: Rp ".number_format($hargaBeliMasuk, 0, ',', '.').' (sebelumnya Rp '.number_format($baselineHarga, 0, ',', '.').')',
+                        'catatan' => "Harga masuk GRN {$grn->no_grn}: Rp ".number_format($hargaBeliPerBase, 0, ',', '.').'/base unit (sebelumnya Rp '.number_format($baselineHarga, 0, ',', '.').')',
                         'user_id' => $actionedBy,
                     ]);
                 }
@@ -363,8 +377,8 @@ class GrnService
             if ($this->produkService) {
                 $this->produkService->sesuaikanHargaBeliAverage(
                     $produkId,
-                    $qty,
-                    $hargaBeliMasuk
+                    $qtyDasar,
+                    $hargaBeliPerBase
                 );
             }
         }

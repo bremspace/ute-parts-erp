@@ -55,6 +55,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'cabang.selected' => EnsureCabangSelected::class,
         ]);
 
+        // Arahkan guest sesuai zona: /app/* ke backoffice login, lainnya ke customer login
+        $middleware->redirectGuestsTo(function (Request $request) {
+            if ($request->is('app') || $request->is('app/*')) {
+                return route('login');
+            }
+
+            return route('customer.login');
+        });
+
         // Sanctum SPA cookie-session auth on /api/* (T-32)
         $middleware->statefulApi();
 

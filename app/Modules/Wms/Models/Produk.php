@@ -132,6 +132,90 @@ class Produk extends Model
         return $this->hasMany(PurchaseOrderItem::class);
     }
 
+    public function satuanKonversi(): HasMany
+    {
+        return $this->hasMany(ProdukSatuanKonversi::class)->orderBy('urutan')->orderBy('id');
+    }
+
+    /**
+     * Daftar seluruh opsi satuan produk (satuan dasar + konversi) beserta faktor konversi ke satuan dasar.
+     */
+    public function getDaftarSatuan(): array
+    {
+        $base = $this->satuan ?: 'pcs';
+        $list = [
+            [
+                'satuan_kode' => $base,
+                'satuan_asal' => $base,
+                'pengali' => 1.0,
+                'faktor_konversi' => 1.0,
+                'is_dasar' => true,
+                'label' => "{$base} (Dasar)",
+                'keterangan' => "1 {$base} (satuan dasar)",
+                'harga_beli' => (float) $this->harga_beli,
+                'harga_jual' => (float) $this->harga_jual_retail,
+                'barcode' => $this->barcode,
+            ],
+        ];
+
+        foreach ($this->satuanKonversi as $k) {
+            $fk = (float) $k->faktor_konversi ?: 1.0;
+            $hb = $k->harga_beli !== null ? (float) $k->harga_beli : round((float) $this->harga_beli * $fk, 2);
+            $hj = $k->harga_jual !== null ? (float) $k->harga_jual : round((float) $this->harga_jual_retail * $fk, 2);
+
+            $keterangan = "1 {$k->satuan_kode} = ".((float) $k->pengali + 0)." {$k->satuan_asal}";
+            if (strtolower($k->satuan_asal) !== strtolower($base)) {
+                $keterangan .= ' = '.($fk + 0)." {$base}";
+            }
+
+            $list[] = [
+                'id' => $k->id,
+                'satuan_kode' => $k->satuan_kode,
+                'satuan_asal' => $k->satuan_asal,
+                'pengali' => (float) $k->pengali,
+                'faktor_konversi' => $fk,
+                'is_dasar' => false,
+                'label' => "{$k->satuan_kode} ({$keterangan})",
+                'keterangan' => $keterangan,
+                'harga_beli' => $hb,
+                'harga_jual' => $hj,
+                'barcode' => $k->barcode,
+            ];
+        }
+
+        return $list;
+    }
+
+    public function konversiKeBaseUnit(float $jumlah, string $satuanKode): float
+    {
+        $base = $this->satuan ?: 'pcs';
+        if (strtolower(trim($satuanKode)) === strtolower(trim($base))) {
+            return $jumlah;
+        }
+
+        $konv = $this->satuanKonversi()->where('satuan_kode', $satuanKode)->first();
+        if ($konv && (float) $konv->faktor_konversi > 0) {
+            return $jumlah * (float) $konv->faktor_konversi;
+        }
+
+        return $jumlah;
+    }
+
+    public function konversiDariBaseUnit(float $jumlahBase, string $satuanKode): float
+    {
+        $base = $this->satuan ?: 'pcs';
+        if (strtolower(trim($satuanKode)) === strtolower(trim($base))) {
+            return $jumlahBase;
+        }
+
+        $konv = $this->satuanKonversi()->where('satuan_kode', $satuanKode)->first();
+        if ($konv && (float) $konv->faktor_konversi > 0) {
+            return $jumlahBase / (float) $konv->faktor_konversi;
+        }
+
+        return $jumlahBase;
+    }
+
     public function stokItems(): HasMany
     {
         return $this->hasMany(StokItem::class);
