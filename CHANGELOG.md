@@ -3,6 +3,25 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-16 — Optimasi Modul Servis, Perbaikan Scrolling Kanban & Konsolidasi Ekspor Data ✅
+
+- **Optimasi Alur Input Part/Jasa Tambahan Pengerjaan Servis (`ServisService`, `ServisBoard`, `servis-board.blade.php`):**
+  - Mengizinkan input pekerjaan servis pada status `disetujui`, `dikerjakan`, dan `qc`.
+  - Memisahkan tampilan item terpasang (dengan total biaya aktual) dan form input item baru/tambahan agar tidak menimpa atau menduplikasi item estimasi yang sudah dicatat sebelumnya.
+  - Menambahkan dukungan template `jenis_servis` untuk jasa dan pencarian part katalog modal dengan gudang aktif & kalkulasi harga tier otomatis.
+  - Menambahkan metode `batalkanItemPekerjaan` di `ServisService`: memulihkan stok ke gudang asal melalui `StokDeductionService::kembalikan` dan melepas klaim SN bila bertipe part.
+- **Perbaikan Interaksi & Tombol Papan Kanban Servis:**
+  - Card kanban kini dapat diklik langsung untuk membuka modal detail tanpa mengganggu drag-and-drop (`x-data="{ dragging: false }"`).
+  - Tombol anak (`+ Update`, link POS, aksi status) dilindungi dengan `@click.stop @mousedown.stop draggable="false"` sehingga event klik tidak tertelan saat mouse digerakkan.
+  - Tombol `+ Update` selalu tampil pada tiket berstatus `dikerjakan` atau `qc` baik yang memiliki batas waktu SLA maupun tidak, serta ditambahkan di header modal detail.
+- **Konsolidasi Ekspor Data:**
+  - Menghapus tombol export Excel dan CSV dari toolbar papan kanban servis (`servis-board.blade.php`); penarikan data servis diarahkan terpusat melalui menu Drill-down Laporan (`/app/report/drilldown`).
+- **Perbaikan Bug Horizontal Scrolling Dual-Scroll:**
+  - Mengatasi hilangnya scrollbar saat memindahkan status kartu kanban via Livewire morphing dengan menambahkan `MutationObserver` dan hook lifecycle Livewire (`morph.updated`, `commit`).
+  - Menjaga posisi horizontal scroll (`lastScrollLeft`) agar papan tidak reset/melompat ke kolom awal saat proses drag-and-drop selesai.
+  - Memperbaiki layout flex container `flex flex-col` dan `flex-1 min-h-0` pada `dual-scroll.blade.php` sehingga scrollbar bawah tidak terpotong dari viewport.
+  - Menyesuaikan CSS scroll-snap menjadi `sm:snap-none` pada layar PC agar scroll horizontal mouse lancar dan responsif.
+
 ## 2026-10-06 — Perbaikan Ekspor Laporan Drilldown & Penambahan Ekspor Pricelist Master Produk ✅
 
 - **Perbaikan Ekspor & Formatting Drilldown Laporan (`ReportBuilderService`, `DrillDownViewer`, `drill-down.blade.php`):**

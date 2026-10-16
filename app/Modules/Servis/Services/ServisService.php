@@ -23,6 +23,7 @@ use App\Modules\Servis\Models\TiketServisEstimasiItem;
 use App\Modules\Servis\Models\TiketServisItem;
 use App\Modules\Servis\Models\TiketServisProgress;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokLog;
@@ -654,8 +655,8 @@ class ServisService
             throw new \Exception('Tidak dapat menambah item pada tiket yang sudah pernah diselesaikan');
         }
 
-        if (! in_array($tiket->status, ['disetujui', 'dikerjakan'], true)) {
-            throw new \Exception('Input pekerjaan hanya saat status disetujui / dikerjakan');
+        if (! in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
+            throw new \Exception('Input pekerjaan hanya saat status disetujui / dikerjakan / qc');
         }
 
         // [T-05/P1-3] Anti dobel potong stok SIMETRIS, tapi hanya berlaku bila
@@ -736,6 +737,58 @@ class ServisService
         });
 
         return $created;
+    }
+
+    /**
+     * Membatalkan item pekerjaan (part / jasa) yang sudah dicatat pada tiket aktif.
+     * Jika item bertipe part: stok dikembalikan ke gudang asal dan status klaim SN dipulihkan.
+     */
+    public function batalkanItemPekerjaan(TiketServis $tiket, TiketServisItem $item, User $user, string $alasan = ''): void
+    {
+        if ($tiket->tanggal_selesai !== null) {
+            throw new \Exception('Tidak dapat membatalkan item pada tiket yang sudah diselesaikan');
+        }
+
+        if (! in_array($tiket->status, ['disetujui', 'dikerjakan', 'qc'], true)) {
+            throw new \Exception('Pembatalan item hanya dapat dilakukan pada status disetujui, dikerjakan, atau qc');
+        }
+
+        if ((int) $item->tiket_servis_id !== (int) $tiket->id) {
+            throw new \Exception('Item bukan milik tiket servis ini');
+        }
+
+        if ($item->dibatalkan_at !== null) {
+            throw new \Exception('Item sudah pernah dibatalkan');
+        }
+
+        DB::transaction(function () use ($tiket, $item, $user, $alasan) {
+            if ($item->tipe === 'part' && $item->produk_id) {
+                // Lepas klaim SN jika ada
+                NomorSeri::where('tiket_servis_item_id', $item->id)
+                    ->update([
+                        'status' => NomorSeri::STATUS_TERSEDIA,
+                        'tiket_servis_id' => null,
+                        'tiket_servis_item_id' => null,
+                    ]);
+
+                // Kembalikan stok berdasarkan dediksi StokLog
+                foreach ($this->dediksiPartDariStokLog($tiket, $item) as $d) {
+                    app(StokDeductionService::class)->kembalikan(
+                        produkId: (int) $item->produk_id,
+                        skuVariantId: $d['sku_variant_id'],
+                        gudangId: (int) $d['gudang_id'],
+                        qty: (int) $d['qty'],
+                        jenis: 'servis',
+                        referensiTipe: TiketServis::class,
+                        referensiId: $tiket->id,
+                        userId: $user->id,
+                        catatan: "Servis {$tiket->no_tiket} — batal item part {$item->nama_item}".($alasan ? " ({$alasan})" : ''),
+                    );
+                }
+            }
+
+            TiketServisItem::where('id', $item->id)->update(['dibatalkan_at' => now()]);
+        });
     }
 
     /**

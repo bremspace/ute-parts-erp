@@ -23,20 +23,6 @@
                 <option value="semua" class="bg-ink-900">Histori: Semua Transaksi</option>
             </select>
 
-            <!-- [F2-5] Export laporan servis (queue) -->
-            @can('laporan.cabang')
-                <div class="flex items-center gap-1.5">
-                    <button type="button" wire:click="exportLaporan('xlsx')" title="Export Excel" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">
-                        <span class="hidden sm:inline">Export Excel</span>
-                        <span class="sm:hidden">XLS</span>
-                    </button>
-                    <button type="button" wire:click="exportLaporan('csv')" title="Export CSV" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">
-                        <span class="hidden sm:inline">Export CSV</span>
-                        <span class="sm:hidden">CSV</span>
-                    </button>
-                </div>
-            @endcan
-
             @can('servis.create')
                 <button
                     type="button"
@@ -124,7 +110,7 @@
     @endif
 
     <!-- ===== KANBAN BOARD ===== -->
-    <x-prism.dual-scroll class="flex-1 min-h-0 overflow-y-hidden pb-1 snap-x snap-mandatory scroll-smooth touch-pan-x">
+    <x-prism.dual-scroll class="flex-1 min-h-0 overflow-y-hidden pb-1 snap-x snap-mandatory sm:snap-none scroll-smooth touch-pan-x">
         <div class="flex gap-3 sm:gap-4 h-full min-w-max px-0.5 items-start">
             @foreach($stateMachineColumns as $status => $col)
                 <div class="w-[82vw] sm:w-[320px] lg:w-[280px] snap-center flex-shrink-0 flex flex-col rounded-2xl glass-panel overflow-hidden h-[calc(100dvh-13.5rem)] sm:h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-11.5rem)] min-h-[380px]"
@@ -161,10 +147,12 @@
                                 $nextStatuses = \App\Modules\Servis\Services\ServisStateMachine::nextValidStatuses($tiket->status);
                             @endphp
                             <div
-                                class="group glass-panel glass-panel-hover rounded-xl p-3 cursor-grab select-none"
+                                x-data="{ dragging: false }"
+                                class="group glass-panel glass-panel-hover rounded-xl p-3 cursor-pointer select-none transition-all duration-150 hover:border-up-primary/40 hover:shadow-lg hover:shadow-up-primary/5 active:cursor-grabbing"
                                 draggable="true"
-                                @dragstart="dragId = {{ $tiket->id }}"
-                                @dragend="dragId = null; overCol = null"
+                                @dragstart="dragging = true; dragId = {{ $tiket->id }}"
+                                @dragend="setTimeout(() => { dragging = false }, 100); dragId = null; overCol = null"
+                                @click="if (!dragging) { $wire.openDetail({{ $tiket->id }}) }"
                                 wire:key="tiket-{{ $tiket->id }}"
                             >
                                 <!-- Card Header: Foto + No Tiket -->
@@ -187,6 +175,9 @@
                                                 @elseif(in_array($tiket->status, ['selesai', 'diambil'], true))
                                                     <a
                                                         href="/app/pos?bayar_servis_id={{ $tiket->id }}"
+                                                        @click.stop
+                                                        @mousedown.stop
+                                                        draggable="false"
                                                         class="bg-up-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-lg hover:bg-up-primary/80 cursor-pointer inline-flex items-center gap-1"
                                                         title="Bayar di Kasir POS"
                                                     >Bayar Kasir</a>
@@ -201,9 +192,12 @@
                                     </div>
                                     <button
                                         type="button"
+                                        @click.stop
+                                        @mousedown.stop
+                                        draggable="false"
                                         wire:click="openDetail({{ $tiket->id }})"
-                                        class="text-ink-500 hover:text-up-primary text-sm opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                        title="Lihat Detail"
+                                        class="text-ink-500 hover:text-up-primary text-sm transition-opacity flex-shrink-0 cursor-pointer p-0.5 rounded hover:bg-white/5"
+                                        title="Lihat Detail Tiket"
                                     >
                                         ↗
                                     </button>
@@ -213,22 +207,50 @@
                                 <p class="text-[11px] text-ink-300 line-clamp-2 mb-2 leading-snug">{{ $tiket->keluhan }}</p>
 
                                 <!-- SLA / Batas Waktu Badge untuk status dikerjakan/qc -->
-                                @if(in_array($tiket->status, ['dikerjakan', 'qc']) && $tiket->pengerjaan_deadline_at)
-                                    @php
-                                        $isOverdue = now()->greaterThan($tiket->pengerjaan_deadline_at);
-                                        $sisaMnt = max(0, (int) now()->diffInMinutes($tiket->pengerjaan_deadline_at, false));
-                                    @endphp
-                                    <div class="mb-2 p-1.5 rounded-lg {{ $isOverdue ? 'bg-up-red/15 border border-up-red/30' : ($sisaMnt <= 30 ? 'bg-up-amber/15 border border-up-amber/30 animate-pulse' : 'bg-up-primary/10 border border-up-primary/20') }} flex items-center justify-between text-[9px]">
-                                        <span class="flex items-center gap-1 font-semibold {{ $isOverdue ? 'text-up-red' : ($sisaMnt <= 30 ? 'text-up-amber' : 'text-up-primary') }}">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            {{ $isOverdue ? 'Waktu Habis (Overdue)' : ($sisaMnt <= 30 ? "Segera Habis (~{$sisaMnt}m)" : "SLA: ~{$sisaMnt}m") }}
-                                        </span>
-                                        <button type="button" wire:click="openProgressModal({{ $tiket->id }})" class="font-bold underline text-ink-300 hover:text-white cursor-pointer" title="Update progress pengerjaan teknisi">
-                                            + Update
-                                        </button>
-                                    </div>
+                                @if(in_array($tiket->status, ['dikerjakan', 'qc']))
+                                    @if($tiket->pengerjaan_deadline_at)
+                                        @php
+                                            $isOverdue = now()->greaterThan($tiket->pengerjaan_deadline_at);
+                                            $sisaMnt = max(0, (int) now()->diffInMinutes($tiket->pengerjaan_deadline_at, false));
+                                        @endphp
+                                        <div class="mb-2 p-1.5 rounded-lg {{ $isOverdue ? 'bg-up-red/15 border border-up-red/30' : ($sisaMnt <= 30 ? 'bg-up-amber/15 border border-up-amber/30 animate-pulse' : 'bg-up-primary/10 border border-up-primary/20') }} flex items-center justify-between text-[9px]">
+                                            <span class="flex items-center gap-1 font-semibold {{ $isOverdue ? 'text-up-red' : ($sisaMnt <= 30 ? 'text-up-amber' : 'text-up-primary') }}">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                {{ $isOverdue ? 'Waktu Habis (Overdue)' : ($sisaMnt <= 30 ? "Segera Habis (~{$sisaMnt}m)" : "SLA: ~{$sisaMnt}m") }}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                @click.stop
+                                                @mousedown.stop
+                                                draggable="false"
+                                                wire:click="openProgressModal({{ $tiket->id }})"
+                                                class="font-bold underline text-ink-200 hover:text-white cursor-pointer px-1 py-0.5 rounded hover:bg-white/10"
+                                                title="Update progress pengerjaan teknisi"
+                                            >
+                                                + Update
+                                            </button>
+                                        </div>
+                                    @else
+                                        <div class="mb-2 p-1.5 rounded-lg bg-up-primary/10 border border-up-primary/20 flex items-center justify-between text-[9px]">
+                                            <span class="flex items-center gap-1 font-medium text-up-primary">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-up-primary animate-pulse"></span>
+                                                Progres Pengerjaan
+                                            </span>
+                                            <button
+                                                type="button"
+                                                @click.stop
+                                                @mousedown.stop
+                                                draggable="false"
+                                                wire:click="openProgressModal({{ $tiket->id }})"
+                                                class="font-bold text-up-primary hover:text-white underline cursor-pointer px-1 py-0.5 rounded hover:bg-up-primary/20"
+                                                title="Update progress pengerjaan teknisi"
+                                            >
+                                                + Update
+                                            </button>
+                                        </div>
+                                    @endif
                                 @endif
 
                                 <!-- Info Row -->
@@ -255,6 +277,9 @@
                                     <div class="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
                                         <button
                                             type="button"
+                                            @click.stop
+                                            @mousedown.stop
+                                            draggable="false"
                                             wire:click="revisiEstimasiDitolak({{ $tiket->id }})"
                                             class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer flex items-center gap-1 shadow-sm shadow-up-primary/20"
                                             title="Ubah status ke Diagnosa untuk ajukan revisi estimasi"
@@ -263,6 +288,9 @@
                                         </button>
                                         <button
                                             type="button"
+                                            @click.stop
+                                            @mousedown.stop
+                                            draggable="false"
                                             wire:click="openBatalReturModal({{ $tiket->id }})"
                                             class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red text-up-red hover:text-white font-bold text-[10px] border border-up-red/30 transition-[background-color,color,transform] duration-100 active:scale-[0.98] cursor-pointer flex items-center gap-1"
                                             title="Batalkan servis dan serahkan unit kembali ke pelanggan"
@@ -276,12 +304,18 @@
                                             @if($ns === 'menunggu_approval')
                                                 <button
                                                     type="button"
+                                                    @click.stop
+                                                    @mousedown.stop
+                                                    draggable="false"
                                                     wire:click="openEstimasiModal({{ $tiket->id }})"
                                                     class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[10px] transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer"
                                                 >+ Estimasi</button>
                                             @elseif($ns === 'disetujui' || $ns === 'ditolak')
                                                 <button
                                                     type="button"
+                                                    @click.stop
+                                                    @mousedown.stop
+                                                    draggable="false"
                                                     wire:click="openApproveModal({{ $tiket->id }})"
                                                     class="px-2.5 py-1 rounded-lg {{ $ns === 'disetujui' ? 'bg-up-mint hover:opacity-90 text-ink-950' : 'bg-up-red hover:opacity-90 text-white' }} font-bold text-[10px] transition-[opacity,transform] duration-100 active:scale-[0.98] cursor-pointer"
                                                 >{{ $ns === 'disetujui' ? 'Setujui' : 'Tolak' }}</button>
@@ -299,6 +333,9 @@
                                                 @endphp
                                                 <button
                                                     type="button"
+                                                    @click.stop
+                                                    @mousedown.stop
+                                                    draggable="false"
                                                     wire:click="updateStatus({{ $tiket->id }}, '{{ $ns }}')"
                                                     class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white font-semibold text-[10px] border border-white/10 transition-[background-color,color,transform] duration-100 active:scale-[0.98] cursor-pointer"
                                                 >{{ $label }}</button>
@@ -1160,6 +1197,17 @@
                                 <span>Audit Log</span>
                             </button>
                         @endcan
+                        @if(in_array($selectedTiket->status, ['dikerjakan', 'qc']))
+                            <button
+                                type="button"
+                                wire:click="openProgressModal({{ $selectedTiket->id }})"
+                                class="text-[10px] font-bold text-white bg-up-primary hover:bg-up-primary-dark border border-up-primary/40 px-2.5 py-0.5 rounded-full cursor-pointer flex items-center gap-1 shadow-sm shadow-up-primary/20 transition-all duration-100 active:scale-95"
+                                title="Catat catatan / foto progres pengerjaan untuk konsumen"
+                            >
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                <span>+ Update Progres</span>
+                            </button>
+                        @endif
                     </div>
                     <button wire:click="$set('selectedTiketId', null)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
@@ -1687,84 +1735,222 @@
                     @endif
 
                     <!-- [T-17] Item Pekerjaan Teknisi (part/jasa) -->
+                    @php
+                        $activeItems = $selectedTiket->items->whereNull('dibatalkan_at');
+                        $canceledItems = $selectedTiket->items->whereNotNull('dibatalkan_at');
+                        $totalBiayaPekerjaan = $activeItems->sum(fn ($i) => (float) $i->harga * (int) $i->qty);
+                    @endphp
                     @if($selectedTiket->items->count() > 0)
-                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                            <p class="text-[10px] text-ink-400 uppercase mb-2">Item Pekerjaan ({{ $selectedTiket->items->count() }})</p>
+                        <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[10px] text-ink-400 font-bold uppercase tracking-wider">Item Pekerjaan & Suku Cadang Terpasang ({{ $activeItems->count() }})</p>
+                                <span class="text-xs font-bold text-up-mint tabular-nums">Total: Rp {{ number_format($totalBiayaPekerjaan, 0, ',', '.') }}</span>
+                            </div>
                             <div class="space-y-1.5">
-                                @foreach($selectedTiket->items as $it)
-                                    <div class="flex justify-between text-xs">
-                                        <span class="text-ink-100">
-                                            <span class="text-[9px] font-bold {{ $it->tipe === 'part' ? 'text-up-amber bg-up-amber/10 border border-up-amber/30' : 'text-up-mint bg-up-mint/10 border border-up-mint/30' }} px-1.5 py-0.5 rounded-full mr-1.5">
+                                @foreach($activeItems as $it)
+                                    <div class="flex items-center justify-between text-xs p-2 rounded-xl bg-white/[0.02] border border-white/5">
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <span class="text-[9px] font-bold {{ $it->tipe === 'part' ? 'text-up-amber bg-up-amber/10 border border-up-amber/30' : 'text-up-mint bg-up-mint/10 border border-up-mint/30' }} px-1.5 py-0.5 rounded-full flex-shrink-0">
                                                 {{ strtoupper($it->tipe) }}
                                             </span>
-                                            {{ $it->nama_item }} × {{ $it->qty }}
-                                        </span>
-                                        <span class="font-bold text-white tabular-nums">Rp {{ number_format($it->harga * $it->qty, 0, ',', '.') }}</span>
+                                            <span class="text-ink-100 truncate font-medium">
+                                                {{ $it->nama_item }}
+                                            </span>
+                                            <span class="text-ink-400 text-[11px] tabular-nums">
+                                                ({{ $it->qty }} × Rp {{ number_format($it->harga, 0, ',', '.') }})
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-3 flex-shrink-0">
+                                            <span class="font-bold text-white tabular-nums">Rp {{ number_format($it->harga * $it->qty, 0, ',', '.') }}</span>
+                                            @if(in_array($selectedTiket->status, ['disetujui', 'dikerjakan', 'qc'], true))
+                                                <button
+                                                    type="button"
+                                                    wire:click="batalkanItem({{ $it->id }})"
+                                                    wire:confirm="Batalkan item '{{ $it->nama_item }}'? Stok suku cadang akan dikembalikan ke gudang jika berupa part."
+                                                    class="text-up-red/70 hover:text-up-red text-[11px] px-1.5 py-0.5 rounded hover:bg-up-red/10 cursor-pointer"
+                                                    title="Batalkan item pekerjaan ini"
+                                                >
+                                                    Batalkan
+                                                </button>
+                                            @endif
+                                        </div>
                                     </div>
                                 @endforeach
+
+                                @if($canceledItems->isNotEmpty())
+                                    <div class="pt-2 border-t border-white/5 space-y-1">
+                                        <p class="text-[9px] text-ink-500 uppercase font-semibold">Item Dibatalkan ({{ $canceledItems->count() }})</p>
+                                        @foreach($canceledItems as $c)
+                                            <div class="flex justify-between text-[11px] text-ink-500 line-through">
+                                                <span>[{{ strtoupper($c->tipe) }}] {{ $c->nama_item }} × {{ $c->qty }}</span>
+                                                <span class="tabular-nums">Rp {{ number_format($c->harga * $c->qty, 0, ',', '.') }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @endif
 
                     <!-- [T-17] Form input pekerjaan teknisi (part → potong stok, jasa → tagihan) -->
                     @if(in_array($selectedTiket->status, ['disetujui', 'dikerjakan', 'qc'], true))
-                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                            <p class="text-[10px] text-ink-400 uppercase mb-2">Input Pekerjaan Teknisi</p>
-                            @foreach($pekerjaanItems as $idx => $row)
-                                <div class="grid grid-cols-12 gap-1.5 mb-2 items-center">
-                                    <select wire:model.live="pekerjaanItems.{{ $idx }}.tipe" class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium">
-                                        <option value="jasa" class="bg-ink-900">Jasa</option>
-                                        <option value="part" class="bg-ink-900">Part</option>
-                                    </select>
-                                    <div class="col-span-3 relative">
-                                        <input type="text"
-                                               wire:model="pekerjaanItems.{{ $idx }}.produk_nama"
-                                               wire:click="bukaPencarianProduk({{ $idx }}, 'servis_pekerjaan')"
-                                               class="w-full px-2 py-2 pr-7 rounded-lg glass-input text-[11px] font-medium cursor-pointer"
-                                               placeholder="Klik untuk cari produk..."
-                                               readonly>
-                                        @if($row['produk_id'])
-                                            <button type="button"
-                                                    wire:click="resetPekerjaanPartRow({{ $idx }})"
-                                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white"
-                                                    title="Hapus pilihan produk">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                                </svg>
-                                            </button>
-                                        @else
-                                            <button type="button"
-                                                    wire:click="bukaPencarianProduk({{ $idx }}, 'servis_pekerjaan')"
-                                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white cursor-pointer"
-                                                    title="Cari Produk">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                                </svg>
-                                            </button>
-                                        @endif
-                                    </div>
-                                    <input type="text" wire:model="pekerjaanItems.{{ $idx }}.nama_item" placeholder="Nama item" class="col-span-3 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
-                                    <input type="number" wire:model="pekerjaanItems.{{ $idx }}.qty" min="1" placeholder="Qty" class="col-span-1 px-2 py-2 rounded-lg glass-input text-[11px] font-medium" />
-                                    <input type="text" inputmode="numeric" x-format-number wire:model="pekerjaanItems.{{ $idx }}.harga" placeholder="Harga" @if(($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) readonly @endif class="col-span-2 px-2 py-2 rounded-lg glass-input text-[11px] font-medium tabular-nums {{ (($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) ? 'opacity-80 bg-white/5 cursor-not-allowed' : '' }}" />
-                                    <button wire:click="removePekerjaanRow({{ $idx }})" class="col-span-1 text-up-red hover:text-white text-sm cursor-pointer" title="Hapus baris">✕</button>
+                        <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="text-xs font-bold text-white">Input Tambahan Jasa / Suku Cadang</h4>
+                                    <p class="text-[10px] text-ink-400">Tambahkan jasa perbaikan atau part pengganti selama proses pengerjaan</p>
                                 </div>
-                                {{-- [F2-3] SN utk produk sn=true — wajib, jumlah = qty --}}
-                                @if(($row['tipe'] ?? 'jasa') === 'part')
-                                    <div class="mb-2">
-                                        <input
-                                            type="text"
-                                            wire:model="pekerjaanItems.{{ $idx }}.sn"
-                                            placeholder="Nomor seri (wajib utk produk SN — pisah koma/baris)"
-                                            class="w-full px-2 py-2 rounded-lg glass-input text-[11px] font-mono"
-                                        />
-                                    </div>
+                                @if($selectedTiket->estimasiItems->count() > 0)
+                                    <button
+                                        type="button"
+                                        wire:click="importEstimasiKePekerjaan"
+                                        class="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-up-primary border border-up-primary/30 text-[10px] font-bold cursor-pointer transition-colors"
+                                        title="Muat rincian dari estimasi yang disetujui"
+                                    >
+                                        Impor dari Estimasi
+                                    </button>
                                 @endif
-                            @endforeach
-                            <div class="flex flex-wrap gap-2">
-                                <button wire:click="addPekerjaanRow" class="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 text-[11px] font-semibold border border-white/10 cursor-pointer">+ Baris</button>
-                                <button wire:click="simpanPekerjaan" class="px-4 py-2 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">Simpan Item Pekerjaan</button>
                             </div>
-                            <p class="text-[10px] text-ink-500 mt-2">Part: stok dikurangi 1x + log. Jasa: hanya tagihan/jurnal. Item part menonaktifkan form sparepart legacy (anti dobel stok).</p>
+
+                            @foreach($pekerjaanItems as $idx => $row)
+                                <div class="p-2.5 rounded-xl bg-black/20 border border-white/5 space-y-2">
+                                    <div class="grid grid-cols-12 gap-2 items-center">
+                                        {{-- Tipe --}}
+                                        <div class="col-span-3 sm:col-span-2">
+                                            <select wire:model.live="pekerjaanItems.{{ $idx }}.tipe" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-semibold">
+                                                <option value="jasa" class="bg-ink-900 text-up-mint">Jasa</option>
+                                                <option value="part" class="bg-ink-900 text-up-amber">Part</option>
+                                            </select>
+                                        </div>
+
+                                        {{-- Jasa Template / Nama Item --}}
+                                        @if(($row['tipe'] ?? 'jasa') === 'jasa')
+                                            <div class="col-span-9 sm:col-span-5 flex gap-1.5">
+                                                @if($jenisServisList->isNotEmpty())
+                                                    <select
+                                                        wire:change="pilihJenisServisPekerjaan({{ $idx }}, $event.target.value)"
+                                                        class="w-1/3 px-2 py-1.5 rounded-lg glass-input text-[11px] text-ink-300"
+                                                    >
+                                                        <option value="">Pilih template...</option>
+                                                        @foreach($jenisServisList as $js)
+                                                            <option value="{{ $js->id }}" class="bg-ink-900">{{ $js->nama }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @endif
+                                                <input
+                                                    type="text"
+                                                    wire:model="pekerjaanItems.{{ $idx }}.nama_item"
+                                                    placeholder="Nama pekerjaan / jasa"
+                                                    class="flex-1 px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium"
+                                                />
+                                            </div>
+                                        @else
+                                            {{-- Part: Cari Produk & Gudang --}}
+                                            <div class="col-span-9 sm:col-span-5 flex gap-1.5">
+                                                <div class="flex-1 relative">
+                                                    <input
+                                                        type="text"
+                                                        wire:model="pekerjaanItems.{{ $idx }}.produk_nama"
+                                                        wire:click="bukaPencarianProduk({{ $idx }}, 'servis_pekerjaan')"
+                                                        class="w-full px-2.5 py-1.5 pr-7 rounded-lg glass-input text-xs font-medium cursor-pointer"
+                                                        placeholder="Pilih part / produk..."
+                                                        readonly
+                                                    />
+                                                    @if($row['produk_id'])
+                                                        <button
+                                                            type="button"
+                                                            wire:click="resetPekerjaanPartRow({{ $idx }})"
+                                                            class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white"
+                                                            title="Hapus pilihan part"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    @else
+                                                        <button
+                                                            type="button"
+                                                            wire:click="bukaPencarianProduk({{ $idx }}, 'servis_pekerjaan')"
+                                                            class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white cursor-pointer"
+                                                        >
+                                                            🔍
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                                @if(count($gudangList ?? []) > 1)
+                                                    <select wire:model="pekerjaanItems.{{ $idx }}.gudang_id" class="w-28 px-1.5 py-1.5 rounded-lg glass-input text-[11px] font-medium">
+                                                        @foreach($gudangList as $g)
+                                                            <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @endif
+                                            </div>
+                                        @endif
+
+                                        {{-- Qty --}}
+                                        <div class="col-span-3 sm:col-span-1">
+                                            <input type="number" wire:model="pekerjaanItems.{{ $idx }}.qty" min="1" placeholder="Qty" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-medium text-center" />
+                                        </div>
+
+                                        {{-- Harga Satuan --}}
+                                        <div class="col-span-7 sm:col-span-3">
+                                            <input
+                                                type="text"
+                                                inputmode="numeric"
+                                                x-format-number
+                                                wire:model="pekerjaanItems.{{ $idx }}.harga"
+                                                placeholder="Tarif (Rp)"
+                                                @if(($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) readonly @endif
+                                                class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium tabular-nums {{ (($row['tipe'] ?? '') === 'part' && ! $canEditHargaPart) ? 'opacity-80 bg-white/5 cursor-not-allowed' : '' }}"
+                                            />
+                                        </div>
+
+                                        {{-- Hapus Baris --}}
+                                        <div class="col-span-2 sm:col-span-1 text-right">
+                                            <button
+                                                type="button"
+                                                wire:click="removePekerjaanRow({{ $idx }})"
+                                                class="text-up-red/70 hover:text-up-red text-xs p-1.5 rounded hover:bg-up-red/10 cursor-pointer"
+                                                title="Hapus baris ini"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {{-- SN jika part --}}
+                                    @if(($row['tipe'] ?? 'jasa') === 'part')
+                                        <div>
+                                            <input
+                                                type="text"
+                                                wire:model="pekerjaanItems.{{ $idx }}.sn"
+                                                placeholder="Nomor Seri (SN) jika produk memiliki serial number (pisahkan dengan koma atau baris baru)"
+                                                class="w-full px-2.5 py-1 rounded-lg glass-input text-[11px] font-mono text-ink-300"
+                                            />
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+
+                            <div class="flex items-center justify-between pt-1">
+                                <button
+                                    type="button"
+                                    wire:click="addPekerjaanRow"
+                                    class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-200 text-xs font-semibold border border-white/10 cursor-pointer flex items-center gap-1"
+                                >
+                                    <span>+ Baris Item</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="simpanPekerjaan"
+                                    wire:loading.attr="disabled"
+                                    class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-bold cursor-pointer shadow-lg shadow-up-primary/25 flex items-center gap-1.5 active:scale-95 transition-all"
+                                >
+                                    <span wire:loading.remove wire:target="simpanPekerjaan">Simpan Item Pekerjaan</span>
+                                    <span wire:loading wire:target="simpanPekerjaan">Menyimpan...</span>
+                                </button>
+                            </div>
+                            <p class="text-[10px] text-ink-500">
+                                ℹ️ Part langsung memotong stok 1x di gudang cabang aktif. Jasa dicatat sebagai tagihan & laporan pendapatan.
+                            </p>
                         </div>
                     @endif
 

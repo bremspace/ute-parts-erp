@@ -390,6 +390,9 @@ class ServisBoard extends Component
             $this->pekerjaanItems[$idx]['produk_id'] = $produkId;
             $this->pekerjaanItems[$idx]['produk_nama'] = $produk->nama;
             $this->pekerjaanItems[$idx]['nama_item'] = $produk->nama;
+            if (empty($this->pekerjaanItems[$idx]['gudang_id'])) {
+                $this->pekerjaanItems[$idx]['gudang_id'] = $this->pekerjaanGudangId;
+            }
             $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
             $pelanggan = $tiket?->pelanggan;
             $resolved = app(ServisService::class)->resolveHargaPartDefault($produk, $pelanggan);
@@ -1545,28 +1548,118 @@ class ServisBoard extends Component
 
         $tiket = $this->tiketScopedOrNull($tiketId);
 
-        // [T-09d] Prefill ke input pekerjaan teknisi dari estimasiItems jika ada
-        $estimasiItems = $tiket?->estimasiItems()->get();
-        if ($estimasiItems && $estimasiItems->isNotEmpty()) {
-            $this->pekerjaanItems = $estimasiItems->map(fn ($it) => [
-                'tipe' => $it->tipe,
-                'produk_id' => $it->produk_id,
-                'nama_item' => $it->nama_item,
-                'qty' => $it->qty,
-                'harga' => (float) $it->harga,
-                'gudang_id' => null,
-                'sn' => '',
-            ])->toArray();
-        } else {
-            // [T-17] init satu baris kosong
-            $this->pekerjaanItems = [$this->pekerjaanRowBaru()];
-        }
-
         if (! $this->pekerjaanGudangId) {
             $cabangId = session('cabang_id');
             $this->pekerjaanGudangId = $cabangId
                 ? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
                 : Gudang::where('is_active', true)->value('id');
+        }
+
+        // [T-09d] Prefill ke input pekerjaan teknisi dari estimasiItems jika tiket belum punya item tersimpan
+        $sudahAdaItems = $tiket?->items()->whereNull('dibatalkan_at')->exists();
+        $estimasiItems = $tiket?->estimasiItems()->with('produk')->get();
+
+        if (! $sudahAdaItems && $estimasiItems && $estimasiItems->isNotEmpty()) {
+            $this->pekerjaanItems = $estimasiItems->map(fn ($it) => [
+                'tipe' => $it->tipe,
+                'produk_id' => $it->produk_id,
+                'produk_nama' => $it->produk?->nama ?? $it->nama_item,
+                'nama_item' => $it->nama_item,
+                'qty' => $it->qty,
+                'harga' => (float) $it->harga,
+                'gudang_id' => $it->tipe === 'part' ? $this->pekerjaanGudangId : null,
+                'sn' => '',
+            ])->toArray();
+        } else {
+            // [T-17] init satu baris kosong baru untuk tambahan part / jasa
+            $this->pekerjaanItems = [$this->pekerjaanRowBaru()];
+        }
+    }
+
+    /** Muat rincian estimasi yang belum tercatat ke form pekerjaan teknisi */
+    public function importEstimasiKePekerjaan(): void
+    {
+        $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
+        if (! $tiket) {
+            return;
+        }
+
+        $estimasiItems = $tiket->estimasiItems()->with('produk')->get();
+        if ($estimasiItems->isEmpty()) {
+            $this->dispatch('alert', ['type' => 'info', 'message' => 'Tiket ini tidak memiliki rincian estimasi']);
+
+            return;
+        }
+
+        $savedNames = $tiket->items()->whereNull('dibatalkan_at')->pluck('nama_item')->toArray();
+        $rows = [];
+        foreach ($estimasiItems as $it) {
+            if (in_array($it->nama_item, $savedNames, true)) {
+                continue;
+            }
+            $rows[] = [
+                'tipe' => $it->tipe,
+                'produk_id' => $it->produk_id,
+                'produk_nama' => $it->produk?->nama ?? $it->nama_item,
+                'nama_item' => $it->nama_item,
+                'qty' => $it->qty,
+                'harga' => (float) $it->harga,
+                'gudang_id' => $it->tipe === 'part' ? $this->pekerjaanGudangId : null,
+                'sn' => '',
+            ];
+        }
+
+        if (empty($rows)) {
+            $this->dispatch('alert', ['type' => 'info', 'message' => 'Semua item estimasi sudah tercatat dalam pekerjaan']);
+
+            return;
+        }
+
+        if (count($this->pekerjaanItems) === 1 && empty($this->pekerjaanItems[0]['nama_item']) && empty($this->pekerjaanItems[0]['produk_id'])) {
+            $this->pekerjaanItems = $rows;
+        } else {
+            $this->pekerjaanItems = array_merge($this->pekerjaanItems, $rows);
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => count($rows).' item estimasi dimuat ke form']);
+    }
+
+    /** [Batalkan Item Pekerjaan] Batalkan part/jasa & kembalikan stok part ke gudang */
+    public function batalkanItem(int $itemId): void
+    {
+        $tiket = $this->selectedTiketId ? $this->tiketScopedOrNull($this->selectedTiketId) : null;
+        if (! $tiket) {
+            return;
+        }
+
+        if (! $this->boleh('servis.input-sparepart', 'Anda tidak punya izin membatalkan item pekerjaan')) {
+            return;
+        }
+
+        $item = TiketServisItem::where('tiket_servis_id', $tiket->id)->find($itemId);
+        if (! $item) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Item pekerjaan tidak ditemukan']);
+
+            return;
+        }
+
+        try {
+            app(ServisService::class)->batalkanItemPekerjaan($tiket, $item, auth()->user());
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Item '{$item->nama_item}' dibatalkan (stok dikembalikan jika part)"]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    /** Pilih template jenis servis untuk baris pekerjaan tipe jasa */
+    public function pilihJenisServisPekerjaan(int $idx, int $jenisServisId): void
+    {
+        if (isset($this->pekerjaanItems[$idx])) {
+            $js = JenisServis::find($jenisServisId);
+            if ($js) {
+                $this->pekerjaanItems[$idx]['nama_item'] = $js->nama;
+                $this->pekerjaanItems[$idx]['harga'] = (float) $js->biaya_default;
+            }
         }
     }
 
@@ -1581,10 +1674,11 @@ class ServisBoard extends Component
         return [
             'tipe' => 'jasa',
             'produk_id' => null,
+            'produk_nama' => '',
             'nama_item' => '',
             'qty' => 1,
             'harga' => 0,
-            'gudang_id' => null,
+            'gudang_id' => $this->pekerjaanGudangId,
             'sn' => '', // [F2-3] daftar SN utk produk sn=true (newline/koma)
         ];
     }
@@ -1612,7 +1706,15 @@ class ServisBoard extends Component
 
         $row = &$this->pekerjaanItems[$idx];
 
-        if ($field === 'harga') {
+        if ($field === 'tipe') {
+            if ($value === 'part') {
+                $row['gudang_id'] = $row['gudang_id'] ?: $this->pekerjaanGudangId;
+            } else {
+                $row['produk_id'] = null;
+                $row['produk_nama'] = '';
+                $row['sn'] = '';
+            }
+        } elseif ($field === 'harga') {
             if ($this->canEditHargaPart || ($row['tipe'] ?? 'jasa') !== 'part') {
                 $row['harga'] = $this->parseNominal($value);
             } else {
