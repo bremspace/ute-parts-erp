@@ -234,9 +234,10 @@
             </div>
         @endif
 
-        <!-- [T-51] Desktop Keyboard Shortcuts & View Mode Switcher -->
-        <div class="hidden lg:flex items-center justify-between gap-2 mb-3 text-[11px] text-ink-400">
-            <div class="flex items-center gap-2">
+        <!-- [T-51] Keyboard Shortcuts & View Mode Switcher (Grid / List Cepat) -->
+        <div class="flex items-center justify-between gap-2 mb-2 text-[11px] text-ink-400">
+            <!-- Shortcut Badge (Desktop Only) -->
+            <div class="hidden lg:flex items-center gap-2">
                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono text-ink-300">
                     <kbd class="text-up-primary font-bold">F2</kbd> Cari/Scan
                 </span>
@@ -251,13 +252,19 @@
                 </span>
             </div>
 
-            <!-- Kasir View Mode Switcher -->
-            <div class="inline-flex items-center p-0.5 rounded-lg bg-black/10 dark:bg-white/5 border border-black/10 dark:border-white/10">
-                <button type="button" @click="setPosView('grid')" :class="posViewMode === 'grid' ? 'bg-white/15 text-white font-bold' : 'text-ink-400 hover:text-white'" class="px-2 py-1 rounded text-[10px] cursor-pointer">
-                    Grid
+            <!-- Kasir View Mode Switcher (Aktif di Mobile & Desktop) -->
+            <div class="inline-flex items-center p-0.5 rounded-lg bg-black/10 dark:bg-white/5 border border-black/10 dark:border-white/10 ml-auto">
+                <button type="button" @click="setPosView('grid')" :class="posViewMode === 'grid' ? 'bg-up-primary text-white font-bold shadow-sm' : 'text-ink-400 hover:text-white'" class="px-2.5 py-1 rounded-md text-[11px] flex items-center gap-1 cursor-pointer transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                    <span>Grid</span>
                 </button>
-                <button type="button" @click="setPosView('list')" :class="posViewMode === 'list' ? 'bg-white/15 text-white font-bold' : 'text-ink-400 hover:text-white'" class="px-2 py-1 rounded text-[10px] cursor-pointer">
-                    List Cepat
+                <button type="button" @click="setPosView('list')" :class="posViewMode === 'list' ? 'bg-up-primary text-white font-bold shadow-sm' : 'text-ink-400 hover:text-white'" class="px-2.5 py-1 rounded-md text-[11px] flex items-center gap-1 cursor-pointer transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <span>List Cepat</span>
                 </button>
             </div>
         </div>

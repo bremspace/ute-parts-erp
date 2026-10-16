@@ -288,73 +288,57 @@ class RiwayatTransaksiIndex extends Component
         if ($cabangId) {
             $tgl = $this->filterTanggal ?: now()->toDateString();
 
-            // POS penjualan
-            $ringkasan['total_penjualan_pos'] = (float) Transaksi::where('cabang_id', $cabangId)
+            // POS penjualan (agregat total & count sekali query)
+            $posStats = Transaksi::where('cabang_id', $cabangId)
                 ->where(function ($q) {
                     $q->whereNull('sumber')->orWhere('sumber', 'pos');
                 })
                 ->whereDate('created_at', $tgl)
                 ->where('status', 'selesai')
-                ->sum('total_akhir');
+                ->selectRaw('COALESCE(SUM(total_akhir), 0) as total, COUNT(*) as count')
+                ->first();
 
-            $ringkasan['count_penjualan_pos'] = Transaksi::where('cabang_id', $cabangId)
-                ->where(function ($q) {
-                    $q->whereNull('sumber')->orWhere('sumber', 'pos');
-                })
-                ->whereDate('created_at', $tgl)
-                ->where('status', 'selesai')
-                ->count();
+            $ringkasan['total_penjualan_pos'] = (float) ($posStats->total ?? 0);
+            $ringkasan['count_penjualan_pos'] = (int) ($posStats->count ?? 0);
 
             // Mutasi kas laci
-            if (Schema::hasTable('kas_mutasi_laci')) {
-                $ringkasan['total_mutasi_masuk'] = (float) DB::table('kas_mutasi_laci')
-                    ->where('cabang_id', $cabangId)
-                    ->whereDate('created_at', $tgl)
-                    ->where('jenis', 'masuk')
-                    ->sum('nominal');
+            $mutasiStats = DB::table('kas_mutasi_laci')
+                ->where('cabang_id', $cabangId)
+                ->whereDate('created_at', $tgl)
+                ->selectRaw("
+                    COALESCE(SUM(CASE WHEN jenis = 'masuk' THEN nominal ELSE 0 END), 0) as total_masuk,
+                    COALESCE(SUM(CASE WHEN jenis = 'keluar' THEN nominal ELSE 0 END), 0) as total_keluar
+                ")
+                ->first();
 
-                $ringkasan['total_mutasi_keluar'] = (float) DB::table('kas_mutasi_laci')
-                    ->where('cabang_id', $cabangId)
-                    ->whereDate('created_at', $tgl)
-                    ->where('jenis', 'keluar')
-                    ->sum('nominal');
-            }
+            $ringkasan['total_mutasi_masuk'] = (float) ($mutasiStats->total_masuk ?? 0);
+            $ringkasan['total_mutasi_keluar'] = (float) ($mutasiStats->total_keluar ?? 0);
 
             // Servis selesai & lunas (transaksi pos servis + tiket servis lunas langsung)
-            if (Schema::hasTable('tiket_servis')) {
-                $servisTrxSum = (float) Transaksi::where('cabang_id', $cabangId)
-                    ->where('sumber', 'servis')
-                    ->whereDate('created_at', $tgl)
-                    ->where('status', 'selesai')
-                    ->sum('total_akhir');
+            $servisTrxStats = Transaksi::where('cabang_id', $cabangId)
+                ->where('sumber', 'servis')
+                ->whereDate('created_at', $tgl)
+                ->where('status', 'selesai')
+                ->selectRaw('COALESCE(SUM(total_akhir), 0) as total, COUNT(*) as count')
+                ->first();
 
-                $servisTrxCount = Transaksi::where('cabang_id', $cabangId)
-                    ->where('sumber', 'servis')
-                    ->whereDate('created_at', $tgl)
-                    ->where('status', 'selesai')
-                    ->count();
+            $servisDirectStats = TiketServis::where('cabang_id', $cabangId)
+                ->whereNull('transaksi_id')
+                ->where('status_pembayaran', 'lunas')
+                ->where(function ($q) use ($tgl) {
+                    $q->whereDate('tanggal_bayar', $tgl)
+                        ->orWhereDate('tanggal_selesai', $tgl);
+                })
+                ->selectRaw('COALESCE(SUM(estimasi_biaya), 0) as total, COUNT(*) as count')
+                ->first();
 
-                $servisDirectSum = (float) TiketServis::where('cabang_id', $cabangId)
-                    ->whereNull('transaksi_id')
-                    ->where('status_pembayaran', 'lunas')
-                    ->where(function ($q) use ($tgl) {
-                        $q->whereDate('tanggal_bayar', $tgl)
-                            ->orWhereDate('tanggal_selesai', $tgl);
-                    })
-                    ->sum('estimasi_biaya');
+            $servisTrxSum = (float) ($servisTrxStats->total ?? 0);
+            $servisTrxCount = (int) ($servisTrxStats->count ?? 0);
+            $servisDirectSum = (float) ($servisDirectStats->total ?? 0);
+            $servisDirectCount = (int) ($servisDirectStats->count ?? 0);
 
-                $servisDirectCount = TiketServis::where('cabang_id', $cabangId)
-                    ->whereNull('transaksi_id')
-                    ->where('status_pembayaran', 'lunas')
-                    ->where(function ($q) use ($tgl) {
-                        $q->whereDate('tanggal_bayar', $tgl)
-                            ->orWhereDate('tanggal_selesai', $tgl);
-                    })
-                    ->count();
-
-                $ringkasan['total_servis_selesai'] = $servisTrxSum + $servisDirectSum;
-                $ringkasan['count_servis_selesai'] = $servisTrxCount + $servisDirectCount;
-            }
+            $ringkasan['total_servis_selesai'] = $servisTrxSum + $servisDirectSum;
+            $ringkasan['count_servis_selesai'] = $servisTrxCount + $servisDirectCount;
 
             // Total arus masuk & kas bersih
             $ringkasan['total_arus_masuk'] = $ringkasan['total_penjualan_pos'] + $ringkasan['total_servis_selesai'] + $ringkasan['total_mutasi_masuk'];

@@ -34,6 +34,7 @@ use App\Modules\Wms\Services\NomorSeriService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -1234,9 +1235,13 @@ class PosKasir extends Component
                     'catatan' => $this->catatan,
                 ]);
 
+                // Pre-load semua produk di cart sekali query (eliminasi N+1 query)
+                $produkIds = array_unique(array_column($this->cart, 'produk_id'));
+                $produkMap = Produk::whereIn('id', $produkIds)->get()->keyBy('id');
+
                 // Create items & deduct stock
                 foreach ($this->cart as $item) {
-                    $produk = Produk::find($item['produk_id']);
+                    $produk = $produkMap->get($item['produk_id']);
 
                     $transaksiItem = TransaksiItem::create([
                         'transaksi_id' => $transaksi->id,
@@ -2262,11 +2267,12 @@ class PosKasir extends Component
                 'hargaTier',
                 'brand',
                 'kualitas',
-            ])
-            ->urutKetersediaanDanTerlaris($this->selectedGudangId, session('cabang_id'));
+            ]);
 
         if (! empty($this->search)) {
             $productsQuery->cariPintar($this->search);
+        } else {
+            $productsQuery->urutKetersediaanDanTerlaris($this->selectedGudangId, session('cabang_id'));
         }
 
         if ($this->visibleFilters['kategori'] && $this->filterKategoriId) {
@@ -2336,26 +2342,31 @@ class PosKasir extends Component
         // [B-02/P0-2] Peta stok katalog — kriteria sama dgn addToCart (satu query)
         $stokPerProduk = $this->petaStokKatalog($products);
 
-        $brandKompatibelList = TipeHp::where('is_active', true)
-            ->distinct()
-            ->pluck('merk')
-            ->merge(Brand::where('is_active', true)->pluck('nama'))
-            ->merge(Produk::whereNotNull('brand_kompatibel')->where('brand_kompatibel', '!=', '')->distinct()->pluck('brand_kompatibel'))
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
+        // Cache master filter data 5 menit untuk kecepatan render Livewire
+        $brandKompatibelList = Cache::remember('pos_filter_brand_kompatibel', 300, function () {
+            return TipeHp::where('is_active', true)
+                ->distinct()
+                ->pluck('merk')
+                ->merge(Brand::where('is_active', true)->pluck('nama'))
+                ->merge(Produk::whereNotNull('brand_kompatibel')->where('brand_kompatibel', '!=', '')->distinct()->pluck('brand_kompatibel'))
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        });
 
-        $modelKompatibelList = TipeHp::where('is_active', true)
-            ->distinct()
-            ->pluck('model')
-            ->merge(Produk::whereNotNull('model_kompatibel')->where('model_kompatibel', '!=', '')->distinct()->pluck('model_kompatibel'))
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
+        $modelKompatibelList = Cache::remember('pos_filter_model_kompatibel', 300, function () {
+            return TipeHp::where('is_active', true)
+                ->distinct()
+                ->pluck('model')
+                ->merge(Produk::whereNotNull('model_kompatibel')->where('model_kompatibel', '!=', '')->distinct()->pluck('model_kompatibel'))
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        });
 
         $config = app(KonfigurasiService::class);
         $kondisiList = $config->get('master_produk_kondisi_list') ?? [
@@ -2364,6 +2375,12 @@ class PosKasir extends Component
             ['kode' => 'compatible', 'nama' => 'Compatible'],
             ['kode' => 'bekas', 'nama' => 'Bekas / Copotan'],
         ];
+
+        $kategoriList = Cache::remember('pos_filter_kategori', 300, fn () => KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get());
+        $brandList = Cache::remember('pos_filter_brand', 300, fn () => Brand::where('is_active', true)->orderBy('nama')->get());
+        $kualitasList = Cache::remember('pos_filter_kualitas', 300, fn () => KualitasProduk::where('is_active', true)->orderBy('nama')->get());
+        $tipeHpList = Cache::remember('pos_filter_tipe_hp', 300, fn () => TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get());
+        $satuanList = Cache::remember('pos_filter_satuan', 300, fn () => SatuanUnit::where('is_active', true)->orderBy('nama')->get());
 
         // Explicitly pass all data needed by the view
         return view('modules.pos.livewire.pos-kasir', [
@@ -2392,14 +2409,14 @@ class PosKasir extends Component
             'snCari' => $this->snCari,
             'snItemKey' => $this->snItemKey,
             'daftarServisSiapBayar' => $this->daftarServisSiapBayar,
-            'kategoriList' => KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get(),
-            'brandList' => Brand::where('is_active', true)->orderBy('nama')->get(),
-            'kualitasList' => KualitasProduk::where('is_active', true)->orderBy('nama')->get(),
-            'tipeHpList' => TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get(),
+            'kategoriList' => $kategoriList,
+            'brandList' => $brandList,
+            'kualitasList' => $kualitasList,
+            'tipeHpList' => $tipeHpList,
             'brandKompatibelList' => $brandKompatibelList,
             'modelKompatibelList' => $modelKompatibelList,
             'kondisiList' => $kondisiList,
-            'satuanList' => SatuanUnit::where('is_active', true)->orderBy('nama')->get(),
+            'satuanList' => $satuanList,
         ])->layout('layouts.backoffice', ['header' => 'Kasir Point of Sale (POS)']);
     }
 }

@@ -180,6 +180,13 @@ button:not(:disabled),
     display: none;
 }
 
+/* [Mobile & Touch Smooth Scrolling] Hardware accelerated inertia scrolling */
+.overflow-x-auto,
+.overflow-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+}
+
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -394,7 +401,7 @@ html:not(.dark) ::-webkit-scrollbar-thumb:hover {
     /* Spacer penahan flow dokumen desktop */
     .sidebar-spacer {
         display: none;
-        width: 5rem;
+        width: 4.75rem;
         flex-shrink: 0;
     }
     .sidebar-spacer.is-collapsed {
@@ -402,7 +409,7 @@ html:not(.dark) ::-webkit-scrollbar-thumb:hover {
     }
 
     aside.sidebar-collapsed {
-        width: 5rem !important;
+        width: 4.75rem !important;
         position: absolute;
         top: 0;
         bottom: 0;
@@ -466,19 +473,28 @@ html:not(.dark) ::-webkit-scrollbar-thumb:hover {
     }
 
     aside.sidebar-collapsed:not(:hover) nav {
-        padding-inline: 0.75rem;
+        padding-inline: 0.625rem;
     }
 
-    /* Saat kursor hover ke aside: tampilkan teks label & brand dengan animasi halus */
+    /* Saat kursor hover ke aside: tampilkan teks label & brand dengan layout normal */
     aside.sidebar-collapsed:hover .sidebar-label,
-    aside.sidebar-collapsed:hover .sidebar-badge,
     aside.sidebar-collapsed:hover .sidebar-brand-text,
     aside.sidebar-collapsed:hover .sidebar-branch-label,
     aside.sidebar-collapsed:hover .sidebar-branch-ganti,
     aside.sidebar-collapsed:hover .sidebar-user-meta,
-    aside.sidebar-collapsed:hover .sidebar-chevron,
-    aside.sidebar-collapsed:hover .sidebar-submenu {
-        display: flex !important;
+    aside.sidebar-collapsed:hover .sidebar-chevron {
+        display: inline-block !important;
+        animation: fade-in 140ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    aside.sidebar-collapsed:hover .sidebar-badge {
+        display: inline-flex !important;
+        animation: fade-in 140ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    /* Submenu tetap mengikuti accordion state (x-show isDropdownOpen) */
+    aside.sidebar-collapsed:hover .sidebar-submenu:not([style*="display: none"]) {
+        display: block !important;
         animation: fade-in 140ms cubic-bezier(0.23, 1, 0.32, 1);
     }
 
@@ -490,7 +506,7 @@ html:not(.dark) ::-webkit-scrollbar-thumb:hover {
 
     aside.sidebar-collapsed:hover .sidebar-brand {
         justify-content: space-between;
-        padding-inline: 1.5rem;
+        padding-inline: 1.25rem;
     }
 
     aside.sidebar-collapsed:hover .sidebar-branch {

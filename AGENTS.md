@@ -1,12 +1,12 @@
 # Ute Parts — Agent Instructions
 
 ## Mandatory Reading (before any work)
-1. `PRD-Frontend-UteParts.md` — UI/UX contract, Design System "Ute Prism", component names
-2. `PRD-Backend-UteParts.md` — entities, business rules, API contracts, 7-day roadmap
-3. `implement-plan.md` — post-MVP optimization phases (§1 onward), do not skip phases
+1. `docs/prd/PRD-Frontend-UteParts.md` — UI/UX contract, Design System "Ute Prism", component names
+2. `docs/prd/PRD-Backend-UteParts.md` — entities, business rules, API contracts, 7-day roadmap
+3. `DESIGN.md` — UI design tokens & frontend base knowledge
 4. `docs/adr/` — Architecture Decision Records (see list below)
 
-**Follow the 7-day roadmap in PRD-Backend-UteParts.md §9. Do not skip modules — each day builds on the previous.** After each phase, update `CHANGELOG.md` with a summary of completed work.
+**Follow the 7-day roadmap in docs/prd/PRD-Backend-UteParts.md §9. Do not skip modules — each day builds on the previous.** After each phase, update `docs/CHANGELOG.md` with a summary of completed work.
 
 ## Stack (verifiable facts only)
 - **Laravel 13** (PHP 8.3+), TALL stack (Tailwind 4, Alpine.js, Livewire)
@@ -122,10 +122,10 @@ npm run build
 - `0012-birthday-field.md` — Pelanggan tanggal_lahir field & birthday campaign
 
 ## References (preserve these links)
-- `PRD-Frontend-UteParts.md` §3 — Design System tokens and components
-- `PRD-Backend-UteParts.md` §4–§9 — Roadmap, kamus data, RBAC matrix, modul rules
-- `implement-plan.md` — post-MVP optimization phases (Fase 0–11)
-- `CHANGELOG.md` — update after each fase selesai
+- `docs/prd/PRD-Frontend-UteParts.md` §3 — Design System tokens and components
+- `docs/prd/PRD-Backend-UteParts.md` §4–§9 — Roadmap, kamus data, RBAC matrix, modul rules
+- `DESIGN.md` — Design System Ute Prism base knowledge
+- `docs/CHANGELOG.md` — update after each fase selesai
 - `SESSION-STATE.md` — running session notes, critical constraints
 - `docs/adr/` — Architecture Decision Records
 - `docs/agents/` — Agent skill configs (issue-tracker, triage-labels, domain)

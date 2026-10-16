@@ -110,7 +110,7 @@
     @endif
 
     <!-- ===== KANBAN BOARD ===== -->
-    <x-prism.dual-scroll class="flex-1 min-h-0 overflow-y-hidden pb-1 snap-x snap-mandatory sm:snap-none scroll-smooth touch-pan-x">
+    <x-prism.dual-scroll class="flex-1 min-h-0 overflow-y-hidden pb-1 touch-pan-x">
         <div class="flex gap-3 sm:gap-4 h-full min-w-max px-0.5 items-start">
             @foreach($stateMachineColumns as $status => $col)
                 <div class="w-[82vw] sm:w-[320px] lg:w-[280px] snap-center flex-shrink-0 flex flex-col rounded-2xl glass-panel overflow-hidden h-[calc(100dvh-13.5rem)] sm:h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-11.5rem)] min-h-[380px]"
