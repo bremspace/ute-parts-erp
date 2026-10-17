@@ -1,4 +1,238 @@
-<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+<div class="max-w-4xl mx-auto px-4 sm:px-6 py-8" wire:poll.8s>
+    {{-- [T-05] Factory alur pembayaran Duitku (PAY-01). Definisi di window supaya
+         selalu tersedia walau tab Orders belum pernah dirender (morph Livewire
+         tidak mengevaluasi ulang <script> biasa). Semua fetch pakai
+         credentials:'include' (Sanctum SPA cookie, same-origin). --}}
+    <script>
+        window.duitkuPay = function () {
+            return {
+                showBayar: false,
+                orderBayar: null,      // { id, no, total }
+                metodeList: [],        // dari GET /api/payment/methods — dinamis, tidak hardcode
+                metodeDipilih: null,
+                kategoriDipilih: 'qris',
+                loadingMetode: false,
+                loadingCreate: false,
+                errorBayar: '',        // pesan bebas; 'PAYMENT_UNAVAILABLE' = gateway belum dikonfigurasi (503)
+                infoBayar: null,       // { payment_url, va_number, qr_string, expiry, sandbox, kode, namaMetode, badge, kategori }
+
+                init() {
+                    const params = new URLSearchParams(window.location.search);
+                    const noOrder = params.get('bayar');
+                    if (noOrder) {
+                        this.$nextTick(() => {
+                            const btn = document.querySelector(`[data-order-no="${noOrder}"]`);
+                            if (btn) {
+                                btn.click();
+                            }
+                        });
+                    }
+                },
+
+                rupiah(n) {
+                    // Format ribuan titik (ADR 0011)
+                    return 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+                },
+
+                csrf() {
+                    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                },
+
+                get kategoriList() {
+                    const order = ['qris', 'va', 'ewallet', 'retail', 'kartu'];
+                    const labelMap = {
+                        'qris': '⚡ QRIS',
+                        'va': 'Transfer Bank (VA)',
+                        'ewallet': 'E-Wallet',
+                        'retail': 'Gerai Retail',
+                        'kartu': 'Kartu Kredit',
+                    };
+                    const existing = new Set(this.metodeList.map(m => m.kategori || 'va'));
+                    return order.filter(k => existing.has(k)).map(k => ({
+                        key: k,
+                        label: labelMap[k] || k.toUpperCase(),
+                        count: this.metodeList.filter(m => (m.kategori || 'va') === k).length
+                    }));
+                },
+
+                get filteredMetode() {
+                    return this.metodeList.filter(m => (m.kategori || 'va') === this.kategoriDipilih);
+                },
+
+                pilihKategori(k) {
+                    this.kategoriDipilih = k;
+                    const items = this.filteredMetode;
+                    if (items.length > 0 && (!this.metodeDipilih || !items.some(m => m.kode === this.metodeDipilih))) {
+                        this.metodeDipilih = items[0].kode;
+                    }
+                },
+
+                metodeTerpilihObj() {
+                    return this.metodeList.find(m => m.kode === this.metodeDipilih) || null;
+                },
+
+                /** Langkah 1: buka panel + muat daftar metode dinamis utk nominal order ini. */
+                async bukaBayar(id, no, total) {
+                    if (this.loadingCreate) return;
+                    this.orderBayar = { id, no, total };
+                    this.metodeList = [];
+                    this.metodeDipilih = null;
+                    this.errorBayar = '';
+                    this.infoBayar = null;
+                    this.showBayar = true;
+                    this.loadingMetode = true;
+
+                    try {
+                        const res = await fetch('/api/payment/methods?amount=' + Math.round(total), {
+                            headers: { 'Accept': 'application/json' },
+                            credentials: 'include',
+                        });
+                        const body = await res.json().catch(() => null);
+
+                        if (res.status === 503) {
+                            this.errorBayar = 'PAYMENT_UNAVAILABLE';
+                            return;
+                        }
+                        if (!res.ok || !body || !body.success) {
+                            throw new Error((body && body.message) || 'Daftar metode pembayaran gagal dimuat.');
+                        }
+
+                        this.metodeList = Array.isArray(body.data) ? body.data : [];
+                        if (!this.metodeList.length) {
+                            this.errorBayar = 'PAYMENT_UNAVAILABLE';
+                            return;
+                        }
+
+                        const katKeys = this.kategoriList.map(k => k.key);
+                        this.kategoriDipilih = katKeys.includes('qris') ? 'qris' : (katKeys[0] || 'va');
+                        const defaultItems = this.filteredMetode;
+                        this.metodeDipilih = defaultItems.length > 0 ? defaultItems[0].kode : this.metodeList[0].kode;
+                    } catch (e) {
+                        this.errorBayar = (e && e.message) || 'Tidak bisa terhubung ke layanan pembayaran. Periksa koneksi internet Anda lalu coba lagi.';
+                        if (window.showToast) showToast(this.errorBayar, 'error');
+                    } finally {
+                        this.loadingMetode = false;
+                    }
+                },
+
+                /** Langkah 2: POST /api/payment/create — anti double-submit (guard loadingCreate). */
+                async konfirmasiBayar() {
+                    if (this.loadingCreate || !this.metodeDipilih || !this.orderBayar) return;
+                    this.loadingCreate = true;
+                    this.errorBayar = '';
+
+                    try {
+                        const res = await fetch('/api/payment/create', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': this.csrf(),
+                            },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                no_transaksi: this.orderBayar.no,
+                                payment_method: this.metodeDipilih,
+                            }),
+                        });
+                        const body = await res.json().catch(() => null);
+
+                        if (res.status === 503) {
+                            this.errorBayar = 'PAYMENT_UNAVAILABLE';
+                            this.loadingCreate = false;
+                            return;
+                        }
+                        if (!res.ok || !body || !body.success) {
+                            throw new Error((body && body.message) || 'Pembayaran gagal diproses. Silakan coba lagi.');
+                        }
+
+                        const d = body.data || {};
+                        const selectedObj = this.metodeTerpilihObj();
+                        this.infoBayar = {
+                            payment_url: d.payment_url || d.paymentUrl || null,
+                            va_number: d.va_number || d.vaNumber || null,
+                            qr_string: d.qr_string || d.qrString || null,
+                            expiry: d.expiry || d.expiryTime || null,
+                            sandbox: !!d.sandbox,
+                            kode: this.metodeDipilih,
+                            namaMetode: selectedObj ? selectedObj.nama : this.metodeDipilih,
+                            badge: selectedObj ? selectedObj.badge : this.metodeDipilih,
+                            kategori: selectedObj ? selectedObj.kategori : 'va',
+                        };
+
+                        this.loadingCreate = false;
+                    } catch (e) {
+                        this.loadingCreate = false;
+                        this.errorBayar = (e && e.message) || 'Pembayaran gagal diproses. Silakan coba lagi.';
+                        if (window.showToast) showToast(this.errorBayar, 'error');
+                    }
+                },
+
+                bukaHalamanPembayaran() {
+                    if (this.infoBayar && this.infoBayar.payment_url) {
+                        window.location.href = this.infoBayar.payment_url;
+                    }
+                },
+
+                async salinVa() {
+                    if (!this.infoBayar || !this.infoBayar.va_number) return;
+                    try {
+                        await navigator.clipboard.writeText(String(this.infoBayar.va_number));
+                        if (window.showToast) showToast('Nomor rekening berhasil disalin', 'success');
+                    } catch (e) {
+                        if (window.showToast) showToast('Gagal menyalin otomatis — salin manual ya.', 'warning');
+                    }
+                },
+
+                /** "Saya Sudah Bayar" / tutup setelah menunggu → sinkronkan status live dari server/Duitku. */
+                async selesaiMenunggu() {
+                    const noOrder = this.orderBayar ? this.orderBayar.no : null;
+                    this.showBayar = false;
+                    this.loadingCreate = false;
+
+                    if (noOrder) {
+                        try {
+                            const res = await fetch('/api/payment/check-status', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': this.csrf(),
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify({ no_transaksi: noOrder }),
+                            });
+                            const body = await res.json().catch(() => null);
+                            if (body && body.data && body.data.is_lunas) {
+                                if (window.showToast) showToast('Pembayaran berhasil diverifikasi lunas!', 'success');
+                            } else if (body && body.message) {
+                                if (window.showToast) showToast(body.message, 'info');
+                            }
+                        } catch (e) {
+                            // Abaikan kendala jaringan, refresh Livewire tetap jalan
+                        }
+                    }
+
+                    if (this.$wire) this.$wire.$refresh();
+                },
+
+                tutupBayar() {
+                    if (this.loadingCreate) return; // jangan tutup saat transisi redirect
+                    this.showBayar = false;
+                    this.loadingCreate = false;
+                    // Muat ulang status order (mis. webhook sudah masuk saat pengguna kembali dari Duitku)
+                    if (this.$wire) this.$wire.$refresh();
+                },
+
+                formatExpiry(s) {
+                    if (!s) return '';
+                    const dt = new Date(String(s).replace(' ', 'T'));
+                    if (isNaN(dt.getTime())) return String(s);
+                    return dt.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+                },
+            };
+        };
+    </script>
     @if(!$customer)
         <div class="text-center py-16 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-8 shadow-sm">
             <h2 class="font-black text-ink-900 dark:text-white text-lg">Silakan Masuk</h2>
@@ -72,7 +306,7 @@
 
         <!-- ORDERS -->
         @if($activeTab === 'orders')
-            <div class="space-y-3">
+            <div class="space-y-3" x-data="duitkuPay()">
                 @forelse($orders as $o)
                     <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-5 shadow-sm space-y-3">
                         <div class="flex items-center justify-between flex-wrap gap-2">
@@ -91,15 +325,16 @@
                                         <span class="w-2 h-2 rounded-full bg-up-amber animate-pulse"></span>
                                         <span>Menunggu Pembayaran</span>
                                     </p>
-                                    <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">Selesaikan pembayaran agar barang segera disiapkan oleh tim gudang.</p>
+                                    <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">Selesaikan pembayaran online agar barang segera disiapkan oleh tim gudang.</p>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        wire:click="bayarPesanan({{ $o->id }})"
+                                        data-order-no="{{ $o->no_transaksi }}"
+                                        x-on:click="bukaBayar({{ $o->id }}, '{{ $o->no_transaksi }}', {{ (float) $o->total_akhir }})"
                                         class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-up-primary hover:bg-indigo-600 shadow-sm transition-colors cursor-pointer"
                                     >
-                                        Bayar Sekarang (Simulasi)
+                                        Bayar Sekarang
                                     </button>
                                     <button
                                         type="button"
@@ -170,6 +405,285 @@
                         <a href="{{ route('shop') }}" class="inline-block mt-4 px-5 py-2.5 rounded-2xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors min-h-[44px]">Mulai Belanja</a>
                     </div>
                 @endforelse
+
+                {{-- ===== [T-05] Panel Pembayaran Duitku (mobile-first bottom sheet) =====
+                     Alur: pilih metode (GET /methods, dinamis + fee) → konfirmasi →
+                     POST /create → redirect payment_url. Layar "menunggu" muncul bila
+                     VA/QRIS ikut balasan (VA bisa disalin; QRIS instruksi scan).
+                     503 (gateway belum dikonfigurasi) → pesan anggun, alur manual tetap jalan. --}}
+                <div
+                    x-show="showBayar"
+                    x-cloak
+                    class="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Pembayaran Pesanan"
+                >
+                    <!-- Backdrop -->
+                    <div
+                        class="absolute inset-0 bg-ink-950/60 backdrop-blur-sm"
+                        x-on:click="tutupBayar()"
+                        aria-hidden="true"
+                    ></div>
+
+                    <!-- Sheet -->
+                    <div
+                        x-transition:enter="transition duration-200 ease-out"
+                        x-transition:enter-start="translate-y-8 opacity-0 sm:translate-y-0 sm:scale-[0.97]"
+                        x-transition:enter-end="translate-y-0 opacity-100 sm:scale-100"
+                        x-transition:leave="transition duration-150 ease-in"
+                        x-transition:leave-start="translate-y-0 opacity-100 sm:scale-100"
+                        x-transition:leave-end="translate-y-8 opacity-0 sm:translate-y-0 sm:scale-[0.97]"
+                        class="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto bg-white dark:bg-ink-900 border border-ink-100 dark:border-white/10 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl"
+                    >
+                        <!-- Header -->
+                        <div class="flex items-start justify-between gap-3 mb-4">
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Pembayaran Pesanan</p>
+                                <p class="font-mono text-up-primary font-bold text-sm truncate" x-text="orderBayar ? orderBayar.no : ''"></p>
+                                <p class="text-lg font-black text-ink-900 dark:text-white tabular-nums mt-0.5" x-text="orderBayar ? rupiah(orderBayar.total) : ''"></p>
+                            </div>
+                            <button
+                                type="button"
+                                x-on:click="tutupBayar()"
+                                class="w-9 h-9 flex-shrink-0 rounded-xl bg-ink-50 dark:bg-white/5 text-ink-400 hover:text-up-red flex items-center justify-center transition-colors cursor-pointer"
+                                aria-label="Tutup"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {{-- ===== Gateway belum dikonfigurasi (503) / daftar kosong ===== --}}
+                        <div x-show="errorBayar === 'PAYMENT_UNAVAILABLE'" class="p-4 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-center space-y-2">
+                            <p class="text-base">🛍️</p>
+                            <p class="text-sm font-bold text-ink-900 dark:text-white">Pembayaran Online Belum Tersedia</p>
+                            <p class="text-xs text-ink-500 dark:text-ink-400 leading-relaxed">
+                                Layanan pembayaran online sedang tidak aktif. Pesanan Anda tetap tersimpan —
+                                selesaikan pembayaran saat ambil barang atau lewat instruksi resmi WhatsApp Ute Parts.
+                            </p>
+                            <button
+                                type="button"
+                                x-on:click="tutupBayar()"
+                                class="mt-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-colors cursor-pointer min-h-[44px]"
+                            >
+                                Mengerti
+                            </button>
+                        </div>
+
+                        {{-- ===== Layar instruksi bayar (VA / QRIS / E-Wallet / URL) ===== --}}
+                        <div x-show="infoBayar && errorBayar !== 'PAYMENT_UNAVAILABLE'" class="space-y-4">
+                            <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-xs text-ink-700 dark:text-emerald-200">
+                                <p class="font-bold text-up-mint flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
+                                    <span x-text="'Tagihan ' + (infoBayar ? (infoBayar.namaMetode || 'Pembayaran') : 'Pembayaran') + ' Dibuat'"></span>
+                                    <span x-show="infoBayar && infoBayar.sandbox" class="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/20 text-up-amber">Mode Sandbox</span>
+                                </p>
+                                <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-1">
+                                    Selesaikan pembayaran sebelum batas waktu agar pesanan Anda segera diproses gudang.
+                                </p>
+                            </div>
+
+                            <!-- Nomor VA + tombol salin (Virtual Account) -->
+                            <div x-show="infoBayar && infoBayar.va_number" class="p-4 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Nomor Virtual Account</p>
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-up-primary/10 text-up-primary" x-text="infoBayar ? infoBayar.badge : ''"></span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <code class="flex-1 min-w-0 text-base sm:text-lg font-black font-mono text-ink-900 dark:text-white tabular-nums tracking-wide break-all" x-text="infoBayar ? infoBayar.va_number : ''"></code>
+                                    <button
+                                        type="button"
+                                        x-on:click="salinVa()"
+                                        class="flex-shrink-0 px-3.5 py-2 rounded-xl bg-up-primary text-white text-xs font-bold hover:bg-up-primary-dark transition-colors cursor-pointer shadow-sm shadow-up-primary/20 active:scale-95"
+                                    >
+                                        Salin
+                                    </button>
+                                </div>
+                                <p class="text-[11px] text-ink-500 dark:text-ink-400">
+                                    Buka m-Banking atau ATM bank terkait, pilih menu <strong>Transfer Virtual Account</strong> lalu masukkan nomor di atas.
+                                </p>
+                            </div>
+
+                            <!-- QRIS: Instruksi Scan Universal -->
+                            <div x-show="infoBayar && infoBayar.kategori === 'qris'" class="p-4 rounded-2xl bg-up-primary/5 border border-up-primary/20 text-xs text-ink-600 dark:text-indigo-200 space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-up-primary text-white tracking-wider">QRIS</span>
+                                    <p class="font-bold text-up-primary">Scan QRIS Semua Bank & E-Wallet</p>
+                                </div>
+                                <p class="text-[11px] leading-relaxed text-ink-500 dark:text-ink-400">
+                                    Dapat dibayar dari <strong>BCA, Mandiri, BRI, BNI, DANA, GoPay, OVO, ShopeePay</strong>, dan semua aplikasi yang mendukung QRIS.
+                                </p>
+                                <div class="pt-1">
+                                    <button
+                                        type="button"
+                                        x-on:click="bukaHalamanPembayaran()"
+                                        class="w-full py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-colors cursor-pointer shadow-sm shadow-up-primary/20"
+                                    >
+                                        Tampilkan QR Code Pembayaran ↗
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- E-Wallet / Retail / Kartu (Redirect URL) -->
+                            <div x-show="infoBayar && infoBayar.kategori !== 'qris' && !infoBayar.va_number && infoBayar.payment_url" class="p-4 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-xs font-bold text-ink-900 dark:text-white" x-text="infoBayar ? infoBayar.namaMetode : ''"></p>
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-up-accent/10 text-up-accent" x-text="infoBayar ? infoBayar.badge : ''"></span>
+                                </div>
+                                <p class="text-[11px] text-ink-500 dark:text-ink-400 leading-relaxed">
+                                    Klik tombol di bawah untuk membuka halaman otorisasi pembayaran resmi.
+                                </p>
+                                <button
+                                    type="button"
+                                    x-on:click="bukaHalamanPembayaran()"
+                                    class="w-full py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-colors cursor-pointer shadow-sm shadow-up-primary/20 flex items-center justify-center gap-1.5"
+                                >
+                                    <span>Lanjut ke Halaman Pembayaran</span>
+                                    <span>↗</span>
+                                </button>
+                            </div>
+
+                            <!-- Sandbox Simulator Helper (Khusus VA di mode uji coba) -->
+                            <div x-show="infoBayar && infoBayar.sandbox && infoBayar.va_number" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-200 space-y-1">
+                                <p class="font-bold flex items-center gap-1">
+                                    <span>🧪</span>
+                                    <span>Uji Coba Pelunasan Sandbox Duitku</span>
+                                </p>
+                                <p class="text-[10px] text-ink-600 dark:text-amber-300/80">
+                                    Ingin tes pesanan langsung lunas otomatis? Buka simulator Duitku, tempel nomor VA di atas, lalu klik Bayar.
+                                </p>
+                                <a
+                                    href="https://sandbox.duitku.com/payment/demo/demosuccesstransaction.aspx"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-block mt-1 font-bold text-up-primary underline hover:text-indigo-600"
+                                >
+                                    Buka Halaman Uji Coba VA Duitku ↗
+                                </a>
+                            </div>
+
+                            <!-- Batas waktu -->
+                            <p x-show="infoBayar && infoBayar.expiry" class="text-[11px] text-ink-400 text-center">
+                                Batas waktu pembayaran: <span class="font-semibold tabular-nums text-ink-700 dark:text-ink-200" x-text="infoBayar ? formatExpiry(infoBayar.expiry) : ''"></span>
+                            </p>
+
+                            <div class="space-y-2 pt-1">
+                                <button
+                                    type="button"
+                                    x-on:click="selesaiMenunggu()"
+                                    class="w-full py-3.5 rounded-2xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-sm shadow-up-primary/25 transition-[background-color,transform] duration-140 cursor-pointer active:scale-[0.98] min-h-[48px]"
+                                >
+                                    Saya Sudah Bayar — Cek Status
+                                </button>
+                                <button
+                                    type="button"
+                                    x-on:click="tutupBayar()"
+                                    class="w-full py-2.5 rounded-2xl bg-white dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 text-ink-600 dark:text-ink-400 font-semibold text-xs hover:bg-ink-50 transition-colors cursor-pointer min-h-[40px]"
+                                >
+                                    Bayar Nanti
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- ===== Pilih metode: Segmented Tabs & Compact Grid ===== --}}
+                        <div x-show="!infoBayar && errorBayar !== 'PAYMENT_UNAVAILABLE'" class="space-y-4">
+                            <!-- Loading daftar metode -->
+                            <div x-show="loadingMetode" class="space-y-2.5">
+                                <p class="text-[11px] text-ink-400 animate-pulse">Memuat metode pembayaran…</p>
+                                <div class="h-10 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 animate-pulse"></div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="h-16 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 animate-pulse"></div>
+                                    <div class="h-16 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 animate-pulse"></div>
+                                </div>
+                            </div>
+
+                            <div x-show="!loadingMetode" class="space-y-3">
+                                <!-- Segmented Category Tabs -->
+                                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-ink-100 dark:border-white/10 text-xs">
+                                    <template x-for="cat in kategoriList" :key="cat.key">
+                                        <button
+                                            type="button"
+                                            x-on:click="pilihKategori(cat.key)"
+                                            class="px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all duration-140 cursor-pointer flex items-center gap-1.5"
+                                            :class="kategoriDipilih === cat.key
+                                                ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20'
+                                                : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/5'"
+                                        >
+                                            <span x-text="cat.label"></span>
+                                            <span
+                                                class="px-1.5 py-0.2 rounded-full text-[10px] font-mono tabular-nums"
+                                                :class="kategoriDipilih === cat.key ? 'bg-white/20 text-white' : 'bg-ink-200/60 dark:bg-white/10 text-ink-500'"
+                                                x-text="cat.count"
+                                            ></span>
+                                        </button>
+                                    </template>
+                                </div>
+
+                                <!-- Compact Grid Metode -->
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1" role="radiogroup" aria-label="Pilihan metode">
+                                    <template x-for="m in filteredMetode" :key="m.kode">
+                                        <button
+                                            type="button"
+                                            x-on:click="metodeDipilih = m.kode"
+                                            class="p-3 rounded-2xl border-2 text-left flex items-start justify-between gap-2.5 transition-[border-color,background-color] duration-140 cursor-pointer active:scale-[0.99]"
+                                            :class="metodeDipilih === m.kode
+                                                ? 'border-up-primary bg-up-primary/5 dark:bg-up-primary/10 shadow-sm'
+                                                : 'border-ink-200/80 dark:border-white/10 hover:border-ink-300 dark:hover:border-white/20'"
+                                            :aria-checked="metodeDipilih === m.kode"
+                                            role="radio"
+                                        >
+                                            <div class="min-w-0 flex-1">
+                                                <div class="flex items-center gap-1.5 mb-0.5">
+                                                    <span
+                                                        class="px-1.5 py-0.5 rounded text-[10px] font-extrabold tracking-wider"
+                                                        :class="metodeDipilih === m.kode ? 'bg-up-primary text-white' : 'bg-ink-100 dark:bg-white/10 text-ink-700 dark:text-ink-300'"
+                                                        x-text="m.badge || m.kode"
+                                                    ></span>
+                                                    <span class="text-xs font-bold text-ink-900 dark:text-white truncate" x-text="m.nama"></span>
+                                                </div>
+                                                <p x-show="m.deskripsi" class="text-[10px] text-ink-400 dark:text-ink-500 line-clamp-1" x-text="m.deskripsi"></p>
+                                                <div class="mt-1 flex items-center gap-2">
+                                                    <span x-show="Number(m.fee) > 0" class="text-[10px] text-up-amber font-semibold tabular-nums" x-text="'Fee +' + rupiah(m.fee)"></span>
+                                                    <span x-show="!Number(m.fee)" class="text-[10px] text-up-mint font-semibold">Bebas Biaya</span>
+                                                </div>
+                                            </div>
+                                            <span
+                                                class="w-4 h-4 mt-0.5 flex-shrink-0 rounded-full border-2 flex items-center justify-center transition-colors"
+                                                :class="metodeDipilih === m.kode ? 'border-up-primary bg-up-primary' : 'border-ink-300 dark:border-white/20'"
+                                            >
+                                                <span x-show="metodeDipilih === m.kode" class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                                            </span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Error inline (mis. jaringan / respons gagal) -->
+                            <div x-show="!loadingMetode && errorBayar && errorBayar !== 'PAYMENT_UNAVAILABLE'" class="p-3 rounded-2xl bg-up-red/10 border border-up-red/20 text-[11px] text-up-red font-semibold">
+                                <span x-text="errorBayar"></span>
+                            </div>
+
+                            <!-- Tombol konfirmasi -->
+                            <button
+                                type="button"
+                                x-on:click="konfirmasiBayar()"
+                                x-bind:disabled="loadingCreate || !metodeDipilih || loadingMetode"
+                                x-bind:class="(!metodeDipilih || loadingCreate || loadingMetode) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-up-primary-dark shadow-sm shadow-up-primary/25 cursor-pointer'"
+                                class="w-full py-3.5 rounded-2xl bg-up-primary text-white font-bold text-sm transition-[opacity,background-color,transform] duration-140 active:scale-[0.98] min-h-[48px] flex items-center justify-center gap-2"
+                            >
+                                <svg x-show="loadingCreate" class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                <span x-text="loadingCreate ? 'Menghubungi penyedia pembayaran…' : 'Lanjut ke Pembayaran'"></span>
+                            </button>
+
+                            <p class="text-[10px] text-ink-400 text-center leading-relaxed">
+                                Pembayaran diproses dengan aman melalui gateway resmi. Status pesanan diperbarui otomatis setelah lunas.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
         @endif
 

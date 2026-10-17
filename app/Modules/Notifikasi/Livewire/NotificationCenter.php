@@ -4,6 +4,8 @@ namespace App\Modules\Notifikasi\Livewire;
 
 use App\Models\UserPreference;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
+use App\Modules\Notifikasi\Services\NotificationService;
+use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -115,6 +117,9 @@ class NotificationCenter extends Component
     {
         $user = Auth::user();
         $cabangId = session('cabang_id');
+
+        // Otomatis sinkronkan/selesaikan notifikasi usang jika entitasnya telah berubah status
+        app(NotificationService::class)->autoResolveOutdatedInapp($user, $cabangId);
 
         $this->unreadNotifCount = NotifikasiKeluar::query()
             ->where('tipe', 'inapp')
@@ -291,6 +296,11 @@ class NotificationCenter extends Component
 
         $notifications = $query->limit(20)->get();
 
+        $transaksiIds = $notifications->pluck('payload.transaksi_id')->filter()->unique();
+        $transaksiMap = $transaksiIds->isNotEmpty()
+            ? Transaksi::whereIn('id', $transaksiIds)->get(['id', 'no_transaksi', 'status'])->keyBy('id')
+            : collect();
+
         $pendingApprovals = collect();
         if (($this->filter === 'semua' || $this->filter === 'belum_proses' || $this->filter === 'approval')
             && in_array('approval', $this->userEvents)
@@ -320,6 +330,7 @@ class NotificationCenter extends Component
             'open' => $this->open,
             'userEvents' => $this->userEvents,
             'availableEvents' => self::$availableEvents,
+            'transaksiMap' => $transaksiMap,
         ]);
     }
 }

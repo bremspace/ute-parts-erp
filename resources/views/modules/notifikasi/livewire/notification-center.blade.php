@@ -291,6 +291,16 @@
                                         {{ $cat }}
                                     </span>
 
+                                    @php
+                                        $txId = $notif->payload['transaksi_id'] ?? null;
+                                        $tx = $txId && isset($transaksiMap) ? ($transaksiMap[$txId] ?? null) : null;
+                                    @endphp
+                                    @if($tx)
+                                        <span class="text-[9px] uppercase font-mono font-extrabold px-1.5 py-0.2 rounded {{ in_array($tx->status, ['lunas', 'selesai']) ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : ($tx->status === 'menunggu_pembayaran' ? 'bg-up-amber/15 text-up-amber border border-up-amber/30' : 'bg-up-primary/15 text-up-primary border border-up-primary/30') }}">
+                                            {{ str_replace('_', ' ', $tx->status) }}
+                                        </span>
+                                    @endif
+
                                     @if($isUnprocessed)
                                         <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-extrabold uppercase bg-up-red/15 text-up-red border border-up-red/30">
                                             <span class="relative flex h-1.5 w-1.5">

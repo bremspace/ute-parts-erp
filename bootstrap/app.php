@@ -9,6 +9,8 @@ use App\Modules\Akunting\Jobs\DepresiasiAsetJob;
 use App\Modules\Crm\Console\Commands\EksekusiBroadcastTerjadwal;
 use App\Modules\Crm\Console\Commands\RecalcTierCommand;
 use App\Modules\Hr\Jobs\HitungKpiBulananJob;
+use App\Modules\Marketplace\Console\Commands\DuitkuHealthCommand;
+use App\Modules\Marketplace\Console\Commands\DuitkuRekonCommand;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
 use App\Modules\Servis\Console\Commands\CekBatasWaktuServisCommand;
 use App\Modules\Wms\Jobs\CycleCountJob;
@@ -35,7 +37,14 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withCommands(
-        commands: [RecalcTierCommand::class, EksekusiBroadcastTerjadwal::class, SidImportRaw::class, CekBatasWaktuServisCommand::class],
+        commands: [
+            RecalcTierCommand::class,
+            EksekusiBroadcastTerjadwal::class,
+            SidImportRaw::class,
+            CekBatasWaktuServisCommand::class,
+            DuitkuHealthCommand::class,
+            DuitkuRekonCommand::class,
+        ],
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Alias middleware Spatie Permission (dipakai semua route RBAC — PRD §3, Route middleware enforcement)
@@ -80,6 +89,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // Force HTTPS in production (T-28)
         $middleware->web(prepend: [ForceHttps::class]);
         $middleware->api(prepend: [ForceHttps::class]);
+
+        // Webhook Duitku & Omnichannel bebas CSRF (incoming server-to-server POST)
+        $middleware->validateCsrfTokens(except: [
+            'webhook/duitku',
+            'webhook/channel/*',
+            'api/payment/check-status',
+        ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
         // Rekalkulasi tier membership harian (PRD §4.4)
@@ -103,6 +119,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // [F1-5] Reorder otomatis harian 03:00 (queue: stok < minimum → usulan PO)
         $schedule->job(ReorderOtomatisJob::class)->dailyAt('03:00');
+
+        // [T-03] Rekonsiliasi & ekspirasi order Duitku — 04:00 (setelah reorder;
+        // order menunggu_pembayaran lewat expiryPeriod ditanya via transactionStatus:
+        // lunas → jalur prosesLunas idempoten; batal/pending-lewat-expiry → kadaluarsa).
+        $schedule->command('duitku:rekon')
+            ->dailyAt('04:00')
+            ->withoutOverlapping();
 
         // [F3-7] Cycle count — cek jadwal jatuh tempo (hari/jam per schedule) → generate
         // sample task acak (queue database; hourly agar hormati field `jam` tiap jadwal)

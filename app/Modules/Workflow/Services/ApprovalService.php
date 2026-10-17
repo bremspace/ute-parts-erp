@@ -149,6 +149,9 @@ class ApprovalService
                 );
             }
 
+            // Otomatis selesaikan notifikasi menunggu approval untuk approver
+            app(NotificationService::class)->sinkronkanStatusApproval($request);
+
             return $request->fresh();
         });
     }

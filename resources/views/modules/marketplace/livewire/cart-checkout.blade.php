@@ -23,17 +23,24 @@
                 </div>
                 <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-ink-700 dark:text-amber-200 text-left">
                     <p class="font-bold flex items-center gap-1.5 mb-1">
-                        <span>⏳</span> Menunggu Konfirmasi & Pembayaran
+                        <span>⏳</span> Menunggu Pembayaran
                     </p>
                     <p class="text-[11px] leading-relaxed text-ink-500 dark:text-ink-400">
-                        Sistem kasir & cabang telah menerima daftar suku cadang Anda. Selesaikan pembayaran saat ambil barang atau lewat instruksi resmi WhatsApp Ute Parts.
+                        Sistem kasir & cabang telah menerima daftar suku cadang Anda.
+                        Bayar online sekarang lewat menu <strong class="text-ink-700 dark:text-amber-100">Akun Saya → Pesanan</strong>
+                        (transfer bank, QRIS, atau e-wallet) agar pesanan segera disiapkan —
+                        atau selesaikan pembayaran saat ambil barang / lewat instruksi resmi WhatsApp Ute Parts.
                     </p>
                 </div>
             </div>
 
             <div class="flex flex-wrap gap-3 justify-center pt-2">
-                <a href="{{ route('customer.account') }}"
-                   class="px-6 py-3.5 rounded-2xl bg-ink-900 text-white dark:bg-white dark:text-ink-950 font-bold text-xs hover:opacity-90 transition-[opacity,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97]">
+                <a href="{{ route('customer.account') }}?tab=orders&bayar={{ $orderNo }}"
+                   class="px-6 py-3.5 rounded-2xl bg-up-primary text-white font-bold text-xs hover:bg-up-primary-dark transition-[background-color,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97] shadow-sm shadow-up-primary/25">
+                    ⚡ Bayar Sekarang
+                </a>
+                <a href="{{ route('customer.account') }}?tab=orders"
+                   class="px-6 py-3.5 rounded-2xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs hover:bg-ink-50 transition-[background-color,transform] duration-140 min-h-[44px] flex items-center active:scale-[0.97]">
                     Lihat Status Pesanan
                 </a>
                 <a href="{{ route('shop') }}"

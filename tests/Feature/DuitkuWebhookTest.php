@@ -292,4 +292,61 @@ class DuitkuWebhookTest extends TestCase
         $this->assertDatabaseHas('transaksi', ['no_transaksi' => 'MP-TEST-0001', 'status' => 'lunas']);
         $this->assertSame(4, JurnalAkuntansi::count());
     }
+
+    // ===== [T-04] Signature HMAC-SHA256 (docs baru) & mode transisi =====
+
+    private function callbackPayloadHmac(string $orderId, string $resultCode): array
+    {
+        $merchantCode = 'TST001';
+        $amount = 100000;
+        $signature = hash_hmac('sha256', $merchantCode.$amount.$orderId, 'testapikey123');
+
+        return [
+            'merchantCode' => $merchantCode,
+            'amount' => $amount,
+            'merchantOrderId' => $orderId,
+            'resultCode' => $resultCode,
+            'reference' => 'REF-HMAC-'.$orderId,
+            'signature' => $signature,
+        ];
+    }
+
+    /** Mode dual (default): callback dgn signature HMAC-SHA256 docs baru diterima. */
+    public function test_callback_hmac_sha256_diterima_mode_dual(): void
+    {
+        $this->setUpData();
+
+        $this->post('/webhook/duitku', $this->callbackPayloadHmac('MP-TEST-0001', '00'))
+            ->assertOk()
+            ->assertJson(['success' => true, 'message' => 'OK']);
+
+        $this->assertDatabaseHas('transaksi', ['no_transaksi' => 'MP-TEST-0001', 'status' => 'lunas']);
+        // Reference callback tersimpan ke payment_reference
+        $this->assertSame('REF-HMAC-MP-TEST-0001', Transaksi::firstOrFail()->payment_reference);
+    }
+
+    /** Mode dual (default): signature MD5 lama TETAP diterima (transisi aman). */
+    public function test_callback_md5_lama_masih_diterima_mode_dual(): void
+    {
+        $this->setUpData();
+
+        $this->post('/webhook/duitku', $this->callbackPayload('MP-TEST-0001', '00'))
+            ->assertOk()
+            ->assertJson(['success' => true, 'message' => 'OK']);
+
+        $this->assertDatabaseHas('transaksi', ['no_transaksi' => 'MP-TEST-0001', 'status' => 'lunas']);
+    }
+
+    /** Mode hmac saja (setelah MD5 dimatikan): callback MD5 ditolak. */
+    public function test_callback_md5_ditolak_ketika_mode_hmac(): void
+    {
+        $this->setUpData();
+        config(['duitku.signature_mode' => 'hmac']);
+
+        $this->post('/webhook/duitku', $this->callbackPayload('MP-TEST-0001', '00'))
+            ->assertStatus(400)
+            ->assertJson(['success' => false]);
+
+        $this->assertSame('menunggu_pembayaran', Transaksi::firstOrFail()->status);
+    }
 }

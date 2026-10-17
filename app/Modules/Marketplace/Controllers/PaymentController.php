@@ -2,47 +2,22 @@
 
 namespace App\Modules\Marketplace\Controllers;
 
-use App\Modules\Akunting\Services\JurnalService;
-use App\Modules\Akunting\Services\PajakService;
-use App\Modules\Crm\Services\PelangganService;
+use App\Modules\Marketplace\Services\DuitkuPaymentProcessor;
 use App\Modules\Marketplace\Services\DuitkuService;
-use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Rbac\Models\Cabang;
-use App\Modules\Reseller\Services\KomisiService;
-use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
     use ApiResponse;
 
-    /**
-     * [B-10b/P0-5] Toleransi pencocokan nominal (rupiah bulat).
-     * Duitku mengirim amount integer; total_akhir desimal 15,2 → selisih
-     * pembulatan 1 rupiah masih dianggap cocok, selebihnya = tidak cocok.
-     */
-    private const TOLERANSI_AMOUNT = 1;
-
-    /**
-     * [B-10b/P0-5] Status final order = callback-nya sudah pernah diproses.
-     * Eksplisit (bukan hanya 'lunas') supaya callback gagal/pending yang
-     * terlambat tidak menimpa order yang sudah dibayar.
-     */
-    private const STATUS_FINAL = ['selesai', 'lunas', 'dibatalkan', 'batal', 'kadaluarsa', 'gagal'];
-
     public function __construct(
         protected DuitkuService $duitku,
-        protected JurnalService $jurnalService,
-        protected PajakService $pajakService,
-        protected StokDeductionService $stokDeduction,
-        protected KomisiService $komisiService,
-        protected NotificationService $notifService
+        protected DuitkuPaymentProcessor $processor
     ) {}
 
     /**
@@ -106,9 +81,10 @@ class PaymentController extends Controller
      *
      * [B-10b/P0-5] Race-safe: SELURUH proses (cek status → validasi nominal →
      * potong stok → jurnal → komisi → notifikasi) berada dalam SATU
-     * DB::transaction dgn `lockForUpdate()` pada baris `transaksi`. Dua webhook
-     * bersamaan tidak bisa dua-duanya lolos guard status → hanya satu yang
-     * memproses, yang kedua dapat "Already processed" tanpa efek samping.
+     * DB::transaction dgn `lockForUpdate()` pada baris `transaksi` (kini di
+     * `DuitkuPaymentProcessor::prosesLunas` — dipakai bersama dgn `duitku:rekon`).
+     * Dua webhook bersamaan tidak bisa dua-duanya lolos guard status → hanya
+     * satu yang memproses, yang kedua dapat "Already processed" tanpa efek samping.
      */
     public function webhook(Request $request)
     {
@@ -117,10 +93,16 @@ class PaymentController extends Controller
         $merchantOrderId = (string) $request->input('merchantOrderId');
         $resultCode = (string) $request->input('resultCode'); // 00 = sukses
         $signature = (string) $request->input('signature');
+        $reference = $request->input('reference');
 
-        Log::info('[Duitku-webhook] Incoming', $request->all());
+        // Sanitasi log: jangan log signature/payload penuh (bisa berisi data pelanggan)
+        Log::info('[Duitku-webhook] Incoming', [
+            'merchantOrderId' => $merchantOrderId,
+            'resultCode' => $resultCode,
+            'amount' => $amount,
+        ]);
 
-        // 1. Verify signature (anti-perusakan)
+        // 1. Verify signature (anti-perusakan) — dual HMAC-SHA256 (docs baru) + MD5 (legacy)
         if (! $this->duitku->verifyCallbackSignature($amount, $merchantOrderId, $signature)) {
             Log::warning('[Duitku-webhook] Signature mismatch', ['order' => $merchantOrderId]);
 
@@ -142,215 +124,22 @@ class PaymentController extends Controller
 
         // ===== PROCESS =====
         if ($resultCode === '00') {
-            return $this->prosesLunas($merchantOrderId, $amount);
+            $hasil = $this->processor->prosesLunas($merchantOrderId, $amount, is_string($reference) ? $reference : null);
+
+            return $this->responsHasilLunas($merchantOrderId, $hasil);
         }
 
         if (in_array($resultCode, ['01', '02', '03', '04', '05'], true)) {
-            return $this->prosesGagal($merchantOrderId, $resultCode);
+            $hasil = $this->processor->prosesGagal($merchantOrderId, $resultCode);
+
+            return $this->responsHasilGagal($merchantOrderId, $resultCode, $hasil);
         }
 
         // Status lain — tandai pending saja, bukan final
         return response()->json(['success' => true, 'message' => 'Received']);
     }
 
-    /**
-     * [B-10b/P0-5] Callback sukses (resultCode 00): order → lunas dalam satu
-     * transaksi atomik + row lock. Idempoten: order yang statusnya sudah final
-     * dikembalikan sukses TANPA potong stok / jurnal / notifikasi lagi.
-     */
-    private function prosesLunas(string $merchantOrderId, int $amount): JsonResponse
-    {
-        try {
-            $hasil = DB::transaction(function () use ($merchantOrderId, $amount) {
-                // lockForUpdate() → baris order terkunci sampai commit; webhook
-                // paralel untuk order yang sama akan MENUNGGU di titik ini lalu
-                // membaca status 'lunas' (idempotent skip), bukan lolos guard.
-                $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership'])
-                    ->where('no_transaksi', $merchantOrderId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $transaksi) {
-                    return ['kode' => 'tidak_ditemukan'];
-                }
-
-                // ===== IDEMPOTENCY GUARD (dalam lock) =====
-                if (in_array($transaksi->status, self::STATUS_FINAL, true)) {
-                    return ['kode' => 'sudah_diproses', 'status' => $transaksi->status];
-                }
-
-                // ===== Validasi nominal =====
-                $expected = (int) round((float) $transaksi->total_akhir);
-                if (abs($amount - $expected) > self::TOLERANSI_AMOUNT) {
-                    // TIDAK proses apa pun (stok, jurnal, status) — order tetap
-                    // menunggu_pembayaran supaya bisa direkonsiliasi manual.
-                    return ['kode' => 'nominal_tidak_cocok', 'expected' => $expected, 'diterima' => $amount];
-                }
-
-                // a. Update status transaksi SEBELUM operasi lain (idempotency marker)
-                $transaksi->update([
-                    'status' => 'lunas',
-                    'metode_bayar' => 'duitku',
-                    'jumlah_bayar' => (float) $transaksi->total_akhir,
-                    'paid_at' => now(),
-                ]);
-
-                // b. Kurangi stok per item (gudang tersedia di cabang transaksi)
-                $cabangId = $transaksi->cabang_id ?: Cabang::firstOrFail()->id;
-                foreach ($transaksi->items as $item) {
-                    $this->stokDeduction->kurangiDariGudangTersedia(
-                        $item->produk_id,
-                        $item->sku_variant_id,
-                        (int) $item->jumlah,
-                        $cabangId,
-                        'penjualan',
-                        Transaksi::class,
-                        $transaksi->id,
-                        null,
-                        "POS Online {$merchantOrderId} (lunas Duitku)"
-                    );
-                }
-
-                // c. Jurnal otomatis: Kas masuk / Pendapatan / PPN / HPP / Persediaan turun
-                //    [B-14] PPN dipisah ke akun pajak 220-01 — POLA SAMA dgn POS
-                //    (`PosController::store()`): debit Kas = total_akhir (nilai yang
-                //    benar-benar dibayar pelanggan, TIDAK diubah), kredit pendapatan
-                //    410-01 = DPP, kredit 220-01 = PPN. Tanpa ini seluruh
-                //    `total_akhir` masuk pendapatan → laporan penjualan marketplace
-                //    ≠ POS + laporan pajak F1-2 under-reported.
-                //    PPN TIDAK dihitung ulang di sini: nominalnya sudah disimpan
-                //    saat order dibuat (`OrderService::buatOrder` → PajakService)
-                //    sehingga tetap non-retroaktif bila konfigurasi pajak berubah.
-                $totalHpp = (float) $transaksi->items->sum(fn ($i) => (float) $i->hpp * (int) $i->jumlah);
-                $totalAkhir = (float) $transaksi->total_akhir;
-                [$dpp, $ppnNominal] = $this->pisahDppPpn($transaksi, $totalAkhir);
-                $noJurnal = $this->jurnalService->generateNoJurnal('pos', $cabangId);
-
-                $lines = [
-                    ['akun_kode' => '120-02', 'debit' => $totalAkhir, 'kredit' => 0],
-                    ['akun_kode' => '410-03', 'debit' => 0, 'kredit' => $dpp],
-                ];
-                // PPN Keluaran → akun 220-01 (kontrak AC F1-2, baris dari PajakService)
-                foreach ($this->pajakService->jurnalLines($ppnNominal, $noJurnal, (int) $cabangId, 0) as $ppnLine) {
-                    $lines[] = $ppnLine;
-                }
-                if ($totalHpp > 0) {
-                    $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
-                    $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
-                }
-                $this->jurnalService->post(
-                    $noJurnal,
-                    now(),
-                    'pos',
-                    $lines,
-                    "Jurnal order online {$merchantOrderId} (lunas Duitku)",
-                    $cabangId,
-                    null,
-                    Transaksi::class,
-                    $transaksi->id
-                );
-
-                // d. Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing
-                $this->komisiService->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
-
-                // e. Notifikasi Backoffice & Pelanggan (via queue)
-                $this->notifService->kirim(
-                    'inapp',
-                    null,
-                    "Pembayaran Pesanan {$merchantOrderId} Diterima",
-                    'Pesanan online '.$merchantOrderId.' lunas (Rp '.number_format($totalAkhir, 0, ',', '.').'). Segera siapkan dan kemas suku cadang.',
-                    [
-                        'transaksi_id' => $transaksi->id,
-                        'cabang_id' => $cabangId,
-                        'target_role' => 'staff-gudang',
-                        'kategori' => 'transaksi',
-                        'sumber' => 'marketplace',
-                        'action_url' => '/app/pos/online-orders',
-                        'audience' => 'staf',
-                    ]
-                );
-
-                $this->notifService->kirim(
-                    'inapp',
-                    $transaksi->pelanggan?->email,
-                    'Pembayaran Diterima',
-                    "Pembayaran pesanan {$merchantOrderId} berhasil. Tim Ute Parts sedang mempersiapkan paket Anda.",
-                    [
-                        'transaksi_id' => $transaksi->id,
-                        'pelanggan_id' => $transaksi->pelanggan_id,
-                        'kategori' => 'transaksi',
-                        'sumber' => 'marketplace',
-                        'action_url' => '/account',
-                        'audience' => 'pelanggan',
-                    ]
-                );
-
-                if ($transaksi->pelanggan?->telepon) {
-                    $this->notifService->kirim(
-                        'wa',
-                        $transaksi->pelanggan->telepon,
-                        'Pembayaran Pesanan Lunas',
-                        "Terima kasih {$transaksi->pelanggan->nama}! Pembayaran pesanan {$merchantOrderId} sebesar Rp ".number_format($totalAkhir, 0, ',', '.').' telah kami terima. Pesanan Anda segera dikemas & dikirim.',
-                        [
-                            'transaksi_id' => $transaksi->id,
-                            'pelanggan_id' => $transaksi->pelanggan_id,
-                            'audience' => 'pelanggan',
-                        ]
-                    );
-                }
-
-                // f. Integrasi CRM: update total belanja 12 bulan & poin loyalty pelanggan
-                if ($transaksi->pelanggan_id) {
-                    app(PelangganService::class)->tambahBelanjaDanPoin($transaksi->pelanggan_id, $totalAkhir);
-                }
-
-                return ['kode' => 'sukses'];
-            });
-        } catch (\Exception $e) {
-            // Rollback DB::transaction sudah mengembalikan status/stok/jurnal.
-            // TIDAK perlu update status manual lagi (bisa menimpa order yang
-            // bersamaan sudah 'lunas').
-            Log::error('[Duitku-webhook] Process failed, transaction rolled back', [
-                'order' => $merchantOrderId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json(['success' => false, 'message' => 'Processing failed'], 500);
-        }
-
-        return $this->responsHasilLunas($merchantOrderId, $hasil);
-    }
-
-    /**
-     * [B-14] Pisahkan `total_akhir` jadi DPP + PPN untuk jurnal, dengan invarian
-     * balance: `total_akhir === dpp + ppn` (dgn presisi 2 desimal).
-     *
-     * Sumber PPN = kolom transaksi (`ppn_nominal`, diisi `PajakService` saat order
-     * dibuat). Fallback `total_akhir - dpp` hanya utk order yang PPN-nya sudah
-     * tercakup di total tapi kolom `ppn_nominal`-nya kosong. Order LAMA
-     * (`ppn_nominal` kosong & `dpp` = total) → PPN 0, jadi tidak ada PPN
-     * retroaktif bila pajak baru diaktifkan (kontrak PajakService: perubahan
-     * konfigurasi hanya berlaku utk transaksi baru).
-     *
-     * @return array{0: float, 1: float} [dpp, ppnNominal]
-     */
-    private function pisahDppPpn(Transaksi $transaksi, float $total): array
-    {
-        $ppn = max(0.0, (float) ($transaksi->ppn_nominal ?? 0));
-
-        if ($ppn <= 0) {
-            $dppTersimpan = (float) ($transaksi->dpp ?? 0);
-            if ($dppTersimpan > 0 && $dppTersimpan < $total) {
-                $ppn = round($total - $dppTersimpan, 2);
-            }
-        }
-
-        $dpp = $ppn > 0 ? round($total - $ppn, 2) : $total;
-
-        return [$dpp, $ppn];
-    }
-
-    /** Mapping hasil prosesLunas() → respons JSON. */
+    /** Mapping hasil DuitkuPaymentProcessor::prosesLunas() → respons JSON. */
     private function responsHasilLunas(string $merchantOrderId, array $hasil): JsonResponse
     {
         if ($hasil['kode'] === 'sukses') {
@@ -387,60 +176,17 @@ class PaymentController extends Controller
             ]);
         }
 
-        return response()->json(['success' => false, 'message' => 'Order not found'], 404);
-    }
-
-    /**
-     * [B-10b/P0-5] Callback gagal/kadaluarsa (resultCode 01-05) — juga di row
-     * lock supaya tidak menimpa order yang bersamaan sudah 'lunas'.
-     */
-    private function prosesGagal(string $merchantOrderId, string $resultCode): JsonResponse
-    {
-        try {
-            $hasil = DB::transaction(function () use ($merchantOrderId) {
-                $transaksi = Transaksi::where('no_transaksi', $merchantOrderId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $transaksi) {
-                    return ['kode' => 'tidak_ditemukan'];
-                }
-
-                if (in_array($transaksi->status, self::STATUS_FINAL, true)) {
-                    return ['kode' => 'sudah_diproses', 'status' => $transaksi->status];
-                }
-
-                $transaksi->update([
-                    'status' => 'gagal',
-                    'paid_at' => null,
-                ]);
-
-                if ($transaksi->pelanggan_id) {
-                    $this->notifService->kirim(
-                        'inapp', null,
-                        'Pembayaran Gagal',
-                        "Pesanan {$merchantOrderId} gagal dibayar. Silakan coba kembali.",
-                        [
-                            'transaksi_id' => $transaksi->id,
-                            'pelanggan_id' => $transaksi->pelanggan_id,
-                            'kategori' => 'transaksi',
-                            'action_url' => '/account',
-                            'audience' => 'pelanggan',
-                        ]
-                    );
-                }
-
-                return ['kode' => 'sukses'];
-            });
-        } catch (\Exception $e) {
-            Log::error('[Duitku-webhook] Gagal menandai order sebagai gagal', [
-                'order' => $merchantOrderId,
-                'error' => $e->getMessage(),
-            ]);
-
+        if ($hasil['kode'] === 'proses_gagal') {
+            // Rollback sudah terjadi di processor — respons 500 agar Duitku retry.
             return response()->json(['success' => false, 'message' => 'Processing failed'], 500);
         }
 
+        return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+    }
+
+    /** Mapping hasil DuitkuPaymentProcessor::prosesGagal() → respons JSON. */
+    private function responsHasilGagal(string $merchantOrderId, string $resultCode, array $hasil): JsonResponse
+    {
         if ($hasil['kode'] === 'tidak_ditemukan') {
             return response()->json(['success' => false, 'message' => 'Order not found'], 404);
         }
@@ -452,6 +198,10 @@ class PaymentController extends Controller
             ]);
 
             return response()->json(['success' => true, 'message' => 'Already processed']);
+        }
+
+        if ($hasil['kode'] === 'proses_gagal') {
+            return response()->json(['success' => false, 'message' => 'Processing failed'], 500);
         }
 
         Log::info('[Duitku-webhook] Payment failed', ['order' => $merchantOrderId, 'resultCode' => $resultCode]);
@@ -472,5 +222,59 @@ class PaymentController extends Controller
         } catch (\Exception $e) {
             return $this->error('Duitku: '.$e->getMessage(), 502);
         }
+    }
+
+    /**
+     * Cek status pembayaran ke Duitku secara on-demand & sinkronisasi otomatis.
+     */
+    public function checkStatus(Request $request)
+    {
+        $request->validate([
+            'no_transaksi' => 'required|string|exists:transaksi,no_transaksi',
+        ]);
+
+        $transaksi = Transaksi::where('no_transaksi', $request->no_transaksi)->firstOrFail();
+
+        // Jika sudah final, langsung kembalikan status saat ini
+        if ($transaksi->status !== 'menunggu_pembayaran') {
+            return $this->success([
+                'no_transaksi' => $transaksi->no_transaksi,
+                'status' => $transaksi->status,
+                'is_lunas' => in_array($transaksi->status, ['lunas', 'diproses', 'dikirim', 'siap_diambil', 'selesai'], true),
+            ], 'Status terkini transaksi');
+        }
+
+        // Tanyakan status live ke server Duitku
+        $res = $this->duitku->transactionStatus($transaksi->no_transaksi);
+
+        if ($res['status'] === 'sukses' && $res['status_code'] === '00') {
+            $amount = $res['amount'] ?? (int) round($transaksi->total_akhir);
+            $this->processor->prosesLunas($transaksi->no_transaksi, $amount, $res['reference']);
+            $transaksi->refresh();
+
+            return $this->success([
+                'no_transaksi' => $transaksi->no_transaksi,
+                'status' => $transaksi->status,
+                'is_lunas' => true,
+            ], 'Pembayaran berhasil diverifikasi lunas');
+        }
+
+        if ($res['status'] === 'batal' || in_array($res['status_code'], ['02', '03'], true)) {
+            $this->processor->prosesGagal($transaksi->no_transaksi, (string) $res['status_code']);
+            $transaksi->refresh();
+
+            return $this->success([
+                'no_transaksi' => $transaksi->no_transaksi,
+                'status' => $transaksi->status,
+                'is_lunas' => false,
+            ], 'Transaksi telah dibatalkan atau kadaluarsa');
+        }
+
+        return $this->success([
+            'no_transaksi' => $transaksi->no_transaksi,
+            'status' => $transaksi->status,
+            'is_lunas' => false,
+            'duitku_status' => $res['status'],
+        ], 'Transaksi masih menunggu pembayaran');
     }
 }

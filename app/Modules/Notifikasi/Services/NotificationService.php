@@ -2,8 +2,11 @@
 
 namespace App\Modules\Notifikasi\Services;
 
+use App\Models\User;
 use App\Modules\Notifikasi\Jobs\KirimNotifikasiJob;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
+use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Workflow\Models\ApprovalRequest;
 use Illuminate\Support\Facades\Queue;
 
 class NotificationService
@@ -117,6 +120,152 @@ class NotificationService
     protected function isStaffZoneUrl(string $url): bool
     {
         return str_starts_with($url, '/app') || str_starts_with($url, 'http');
+    }
+
+    /**
+     * Otomatis sesuaikan & selesaikan notifikasi terkait transaksi saat statusnya berubah.
+     * Mengeliminasi kebutuhan staf/konsumen untuk konfirmasi/tandai selesai secara manual.
+     */
+    public function sinkronkanStatusTransaksi(Transaksi $transaksi, ?string $statusBaru = null): int
+    {
+        $status = $statusBaru ?? $transaksi->status;
+        $transaksiId = $transaksi->id;
+        $resolvedCount = 0;
+
+        $query = NotifikasiKeluar::query()
+            ->where('tipe', 'inapp')
+            ->whereNull('read_at')
+            ->where(function ($q) use ($transaksiId) {
+                $q->where('payload->transaksi_id', $transaksiId)
+                    ->orWhere('payload->transaksi_id', (string) $transaksiId);
+            });
+
+        $activeNotifs = $query->get();
+
+        foreach ($activeNotifs as $notif) {
+            $shouldResolve = false;
+            $judul = strtolower($notif->judul ?? '');
+            $konten = strtolower($notif->konten ?? '');
+            $isMenungguBayarNotif = str_contains($judul, 'menunggu pembayaran')
+                || str_contains($konten, 'menunggu pembayaran')
+                || str_contains($judul, 'pesanan online baru')
+                || str_contains($judul, 'pesanan berhasil didaftarkan')
+                || str_contains($konten, 'selesaikan pembayaran')
+                || ($notif->payload['stage'] ?? '') === 'menunggu_pembayaran';
+
+            // 1. Jika sudah lunas atau tahapan setelahnya: notifikasi menunggu bayar otomatis diselesaikan
+            if (in_array($status, ['lunas', 'diproses', 'dikirim', 'siap_diambil', 'selesai'], true) && $isMenungguBayarNotif) {
+                $shouldResolve = true;
+            }
+
+            // 2. Jika sudah diproses/dikemas: notifikasi instruksi kemas/bayar diselesaikan
+            if (in_array($status, ['diproses', 'dikirim', 'siap_diambil', 'selesai'], true)) {
+                if (str_contains($judul, 'pembayaran') || str_contains($konten, 'segera siapkan dan kemas')) {
+                    $shouldResolve = true;
+                }
+            }
+
+            // 3. Jika sudah dikirim / siap diambil: notifikasi kemas diselesaikan
+            if (in_array($status, ['dikirim', 'siap_diambil', 'selesai'], true)) {
+                if (str_contains($judul, 'dikemas') || str_contains($konten, 'sedang dikemas')) {
+                    $shouldResolve = true;
+                }
+            }
+
+            // 4. Jika selesai atau batal: seluruh notifikasi aktif untuk transaksi ini diselesaikan
+            if (in_array($status, ['selesai', 'batal', 'kadaluarsa'], true)) {
+                $shouldResolve = true;
+            }
+
+            if ($shouldResolve) {
+                $payload = $notif->payload ?? [];
+                $payload['auto_resolved'] = true;
+                $payload['resolved_by_status'] = $status;
+                $payload['resolved_at'] = now()->toIso8601String();
+
+                $notif->update([
+                    'read_at' => now(),
+                    'payload' => $payload,
+                ]);
+                $resolvedCount++;
+            }
+        }
+
+        return $resolvedCount;
+    }
+
+    /**
+     * Otomatis selesaikan notifikasi approval saat request telah disetujui atau ditolak.
+     */
+    public function sinkronkanStatusApproval(ApprovalRequest $request): int
+    {
+        $requestId = $request->id;
+        $resolvedCount = 0;
+
+        $activeNotifs = NotifikasiKeluar::query()
+            ->where('tipe', 'inapp')
+            ->whereNull('read_at')
+            ->where(function ($q) use ($requestId) {
+                $q->where('payload->approval_request_id', $requestId)
+                    ->orWhere('payload->approval_request_id', (string) $requestId);
+            })
+            ->get();
+
+        foreach ($activeNotifs as $notif) {
+            $payload = $notif->payload ?? [];
+            $payload['auto_resolved'] = true;
+            $payload['resolved_by_status'] = $request->status;
+            $payload['resolved_at'] = now()->toIso8601String();
+
+            $notif->update([
+                'read_at' => now(),
+                'payload' => $payload,
+            ]);
+            $resolvedCount++;
+        }
+
+        return $resolvedCount;
+    }
+
+    /**
+     * Self-healing auto-resolve sweep untuk notifikasi in-app yang entitasnya telah berpindah status.
+     * Dipanggil secara periodik oleh polling NotificationCenter.
+     */
+    public function autoResolveOutdatedInapp(?User $user = null, ?int $cabangId = null): int
+    {
+        $query = NotifikasiKeluar::query()
+            ->where('tipe', 'inapp')
+            ->whereNull('read_at')
+            ->whereNotNull('payload');
+
+        if ($cabangId) {
+            $query->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId));
+        }
+
+        $activeNotifs = $query->limit(50)->get();
+        $resolvedCount = 0;
+
+        foreach ($activeNotifs as $notif) {
+            $transaksiId = $notif->payload['transaksi_id'] ?? null;
+            if ($transaksiId) {
+                $transaksi = Transaksi::find($transaksiId);
+                if ($transaksi && $transaksi->status !== 'menunggu_pembayaran') {
+                    $resolvedCount += $this->sinkronkanStatusTransaksi($transaksi);
+                }
+
+                continue;
+            }
+
+            $approvalId = $notif->payload['approval_request_id'] ?? null;
+            if ($approvalId) {
+                $approval = ApprovalRequest::find($approvalId);
+                if ($approval && $approval->status !== 'pending') {
+                    $resolvedCount += $this->sinkronkanStatusApproval($approval);
+                }
+            }
+        }
+
+        return $resolvedCount;
     }
 
     protected function deteksiKategori(string $judul, string $konten, array $payload): string

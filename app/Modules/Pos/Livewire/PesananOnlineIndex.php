@@ -278,6 +278,8 @@ class PesananOnlineIndex extends Component
                     ]
                 );
             }
+
+            $notif->sinkronkanStatusTransaksi($transaksi, 'lunas');
         });
 
         $this->dispatch('alert', ['type' => 'success', 'message' => "Pesanan {$transaksi->no_transaksi} berhasil dikonfirmasi lunas."]);
@@ -383,6 +385,8 @@ class PesananOnlineIndex extends Component
             ]
         );
 
+        $notif->sinkronkanStatusTransaksi($transaksi, 'diproses');
+
         $this->dispatch('alert', ['type' => 'success', 'message' => "Pesanan {$transaksi->no_transaksi} dalam proses pengemasan."]);
     }
 
@@ -474,6 +478,8 @@ class PesananOnlineIndex extends Component
                     ]
                 );
             }
+
+            $notif->sinkronkanStatusTransaksi($transaksi, $newStatus);
         });
 
         $this->showKirimModal = false;
@@ -511,6 +517,8 @@ class PesananOnlineIndex extends Component
                 'audience' => 'pelanggan',
             ]
         );
+
+        $notif->sinkronkanStatusTransaksi($transaksi, 'selesai');
 
         $this->dispatch('alert', ['type' => 'success', 'message' => "Pesanan {$transaksi->no_transaksi} selesai."]);
     }
@@ -583,6 +591,8 @@ class PesananOnlineIndex extends Component
                     'audience' => 'pelanggan',
                 ]
             );
+
+            $notif->sinkronkanStatusTransaksi($transaksi, 'batal');
         });
 
         $this->showBatalModal = false;

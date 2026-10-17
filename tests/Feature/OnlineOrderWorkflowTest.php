@@ -213,15 +213,19 @@ class OnlineOrderWorkflowTest extends TestCase
 
         $this->actingAs($this->pelanggan, 'customer');
 
+        // [T-05] `bayarPesanan()` simulasi sudah DIHAPUS — pembayaran kini alur
+        // nyata Duitku (POST /api/payment/create + redirect payment_url); status
+        // lunas/stok/jurnal hanya diproses webhook PAY-02. Halaman akun cukup
+        // menampilkan order dengan status menunggu_pembayaran + tombol "Bayar Sekarang".
         Livewire::test(CustomerAccount::class)
             ->assertSee($transaksi->no_transaksi)
-            ->call('bayarPesanan', $transaksi->id)
-            ->assertDispatched('alert');
+            ->assertSee('Bayar Sekarang')
+            ->assertDontSee('Simulasi');
 
         $transaksi->refresh();
-        $this->assertEquals('lunas', $transaksi->status);
+        $this->assertEquals('menunggu_pembayaran', $transaksi->status);
 
-        // Konsumen melihat notifikasi dan dapat menandainya terbaca
+        // Konsumen melihat notifikasi (dibuat OrderService saat order dibuat) dan dapat menandainya terbaca
         $notif = NotifikasiKeluar::forPelanggan($this->pelanggan->id)->first();
         $this->assertNotNull($notif);
 

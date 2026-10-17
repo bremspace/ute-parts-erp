@@ -43,6 +43,7 @@ use App\Modules\Wms\Livewire\WmsDashboard;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Workflow\Livewire\ApprovalInbox;
 use App\Modules\Workflow\Services\ApprovalService;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -271,15 +272,21 @@ if (class_exists(BookingServis::class)) {
 }
 
 // ===== [API: PAY-02] Webhook Duitku — path tanpa prefix /api (PRD §5) =====
-// Duitku menembak POST /webhook/duitku dengan json body — bebaskan dari CSRF.
+// Duitku menembak POST /webhook/duitku dengan x-www-form-urlencoded — bebaskan dari CSRF.
 Route::post('/webhook/duitku', [PaymentController::class, 'webhook'])
     ->middleware('throttle:60,1')
-    ->withoutMiddleware(ValidateCsrfToken::class);
+    ->withoutMiddleware([ValidateCsrfToken::class, PreventRequestForgery::class]);
+
+// ===== Endpoint Pembayaran Duitku (Web Session / AJAX) =====
+// Didaftarkan di web.php agar berjalan di bawah session web/customer tanpa kendala Sanctum domain mismatch.
+Route::get('/api/payment/methods', [PaymentController::class, 'paymentMethods']);
+Route::post('/api/payment/create', [PaymentController::class, 'create'])->middleware('auth:customer');
+Route::post('/api/payment/check-status', [PaymentController::class, 'checkStatus']);
 
 // ===== [API: OMNI-05] Webhook channel marketplace (publik) =====
 Route::post('/webhook/channel/{channelId}', [OmnichannelController::class, 'webhook'])
     ->middleware('throttle:120,1')
-    ->withoutMiddleware(ValidateCsrfToken::class);
+    ->withoutMiddleware([ValidateCsrfToken::class, PreventRequestForgery::class]);
 
 // Auth + akun pelanggan
 Route::get('/login-pelanggan', fn () => view('auth.customer-login'))->name('customer.login');

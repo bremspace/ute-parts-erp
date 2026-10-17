@@ -215,6 +215,8 @@ class PembayaranPesananOnlineService
                 );
             }
 
+            $notif->sinkronkanStatusTransaksi($transaksi, 'lunas');
+
             return ['transaksi' => $transaksi, 'kembalian' => $kembalian];
         });
     }
@@ -308,6 +310,8 @@ class PembayaranPesananOnlineService
                 ]
             );
         }
+
+        $notif->sinkronkanStatusTransaksi($transaksi, 'selesai');
     }
 
     /** Deteksi sumber order online — selaraskan filter index: marketplace / channel:* . */

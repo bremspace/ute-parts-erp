@@ -2,17 +2,10 @@
 
 namespace App\Modules\Marketplace\Livewire;
 
-use App\Modules\Akunting\Services\JurnalService;
-use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\TierMembership;
-use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
-use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
-use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Servis\Models\TiketServis;
-use App\Modules\Wms\Services\StokDeductionService;
-use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 /**
@@ -22,6 +15,14 @@ use Livewire\Component;
 class CustomerAccount extends Component
 {
     public string $activeTab = 'orders'; // orders, servis, notifikasi, komisi, membership
+
+    public function mount(): void
+    {
+        $tab = request()->query('tab');
+        if ($tab && in_array($tab, ['orders', 'servis', 'notifikasi', 'komisi', 'membership'], true)) {
+            $this->activeTab = $tab;
+        }
+    }
 
     public function getOrdersProperty()
     {
@@ -44,6 +45,26 @@ class CustomerAccount extends Component
             return collect();
         }
 
+        // Auto-resolve notifikasi menunggu pembayaran untuk pesanan yang sudah lunas/selesai
+        $unreadOrdersNotif = NotifikasiKeluar::forPelanggan($customer->id)
+            ->whereNull('read_at')
+            ->whereNotNull('payload->transaksi_id')
+            ->get();
+
+        foreach ($unreadOrdersNotif as $notif) {
+            $transaksiId = $notif->payload['transaksi_id'] ?? null;
+            if ($transaksiId) {
+                $transaksi = Transaksi::find($transaksiId);
+                if ($transaksi && in_array($transaksi->status, ['lunas', 'diproses', 'dikirim', 'siap_diambil', 'selesai', 'batal'], true)) {
+                    $judul = strtolower($notif->judul ?? '');
+                    $konten = strtolower($notif->konten ?? '');
+                    if (str_contains($judul, 'pesanan berhasil didaftarkan') || str_contains($konten, 'selesaikan pembayaran')) {
+                        $notif->update(['read_at' => now()]);
+                    }
+                }
+            }
+        }
+
         return NotifikasiKeluar::forPelanggan($customer->id)
             ->latest()
             ->limit(20)
@@ -59,126 +80,15 @@ class CustomerAccount extends Component
     }
 
     /**
-     * Bayar pesanan online langsung (simulasi / konfirmasi pembayaran).
+     * [T-05] Metode `bayarPesanan()` simulasi (status lunas + stok + jurnal
+     * langsung dari frontend) DIHAPUS — pembayaran kini alur nyata Duitku:
+     *   1. UI (Alpine) ambil daftar metode  → GET  /api/payment/methods?amount=...
+     *   2. Konfirmasi metode                 → POST /api/payment/create
+     *   3. Redirect browser ke `payment_url` (halaman checkout Duitku).
+     * Konfirmasi lunas, potong stok, jurnal, komisi & notifikasi semuanya
+     * diproses oleh webhook PAY-02 (`PaymentController::webhook`) — tidak ada
+     * lagi penulisan status dari sisi frontend.
      */
-    public function bayarPesanan(int $id): void
-    {
-        $customer = auth('customer')->user();
-        if (! $customer) {
-            return;
-        }
-
-        $transaksi = Transaksi::with(['items.produk', 'pelanggan', 'cabang'])
-            ->where('pelanggan_id', $customer->id)
-            ->where('id', $id)
-            ->firstOrFail();
-
-        if ($transaksi->status !== 'menunggu_pembayaran') {
-            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pesanan ini sudah bukan status menunggu pembayaran.']);
-
-            return;
-        }
-
-        DB::transaction(function () use ($transaksi, $customer) {
-            $transaksi->update([
-                'status' => 'lunas',
-                'metode_bayar' => 'duitku_gateway',
-                'jumlah_bayar' => (float) $transaksi->total_akhir,
-                'paid_at' => now(),
-            ]);
-
-            // Potong stok produk
-            $stokDeduction = app(StokDeductionService::class);
-            $cabangId = $transaksi->cabang_id ?: Cabang::firstOrFail()->id;
-
-            foreach ($transaksi->items as $item) {
-                $stokDeduction->kurangiDariGudangTersedia(
-                    $item->produk_id,
-                    $item->sku_variant_id,
-                    (int) $item->jumlah,
-                    $cabangId,
-                    'penjualan',
-                    Transaksi::class,
-                    $transaksi->id,
-                    null,
-                    "Order online consumer {$transaksi->no_transaksi}"
-                );
-            }
-
-            // Jurnal akuntansi
-            $jurnalService = app(JurnalService::class);
-            $pajakService = app(PajakService::class);
-
-            $totalAkhir = (float) $transaksi->total_akhir;
-            $ppnNominal = max(0.0, (float) ($transaksi->ppn_nominal ?? 0));
-            $dpp = $ppnNominal > 0 ? round($totalAkhir - $ppnNominal, 2) : $totalAkhir;
-            $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
-
-            $lines = [
-                ['akun_kode' => '120-02', 'debit' => $totalAkhir, 'kredit' => 0],
-                ['akun_kode' => '410-03', 'debit' => 0, 'kredit' => $dpp],
-            ];
-            foreach ($pajakService->jurnalLines($ppnNominal, $noJurnal, (int) $cabangId, 0) as $ppnLine) {
-                $lines[] = $ppnLine;
-            }
-
-            $totalHpp = (float) $transaksi->items->sum(fn ($i) => (float) $i->hpp * (int) $i->jumlah);
-            if ($totalHpp > 0) {
-                $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
-                $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
-            }
-
-            $jurnalService->post(
-                $noJurnal,
-                now(),
-                'pos',
-                $lines,
-                "Jurnal order online {$transaksi->no_transaksi} (lunas)",
-                $cabangId,
-                null,
-                Transaksi::class,
-                $transaksi->id
-            );
-
-            // Integrasi CRM: loyalty points
-            app(PelangganService::class)->tambahBelanjaDanPoin($customer->id, $totalAkhir);
-
-            // Notifikasi ke Backoffice (Staf Gudang & Kasir)
-            $notif = app(NotificationService::class);
-            $notif->kirim(
-                'inapp',
-                null,
-                "Pembayaran Pesanan {$transaksi->no_transaksi} Diterima",
-                "Pesanan online {$transaksi->no_transaksi} dari {$customer->nama} senilai Rp ".number_format($totalAkhir, 0, ',', '.').' telah lunas. Segera kemas dan siapkan suku cadang.',
-                [
-                    'transaksi_id' => $transaksi->id,
-                    'cabang_id' => $cabangId,
-                    'target_role' => 'staff-gudang',
-                    'kategori' => 'transaksi',
-                    'sumber' => 'marketplace',
-                    'action_url' => '/app/pos/online-orders',
-                    'audience' => 'staf',
-                ]
-            );
-
-            // Notifikasi in-app ke Konsumen
-            $notif->kirim(
-                'inapp',
-                $customer->email,
-                'Pembayaran Berhasil',
-                "Pembayaran untuk pesanan {$transaksi->no_transaksi} berhasil diterima. Tim toko kami segera memproses pesanan Anda.",
-                [
-                    'transaksi_id' => $transaksi->id,
-                    'pelanggan_id' => $customer->id,
-                    'kategori' => 'transaksi',
-                    'action_url' => '/account',
-                    'audience' => 'pelanggan',
-                ]
-            );
-        });
-
-        $this->dispatch('alert', ['type' => 'success', 'message' => "Pembayaran pesanan {$transaksi->no_transaksi} berhasil."]);
-    }
 
     /**
      * Batalkan pesanan oleh konsumen jika belum dibayar.

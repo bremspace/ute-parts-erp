@@ -3,6 +3,26 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-17 — Optimasi Integrasi Duitku (HMAC-SHA256, endpoint docs baru, rekonsiliasi) ✅
+
+- **[T-01] `DuitkuService` rewrite sesuai docs.duitku.com (30 Sep 2026):**
+  - Endpoint baru: `POST /v2/inquiry` (createTransaction), `POST /paymentmethod/getpaymentmethod` (getPaymentMethods), `POST /transactionStatus` (method baru `transactionStatus($merchantOrderId)` → status `sukses|pending|batal|unknown|error`).
+  - Signature **HMAC-SHA256**: inquiry `merchantCode+merchantOrderId+paymentAmount`, methods `merchantCode+paymentAmount+datetime`, status `merchantCode+merchantOrderId`, callback `merchantCode+amount+merchantOrderId`.
+  - Config baru `duitku.signature_mode` (env `DUITKU_SIGNATURE_MODE`, default `dual`): `hmac` (HMAC saja), `md5` (MD5 legacy saja, rollback darurat), `dual` (outbound HMAC; verifikasi callback menerima HMAC **atau** MD5 via `hash_equals`).
+  - Parsing response robust: terima `statusCode` ATAU `responseCode` === '00', key case-insensitive; `Http::timeout(20)->retry(2, 1000)` (inquiry aman karena merchantOrderId idempotent); payload `array_field` (buang null) + `customerVaName` ≤20 char, `productDetails` ≤255 char.
+  - Base URL produksi default diperbaiki ke `https://passport.duitku.com/webapi/api/merchant` (docs resmi; sebelumnya `api.duitku.com`).
+- **[T-02] Webhook PAY-02 (`PaymentController`):**
+  - Verifikasi dual HMAC+MD5 (mode via config), `reference` callback disimpan ke `transaksi.payment_reference` bila kosong/beda (saat prosesLunas).
+  - Log sanitasi: hanya `merchantOrderId, resultCode, amount` (signature/raw payload penuh tidak lagi di-log).
+  - `metode_bayar='duitku'` diseragamkan di processor (TODO ditinggalkan untuk `CustomerAccount::bayarPesanan` yang masih `duitku_gateway` — lane designer/T-05).
+  - Guard STATUS_FINAL, `lockForUpdate`, toleransi Rp1, pesan error Indonesia, HTTP 200 kasus rekonsiliasi manual — TIDAK berubah.
+- **[T-03] Service bersama + commands:**
+  - `DuitkuPaymentProcessor` (baru): ekstraksi utuh `prosesLunas`/`prosesGagal`/`pisahDppPpn` dari controller (logika jurnal/stok/komisi tidak diubah) + `prosesKadaluarsa`; dipakai bersama webhook & rekon (tidak ada duplikasi jurnal).
+  - `duitku:health` — cek kredensial+signature live via getpaymentmethod amount 10.000.
+  - `duitku:rekon` — scan `menunggu_pembayaran` lewat `expiryPeriod`: `transactionStatus` 00 → `prosesLunas` (jalur sama webhook, idempoten); 02/01+lewat expiry/belum pernah invoice → `kadaluarsa`; error jaringan → skip. Terjadwal harian 04:00 (`bootstrap/app.php`, `withoutOverlapping()`). Notifikasi tetap via queue.
+- **[T-04] Tests:** baru `DuitkuServiceTest` (13 test, `Http::fake`: endpoint `/v2/inquiry` + known-vector HMAC, parse `responseCode` legacy, mapping status 00/01/02/99, network error → `error`, mode hmac/md5/dual). `DuitkuWebhookTest` +3: HMAC diterima (dual), MD5 lama tetap diterima (dual), MD5 ditolak saat mode `hmac`.
+- **[T-06]** `.env.example`: `DUITKU_SIGNATURE_MODE=dual` + komentar callback URL (dokumentasi saja; webhook tetap `url('/webhook/duitku')`) + URL produksi passport.duitku.com.
+
 ## 2026-10-17 — Integrasi Pembayaran Pesanan Online di Kasir POS + Auto-Refresh Notifikasi ✅
 
 - **Lookup & Pembayaran "Bayar di Toko" di Layar Kasir POS (`/app/pos`):**

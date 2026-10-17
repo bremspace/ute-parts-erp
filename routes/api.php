@@ -235,8 +235,11 @@ Route::middleware(['throttle:60,1'])->group(function () {
 
         // [API: PAY-01] Buat transaksi Duitku
         Route::post('/payment/create', [PaymentController::class, 'create']);
-        Route::get('/payment/methods', [PaymentController::class, 'paymentMethods']);
     });
+
+    // Payment methods & check status publik (bisa diakses tanpa auth token)
+    Route::get('/payment/methods', [PaymentController::class, 'paymentMethods']);
+    Route::post('/payment/check-status', [PaymentController::class, 'checkStatus']);
 
     // ===== [API: PAY-02] Webhook Duitku — lihat routes/web.php (path tanpa prefix /api) =====
     // ===== [API: OMNI-05] Webhook channel — lihat routes/web.php =====

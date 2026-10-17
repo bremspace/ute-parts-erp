@@ -29,8 +29,14 @@ class SecurityHeaders
         $response->headers->set('Content-Security-Policy', $csp);
 
         // HTTP Strict Transport Security (HSTS)
-        // Only apply in production with HTTPS
-        if ($request->isSecure() || config('app.force_https')) {
+        // JANGAN aktifkan HSTS untuk IP address (self-signed cert membuat browser stuck di HTTPS dicoret)
+        $host = $request->getHost();
+        $isIp = filter_var($host, FILTER_VALIDATE_IP) !== false;
+
+        if ($isIp) {
+            // Bersihkan memori HSTS browser jika sebelumnya pernah tercatat
+            $response->headers->set('Strict-Transport-Security', 'max-age=0');
+        } elseif ($request->isSecure() && config('app.force_https')) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
         }
 
