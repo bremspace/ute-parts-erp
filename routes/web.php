@@ -23,6 +23,7 @@ use App\Modules\Marketplace\Livewire\CustomerAccount;
 use App\Modules\Marketplace\Livewire\ShopPage;
 use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter;
+use App\Modules\Pos\Livewire\PesananOnlineIndex;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Livewire\RiwayatTransaksiIndex;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
@@ -504,6 +505,11 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
     Route::get('/pos/riwayat', RiwayatTransaksiIndex::class)
         ->name('pos.riwayat')
         ->middleware('permission:pos.view|pos.view-own|servis.view');
+
+    // Pesanan Online (Fulfillment Marketplace Storefront)
+    Route::get('/pos/online-orders', PesananOnlineIndex::class)
+        ->name('pos.online-orders')
+        ->middleware('permission:pos.view|pos.view-own');
 
     // WMS Gudang & Stok Screen — [F2-2] RBAC: permission wms.view (pola servis.view/crm.view)
     Route::get('/wms', WmsDashboard::class)

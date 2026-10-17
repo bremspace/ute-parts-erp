@@ -86,8 +86,10 @@ class DuitkuWebhookTest extends TestCase
             'duitku.sandbox' => true,
         ]);
 
-        // COA minimal
-        AkunCOA::create(['kode' => '110-01', 'nama' => 'Kas', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit']);
+        // COA minimal — jurnal webhook Duitku: D 120-02 Kliring Duitku / C 410-03 Pendapatan Web
+        // (akun standar ini sudah ter-seed migrasi COA — pakai firstOrCreate)
+        AkunCOA::firstOrCreate(['kode' => '120-02'], ['nama' => 'Kliring Duitku', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit']);
+        AkunCOA::firstOrCreate(['kode' => '410-03'], ['nama' => 'Pendapatan Web', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit']);
         AkunCOA::create(['kode' => '410-01', 'nama' => 'Pendapatan', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit']);
         AkunCOA::create(['kode' => '510-02', 'nama' => 'HPP', 'tipe' => 'beban', 'kelompok' => 'hpp', 'saldo_normal' => 'debit']);
         AkunCOA::create(['kode' => '130-01', 'nama' => 'Persediaan', 'tipe' => 'aset', 'kelompok' => 'persediaan', 'saldo_normal' => 'debit']);
@@ -140,10 +142,10 @@ class DuitkuWebhookTest extends TestCase
             'jumlah' => 9,
         ]);
 
-        // Jurnal dibuat (debit Kas = kredit Pendapatan)
+        // Jurnal dibuat (debit 120-02 Kliring Duitku = kredit 410-03 Pendapatan Web)
         $this->assertDatabaseHas('jurnal_akuntansi', [
             'referensi_tipe' => Transaksi::class,
-            'akun_coa_id' => AkunCOA::where('kode', '110-01')->first()->id,
+            'akun_coa_id' => AkunCOA::where('kode', '120-02')->first()->id,
             'debit' => 100000,
         ]);
 

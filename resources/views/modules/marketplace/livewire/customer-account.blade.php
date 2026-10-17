@@ -47,9 +47,11 @@
         <!-- Tabs -->
         <div class="flex items-center gap-2 mb-5 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
             @php
+                $unreadNotifCount = $notifikasi->whereNull('read_at')->count();
                 $tabList = [
                     'orders' => 'Pesanan',
                     'servis' => 'Tracking Servis',
+                    'notifikasi' => 'Pemberitahuan',
                     'membership' => 'Status Membership & Poin',
                 ];
                 if ($customer->is_reseller) {
@@ -57,7 +59,14 @@
                 }
             @endphp
             @foreach($tabList as $kode => $label)
-                <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/5' }}">{{ $label }}</button>
+                <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center gap-1.5 {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/5' }}">
+                    <span>{{ $label }}</span>
+                    @if($kode === 'notifikasi' && $unreadNotifCount > 0)
+                        <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-up-red text-white">
+                            {{ $unreadNotifCount }}
+                        </span>
+                    @endif
+                </button>
             @endforeach
         </div>
 
@@ -65,28 +74,136 @@
         @if($activeTab === 'orders')
             <div class="space-y-3">
                 @forelse($orders as $o)
-                    <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-5 shadow-sm">
-                        <div class="flex items-center justify-between">
+                    <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-5 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between flex-wrap gap-2">
                             <div>
                                 <span class="font-mono text-up-primary font-bold text-sm">{{ $o->no_transaksi }}</span>
                                 <span class="text-xs text-ink-400 ml-2">{{ $o->created_at->format('d/m/Y H:i') }}</span>
                             </div>
                             <x-prism.status-pill :status="$o->status" />
                         </div>
-                        <div class="mt-3 flex flex-wrap gap-1.5">
+
+                        <!-- Status Details & Tracking Banner -->
+                        @if($o->status === 'menunggu_pembayaran')
+                            <div class="p-3.5 rounded-2xl bg-up-amber/10 border border-up-amber/20 text-xs text-ink-700 dark:text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div>
+                                    <p class="font-bold text-up-amber flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-up-amber animate-pulse"></span>
+                                        <span>Menunggu Pembayaran</span>
+                                    </p>
+                                    <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">Selesaikan pembayaran agar barang segera disiapkan oleh tim gudang.</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        wire:click="bayarPesanan({{ $o->id }})"
+                                        class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-up-primary hover:bg-indigo-600 shadow-sm transition-colors cursor-pointer"
+                                    >
+                                        Bayar Sekarang (Simulasi)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="batalkanPesanan({{ $o->id }})"
+                                        wire:confirm="Batalkan pesanan ini?"
+                                        class="px-2.5 py-1.5 rounded-xl text-xs font-bold text-ink-500 hover:text-up-red transition-colors cursor-pointer"
+                                    >
+                                        Batal
+                                    </button>
+                                </div>
+                            </div>
+                        @elseif($o->status === 'lunas')
+                            <div class="p-3 rounded-2xl bg-up-primary/10 border border-up-primary/20 text-xs text-ink-700 dark:text-indigo-200 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                                <span>Pembayaran Terverifikasi — Menunggu giliran pengemasan di toko.</span>
+                            </div>
+                        @elseif($o->status === 'diproses')
+                            <div class="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-ink-700 dark:text-indigo-200 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                                <span>Sedang Dikemas — Tim staf kami sedang menyiapkan suku cadang Anda.</span>
+                            </div>
+                        @elseif($o->status === 'dikirim')
+                            <div class="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-xs text-ink-700 dark:text-sky-200 space-y-1">
+                                <div class="font-bold text-sky-400 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                    <span>Paket Sedang Dikirim via {{ $o->pengiriman?->kurir ?? 'Ekspedisi' }}</span>
+                                </div>
+                                <p class="text-[11px] text-ink-600 dark:text-ink-300">
+                                    Nomor Resi: <strong class="font-mono text-up-primary">{{ $o->pengiriman?->tracking_id ?: 'Dalam penjemputan kurir' }}</strong>
+                                </p>
+                            </div>
+                        @elseif($o->status === 'siap_diambil')
+                            <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-xs text-ink-700 dark:text-emerald-200 space-y-1">
+                                <div class="font-bold text-up-mint flex items-center gap-1.5">
+                                    <span>🏬</span>
+                                    <span>Siap Diambil di Konter Toko</span>
+                                </div>
+                                <p class="text-[11px] text-ink-600 dark:text-ink-300">
+                                    Suku cadang sudah siap diambil di cabang <strong>{{ $o->cabang?->nama }}</strong>. Tunjukkan nomor pesanan ini ke kasir.
+                                </p>
+                            </div>
+                        @elseif($o->status === 'selesai')
+                            <div class="p-3 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-xs text-ink-700 dark:text-emerald-200 flex items-center gap-2">
+                                <span class="text-up-mint font-bold">✓</span>
+                                <span>Pesanan Selesai. Terima kasih telah berbelanja di Ute Parts!</span>
+                            </div>
+                        @elseif($o->status === 'batal')
+                            <div class="p-3 rounded-2xl bg-up-red/10 border border-up-red/20 text-xs text-up-red flex items-center gap-2">
+                                <span>✕</span>
+                                <span>Pesanan Telah Dibatalkan.</span>
+                            </div>
+                        @endif
+
+                        <div class="flex flex-wrap gap-1.5">
                             @foreach($o->items as $it)
                                 <span class="text-[11px] px-2.5 py-1 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 text-ink-600 dark:text-ink-300">{{ $it->produk?->nama }} ×{{ $it->jumlah }}</span>
                             @endforeach
                         </div>
-                        <div class="flex justify-between items-center mt-3 pt-3 border-t border-ink-100 dark:border-white/10">
-                            <span class="text-xs text-ink-500 dark:text-ink-400">{{ $o->cabang?->nama }}</span>
-                            <span class="font-black text-up-primary tabular-nums">Rp {{ number_format($o->total_akhir, 0, ',', '.') }}</span>
+
+                        <div class="flex justify-between items-center pt-3 border-t border-ink-100 dark:border-white/10 text-xs">
+                            <span class="text-ink-500 dark:text-ink-400">{{ $o->cabang?->nama }}</span>
+                            <span class="font-black text-up-primary tabular-nums text-sm">Rp {{ number_format($o->total_akhir, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 @empty
                     <div class="text-center py-14 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
                         <p class="font-semibold text-ink-700 dark:text-ink-300">Belum ada pesanan</p>
                         <a href="{{ route('shop') }}" class="inline-block mt-4 px-5 py-2.5 rounded-2xl bg-up-primary text-white font-bold text-sm hover:bg-up-primary-dark transition-colors min-h-[44px]">Mulai Belanja</a>
+                    </div>
+                @endforelse
+            </div>
+        @endif
+
+        <!-- NOTIFIKASI KONSUMEN -->
+        @if($activeTab === 'notifikasi')
+            <div class="space-y-3">
+                @forelse($notifikasi as $notif)
+                    <div
+                        wire:click="markNotifikasiRead({{ $notif->id }})"
+                        class="bg-white dark:bg-ink-900 rounded-3xl border transition-all duration-150 p-4 sm:p-5 shadow-sm cursor-pointer {{ is_null($notif->read_at) ? 'border-up-primary/40 bg-up-primary/[0.02]' : 'border-ink-100 dark:border-white/10 opacity-75' }}"
+                    >
+                        <div class="flex items-start gap-3">
+                            <div class="p-2 rounded-xl flex-shrink-0 {{ is_null($notif->read_at) ? 'bg-up-primary/10 text-up-primary' : 'bg-black/5 dark:bg-white/5 text-ink-400' }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-2 mb-1">
+                                    <h4 class="text-xs font-bold text-ink-900 dark:text-white truncate">{{ $notif->judul }}</h4>
+                                    <span class="text-[10px] text-ink-400 font-mono">{{ $notif->created_at?->diffForHumans() }}</span>
+                                </div>
+                                <p class="text-xs text-ink-600 dark:text-ink-300 leading-relaxed">{{ $notif->konten }}</p>
+                                @if(is_null($notif->read_at))
+                                    <div class="mt-2 flex items-center gap-1 text-[10px] text-up-primary font-bold">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-up-primary animate-pulse"></span>
+                                        <span>Baru</span>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @empty
+                    <div class="text-center py-14 bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 shadow-sm">
+                        <p class="font-semibold text-ink-700 dark:text-ink-300">Belum ada pemberitahuan</p>
+                        <p class="text-xs text-ink-400 mt-1">Status pesanan dan servis Anda akan ditampilkan di sini.</p>
                     </div>
                 @endforelse
             </div>

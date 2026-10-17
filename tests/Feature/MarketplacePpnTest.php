@@ -18,14 +18,15 @@ use Tests\TestCase;
 
 /**
  * B-14 — PPN marketplace harus sama dgn POS (sebelumnya journal order Duitku
- * membukukan SELURUH `total_akhir` ke pendapatan 410-01 tanpa memisah PPN ke
+ * membukukan SELURUH `total_akhir` ke pendapatan tanpa memisah PPN ke
  * akun pajak 220-01 → laporan penjualan marketplace ≠ POS + laporan pajak F1-2
  * under-reported).
  *
  * Kontrak yang diuji (identik `PosController::store()`):
  *   DPP   = subtotal - diskon
  *   PPN   = DPP × persen
- *   Total = DPP + PPN   →  debit 110-01 = total, kredit 410-01 = DPP, kredit 220-01 = PPN
+ *   Total = DPP + PPN   →  debit 120-02 (Kliring Duitku) = total,
+ *                          kredit 410-03 (Pendapatan Web) = DPP, kredit 220-01 = PPN
  *
  * Catatan: method wajib prefix test_ (PHPUnit 12 tidak deteksi @test docblock).
  */
@@ -43,7 +44,9 @@ class MarketplacePpnTest extends TestCase
 
         // COA minimal utk jurnal marketplace + PPN
         AkunCOA::firstOrCreate(['kode' => '110-01'], ['nama' => 'Kas', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit']);
+        AkunCOA::firstOrCreate(['kode' => '120-02'], ['nama' => 'Piutang / Kliring Duitku Gateway', 'tipe' => 'aset', 'kelompok' => 'piutang', 'saldo_normal' => 'debit']);
         AkunCOA::firstOrCreate(['kode' => '410-01'], ['nama' => 'Pendapatan Penjualan', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit']);
+        AkunCOA::firstOrCreate(['kode' => '410-03'], ['nama' => 'Pendapatan Penjualan Web Marketplace Ute', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit']);
         AkunCOA::firstOrCreate(['kode' => '510-02'], ['nama' => 'HPP', 'tipe' => 'beban', 'kelompok' => 'hpp', 'saldo_normal' => 'debit']);
         AkunCOA::firstOrCreate(['kode' => '130-01'], ['nama' => 'Persediaan', 'tipe' => 'aset', 'kelompok' => 'persediaan', 'saldo_normal' => 'debit']);
         AkunCOA::firstOrCreate(['kode' => '220-01'], ['nama' => 'PPN Keluaran', 'tipe' => 'kewajiban', 'kelompok' => 'pajak', 'saldo_normal' => 'kredit']);
@@ -178,12 +181,12 @@ class MarketplacePpnTest extends TestCase
             round((float) $jurnal->sum('kredit'), 2)
         );
 
-        // Nominal per akun
+        // Nominal per akun (web jurnal ke kliring gateway 120-02 / pendapatan web 410-03)
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'akun_coa_id' => $this->akunId('110-01'), 'debit' => 1110000, 'kredit' => 0,
+            'akun_coa_id' => $this->akunId('120-02'), 'debit' => 1110000, 'kredit' => 0,
         ]);
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'akun_coa_id' => $this->akunId('410-01'), 'debit' => 0, 'kredit' => 1000000,
+            'akun_coa_id' => $this->akunId('410-03'), 'debit' => 0, 'kredit' => 1000000,
         ]);
         $this->assertDatabaseHas('jurnal_akuntansi', [
             'akun_coa_id' => $this->akunId('220-01'), 'debit' => 0, 'kredit' => 110000,
@@ -209,8 +212,8 @@ class MarketplacePpnTest extends TestCase
             ->value('saldo');
         $this->assertEquals(110000, $saldoPpn);
 
-        // Pendapatan (410-01) hanya DPP — BUKAN total incl. PPN
-        $saldoPendapatan = (float) JurnalAkuntansi::where('akun_coa_id', $this->akunId('410-01'))
+        // Pendapatan web (410-03) hanya DPP — BUKAN total incl. PPN
+        $saldoPendapatan = (float) JurnalAkuntansi::where('akun_coa_id', $this->akunId('410-03'))
             ->selectRaw('COALESCE(SUM(kredit),0) - COALESCE(SUM(debit),0) as saldo')
             ->value('saldo');
         $this->assertEquals(1000000, $saldoPendapatan);
@@ -250,10 +253,10 @@ class MarketplacePpnTest extends TestCase
         );
 
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'akun_coa_id' => $this->akunId('110-01'), 'debit' => 1000000, 'kredit' => 0,
+            'akun_coa_id' => $this->akunId('120-02'), 'debit' => 1000000, 'kredit' => 0,
         ]);
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'akun_coa_id' => $this->akunId('410-01'), 'debit' => 0, 'kredit' => 1000000,
+            'akun_coa_id' => $this->akunId('410-03'), 'debit' => 0, 'kredit' => 1000000,
         ]);
         $this->assertDatabaseMissing('jurnal_akuntansi', [
             'akun_coa_id' => $this->akunId('220-01'),
@@ -277,7 +280,7 @@ class MarketplacePpnTest extends TestCase
             'akun_coa_id' => $this->akunId('220-01'),
         ]);
         $this->assertDatabaseHas('jurnal_akuntansi', [
-            'akun_coa_id' => $this->akunId('410-01'), 'debit' => 0, 'kredit' => 1000000,
+            'akun_coa_id' => $this->akunId('410-03'), 'debit' => 0, 'kredit' => 1000000,
         ]);
         $jurnal = JurnalAkuntansi::all();
         $this->assertEquals(

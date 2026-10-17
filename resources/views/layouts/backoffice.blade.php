@@ -170,6 +170,21 @@
                                 <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pos') ? 'bg-white' : 'bg-up-mint/70' }}"></span>
                                 <span>Kasir POS (F2)</span>
                             </a>
+
+                            <a href="/app/pos/online-orders" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pos/online-orders*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pos/online-orders*') ? 'bg-white' : 'bg-sky-400' }}"></span>
+                                    <span>Pesanan Online</span>
+                                </div>
+                                @php
+                                    $pendingOnlineCount = \App\Modules\Pos\Models\Transaksi::where('sumber', 'marketplace')->whereIn('status', ['lunas', 'menunggu_pembayaran'])->when(session('cabang_id'), fn($q, $cid) => $q->where('cabang_id', $cid))->count();
+                                @endphp
+                                @if($pendingOnlineCount > 0)
+                                    <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                                        {{ $pendingOnlineCount }}
+                                    </span>
+                                @endif
+                            </a>
                         @endcanany
 
                         @can('servis.view')
@@ -367,7 +382,7 @@
                             </svg>
                             <span class="sidebar-label">Approval</span>
                             @if($pendingApprovalCount > 0)
-                                <span class="sidebar-badge ml-auto text-[10px] font-semibold text-white bg-up-red px-1.5 py-0.5 rounded">{{ $pendingApprovalCount }}</span>
+                                <span class="sidebar-badge ml-auto text-[10px] font-extrabold text-white bg-up-red animate-pulse ring-2 ring-up-red/40 px-1.5 py-0.5 rounded">{{ $pendingApprovalCount }}</span>
                             @endif
                         </a>
                     </div>
@@ -516,6 +531,11 @@
                             </template>
                         </div>
                     </div>
+
+                    <!-- [2026] Pusat Notifikasi Aktif -->
+                    @auth
+                        @livewire(\App\Modules\Notifikasi\Livewire\NotificationCenter::class)
+                    @endauth
 
                     <!-- [T-32] Toggle tema: sun (gelap) / moon (terang) / monitor (auto) -->
                     <button type="button" x-data="themeManager()" @click="cycleTheme()"

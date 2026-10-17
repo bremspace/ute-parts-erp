@@ -5,6 +5,7 @@ namespace App\Modules\Omnichannel\Services;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Marketplace\Models\Pengiriman;
 use App\Modules\Omnichannel\Adapters\ShopeeAdapter;
 use App\Modules\Omnichannel\Contracts\ChannelAdapterInterface;
 use App\Modules\Omnichannel\Jobs\PushStockToChannelJob;
@@ -12,6 +13,7 @@ use App\Modules\Omnichannel\Models\Channel;
 use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\StokDeductionService;
@@ -324,16 +326,20 @@ class ChannelSyncService
                 'sumber' => 'channel:'.$channel->platform,
                 'subtotal' => $totalAmount,
                 'total_akhir' => $totalAmount,
-                'metode_bayar' => 'marketplace',
+                'metode_bayar' => $channel->platform ?: 'marketplace',
                 'status' => 'selesai',
+                'catatan' => "Order {$channel->nama} #{$channelOrder->channel_order_id}",
             ]
         );
+
+        $totalHpp = 0.0;
 
         foreach ($items as $item) {
             $itemId = $item['item_id'] ?? null;
             $modelId = $item['model_id'] ?? null;
             $itemSku = $item['item_sku'] ?? $item['model_sku'] ?? null;
             $qty = (int) ($item['model_quantity_purchased'] ?? $item['quantity_purchased'] ?? 1);
+            $itemPrice = (float) ($item['model_discounted_price'] ?? $item['item_price'] ?? 0);
 
             if ($qty <= 0) {
                 continue;
@@ -353,6 +359,24 @@ class ChannelSyncService
             }
 
             $mapping = $mappingQuery->first();
+            $hpp = 0.0;
+
+            if ($mapping && $mapping->produk) {
+                $hpp = (float) $mapping->produk->harga_beli;
+                $totalHpp += ($hpp * $qty);
+
+                TransaksiItem::create([
+                    'transaksi_id' => $transaksi->id,
+                    'produk_id' => $mapping->produk_id,
+                    'sku_variant_id' => $mapping->sku_variant_id,
+                    'jumlah' => $qty,
+                    'harga_satuan' => $itemPrice > 0 ? $itemPrice : (float) $mapping->produk->harga_jual,
+                    'diskon_nominal' => 0,
+                    'subtotal' => round(($itemPrice > 0 ? $itemPrice : (float) $mapping->produk->harga_jual) * $qty, 2),
+                    'hpp' => $hpp,
+                ]);
+            }
+
             if ($mapping && $mapping->gudang_id) {
                 try {
                     app(StokDeductionService::class)->kurangi(
@@ -373,12 +397,63 @@ class ChannelSyncService
             }
         }
 
+        // Buat record pengiriman jika ada tracking/kurir
+        $trackingNo = $payload['tracking_number'] ?? $payload['shipping_carrier_number'] ?? null;
+        $carrier = $payload['shipping_carrier'] ?? $channel->nama;
+        if ($trackingNo || $carrier) {
+            Pengiriman::firstOrCreate(
+                ['transaksi_id' => $transaksi->id],
+                [
+                    'kurir' => $carrier,
+                    'layanan' => 'Reguler',
+                    'ongkir' => (float) ($payload['actual_shipping_fee'] ?? 0),
+                    'asal_cabang' => $transaksi->cabang?->nama ?? 'Cabang',
+                    'nama_penerima' => $payload['recipient_address']['name'] ?? $payload['buyer_username'] ?? 'Konsumen Channel',
+                    'alamat_tujuan' => $payload['recipient_address']['full_address'] ?? '-',
+                    'telepon_tujuan' => $payload['recipient_address']['phone'] ?? '-',
+                    'tracking_id' => $trackingNo,
+                    'status' => 'dikirim',
+                ]
+            );
+        }
+
+        // Catat Jurnal Penjualan Omnichannel Terintegrasi
+        try {
+            $akunPiutangChannel = str_contains($channel->platform, 'shopee') ? '120-03' : '120-04';
+            $jurnalService = app(JurnalService::class);
+            $noJurnal = $jurnalService->generateNoJurnal('channel', $cabangId);
+
+            $lines = [
+                ['akun_kode' => $akunPiutangChannel, 'debit' => $totalAmount, 'kredit' => 0],
+                ['akun_kode' => '410-04', 'debit' => 0, 'kredit' => $totalAmount],
+            ];
+
+            if ($totalHpp > 0) {
+                $lines[] = ['akun_kode' => '510-02', 'debit' => $totalHpp, 'kredit' => 0];
+                $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalHpp];
+            }
+
+            $jurnalService->post(
+                $noJurnal,
+                now(),
+                'channel',
+                $lines,
+                "Jurnal penjualan {$channel->nama} #{$channelOrder->channel_order_id}",
+                $cabangId,
+                null,
+                Transaksi::class,
+                $transaksi->id
+            );
+        } catch (\Throwable $e) {
+            Log::warning("Jurnal penjualan channel gagal (order #{$channelOrder->id}): {$e->getMessage()}");
+        }
+
         $channelOrder->update(['transaksi_id' => $transaksi->id]);
     }
 
     /**
      * [T-26] Jurnal beban biaya admin marketplace saat ChannelOrder diproses (status selesai).
-     * Jurnal: Debit 520-06 "Beban Biaya Admin Marketplace" / Kredit 110-01 Kas.
+     * Jurnal: Debit 520-06 "Beban Biaya Admin Marketplace" / Kredit 120-03 (Shopee) atau 120-04 (Lainnya) Piutang Saldo Channel.
      */
     public function prosesBiayaAdmin(ChannelOrder $order): void
     {
@@ -394,13 +469,16 @@ class ChannelSyncService
             return;
         }
 
+        $channel = $order->channel;
+        $akunPiutangChannel = ($channel && str_contains($channel->platform, 'shopee')) ? '120-03' : '120-04';
+
         AkunCOA::firstOrCreate(
             ['kode' => '520-06'],
             ['nama' => 'Beban Biaya Admin Marketplace', 'tipe' => 'beban', 'kelompok' => 'biaya_marketplace', 'saldo_normal' => 'debit', 'is_active' => true]
         );
         AkunCOA::firstOrCreate(
-            ['kode' => '110-01'],
-            ['nama' => 'Kas', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit', 'is_active' => true]
+            ['kode' => $akunPiutangChannel],
+            ['nama' => 'Piutang / Saldo Channel Marketplace', 'tipe' => 'aset', 'kelompok' => 'piutang', 'saldo_normal' => 'debit', 'is_active' => true]
         );
 
         try {
@@ -411,7 +489,7 @@ class ChannelSyncService
                 'channel',
                 [
                     ['akun_kode' => '520-06', 'debit' => $biaya, 'kredit' => 0],
-                    ['akun_kode' => '110-01', 'debit' => 0, 'kredit' => $biaya],
+                    ['akun_kode' => $akunPiutangChannel, 'debit' => 0, 'kredit' => $biaya],
                 ],
                 'Biaya admin marketplace '.($order->channel?->nama ?? 'channel').' — order '.$order->channel_order_id,
                 $cabangId,

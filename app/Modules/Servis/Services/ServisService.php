@@ -86,16 +86,29 @@ class ServisService
                 $telepon,
                 'Unit Servis Diterima',
                 "Unit {$tiket->jenis_hp} ({$tiket->no_tiket}) telah kami terima. Pantau perbaikan Anda di: ".url("/tracking/{$tiket->token_approval}"),
-                ['tiket_id' => $tiket->id]
+                [
+                    'tiket_id' => $tiket->id,
+                    'pelanggan_id' => $tiket->pelanggan_id,
+                    'audience' => 'pelanggan',
+                ]
             );
         } else {
-            $this->notifService->kirim(
-                'inapp',
-                null,
-                'Unit Servis Diterima',
-                "Unit {$tiket->jenis_hp} ({$tiket->no_tiket}) telah diterima di cabang.",
-                ['tiket_id' => $tiket->id]
-            );
+            $pelangganId = $tiket->pelanggan_id ?? null;
+            if ($pelangganId) {
+                $this->notifService->kirim(
+                    'inapp',
+                    null,
+                    'Unit Servis Diterima',
+                    "Unit {$tiket->jenis_hp} ({$tiket->no_tiket}) telah diterima di cabang.",
+                    [
+                        'tiket_id' => $tiket->id,
+                        'pelanggan_id' => $pelangganId,
+                        'action_url' => '/account',
+                        'audience' => 'pelanggan',
+                        'kategori' => 'servis',
+                    ]
+                );
+            }
         }
 
         return $tiket;
@@ -141,7 +154,7 @@ class ServisService
             'inapp', null,
             'Servis Online Baru',
             "Booking servis dari {$tiket->nama_pelanggan} untuk {$tiket->jenis_hp} — menunggu konfirmasi diterima",
-            ['tiket_id' => $tiket->id]
+            ['tiket_id' => $tiket->id, 'audience' => 'staf']
         );
 
         return $tiket;
@@ -268,16 +281,31 @@ class ServisService
                 $telepon,
                 'Status Servis Diperbarui',
                 $pesanNotif,
-                ['tiket_id' => $tiket->id, 'status' => $statusBaru]
+                [
+                    'tiket_id' => $tiket->id,
+                    'status' => $statusBaru,
+                    'pelanggan_id' => $tiket->pelanggan_id,
+                    'audience' => 'pelanggan',
+                ]
             );
         } else {
-            $this->notifService->kirim(
-                'inapp',
-                null,
-                'Status Servis Diperbarui',
-                $pesanNotif,
-                ['tiket_id' => $tiket->id, 'status' => $statusBaru]
-            );
+            $pelangganId = $tiket->pelanggan_id ?? null;
+            if ($pelangganId) {
+                $this->notifService->kirim(
+                    'inapp',
+                    null,
+                    'Status Servis Diperbarui',
+                    $pesanNotif,
+                    [
+                        'tiket_id' => $tiket->id,
+                        'status' => $statusBaru,
+                        'pelanggan_id' => $pelangganId,
+                        'action_url' => '/account',
+                        'audience' => 'pelanggan',
+                        'kategori' => 'servis',
+                    ]
+                );
+            }
         }
 
         return $tiket;
@@ -420,16 +448,31 @@ class ServisService
                 $telepon,
                 'Estimasi Servis Perlu Approval',
                 $pesanEstimasi,
-                ['tiket_id' => $tiket->id, 'token' => $token]
+                [
+                    'tiket_id' => $tiket->id,
+                    'token' => $token,
+                    'pelanggan_id' => $tiket->pelanggan_id,
+                    'audience' => 'pelanggan',
+                ]
             );
         } else {
-            $this->notifService->kirim(
-                'inapp',
-                null,
-                'Estimasi Servis Perlu Approval',
-                $pesanEstimasi,
-                ['tiket_id' => $tiket->id, 'token' => $token]
-            );
+            $pelangganId = $tiket->pelanggan_id ?? null;
+            if ($pelangganId) {
+                $this->notifService->kirim(
+                    'inapp',
+                    null,
+                    'Estimasi Servis Perlu Approval',
+                    $pesanEstimasi,
+                    [
+                        'tiket_id' => $tiket->id,
+                        'token' => $token,
+                        'pelanggan_id' => $pelangganId,
+                        'action_url' => '/account',
+                        'audience' => 'pelanggan',
+                        'kategori' => 'servis',
+                    ]
+                );
+            }
         }
 
         return $tiket;

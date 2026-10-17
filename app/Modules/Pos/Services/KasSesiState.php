@@ -178,10 +178,20 @@ class KasSesiState
             return 0.0;
         }
 
+        // [DRAWER — OPSI A] Window memakai waktu BAYAR (paid_at) bila ada,
+        // fallback created_at: order online "bayar di toko" dibuat jauh sebelum
+        // sesi kas dibuka, sehingga window `created_at` semata membuat uang
+        // tunai pickup tidak pernah terhitung masuk laci. POS-native TIDAK
+        // pernah menulis paid_at (PosKasir hanya mengisi kasir_id) → COALESCE
+        // jatuh ke created_at → perilaku POS lama TIDAK berubah.
+        // Mekanisme tunggal: pembayaran pickup TIDAK membuat baris
+        // kas_mutasi_laci (lihat PembayaranPesananOnlineService — Opsi B
+        // ditolak karena sesi bersama user_id NULL tidak memfilter kasir_id,
+        // sehingga mutasi + agregasi akan dobel).
         $akumulasiQuery = DB::table('transaksi')
             ->where('cabang_id', $sesi->cabang_id)
             ->where('status', 'selesai')
-            ->where('created_at', '>=', $sesi->dibuka_at);
+            ->whereRaw('COALESCE(paid_at, created_at) >= ?', [$sesi->dibuka_at]);
 
         if ($sesi->user_id) {
             $akumulasiQuery->where('kasir_id', $sesi->user_id);

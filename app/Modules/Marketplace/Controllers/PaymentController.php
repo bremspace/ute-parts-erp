@@ -227,8 +227,8 @@ class PaymentController extends Controller
                 $noJurnal = $this->jurnalService->generateNoJurnal('pos', $cabangId);
 
                 $lines = [
-                    ['akun_kode' => '110-01', 'debit' => $totalAkhir, 'kredit' => 0],
-                    ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $dpp],
+                    ['akun_kode' => '120-02', 'debit' => $totalAkhir, 'kredit' => 0],
+                    ['akun_kode' => '410-03', 'debit' => 0, 'kredit' => $dpp],
                 ];
                 // PPN Keluaran → akun 220-01 (kontrak AC F1-2, baris dari PajakService)
                 foreach ($this->pajakService->jurnalLines($ppnNominal, $noJurnal, (int) $cabangId, 0) as $ppnLine) {
@@ -253,13 +253,51 @@ class PaymentController extends Controller
                 // d. Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing
                 $this->komisiService->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
 
-                // e. Notifikasi pelanggan (via queue)
+                // e. Notifikasi Backoffice & Pelanggan (via queue)
                 $this->notifService->kirim(
-                    'inapp', null,
-                    'Pembayaran Diterima',
-                    "Pesanan {$merchantOrderId} lunas — stok siap diproses. Terima kasih!",
-                    ['transaksi_id' => $transaksi->id]
+                    'inapp',
+                    null,
+                    "Pembayaran Pesanan {$merchantOrderId} Diterima",
+                    'Pesanan online '.$merchantOrderId.' lunas (Rp '.number_format($totalAkhir, 0, ',', '.').'). Segera siapkan dan kemas suku cadang.',
+                    [
+                        'transaksi_id' => $transaksi->id,
+                        'cabang_id' => $cabangId,
+                        'target_role' => 'staff-gudang',
+                        'kategori' => 'transaksi',
+                        'sumber' => 'marketplace',
+                        'action_url' => '/app/pos/online-orders',
+                        'audience' => 'staf',
+                    ]
                 );
+
+                $this->notifService->kirim(
+                    'inapp',
+                    $transaksi->pelanggan?->email,
+                    'Pembayaran Diterima',
+                    "Pembayaran pesanan {$merchantOrderId} berhasil. Tim Ute Parts sedang mempersiapkan paket Anda.",
+                    [
+                        'transaksi_id' => $transaksi->id,
+                        'pelanggan_id' => $transaksi->pelanggan_id,
+                        'kategori' => 'transaksi',
+                        'sumber' => 'marketplace',
+                        'action_url' => '/account',
+                        'audience' => 'pelanggan',
+                    ]
+                );
+
+                if ($transaksi->pelanggan?->telepon) {
+                    $this->notifService->kirim(
+                        'wa',
+                        $transaksi->pelanggan->telepon,
+                        'Pembayaran Pesanan Lunas',
+                        "Terima kasih {$transaksi->pelanggan->nama}! Pembayaran pesanan {$merchantOrderId} sebesar Rp ".number_format($totalAkhir, 0, ',', '.').' telah kami terima. Pesanan Anda segera dikemas & dikirim.',
+                        [
+                            'transaksi_id' => $transaksi->id,
+                            'pelanggan_id' => $transaksi->pelanggan_id,
+                            'audience' => 'pelanggan',
+                        ]
+                    );
+                }
 
                 // f. Integrasi CRM: update total belanja 12 bulan & poin loyalty pelanggan
                 if ($transaksi->pelanggan_id) {
@@ -377,12 +415,20 @@ class PaymentController extends Controller
                     'paid_at' => null,
                 ]);
 
-                $this->notifService->kirim(
-                    'inapp', null,
-                    'Pembayaran Gagal',
-                    "Pesanan {$merchantOrderId} gagal dibayar. Silakan coba kembali.",
-                    ['transaksi_id' => $transaksi->id]
-                );
+                if ($transaksi->pelanggan_id) {
+                    $this->notifService->kirim(
+                        'inapp', null,
+                        'Pembayaran Gagal',
+                        "Pesanan {$merchantOrderId} gagal dibayar. Silakan coba kembali.",
+                        [
+                            'transaksi_id' => $transaksi->id,
+                            'pelanggan_id' => $transaksi->pelanggan_id,
+                            'kategori' => 'transaksi',
+                            'action_url' => '/account',
+                            'audience' => 'pelanggan',
+                        ]
+                    );
+                }
 
                 return ['kode' => 'sukses'];
             });

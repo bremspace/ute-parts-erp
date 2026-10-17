@@ -341,8 +341,8 @@ class MarketplaceNplus1Test extends TestCase
         $i = 7;
         Livewire::test(ShopPage::class)
             ->assertOk()
-            // Blade lama: "N tersedia" per kartu
-            ->assertSee($this->totalManual($i).' tersedia')
+            // Blade kini: "N stok" per kartu
+            ->assertSee($this->totalManual($i).' stok')
             // Dropdown merk & model (escape=false: yang dibandingkan atribut HTML)
             ->assertSee('value="Samsung"', false)
             ->assertSee('value="Galaxy A50"', false);
@@ -601,7 +601,8 @@ class MarketplaceNplus1Test extends TestCase
 
         Livewire::test(ShopPage::class, ['slug' => 'part-b15a-'.$i])
             ->assertOk()
-            ->assertSee('Varian 0 <span class="opacity-60">('.$stokVarian0.')</span>', false)
+            ->assertSee('<span>Varian 0</span>', false)
+            ->assertSee('opacity-60 tabular-nums">('.$stokVarian0.')</span>', false)
             ->assertSee($this->totalManual($i).' unit tersedia');
     }
 

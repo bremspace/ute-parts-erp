@@ -18,6 +18,12 @@ class CartCheckout extends Component
 
     public string $catatan = '';
 
+    public string $namaPenerima = '';
+
+    public string $teleponPenerima = '';
+
+    public string $alamatPengiriman = '';
+
     public ?string $orderNo = null;
 
     public ?float $orderTotal = null;
@@ -30,6 +36,13 @@ class CartCheckout extends Component
         $this->mode = request()->is('checkout') ? 'checkout' : 'cart';
         if (! $this->selectedCabangId) {
             $this->selectedCabangId = Cabang::where('is_active', true)->first()?->id;
+        }
+
+        $customer = auth('customer')->user();
+        if ($customer) {
+            $this->namaPenerima = $customer->nama ?? '';
+            $this->teleponPenerima = $customer->telepon ?? '';
+            $this->alamatPengiriman = $customer->alamat ?? '';
         }
     }
 
@@ -90,6 +103,9 @@ class CartCheckout extends Component
         $this->validate([
             'selectedCabangId' => 'required|exists:cabang,id',
             'metodeAmbil' => 'required|in:ambil_ke_toko,pengiriman',
+            'namaPenerima' => 'nullable|string|max:100',
+            'teleponPenerima' => 'nullable|string|max:20',
+            'alamatPengiriman' => 'nullable|string',
         ]);
 
         $items = [];
@@ -102,12 +118,19 @@ class CartCheckout extends Component
         }
 
         try {
+            $shippingData = [
+                'nama_penerima' => $this->namaPenerima ?: $customer->nama,
+                'telepon_tujuan' => $this->teleponPenerima ?: $customer->telepon,
+                'alamat_tujuan' => $this->alamatPengiriman ?: $customer->alamat,
+            ];
+
             $order = app(OrderService::class)->buatOrder(
                 $customer,
                 $items,
                 $this->selectedCabangId,
                 $this->metodeAmbil,
-                $this->catatan
+                $this->catatan,
+                $shippingData
             );
 
             app(CartService::class)->kosongkan();

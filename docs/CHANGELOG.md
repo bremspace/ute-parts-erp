@@ -3,6 +3,91 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-17 — Integrasi Pembayaran Pesanan Online di Kasir POS + Auto-Refresh Notifikasi ✅
+
+- **Lookup & Pembayaran "Bayar di Toko" di Layar Kasir POS (`/app/pos`):**
+  - Tombol entry **"Pesanan Online"** (dengan badge jumlah order menunggu bayar pickup) di panel atas kasir, sejajar "Bayar Servis" (`PosKasir` + blade `pos-kasir`, blok `[POS-ONLINE-PICKUP]`).
+  - Modal dua tahap seperti Bayar Servis: daftar pencarian order pickup (`menunggu_pembayaran` + `sumber` marketplace/`channel:*` + `catatan` `ambil_ke_toko`, cari no. order/nama/telepon/resi/channel ID, limit 15, guard cabang/status server-side) → modal bayar dengan metode 💵 Tunai / 📱 QRIS / 🏦 Transfer, input nominal + quick-cash + kembalian otomatis, peringatan sesi kas belum dibuka.
+  - Eksekusi via service baru `PembayaranPesananOnlineService::bayarDiToko()` — satu-satunya jalur logika pembayaran (dipakai UI kasir dan `PesananOnlineIndex::prosesPickupKasir` cabang belum-lunas).
+- **Service Pembayaran Pesanan Online (`app/Modules/Pos/Services/PembayaranPesananOnlineService.php`):**
+  - Validasi ketat (status `menunggu_pembayaran`, deteksi pickup selaraskan index, whitelist metode tunai/qris/transfer/edc, tunai wajib sesi kas aktif bila cabang punya riwayat `kas_sesi`, nominal kurang ditolak), potong stok sekali via `StokDeductionService`, jurnal D `110-04` (tunai) / `110-02` (qris/transfer/edc) + C `410-03` DPP + PPN `220-01` + HPP `510-02`/`130-01`, update `status=selesai`/`paid_at`/**`kasir_id`**, poin loyalty, notifikasi konsumen inapp+WA ber-`audience pelanggan`.
+  - **Invariant drawer (OPSI A)**: `KasSesiState::hitungSaldoSistem()` window agregasi `created_at` → `COALESCE(paid_at, created_at)` — pembayaran tunai pickup kini terhitung **tepat satu kali** di saldo laci sesi kas (termasuk order yang dibuat jauh sebelum sesi dibuka); perilaku POS-native identik (kasir_id-only, tanpa `kas_mutasi_laci` ganda). `prosesPickupKasir` cabang handover (sudah lunas) tetap tanpa `kasir_id`.
+- **Auto-Refresh Notifikasi & Pesanan Online:**
+  - `pesanan-online-index.blade.php`: `wire:poll.10s` di root — list, metric cards, dan badge status kini ikut update saat webhook/aksi lain mengubah order (sebelumnya hanya via reload).
+  - `NotificationCenter::checkNewNotifications()`: watermark `lastKnownMaxId` dinaikkan ke max id **global** semua baris inapp baru (bukan hanya yang lolos scope) — baris lintas role/cabang tidak lagi di-scan ulang tiap poll 8 detik; dispatch `ute:notification-arrived` tetap hanya untuk baris ter-scope.
+  - Test baru: `PembayaranPesananOnlineServiceTest` (5), `NotificationAutoRefreshTest` (3), `PosKasirPesananOnlineIntegrationTest` (3 — E2E Livewire alur kasir).
+  - Perbaikan test basi `DuitkuWebhookTest`: seed & asersi jurnal webhook kini `120-02`/`410-03` (kontrak COA fase sebelumnya).
+- **Siklus Pickup Penuh Tanpa Menu Pesanan Online (Kelengkapan Kasir POS):**
+  - Lookup kasir kini mencakup status `menunggu_pembayaran` **dan** `lunas` (order sudah dibayar online, menunggu diambil) — badge tombol ikut menghitung keduanya.
+  - Ringkasan order lunas: label "✅ Sudah Lunas — menunggu serah terima" + metode & tanggal bayar; input metode/nominal disembunyikan; tombol aksi **"Serahkan Barang"** → `PosKasir::serahkanPesananOnline()` (guard server-side khusus `lunas` + cabang session + pickup + sumber online).
+  - Handover diekstrak ke `PembayaranPesananOnlineService::serahkanDiToko()` — single source of truth dipakai bersama `PesananOnlineIndex::prosesPickupKasir` (menerima `lunas|siap_diambil|diproses` sesuai tombol di index; tanpa `kasir_id`/stok/jurnal ganda). Notifikasi serah-terima konsumen (inapp+WA) via `kirimNotifikasiSerahTerima()` — dipanggil kedua jalur (kasir bayar+serah & index), tidak diduplikasi.
+  - **Struk bukti serah terima pickup** terbit otomatis di layar kasir setelah bayar/serah — memakai mekanisme receipt generik kasir yang sudah ada (`thermal-receipt-modal`: preview 58mm, cetak Web/BLE 58/80mm, kirim WA); baris BAYAR untuk order lunas dicetak "BAYAR (SUDAH DIBAYAR ONLINE)".
+- **Verifikasi**: 93/93 test lintas suite (PembayaranPesananOnlineService, OnlineOrderWorkflow, Notification* (3 suite), SmokeOnlineOrders, DuitkuWebhook, MutasiKasLaci, KasLaciApprovalFlow, KasSesiJurnalFailClosed, TransaksiPaidAt, PosStokSinkron, PosBayarServisIntegration, MarketplacePpn, OmnichannelShopeeIntegration) + Pint bersih + `npm run build` sukses.
+
+## 2026-10-16 — Alur Pesanan Online Marketplace & Notifikasi Terpadu Konsumen-Backoffice ✅
+
+- **Fulfillment & Backoffice Screen Pesanan Online (`/app/pos/online-orders`):**
+  - Komponen Livewire `PesananOnlineIndex` untuk staf toko/kasir dan gudang memproses seluruh siklus pesanan web konsumen.
+  - Lifecycle 5-tahap lengkap: `Menunggu Pembayaran` ➔ `Verifikasi Lunas (Siap Dikemas)` ➔ `Sedang Dikemas (Gudang)` ➔ `Pengiriman (Input Resi / Konter Toko)` ➔ `Selesai / Batal`.
+  - Integrasi otomatis saat konfirmasi lunas: potong stok otomatis per gudang/cabang via `StokDeductionService`, posting 4 baris jurnal akuntansi otomatis (Kas/Pendapatan/PPN/HPP/Persediaan), dan penambahan poin loyalty pelanggan via `PelangganService`.
+  - Otomatisasi pengembalian saldo stok barang ke gudang ketika pesanan online dibatalkan.
+  - Label slip packing dan struk pengiriman cetak instan (thermal/A4).
+- **Notifikasi Terpadu Dua Arah (Backoffice & Konsumen):**
+  - **Ke Backoffice**: Polling notifikasi real-time berkala dengan audio alert otomotif & blinking beacon saat ada order masuk dan order lunas. Notifikasi tertarget ke role `kasir` dan `staff-gudang` di cabang terkait dengan action URL langsung ke `/app/pos/online-orders`.
+  - **Ke Konsumen**: Notifikasi in-app pada akun pelanggan (`/account` tab `Pemberitahuan` dengan counter badge) serta notifikasi WhatsApp otomatis saat order dibuat, pembayaran terkonfirmasi, barang dikemas, dan resi kurir terbit.
+- **Penyempurnaan Web Konsumen (`/checkout` & `/account`):**
+  - Input tujuan pengiriman lengkap pada checkout (Nama penerima, no WA, alamat detail) yang langsung terikat ke entitas `Pengiriman`.
+  - Konsumen dapat melakukan simulasi pembayaran instan dan membatalkan pesanan yang belum dibayar di dashboard `/account`.
+- **Filter Omnichannel di `/app/pos/online-orders`:**
+  - Filter `sumberFilter` (Semua Platform / 🌐 Web Ute Parts Store / 🧡 Shopee / 💚 Tokopedia / 📦 Omnichannel Lainnya) dan `metodeFilter` (🏬 Ambil di Toko / 🚚 Kirim Ekspedisi) dengan badge platform per baris pesanan.
+  - Relasi baru `Transaksi::channelOrder()` menghubungkan transaksi POS ke `ChannelOrder` omnichannel (ID order channel, estimasi fee platform, info channel).
+- **Alur Pickup Langsung ke Toko (Pay-at-Counter & Handover):**
+  - Modal `bukaModalPickup` / `prosesPickupKasir` untuk kasir: konsumen bayar tunai/QRIS/EDC di konter (kembalian otomatis) ATAU konsumen sudah bayar online → kasir tinggal serahkan barang (stok tidak dipotong dua kali).
+  - Struk bukti serah terima pickup (termasuk kas laci `110-04`) vs slip packing pengiriman.
+- **Jurnal Omnichannel & COA Standar Transaksi Online (`AkunCoaSeeder` + migrasi `2026_10_16_040000`):**
+  - Akun baru: `120-02` Piutang/Kliring Duitku Gateway, `120-03` Piutang Saldo Channel Shopee, `120-04` Piutang Saldo Channel Tokopedia & Lainnya, `410-03` Pendapatan Penjualan Web Marketplace Ute, `410-04` Pendapatan Penjualan Omnichannel, `520-10` Beban Fee Transaksi Payment Gateway.
+  - Webhook Duitku lunas: Debit `120-02` / Kredit `410-03` (+PPN `220-01`, HPP `510-02`/`130-01`) — memisahkan income web dari kas toko (`410-01`).
+  - `ChannelSyncService::potongStokDanBuatTransaksi`: tiap order channel kini membuat `TransaksiItem` rinci + `Pengiriman` (tracking kurir) dan posting jurnal omnichannel Debit `120-03`/`120-04` / Kredit `410-04` (+HPP).
+  - `prosesBiayaAdmin` fee platform: Debit `520-06` / Kredit `120-03`/`120-04` (piutang channel, bukan Kas).
+  - Pickup bayar di kasir: Debit `110-04` Kas Laci (tunai) / `110-02` Bank (QRIS/EDC) / Kredit `410-03`; verifikasi lunas transfer via `konfirmasiLunas` memakai `120-02`/`410-03`.
+- **Isolasi Audience Notifikasi (Perbaikan Silang Zona Backoffice ↔ Konsumen):**
+  - Model audience eksplisit di `NotificationService::kirim()` via kunci payload `audience` (`staf` | `pelanggan`) dengan fallback deteksi berurutan (pelanggan_id → zona URL → konteks auth):
+    - Audience **pelanggan** → kolom `user_id` & `target_role` dipaksa `null` (pesan konsumen tidak lagi otomatis jadi `target_role=kasir`/`teknisi` dan bocor ke bell staf); `action_url` dipaksa zona konsumen (`/account`).
+    - Audience **staf** → kolom `pelanggan_id` dipaksa `null` (notifikasi backoffice yang dibuat dari konteks login `auth('customer')` — checkout & `/account` — tidak lagi bocor ke tab notifikasi konsumen); `action_url` dipaksa zona `/app`.
+  - Scope `NotifikasiKeluar::forUserRoleAndCategory` kini `whereNull('pelanggan_id')` — baris konsumen tidak pernah tampil di bell backoffice, termasuk untuk super-admin.
+  - `NotificationCenter::markAsRead`/`bukaAksi` memakai query ter-scope (tidak lagi `find()` telanjang — tidak bisa menandai/membuka baris lintas zona), dan `bukaAksi` me-redirect lewat `safeActionUrlForStaff()` yang memetakan URL zona konsumen ke halaman backoffice kategori terkait (transaksi → `/app/pos/online-orders`, dst).
+  - Event polling `ute:notification-arrived` menyandisasi `action_url` — link toast "Buka / Proses" di topbar tidak pernah menunjuk `/account`/`/checkout` lagi.
+  - Call site eksplisit: OrderService, PaymentController (termasuk "Pembayaran Gagal" yang sebelumnya tidak terkirim ke konsumen sama sekali), CustomerAccount, PesananOnlineIndex (6 inapp + 3 WA), ServisService (fallback inapp "Diterima/Diperbarui/Estimasi+Token Approval" kini ber-`pelanggan_id` → benar-benar terlihat di inbox konsumen, bukan bell teknisi; WA staf teknisi tidak salah-terset), BroadcastService.
+  - Migrasi backfill `2026_10_16_050000` membersihkan baris lama: `pelanggan_id` di baris `/app%` (bawaan auto `auth('customer')`) di-null-kan; `target_role`/`user_id` di baris ber-`pelanggan_id` dibersihkan.
+  - Test regresi `NotificationAudienceIsolationTest` (8 kasus: visibilitas silang, guard redirect, scope markAsRead, sanitasi polling).
+
+## 2026-10-16 — Optimasi Sistem Notifikasi Aktif, Indikator Berkedip & Audio Identitas Otomotif ✅
+
+- **Pusat Notifikasi Aktif Real-Time (`NotificationCenter` Livewire Component):**
+  - Implementasi komponen livewire `NotificationCenter` di Topbar Backoffice dengan pengecekan aktif berkala (`wire:poll.8s="checkNewNotifications"`).
+  - Mengeliminasi kebutuhan refresh halaman untuk melihat notifikasi sistem (stok minimum, servis selesai, import/export selesai, dsb.) dan permohonan persetujuan (approval pending).
+  - Mendeteksi penambahan notifikasi baru secara instan dan memicu event browser `ute:notification-arrived`.
+- **Indikator Berkedip Terus-Menerus (Continuous Pulsing Beacon):**
+  - Icon bell pada navbar dilengkapi badge neon gradient dengan animasi radar ping (`animate-ping`) dan pulse (`animate-pulse`) yang terus berkedip selama masih ada notifikasi atau approval belum diproses.
+  - Setiap card notifikasi berstatus belum diproses di dropdown maupun floating toast menampilkan badge berkedip `[● Belum Diproses]` dengan pulsing beacon titik merah/amber.
+  - Sidebar approval count badge juga diperbarui dengan `animate-pulse` saat ada approval pending.
+- **Identitas Suara Notifikasi Presisi Otomotif (`resources/js/components/notification-sound.js`):**
+  - Synthesizer suara audio presisi berbasis Web Audio API tanpa beban network atau file audio eksternal.
+  - Karakter suara identik otomotif: precision dual-harmonic metallic chime (587.33Hz D5 & 880Hz A5) untuk notifikasi umum, 3-tone urgent alert (740Hz, 880Hz, 1046.5Hz) untuk error/warning/approval, dan harmonic rising triad untuk sukses.
+  - Dilengkapi tombol uji suara langsung di dalam panel notifikasi dan kontrol mute/sound preference.
+- **Desain Toast & Dropdown Ute Prism ("Mencolok dan Gak Slop"):**
+  - Kartu notifikasi floating toast dengan surface frosted glass, border glow spesifik level (mint/amber/rose/primary), tombol aksi langsung ("Buka / Proses"), dan penutup manual.
+  - Skema database `notifikasi_keluar` diperluas dengan kolom `read_at`, `user_id`, `cabang_id`, `target_role`, `kategori`, dan `action_url` berindeks untuk pelacakan status selesai/proses tiap cabang dan pengguna.
+- **Scoping Notifikasi Berbasis Role & Cabang Aktif:**
+  - `NotifikasiKeluar::scopeForUserRoleAndCategory`: query notifikasi memfilter sesuai peran pengguna (super-admin/owner menerima seluruh event; admin-toko menerima operasional toko dan stafnya; kasir, teknisi, staff-gudang menerima event khusus tugas mereka).
+  - Multi-cabang scoping ketat (`cabang_id` aktif dari session).
+- **Pemilihan Event Notifikasi Sesuai Preferensi Pengguna (`UserPreference`):**
+  - Panel preferensi interaktif di dropdown notifikasi untuk mengaktifkan/menonaktifkan kategori event: Stok & Inventori, Penjualan & Kasir, Servis & Reparasi, Approval, Keuangan, dan Sistem.
+  - Pengaturan tersimpan persisten ke tabel `user_preferences` (`key: notification_events`) per pengguna.
+- **Sinkronisasi Aksi Notifikasi Langsung Terintegrasi:**
+  - Metode `bukaAksi($id)` menandai notifikasi sebagai selesai (`read_at = now()`), memperbarui counter belum diproses, dan me-redirect pengguna ke menu kerja terkait (`action_url`).
+
+
 ## 2026-10-16 — Optimasi Modul Servis, Perbaikan Scrolling Kanban & Konsolidasi Ekspor Data ✅
 
 - **Optimasi Alur Input Part/Jasa Tambahan Pengerjaan Servis (`ServisService`, `ServisBoard`, `servis-board.blade.php`):**

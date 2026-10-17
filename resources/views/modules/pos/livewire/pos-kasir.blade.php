@@ -952,6 +952,14 @@
                     Ditahan ({{ $ditahanList->count() }})
                 </button>
                 <div class="flex items-center gap-2.5">
+                    <button wire:click="bukaPesananOnlineModal" class="text-[11px] font-bold text-up-amber hover:underline flex items-center gap-1 cursor-pointer" title="Terima pembayaran pesanan online (Ambil di Toko) di kasir">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                        <span>Pesanan Online</span>
+                        @if($jumlahPesananOnline > 0)
+                            <span class="min-w-[16px] h-4 px-1 rounded-full bg-up-amber text-ink-950 text-[10px] font-black flex items-center justify-center tabular-nums">{{ $jumlahPesananOnline }}</span>
+                        @endif
+                    </button>
+                    <span class="text-ink-300 dark:text-white/20">|</span>
                     <button wire:click="bukaBayarServisModal" class="text-[11px] font-bold text-blue-500 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer" title="Proses Pelunasan Servis di Kasir">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
                         <span>Bayar Servis</span>
@@ -1787,6 +1795,263 @@
                         <button wire:click="prosesBayarServis" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-indigo-600 text-white font-bold text-xs cursor-pointer min-h-[40px] shadow-sm shadow-up-primary/30">
                             Proses Bayar & Struk POS
                         </button>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- ===== [POS-ONLINE-PICKUP] MODAL: PEMBAYARAN PESANAN ONLINE (AMBIL DI TOKO) DI KASIR ===== -->
+    @if($showPesananOnlineModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+                <!-- Header -->
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-up-amber/10 border border-up-amber/20 flex items-center justify-center text-up-amber font-bold">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-white">Pembayaran Pesanan Online (Ambil di Toko)</h3>
+                            <p class="text-xs text-ink-400">Terima bayar order marketplace / web konsumen — serahkan barang di konter kasir (termasuk order lunas online menunggu diambil)</p>
+                        </div>
+                    </div>
+                    <button wire:click="tutupPesananOnlineModal" class="p-2 text-ink-400 hover:text-white cursor-pointer" title="Tutup">✕</button>
+                </div>
+
+                <div class="overflow-y-auto flex-1 space-y-4 pr-1">
+                    @if(! $pesananOnlineDetail)
+                        {{-- STATE 1: CARI & PILIH PESANAN --}}
+                        <div class="space-y-3">
+                            <div class="relative">
+                                <input
+                                    type="text"
+                                    wire:model.live.debounce.300ms="pencarianPesananOnline"
+                                    wire:keydown.enter="pilihPesananOnlinePertama"
+                                    placeholder="Cari no. order / nama / no. HP pelanggan..."
+                                    class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white border border-white/10"
+                                    autofocus
+                                />
+                                @if($pencarianPesananOnline)
+                                    <button wire:click="$set('pencarianPesananOnline', '')" class="absolute right-3 top-2.5 text-xs text-ink-400 hover:text-white">✕</button>
+                                @endif
+                            </div>
+
+                            <div class="space-y-2 max-h-[55vh] overflow-y-auto">
+                                @forelse($pesananOnlineHasil as $po)
+                                    <div class="p-3.5 rounded-2xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 transition flex items-center justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="font-mono font-bold text-white text-xs">{{ $po->no_transaksi }}</span>
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                                    🏬 Ambil di Toko
+                                                </span>
+                                                @if($po->status === 'lunas')
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/10 text-up-mint border border-up-mint/30">
+                                                        ✅ Lunas — menunggu serah
+                                                    </span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/10 text-up-amber border border-up-amber/30">
+                                                        ⏳ Menunggu Bayar
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <p class="text-xs text-ink-200 font-medium mt-1">
+                                                {{ $po->pelanggan?->nama ?? 'Konsumen Umum' }}
+                                                <span class="text-ink-400">({{ $po->pelanggan?->telepon ?? '-' }})</span>
+                                            </p>
+                                            <p class="text-[11px] text-ink-400 mt-0.5">
+                                                {{ $po->items->sum('jumlah') }} item · {{ $po->created_at?->format('d/m/Y H:i') }}
+                                            </p>
+                                        </div>
+                                        <div class="text-right flex flex-col items-end gap-1.5 flex-shrink-0">
+                                            <span class="font-bold text-sm text-up-mint tabular-nums">
+                                                Rp {{ number_format($po->total_akhir, 0, ',', '.') }}
+                                            </span>
+                                            <button
+                                                wire:click="pilihPesananOnline({{ $po->id }})"
+                                                class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-bold transition active:scale-[0.98] cursor-pointer">
+                                                Pilih
+                                            </button>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="py-12 text-center text-ink-400 text-xs">
+                                        @if($pencarianPesananOnline)
+                                            Tidak ditemukan pesanan untuk pencarian "<span class="text-white font-semibold">{{ $pencarianPesananOnline }}</span>".
+                                        @else
+                                            Belum ada pesanan pickup di cabang ini (menunggu pembayaran maupun lunas menunggu serah terima).
+                                        @endif
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    @else
+                        {{-- STATE 2: RINGKASAN & PEMBAYARAN --}}
+                        <div class="space-y-4">
+                            <!-- Card Info Pesanan -->
+                            <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="font-mono font-bold text-sm text-white">{{ $pesananOnlineDetail['no_transaksi'] }}</span>
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                            🏬 Ambil di Toko
+                                        </span>
+                                        @if($pesananOnlineDetail['sudah_lunas'])
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/10 text-up-mint border border-up-mint/30">
+                                                ✅ Lunas
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/10 text-up-amber border border-up-amber/30">
+                                                ⏳ Belum Bayar
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <p class="text-xs text-ink-200 mt-1">
+                                        {{ $pesananOnlineDetail['pelanggan_nama'] }} · {{ $pesananOnlineDetail['pelanggan_telepon'] }}
+                                    </p>
+                                    <p class="text-[11px] text-ink-400">
+                                        Dipesan {{ $pesananOnlineDetail['waktu'] }} · {{ $pesananOnlineDetail['jumlah_item'] }} item
+                                    </p>
+                                </div>
+                                <button
+                                    wire:click="kembaliKeDaftarPesananOnline"
+                                    class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-[11px] font-semibold cursor-pointer">
+                                    Ganti Pesanan
+                                </button>
+                            </div>
+
+                            <!-- Daftar Item -->
+                            <div>
+                                <h4 class="text-xs font-semibold text-ink-300 mb-2">Item yang Diserahkan:</h4>
+                                <div class="rounded-xl border border-white/5 overflow-hidden">
+                                    <table class="w-full text-left text-xs">
+                                        <thead>
+                                            <tr class="border-b border-white/10 text-ink-400 text-[10px] bg-white/[0.02]">
+                                                <th class="py-2 px-3">Item</th>
+                                                <th class="py-2 px-3 text-center">Qty</th>
+                                                <th class="py-2 px-3 text-right">Subtotal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-white/5">
+                                            @foreach($pesananOnlineDetail['items'] as $it)
+                                                <tr>
+                                                    <td class="py-2 px-3 text-white">{{ $it['nama'] }}</td>
+                                                    <td class="py-2 px-3 text-center text-white tabular-nums">{{ $it['jumlah'] }}</td>
+                                                    <td class="py-2 px-3 text-right text-white font-bold tabular-nums">Rp {{ number_format($it['subtotal'], 0, ',', '.') }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Total Tagihan Banner -->
+                            <div class="p-3.5 rounded-2xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-between">
+                                <span class="text-xs font-semibold text-ink-200">Total Tagihan</span>
+                                <span class="text-xl font-bold text-up-mint tabular-nums">
+                                    Rp {{ number_format($pesananOnlineDetail['total'], 0, ',', '.') }}
+                                </span>
+                            </div>
+
+                            @if($pesananOnlineDetail['sudah_lunas'])
+                                {{-- SUDAH LUNAS ONLINE: ringkasan pembayaran + mode serah terima (tanpa input bayar) --}}
+                                <div class="space-y-2.5">
+                                    <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/30 text-up-mint text-xs font-bold flex items-center gap-2">
+                                        <span>✅</span>
+                                        <span>Sudah Lunas — menunggu serah terima</span>
+                                    </div>
+                                    <div class="p-3 rounded-2xl bg-white/[0.02] border border-white/5 text-[11px] text-ink-300 space-y-1.5">
+                                        <div class="flex justify-between">
+                                            <span>Metode Pembayaran</span>
+                                            <span class="text-white font-semibold">{{ $pesananOnlineDetail['metode_bayar'] }}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Tanggal Bayar</span>
+                                            <span class="text-white font-semibold tabular-nums">{{ $pesananOnlineDetail['tanggal_bayar'] ?? '-' }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-ink-300">
+                                        Pembayaran sudah diterima online — cukup serahkan barang fisik lalu cetak bukti serah terima.
+                                    </div>
+                                </div>
+                            @else
+                            <!-- Metode Pembayaran -->
+                            <div>
+                                <label class="block text-xs font-semibold text-ink-300 mb-1.5">Metode Pembayaran di Toko</label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    @foreach(['tunai' => '💵 Tunai', 'qris' => '📱 QRIS', 'transfer' => '🏦 Transfer'] as $m => $lbl)
+                                        <button
+                                            type="button"
+                                            wire:click="$set('metodeBayarOnline', '{{ $m }}')"
+                                            class="py-2.5 px-2 rounded-xl border text-center text-xs font-bold transition active:scale-[0.97] cursor-pointer min-h-[44px] {{ $metodeBayarOnline === $m ? 'bg-up-primary text-white border-up-primary shadow-md shadow-up-primary/30' : 'bg-white/[0.02] border-white/5 text-ink-300 hover:bg-white/5' }}">
+                                            {{ $lbl }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <!-- Input Tunai: Nominal + Kembalian + Peringatan Sesi Kas -->
+                            @if($metodeBayarOnline === 'tunai')
+                                @if(! $kasAktif)
+                                    <div class="p-2.5 rounded-xl bg-up-amber/10 border border-up-amber/30 text-[11px] text-up-amber font-semibold flex items-center gap-2">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                        <span>Sesi kas belum dibuka — buka kas dulu (pembayaran tunai akan ditolak)</span>
+                                    </div>
+                                @endif
+
+                                <div class="space-y-2">
+                                    <div class="flex items-center justify-between text-xs font-semibold text-ink-300">
+                                        <span>Nominal Diterima</span>
+                                        <div class="flex gap-1.5">
+                                            <button type="button" wire:click="setNominalBayarOnline({{ $pesananOnlineDetail['total'] }})" class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[10px] text-ink-300 cursor-pointer">Uang Pas</button>
+                                            <button type="button" wire:click="setNominalBayarOnline(50000)" class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[10px] text-ink-300 cursor-pointer">50k</button>
+                                            <button type="button" wire:click="setNominalBayarOnline(100000)" class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[10px] text-ink-300 cursor-pointer">100k</button>
+                                            <button type="button" wire:click="setNominalBayarOnline(200000)" class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[10px] text-ink-300 cursor-pointer">200k</button>
+                                        </div>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        inputmode="numeric"
+                                        wire:model.live.debounce.300ms="nominalBayarOnline"
+                                        class="w-full px-3.5 py-3 rounded-xl glass-input text-lg font-bold text-white tabular-nums border border-white/10 min-h-[44px]"
+                                        placeholder="0"
+                                    />
+                                    <div class="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5 text-sm">
+                                        <span class="text-ink-400 font-medium">Kembalian</span>
+                                        <span class="font-bold text-lg tabular-nums {{ $kembalianOnline > 0 ? 'text-up-mint' : 'text-white' }}">
+                                            Rp {{ number_format($kembalianOnline, 0, ',', '.') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="p-4 rounded-xl bg-white/5 text-center text-xs text-ink-300 border border-white/5">
+                                    Silakan scan QRIS / konfirmasi bukti transfer sebesar
+                                    <strong class="text-white block mt-1 text-sm font-bold tabular-nums">
+                                        Rp {{ number_format($pesananOnlineDetail['total'], 0, ',', '.') }}
+                                    </strong>
+                                </div>
+                            @endif
+                            @endif {{-- /sudah_lunas: input metode & nominal hanya utk order belum bayar --}}
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Footer Aksi -->
+                <div class="flex gap-3 pt-3 border-t border-white/5 mt-4">
+                    <button wire:click="tutupPesananOnlineModal" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[40px]">
+                        Tutup
+                    </button>
+                    @if($pesananOnlineDetail)
+                        @if($pesananOnlineDetail['sudah_lunas'])
+                            <button wire:click="serahkanPesananOnline" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-xs transition-[transform,opacity] active:scale-[0.97] shadow-sm shadow-up-mint/20 cursor-pointer min-h-[44px]">
+                                Serahkan Barang
+                            </button>
+                        @else
+                            <button wire:click="bayarOnlineOrder" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-bold text-xs transition-[transform,opacity] active:scale-[0.97] shadow-sm shadow-up-mint/20 cursor-pointer min-h-[44px]">
+                                Terima Pembayaran & Serahkan
+                            </button>
+                        @endif
                     @endif
                 </div>
             </div>

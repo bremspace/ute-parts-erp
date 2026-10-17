@@ -14,6 +14,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Pos\Services\KasSesiState;
+use App\Modules\Pos\Services\PembayaranPesananOnlineService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Rbac\Models\Cabang;
@@ -246,6 +247,17 @@ class PosKasir extends Component
     public bool $servisUbahStatusDiambil = true;
 
     public string $servisCatatan = '';
+
+    // [POS-ONLINE-PICKUP] Pembayaran pesanan online (bayar di toko / pickup) dari layar kasir
+    public bool $showPesananOnlineModal = false;
+
+    public string $pencarianPesananOnline = '';
+
+    public ?int $pesananOnlineTerpilih = null;
+
+    public string $metodeBayarOnline = 'tunai'; // tunai | qris | transfer
+
+    public mixed $nominalBayarOnline = 0;
 
     public function mount()
     {
@@ -2256,6 +2268,339 @@ class PosKasir extends Component
         }
     }
 
+    // ==================== [POS-ONLINE-PICKUP] PESANAN ONLINE BAYAR DI TOKO ====================
+
+    /**
+     * Query dasar: pesanan marketplace/channel pada cabang aktif, status
+     * `menunggu_pembayaran` (menunggu bayar di toko) ATAU `lunas` (sudah bayar
+     * online, menunggu serah terima). Metode ambil di toko (pickup kasir) —
+     * deteksi selaraskan PesananOnlineIndex: kolom catatan memuat 'ambil_ke_toko'.
+     * Sumber: 'marketplace' (web konsumen) atau 'channel:*' (omnichannel).
+     */
+    private function queryPesananOnlinePickup()
+    {
+        return Transaksi::with(['pelanggan', 'items.produk'])
+            ->where('cabang_id', session('cabang_id'))
+            ->whereIn('status', ['menunggu_pembayaran', 'lunas'])
+            ->where(function ($q) {
+                $q->where('sumber', 'marketplace')
+                    ->orWhere('sumber', 'like', 'channel:%');
+            })
+            ->where('catatan', 'like', '%ambil_ke_toko%');
+    }
+
+    /** Jumlah order pickup (menunggu bayar / menunggu serah) utk badge tombol entry (computed, segar tiap render). */
+    public function getJumlahPesananOnlineProperty(): int
+    {
+        return (int) $this->queryPesananOnlinePickup()->count();
+    }
+
+    /** Hasil pencarian pesanan online pickup (no. order / pelanggan / telepon / resi / channel ID), limit 15. */
+    public function getPesananOnlineHasilProperty()
+    {
+        $query = $this->queryPesananOnlinePickup();
+
+        $term = trim($this->pencarianPesananOnline);
+        if ($term !== '') {
+            $like = '%'.$term.'%';
+            $query->where(function ($q) use ($like) {
+                $q->where('no_transaksi', 'like', $like)
+                    ->orWhereHas('pelanggan', fn ($sub) => $sub->where('nama', 'like', $like)->orWhere('telepon', 'like', $like))
+                    ->orWhereHas('pengiriman', fn ($sub) => $sub->where('tracking_id', 'like', $like))
+                    ->orWhereHas('channelOrder', fn ($sub) => $sub->where('channel_order_id', 'like', $like));
+            });
+        }
+
+        return $query->latest()->limit(15)->get();
+    }
+
+    /** Detail ringkas order terpilih utk modal bayar/serah (guard cabang/status/pickup di server). */
+    public function getPesananOnlineDetailProperty(): ?array
+    {
+        if (! $this->pesananOnlineTerpilih) {
+            return null;
+        }
+
+        $trx = $this->queryPesananOnlinePickup()->whereKey($this->pesananOnlineTerpilih)->first();
+        if (! $trx) {
+            return null;
+        }
+
+        return [
+            'id' => $trx->id,
+            'no_transaksi' => $trx->no_transaksi,
+            'pelanggan_nama' => $trx->pelanggan?->nama ?? 'Konsumen Umum',
+            'pelanggan_telepon' => $trx->pelanggan?->telepon ?? '-',
+            'waktu' => $trx->created_at?->format('d/m/Y H:i'),
+            'total' => (float) $trx->total_akhir,
+            'jumlah_item' => (int) $trx->items->sum('jumlah'),
+            'items' => $trx->items->map(fn ($it) => [
+                'nama' => $it->produk?->nama ?? 'Produk',
+                'jumlah' => (int) $it->jumlah,
+                'subtotal' => (float) $it->subtotal,
+            ])->values()->all(),
+            // [T-SERAH] Sudah lunas online → mode serah terima (bukan bayar)
+            'sudah_lunas' => $trx->status === 'lunas',
+            'status' => $trx->status,
+            'metode_bayar' => strtoupper($trx->metode_bayar ?? '-'),
+            'tanggal_bayar' => $trx->paid_at?->format('d/m/Y H:i'),
+        ];
+    }
+
+    /** Kembalian otomatis utk pembayaran tunai pesanan online (computed). */
+    public function getKembalianOnlineProperty(): float
+    {
+        $detail = $this->pesananOnlineDetail;
+        if (! $detail || $this->metodeBayarOnline !== 'tunai') {
+            return 0;
+        }
+
+        return max(0, (float) $this->parseNominal($this->nominalBayarOnline) - (float) $detail['total']);
+    }
+
+    public function bukaPesananOnlineModal(): void
+    {
+        $this->resetPesananOnlineState();
+        $this->showPesananOnlineModal = true;
+    }
+
+    public function tutupPesananOnlineModal(): void
+    {
+        $this->showPesananOnlineModal = false;
+        $this->resetPesananOnlineState();
+    }
+
+    private function resetPesananOnlineState(): void
+    {
+        $this->pencarianPesananOnline = '';
+        $this->pesananOnlineTerpilih = null;
+        $this->metodeBayarOnline = 'tunai';
+        $this->nominalBayarOnline = 0;
+    }
+
+    public function pilihPesananOnline(int $id): void
+    {
+        // Guard server-side: order harus lolos filter cabang / status / pickup
+        if (! $this->queryPesananOnlinePickup()->whereKey($id)->exists()) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Pesanan tidak ditemukan atau bukan pesanan pickup (menunggu bayar / lunas menunggu serah) di cabang ini',
+            ]);
+
+            return;
+        }
+
+        $this->pesananOnlineTerpilih = $id;
+        $this->metodeBayarOnline = 'tunai';
+        // Default nominal diterima = total tagihan (pola "uang pas" di payment modal)
+        $total = (float) $this->queryPesananOnlinePickup()->whereKey($id)->value('total_akhir');
+        $this->nominalBayarOnline = $total > 0 ? number_format($total, 0, ',', '.') : '0';
+    }
+
+    /** Enter di input pencarian → pilih hasil pertama. */
+    public function pilihPesananOnlinePertama(): void
+    {
+        $pertama = $this->pesananOnlineHasil->first();
+        if ($pertama) {
+            $this->pilihPesananOnline((int) $pertama->id);
+        }
+    }
+
+    /** Kembali ke daftar hasil dari tampilan bayar (ganti pesanan). */
+    public function kembaliKeDaftarPesananOnline(): void
+    {
+        $this->pesananOnlineTerpilih = null;
+        $this->metodeBayarOnline = 'tunai';
+        $this->nominalBayarOnline = 0;
+    }
+
+    public function setNominalBayarOnline(float $nominal): void
+    {
+        $this->nominalBayarOnline = number_format($nominal, 0, ',', '.');
+    }
+
+    public function updatedNominalBayarOnline($value): void
+    {
+        // Biarkan teks input apa adanya (pola updatedJumlahBayar — format ribuan tidak reset)
+    }
+
+    public function updatedMetodeBayarOnline(): void
+    {
+        // KembalianOnline dihitung ulang otomatis via computed property
+    }
+
+    /**
+     * Eksekusi pembayaran pesanan online pickup via service beku:
+     * PembayaranPesananOnlineService::bayarDiToko() — service melakukan semua
+     * (validasi status/pickup, potong stok, jurnal, status→selesai, kasir_id,
+     * sesi kas, notifikasi konsumen). UI hanya lookup + metode + hasil.
+     * Setelah sukses: struk bukti serah terima pickup dicetak via modal struk
+     * generik kasir (showReceiptModal + receiptData).
+     * RuntimeException (Bahasa Indonesia) → alert error, modal tetap terbuka.
+     */
+    public function bayarOnlineOrder(): void
+    {
+        $detail = $this->pesananOnlineDetail;
+        if (! $detail || ! $this->pesananOnlineTerpilih) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih pesanan online terlebih dahulu']);
+
+            return;
+        }
+
+        // Anti-tamper: order lunas tidak boleh dibayar ulang di kasir
+        if (! empty($detail['sudah_lunas'])) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Pesanan {$detail['no_transaksi']} sudah lunas — gunakan tombol 'Serahkan Barang'.",
+            ]);
+
+            return;
+        }
+
+        $transaksi = Transaksi::find($this->pesananOnlineTerpilih);
+        if (! $transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pesanan tidak ditemukan']);
+
+            return;
+        }
+
+        $nominalDiterima = $this->metodeBayarOnline === 'tunai'
+            ? (float) $this->parseNominal($this->nominalBayarOnline)
+            : (float) $detail['total'];
+
+        // Validasi cepat di UI (service tetap penentu akhir)
+        if ($this->metodeBayarOnline === 'tunai' && $nominalDiterima < (float) $detail['total']) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Jumlah bayar kurang dari total tagihan']);
+
+            return;
+        }
+
+        try {
+            $service = app(PembayaranPesananOnlineService::class);
+            $hasil = $service->bayarDiToko($transaksi, $this->metodeBayarOnline, $nominalDiterima);
+            // Serah terima fisik saat bayar di konter — samakan jalur PesananOnlineIndex
+            $service->kirimNotifikasiSerahTerima($transaksi);
+        } catch (\RuntimeException $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+
+            return;
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Gagal memproses pembayaran pesanan online: '.$e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        $kembalian = (float) ($hasil['kembalian'] ?? 0);
+        $pesanSukses = "Pembayaran {$detail['no_transaksi']} berhasil — barang dapat diserahkan.";
+        if ($kembalian > 0) {
+            $pesanSukses .= ' Kembalian Rp '.number_format($kembalian, 0, ',', '.');
+        }
+
+        // Struk bukti serah terima pickup (modal struk generik kasir)
+        $this->siapkanStrukPickupOnline($transaksi->fresh(['items.produk', 'pelanggan', 'cabang']), $kembalian);
+
+        // Tutup modal + bersihkan state. Riwayat hari-ini (computed prop) dan
+        // badge jumlah order ikut segar otomatis pada render berikutnya.
+        $this->tutupPesananOnlineModal();
+        $this->showReceiptModal = true;
+        $this->checkKasSesi();
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesanSukses]);
+    }
+
+    /**
+     * Serahkan pesanan online pickup YANG SUDAH LUNAS (tanpa pembayaran baru).
+     * Delegasi ke `PembayaranPesananOnlineService::serahkanDiToko()` —
+     * single source of truth handover (status→selesai, tanpa potong stok,
+     * tanpa jurnal kas, tanpa kasir_id, notifikasi konsumen serah terima).
+     * Guard server-side: cabang session + status lunas + pickup + sumber online.
+     */
+    public function serahkanPesananOnline(): void
+    {
+        // Guard anti-tamper: harus lolos query cabang/status/pickup/sumber dulu
+        $transaksi = $this->queryPesananOnlinePickup()
+            ->whereKey($this->pesananOnlineTerpilih)
+            ->where('status', 'lunas')
+            ->first();
+
+        if (! $transaksi) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Pesanan tidak ditemukan atau bukan pesanan pickup lunas menunggu serah terima',
+            ]);
+
+            return;
+        }
+
+        try {
+            app(PembayaranPesananOnlineService::class)->serahkanDiToko($transaksi);
+        } catch (\RuntimeException $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+
+            return;
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Gagal menyerahkan pesanan online: '.$e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        $pesanSukses = "Pesanan {$transaksi->no_transaksi} telah diserahkan kepada konsumen.";
+
+        // Struk bukti serah terima pickup (tanpa pembayaran baru di kasir)
+        $this->siapkanStrukPickupOnline($transaksi->fresh(['items.produk', 'pelanggan', 'cabang']));
+
+        $this->tutupPesananOnlineModal();
+        $this->showReceiptModal = true;
+        $this->dispatch('alert', ['type' => 'success', 'message' => $pesanSukses]);
+    }
+
+    /**
+     * Susun `receiptData` bukti serah terima pesanan online pickup — memakai
+     * MEKANISME struk generik kasir yang sama dengan Bayar Servis / penjualan:
+     * state `showReceiptModal` + partial `partials.thermal-receipt-modal`
+     * (preview 58mm, cetak Web/BLE 58mm & 80mm, kirim struk via WhatsApp).
+     *
+     * @param  float  $kembalian  kembalian uang diterima (null bila handover tanpa bayar baru)
+     */
+    private function siapkanStrukPickupOnline(Transaksi $transaksi, ?float $kembalian = null): void
+    {
+        $this->receiptData = [
+            'no_transaksi' => $transaksi->no_transaksi,
+            'cabang' => $transaksi->cabang?->nama,
+            'waktu' => now()->format('d/m/Y H:i'),
+            'kasir' => auth()->user()?->name ?? 'Kasir',
+            'pelanggan' => $transaksi->pelanggan?->nama ?? 'Konsumen Umum',
+            'telepon' => $transaksi->pelanggan?->telepon ?? null,
+            'tier' => 'Ambil di Toko (Pickup Online)',
+            'items' => $transaksi->items->map(fn ($it) => [
+                'nama' => $it->produk?->nama ?? 'Produk',
+                'sku' => $it->produk?->sku ?? '-',
+                'qty' => (int) $it->jumlah,
+                'harga' => (float) $it->harga_satuan,
+                'subtotal' => (float) $it->subtotal,
+            ])->values()->all(),
+            'subtotal' => (float) ($transaksi->subtotal ?: $transaksi->total_akhir),
+            'diskon' => (float) ($transaksi->diskon_nominal ?? 0),
+            'dpp' => (float) ($transaksi->dpp ?? $transaksi->total_akhir),
+            'pajak' => (float) ($transaksi->pajak_nominal ?? 0),
+            'ppn_persen' => (float) ($transaksi->pajak_persen ?? 0),
+            'total' => (float) $transaksi->total_akhir,
+            'bayar' => (float) ($transaksi->jumlah_bayar ?: $transaksi->total_akhir),
+            'kembali' => (float) ($kembalian ?? $transaksi->kembalian ?? 0),
+            // Handover (tanpa bayar baru) ditandai jelas di baris BAYAR struk
+            'metode' => $kembalian === null
+                ? 'SUDAH DIBAYAR ONLINE'
+                : strtoupper($transaksi->metode_bayar ?? 'TUNAI'),
+        ];
+
+        $this->completedTransactionId = $transaksi->id;
+    }
+
     public function render()
     {
         $productsQuery = Produk::query()
@@ -2409,6 +2754,11 @@ class PosKasir extends Component
             'snCari' => $this->snCari,
             'snItemKey' => $this->snItemKey,
             'daftarServisSiapBayar' => $this->daftarServisSiapBayar,
+            // [POS-ONLINE-PICKUP] computed props pesanan online — pass eksplisit (WAIBS)
+            'jumlahPesananOnline' => $this->jumlahPesananOnline,
+            'pesananOnlineHasil' => $this->pesananOnlineHasil,
+            'pesananOnlineDetail' => $this->pesananOnlineDetail,
+            'kembalianOnline' => $this->kembalianOnline,
             'kategoriList' => $kategoriList,
             'brandList' => $brandList,
             'kualitasList' => $kualitasList,

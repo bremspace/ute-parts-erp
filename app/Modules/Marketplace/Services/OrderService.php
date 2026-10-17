@@ -4,9 +4,12 @@ namespace App\Modules\Marketplace\Services;
 
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Marketplace\Models\Pengiriman;
+use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +28,8 @@ class OrderService
 {
     public function __construct(
         protected PricingService $pricingService,
-        protected PajakService $pajakService
+        protected PajakService $pajakService,
+        protected NotificationService $notifService
     ) {}
 
     public function buatOrder(
@@ -33,9 +37,10 @@ class OrderService
         array $items,
         int $cabangId,
         string $metodeAmbil,
-        ?string $catatan = null
+        ?string $catatan = null,
+        array $shippingData = []
     ): Transaksi {
-        return DB::transaction(function () use ($pelanggan, $items, $cabangId, $metodeAmbil, $catatan) {
+        return DB::transaction(function () use ($pelanggan, $items, $cabangId, $metodeAmbil, $catatan, $shippingData) {
             $today = now()->format('Ymd');
             $count = Transaksi::whereDate('created_at', now()->toDateString())
                 ->where('sumber', 'marketplace')
@@ -102,6 +107,70 @@ class OrderService
                     'subtotal' => $row['subtotal'],
                     'hpp' => $row['hpp'],
                 ]);
+            }
+
+            // Buat record pengiriman jika metode ambil adalah pengiriman
+            if ($metodeAmbil === 'pengiriman') {
+                $cabang = Cabang::find($cabangId);
+                Pengiriman::create([
+                    'transaksi_id' => $transaksi->id,
+                    'kurir' => $shippingData['kurir'] ?? 'Ekspedisi / Biteship',
+                    'layanan' => $shippingData['layanan'] ?? 'Reguler',
+                    'ongkir' => (float) ($shippingData['ongkir'] ?? 0),
+                    'asal_cabang' => $cabang?->nama ?? 'Cabang Pusat',
+                    'nama_penerima' => $shippingData['nama_penerima'] ?? $pelanggan->nama,
+                    'alamat_tujuan' => $shippingData['alamat_tujuan'] ?? $pelanggan->alamat ?? '-',
+                    'telepon_tujuan' => $shippingData['telepon_tujuan'] ?? $pelanggan->telepon ?? '-',
+                    'status' => 'pending',
+                ]);
+            }
+
+            // 1. Notifikasi ke Backoffice (kasir & admin-toko)
+            $this->notifService->kirim(
+                'inapp',
+                null,
+                "Pesanan Online Baru ({$noTransaksi})",
+                "Pesanan baru dari {$pelanggan->nama} senilai Rp ".number_format($transaksi->total_akhir, 0, ',', '.')." [{$metodeAmbil}] menunggu pembayaran.",
+                [
+                    'transaksi_id' => $transaksi->id,
+                    'cabang_id' => $cabangId,
+                    'target_role' => 'kasir',
+                    'sumber' => 'marketplace',
+                    'kategori' => 'transaksi',
+                    'action_url' => '/app/pos/online-orders',
+                    'audience' => 'staf',
+                ]
+            );
+
+            // 2. Notifikasi ke Konsumen (In-App)
+            $this->notifService->kirim(
+                'inapp',
+                $pelanggan->email,
+                'Pesanan Berhasil Didaftarkan',
+                "Pesanan {$noTransaksi} telah terdaftar. Silakan selesaikan pembayaran agar barang segera disiapkan.",
+                [
+                    'transaksi_id' => $transaksi->id,
+                    'pelanggan_id' => $pelanggan->id,
+                    'kategori' => 'transaksi',
+                    'sumber' => 'marketplace',
+                    'action_url' => '/account',
+                    'audience' => 'pelanggan',
+                ]
+            );
+
+            // 3. Notifikasi via WhatsApp jika nomor telepon tersedia
+            if (! empty($pelanggan->telepon)) {
+                $this->notifService->kirim(
+                    'wa',
+                    $pelanggan->telepon,
+                    'Invoice Pesanan Ute Parts',
+                    "Halo {$pelanggan->nama}, pesanan {$noTransaksi} telah kami terima dengan total Rp ".number_format($transaksi->total_akhir, 0, ',', '.').'. Silakan selesaikan pembayaran untuk diproses toko.',
+                    [
+                        'transaksi_id' => $transaksi->id,
+                        'pelanggan_id' => $pelanggan->id,
+                        'audience' => 'pelanggan',
+                    ]
+                );
             }
 
             return $transaksi;

@@ -4,6 +4,8 @@ namespace App\Modules\Pos\Models;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Marketplace\Models\Pengiriman;
+use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use App\Modules\Servis\Models\TiketServis;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -83,5 +86,15 @@ class Transaksi extends Model
     public function tiketServis(): BelongsTo
     {
         return $this->belongsTo(TiketServis::class, 'tiket_servis_id');
+    }
+
+    public function pengiriman(): HasOne
+    {
+        return $this->hasOne(Pengiriman::class, 'transaksi_id');
+    }
+
+    public function channelOrder(): HasOne
+    {
+        return $this->hasOne(ChannelOrder::class, 'transaksi_id');
     }
 }

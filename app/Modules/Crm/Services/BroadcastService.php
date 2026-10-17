@@ -138,7 +138,11 @@ class BroadcastService
                         $tujuan,
                         $kampanye->judul,
                         $konten,
-                        ['pelanggan_id' => $pelanggan->id, 'kampanye_id' => $kampanye->id],
+                        [
+                            'pelanggan_id' => $pelanggan->id,
+                            'kampanye_id' => $kampanye->id,
+                            'audience' => 'pelanggan',
+                        ],
                         $kampanye->id
                     );
                     $terkirim++;

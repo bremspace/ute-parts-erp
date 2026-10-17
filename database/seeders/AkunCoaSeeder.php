@@ -43,6 +43,9 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '110-03', 'nama' => 'PPN Masukan',                  'tipe' => 'aset',      'kelompok' => 'pajak',       'saldo_normal' => 'debit'], // [F1-2] rekap PPN masukan
             ['kode' => '110-04', 'nama' => 'Kas Laci',                     'tipe' => 'aset',      'kelompok' => 'kas',         'saldo_normal' => 'debit'], // [KAS-LACI] dana tunai laci kasir
             ['kode' => '120-01', 'nama' => 'Piutang Usaha',                'tipe' => 'aset',      'kelompok' => 'piutang',     'saldo_normal' => 'debit'],
+            ['kode' => '120-02', 'nama' => 'Piutang / Kliring Duitku Gateway', 'tipe' => 'aset',  'kelompok' => 'piutang',     'saldo_normal' => 'debit'],
+            ['kode' => '120-03', 'nama' => 'Piutang / Saldo Channel Shopee', 'tipe' => 'aset',   'kelompok' => 'piutang',     'saldo_normal' => 'debit'],
+            ['kode' => '120-04', 'nama' => 'Piutang / Saldo Channel Tokopedia & Lainnya', 'tipe' => 'aset', 'kelompok' => 'piutang', 'saldo_normal' => 'debit'],
             ['kode' => '130-01', 'nama' => 'Persediaan Barang Dagang',     'tipe' => 'aset',      'kelompok' => 'persediaan',  'saldo_normal' => 'debit'],
             ['kode' => '140-01', 'nama' => 'Perlengkapan Toko',            'tipe' => 'aset',      'kelompok' => 'perlengkapan', 'saldo_normal' => 'debit'],
             ['kode' => '150-01', 'nama' => 'Peralatan Servis',             'tipe' => 'aset',      'kelompok' => 'peralatan',   'saldo_normal' => 'debit'],
@@ -62,6 +65,8 @@ class AkunCoaSeeder extends Seeder
             // PENDAPATAN
             ['kode' => '410-01', 'nama' => 'Pendapatan Penjualan',         'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit'],
             ['kode' => '410-02', 'nama' => 'Retur Penjualan',              'tipe' => 'pendapatan', 'kelompok' => 'retur_penjualan',      'saldo_normal' => 'kredit'],
+            ['kode' => '410-03', 'nama' => 'Pendapatan Penjualan Web Marketplace Ute', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit'],
+            ['kode' => '410-04', 'nama' => 'Pendapatan Penjualan Omnichannel', 'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_penjualan', 'saldo_normal' => 'kredit'],
             ['kode' => '420-01', 'nama' => 'Pendapatan Jasa Servis',       'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_jasa',      'saldo_normal' => 'kredit'],
             ['kode' => '430-01', 'nama' => 'Pendapatan Lain-lain',         'tipe' => 'pendapatan', 'kelompok' => 'pendapatan_lain',      'saldo_normal' => 'kredit'],
 
@@ -77,6 +82,7 @@ class AkunCoaSeeder extends Seeder
             ['kode' => '520-07', 'nama' => 'Selisih Kas',                 'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'], // [T-09]
             ['kode' => '520-08', 'nama' => 'Selisih Stok (Opname)',        'tipe' => 'beban', 'kelompok' => 'hpp',               'saldo_normal' => 'debit'], // [T-14] selisih opname
             ['kode' => '520-09', 'nama' => 'Beban Komisi Teknisi',        'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'], // [F3-8] komisi teknisi / karyawan
+            ['kode' => '520-10', 'nama' => 'Beban Fee Transaksi Payment Gateway', 'tipe' => 'beban', 'kelompok' => 'beban_operasional', 'saldo_normal' => 'debit'],
         ];
 
         foreach ($coa as $data) {
