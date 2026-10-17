@@ -1,4 +1,4 @@
-<div class="space-y-6" wire:poll.10s>
+<div class="space-y-6" wire:poll.30s>
     <!-- Header & Metric Cards -->
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

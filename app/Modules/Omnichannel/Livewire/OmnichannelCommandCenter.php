@@ -39,8 +39,7 @@ class OmnichannelCommandCenter extends Component
 
     public function getChannelsProperty()
     {
-        return Channel::withCount('productMappings')
-            ->with('orders')
+        return Channel::withCount(['productMappings', 'orders'])
             ->orderBy('platform')
             ->get()
             ->map(function ($c) {
@@ -50,7 +49,7 @@ class OmnichannelCommandCenter extends Component
                     'platform' => $c->platform,
                     'status' => $c->status,
                     'mapping_count' => $c->product_mappings_count,
-                    'order_count' => $c->orders->count(),
+                    'order_count' => $c->orders_count,
                     'last_sync_at' => $c->last_sync_at,
                     'last_sync_status' => $c->last_sync_status,
                 ];

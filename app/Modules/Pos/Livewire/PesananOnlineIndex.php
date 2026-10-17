@@ -144,14 +144,24 @@ class PesananOnlineIndex extends Component
             }
         }
 
+        $stats = (clone $base)->selectRaw("
+            COUNT(*) as total_semua,
+            COALESCE(SUM(CASE WHEN status = 'menunggu_pembayaran' THEN 1 ELSE 0 END), 0) as total_menunggu,
+            COALESCE(SUM(CASE WHEN status = 'lunas' THEN 1 ELSE 0 END), 0) as total_lunas,
+            COALESCE(SUM(CASE WHEN status = 'diproses' THEN 1 ELSE 0 END), 0) as total_diproses,
+            COALESCE(SUM(CASE WHEN status IN ('dikirim', 'siap_diambil') THEN 1 ELSE 0 END), 0) as total_dikirim,
+            COALESCE(SUM(CASE WHEN status = 'selesai' THEN 1 ELSE 0 END), 0) as total_selesai,
+            COALESCE(SUM(CASE WHEN status = 'batal' THEN 1 ELSE 0 END), 0) as total_batal
+        ")->first();
+
         return [
-            'semua' => (clone $base)->count(),
-            'menunggu_pembayaran' => (clone $base)->where('status', 'menunggu_pembayaran')->count(),
-            'lunas' => (clone $base)->where('status', 'lunas')->count(),
-            'diproses' => (clone $base)->where('status', 'diproses')->count(),
-            'dikirim' => (clone $base)->whereIn('status', ['dikirim', 'siap_diambil'])->count(),
-            'selesai' => (clone $base)->where('status', 'selesai')->count(),
-            'batal' => (clone $base)->where('status', 'batal')->count(),
+            'semua' => (int) ($stats->total_semua ?? 0),
+            'menunggu_pembayaran' => (int) ($stats->total_menunggu ?? 0),
+            'lunas' => (int) ($stats->total_lunas ?? 0),
+            'diproses' => (int) ($stats->total_diproses ?? 0),
+            'dikirim' => (int) ($stats->total_dikirim ?? 0),
+            'selesai' => (int) ($stats->total_selesai ?? 0),
+            'batal' => (int) ($stats->total_batal ?? 0),
         ];
     }
 

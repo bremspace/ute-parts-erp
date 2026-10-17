@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Marketplace\Models\Pengiriman;
 use App\Modules\Pos\Livewire\RiwayatTransaksiIndex;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
@@ -194,5 +195,81 @@ class RiwayatTransaksiGlobalTest extends TestCase
             ->assertSee('Samsung Galaxy (S22 Ultra)')
             ->assertSee('LUNAS')
             ->assertSee('Diambil');
+    }
+
+    public function test_riwayat_transaksi_menampilkan_pesanan_online_web_dan_omnichannel(): void
+    {
+        $this->authed();
+
+        // 1. Buat pesanan online Web Ute Store
+        $orderWeb = Transaksi::create([
+            'no_transaksi' => 'TRX-MKT-888',
+            'cabang_id' => $this->cabang->id,
+            'pelanggan_id' => $this->pelanggan->id,
+            'sumber' => 'marketplace',
+            'subtotal' => 250000,
+            'total_akhir' => 250000,
+            'metode_bayar' => 'duitku_va',
+            'status' => 'lunas',
+            'catatan' => 'Order Web Ute Parts',
+        ]);
+
+        // Buat pengiriman untuk order web
+        Pengiriman::create([
+            'transaksi_id' => $orderWeb->id,
+            'kurir' => 'JNE',
+            'layanan' => 'REG',
+            'tracking_id' => 'JNE1234567890',
+            'ongkir' => 15000,
+            'nama_penerima' => 'Budi Penerima',
+            'alamat_tujuan' => 'Jl. Merdeka No. 10',
+            'telepon_tujuan' => '081234567890',
+            'status' => 'dikirim',
+        ]);
+
+        // 2. Buat pesanan online Omnichannel Shopee
+        $orderShopee = Transaksi::create([
+            'no_transaksi' => 'TRX-SHP-999',
+            'cabang_id' => $this->cabang->id,
+            'pelanggan_id' => $this->pelanggan->id,
+            'sumber' => 'channel:shopee',
+            'subtotal' => 450000,
+            'total_akhir' => 450000,
+            'metode_bayar' => 'shopee_pay',
+            'status' => 'selesai',
+            'catatan' => 'Pesanan Shopee',
+        ]);
+
+        // Tab Global: harus menampilkan TRX-MKT-888 & TRX-SHP-999 dan kartu ringkasan
+        Livewire::test(RiwayatTransaksiIndex::class)
+            ->assertSet('activeTab', 'global')
+            ->assertSee('TRX-MKT-888')
+            ->assertSee('TRX-SHP-999')
+            ->assertSee('Pesanan Online')
+            // Cek kartu ringkasan menampilkan count & nominal
+            ->assertSee('2 Trx')
+            // Filter jenis transaksi: online
+            ->set('filterStatus', 'online')
+            ->assertSee('TRX-MKT-888')
+            ->assertSee('TRX-SHP-999')
+            // Buka tab online
+            ->set('activeTab', 'online')
+            ->assertSee('TRX-MKT-888')
+            ->assertSee('TRX-SHP-999')
+            ->assertSee('Web Ute')
+            ->assertSee('Shopee')
+            ->assertSee('JNE')
+            // Buka detail modal pesanan online
+            ->call('lihatDetailTransaksi', $orderWeb->id)
+            ->assertSet('showDetailModal', true)
+            ->assertSee('Detail Transaksi TRX-MKT-888')
+            ->assertSee('JNE')
+            ->assertSee('JNE1234567890')
+            ->assertSee('Budi Penerima')
+            ->call('tutupDetailModal')
+            // Cetak struk pesanan online
+            ->call('cetakUlangStruk', 'online', $orderWeb->id)
+            ->assertSet('showReceiptModal', true)
+            ->assertSee('TRX-MKT-888');
     }
 }

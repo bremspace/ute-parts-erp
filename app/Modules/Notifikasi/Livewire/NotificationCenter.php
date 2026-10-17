@@ -77,7 +77,7 @@ class NotificationCenter extends Component
             ->where('tipe', 'inapp')
             ->max('id') ?? 0);
 
-        $this->refreshCounts();
+        $this->refreshCounts(true);
         $this->lastKnownPendingApprovalCount = $this->pendingApprovalCount;
     }
 
@@ -113,13 +113,15 @@ class NotificationCenter extends Component
         $this->refreshCounts();
     }
 
-    public function refreshCounts(): void
+    public function refreshCounts(bool $withAutoResolve = false): void
     {
         $user = Auth::user();
         $cabangId = session('cabang_id');
 
-        // Otomatis sinkronkan/selesaikan notifikasi usang jika entitasnya telah berubah status
-        app(NotificationService::class)->autoResolveOutdatedInapp($user, $cabangId);
+        // Otomatis sinkronkan/selesaikan notifikasi usang hanya saat diminta (misal mount atau buka panel)
+        if ($withAutoResolve) {
+            app(NotificationService::class)->autoResolveOutdatedInapp($user, $cabangId);
+        }
 
         $this->unreadNotifCount = NotifikasiKeluar::query()
             ->where('tipe', 'inapp')
@@ -191,6 +193,9 @@ class NotificationCenter extends Component
     public function toggleDropdown(): void
     {
         $this->open = ! $this->open;
+        if ($this->open) {
+            $this->refreshCounts(true);
+        }
     }
 
     public function closeDropdown(): void
@@ -281,8 +286,6 @@ class NotificationCenter extends Component
     {
         $user = Auth::user();
         $cabangId = session('cabang_id');
-
-        $this->refreshCounts();
 
         // Query notification list based on user role and event preferences
         $query = NotifikasiKeluar::query()

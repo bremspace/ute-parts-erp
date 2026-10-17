@@ -1,4 +1,4 @@
-<div class="relative" wire:poll.8s="checkNewNotifications" x-data="{ open: @entangle('open') }" @click.outside="open = false" @keydown.escape.window="open = false">
+<div class="relative" wire:poll.25s="checkNewNotifications" x-data="{ open: @entangle('open') }" @click.outside="open = false" @keydown.escape.window="open = false">
     <!-- Backdrop for mobile screens (<sm) -->
     <div
         x-show="open"

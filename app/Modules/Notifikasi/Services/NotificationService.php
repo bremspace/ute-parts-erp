@@ -243,24 +243,54 @@ class NotificationService
         }
 
         $activeNotifs = $query->limit(50)->get();
+        if ($activeNotifs->isEmpty()) {
+            return 0;
+        }
+
+        // Kumpulkan ID transaksi dan approval untuk batch lookup (mencegah N+1 query)
+        $transaksiIds = [];
+        $approvalIds = [];
+        foreach ($activeNotifs as $notif) {
+            $tId = $notif->payload['transaksi_id'] ?? null;
+            if ($tId) {
+                $transaksiIds[] = (int) $tId;
+            }
+            $aId = $notif->payload['approval_request_id'] ?? null;
+            if ($aId) {
+                $approvalIds[] = (int) $aId;
+            }
+        }
+
+        $transaksiMap = ! empty($transaksiIds)
+            ? Transaksi::whereIn('id', array_unique($transaksiIds))->get()->keyBy('id')
+            : collect();
+
+        $approvalMap = ! empty($approvalIds)
+            ? ApprovalRequest::whereIn('id', array_unique($approvalIds))->get()->keyBy('id')
+            : collect();
+
         $resolvedCount = 0;
+        $resolvedTransaksiIds = [];
+        $resolvedApprovalIds = [];
 
         foreach ($activeNotifs as $notif) {
-            $transaksiId = $notif->payload['transaksi_id'] ?? null;
-            if ($transaksiId) {
-                $transaksi = Transaksi::find($transaksiId);
-                if ($transaksi && $transaksi->status !== 'menunggu_pembayaran') {
+            $transaksiId = (int) ($notif->payload['transaksi_id'] ?? 0);
+            if ($transaksiId && isset($transaksiMap[$transaksiId])) {
+                $transaksi = $transaksiMap[$transaksiId];
+                if ($transaksi->status !== 'menunggu_pembayaran' && ! in_array($transaksiId, $resolvedTransaksiIds, true)) {
                     $resolvedCount += $this->sinkronkanStatusTransaksi($transaksi);
+                    $resolvedTransaksiIds[] = $transaksiId;
                 }
 
                 continue;
             }
 
-            $approvalId = $notif->payload['approval_request_id'] ?? null;
-            if ($approvalId) {
-                $approval = ApprovalRequest::find($approvalId);
-                if ($approval && $approval->status !== 'pending') {
+            $approvalId = (int) ($notif->payload['approval_request_id'] ?? 0);
+            if ($approvalId && isset($approvalMap[$approvalId])) {
+                $approval = $approvalMap[$approvalId];
+                if ($approval->status !== 'pending' && ! in_array($approvalId, $resolvedApprovalIds, true)) {
                     $resolvedCount += $this->sinkronkanStatusApproval($approval);
+                    $resolvedApprovalIds[] = $approvalId;
                 }
             }
         }

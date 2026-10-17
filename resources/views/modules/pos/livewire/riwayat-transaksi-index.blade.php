@@ -20,7 +20,7 @@
     </div>
 
     {{-- Kartu Ringkasan (Hari / Tanggal Terpilih) --}}
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <div class="p-4 rounded-2xl glass-panel border border-white/10">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
                 <span>Penjualan POS</span>
@@ -28,6 +28,15 @@
             </div>
             <p class="text-lg sm:text-xl font-bold text-white tabular-nums mt-1">
                 Rp {{ number_format($ringkasan['total_penjualan_pos'], 0, ',', '.') }}
+            </p>
+        </div>
+        <div class="p-4 rounded-2xl glass-panel border border-white/10">
+            <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
+                <span>Pesanan Online</span>
+                <span class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[10px] font-mono">{{ $ringkasan['count_pesanan_online'] }} Trx</span>
+            </div>
+            <p class="text-lg sm:text-xl font-bold text-indigo-400 tabular-nums mt-1">
+                Rp {{ number_format($ringkasan['total_pesanan_online'], 0, ',', '.') }}
             </p>
         </div>
         <div class="p-4 rounded-2xl glass-panel border border-white/10">
@@ -76,6 +85,12 @@
             <span>Penjualan Kasir POS</span>
         </button>
         <button
+            wire:click="$set('activeTab', 'online')"
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'online' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+            <span>Pesanan Online (Web & Omni)</span>
+        </button>
+        <button
             wire:click="$set('activeTab', 'servis')"
             class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'servis' ? 'bg-up-mint text-white shadow-sm shadow-up-mint/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
@@ -112,6 +127,7 @@
                 <select wire:model.live="filterStatus" class="px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
                     <option value="">Semua Jenis Transaksi</option>
                     <option value="pos">Penjualan Kasir POS</option>
+                    <option value="online">Pesanan Online (Web & Omni)</option>
                     <option value="servis">Pelunasan Servis Gadget</option>
                     <option value="mutasi_masuk">Kas Masuk (Laci)</option>
                     <option value="mutasi_keluar">Kas Keluar (Laci)</option>
@@ -215,6 +231,10 @@
                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/15 text-indigo-300 border border-up-primary/20">
                                             🛒 Kasir POS
                                         </span>
+                                    @elseif($row->jenis === 'online')
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+                                            🌐 Online ({{ $row->operator }})
+                                        </span>
                                     @elseif($row->jenis === 'servis')
                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/20">
                                             🔧 Servis Gadget
@@ -262,16 +282,16 @@
                                 </td>
                                 <td class="py-3.5 px-4 text-right">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        @if($row->jenis === 'pos')
+                                        @if($row->jenis === 'pos' || $row->jenis === 'online')
                                             <button
                                                 wire:click="lihatDetailTransaksi({{ $row->target_id }})"
                                                 class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white text-[11px] font-semibold transition cursor-pointer"
-                                                title="Lihat Detail Transaksi POS"
+                                                title="Lihat Detail Transaksi"
                                             >
                                                 Detail
                                             </button>
                                             <button
-                                                wire:click="cetakUlangStruk('pos', {{ $row->target_id }})"
+                                                wire:click="cetakUlangStruk('{{ $row->jenis }}', {{ $row->target_id }})"
                                                 class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition cursor-pointer"
                                                 title="Cetak Ulang Struk"
                                             >
@@ -371,6 +391,97 @@
                             <tr>
                                 <td colspan="8" class="py-12 text-center text-ink-400 text-xs">
                                     Tidak ada transaksi kasir POS ditemukan untuk filter ini.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </x-prism.dual-scroll>
+
+        @elseif($activeTab === 'online')
+            {{-- TAB: PESANAN ONLINE & OMNICHANNEL --}}
+            <x-prism.dual-scroll>
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
+                            <th class="py-3 px-4">No Pesanan</th>
+                            <th class="py-3 px-4">Platform</th>
+                            <th class="py-3 px-4">Waktu</th>
+                            <th class="py-3 px-4">Pelanggan</th>
+                            <th class="py-3 px-4">Metode & Pengiriman</th>
+                            <th class="py-3 px-4 text-right">Total Akhir</th>
+                            <th class="py-3 px-4 text-center">Status</th>
+                            <th class="py-3 px-4 text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        @forelse($dataList as $row)
+                            @php
+                                $platformLabel = $row->sumber === 'marketplace' ? 'Web Ute' : (str_starts_with((string) $row->sumber, 'channel:') ? ucfirst(str_replace('channel:', '', $row->sumber)) : 'Online');
+                                $isPickup = str_contains(strtolower($row->catatan ?? ''), 'ambil_ke_toko');
+                            @endphp
+                            <tr class="hover:bg-white/[0.02] transition-colors">
+                                <td class="py-3.5 px-4 font-mono font-bold text-white">
+                                    {{ $row->no_transaksi }}
+                                    @if($row->channelOrder)
+                                        <span class="block text-[10px] text-indigo-400 font-sans font-normal">
+                                            ID: {{ $row->channelOrder->channel_order_id }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="py-3.5 px-4">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $row->sumber === 'marketplace' ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/25' : 'bg-up-accent/15 text-up-accent border border-up-accent/25' }}">
+                                        {{ $platformLabel }}
+                                    </span>
+                                </td>
+                                <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $row->created_at?->format('d/m/Y H:i') }}</td>
+                                <td class="py-3.5 px-4 text-white font-medium">
+                                    {{ $row->pelanggan?->nama ?? 'Pelanggan Online' }}
+                                    @if($row->pelanggan?->telepon)
+                                        <span class="block text-[10px] text-ink-400 font-mono">{{ $row->pelanggan->telepon }}</span>
+                                    @endif
+                                </td>
+                                <td class="py-3.5 px-4 text-ink-300">
+                                    <div class="font-semibold text-white uppercase text-[11px]">{{ $row->metode_bayar ?: 'Duitku' }}</div>
+                                    <div class="text-[10px] text-ink-400 mt-0.5">
+                                        @if($isPickup)
+                                            <span class="text-amber-400 font-medium">🏬 Ambil di Toko</span>
+                                        @elseif($row->pengiriman)
+                                            <span>🚚 {{ $row->pengiriman->kurir }} {{ ($row->pengiriman->tracking_id ?? $row->pengiriman->no_resi) ? '('.($row->pengiriman->tracking_id ?? $row->pengiriman->no_resi).')' : '' }}</span>
+                                        @else
+                                            <span>🚚 Pengiriman Kurir</span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="py-3.5 px-4 text-right font-bold text-white tabular-nums">Rp {{ number_format($row->total_akhir, 0, ',', '.') }}</td>
+                                <td class="py-3.5 px-4 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ in_array($row->status, ['lunas', 'selesai']) ? 'bg-up-mint/15 text-up-mint' : (in_array($row->status, ['diproses', 'dikirim', 'siap_diambil']) ? 'bg-sky-500/15 text-sky-400' : 'bg-up-amber/15 text-up-amber') }}">
+                                        {{ ucfirst(str_replace('_', ' ', $row->status)) }}
+                                    </span>
+                                </td>
+                                <td class="py-3.5 px-4 text-right">
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <button
+                                            wire:click="lihatDetailTransaksi({{ $row->id }})"
+                                            class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white text-[11px] font-semibold transition cursor-pointer"
+                                            title="Detail Pesanan Online"
+                                        >
+                                            Detail
+                                        </button>
+                                        <button
+                                            wire:click="cetakUlangStruk('online', {{ $row->id }})"
+                                            class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition cursor-pointer"
+                                            title="Cetak Struk / Label"
+                                        >
+                                            🖨️
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="py-12 text-center text-ink-400 text-xs">
+                                    Tidak ada transaksi pesanan online ditemukan untuk filter ini.
                                 </td>
                             </tr>
                         @endforelse
@@ -553,12 +664,18 @@
                 {{-- Header Modal Sesuai Tipe --}}
                 <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
                     <div>
-                        @if($selectedDetail['tipe'] === 'pos')
+                        @if($selectedDetail['tipe'] === 'pos' || $selectedDetail['tipe'] === 'online')
                             <div class="flex items-center gap-2">
-                                <span class="px-2 py-0.5 rounded bg-up-primary/20 text-up-primary font-bold text-[10px] uppercase">Kasir POS</span>
+                                @if($selectedDetail['tipe'] === 'online')
+                                    <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px] uppercase">
+                                        Pesanan Online ({{ $selectedDetail['sumber'] === 'marketplace' ? 'Web Ute' : $selectedDetail['sumber'] }})
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 rounded bg-up-primary/20 text-up-primary font-bold text-[10px] uppercase">Kasir POS</span>
+                                @endif
                                 <h3 class="text-base font-bold text-white">Detail Transaksi {{ $selectedDetail['no_transaksi'] }}</h3>
                             </div>
-                            <p class="text-xs text-ink-400 mt-0.5">{{ $selectedDetail['tanggal'] }} · Kasir: {{ $selectedDetail['kasir'] }}</p>
+                            <p class="text-xs text-ink-400 mt-0.5">{{ $selectedDetail['tanggal'] }} · {{ $selectedDetail['tipe'] === 'online' ? 'Operator' : 'Kasir' }}: {{ $selectedDetail['kasir'] }}</p>
                         @elseif($selectedDetail['tipe'] === 'servis')
                             <div class="flex items-center gap-2">
                                 <span class="px-2 py-0.5 rounded bg-teal-500/20 text-teal-400 font-bold text-[10px] uppercase">Rekap Servis</span>
@@ -580,18 +697,37 @@
 
                 {{-- Body Modal --}}
                 <div class="overflow-y-auto flex-1 space-y-4 pr-1">
-                    @if($selectedDetail['tipe'] === 'pos')
-                        {{-- POS DETAIL --}}
-                        <div class="grid grid-cols-2 gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs">
+                    @if($selectedDetail['tipe'] === 'pos' || $selectedDetail['tipe'] === 'online')
+                        {{-- POS & ONLINE DETAIL --}}
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs">
                             <div>
                                 <span class="text-ink-400 block text-[10px]">Pelanggan</span>
                                 <span class="font-semibold text-white">{{ $selectedDetail['pelanggan'] }}</span>
                             </div>
                             <div>
                                 <span class="text-ink-400 block text-[10px]">Metode Pembayaran</span>
-                                <span class="font-semibold text-white uppercase">{{ $selectedDetail['metode_bayar'] }}</span>
+                                <span class="font-semibold text-white uppercase">{{ $selectedDetail['metode_bayar'] ?: 'Online' }}</span>
+                            </div>
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Status Transaksi</span>
+                                <span class="font-semibold text-up-mint uppercase">{{ ucfirst(str_replace('_', ' ', $selectedDetail['status'])) }}</span>
                             </div>
                         </div>
+
+                        @if(!empty($selectedDetail['pengiriman']))
+                            <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs space-y-1">
+                                <div class="font-bold text-indigo-300 flex items-center justify-between">
+                                    <span>🚚 Ekspedisi / Kurir: {{ $selectedDetail['pengiriman']['kurir'] }} ({{ $selectedDetail['pengiriman']['layanan'] ?? 'Reguler' }})</span>
+                                    <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200">{{ $selectedDetail['pengiriman']['status'] ?? 'pending' }}</span>
+                                </div>
+                                <div class="text-ink-300">
+                                    No. Resi: <span class="font-mono font-bold text-white">{{ $selectedDetail['pengiriman']['no_resi'] ?? 'Belum ada resi' }}</span>
+                                </div>
+                                <div class="text-ink-300 text-[11px]">
+                                    Penerima: {{ $selectedDetail['pengiriman']['nama_penerima'] }} ({{ $selectedDetail['pengiriman']['telepon_tujuan'] ?? '-' }}) · {{ $selectedDetail['pengiriman']['alamat_tujuan'] }}
+                                </div>
+                            </div>
+                        @endif
 
                         <div>
                             <h4 class="text-xs font-semibold text-ink-300 mb-2">Item Belanja:</h4>

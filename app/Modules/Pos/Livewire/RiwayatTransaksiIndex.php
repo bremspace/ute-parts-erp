@@ -16,7 +16,7 @@ class RiwayatTransaksiIndex extends Component
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
-    public string $activeTab = 'global'; // 'global' | 'pos' | 'servis' | 'mutasi_kas'
+    public string $activeTab = 'global'; // 'global' | 'pos' | 'online' | 'servis' | 'mutasi_kas'
 
     public string $search = '';
 
@@ -80,16 +80,18 @@ class RiwayatTransaksiIndex extends Component
     public function lihatDetailTransaksi(int $id): void
     {
         $cabangId = session('cabang_id');
-        $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'tiketServis'])
+        $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'tiketServis', 'pengiriman', 'channelOrder.channel'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
 
+        $isOnline = in_array($trx->sumber, ['marketplace']) || str_starts_with((string) $trx->sumber, 'channel:');
+
         $this->selectedDetail = [
-            'tipe' => 'pos',
+            'tipe' => $isOnline ? 'online' : 'pos',
             'id' => $trx->id,
             'no_transaksi' => $trx->no_transaksi,
             'tanggal' => $trx->created_at?->format('d/m/Y H:i:s'),
-            'kasir' => $trx->kasir?->name ?? 'Kasir',
+            'kasir' => $trx->kasir?->name ?? ($isOnline ? 'Sistem Online' : 'Kasir'),
             'pelanggan' => $trx->pelanggan?->nama ?? 'Pelanggan Umum',
             'metode_bayar' => $trx->metode_bayar,
             'subtotal' => (float) $trx->subtotal,
@@ -110,6 +112,19 @@ class RiwayatTransaksiIndex extends Component
             ])->toArray(),
             'tiket_servis_id' => $trx->tiket_servis_id,
             'no_tiket' => $trx->tiketServis?->no_tiket,
+            'pengiriman' => $trx->pengiriman ? [
+                'kurir' => $trx->pengiriman->kurir,
+                'layanan' => $trx->pengiriman->layanan,
+                'no_resi' => $trx->pengiriman->tracking_id ?? $trx->pengiriman->no_resi ?? null,
+                'status' => $trx->pengiriman->status,
+                'ongkir' => (float) $trx->pengiriman->ongkir,
+                'nama_penerima' => $trx->pengiriman->nama_penerima,
+                'telepon_tujuan' => $trx->pengiriman->telepon_tujuan,
+                'alamat_tujuan' => $trx->pengiriman->alamat_tujuan,
+            ] : null,
+            'channel' => $trx->channelOrder?->channel?->nama,
+            'channel_platform' => $trx->channelOrder?->channel?->platform,
+            'channel_order_id' => $trx->channelOrder?->channel_order_id,
         ];
 
         $this->showDetailModal = true;
@@ -191,7 +206,7 @@ class RiwayatTransaksiIndex extends Component
     {
         $cabangId = session('cabang_id');
 
-        if ($tipe === 'pos') {
+        if ($tipe === 'pos' || $tipe === 'online') {
             $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'cabang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->find($id);
@@ -200,11 +215,16 @@ class RiwayatTransaksiIndex extends Component
                 return;
             }
 
+            $kasirName = $trx->kasir?->name;
+            if (! $kasirName) {
+                $kasirName = $trx->sumber === 'marketplace' ? 'Web Store' : (str_starts_with((string) $trx->sumber, 'channel:') ? strtoupper(str_replace('channel:', '', $trx->sumber)) : 'Kasir');
+            }
+
             $this->completedTransactionId = $trx->id;
             $this->receiptData = [
                 'no_transaksi' => $trx->no_transaksi,
                 'waktu' => $trx->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
-                'kasir' => $trx->kasir?->name ?? 'Kasir',
+                'kasir' => $kasirName,
                 'pelanggan' => $trx->pelanggan?->nama ?? 'Pelanggan Umum',
                 'telepon' => $trx->pelanggan?->telepon ?? null,
                 'items' => $trx->items->map(fn ($it) => [
@@ -217,9 +237,9 @@ class RiwayatTransaksiIndex extends Component
                 'diskon' => (float) $trx->diskon_nominal,
                 'pajak' => (float) $trx->pajak_nominal,
                 'total' => (float) $trx->total_akhir,
-                'bayar' => (float) $trx->jumlah_bayar,
-                'kembalian' => (float) $trx->kembalian,
-                'metode' => strtoupper($trx->metode_bayar),
+                'bayar' => (float) ($trx->jumlah_bayar ?: $trx->total_akhir),
+                'kembalian' => (float) ($trx->kembalian ?? 0),
+                'metode' => strtoupper($trx->metode_bayar ?: 'ONLINE'),
                 'cabang' => $trx->cabang?->nama ?? 'Ute Parts Store',
             ];
 
@@ -277,6 +297,8 @@ class RiwayatTransaksiIndex extends Component
         $ringkasan = [
             'total_penjualan_pos' => 0.0,
             'count_penjualan_pos' => 0,
+            'total_pesanan_online' => 0.0,
+            'count_pesanan_online' => 0,
             'total_mutasi_masuk' => 0.0,
             'total_mutasi_keluar' => 0.0,
             'total_servis_selesai' => 0.0,
@@ -300,6 +322,20 @@ class RiwayatTransaksiIndex extends Component
 
             $ringkasan['total_penjualan_pos'] = (float) ($posStats->total ?? 0);
             $ringkasan['count_penjualan_pos'] = (int) ($posStats->count ?? 0);
+
+            // Pesanan Online (Web Ute Store & Omnichannel)
+            $onlineStats = Transaksi::where('cabang_id', $cabangId)
+                ->where(function ($q) {
+                    $q->where('sumber', 'marketplace')
+                        ->orWhere('sumber', 'like', 'channel:%');
+                })
+                ->whereDate('created_at', $tgl)
+                ->whereIn('status', ['lunas', 'diproses', 'dikirim', 'siap_diambil', 'selesai'])
+                ->selectRaw('COALESCE(SUM(total_akhir), 0) as total, COUNT(*) as count')
+                ->first();
+
+            $ringkasan['total_pesanan_online'] = (float) ($onlineStats->total ?? 0);
+            $ringkasan['count_pesanan_online'] = (int) ($onlineStats->count ?? 0);
 
             // Mutasi kas laci
             $mutasiStats = DB::table('kas_mutasi_laci')
@@ -341,7 +377,7 @@ class RiwayatTransaksiIndex extends Component
             $ringkasan['count_servis_selesai'] = $servisTrxCount + $servisDirectCount;
 
             // Total arus masuk & kas bersih
-            $ringkasan['total_arus_masuk'] = $ringkasan['total_penjualan_pos'] + $ringkasan['total_servis_selesai'] + $ringkasan['total_mutasi_masuk'];
+            $ringkasan['total_arus_masuk'] = $ringkasan['total_penjualan_pos'] + $ringkasan['total_pesanan_online'] + $ringkasan['total_servis_selesai'] + $ringkasan['total_mutasi_masuk'];
             $ringkasan['total_kas_bersih'] = $ringkasan['total_arus_masuk'] - $ringkasan['total_mutasi_keluar'];
         }
 
@@ -351,6 +387,8 @@ class RiwayatTransaksiIndex extends Component
             $dataList = $cabangId ? $this->getGlobalData($cabangId) : null;
         } elseif ($this->activeTab === 'pos') {
             $dataList = $cabangId ? $this->getPosData($cabangId) : null;
+        } elseif ($this->activeTab === 'online') {
+            $dataList = $cabangId ? $this->getOnlineData($cabangId) : null;
         } elseif ($this->activeTab === 'servis') {
             $dataList = $cabangId ? $this->getServisData($cabangId) : null;
         } elseif ($this->activeTab === 'mutasi_kas') {
@@ -400,7 +438,38 @@ class RiwayatTransaksiIndex extends Component
             $qPos->where('t.metode_bayar', $metode);
         }
 
-        // 2. Transaksi Servis (Pelunasan via POS)
+        // 2. Transaksi Pesanan Online (Web Ute Store & Omnichannel)
+        $qOnline = DB::table('transaksi as t')
+            ->leftJoin('users as u', 't.kasir_id', '=', 'u.id')
+            ->leftJoin('pelanggan as p', 't.pelanggan_id', '=', 'p.id')
+            ->where('t.cabang_id', $cabangId)
+            ->where(function ($q) {
+                $q->where('t.sumber', 'marketplace')
+                    ->orWhere('t.sumber', 'like', 'channel:%');
+            })
+            ->select([
+                't.id as id',
+                DB::raw("'online' as jenis"),
+                't.no_transaksi as no_referensi',
+                't.created_at as waktu',
+                DB::raw("COALESCE(p.nama, 'Pelanggan Online') as pihak"),
+                DB::raw("CASE WHEN t.sumber = 'marketplace' THEN 'Web Ute' ELSE COALESCE(u.name, REPLACE(t.sumber, 'channel:', '')) END as operator"),
+                't.metode_bayar as metode',
+                't.total_akhir as nominal',
+                DB::raw("'in' as arah_kas"),
+                't.status as status',
+                DB::raw("COALESCE(t.catatan, 'Pesanan Online') as deskripsi"),
+                't.id as target_id',
+            ]);
+
+        if ($tanggal) {
+            $qOnline->whereDate('t.created_at', $tanggal);
+        }
+        if ($metode) {
+            $qOnline->where('t.metode_bayar', $metode);
+        }
+
+        // 3. Transaksi Servis (Pelunasan via POS)
         $qServisTrx = DB::table('transaksi as t')
             ->leftJoin('users as u', 't.kasir_id', '=', 'u.id')
             ->leftJoin('pelanggan as p', 't.pelanggan_id', '=', 'p.id')
@@ -494,7 +563,7 @@ class RiwayatTransaksiIndex extends Component
         // Susun queries berdasarkan filterStatus jenis
         $queries = [];
         if (! $status || $status === 'semua') {
-            $queries = [$qPos, $qServisTrx];
+            $queries = [$qPos, $qOnline, $qServisTrx];
             if ($qServisDirect) {
                 $queries[] = $qServisDirect;
             }
@@ -503,6 +572,8 @@ class RiwayatTransaksiIndex extends Component
             }
         } elseif ($status === 'pos') {
             $queries = [$qPos];
+        } elseif ($status === 'online') {
+            $queries = [$qOnline];
         } elseif ($status === 'servis') {
             $queries = [$qServisTrx];
             if ($qServisDirect) {
@@ -554,6 +625,30 @@ class RiwayatTransaksiIndex extends Component
                     $sub->where('no_transaksi', 'like', "%{$this->search}%")
                         ->orWhereHas('pelanggan', fn ($p) => $p->where('nama', 'like', "%{$this->search}%"))
                         ->orWhereHas('kasir', fn ($k) => $k->where('name', 'like', "%{$this->search}%"));
+                });
+            })
+            ->latest('id');
+
+        return $query->paginate(15);
+    }
+
+    protected function getOnlineData(int $cabangId)
+    {
+        $query = Transaksi::with(['kasir', 'pelanggan', 'pengiriman', 'channelOrder.channel'])
+            ->where('cabang_id', $cabangId)
+            ->where(function ($q) {
+                $q->where('sumber', 'marketplace')
+                    ->orWhere('sumber', 'like', 'channel:%');
+            })
+            ->when($this->filterTanggal, fn ($q) => $q->whereDate('created_at', $this->filterTanggal))
+            ->when($this->filterMetode, fn ($q) => $q->where('metode_bayar', $this->filterMetode))
+            ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
+            ->when($this->search, function ($q) {
+                $q->where(function ($sub) {
+                    $sub->where('no_transaksi', 'like', "%{$this->search}%")
+                        ->orWhere('sumber', 'like', "%{$this->search}%")
+                        ->orWhereHas('pelanggan', fn ($p) => $p->where('nama', 'like', "%{$this->search}%"))
+                        ->orWhereHas('pengiriman', fn ($pr) => $pr->where('tracking_id', 'like', "%{$this->search}%"));
                 });
             })
             ->latest('id');
