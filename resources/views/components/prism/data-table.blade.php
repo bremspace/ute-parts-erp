@@ -10,7 +10,7 @@
                 <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-500 dark:text-ink-400 sticky top-0 z-10 backdrop-blur-md">
                     <tr>
                         @foreach($headers as $header)
-                            <th class="py-3.5 px-4 font-semibold whitespace-nowrap">{{ $header }}</th>
+                            <th class="py-3.5 px-4 font-semibold whitespace-nowrap">{!! $header !!}</th>
                         @endforeach
                     </tr>
                 </thead>
@@ -31,7 +31,7 @@
                 <thead class="bg-black/5 dark:bg-white/5 border-b border-black/10 dark:border-white/10 text-xs uppercase tracking-wider font-semibold text-ink-500 dark:text-ink-400 sticky top-0 z-10 backdrop-blur-md">
                     <tr>
                         @foreach($headers as $header)
-                            <th class="py-3.5 px-3 sm:px-4 font-semibold whitespace-nowrap">{{ $header }}</th>
+                            <th class="py-3.5 px-3 sm:px-4 font-semibold whitespace-nowrap">{!! $header !!}</th>
                         @endforeach
                     </tr>
                 </thead>

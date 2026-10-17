@@ -25,6 +25,7 @@ use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -69,6 +70,12 @@ class ProdukTab extends Component
     public bool $filterHanyaReadyStok = false;
 
     public string $filterTierHarga = 'retail'; // retail, reseller, agen, atau tier_{id}
+
+    public int $perPage = 25;
+
+    public array $selectedProdukIds = [];
+
+    public bool $selectAll = false;
 
     // Filter toggle preferences (checkbox custom)
     public array $visibleFilters = [
@@ -909,11 +916,12 @@ class ProdukTab extends Component
         }
 
         // 2. Cek riwayat transaksi/mutasi yang terhubung
-        $hasTransaksi = DB::table('transaksi_items')->where('produk_id', $produkId)->exists();
-        $hasPo = DB::table('po_items')->where('produk_id', $produkId)->exists();
-        $hasServis = DB::table('servis_item')->where('produk_id', $produkId)->exists();
-        $hasTransfer = DB::table('stok_transfer_item')->where('produk_id', $produkId)->exists();
-        $hasOpname = DB::table('stok_opname_item')->where('produk_id', $produkId)->exists();
+        $hasTransaksi = Schema::hasTable('transaksi_item') && DB::table('transaksi_item')->where('produk_id', $produkId)->exists();
+        $hasPo = Schema::hasTable('purchase_order_item') && DB::table('purchase_order_item')->where('produk_id', $produkId)->exists();
+        $hasServis = (Schema::hasTable('tiket_servis_item') && DB::table('tiket_servis_item')->where('produk_id', $produkId)->exists())
+            || (Schema::hasTable('servis_sparepart') && DB::table('servis_sparepart')->where('produk_id', $produkId)->exists());
+        $hasTransfer = Schema::hasTable('stok_transfer_item') && DB::table('stok_transfer_item')->where('produk_id', $produkId)->exists();
+        $hasOpname = Schema::hasTable('stok_opname_item') && DB::table('stok_opname_item')->where('produk_id', $produkId)->exists();
 
         if ($hasTransaksi || $hasPo || $hasServis || $hasTransfer || $hasOpname) {
             $produk->update(['is_active' => false]);
@@ -941,7 +949,9 @@ class ProdukTab extends Component
                 HargaTier::where('produk_id', $produkId)->delete();
                 StokItem::where('produk_id', $produkId)->delete();
                 SkuVariant::where('produk_id', $produkId)->delete();
-                DB::table('sid_import_maps')->where('entity_type', 'produk')->where('entity_id', $produkId)->delete();
+                if (Schema::hasTable('sid_import_maps')) {
+                    DB::table('sid_import_maps')->where('entity_type', 'produk')->where('entity_id', $produkId)->delete();
+                }
 
                 if (! empty($produk->foto)) {
                     $fotos = is_array($produk->foto) ? $produk->foto : json_decode((string) $produk->foto, true);
@@ -1468,6 +1478,342 @@ class ProdukTab extends Component
         $this->resetPage();
     }
 
+    public function updatingPerPage(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSelectAll($value): void
+    {
+        $currentPageIds = array_map('intval', $this->getCurrentPageProdukIds());
+        $currentSelected = array_map('intval', $this->selectedProdukIds);
+
+        if ($value) {
+            $this->selectedProdukIds = array_values(array_unique(array_merge($currentSelected, $currentPageIds)));
+        } else {
+            $this->selectedProdukIds = array_values(array_diff($currentSelected, $currentPageIds));
+        }
+    }
+
+    public function selectAllMatching(): void
+    {
+        $this->selectedProdukIds = array_map('intval', $this->getFilteredProdukQuery()->pluck('id')->all());
+        $this->selectAll = true;
+    }
+
+    public function clearSelected(): void
+    {
+        $this->selectedProdukIds = [];
+        $this->selectAll = false;
+    }
+
+    public function getLabelTierAktifProperty(): string
+    {
+        if ($this->filterTierHarga === 'reseller') {
+            return 'Reseller';
+        }
+        if ($this->filterTierHarga === 'agen') {
+            return 'Agen';
+        }
+        if (str_starts_with($this->filterTierHarga, 'tier_')) {
+            $tierId = (int) str_replace('tier_', '', $this->filterTierHarga);
+            $tierObj = TierMembership::find($tierId);
+
+            return $tierObj ? 'Tier '.$tierObj->nama : 'Tier Khusus';
+        }
+
+        return 'Retail Standar';
+    }
+
+    public function resolveHargaTierProduk(Produk $p, ?string $filterTier = null): array
+    {
+        $filterTier = $filterTier ?? $this->filterTierHarga;
+        $hargaJual = (float) $p->harga_jual_retail;
+        $hargaFinal = $hargaJual;
+        $tierLabel = 'Retail Standar';
+
+        if ($filterTier === 'reseller') {
+            $tierLabel = 'Reseller';
+            $ht = $p->hargaTier->first(fn ($h) => $h->tipe_konsumen === 'reseller' || ($h->is_reseller && ! $h->tier_membership_id));
+            if ($ht) {
+                if ($ht->nominal_tetap !== null) {
+                    $hargaFinal = (float) $ht->nominal_tetap;
+                } elseif ($ht->persen_diskon !== null) {
+                    $hargaFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
+                } elseif ($ht->harga !== null) {
+                    $hargaFinal = (float) $ht->harga;
+                }
+            }
+        } elseif ($filterTier === 'agen') {
+            $tierLabel = 'Agen';
+            $ht = $p->hargaTier->first(fn ($h) => $h->tipe_konsumen === 'agen');
+            if ($ht) {
+                if ($ht->nominal_tetap !== null) {
+                    $hargaFinal = (float) $ht->nominal_tetap;
+                } elseif ($ht->persen_diskon !== null) {
+                    $hargaFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
+                }
+            }
+        } elseif (str_starts_with($filterTier, 'tier_')) {
+            $tierId = (int) str_replace('tier_', '', $filterTier);
+            $tierObj = TierMembership::find($tierId);
+            $tierLabel = $tierObj ? 'Tier '.$tierObj->nama : 'Tier Khusus';
+
+            $ht = $p->hargaTier->first(fn ($h) => (int) $h->tier_membership_id === $tierId);
+            if ($ht) {
+                if ($ht->nominal_tetap !== null) {
+                    $hargaFinal = (float) $ht->nominal_tetap;
+                } elseif ($ht->persen_diskon !== null) {
+                    $hargaFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
+                } elseif ($ht->harga !== null) {
+                    $hargaFinal = (float) $ht->harga;
+                }
+            } elseif ($tierObj && (float) $tierObj->diskon_persen > 0) {
+                $diskon = round(($hargaJual * (float) $tierObj->diskon_persen) / 100, 2);
+                $hargaFinal = max(0, $hargaJual - $diskon);
+            }
+        }
+
+        return [
+            'harga' => $hargaFinal,
+            'label' => $tierLabel,
+        ];
+    }
+
+    public function copySingleProduk(int $produkId): void
+    {
+        $p = Produk::with(['hargaTier.tierMembership'])->find($produkId);
+        if (! $p) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk tidak ditemukan.']);
+
+            return;
+        }
+
+        $tierInfo = $this->resolveHargaTierProduk($p);
+        $hargaFmt = 'Rp '.number_format($tierInfo['harga'], 0, ',', '.');
+        $text = "{$p->nama} - {$hargaFmt}";
+
+        $this->dispatch('salin-teks', teks: $text, message: "Harga '{$p->nama}' ({$hargaFmt}) berhasil disalin!");
+    }
+
+    public function salinHargaTerpilih(): void
+    {
+        if (empty($this->selectedProdukIds)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih minimal satu produk terlebih dahulu.']);
+
+            return;
+        }
+
+        $produks = Produk::with(['hargaTier.tierMembership'])
+            ->whereIn('id', $this->selectedProdukIds)
+            ->orderBy('nama')
+            ->get();
+
+        if ($produks->isEmpty()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk terpilih tidak ditemukan.']);
+
+            return;
+        }
+
+        $lines = [];
+        foreach ($produks as $p) {
+            $tierInfo = $this->resolveHargaTierProduk($p);
+            $hargaFmt = 'Rp '.number_format($tierInfo['harga'], 0, ',', '.');
+            $lines[] = "{$p->nama} - {$hargaFmt}";
+        }
+
+        $text = implode("\n", $lines);
+
+        $this->dispatch('salin-teks', teks: $text, message: "{$produks->count()} harga produk berhasil disalin ke clipboard!");
+    }
+
+    public function cetakBarcodeTerpilih(): void
+    {
+        if (empty($this->selectedProdukIds)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih minimal satu produk terlebih dahulu.']);
+
+            return;
+        }
+
+        $ids = implode(',', $this->selectedProdukIds);
+        $url = route('barcode.print').'?ids='.$ids;
+        $this->dispatch('buka-tab-baru', url: $url);
+    }
+
+    public function hapusProdukMasal(): void
+    {
+        if (! $this->isSuperAdmin()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin / Owner yang berhak menghapus master data produk.']);
+
+            return;
+        }
+
+        if (empty($this->selectedProdukIds)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih produk yang akan dihapus terlebih dahulu.']);
+
+            return;
+        }
+
+        $produks = Produk::whereIn('id', $this->selectedProdukIds)->get();
+        if ($produks->isEmpty()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak ada produk valid yang ditemukan.']);
+
+            return;
+        }
+
+        $countPermanen = 0;
+        $countNonaktif = 0;
+        $countGagalStok = 0;
+        $imgService = app(ProductImageService::class);
+
+        foreach ($produks as $produk) {
+            $produkId = $produk->id;
+
+            // 1. Cek sisa stok fisik
+            $stokFisik = (int) StokItem::where('produk_id', $produkId)->sum('jumlah');
+            if ($stokFisik > 0) {
+                $countGagalStok++;
+
+                continue;
+            }
+
+            // 2. Cek riwayat transaksi/mutasi
+            $hasTransaksi = Schema::hasTable('transaksi_item') && DB::table('transaksi_item')->where('produk_id', $produkId)->exists();
+            $hasPo = Schema::hasTable('purchase_order_item') && DB::table('purchase_order_item')->where('produk_id', $produkId)->exists();
+            $hasServis = (Schema::hasTable('tiket_servis_item') && DB::table('tiket_servis_item')->where('produk_id', $produkId)->exists())
+                || (Schema::hasTable('servis_sparepart') && DB::table('servis_sparepart')->where('produk_id', $produkId)->exists());
+            $hasTransfer = Schema::hasTable('stok_transfer_item') && DB::table('stok_transfer_item')->where('produk_id', $produkId)->exists();
+            $hasOpname = Schema::hasTable('stok_opname_item') && DB::table('stok_opname_item')->where('produk_id', $produkId)->exists();
+
+            if ($hasTransaksi || $hasPo || $hasServis || $hasTransfer || $hasOpname) {
+                $produk->update(['is_active' => false]);
+                activity()
+                    ->performedOn($produk)
+                    ->causedBy(auth()->user())
+                    ->log("Produk '{$produk->nama}' dinonaktifkan via aksi masal karena memiliki riwayat transaksi/mutasi.");
+                $countNonaktif++;
+
+                continue;
+            }
+
+            // 3. Hapus permanen
+            try {
+                DB::transaction(function () use ($produk, $produkId, $imgService) {
+                    HargaTier::where('produk_id', $produkId)->delete();
+                    StokItem::where('produk_id', $produkId)->delete();
+                    SkuVariant::where('produk_id', $produkId)->delete();
+                    if (Schema::hasTable('sid_import_maps')) {
+                        DB::table('sid_import_maps')->where('entity_type', 'produk')->where('entity_id', $produkId)->delete();
+                    }
+
+                    if (! empty($produk->foto)) {
+                        $fotos = is_array($produk->foto) ? $produk->foto : json_decode((string) $produk->foto, true);
+                        if (is_array($fotos)) {
+                            foreach ($fotos as $f) {
+                                if (isset($f['url'])) {
+                                    $imgService->hapusFoto($f['url'], $f['thumb'] ?? null);
+                                }
+                            }
+                        }
+                    }
+
+                    $produk->delete();
+                });
+                $countPermanen++;
+            } catch (\Exception $e) {
+                // skip on error
+            }
+        }
+
+        $this->selectedProdukIds = [];
+        $this->selectAll = false;
+
+        $msgParts = [];
+        if ($countPermanen > 0) {
+            $msgParts[] = "{$countPermanen} dihapus permanen";
+        }
+        if ($countNonaktif > 0) {
+            $msgParts[] = "{$countNonaktif} dinonaktifkan (karena riwayat transaksi)";
+        }
+        if ($countGagalStok > 0) {
+            $msgParts[] = "{$countGagalStok} dilewati (masih ada sisa stok fisik)";
+        }
+
+        $type = ($countPermanen > 0 || $countNonaktif > 0) ? 'success' : 'error';
+        $pesan = ! empty($msgParts)
+            ? 'Aksi masal selesai: '.implode(', ', $msgParts).'.'
+            : 'Tidak ada produk yang berhasil diproses.';
+
+        $this->dispatch('alert', ['type' => $type, 'message' => $pesan]);
+    }
+
+    protected function getFilteredProdukQuery()
+    {
+        $selectedKategoriIds = [];
+        if ($this->filterKategoriId) {
+            $kat = KategoriProduk::with('children')->find($this->filterKategoriId);
+            if ($kat) {
+                $selectedKategoriIds = array_merge([$kat->id], $kat->children->pluck('id')->all());
+            }
+        }
+
+        $query = Produk::with(['skuVariants', 'stokItems.gudang', 'stokItems.rak', 'brand', 'kualitas', 'tipeHps', 'kategoriRelasi', 'hargaTier.tierMembership'])
+            ->withSum('stokItems as total_stok', 'jumlah')
+            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch));
+
+        if (($this->visibleFilters['kategori'] ?? true) && ! empty($selectedKategoriIds)) {
+            $query->whereIn('kategori_id', $selectedKategoriIds);
+        }
+
+        if (($this->visibleFilters['brand'] ?? true) && $this->filterBrandId) {
+            $query->where('brand_id', $this->filterBrandId);
+        }
+
+        if (($this->visibleFilters['kualitas'] ?? false) && $this->filterKualitasId) {
+            $query->where('kualitas_id', $this->filterKualitasId);
+        }
+
+        if (($this->visibleFilters['tipe_hp'] ?? false) && $this->filterTipeHpId) {
+            $query->whereHas('tipeHps', fn ($q) => $q->where('tipe_hp.id', $this->filterTipeHpId));
+        }
+
+        if (($this->visibleFilters['brand_kompatibel'] ?? false) && $this->filterBrandKompatibel) {
+            $query->where('brand_kompatibel', $this->filterBrandKompatibel);
+        }
+
+        if (($this->visibleFilters['model_kompatibel'] ?? false) && $this->filterModelKompatibel) {
+            $query->where('model_kompatibel', $this->filterModelKompatibel);
+        }
+
+        if (($this->visibleFilters['kondisi'] ?? false) && $this->filterKondisi) {
+            $query->where('kondisi', $this->filterKondisi);
+        }
+
+        if (($this->visibleFilters['satuan'] ?? false) && $this->filterSatuan) {
+            $query->where('satuan', $this->filterSatuan);
+        }
+
+        if (($this->visibleFilters['abc_class'] ?? false) && $this->filterAbcClass) {
+            $query->where('abc_class', $this->filterAbcClass);
+        }
+
+        if (($this->visibleFilters['stok'] ?? false) && $this->filterHanyaReadyStok) {
+            $query->whereHas('stokItems', fn ($q) => $q->where('jumlah', '>', 0));
+        }
+
+        return $query;
+    }
+
+    protected function getCurrentPageProdukIds(): array
+    {
+        return $this->getFilteredProdukQuery()
+            ->orderBy('nama')
+            ->paginate($this->perPage)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     /**
      * Ekspor daftar master produk sebagai pricelist (Excel / CSV)
      * berdasarkan filter tier harga (retail, reseller, agen, atau tier membership CRM).
@@ -1495,61 +1841,12 @@ class ProdukTab extends Component
 
         $produks = $query->get();
 
-        // Siapkan dummy pelanggan untuk resolver tier membership bila filter berupa tier_{id}
-        $tierMembershipId = null;
-        $tierMembershipObj = null;
-        if (str_starts_with($this->filterTierHarga, 'tier_')) {
-            $tierMembershipId = (int) str_replace('tier_', '', $this->filterTierHarga);
-            $tierMembershipObj = TierMembership::find($tierMembershipId);
-        }
-
-        $tierLabel = match ($this->filterTierHarga) {
-            'reseller' => 'Reseller',
-            'agen' => 'Agen',
-            default => $tierMembershipObj ? 'Tier '.$tierMembershipObj->nama : 'Retail Standar',
-        };
-
         $rows = [];
+        $tierLabel = $this->labelTierAktif;
         foreach ($produks as $p) {
             $hargaJual = (float) $p->harga_jual_retail;
-            $hargaTierFinal = $hargaJual;
-
-            if ($this->filterTierHarga === 'reseller') {
-                $ht = $p->hargaTier->first(fn ($h) => $h->tipe_konsumen === 'reseller' || ($h->is_reseller && ! $h->tier_membership_id));
-                if ($ht) {
-                    if ($ht->nominal_tetap !== null) {
-                        $hargaTierFinal = (float) $ht->nominal_tetap;
-                    } elseif ($ht->persen_diskon !== null) {
-                        $hargaTierFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
-                    } elseif ($ht->harga !== null) {
-                        $hargaTierFinal = (float) $ht->harga;
-                    }
-                }
-            } elseif ($this->filterTierHarga === 'agen') {
-                $ht = $p->hargaTier->first(fn ($h) => $h->tipe_konsumen === 'agen');
-                if ($ht) {
-                    if ($ht->nominal_tetap !== null) {
-                        $hargaTierFinal = (float) $ht->nominal_tetap;
-                    } elseif ($ht->persen_diskon !== null) {
-                        $hargaTierFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
-                    }
-                }
-            } elseif ($tierMembershipId) {
-                // Tier membership CRM
-                $ht = $p->hargaTier->first(fn ($h) => (int) $h->tier_membership_id === $tierMembershipId);
-                if ($ht) {
-                    if ($ht->nominal_tetap !== null) {
-                        $hargaTierFinal = (float) $ht->nominal_tetap;
-                    } elseif ($ht->persen_diskon !== null) {
-                        $hargaTierFinal = round($hargaJual * (1 - (float) $ht->persen_diskon / 100), 2);
-                    } elseif ($ht->harga !== null) {
-                        $hargaTierFinal = (float) $ht->harga;
-                    }
-                } elseif ($tierMembershipObj && (float) $tierMembershipObj->diskon_persen > 0) {
-                    $diskon = round(($hargaJual * (float) $tierMembershipObj->diskon_persen) / 100, 2);
-                    $hargaTierFinal = max(0, $hargaJual - $diskon);
-                }
-            }
+            $tierInfo = $this->resolveHargaTierProduk($p, $this->filterTierHarga);
+            $hargaTierFinal = $tierInfo['harga'];
 
             $rows[] = [
                 'Kode / SKU' => $p->kode ?: ($p->skuVariants->first()?->sku ?? '-'),
@@ -1623,61 +1920,9 @@ class ProdukTab extends Component
     {
         $kategoriTree = KategoriProduk::getTree();
 
-        $selectedKategoriIds = [];
-        if ($this->filterKategoriId) {
-            $kat = KategoriProduk::with('children')->find($this->filterKategoriId);
-            if ($kat) {
-                $selectedKategoriIds = array_merge([$kat->id], $kat->children->pluck('id')->all());
-            }
-        }
-
-        $query = Produk::with(['skuVariants', 'stokItems.gudang', 'stokItems.rak', 'brand', 'kualitas', 'tipeHps', 'kategoriRelasi'])
-            ->withSum('stokItems as total_stok', 'jumlah')
-            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch));
-
-        if ($this->visibleFilters['kategori'] && ! empty($selectedKategoriIds)) {
-            $query->whereIn('kategori_id', $selectedKategoriIds);
-        }
-
-        if ($this->visibleFilters['brand'] && $this->filterBrandId) {
-            $query->where('brand_id', $this->filterBrandId);
-        }
-
-        if ($this->visibleFilters['kualitas'] && $this->filterKualitasId) {
-            $query->where('kualitas_id', $this->filterKualitasId);
-        }
-
-        if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
-            $query->whereHas('tipeHps', fn ($q) => $q->where('tipe_hp.id', $this->filterTipeHpId));
-        }
-
-        if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
-            $query->where('brand_kompatibel', $this->filterBrandKompatibel);
-        }
-
-        if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
-            $query->where('model_kompatibel', $this->filterModelKompatibel);
-        }
-
-        if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
-            $query->where('kondisi', $this->filterKondisi);
-        }
-
-        if ($this->visibleFilters['satuan'] && $this->filterSatuan) {
-            $query->where('satuan', $this->filterSatuan);
-        }
-
-        if ($this->visibleFilters['abc_class'] && $this->filterAbcClass) {
-            $query->where('abc_class', $this->filterAbcClass);
-        }
-
-        if ($this->visibleFilters['stok'] && $this->filterHanyaReadyStok) {
-            $query->whereHas('stokItems', fn ($q) => $q->where('jumlah', '>', 0));
-        }
-
-        $produks = $query
+        $produks = $this->getFilteredProdukQuery()
             ->orderBy('nama')
-            ->paginate(12);
+            ->paginate($this->perPage);
 
         $gudangs = Gudang::where('is_active', true)->get();
 
@@ -1748,6 +1993,10 @@ class ProdukTab extends Component
             'gudangsCabang' => $gudangsCabang,
             'raks' => Rak::with('gudang')->get(),
             'produks' => $produks,
+            'perPage' => $this->perPage,
+            'selectedProdukIds' => $this->selectedProdukIds,
+            'selectAll' => $this->selectAll,
+            'labelTierAktif' => $this->labelTierAktif,
             'kategoriTree' => $kategoriTree,
             'tierMemberships' => TierMembership::where('is_active', true)->orderBy('urutan')->get(),
             // [T-44] master data pendukung
