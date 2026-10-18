@@ -3,6 +3,28 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-18 — Penyederhanaan Struk Transaksi, Pembersihan Pesan WA, Bulk Pindah Rak & Kustomisasi Salin Data WMS ✅
+
+- **[Penyederhanaan Menu Struk Transaksi Selesai]:**
+  - Mengonsolidasikan beragam tombol cetak di modal struk thermal (`thermal-receipt-modal.blade.php`) menjadi 1 tombol cetak utama terpadu dengan segmented control pilihan format kertas ringkas (`58mm` / `80mm`) dan 1 tombol BLE.
+  - Menghilangkan redundansi tombol cetak terpisah agar tampilan kasir lebih rapi, modern, dan tidak membingungkan operator.
+- **[Pembersihan & Standardisasi Pesan WhatsApp]:**
+  - Mengoptimalkan seluruh helper draf pesan WhatsApp (`WhatsAppHelper::draftStrukPos`, `draftTerimaServis`, `draftEstimasiServis`, `draftServisSelesai`) dengan sanitasi `strip_tags` dan decoding entitas HTML (`ENT_QUOTES | ENT_HTML5`).
+  - Menghapus prefix teknis internal seperti `[Jasa]` dan `[Part]` dari nama produk di rincian pesan WhatsApp.
+  - Memperbaiki layout pemisah dan baris rincian agar tidak ada karakter rusak, garis pecah, atau rendering bermasalah di aplikasi WhatsApp Android, iOS, maupun WhatsApp Web.
+  - Menambahkan fallback link universal `api.whatsapp.com/send` bila nomor telepon konsumen belum terdata agar kasir tetap dapat mengirim pesan ke kontak manapun.
+- **[Bulk Edit Pindah Rak di Master Produk WMS]:**
+  - Menambahkan opsi `Pindah Lokasi Rak` pada modal Bulk Edit produk terpilih (`ProdukTab.php` dan `produk-tab.blade.php`).
+  - Mendukung pemindahan lokasi rak masal secara instan ke rak tujuan maupun pengosongan lokasi rak dalam transaksi database terisolasi.
+- **[Kustomisasi Salin Data Master Produk]:**
+  - Mengubah aksi salin harga menjadi split button: klik langsung untuk salin cepat dan icon pengaturan untuk membuka modal kustomisasi salin data.
+  - Menyediakan modal preferensi salin data produk dengan pilihan atribut fleksibel: Nama Produk, Harga Tier Aktif, Kode SKU, Stok Ready, Lokasi Rak, Brand, Kategori, dan Garansi.
+  - Menyediakan 2 pilihan format output: Format Teks Rapi (untuk chat WA/catatan) dan Format Tabel TSV (langsung paste ke Excel / Google Sheets).
+- **[Pengujian & Verifikasi]:**
+  - Menambahkan dan menjalankan pengujian feature `MasterProdukUiDanBatchTest` (6 tests, 37 assertions passed 100%).
+  - Uji regresi `WmsProdukHeaderSortFilterAndQrTest` dan `TransaksiRoutesSmokeTest` lulus 100%.
+  - Format kode sesuai PSR-12 via Laravel Pint dan aset frontend ter-build rapi via Vite.
+
 ## 2026-10-18 — Optimasi UI/UX POS Kasir, Header Wake Lock & Fixed Non-Scrolling Sidebar ✅
 
 - **[Fixed Non-Scrolling Sidebar]:**

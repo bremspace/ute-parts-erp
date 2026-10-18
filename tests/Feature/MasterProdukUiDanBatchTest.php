@@ -8,6 +8,10 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Livewire\ProdukTab;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\Rak;
+use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\StokItem;
+use App\Support\WhatsAppHelper;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -154,5 +158,158 @@ class MasterProdukUiDanBatchTest extends TestCase
 
         $this->assertDatabaseMissing('produk', ['id' => $p1->id]);
         $this->assertDatabaseMissing('produk', ['id' => $p2->id]);
+    }
+
+    public function test_bulk_edit_pindah_rak(): void
+    {
+        $gudang = Gudang::where('cabang_id', $this->cabang->id)->first();
+        $rak = Rak::create([
+            'gudang_id' => $gudang->id,
+            'kode' => 'RAK-A1',
+            'nama' => 'Rak Display Utama',
+        ]);
+
+        $p1 = Produk::create(['nama' => 'Produk Rak 1', 'harga_beli' => 10000, 'harga_jual_retail' => 15000]);
+        $p2 = Produk::create(['nama' => 'Produk Rak 2', 'harga_beli' => 20000, 'harga_jual_retail' => 25000]);
+
+        Livewire::test(ProdukTab::class)
+            ->set('selectedProdukIds', [$p1->id, $p2->id])
+            ->call('openBulkEditModal')
+            ->assertSet('showBulkEditModal', true)
+            ->set('bulkEditFields.rak_id', true)
+            ->set('bulkEditForm.rak_id', $rak->id)
+            ->call('simpanBulkEdit')
+            ->assertSet('showBulkEditModal', false)
+            ->assertSet('selectedProdukIds', []);
+
+        $this->assertDatabaseHas('stok_items', [
+            'produk_id' => $p1->id,
+            'rak_id' => $rak->id,
+        ]);
+        $this->assertDatabaseHas('stok_items', [
+            'produk_id' => $p2->id,
+            'rak_id' => $rak->id,
+        ]);
+    }
+
+    public function test_kustomisasi_salin_data_produk(): void
+    {
+        $gudang = Gudang::where('cabang_id', $this->cabang->id)->first();
+        $rak = Rak::create([
+            'gudang_id' => $gudang->id,
+            'kode' => 'RAK-B2',
+            'nama' => 'Rak Komponen',
+        ]);
+
+        $p1 = Produk::create([
+            'nama' => 'Kabel Data Type C',
+            'harga_beli' => 10000,
+            'harga_jual_retail' => 25000,
+        ]);
+
+        SkuVariant::create([
+            'produk_id' => $p1->id,
+            'sku' => 'SKU-KBL-01',
+            'nama' => 'Default',
+            'is_active' => true,
+        ]);
+
+        StokItem::create([
+            'produk_id' => $p1->id,
+            'gudang_id' => $gudang->id,
+            'rak_id' => $rak->id,
+            'jumlah' => 15,
+            'jumlah_minimum' => 5,
+        ]);
+
+        // 1. Uji modal kustomisasi salin data
+        Livewire::test(ProdukTab::class)
+            ->set('selectedProdukIds', [$p1->id])
+            ->call('openSalinDataModal')
+            ->assertSet('showSalinDataModal', true)
+            ->set('salinOptions.sku', true)
+            ->set('salinOptions.stok', true)
+            ->set('salinOptions.rak', true)
+            ->set('salinOptions.format', 'teks')
+            ->call('eksekusiSalinData')
+            ->assertSet('showSalinDataModal', false)
+            ->assertDispatched('salin-teks', function ($event, $params) {
+                return str_contains($params['teks'], 'Kabel Data Type C')
+                    && str_contains($params['teks'], '[SKU-KBL-01]')
+                    && str_contains($params['teks'], '25.000')
+                    && str_contains($params['teks'], 'Stok: 15')
+                    && str_contains($params['teks'], 'Rak: RAK-B2');
+            });
+
+        // 2. Uji format TSV untuk paste ke Excel / Spreadsheet
+        Livewire::test(ProdukTab::class)
+            ->set('selectedProdukIds', [$p1->id])
+            ->set('salinOptions.nama', true)
+            ->set('salinOptions.sku', true)
+            ->set('salinOptions.harga', true)
+            ->set('salinOptions.format', 'tsv')
+            ->call('eksekusiSalinData')
+            ->assertDispatched('salin-teks', function ($event, $params) {
+                $lines = explode("\n", $params['teks']);
+
+                return str_contains($lines[0], "Nama Produk\tSKU\tHarga")
+                    && str_contains($lines[1], "Kabel Data Type C\tSKU-KBL-01\t25000");
+            });
+    }
+
+    public function test_whatsapp_helper_struk_bersih_dan_bebas_simbol_rusak(): void
+    {
+        $receiptData = [
+            'cabang' => '<b>Ute Parts Official</b>',
+            'no_transaksi' => 'TRX-20261018-0001',
+            'waktu' => '18/10/2026 14:00',
+            'pelanggan' => 'Budi Santoso &amp; Rekan',
+            'total' => 150000,
+            'bayar' => 200000,
+            'kembali' => 50000,
+            'metode' => 'TUNAI',
+            'items' => [
+                [
+                    'nama' => '[Part] LCD &amp; Touchscreen <em>Original</em>',
+                    'qty' => 1,
+                    'harga' => 100000,
+                    'subtotal' => 100000,
+                ],
+                [
+                    'nama' => '[Jasa] Pasang LCD',
+                    'qty' => 1,
+                    'harga' => 50000,
+                    'subtotal' => 50000,
+                ],
+            ],
+            'garansi' => '1 Bulan (Segel Utuh)',
+        ];
+
+        $draft = WhatsAppHelper::draftStrukPos($receiptData);
+
+        // Tidak boleh ada tag HTML
+        $this->assertStringNotContainsString('<b>', $draft);
+        $this->assertStringNotContainsString('<em>', $draft);
+        $this->assertStringNotContainsString('&amp;', $draft);
+
+        // Tidak boleh ada prefix teknis [Part] atau [Jasa]
+        $this->assertStringNotContainsString('[Part]', $draft);
+        $this->assertStringNotContainsString('[Jasa]', $draft);
+
+        // Harus memuat nama bersih, rincian pembayaran, dan garansi
+        $this->assertStringContainsString('Halo kak *Budi Santoso & Rekan*', $draft);
+        $this->assertStringContainsString('LCD & Touchscreen Original', $draft);
+        $this->assertStringContainsString('Pasang LCD', $draft);
+        $this->assertStringContainsString('*Total: Rp 150.000*', $draft);
+        $this->assertStringContainsString('Bayar: Rp 200.000', $draft);
+        $this->assertStringContainsString('Kembali: Rp 50.000', $draft);
+        $this->assertStringContainsString('Garansi: 1 Bulan (Segel Utuh)', $draft);
+
+        // Uji URL WhatsApp dengan nomor dan tanpa nomor
+        $linkDenganNomor = WhatsAppHelper::buatLink('081234567890', $draft);
+        $this->assertStringStartsWith('https://wa.me/6281234567890?text=', $linkDenganNomor);
+
+        $linkTanpaNomor = WhatsAppHelper::buatLink(null, $draft);
+        $this->assertStringStartsWith('https://api.whatsapp.com/send?text=', $linkTanpaNomor);
     }
 }

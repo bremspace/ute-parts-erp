@@ -113,6 +113,7 @@ class ProdukTab extends Component
         'harga_fleksibel' => false,
         'sn' => false,
         'penyesuaian_harga' => false,
+        'rak_id' => false,
     ];
 
     public array $bulkEditForm = [
@@ -127,6 +128,22 @@ class ProdukTab extends Component
         'sn' => 0,
         'tipe_penyesuaian_harga' => 'margin_persen', // 'margin_persen' | 'tambah_persen' | 'potong_persen' | 'tambah_nominal' | 'potong_nominal'
         'nilai_penyesuaian_harga' => 0,
+        'rak_id' => null,
+    ];
+
+    // Salin Data Modal & Preferences
+    public bool $showSalinDataModal = false;
+
+    public array $salinOptions = [
+        'nama' => true,
+        'harga' => true,
+        'sku' => false,
+        'stok' => false,
+        'rak' => false,
+        'kategori' => false,
+        'brand' => false,
+        'garansi' => false,
+        'format' => 'teks', // 'teks' (Chat / Catatan) | 'tsv' (Excel / Spreadsheet)
     ];
 
     // Filter toggle preferences (checkbox custom)
@@ -274,11 +291,6 @@ class ProdukTab extends Component
 
     public function mount()
     {
-        $cabangId = session('cabang_id');
-        if ($cabangId) {
-            $this->filterGudangId = Gudang::where('cabang_id', $cabangId)->value('id');
-        }
-
         $this->loadUserPreferences();
     }
 
@@ -1877,7 +1889,15 @@ class ProdukTab extends Component
 
     public function copySingleProduk(int $produkId): void
     {
-        $p = Produk::with(['hargaTier.tierMembership'])->find($produkId);
+        $cabangId = session('cabang_id');
+        $p = Produk::with([
+            'skuVariants',
+            'hargaTier.tierMembership',
+            'kategoriRelasi',
+            'brand',
+            'stokItems' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->with('rak'),
+        ])->find($produkId);
+
         if (! $p) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk tidak ditemukan.']);
 
@@ -1886,9 +1906,195 @@ class ProdukTab extends Component
 
         $tierInfo = $this->resolveHargaTierProduk($p);
         $hargaFmt = 'Rp '.number_format($tierInfo['harga'], 0, ',', '.');
-        $text = "{$p->nama} - {$hargaFmt}";
+        $text = $this->formatTeksProduk($p, $this->salinOptions);
 
         $this->dispatch('salin-teks', teks: $text, message: "Harga '{$p->nama}' ({$hargaFmt}) berhasil disalin!");
+    }
+
+    public function openSalinDataModal(): void
+    {
+        if (empty($this->selectedProdukIds)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih minimal satu produk terlebih dahulu.']);
+
+            return;
+        }
+
+        $this->showSalinDataModal = true;
+    }
+
+    public function closeSalinDataModal(): void
+    {
+        $this->showSalinDataModal = false;
+    }
+
+    public function formatTeksProduk(Produk $p, array $options): string
+    {
+        $hasNama = ! empty($options['nama']);
+        $hasHarga = ! empty($options['harga']);
+        $hasSku = ! empty($options['sku']);
+        $hasStok = ! empty($options['stok']);
+        $hasRak = ! empty($options['rak']);
+        $hasKategori = ! empty($options['kategori']);
+        $hasBrand = ! empty($options['brand']);
+        $hasGaransi = ! empty($options['garansi']);
+
+        $tierInfo = $this->resolveHargaTierProduk($p);
+        $hargaFmt = 'Rp '.number_format($tierInfo['harga'], 0, ',', '.');
+
+        // Jika hanya nama & harga yang dipilih: format klasik standar (nama - harga)
+        if ($hasNama && $hasHarga && ! $hasSku && ! $hasStok && ! $hasRak && ! $hasKategori && ! $hasBrand && ! $hasGaransi) {
+            return "{$p->nama} - {$hargaFmt}";
+        }
+
+        $output = '';
+        if ($hasNama) {
+            $output .= $p->nama;
+        }
+
+        $sku = $p->relationLoaded('skuVariants') ? $p->skuVariants->first()?->sku : null;
+        $sku = $sku ?? $p->barcode ?? ($p->getAttribute('sku') ?: null);
+
+        if ($hasSku && ! empty($sku)) {
+            $output .= ($output ? ' ' : '')."[{$sku}]";
+        }
+
+        if ($hasHarga) {
+            $output .= ($output ? ' - ' : '').$hargaFmt;
+        }
+
+        $extras = [];
+        if ($hasStok) {
+            $stok = $p->relationLoaded('stokItems') ? $p->stokItems->sum('jumlah') : $p->stok_total;
+            $extras[] = "Stok: {$stok}";
+        }
+        if ($hasRak && $p->relationLoaded('stokItems')) {
+            $raks = $p->stokItems->map(fn ($s) => $s->rak ? $s->rak->kode : null)->filter()->unique()->implode(', ');
+            if ($raks) {
+                $extras[] = "Rak: {$raks}";
+            }
+        }
+        if ($hasBrand) {
+            $brand = $p->brand?->nama ?? (is_string($p->brand) ? $p->brand : null);
+            if ($brand) {
+                $extras[] = "Brand: {$brand}";
+            }
+        }
+        if ($hasKategori) {
+            $kat = $p->kategoriRelasi?->nama ?? $p->kategori;
+            if ($kat) {
+                $extras[] = "Kat: {$kat}";
+            }
+        }
+        if ($hasGaransi && ! empty($p->garansi)) {
+            $extras[] = "Garansi: {$p->garansi} bln";
+        }
+
+        if (! empty($extras)) {
+            $output .= ($output ? ' ' : '').'('.implode(' | ', $extras).')';
+        }
+
+        return $output ?: $p->nama;
+    }
+
+    public function eksekusiSalinData(): void
+    {
+        if (empty($this->selectedProdukIds)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih minimal satu produk terlebih dahulu.']);
+
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $produks = Produk::with([
+            'skuVariants',
+            'hargaTier.tierMembership',
+            'kategoriRelasi',
+            'brand',
+            'stokItems' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->with('rak'),
+        ])
+            ->whereIn('id', $this->selectedProdukIds)
+            ->orderBy('nama')
+            ->get();
+
+        if ($produks->isEmpty()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk terpilih tidak ditemukan.']);
+
+            return;
+        }
+
+        $isTsv = ($this->salinOptions['format'] ?? 'teks') === 'tsv';
+        $lines = [];
+
+        if ($isTsv) {
+            $headers = [];
+            if (! empty($this->salinOptions['nama'])) {
+                $headers[] = 'Nama Produk';
+            }
+            if (! empty($this->salinOptions['sku'])) {
+                $headers[] = 'SKU';
+            }
+            if (! empty($this->salinOptions['harga'])) {
+                $headers[] = 'Harga';
+            }
+            if (! empty($this->salinOptions['stok'])) {
+                $headers[] = 'Stok Ready';
+            }
+            if (! empty($this->salinOptions['rak'])) {
+                $headers[] = 'Lokasi Rak';
+            }
+            if (! empty($this->salinOptions['kategori'])) {
+                $headers[] = 'Kategori';
+            }
+            if (! empty($this->salinOptions['brand'])) {
+                $headers[] = 'Brand';
+            }
+            if (! empty($this->salinOptions['garansi'])) {
+                $headers[] = 'Garansi';
+            }
+            $lines[] = implode("\t", $headers);
+
+            foreach ($produks as $p) {
+                $cols = [];
+                $tierInfo = $this->resolveHargaTierProduk($p);
+                $sku = $p->relationLoaded('skuVariants') ? $p->skuVariants->first()?->sku : null;
+                $sku = $sku ?? $p->barcode ?? ($p->getAttribute('sku') ?: null);
+                if (! empty($this->salinOptions['nama'])) {
+                    $cols[] = $p->nama;
+                }
+                if (! empty($this->salinOptions['sku'])) {
+                    $cols[] = $sku ?? '-';
+                }
+                if (! empty($this->salinOptions['harga'])) {
+                    $cols[] = (string) $tierInfo['harga'];
+                }
+                if (! empty($this->salinOptions['stok'])) {
+                    $cols[] = (string) $p->stokItems->sum('jumlah');
+                }
+                if (! empty($this->salinOptions['rak'])) {
+                    $rak = $p->stokItems->map(fn ($s) => $s->rak ? $s->rak->kode : null)->filter()->unique()->implode(', ');
+                    $cols[] = $rak ?: '-';
+                }
+                if (! empty($this->salinOptions['kategori'])) {
+                    $cols[] = $p->kategoriRelasi?->nama ?? $p->kategori ?? '-';
+                }
+                if (! empty($this->salinOptions['brand'])) {
+                    $cols[] = $p->brand?->nama ?? (is_string($p->brand) ? $p->brand : '-');
+                }
+                if (! empty($this->salinOptions['garansi'])) {
+                    $cols[] = $p->garansi ? $p->garansi.' bln' : '-';
+                }
+                $lines[] = implode("\t", $cols);
+            }
+        } else {
+            foreach ($produks as $p) {
+                $lines[] = $this->formatTeksProduk($p, $this->salinOptions);
+            }
+        }
+
+        $text = implode("\n", $lines);
+
+        $this->dispatch('salin-teks', teks: $text, message: "{$produks->count()} data produk berhasil disalin ke clipboard!");
+        $this->showSalinDataModal = false;
     }
 
     public function salinHargaTerpilih(): void
@@ -1899,7 +2105,14 @@ class ProdukTab extends Component
             return;
         }
 
-        $produks = Produk::with(['hargaTier.tierMembership'])
+        $cabangId = session('cabang_id');
+        $produks = Produk::with([
+            'skuVariants',
+            'hargaTier.tierMembership',
+            'kategoriRelasi',
+            'brand',
+            'stokItems' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->with('rak'),
+        ])
             ->whereIn('id', $this->selectedProdukIds)
             ->orderBy('nama')
             ->get();
@@ -1912,9 +2125,7 @@ class ProdukTab extends Component
 
         $lines = [];
         foreach ($produks as $p) {
-            $tierInfo = $this->resolveHargaTierProduk($p);
-            $hargaFmt = 'Rp '.number_format($tierInfo['harga'], 0, ',', '.');
-            $lines[] = "{$p->nama} - {$hargaFmt}";
+            $lines[] = $this->formatTeksProduk($p, $this->salinOptions);
         }
 
         $text = implode("\n", $lines);
@@ -2088,6 +2299,7 @@ class ProdukTab extends Component
             'harga_fleksibel' => false,
             'sn' => false,
             'penyesuaian_harga' => false,
+            'rak_id' => false,
         ];
 
         $this->bulkEditForm = [
@@ -2102,6 +2314,7 @@ class ProdukTab extends Component
             'sn' => 0,
             'tipe_penyesuaian_harga' => 'margin_persen',
             'nilai_penyesuaian_harga' => 0,
+            'rak_id' => null,
         ];
 
         $this->showBulkEditModal = true;
@@ -2148,7 +2361,12 @@ class ProdukTab extends Component
             $brandKompatibel = Brand::find($this->bulkEditForm['brand_id'])?->nama;
         }
 
-        DB::transaction(function () use ($produks, $activeFields, $kategoriNama, $brandKompatibel) {
+        $targetRakId = ! empty($activeFields['rak_id']) ? ($this->bulkEditForm['rak_id'] ?: null) : null;
+        $pindahRak = ! empty($activeFields['rak_id']);
+        $targetRak = $targetRakId ? Rak::find($targetRakId) : null;
+        $cabangId = session('cabang_id');
+
+        DB::transaction(function () use ($produks, $activeFields, $kategoriNama, $brandKompatibel, $pindahRak, $targetRak, $cabangId) {
             foreach ($produks as $p) {
                 $updates = [];
 
@@ -2225,6 +2443,28 @@ class ProdukTab extends Component
 
                 if (! empty($updates)) {
                     $p->update($updates);
+                }
+
+                if ($pindahRak) {
+                    if ($targetRak) {
+                        $stok = StokItem::firstOrCreate(
+                            [
+                                'produk_id' => $p->id,
+                                'gudang_id' => $targetRak->gudang_id,
+                                'sku_variant_id' => null,
+                            ],
+                            [
+                                'jumlah' => 0,
+                                'jumlah_minimum' => $p->stok_minimum ?? 0,
+                                'rak_id' => $targetRak->id,
+                            ]
+                        );
+                        $stok->update(['rak_id' => $targetRak->id]);
+                    } else {
+                        StokItem::where('produk_id', $p->id)
+                            ->when($cabangId, fn ($q) => $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))
+                            ->update(['rak_id' => null]);
+                    }
                 }
             }
         });

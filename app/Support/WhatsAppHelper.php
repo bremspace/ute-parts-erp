@@ -30,48 +30,79 @@ class WhatsAppHelper
     }
 
     /**
-     * Buat URL intent WhatsApp (wa.me) yang kompatibel di HP (aplikasi WA) & PC (WhatsApp Web / App).
+     * Buat URL intent WhatsApp yang kompatibel di HP (aplikasi WA) & PC (WhatsApp Web / App).
+     * Jika nomor tidak ada, mengarah ke dialog kirim pesan (pengguna memilih kontak).
      */
     public static function buatLink(?string $nomor, string $pesan): ?string
     {
         $nomorFormatted = self::formatNomor($nomor);
-        if (! $nomorFormatted) {
-            return null;
+        if ($nomorFormatted) {
+            return 'https://wa.me/'.$nomorFormatted.'?text='.rawurlencode($pesan);
         }
 
-        return 'https://wa.me/'.$nomorFormatted.'?text='.rawurlencode($pesan);
+        // Jika nomor kosong, fallback ke intent universal WhatsApp agar kasir tetap bisa kirim struk
+        return 'https://api.whatsapp.com/send?text='.rawurlencode($pesan);
     }
 
     /**
-     * Template pesan struk penjualan kasir POS.
+     * Template pesan struk penjualan kasir POS (format bersih, bebas simbol rusak di WA).
      */
     public static function draftStrukPos(array $receiptData): string
     {
-        $toko = $receiptData['cabang'] ?? config('app.name', 'Ute Parts');
-        $noTrx = $receiptData['no_transaksi'] ?? '-';
+        $tokoRaw = $receiptData['cabang'] ?? config('app.name', 'Ute Parts');
+        $toko = strip_tags(html_entity_decode((string) $tokoRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+        $noTrx = trim((string) ($receiptData['no_transaksi'] ?? '-'));
         $waktu = $receiptData['waktu'] ?? now()->format('d/m/Y H:i');
-        $pelanggan = $receiptData['pelanggan'] ?? 'Pelanggan';
+
+        $pelangganRaw = $receiptData['pelanggan'] ?? 'Pelanggan';
+        $pelanggan = trim(strip_tags(html_entity_decode((string) $pelangganRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+
+        $isUmum = in_array(strtolower($pelanggan), ['pelanggan umum', 'umum', 'guest', 'retail', 'pelanggan', '-']) || blank($pelanggan);
+        $salam = $isUmum
+            ? "Halo kak,\nTerima kasih telah berbelanja di *{$toko}*! 🙏"
+            : "Halo kak *{$pelanggan}*,\nTerima kasih telah berbelanja di *{$toko}*! 🙏";
+
         $total = number_format((float) ($receiptData['total'] ?? 0), 0, ',', '.');
-        $metode = $receiptData['metode'] ?? 'TUNAI';
+        $metode = strtoupper(trim((string) ($receiptData['metode'] ?? 'TUNAI')));
 
         $items = '';
         foreach (($receiptData['items'] ?? []) as $it) {
-            $nama = $it['nama'] ?? $it['nama_produk'] ?? 'Item';
+            $namaRaw = $it['nama'] ?? $it['nama_produk'] ?? 'Item';
+            $nama = strip_tags(html_entity_decode((string) $namaRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            // Bersihkan prefix teknis seperti [Jasa] atau [Part] jika ada
+            $nama = preg_replace('/^\[(Jasa|Part)\]\s*/i', '', $nama);
+            $nama = trim(preg_replace('/\s+/', ' ', (string) $nama));
+
             $qty = (int) ($it['qty'] ?? 1);
+            $harga = number_format((float) ($it['harga'] ?? 0), 0, ',', '.');
             $subtotal = number_format((float) ($it['subtotal'] ?? 0), 0, ',', '.');
-            $items .= "• {$nama} (x{$qty}): Rp {$subtotal}\n";
+
+            $items .= "- {$nama}\n  {$qty}x Rp {$harga} = Rp {$subtotal}\n";
         }
 
-        return "Halo kak *{$pelanggan}*,\n"
-            ."Terima kasih telah berbelanja di *{$toko}*! 🙏\n\n"
-            ."📄 *STRUK PEMBELIAN*\n"
-            ."No Transaksi: #{$noTrx}\n"
+        $garansiText = ! empty($receiptData['garansi']) ? "Garansi: {$receiptData['garansi']}\n" : '';
+
+        $pembayaranText = "*Total: Rp {$total}*\nMetode: {$metode}";
+        if (isset($receiptData['bayar']) && (float) $receiptData['bayar'] > 0 && (float) $receiptData['bayar'] !== (float) ($receiptData['total'] ?? 0)) {
+            $bayarFmt = number_format((float) $receiptData['bayar'], 0, ',', '.');
+            $pembayaranText .= "\nBayar: Rp {$bayarFmt}";
+        }
+        if (isset($receiptData['kembali']) && (float) $receiptData['kembali'] > 0) {
+            $kembaliFmt = number_format((float) $receiptData['kembali'], 0, ',', '.');
+            $pembayaranText .= "\nKembali: Rp {$kembaliFmt}";
+        }
+
+        return "{$salam}\n\n"
+            ."*STRUK PEMBELIAN*\n"
+            ."No. Transaksi: {$noTrx}\n"
             ."Waktu: {$waktu}\n"
-            ."--------------------------------\n"
+            ."-------------------------\n"
             ."{$items}"
-            ."--------------------------------\n"
-            ."💰 *Total: Rp {$total}* ({$metode})\n\n"
-            ."Simpan pesan ini sebagai bukti transaksi resmi Anda.\n"
+            ."-------------------------\n"
+            ."{$pembayaranText}\n"
+            .($garansiText ? "{$garansiText}" : '')
+            ."\nSimpan pesan ini sebagai bukti transaksi resmi Anda.\n"
             .'Semoga harimu menyenangkan! ✨';
     }
 
@@ -80,14 +111,16 @@ class WhatsAppHelper
      */
     public static function draftTerimaServis(string $pelanggan, string $noTiket, string $jenisHp, string $token): string
     {
-        $toko = config('app.name', 'Ute Parts');
+        $toko = strip_tags(html_entity_decode(config('app.name', 'Ute Parts'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $pelangganClean = trim(strip_tags(html_entity_decode($pelanggan, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        $jenisHpClean = trim(strip_tags(html_entity_decode($jenisHp, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $trackingUrl = url("/tracking/{$token}");
 
-        return "Halo kak *{$pelanggan}*,\n"
+        return "Halo kak *{$pelangganClean}*,\n"
             ."Unit Anda telah kami terima di *{$toko}*. 📱🔧\n\n"
             ."📋 *NOTA SERVIS*\n"
-            ."No Tiket: *#{$noTiket}*\n"
-            ."Perangkat: {$jenisHp}\n"
+            ."No. Tiket: *#{$noTiket}*\n"
+            ."Perangkat: {$jenisHpClean}\n"
             ."Status: Sedang dalam antrean diagnosa teknisi.\n\n"
             ."🔍 Anda dapat memantau proses perbaikan secara real-time di sini:\n"
             ."{$trackingUrl}\n\n"
@@ -99,13 +132,16 @@ class WhatsAppHelper
      */
     public static function draftEstimasiServis(string $pelanggan, string $noTiket, string $jenisHp, float $biaya, string $alasan, string $token): string
     {
-        $toko = config('app.name', 'Ute Parts');
+        $toko = strip_tags(html_entity_decode(config('app.name', 'Ute Parts'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $pelangganClean = trim(strip_tags(html_entity_decode($pelanggan, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        $jenisHpClean = trim(strip_tags(html_entity_decode($jenisHp, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        $alasanClean = trim(strip_tags(html_entity_decode($alasan, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $nominal = number_format($biaya, 0, ',', '.');
         $approvalUrl = url("/tracking/{$token}");
 
-        return "Halo kak *{$pelanggan}*,\n"
-            ."Hasil diagnosa teknisi *{$toko}* untuk tiket *#{$noTiket}* ({$jenisHp}):\n\n"
-            ."📝 Pengerjaan: {$alasan}\n"
+        return "Halo kak *{$pelangganClean}*,\n"
+            ."Hasil diagnosa teknisi *{$toko}* untuk tiket *#{$noTiket}* ({$jenisHpClean}):\n\n"
+            ."📝 Pengerjaan: {$alasanClean}\n"
             ."💰 Estimasi Biaya: *Rp {$nominal}*\n\n"
             ."Silakan klik link berikut untuk konfirmasi persetujuan pengerjaan:\n"
             ."👉 {$approvalUrl}\n\n"
@@ -117,12 +153,14 @@ class WhatsAppHelper
      */
     public static function draftServisSelesai(string $pelanggan, string $noTiket, string $jenisHp, float $total, ?string $token): string
     {
-        $toko = config('app.name', 'Ute Parts');
+        $toko = strip_tags(html_entity_decode(config('app.name', 'Ute Parts'), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $pelangganClean = trim(strip_tags(html_entity_decode($pelanggan, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        $jenisHpClean = trim(strip_tags(html_entity_decode($jenisHp, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $nominal = number_format($total, 0, ',', '.');
         $trackingUrl = $token ? url("/tracking/{$token}") : '';
 
-        $pesan = "Halo kak *{$pelanggan}*,\n"
-            ."Kabar baik! Perbaikan gadget *{$jenisHp}* (Tiket *#{$noTiket}*) telah *SELESAI* dan lolos uji Quality Control (QC). 🎉\n\n"
+        $pesan = "Halo kak *{$pelangganClean}*,\n"
+            ."Kabar baik! Perbaikan gadget *{$jenisHpClean}* (Tiket *#{$noTiket}*) telah *SELESAI* dan lolos uji Quality Control (QC). 🎉\n\n"
             ."Total Biaya: *Rp {$nominal}*\n"
             ."Unit sudah siap untuk diambil di toko *{$toko}*.\n\n";
 

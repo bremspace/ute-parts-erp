@@ -366,12 +366,21 @@
                             <span>✏️ Bulk Edit ({{ count($selectedProdukIds) }})</span>
                         </button>
 
-                        <button type="button"
-                                wire:click="salinHargaTerpilih"
-                                class="px-3 py-1.5 rounded-xl bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
-                                title="Salin nama & harga produk terpilih ke clipboard (sesuai tier filter)">
-                            <span>📋 Salin Harga</span>
-                        </button>
+                        <!-- Tombol Salin Data / Harga & Pengaturan Data yang Disalin -->
+                        <div class="inline-flex rounded-xl bg-up-mint p-0.5 shadow-sm text-ink-950 font-bold text-xs">
+                            <button type="button"
+                                    wire:click="salinHargaTerpilih"
+                                    class="px-2.5 py-1.5 rounded-lg hover:bg-black/10 flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                                    title="Salin langsung data terpilih ke clipboard (format saat ini)">
+                                <span>📋 Salin Data ({{ count($selectedProdukIds) }})</span>
+                            </button>
+                            <button type="button"
+                                    wire:click="openSalinDataModal"
+                                    class="px-2 py-1.5 rounded-lg hover:bg-black/10 border-l border-ink-950/20 flex items-center transition cursor-pointer"
+                                    title="Pilih atribut data produk yang ingin disalin (Nama, SKU, Harga, Stok, Rak, dll)">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            </button>
+                        </div>
 
                         <button type="button"
                                 wire:click="exportTerpilih('xlsx')"
@@ -3271,6 +3280,27 @@
                         </div>
                     </div>
 
+                    <!-- Pindah Lokasi Rak Masal -->
+                    <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['rak_id'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                        <label class="flex items-center justify-between cursor-pointer select-none">
+                            <div>
+                                <span class="text-xs font-semibold text-ink-200 block">Pindah Lokasi Rak</span>
+                                <span class="text-[10px] text-ink-400">Pindahkan lokasi rak penyimpanan untuk semua produk terpilih.</span>
+                            </div>
+                            <input type="checkbox" wire:model.live="bulkEditFields.rak_id" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                        </label>
+                        @if($bulkEditFields['rak_id'] ?? false)
+                            <select wire:model="bulkEditForm.rak_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                <option value="">— Kosongkan Lokasi Rak (Tanpa Rak) —</option>
+                                @foreach($raks as $rk)
+                                    <option value="{{ $rk->id }}">
+                                        {{ $rk->kode }} — {{ $rk->nama }} (Gudang: {{ $rk->gudang?->nama ?? '-' }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+
                     <!-- Penyesuaian Harga / Margin Masal -->
                     <div class="p-3.5 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['penyesuaian_harga'] ?? false) ? 'border-up-mint/40 bg-up-mint/5' : 'border-white/5' }} space-y-3">
                         <label class="flex items-center justify-between cursor-pointer select-none">
@@ -3314,6 +3344,117 @@
                             class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-lg shadow-up-primary/25 transition active:scale-95 cursor-pointer">
                         <span wire:loading.remove wire:target="simpanBulkEdit">Terapkan Perubahan Masal</span>
                         <span wire:loading wire:target="simpanBulkEdit">Menyimpan Perubahan…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: KUSTOMISASI SALIN DATA PRODUK KE CLIPBOARD -->
+    @if($showSalinDataModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" x-cloak>
+            <div class="w-full max-w-xl glass-panel p-5 sm:p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto space-y-4 border border-white/10 shadow-2xl">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div>
+                        <h3 class="font-bold text-base text-white flex items-center gap-2">
+                            <span>📋 Kustomisasi Salin Data Produk</span>
+                            <span class="px-2 py-0.5 rounded-full bg-up-mint/20 text-up-mint text-xs font-bold font-mono">
+                                {{ count($selectedProdukIds) }} produk
+                            </span>
+                        </h3>
+                        <p class="text-xs text-ink-400 mt-0.5">Pilih atribut data dan format teks yang ingin disalin ke clipboard.</p>
+                    </div>
+                    <button type="button" wire:click="closeSalinDataModal" class="p-1.5 rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition cursor-pointer">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Format Output Selector -->
+                <div class="p-3 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2">
+                    <label class="block text-xs font-semibold text-ink-200">Format Salinan:</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2.5 p-2.5 rounded-xl border {{ ($salinOptions['format'] ?? 'teks') === 'teks' ? 'bg-up-mint/10 border-up-mint/40 text-up-mint' : 'bg-white/5 border-white/5 text-ink-300' }} cursor-pointer transition select-none">
+                            <input type="radio" value="teks" wire:model.live="salinOptions.format" class="text-up-mint bg-ink-900 focus:ring-0">
+                            <div>
+                                <div class="text-xs font-bold">Format Teks Rapi</div>
+                                <div class="text-[10px] text-ink-400 leading-tight">Cocok untuk Chat WA, SMS, atau Catatan</div>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-2.5 rounded-xl border {{ ($salinOptions['format'] ?? 'teks') === 'tsv' ? 'bg-up-mint/10 border-up-mint/40 text-up-mint' : 'bg-white/5 border-white/5 text-ink-300' }} cursor-pointer transition select-none">
+                            <input type="radio" value="tsv" wire:model.live="salinOptions.format" class="text-up-mint bg-ink-900 focus:ring-0">
+                            <div>
+                                <div class="text-xs font-bold">Format Tabel (TSV)</div>
+                                <div class="text-[10px] text-ink-400 leading-tight">Langsung paste ke Excel / Google Sheets</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Atribut Checkbox Grid -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-ink-200">Pilih Data yang Mau Disalin:</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <!-- Nama -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['nama'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.nama" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Nama Produk</span>
+                        </label>
+
+                        <!-- Harga Jual -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['harga'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.harga" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Harga ({{ $labelTierAktif }})</span>
+                        </label>
+
+                        <!-- SKU -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['sku'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.sku" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Kode SKU</span>
+                        </label>
+
+                        <!-- Stok Ready -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['stok'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.stok" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Stok Ready</span>
+                        </label>
+
+                        <!-- Lokasi Rak -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['rak'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.rak" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Lokasi Rak</span>
+                        </label>
+
+                        <!-- Brand -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['brand'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.brand" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Brand</span>
+                        </label>
+
+                        <!-- Kategori -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['kategori'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.kategori" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Kategori</span>
+                        </label>
+
+                        <!-- Garansi -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['garansi'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.garansi" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Garansi</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                    <button type="button" wire:click="closeSalinDataModal" class="px-4 py-2 rounded-xl text-ink-300 hover:text-white text-xs font-semibold hover:bg-white/5 transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="button"
+                            wire:click="eksekusiSalinData"
+                            class="px-5 py-2.5 rounded-xl bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs shadow-lg shadow-up-mint/25 transition active:scale-95 cursor-pointer flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                        <span>Salin ke Clipboard</span>
                     </button>
                 </div>
             </div>
