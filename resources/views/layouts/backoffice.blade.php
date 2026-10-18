@@ -48,13 +48,13 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="bg-[#F1F5F9] dark:bg-[#090D16] text-ink-900 dark:text-ink-100 font-sans antialiased min-h-screen flex flex-col overflow-x-clip selection:bg-up-primary selection:text-white"
+<body class="bg-[#F1F5F9] dark:bg-[#090D16] text-ink-900 dark:text-ink-100 font-sans antialiased h-screen h-[100dvh] flex flex-col overflow-hidden selection:bg-up-primary selection:text-white"
       x-data="sidebarManager()"
       @keydown.escape.window="sidebarOpen = false"
       data-cabang-count="{{ auth()->user()?->daftarCabangAkses()->count() ?? 0 }}"
       data-cabang-id="{{ session('cabang_id') ?? '' }}"
       style="padding-bottom: env(safe-area-inset-bottom, 0);">
-    <div class="flex-1 flex overflow-hidden relative">
+    <div class="flex-1 flex overflow-hidden relative h-full">
         <!-- Mobile Sidebar Overlay (hanya < md — drawer) -->
         <div x-show="sidebarOpen"
              x-transition:enter="transition-opacity ease-linear duration-200"
@@ -78,8 +78,8 @@
             class="w-64 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border-r border-ink-200/60 dark:border-white/5 flex flex-col flex-shrink-0
                    fixed inset-y-0 left-0 z-50 transform-gpu shadow-xl md:shadow-none
                    transition-[width,transform] duration-200 ease-out
-                   md:inset-auto md:z-30 md:translate-x-0 md:transform-none"
-            :class="[isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : 'md:static']">
+                   md:sticky md:top-0 md:h-screen md:max-h-screen md:inset-auto md:z-30 md:translate-x-0 md:transform-none"
+            :class="[isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : '', sidebarCollapsed ? 'sidebar-collapsed' : '']">
             <!-- Brand -->
             <div class="sidebar-brand h-16 flex items-center justify-between px-5 border-b border-ink-200/60 dark:border-white/5">
                 <x-prism.logo size="md" :with-text="true" mode="auto" subtitle="Backoffice ERP" text-class="sidebar-brand-text" href="/app/dashboard" />
@@ -551,6 +551,23 @@
                     @auth
                         @livewire(\App\Modules\Notifikasi\Livewire\NotificationCenter::class)
                     @endauth
+
+                    <!-- [T-32] Screen Wake Lock Toggle (Kunci Layar Selalu Menyala) -->
+                    <div x-data="screenWakeLock()" x-init="init()" x-show="isSupported" class="flex-shrink-0" x-cloak>
+                        <button
+                            type="button"
+                            @click="toggle()"
+                            :class="isActive ? 'bg-up-mint/20 text-up-mint border-up-mint/40 dark:bg-up-mint/25' : 'text-ink-500 hover:text-ink-900 dark:text-ink-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 border-transparent'"
+                            class="p-2 sm:p-2.5 rounded-lg border transition flex items-center gap-1.5 cursor-pointer"
+                            :title="isActive ? 'Layar selalu menyala (Aktif) - Klik untuk matikan' : 'Kunci Layar: Cegah layar mati / sleep saat kasir & operasional'"
+                            aria-label="Kunci Layar Tetap Menyala"
+                        >
+                            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                            </svg>
+                            <span class="text-[11px] font-bold hidden xl:inline" x-text="isActive ? 'Layar ON' : 'Kunci Layar'"></span>
+                        </button>
+                    </div>
 
                     <!-- [T-32] Toggle tema: sun (gelap) / moon (terang) / monitor (auto) -->
                     <button type="button" x-data="themeManager()" @click="cycleTheme()"

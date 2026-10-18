@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Pos\Livewire\PesananOnlineIndex;
+use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Livewire\ReturPenjualanIndex;
 use App\Modules\Pos\Livewire\RiwayatTransaksiIndex;
 use App\Modules\Pos\Models\Transaksi;
@@ -136,6 +138,39 @@ class TransaksiRoutesSmokeTest extends TestCase
         Livewire::test(ReturPenjualanIndex::class)
             ->call('bukaModalTambah')
             ->assertSet('showCreateModal', true);
+    }
+
+    public function test_pos_kasir_customer_search_dan_filter_optimasi(): void
+    {
+        $this->actingAs($this->user);
+
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Budi Santoso',
+            'telepon' => '081234567890',
+            'email' => 'budi@test.com',
+        ]);
+
+        Livewire::test(PosKasir::class)
+            ->set('pelangganSearch', 'Budi')
+            ->assertSee('Budi Santoso')
+            ->call('setPelanggan', $pelanggan->id)
+            ->assertSet('selectedCustomerId', $pelanggan->id)
+            ->assertSet('pelangganSearch', '')
+            ->assertSee('Budi Santoso')
+            ->call('setPelanggan', null)
+            ->assertSet('selectedCustomerId', null)
+            ->assertSee('Pelanggan Umum')
+            // Toggle filter settings
+            ->set('visibleFilters.brand_kompatibel', true)
+            ->set('visibleFilters.model_kompatibel', true)
+            ->set('visibleFilters.kondisi', true)
+            ->set('visibleFilters.satuan', true)
+            ->set('visibleFilters.abc_class', true)
+            ->set('visibleFilters.stok', true)
+            ->set('filterAbcClass', 'A')
+            ->assertSee('Semua Kelas ABC')
+            ->call('resetFilterValues')
+            ->assertSet('filterAbcClass', null);
     }
 
     public function test_halaman_servis_kanban_dapat_diakses(): void

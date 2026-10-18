@@ -381,6 +381,21 @@ class PosKasir extends Component
         }
     }
 
+    public function resetFilterValues(): void
+    {
+        $this->filterKategoriId = null;
+        $this->filterBrandId = null;
+        $this->filterKualitasId = null;
+        $this->filterTipeHpId = null;
+        $this->filterBrandKompatibel = null;
+        $this->filterModelKompatibel = null;
+        $this->filterKondisi = null;
+        $this->filterSatuan = null;
+        $this->filterAbcClass = null;
+        $this->filterHanyaReadyStok = false;
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
     protected function simpanPreferensi(): void
     {
         $userId = auth()->id();
@@ -1093,6 +1108,7 @@ class PosKasir extends Component
     public function setPelanggan(?int $customerId)
     {
         $this->selectedCustomerId = $customerId;
+        $this->pelangganSearch = '';
         // Recalculate cart prices when customer/tier changes
         $pricingService = app(PricingService::class);
         foreach ($this->cart as $key => $item) {
@@ -1674,15 +1690,16 @@ class PosKasir extends Component
 
     public function getPelangganCariProperty()
     {
-        if (strlen($this->pelangganSearch) < 2) {
+        $term = trim($this->pelangganSearch);
+        if (strlen($term) < 1) {
             return collect();
         }
 
         return Pelanggan::with('tierMembership')
-            ->where(function ($q) {
-                $q->where('nama', 'like', "%{$this->pelangganSearch}%")
-                    ->orWhere('telepon', 'like', "%{$this->pelangganSearch}%")
-                    ->orWhere('email', 'like', "%{$this->pelangganSearch}%");
+            ->where(function ($q) use ($term) {
+                $q->where('nama', 'like', "%{$term}%")
+                    ->orWhere('telepon', 'like', "%{$term}%")
+                    ->orWhere('email', 'like', "%{$term}%");
             })
             ->limit(8)
             ->get();

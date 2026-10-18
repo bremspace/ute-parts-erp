@@ -3,6 +3,25 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-18 — Optimasi UI/UX POS Kasir, Header Wake Lock & Fixed Non-Scrolling Sidebar ✅
+
+- **[Fixed Non-Scrolling Sidebar]:**
+  - Mengunci viewport backoffice (`h-screen h-[100dvh] overflow-hidden`) dan menjadikan container sidebar `md:sticky md:top-0 md:h-screen md:max-h-screen` agar posisinya permanen dan tidak ikut tergulung saat konten halaman di-scroll.
+  - Memperbarui styling `aside.sidebar-collapsed` di `prism-tokens.css` dengan `position: fixed` dan `height: 100dvh` untuk mode rel icon rail.
+- **[Relokasi Screen Wake Lock ke Header Backoffice]:**
+  - Memindahkan toggle kunci layar selalu menyala dari kasir POS ke header navigasi global backoffice (`backoffice.blade.php`), sehingga dapat diaktifkan oleh kasir maupun staf operasional di seluruh menu.
+- **[Restrukturisasi UI/UX POS Kasir]:**
+  - Menghapus dropdown CRM berlebih dan menggantinya dengan satu kolom pencarian konsumen interaktif terpadu (`pelangganSearch`) dengan fallback tombol tambah konsumen baru jika hasil pencarian nihil.
+  - Menampilkan badge konsumen terpilih di Baris 2 sejajar dengan shortcut kasir (Retur, Riwayat, Online, Servis) lengkap dengan tombol lepas/ganti konsumen.
+  - Mengaktifkan rendering dan sinkronisasi seluruh 10 filter produk di dynamic filter bar POS (`kategori`, `brand`, `kualitas`, `tipe_hp`, `brand_kompatibel`, `model_kompatibel`, `kondisi`, `satuan`, `abc_class`, `stok`) beserta tombol reset nilai filter aktif.
+  - Menyesuaikan proporsi layout keranjang dan tabel transaksi agar responsif dan tidak terpotong dock/margin pada perangkat desktop, tablet, maupun smartphone.
+- **[Resolusi Error HTTP 500 Transaksi]:**
+  - Mengganti cache model master data POS ke query langsung untuk mencegah kegagalan serialisasi cache driver.
+  - Menyelaraskan teks syarat garansi dinamis pada cetak ulang struk riwayat transaksi.
+- **[Pengujian & Verifikasi]:**
+  - Feature test `TransaksiRoutesSmokeTest` lulus 100% (7 tests, 24 assertions).
+  - Format kode via Laravel Pint lulus, build Vite production sukses.
+
 ## 2026-10-18 — Pemisahan Manajemen Retur Konsumen ke Dedicated Sub Transaksi (`/app/pos/retur`) ✅
 
 - **[Pemisahan Halaman Mandiri Retur Konsumen]:**
