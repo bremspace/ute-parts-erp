@@ -83,6 +83,7 @@ class PoTab extends Component
         'only_reorder' => true,
         'is_ondemand' => '',
         'search' => '',
+        'urgensi' => '',
     ];
 
     #[On('wms-procurement-modal')]
@@ -124,6 +125,57 @@ class PoTab extends Component
         $this->dispatch('alert', [
             'type' => 'info',
             'message' => "Produk {$produk->nama} ({$qty} unit) dimasukkan ke usulan PO",
+        ]);
+    }
+
+    public function masukkanSemuaRekomendasiKePo(): void
+    {
+        $cabangId = session('cabang_id');
+        $service = app(ProcurementService::class);
+        $filterPayload = [
+            'abc_class' => $this->procurementFilter['abc_class'],
+            'only_reorder' => true,
+            'is_ondemand' => $this->procurementFilter['is_ondemand'] !== '' ? filter_var($this->procurementFilter['is_ondemand'], FILTER_VALIDATE_BOOLEAN) : null,
+            'search' => $this->procurementFilter['search'],
+            'urgensi' => $this->procurementFilter['urgensi'] ?? '',
+        ];
+        $items = $service->getProcurementRecommendations($cabangId, $filterPayload);
+
+        $orderItems = [];
+        foreach ($items as $item) {
+            if ($item['action'] === 'ORDER' && $item['recommended_order'] > 0) {
+                $p = Produk::find($item['produk_id']);
+                if ($p) {
+                    $orderItems[] = [
+                        'produk_id' => $p->id,
+                        'sku_variant_id' => $p->skuVariants()->first()?->id,
+                        'harga_beli' => (float) $p->harga_beli,
+                        'jumlah' => (int) $item['recommended_order'],
+                    ];
+                }
+            }
+        }
+
+        if (empty($orderItems)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tidak ada item rekomendasi yang perlu dipesan.']);
+
+            return;
+        }
+
+        $this->poForm = [
+            'supplier_id' => null,
+            'gudang_tujuan_id' => null,
+            'metode_bayar' => 'kredit',
+            'akun_kas_bank' => '110-01',
+            'jatuh_tempo' => '',
+            'items' => $orderItems,
+        ];
+
+        $this->showProcurementModal = false;
+        $this->showPoModal = true;
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => count($orderItems).' produk rekomendasi berhasil dimasukkan ke form PO!',
         ]);
     }
 
@@ -679,9 +731,11 @@ class PoTab extends Component
                 'only_reorder' => $this->procurementFilter['only_reorder'],
                 'is_ondemand' => $this->procurementFilter['is_ondemand'] !== '' ? filter_var($this->procurementFilter['is_ondemand'], FILTER_VALIDATE_BOOLEAN) : null,
                 'search' => $this->procurementFilter['search'],
+                'urgensi' => $this->procurementFilter['urgensi'] ?? '',
             ];
-            $procurementData = $service->getProcurementRecommendations($cabangId, $filterPayload);
-            $procurementSummary = $service->getProcurementSummary($cabangId);
+            $res = $service->getProcurementDataAndSummary($cabangId, $filterPayload);
+            $procurementData = $res['recommendations'];
+            $procurementSummary = $res['summary'];
         }
 
         $detailPo = null;

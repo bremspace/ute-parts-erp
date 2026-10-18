@@ -526,14 +526,14 @@
                 <div class="flex items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
                     <div>
                         <div class="flex items-center gap-2">
-                            <span class="text-xl">📊</span>
-                            <h3 class="text-lg font-bold text-white tracking-wide">Rekomendasi Pengadaan Stok</h3>
+                            <span class="text-xl">📦</span>
+                            <h3 class="text-lg font-bold text-white tracking-wide">Rekomendasi Pengadaan Stok (WMS)</h3>
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
-                                ABC • ROP • Min-Max • JIT
+                                ROP • Min-Max • JIT Demand
                             </span>
                         </div>
                         <p class="text-xs text-ink-400 mt-1">
-                            Sistem menghitung titik pemesanan optimal berbasis pergerakan barang dan pesanan servis aktif.
+                            Rekomendasi terarah &amp; akurat berdasarkan titik pesan kembali (ROP), batas aman min-max, dan kebutuhan servis aktif.
                         </p>
                     </div>
                     <button wire:click="closeProcurementModal" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
@@ -544,45 +544,45 @@
                 <!-- KPI & Metric Cards -->
                 @if($procurementSummary)
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
-                        <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
-                            <span class="text-[11px] font-semibold text-ink-400 block">Total SKU Terdata</span>
-                            <span class="text-lg font-bold text-white tabular-nums">{{ number_format($procurementSummary['total_sku']) }}</span>
-                        </div>
                         <div class="p-3.5 rounded-2xl bg-up-accent/10 border border-up-accent/25">
                             <span class="text-[11px] font-semibold text-up-accent block">Perlu Order (Restock)</span>
-                            <span class="text-lg font-bold text-up-accent tabular-nums">{{ number_format($procurementSummary['total_needs_order']) }} SKU</span>
+                            <span class="text-xl font-black text-up-accent tabular-nums">{{ number_format($procurementSummary['total_needs_order']) }} SKU</span>
+                            <span class="text-[10px] text-ink-400 block mt-0.5">dari total {{ number_format($procurementSummary['total_sku']) }} SKU aktif</span>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-up-red/10 border border-up-red/25">
+                            <span class="text-[11px] font-semibold text-up-red block">🔴 Kritis (Kosong / Defisit)</span>
+                            <span class="text-xl font-black text-up-red tabular-nums">{{ number_format($procurementSummary['kritis_count'] ?? 0) }} SKU</span>
+                            <span class="text-[10px] text-ink-400 block mt-0.5">stok 0 atau pesanan servis</span>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-up-primary/10 border border-up-primary/25">
+                            <span class="text-[11px] font-semibold text-up-primary block">🟡 Fast Moving (ROP)</span>
+                            <span class="text-xl font-black text-up-primary tabular-nums">{{ number_format($procurementSummary['rop_count'] ?? 0) }} SKU</span>
+                            <span class="text-[10px] text-ink-400 block mt-0.5">stok di bawah reorder point</span>
                         </div>
                         <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/25">
-                            <span class="text-[11px] font-semibold text-up-mint block">Estimasi Biaya Order</span>
+                            <span class="text-[11px] font-semibold text-up-mint block">Estimasi Total Biaya</span>
                             <span class="text-lg font-bold text-up-mint tabular-nums">Rp {{ number_format($procurementSummary['total_estimasi_biaya'], 0, ',', '.') }}</span>
-                        </div>
-                        <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between text-xs">
-                            <div class="space-y-0.5">
-                                <div class="text-[10px] text-ink-400">Kelas A: <strong class="text-up-red font-bold">{{ $procurementSummary['breakdown']['A']['needs_order'] ?? 0 }}</strong></div>
-                                <div class="text-[10px] text-ink-400">Kelas B: <strong class="text-up-primary font-bold">{{ $procurementSummary['breakdown']['B']['needs_order'] ?? 0 }}</strong></div>
-                            </div>
-                            <div class="space-y-0.5 text-right">
-                                <div class="text-[10px] text-ink-400">Kelas C: <strong class="text-ink-200 font-bold">{{ $procurementSummary['breakdown']['C']['needs_order'] ?? 0 }}</strong></div>
-                                <div class="text-[10px] text-ink-400">JIT: <strong class="text-purple-400 font-bold">{{ $procurementSummary['breakdown']['JIT']['needs_order'] ?? 0 }}</strong></div>
-                            </div>
+                            <span class="text-[10px] text-ink-400 block mt-0.5">harga beli supplier terakhir</span>
                         </div>
                     </div>
                 @endif
 
-                <!-- Filter Bar -->
-                <div class="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-black/30 border border-white/5 mb-3">
+                <!-- Filter Bar Ringkas & Terarah -->
+                <div class="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-black/30 border border-white/5 mb-3">
                     <div class="flex flex-wrap items-center gap-2">
+                        <select wire:model.live="procurementFilter.urgensi" class="px-3 py-1.5 rounded-xl glass-input text-xs font-semibold">
+                            <option value="" class="bg-ink-900">Semua Tingkat Urgensi</option>
+                            <option value="KRITIS_KOSONG" class="bg-ink-900">🔴 Stok Kosong (Stockout)</option>
+                            <option value="KRITIS_DEMAND" class="bg-ink-900">🔴 Defisit Pesanan Servis (JIT)</option>
+                            <option value="ROP_BREACH" class="bg-ink-900">🟡 Reorder Point (Kelas A)</option>
+                            <option value="MIN_STOCK_BREACH" class="bg-ink-900">🔵 Min Stock (Kelas B/C)</option>
+                        </select>
+
                         <select wire:model.live="procurementFilter.abc_class" class="px-3 py-1.5 rounded-xl glass-input text-xs font-semibold">
                             <option value="" class="bg-ink-900">Semua Kelas ABC</option>
                             <option value="A" class="bg-ink-900">Kelas A (Fast Moving)</option>
                             <option value="B" class="bg-ink-900">Kelas B (Normal)</option>
                             <option value="C" class="bg-ink-900">Kelas C (Slow Moving)</option>
-                        </select>
-
-                        <select wire:model.live="procurementFilter.is_ondemand" class="px-3 py-1.5 rounded-xl glass-input text-xs font-semibold">
-                            <option value="" class="bg-ink-900">Semua Tipe Stok</option>
-                            <option value="0" class="bg-ink-900">Regular (Stok Rutin)</option>
-                            <option value="1" class="bg-ink-900">Modified JIT (On-Demand)</option>
                         </select>
 
                         <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-ink-200 cursor-pointer">
@@ -591,94 +591,109 @@
                         </label>
                     </div>
 
-                    <div class="w-full sm:w-64">
-                        <input type="text" wire:model.live.debounce.300ms="procurementFilter.search" placeholder="Cari nama produk / barcode..." class="w-full px-3 py-1.5 rounded-xl glass-input text-xs" />
+                    <div class="w-full sm:w-56">
+                        <input type="text" wire:model.live.debounce.300ms="procurementFilter.search" placeholder="Cari produk / barcode..." class="w-full px-3 py-1.5 rounded-xl glass-input text-xs" />
                     </div>
                 </div>
 
                 <!-- Table Content (Scrollable) -->
-                <div class="overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[50vh]">
+                <div class="overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[48vh]">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead class="sticky top-0 bg-ink-950/95 backdrop-blur-sm z-10 border-b border-white/10">
                             <tr class="text-ink-400 font-semibold text-[11px] uppercase tracking-wider">
-                                <th class="py-3 px-3.5">Produk</th>
-                                <th class="py-3 px-3">Metode &amp; Kelas</th>
-                                <th class="py-3 px-3 text-right">Stok / Demand</th>
-                                <th class="py-3 px-3 text-right">ROP / Min-Max</th>
-                                <th class="py-3 px-3 text-right">Rekomendasi</th>
-                                <th class="py-3 px-3 text-right">Estimasi Biaya</th>
-                                <th class="py-3 px-3.5 text-center">Aksi</th>
+                                <th class="py-2.5 px-3.5">Produk &amp; Urgensi</th>
+                                <th class="py-2.5 px-3">Kondisi Stok &amp; Dasar Rekomendasi</th>
+                                <th class="py-2.5 px-3 text-right">Rekomendasi Order</th>
+                                <th class="py-2.5 px-3 text-right">Estimasi Biaya</th>
+                                <th class="py-2.5 px-3.5 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/5">
                             @forelse($procurementData ?? [] as $item)
-                                <tr class="hover:bg-white/[0.02] transition-colors {{ $item['action'] === 'ORDER' ? 'bg-up-accent/[0.03]' : '' }}">
-                                    <td class="py-3 px-3.5">
-                                        <div class="font-bold text-white">{{ $item['nama'] }}</div>
+                                @php
+                                    $isUrgent = in_array($item['urgensi'], ['KRITIS_KOSONG', 'KRITIS_DEMAND']);
+                                    $isRop = $item['urgensi'] === 'ROP_BREACH';
+                                @endphp
+                                <tr class="hover:bg-white/[0.02] transition-colors {{ $isUrgent ? 'bg-up-red/[0.04]' : ($isRop ? 'bg-up-amber/[0.03]' : '') }}">
+                                    <td class="py-2.5 px-3.5 max-w-[240px]">
+                                        <div class="font-bold text-white text-xs truncate" title="{{ $item['nama'] }}">{{ $item['nama'] }}</div>
                                         <div class="text-[10px] text-ink-400 flex items-center gap-1.5 mt-0.5">
                                             @if($item['barcode']) <span class="font-mono">{{ $item['barcode'] }}</span> • @endif
                                             <span>{{ $item['kategori'] ?? 'Umum' }}</span>
                                         </div>
-                                    </td>
-                                    <td class="py-3 px-3">
-                                        <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold {{ $item['abc_class'] === 'A' ? 'bg-up-red/15 text-up-red border border-up-red/30' : ($item['abc_class'] === 'C' ? 'bg-white/10 text-ink-300 border border-white/20' : 'bg-up-primary/15 text-up-primary border border-up-primary/30') }}">
+                                        <div class="flex items-center gap-1 mt-1 flex-wrap">
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold {{ $item['abc_class'] === 'A' ? 'bg-up-red/15 text-up-red border border-up-red/30' : ($item['abc_class'] === 'C' ? 'bg-white/10 text-ink-300 border border-white/20' : 'bg-up-primary/15 text-up-primary border border-up-primary/30') }}">
                                                 Kelas {{ $item['abc_class'] }}
                                             </span>
                                             @if($item['is_ondemand'])
-                                                <span class="px-1.5 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-[9px] font-bold text-purple-400">JIT</span>
+                                                <span class="px-1.5 py-0.2 rounded bg-purple-500/15 border border-purple-500/30 text-[9px] font-bold text-purple-400">JIT</span>
+                                            @endif
+                                            @if($item['action'] === 'ORDER')
+                                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold {{ $isUrgent ? 'bg-up-red/20 text-up-red border border-up-red/30' : ($isRop ? 'bg-up-amber/20 text-up-amber border border-up-amber/30' : 'bg-up-primary/20 text-up-primary border border-up-primary/30') }}">
+                                                    {{ $item['urgensi_label'] }}
+                                                </span>
                                             @endif
                                         </div>
-                                        <span class="text-[10px] text-ink-500 block mt-0.5">{{ $item['metode'] }}</span>
                                     </td>
-                                    <td class="py-3 px-3 text-right tabular-nums">
-                                        <div class="font-bold text-white">{{ number_format($item['current_stock']) }} {{ $item['satuan'] }}</div>
-                                        @if($item['pending_demand'] > 0)
-                                            <span class="text-[10px] text-up-amber font-semibold">Demand: {{ $item['pending_demand'] }}</span>
-                                        @endif
+                                    <td class="py-2.5 px-3">
+                                        <div class="flex items-center gap-3 text-xs">
+                                            <div>
+                                                <span class="text-[10px] text-ink-400 block">Stok Fisik:</span>
+                                                <span class="font-bold tabular-nums {{ $item['current_stock'] <= 0 ? 'text-up-red' : 'text-white' }}">
+                                                    {{ number_format($item['current_stock']) }} {{ $item['satuan'] }}
+                                                </span>
+                                            </div>
+                                            @if($item['pending_demand'] > 0)
+                                                <div>
+                                                    <span class="text-[10px] text-up-amber block font-semibold">Demand Servis:</span>
+                                                    <span class="font-bold text-up-amber tabular-nums">{{ $item['pending_demand'] }} {{ $item['satuan'] }}</span>
+                                                </div>
+                                            @endif
+                                            <div>
+                                                <span class="text-[10px] text-ink-400 block">Dasar Target:</span>
+                                                <span class="text-ink-200 font-mono text-[11px]">
+                                                    @if($item['abc_class'] === 'A')
+                                                        ROP: {{ $item['reorder_point'] ?? 0 }} | Max: {{ $item['max_stock'] ?? '-' }}
+                                                    @elseif($item['is_ondemand'])
+                                                        Demand Konsumen
+                                                    @else
+                                                        Min: {{ $item['min_stock'] ?? 0 }} | Max: {{ $item['max_stock'] ?? '-' }}
+                                                    @endif
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="text-[10px] text-ink-400 mt-1 leading-snug">
+                                            💡 {{ $item['alasan'] }}
+                                        </div>
                                     </td>
-                                    <td class="py-3 px-3 text-right tabular-nums text-ink-300 text-[11px]">
-                                        @if($item['is_ondemand'])
-                                            <span class="text-ink-500">On-Demand</span>
-                                        @elseif($item['abc_class'] === 'A')
-                                            <div>ROP: <strong class="text-white">{{ $item['reorder_point'] ?? '-' }}</strong></div>
-                                            <div class="text-[10px] text-ink-500">Max: {{ $item['max_stock'] ?? '-' }}</div>
-                                        @else
-                                            <div>Min: <strong class="text-white">{{ $item['min_stock'] ?? '-' }}</strong></div>
-                                            <div class="text-[10px] text-ink-500">Max: {{ $item['max_stock'] ?? '-' }}</div>
-                                        @endif
-                                    </td>
-                                    <td class="py-3 px-3 text-right tabular-nums">
+                                    <td class="py-2.5 px-3 text-right tabular-nums whitespace-nowrap">
                                         @if($item['action'] === 'ORDER')
-                                            <span class="px-2 py-0.5 rounded-lg bg-up-accent/20 border border-up-accent/40 text-up-accent font-black text-xs inline-block">
+                                            <span class="px-2.5 py-1 rounded-lg bg-up-accent/20 border border-up-accent/40 text-up-accent font-black text-xs inline-block">
                                                 +{{ number_format($item['recommended_order']) }} {{ $item['satuan'] }}
                                             </span>
                                         @else
-                                            <span class="text-ink-500 font-semibold text-[11px]">—</span>
+                                            <span class="text-ink-500 font-semibold text-xs">Aman</span>
                                         @endif
-                                        <div class="text-[9px] text-ink-500 mt-0.5 max-w-[160px] truncate" title="{{ $item['alasan'] }}">
-                                            {{ $item['alasan'] }}
-                                        </div>
                                     </td>
-                                    <td class="py-3 px-3 text-right tabular-nums">
+                                    <td class="py-2.5 px-3 text-right tabular-nums whitespace-nowrap">
                                         @if($item['estimasi_biaya'] > 0)
-                                            <span class="font-bold text-white">Rp {{ number_format($item['estimasi_biaya'], 0, ',', '.') }}</span>
-                                            <span class="block text-[10px] text-ink-500">@ Rp {{ number_format($item['harga_beli'], 0, ',', '.') }}</span>
+                                            <div class="font-bold text-white text-xs">Rp {{ number_format($item['estimasi_biaya'], 0, ',', '.') }}</div>
+                                            <span class="text-[10px] text-ink-500">@ Rp {{ number_format($item['harga_beli'], 0, ',', '.') }}</span>
                                         @else
-                                            <span class="text-ink-500">—</span>
+                                            <span class="text-ink-500 text-xs">—</span>
                                         @endif
                                     </td>
-                                    <td class="py-3 px-3.5 text-center">
+                                    <td class="py-2.5 px-3.5 text-center whitespace-nowrap">
                                         <div class="flex items-center justify-center gap-1.5">
                                             <button type="button" wire:click="bukaHistoriPembelian({{ $item['produk_id'] }}, '{{ addslashes($item['nama']) }}')" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white border border-white/5 text-[10px]" title="Histori Pembelian Supplier">
                                                 📊
                                             </button>
                                             @if($item['action'] === 'ORDER')
-                                                <button wire:click="terapkanKePo({{ $item['produk_id'] }}, {{ $item['recommended_order'] }})" class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/20 transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer whitespace-nowrap">
+                                                <button wire:click="terapkanKePo({{ $item['produk_id'] }}, {{ $item['recommended_order'] }})" class="px-2.5 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/20 transition active:scale-95 cursor-pointer whitespace-nowrap">
                                                     + Buat PO
                                                 </button>
                                             @else
-                                                <button wire:click="terapkanKePo({{ $item['produk_id'] }}, 1)" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white font-semibold text-[10px] border border-white/5 transition-colors cursor-pointer">
+                                                <button wire:click="terapkanKePo({{ $item['produk_id'] }}, 1)" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white font-semibold text-[10px] border border-white/5 transition cursor-pointer">
                                                     Order Manual
                                                 </button>
                                             @endif
@@ -687,8 +702,8 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="py-12 text-center text-ink-400">
-                                        Tidak ada rekomendasi pengadaan yang sesuai dengan filter.
+                                    <td colspan="5" class="py-12 text-center text-ink-400">
+                                        Semua stok aman. Tidak ada produk yang membutuhkan pemesanan saat ini.
                                     </td>
                                 </tr>
                             @endforelse
@@ -699,13 +714,21 @@
                 <!-- Footer Modal -->
                 <div class="flex flex-wrap items-center justify-between pt-4 border-t border-white/10 mt-3 gap-2">
                     <span class="text-[11px] text-ink-500">
-                        Rekomendasi dihitung secara realtime berdasarkan parameter ABC, ROP, Min-Max, dan order servis aktif.
+                        Formula ROP &amp; Min-Max disesuaikan otomatis dengan riwayat penjualan kasir &amp; pesanan servis aktif.
                     </span>
-                    <div class="flex items-center gap-2">
-                        <button wire:click="bukaAnalisisAbcModal" class="px-4 py-2.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 font-bold text-xs cursor-pointer">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        @if(($procurementSummary['total_needs_order'] ?? 0) > 0)
+                            <button type="button"
+                                    wire:click="masukkanSemuaRekomendasiKePo"
+                                    wire:confirm="Masukkan seluruh {{ $procurementSummary['total_needs_order'] }} produk yang perlu order ke dalam draft PO baru?"
+                                    class="px-4 py-2.5 rounded-xl bg-up-accent hover:bg-up-accent/90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-accent/20 active:scale-95 transition">
+                                📦 Masukkan Semua ({{ $procurementSummary['total_needs_order'] }} SKU) ke PO
+                            </button>
+                        @endif
+                        <button wire:click="bukaAnalisisAbcModal" class="px-3.5 py-2.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 font-bold text-xs cursor-pointer">
                             ⚡ Analisis Ulang ABC (Pareto)
                         </button>
-                        <button wire:click="closeProcurementModal" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
+                        <button wire:click="closeProcurementModal" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
                             Tutup
                         </button>
                     </div>

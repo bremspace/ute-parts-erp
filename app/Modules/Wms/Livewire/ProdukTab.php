@@ -21,6 +21,7 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\ImportSidRetailService;
+use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
 use App\Traits\ParsesNominal;
@@ -140,6 +141,8 @@ class ProdukTab extends Component
     public ?int $editProdukId = null;
 
     public array $editProdukForm = [];
+
+    public string $autoAbcKeterangan = '';
 
     public array $editStokItems = [];
 
@@ -654,6 +657,14 @@ class ProdukTab extends Component
         $this->editStokRaks = [];
         foreach ($this->editStokItems as $item) {
             $this->editStokRaks[$item['id']] = $item['rak_id'];
+        }
+
+        // Ambil data analisis WMS otomatis untuk panduan staf
+        try {
+            $autoInfo = app(ProcurementService::class)->hitungParameterProdukOtomatis($p->id, session('cabang_id'), 90);
+            $this->autoAbcKeterangan = $autoInfo['keterangan'] ?? '';
+        } catch (\Throwable $e) {
+            $this->autoAbcKeterangan = '';
         }
 
         $this->showEditProdukModal = true;
@@ -1745,6 +1756,57 @@ class ProdukTab extends Component
             : 'Tidak ada produk yang berhasil diproses.';
 
         $this->dispatch('alert', ['type' => $type, 'message' => $pesan]);
+    }
+
+    public function hitungOtomatisParameterEdit(): void
+    {
+        if (! $this->editProdukId) {
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $res = app(ProcurementService::class)->hitungParameterProdukOtomatis($this->editProdukId, $cabangId, 90);
+
+        if ($res) {
+            $this->editProdukForm['abc_class'] = $res['rekomendasi_abc'];
+            $this->editProdukForm['reorder_point'] = $res['rekomendasi_rop'];
+            $this->editProdukForm['min_stock'] = $res['rekomendasi_min'];
+            $this->editProdukForm['max_stock'] = $res['rekomendasi_max'];
+            $this->autoAbcKeterangan = $res['keterangan'] ?? '';
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Kelas {$res['rekomendasi_abc']} dihitung otomatis (ADU: {$res['adu']}/hari, ROP: {$res['rekomendasi_rop']})",
+            ]);
+        }
+    }
+
+    public function autoKlasifikasiAbcTerpilih(): void
+    {
+        if (empty($this->selectedProdukIds)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih produk terlebih dahulu.']);
+
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $res = app(ProcurementService::class)->sinkronisasiKelasAbcOtomatis($cabangId, $this->selectedProdukIds, 90);
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Klasifikasi otomatis selesai untuk {$res['total_updated']} produk terpilih (Kelas A: {$res['breakdown']['A']}, B: {$res['breakdown']['B']}, C: {$res['breakdown']['C']}).",
+        ]);
+    }
+
+    public function autoKlasifikasiAbcSemua(): void
+    {
+        $cabangId = session('cabang_id');
+        $res = app(ProcurementService::class)->sinkronisasiKelasAbcOtomatis($cabangId, [], 90);
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Klasifikasi WMS otomatis berhasil diterapkan untuk {$res['total_updated']} produk (Kelas A: {$res['breakdown']['A']}, B: {$res['breakdown']['B']}, C: {$res['breakdown']['C']}).",
+        ]);
     }
 
     protected function getFilteredProdukQuery()

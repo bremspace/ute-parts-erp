@@ -149,6 +149,15 @@
                             </select>
                         </div>
 
+                        <!-- Tombol Auto ABC WMS Seluruh Produk -->
+                        <button type="button"
+                                wire:click="autoKlasifikasiAbcSemua"
+                                wire:confirm="Jalankan klasifikasi otomatis kelas WMS (ABC Pareto) dan parameter ROP / Min-Max untuk seluruh master produk aktif berdasarkan pergerakan 90 hari terakhir?"
+                                class="px-3 py-1.5 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[36px]"
+                                title="Kalkulasi otomatis kelas ABC dan parameter restock seluruh produk">
+                            <span>⚡ Auto ABC (WMS)</span>
+                        </button>
+
                         <!-- View Switcher (Table vs Grid) -->
                         <div class="inline-flex items-center p-0.5 rounded-xl bg-white/5 border border-white/10 ml-auto">
                             <button type="button"
@@ -266,6 +275,14 @@
                                 class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
                                 title="Cetak barcode produk yang dipilih">
                             <span>🖨️ Cetak Barcode</span>
+                        </button>
+
+                        <button type="button"
+                                wire:click="autoKlasifikasiAbcTerpilih"
+                                wire:confirm="Hitung dan terapkan kelas ABC serta parameter WMS otomatis untuk {{ count($selectedProdukIds) }} produk terpilih?"
+                                class="px-3 py-1.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                                title="Kalkulasi otomatis kelas ABC dan parameter WMS untuk produk terpilih">
+                            <span>⚡ Auto Kelas ABC</span>
                         </button>
 
                         @if(isSuperAdminOrOwner())
@@ -1080,21 +1097,26 @@
                     <!-- Konfigurasi Pengadaan (ABC, ROP, Min-Max, Modified JIT) -->
                     <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-3">
                         <div class="flex items-center justify-between">
-                            <p class="text-xs font-bold text-ink-200">⚙️ Strategi Pengadaan Stok (ABC / ROP / Min-Max / JIT)</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-xs font-bold text-ink-200">⚙️ Strategi Pengadaan Stok (WMS Auto ABC / ROP / Min-Max)</p>
+                                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-up-primary/15 text-up-primary border border-up-primary/30">Otomatis Sistem</span>
+                            </div>
                             <label class="inline-flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" wire:model.live="produkForm.is_ondemand" class="rounded bg-black/40 border-white/20 text-up-accent focus:ring-0">
                                 <span class="text-xs font-semibold text-up-accent">Modified JIT (On-Demand)</span>
                             </label>
                         </div>
-                        <p class="text-[10px] text-ink-500">Jika Modified JIT dicentang, pengecekan stok otomatis (ROP &amp; Min-Max) diabaikan. Pengadaan hanya dipesan saat ada pesanan konsumen/servis aktif.</p>
+                        <p class="text-[10px] text-ink-400">
+                            Sistem secara berkala menghitung pergerakan omzet barang (Pareto 80/20) dan menetapkan kelas ABC, ROP, serta Min-Max secara otomatis. Untuk produk baru, awal diberikan Kelas B (Normal).
+                        </p>
 
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
-                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">Klasifikasi ABC</label>
+                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">Klasifikasi ABC (Sistem / Manual)</label>
                                 <select wire:model="produkForm.abc_class" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold">
-                                    <option value="A" class="bg-ink-900">Kelas A (Fast Moving)</option>
-                                    <option value="B" class="bg-ink-900">Kelas B (Normal)</option>
-                                    <option value="C" class="bg-ink-900">Kelas C (Slow Moving)</option>
+                                    <option value="A" class="bg-ink-900">Kelas A (Fast Moving - Pareto 80%)</option>
+                                    <option value="B" class="bg-ink-900">Kelas B (Normal - Pareto 15%)</option>
+                                    <option value="C" class="bg-ink-900">Kelas C (Slow Moving / Long-tail)</option>
                                 </select>
                             </div>
                             <div>
@@ -1848,22 +1870,41 @@
 
                     <!-- Konfigurasi Pengadaan (ABC, ROP, Min-Max, Modified JIT) -->
                     <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <p class="text-xs font-bold text-ink-200">⚙️ Strategi Pengadaan Stok (ABC / ROP / Min-Max / JIT)</p>
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <div class="flex items-center gap-2">
+                                <p class="text-xs font-bold text-ink-200">⚙️ Strategi Pengadaan Stok (WMS Auto ABC / ROP / Min-Max)</p>
+                                <button type="button"
+                                        wire:click="hitungOtomatisParameterEdit"
+                                        class="px-2.5 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 text-[10px] font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer">
+                                    <span>⚡ Hitung Otomatis Sistem</span>
+                                </button>
+                            </div>
                             <label class="inline-flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" wire:model.live="editProdukForm.is_ondemand" class="rounded bg-black/40 border-white/20 text-up-accent focus:ring-0">
                                 <span class="text-xs font-semibold text-up-accent">Modified JIT (On-Demand)</span>
                             </label>
                         </div>
-                        <p class="text-[10px] text-ink-500">Jika Modified JIT dicentang, pengecekan stok otomatis diabaikan. Part hanya dipesan saat ada order pelanggan/servis aktif.</p>
+
+                        @if(!empty($autoAbcKeterangan))
+                            <div class="p-2.5 rounded-xl bg-up-primary/[0.07] border border-up-primary/20 text-[11px] text-ink-200 flex items-start gap-2">
+                                <span class="text-up-primary text-sm shrink-0">📊</span>
+                                <div class="leading-relaxed">
+                                    <strong class="text-white font-semibold">Hasil Analisis WMS:</strong> {{ $autoAbcKeterangan }}
+                                </div>
+                            </div>
+                        @else
+                            <p class="text-[10px] text-ink-500">
+                                Sistem menentukan kelas ABC secara otomatis berbasis akumulasi omzet &amp; pergerakan riil (Pareto 80/20) serta menghitung titik pemesanan optimal.
+                            </p>
+                        @endif
 
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
                                 <label class="block text-[11px] font-semibold text-ink-300 mb-1">Klasifikasi ABC</label>
                                 <select wire:model="editProdukForm.abc_class" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold">
-                                    <option value="A" class="bg-ink-900">Kelas A (Fast Moving)</option>
-                                    <option value="B" class="bg-ink-900">Kelas B (Normal)</option>
-                                    <option value="C" class="bg-ink-900">Kelas C (Slow Moving)</option>
+                                    <option value="A" class="bg-ink-900">Kelas A (Fast Moving - Pareto 80%)</option>
+                                    <option value="B" class="bg-ink-900">Kelas B (Normal - Pareto 15%)</option>
+                                    <option value="C" class="bg-ink-900">Kelas C (Slow Moving / Long-tail)</option>
                                 </select>
                             </div>
                             <div>

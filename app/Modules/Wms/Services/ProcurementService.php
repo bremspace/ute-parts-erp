@@ -171,6 +171,25 @@ class ProcurementService
 
             $estimasiBiaya = $recommendedOrder * $hargaBeli;
 
+            // Tingkat urgensi untuk sorting & prioritas pengadaan yang valid
+            $urgensi = 'AMAN';
+            $urgensiLabel = 'Stok Aman';
+            if ($action === 'ORDER') {
+                if ($currentStock <= 0) {
+                    $urgensi = 'KRITIS_KOSONG';
+                    $urgensiLabel = 'Stok Kosong (Stockout)';
+                } elseif ($isOndemand && $currentStock < $pendingDemand) {
+                    $urgensi = 'KRITIS_DEMAND';
+                    $urgensiLabel = 'Defisit Servis Aktif';
+                } elseif ($abcClass === 'A') {
+                    $urgensi = 'ROP_BREACH';
+                    $urgensiLabel = 'ROP Tercapai (Fast Moving)';
+                } else {
+                    $urgensi = 'MIN_STOCK_BREACH';
+                    $urgensiLabel = 'Di Bawah Min Stock';
+                }
+            }
+
             return [
                 'produk_id' => $item->id,
                 'nama' => $item->nama,
@@ -192,6 +211,8 @@ class ProcurementService
                 'action' => $action,
                 'metode' => $metode,
                 'alasan' => $alasan,
+                'urgensi' => $urgensi,
+                'urgensi_label' => $urgensiLabel,
             ];
         });
 
@@ -200,7 +221,73 @@ class ProcurementService
             $results = $results->filter(fn ($item) => $item['action'] === 'ORDER')->values();
         }
 
-        return $results;
+        // Urutkan rekomendasi order berdasarkan urgensi (Kritis/Kosong -> ROP -> Min Stock)
+        return $results->sortBy(function ($item) {
+            $prioritas = [
+                'KRITIS_DEMAND' => 1,
+                'KRITIS_KOSONG' => 2,
+                'ROP_BREACH' => 3,
+                'MIN_STOCK_BREACH' => 4,
+                'AMAN' => 5,
+            ];
+
+            return $prioritas[$item['urgensi']] ?? 99;
+        })->values();
+    }
+
+    /**
+     * Hitung rekomendasi dan ringkasan metrik sekaligus dalam satu siklus efisien.
+     * Mencegah pemanggilan query database berganda saat modal pengadaan dibuka.
+     *
+     * @return array{recommendations: Collection, summary: array}
+     */
+    public function getProcurementDataAndSummary(?int $cabangId = null, array $filters = []): array
+    {
+        // 1. Ambil data rekomendasi lengkap
+        $all = $this->getProcurementRecommendations($cabangId, array_merge($filters, ['only_reorder' => false]));
+
+        // 2. Hitung summary ringkas
+        $needsOrder = $all->where('action', 'ORDER');
+        $summary = [
+            'total_sku' => $all->count(),
+            'total_needs_order' => $needsOrder->count(),
+            'total_estimasi_biaya' => $needsOrder->sum('estimasi_biaya'),
+            'kritis_count' => $needsOrder->whereIn('urgensi', ['KRITIS_KOSONG', 'KRITIS_DEMAND'])->count(),
+            'rop_count' => $needsOrder->where('urgensi', 'ROP_BREACH')->count(),
+            'breakdown' => [
+                'A' => [
+                    'total' => $all->where('abc_class', 'A')->where('is_ondemand', false)->count(),
+                    'needs_order' => $needsOrder->where('abc_class', 'A')->where('is_ondemand', false)->count(),
+                ],
+                'B' => [
+                    'total' => $all->where('abc_class', 'B')->where('is_ondemand', false)->count(),
+                    'needs_order' => $needsOrder->where('abc_class', 'B')->where('is_ondemand', false)->count(),
+                ],
+                'C' => [
+                    'total' => $all->where('abc_class', 'C')->where('is_ondemand', false)->count(),
+                    'needs_order' => $needsOrder->where('abc_class', 'C')->where('is_ondemand', false)->count(),
+                ],
+                'JIT' => [
+                    'total' => $all->where('is_ondemand', true)->count(),
+                    'needs_order' => $needsOrder->where('is_ondemand', true)->count(),
+                ],
+            ],
+        ];
+
+        // 3. Filter rekomendasi yang dikembalikan ke tampilan sesuai parameter
+        $recommendations = $all;
+        if (! empty($filters['only_reorder'])) {
+            $recommendations = $recommendations->where('action', 'ORDER');
+        }
+
+        if (! empty($filters['urgensi'])) {
+            $recommendations = $recommendations->where('urgensi', $filters['urgensi']);
+        }
+
+        return [
+            'recommendations' => $recommendations->values(),
+            'summary' => $summary,
+        ];
     }
 
     /**
@@ -469,5 +556,87 @@ class ProcurementService
         }
 
         return $count;
+    }
+
+    /**
+     * Hitung parameter klasifikasi WMS otomatis untuk satu produk spesifik.
+     * Digunakan saat form produk dibuka / tombol hitung instan ditekan.
+     */
+    public function hitungParameterProdukOtomatis(int $produkId, ?int $cabangId = null, int $periodeHari = 90): ?array
+    {
+        $analisis = $this->hitungAnalisisAbc($cabangId, $periodeHari);
+        $found = collect($analisis['items'])->firstWhere('produk_id', $produkId);
+
+        if (! $found) {
+            $p = Produk::find($produkId);
+            if (! $p) {
+                return null;
+            }
+
+            return [
+                'produk_id' => $p->id,
+                'nama' => $p->nama,
+                'rekomendasi_abc' => 'C',
+                'rekomendasi_rop' => 1,
+                'rekomendasi_min' => 1,
+                'rekomendasi_max' => 5,
+                'adu' => 0,
+                'qty_keluar' => 0,
+                'nilai_omzet' => 0,
+                'keterangan' => 'Belum ada data transaksi/mutasi (Default Kelas C - Slow Moving)',
+            ];
+        }
+
+        $labelKelas = match ($found['rekomendasi_abc']) {
+            'A' => 'Kelas A (Fast Moving - Pareto 80%)',
+            'B' => 'Kelas B (Normal Moving - Pareto 15%)',
+            default => 'Kelas C (Slow Moving / Long Tail)',
+        };
+
+        $found['keterangan'] = "Berdasarkan konsumsi {$found['qty_keluar']} unit ({$found['adu']}/hari) selama {$periodeHari} hari terakhir. Klasifikasi: {$labelKelas}.";
+
+        return $found;
+    }
+
+    /**
+     * Sinkronisasi otomatis kelas WMS (ABC, ROP, Min, Max) untuk semua atau produk terpilih.
+     * Mengembalikan ringkasan perubahan untuk feedback pengguna / log.
+     *
+     * @return array{total_updated: int, breakdown: array<string, int>}
+     */
+    public function sinkronisasiKelasAbcOtomatis(?int $cabangId = null, array $produkIds = [], int $periodeHari = 90): array
+    {
+        $analisis = $this->hitungAnalisisAbc($cabangId, $periodeHari);
+        $count = 0;
+        $breakdown = ['A' => 0, 'B' => 0, 'C' => 0];
+
+        foreach ($analisis['items'] as $item) {
+            if (! empty($produkIds) && ! in_array($item['produk_id'], $produkIds, true)) {
+                continue;
+            }
+
+            if ($item['is_ondemand']) {
+                continue; // Komponen JIT diatur manual sesuai pesanan servis
+            }
+
+            Produk::where('id', $item['produk_id'])->update([
+                'abc_class' => $item['rekomendasi_abc'],
+                'reorder_point' => $item['rekomendasi_rop'],
+                'min_stock' => $item['rekomendasi_min'],
+                'max_stock' => $item['rekomendasi_max'],
+            ]);
+
+            $count++;
+            $kelas = $item['rekomendasi_abc'] ?? 'C';
+            if (isset($breakdown[$kelas])) {
+                $breakdown[$kelas]++;
+            }
+        }
+
+        return [
+            'total_updated' => $count,
+            'breakdown' => $breakdown,
+            'periode_hari' => $periodeHari,
+        ];
     }
 }
