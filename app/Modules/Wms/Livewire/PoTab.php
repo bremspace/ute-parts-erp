@@ -71,13 +71,6 @@ class PoTab extends Component
 
     public array $historiStatistik = [];
 
-    // [ANALISIS ABC MODAL]
-    public bool $showAnalisisAbcModal = false;
-
-    public array $analisisAbcData = [];
-
-    public int $analisisAbcPeriode = 90;
-
     public array $procurementFilter = [
         'abc_class' => '',
         'only_reorder' => true,
@@ -386,29 +379,6 @@ class PoTab extends Component
         $this->historiProdukNama = '';
         $this->historiPembelianData = [];
         $this->historiStatistik = [];
-    }
-
-    public function bukaAnalisisAbcModal(): void
-    {
-        $cabangId = session('cabang_id');
-        $this->analisisAbcData = app(ProcurementService::class)->hitungAnalisisAbc($cabangId, $this->analisisAbcPeriode);
-        $this->showAnalisisAbcModal = true;
-    }
-
-    public function tutupAnalisisAbcModal(): void
-    {
-        $this->showAnalisisAbcModal = false;
-    }
-
-    public function terapkanAnalisisAbcSemua(): void
-    {
-        $cabangId = session('cabang_id');
-        $count = app(ProcurementService::class)->terapkanAnalisisAbc([], $cabangId, $this->analisisAbcPeriode);
-        $this->showAnalisisAbcModal = false;
-        $this->dispatch('alert', [
-            'type' => 'success',
-            'message' => "Analisis ABC & parameter ROP berhasil diterapkan ke {$count} produk aktif.",
-        ]);
     }
 
     public function simpanPo()

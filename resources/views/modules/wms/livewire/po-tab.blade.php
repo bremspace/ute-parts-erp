@@ -8,11 +8,8 @@
                     <p class="text-xs text-ink-400">Pengadaan barang ke supplier dengan tracking harga otomatis &amp; strategi reorder ABC</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                    <button wire:click="openProcurementModal" class="px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97]" title="Rekomendasi Reorder Berdasarkan Stok & Demand">
-                        <span>📊</span> Rekomendasi Reorder
-                    </button>
-                    <button wire:click="bukaAnalisisAbcModal" class="px-3.5 py-2 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97]" title="Hitung Otomatis Strategi ABC Pareto & ROP">
-                        <span>⚡</span> Analisis ABC (Pareto)
+                    <button wire:click="openProcurementModal" class="px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97]" title="Rekomendasi Pengadaan Berdasarkan Stok & Demand">
+                        <span>📊</span> Rekomendasi Pengadaan
                     </button>
                     <button wire:click="openPoModal" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.97]">
                         + Buat PO
@@ -725,10 +722,7 @@
                                 📦 Masukkan Semua ({{ $procurementSummary['total_needs_order'] }} SKU) ke PO
                             </button>
                         @endif
-                        <button wire:click="bukaAnalisisAbcModal" class="px-3.5 py-2.5 rounded-xl bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 font-bold text-xs cursor-pointer">
-                            ⚡ Analisis Ulang ABC (Pareto)
-                        </button>
-                        <button wire:click="closeProcurementModal" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
+                        <button wire:click="closeProcurementModal" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
                             Tutup
                         </button>
                     </div>
@@ -852,128 +846,6 @@
                     <button wire:click="tutupHistoriPembelian" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
                         Tutup
                     </button>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    <!-- MODAL ANALISIS ABC (PARETO 80/20) & STRATEGI WMS -->
-    @if($showAnalisisAbcModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
-            <div class="w-full max-w-5xl glass-panel p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
-                <!-- Header Modal -->
-                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xl">⚡</span>
-                            <h3 class="text-lg font-bold text-white tracking-wide">Analisis ABC (Pareto) &amp; Rekomendasi ROP / Min-Max</h3>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
-                                Strategi WMS Otomatis
-                            </span>
-                        </div>
-                        <p class="text-xs text-ink-400 mt-1">
-                            Sistem menghitung kontribusi omzet/pergerakan barang periode {{ $analisisAbcData['periode_hari'] ?? 90 }} hari terakhir dan merekomendasikan parameter reorder optimal.
-                        </p>
-                    </div>
-                    <button wire:click="tutupAnalisisAbcModal" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
-                        ✕
-                    </button>
-                </div>
-
-                <!-- Parameter Info Bar -->
-                <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 my-3">
-                    <div class="flex items-center gap-3">
-                        <span class="text-xs text-ink-300 font-semibold">Periode Analisis:</span>
-                        <div class="flex items-center gap-1.5">
-                            @foreach([30, 60, 90, 180] as $hari)
-                                <button type="button" wire:click="$set('analisisAbcPeriode', {{ $hari }}); bukaAnalisisAbcModal()" class="px-2.5 py-1 rounded-lg text-xs font-bold {{ ($analisisAbcPeriode ?? 90) === $hari ? 'bg-up-primary text-white shadow-sm' : 'bg-white/5 text-ink-400 hover:text-white' }}">
-                                    {{ $hari }} Hari
-                                </button>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    <div class="text-right">
-                        <span class="text-[11px] text-ink-400">Total Omzet Pergerakan:</span>
-                        <span class="text-xs font-bold text-up-mint ml-1 tabular-nums">
-                            Rp {{ number_format($analisisAbcData['total_nilai'] ?? 0, 0, ',', '.') }}
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Tabel Hasil Analisis ABC -->
-                <div class="overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[48vh]">
-                    <table class="w-full text-left border-collapse text-xs">
-                        <thead class="sticky top-0 bg-ink-950/95 backdrop-blur-sm z-10 border-b border-white/10">
-                            <tr class="text-ink-400 font-semibold text-[11px] uppercase tracking-wider">
-                                <th class="py-3 px-3.5">Produk</th>
-                                <th class="py-3 px-3 text-right">Qty Keluar</th>
-                                <th class="py-3 px-3 text-right">Nilai Omzet</th>
-                                <th class="py-3 px-3 text-center">Kelas Saat Ini</th>
-                                <th class="py-3 px-3 text-center">Rekomendasi ABC</th>
-                                <th class="py-3 px-3 text-right">Rekomendasi ROP</th>
-                                <th class="py-3 px-3 text-right">Rekomendasi Min-Max</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5">
-                            @forelse($analisisAbcData['items'] ?? [] as $row)
-                                <tr class="hover:bg-white/[0.02] transition-colors {{ $row['rekomendasi_abc'] === 'A' ? 'bg-up-red/[0.02]' : '' }}">
-                                    <td class="py-3 px-3.5">
-                                        <div class="font-bold text-white">{{ $row['nama'] }}</div>
-                                        <div class="text-[10px] text-ink-400 flex items-center gap-1.5 mt-0.5">
-                                            <span>{{ $row['kategori'] ?? 'Umum' }}</span> •
-                                            <span>ADU: {{ $row['adu'] }}/hari</span>
-                                        </div>
-                                    </td>
-                                    <td class="py-3 px-3 text-right tabular-nums font-bold text-white">
-                                        {{ number_format($row['qty_keluar']) }} {{ $row['satuan'] }}
-                                    </td>
-                                    <td class="py-3 px-3 text-right tabular-nums">
-                                        <div class="font-bold text-white">Rp {{ number_format($row['nilai_omzet'], 0, ',', '.') }}</div>
-                                        <div class="text-[10px] text-ink-500 font-mono">{{ $row['persen_kumulatif'] }}% kumulatif</div>
-                                    </td>
-                                    <td class="py-3 px-3 text-center">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ $row['current_abc'] === 'A' ? 'bg-up-red/15 text-up-red' : ($row['current_abc'] === 'C' ? 'bg-white/10 text-ink-300' : 'bg-up-primary/15 text-up-primary') }}">
-                                            Kelas {{ $row['current_abc'] }}
-                                        </span>
-                                    </td>
-                                    <td class="py-3 px-3 text-center">
-                                        <span class="px-2.5 py-1 rounded-lg text-xs font-black {{ $row['rekomendasi_abc'] === 'A' ? 'bg-up-red/25 text-up-red border border-up-red/40' : ($row['rekomendasi_abc'] === 'C' ? 'bg-white/15 text-ink-200 border border-white/20' : 'bg-up-primary/25 text-up-primary border border-up-primary/40') }}">
-                                            Kelas {{ $row['rekomendasi_abc'] }}
-                                        </span>
-                                    </td>
-                                    <td class="py-3 px-3 text-right tabular-nums font-bold text-white">
-                                        {{ $row['rekomendasi_rop'] }} {{ $row['satuan'] }}
-                                    </td>
-                                    <td class="py-3 px-3 text-right tabular-nums text-ink-300">
-                                        Min: <strong class="text-white">{{ $row['rekomendasi_min'] }}</strong> •
-                                        Max: <strong class="text-white">{{ $row['rekomendasi_max'] }}</strong>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="py-12 text-center text-ink-400">
-                                        Belum ada data transaksi/mutasi untuk dianalisis.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Footer Modal -->
-                <div class="flex flex-wrap items-center justify-between pt-4 border-t border-white/10 mt-3 gap-3">
-                    <span class="text-[11px] text-ink-500">
-                        Penerapan akan memperbarui kolom <code>abc_class</code>, <code>reorder_point</code>, <code>min_stock</code>, dan <code>max_stock</code> seluruh produk aktif.
-                    </span>
-                    <div class="flex items-center gap-2">
-                        <button wire:click="tutupAnalisisAbcModal" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
-                            Batal
-                        </button>
-                        <button wire:click="terapkanAnalisisAbcSemua" wire:confirm="Terapkan rekomendasi klasifikasi ABC &amp; ROP hasil analisis ke seluruh produk aktif?" class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer transition active:scale-[0.97]">
-                            ✓ Terapkan Strategi ABC &amp; ROP
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
