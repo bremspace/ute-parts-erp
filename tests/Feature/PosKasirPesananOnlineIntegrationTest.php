@@ -220,7 +220,7 @@ class PosKasirPesananOnlineIntegrationTest extends TestCase
             ->assertSee($transaksi->no_transaksi)
             ->set('pesananOnlineTerpilih', $transaksi->id)
             // Sudah lunas: input metode/nominal disembunyikan, aksi = serahkan barang
-            ->assertSee('Sudah Lunas')
+            ->assertSee('Lunas')
             ->assertSee('Serahkan Barang')
             ->assertDontSee('Terima Pembayaran')
             ->call('serahkanPesananOnline')
@@ -266,5 +266,19 @@ class PosKasirPesananOnlineIntegrationTest extends TestCase
         $this->assertSame(20, $this->stokProduk());
         $this->assertSame(0, JurnalAkuntansi::where('referensi_tipe', Transaksi::class)
             ->where('referensi_id', $transaksi->id)->count());
+    }
+
+    public function test_mount_dengan_query_pesanan_online_id_otomatis_buka_modal(): void
+    {
+        $transaksi = $this->buatOrderPickup('menunggu_pembayaran', 1);
+
+        $this->get(route('pos', ['pesanan_online_id' => $transaksi->id]))
+            ->assertOk();
+
+        Livewire::withQueryParams(['pesanan_online_id' => $transaksi->id])
+            ->test(PosKasir::class)
+            ->assertSet('showPesananOnlineModal', true)
+            ->assertSet('pesananOnlineTerpilih', $transaksi->id)
+            ->assertSee($transaksi->no_transaksi);
     }
 }

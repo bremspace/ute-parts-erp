@@ -286,6 +286,17 @@ class PosKasir extends Component
         } elseif (request()->has('tiket_servis_id')) {
             $this->bukaBayarServisModal((int) request()->query('tiket_servis_id'));
         }
+
+        // [POS-ONLINE-PICKUP] Direct link dari notifikasi / Pesanan Online index
+        if (request()->has('pesanan_online_id') || request()->has('pickup_id')) {
+            $orderId = (int) (request()->query('pesanan_online_id') ?: request()->query('pickup_id'));
+            $this->bukaPesananOnlineModal();
+            if ($orderId > 0) {
+                $this->pilihPesananOnline($orderId);
+            }
+        } elseif (request()->boolean('pesanan_online')) {
+            $this->bukaPesananOnlineModal();
+        }
     }
 
     public function loadUserPreferences(): void
