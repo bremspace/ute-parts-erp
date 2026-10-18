@@ -7,7 +7,7 @@
                 $wire.set('activeTab', 'users');
             } else if (modul === 'master' && !['master_produk', 'master'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'master_produk');
-            } else if (modul === 'bisnis' && !['loyalitas', 'pajak', 'database'].includes(@js($activeTab))) {
+            } else if (modul === 'bisnis' && !['loyalitas', 'pajak', 'printer', 'database'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'loyalitas');
             }
         }
@@ -15,7 +15,7 @@
     x-init="$watch('$wire.activeTab', value => {
         if (['users', 'role', 'cabang'].includes(value)) subModul = 'akses';
         else if (['master_produk', 'master'].includes(value)) subModul = 'master';
-        else if (['loyalitas', 'pajak', 'database'].includes(value)) subModul = 'bisnis';
+        else if (['loyalitas', 'pajak', 'printer', 'database'].includes(value)) subModul = 'bisnis';
     })"
 >
     <!-- Header with 2-Tier Sub-Modul Tabs and Actions (No Overlapping on Mobile/Desktop) -->
@@ -109,6 +109,12 @@
                     >
                         ⚖️ Pajak & PPN
                     </button>
+                    <button
+                        wire:click="$set('activeTab', 'printer')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'printer' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        🖨️ Printer & Label QR
+                    </button>
                     @if(isSuperAdminOrOwner())
                     <button
                         wire:click="$set('activeTab', 'database')"
@@ -129,6 +135,7 @@
                 @elseif($activeTab === 'cabang')
                     <button wire:click="openCabangModal()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Cabang</button>
                     <button wire:click="openGudangModal()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Gudang</button>
+                    <button wire:click="openRakModal()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/10 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Rak</button>
                 @elseif($activeTab === 'master_produk')
                     @if($masterProdukSubTab === 'kategori')
                         <button wire:click="openKategoriModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kategori Baru</button>
@@ -276,7 +283,7 @@
 
     <!-- TAB: CABANG & GUDANG -->
     @if($activeTab === 'cabang')
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- Cabang -->
             <x-prism.glass-card title="Cabang" subtitle="Lokasi toko fisik">
                 <div class="space-y-2">
@@ -310,6 +317,34 @@
                             </div>
                         </div>
                     @endforeach
+                </div>
+            </x-prism.glass-card>
+
+            <!-- Rak Penyimpanan -->
+            <x-prism.glass-card title="Rak Penyimpanan" subtitle="Lokasi bin & slot per gudang">
+                <div class="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                    @forelse($raks as $r)
+                        <div class="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                            <div>
+                                <p class="text-xs font-bold text-white">{{ $r->nama }} <span class="text-ink-500 font-mono">({{ $r->kode }})</span></p>
+                                <p class="text-[10px] text-ink-400">
+                                    {{ $r->gudang?->nama ?? 'Tanpa Gudang' }}
+                                    @if($r->gudang?->cabang)
+                                        <span class="text-ink-500">({{ $r->gudang->cabang->nama }})</span>
+                                    @endif
+                                    @if($r->zona)
+                                        · Zona: <span class="font-mono text-ink-300">{{ $r->zona }}</span>
+                                    @endif
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button wire:click="openRakModal({{ $r->id }})" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold cursor-pointer">Edit</button>
+                                <button wire:click="hapusRak({{ $r->id }})" wire:confirm="Yakin ingin menghapus rak ini?" class="text-up-red hover:underline text-[11px] cursor-pointer">Hapus</button>
+                            </div>
+                        </div>
+                    @empty
+                        <p class="text-xs text-ink-400 italic py-3 text-center">Belum ada data rak penyimpanan</p>
+                    @endforelse
                 </div>
             </x-prism.glass-card>
         </div>
@@ -522,6 +557,470 @@
                     </x-prism.glass-card>
                 </div>
             </div>
+        </div>
+    @endif
+
+    <!-- TAB: PRINTER, STRUK & LABEL QR -->
+    @if($activeTab === 'printer')
+        <div class="space-y-6">
+            <!-- Sub-tab Navigasi Printer & Template Struk -->
+            <div class="flex items-center gap-2 border-b border-black/10 dark:border-white/10 pb-3">
+                <button
+                    type="button"
+                    wire:click="$set('printerSubTab', 'struk')"
+                    class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'struk' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    <span>🧾 Kustomisasi Template Struk & Faktur</span>
+                </button>
+                <button
+                    type="button"
+                    wire:click="$set('printerSubTab', 'label')"
+                    class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'label' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    <span>🏷️ Label Barcode & QR Master Produk</span>
+                </button>
+            </div>
+
+            @if($printerSubTab === 'struk')
+                <!-- SUB-TAB 1: KUSTOMISASI TEMPLATE STRUK / FAKTUR KASIR -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Form Kustomisasi Struk -->
+                    <div class="lg:col-span-7 space-y-6">
+                        <x-prism.glass-card title="Pengaturan Template Struk & Faktur" subtitle="Kustomisasi identitas toko, rincian faktur, QR code retur garansi, dan ketentuan">
+                            <form wire:submit.prevent="simpanTemplateStruk" class="space-y-5">
+                                <!-- Bagian 1: Header Toko -->
+                                <div class="space-y-3">
+                                    <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-up-primary"></span>
+                                        <span>Identitas & Header Struk Toko</span>
+                                    </h4>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama Toko / Brand *</label>
+                                            <input type="text" wire:model.live.debounce.300ms="strukForm.nama_toko" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-white" placeholder="Contoh: UTE PARTS">
+                                            @error('strukForm.nama_toko') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1">Slogan / Sub-header</label>
+                                            <input type="text" wire:model.live.debounce.300ms="strukForm.slogan" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Pusat Sparepart & Servis HP">
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1">Alamat Toko</label>
+                                        <input type="text" wire:model.live.debounce.300ms="strukForm.alamat" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Jl. Veteran No. 12, Jakarta">
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1">No. Telepon / WhatsApp</label>
+                                            <input type="text" wire:model.live.debounce.300ms="strukForm.telepon" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: 0812-3456-7890">
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1">Website / Media Sosial</label>
+                                            <input type="text" wire:model.live.debounce.300ms="strukForm.website_medsos" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: www.uteparts.id / @uteparts">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Bagian 2: Konten & Informasi Struk -->
+                                <div class="pt-4 border-t border-white/5 space-y-3">
+                                    <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-up-mint"></span>
+                                        <span>Komponen & Informasi Transaksi</span>
+                                    </h4>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/5">
+                                            <input type="checkbox" wire:model.live="strukForm.show_cabang" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-ink-200">Tampilkan Nama Cabang</span>
+                                        </label>
+
+                                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/5">
+                                            <input type="checkbox" wire:model.live="strukForm.show_waktu" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-ink-200">Tampilkan Tanggal & Waktu</span>
+                                        </label>
+
+                                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/5">
+                                            <input type="checkbox" wire:model.live="strukForm.show_kasir" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-ink-200">Tampilkan Nama Kasir</span>
+                                        </label>
+
+                                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/5">
+                                            <input type="checkbox" wire:model.live="strukForm.show_pelanggan" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-ink-200">Tampilkan Nama Pelanggan</span>
+                                        </label>
+
+                                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/5 sm:col-span-2">
+                                            <input type="checkbox" wire:model.live="strukForm.show_subtotal_breakdown" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-ink-200">Pisahkan Subtotal Jasa & Sparepart (Bila Ada)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Bagian 3: QR Code Faktur Retur & Garansi (Anti-Fraud) -->
+                                <div class="pt-4 border-t border-white/5 space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                                            <span class="w-2 h-2 rounded-full bg-up-red"></span>
+                                            <span>QR Code Faktur Retur & Garansi Anti-Fraud</span>
+                                        </h4>
+                                        <span class="px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary font-bold text-[10px]">Fitur Retur Instan</span>
+                                    </div>
+
+                                    <div class="p-3.5 rounded-2xl bg-up-primary/10 border border-up-primary/20 space-y-2">
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" wire:model.live="strukForm.show_qr_retur" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-xs font-bold text-white">Cetak QR Code Nomor Faktur pada Struk</span>
+                                        </label>
+                                        <p class="text-[11px] text-ink-300">
+                                            Memudahkan pemindaian struk menggunakan kamera atau scanner barcode di halaman Retur Konsumen untuk verifikasi instan riwayat transaksi & nomor seri barang.
+                                        </p>
+                                    </div>
+
+                                    @if($strukForm['show_qr_retur'] ?? true)
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                            <div>
+                                                <label class="block text-xs font-semibold text-ink-300 mb-1">Teks Petunjuk di Bawah QR</label>
+                                                <input type="text" wire:model.live.debounce.300ms="strukForm.qr_caption" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Scan QR ini untuk retur & klaim garansi">
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-xs font-semibold text-ink-300 mb-1">Ukuran QR Code (px)</label>
+                                                <select wire:model.live="strukForm.qr_size" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900">
+                                                    <option value="60">Kecil (60px) — Hemat Kertas 58mm</option>
+                                                    <option value="80">Sedang (80px) — Standar Rekomendasi</option>
+                                                    <option value="100">Besar (100px) — Sangat Jelas untuk 80mm</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <!-- Bagian 4: Ketentuan Garansi, Retur & Footer -->
+                                <div class="pt-4 border-t border-white/5 space-y-3">
+                                    <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-up-amber"></span>
+                                        <span>Ketentuan Garansi, Retur & Footer</span>
+                                    </h4>
+
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1">Ucapan Penutup / Terima Kasih *</label>
+                                        <input type="text" wire:model.live.debounce.300ms="strukForm.footer_text" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Terima kasih atas kunjungan Anda!">
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1">Kebijakan Retur & Garansi Konsumen</label>
+                                        <textarea wire:model.live.debounce.300ms="strukForm.kebijakan_retur" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Maksimal retur/garansi 3 hari sejak tanggal pembelian dengan membawa struk ber-QR ini."></textarea>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1">Catatan Kaki Tambahan</label>
+                                        <input type="text" wire:model.live.debounce.300ms="strukForm.catatan_kaki" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" placeholder="Contoh: Segel garansi toko wajib utuh & unit tidak cacat fisik.">
+                                    </div>
+                                </div>
+
+                                <!-- Bagian 5: Format Kertas Default -->
+                                <div class="pt-4 border-t border-white/5 space-y-3">
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1">Format Kertas Default Transaksi</label>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <label class="p-3 rounded-xl border cursor-pointer transition-colors {{ ($strukForm['default_width'] ?? '') === '80mm' ? 'border-up-primary bg-up-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/5' }}">
+                                            <input type="radio" wire:model.live="strukForm.default_width" value="80mm" class="sr-only">
+                                            <p class="text-xs font-bold text-white">🖨️ Struk 80mm</p>
+                                            <p class="text-[10px] text-ink-400 mt-0.5">Default Rekomendasi (Lebar & Lengkap)</p>
+                                        </label>
+                                        <label class="p-3 rounded-xl border cursor-pointer transition-colors {{ ($strukForm['default_width'] ?? '') === '58mm' ? 'border-up-primary bg-up-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/5' }}">
+                                            <input type="radio" wire:model.live="strukForm.default_width" value="58mm" class="sr-only">
+                                            <p class="text-xs font-bold text-white">🧾 Struk 58mm</p>
+                                            <p class="text-[10px] text-ink-400 mt-0.5">Printer Mini / Bluetooth BLE</p>
+                                        </label>
+                                        <label class="p-3 rounded-xl border cursor-pointer transition-colors {{ ($strukForm['default_width'] ?? '') === 'a4' ? 'border-up-primary bg-up-primary/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/5' }}">
+                                            <input type="radio" wire:model.live="strukForm.default_width" value="a4" class="sr-only">
+                                            <p class="text-xs font-bold text-white">📄 Faktur A4</p>
+                                            <p class="text-[10px] text-ink-400 mt-0.5">Printer Kantor / Laserjet</p>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="pt-4 border-t border-white/5 flex items-center justify-between">
+                                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-mint/20">
+                                        Simpan Kustomisasi Template Struk
+                                    </button>
+                                    <span class="text-[11px] text-ink-400">Format aktif: <strong class="text-white">{{ strtoupper($strukForm['default_width'] ?? '80MM') }}</strong></span>
+                                </div>
+                            </form>
+                        </x-prism.glass-card>
+                    </div>
+
+                    <!-- Live Pratinjau Interaktif Struk Thermal -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <x-prism.glass-card title="Pratinjau Struk Thermal Live" subtitle="Hasil cetak fisik sesuai kustomisasi template Anda">
+                            <div class="flex flex-col items-center justify-center p-4 sm:p-6 bg-ink-950/40 rounded-2xl border border-white/5">
+                                <!-- Kertas Struk Simulasi -->
+                                <div
+                                    class="bg-white text-black p-4 rounded-xl font-mono text-xs shadow-2xl space-y-2 border border-gray-300 transition-all duration-200 select-text"
+                                    style="width: {{ ($strukForm['default_width'] ?? '') === '58mm' ? '280px' : '330px' }};"
+                                >
+                                    <!-- Header Toko -->
+                                    <div class="text-center pb-2 border-b border-dashed border-gray-400 space-y-0.5">
+                                        <h3 class="text-sm font-black tracking-wider text-gray-900 uppercase">{{ $strukForm['nama_toko'] ?: 'UTE PARTS' }}</h3>
+                                        @if(!empty($strukForm['slogan']))
+                                            <p class="text-[10px] text-gray-600 font-medium">{{ $strukForm['slogan'] }}</p>
+                                        @endif
+                                        @if(!empty($strukForm['alamat']))
+                                            <p class="text-[9px] text-gray-500">{{ $strukForm['alamat'] }}</p>
+                                        @endif
+                                        @if(!empty($strukForm['telepon']))
+                                            <p class="text-[9px] text-gray-500">Telp/WA: {{ $strukForm['telepon'] }}</p>
+                                        @endif
+                                        @if(!empty($strukForm['website_medsos']))
+                                            <p class="text-[9px] text-gray-400">{{ $strukForm['website_medsos'] }}</p>
+                                        @endif
+                                        @if($strukForm['show_cabang'] ?? true)
+                                            <p class="text-[9px] text-gray-500">Cabang Pusat - Jakarta</p>
+                                        @endif
+                                        @if($strukForm['show_waktu'] ?? true)
+                                            <p class="text-[9px] text-gray-500">{{ now()->format('d/m/Y H:i:s') }}</p>
+                                        @endif
+                                    </div>
+
+                                    <!-- Meta Transaksi -->
+                                    <div class="text-[10px] space-y-0.5 border-b border-dashed border-gray-300 pb-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">No. TRX:</span>
+                                            <span class="font-bold text-gray-900">TRX-20261018-0001</span>
+                                        </div>
+                                        @if($strukForm['show_kasir'] ?? true)
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">Kasir:</span>
+                                                <span class="text-gray-900">{{ auth()->user()?->name ?? 'Kasir 1' }}</span>
+                                            </div>
+                                        @endif
+                                        @if($strukForm['show_pelanggan'] ?? true)
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">Pelanggan:</span>
+                                                <span class="text-gray-900 font-medium">Budi Santoso</span>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    <!-- Sampel Item -->
+                                    <div class="space-y-1.5 border-b border-dashed border-gray-300 pb-2 pt-1 text-[11px]">
+                                        <div>
+                                            <div class="font-semibold text-gray-900 truncate">[Part] LCD iPhone 13 Pro OLED</div>
+                                            <div class="flex justify-between text-[10px] text-gray-600 mt-0.5">
+                                                <span>1 x 1.450.000</span>
+                                                <span class="font-bold text-gray-900">1.450.000</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-gray-900 truncate">[Jasa] Pasang & Segel Garansi</div>
+                                            <div class="flex justify-between text-[10px] text-gray-600 mt-0.5">
+                                                <span>1 x 100.000</span>
+                                                <span class="font-bold text-gray-900">100.000</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if($strukForm['show_subtotal_breakdown'] ?? true)
+                                        <div class="text-[10px] space-y-0.5 border-b border-dashed border-gray-300 pb-1 text-gray-600">
+                                            <div class="flex justify-between">
+                                                <span>Subtotal Part:</span>
+                                                <span>Rp 1.450.000</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span>Subtotal Jasa:</span>
+                                                <span>Rp 100.000</span>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <!-- Total & Bayar -->
+                                    <div class="space-y-1 text-[11px] pt-1 font-bold">
+                                        <div class="flex justify-between text-xs text-gray-950">
+                                            <span>TOTAL:</span>
+                                            <span class="font-black">Rp 1.550.000</span>
+                                        </div>
+                                        <div class="flex justify-between text-gray-700 font-normal text-[10px]">
+                                            <span>BAYAR (TUNAI):</span>
+                                            <span>Rp 1.600.000</span>
+                                        </div>
+                                        <div class="flex justify-between text-gray-700 font-normal text-[10px]">
+                                            <span>KEMBALI:</span>
+                                            <span>Rp 50.000</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- QR Code Faktur Retur & Garansi Anti-Fraud -->
+                                    @if($strukForm['show_qr_retur'] ?? true)
+                                        <div class="text-center py-2 flex flex-col items-center justify-center border-t border-dashed border-gray-300">
+                                            <div class="p-1 bg-white inline-block">
+                                                {!! app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg('TRX-20261018-0001', (int)($strukForm['qr_size'] ?? 80), 0) !!}
+                                            </div>
+                                            <p class="font-mono text-[9px] text-gray-900 font-bold mt-1 tracking-wider">TRX-20261018-0001</p>
+                                            <p class="text-[8px] text-gray-500 text-center mt-0.5">{{ $strukForm['qr_caption'] ?: 'Scan QR ini untuk retur & klaim garansi' }}</p>
+                                        </div>
+                                    @endif
+
+                                    <!-- Footer & Ketentuan -->
+                                    <div class="text-center pt-2 text-[9px] text-gray-500 border-t border-dashed border-gray-300 space-y-0.5">
+                                        <p class="font-bold text-gray-800">Garansi: 3 Hari Toko</p>
+                                        <p class="font-medium text-gray-700">{{ $strukForm['footer_text'] ?: 'Terima Kasih atas Kunjungan Anda!' }}</p>
+                                        @if(!empty($strukForm['kebijakan_retur']))
+                                            <p class="text-[8px] text-gray-600 font-medium">{{ $strukForm['kebijakan_retur'] }}</p>
+                                        @endif
+                                        @if(!empty($strukForm['catatan_kaki']))
+                                            <p class="text-[8px] text-gray-400">{{ $strukForm['catatan_kaki'] }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </x-prism.glass-card>
+                    </div>
+                </div>
+            @else
+                <!-- SUB-TAB 2: LABEL BARCODE & QR MASTER PRODUK -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Form Pengaturan -->
+                    <div class="lg:col-span-7 space-y-6">
+                        <x-prism.glass-card title="Pengaturan Label QR & Barcode Produk" subtitle="Konfigurasi dimensi label thermal roll dan margin custom">
+                            <form wire:submit.prevent="simpanPengaturanPrinter" class="space-y-5">
+                                <!-- Preset Ukuran -->
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Preset Ukuran Label Produk</label>
+                                    <select wire:model.live="printerForm.label_preset" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                        <option value="33x15">🏷️ 33mm × 15mm (Default Rekomendasi)</option>
+                                        <option value="40x20">🏷️ 40mm × 20mm (Sedang)</option>
+                                        <option value="50x30">🏷️ 50mm × 30mm (Besar)</option>
+                                        <option value="58x40">🏷️ 58mm × 40mm (Ekstra Besar)</option>
+                                        <option value="custom">⚙️ Custom (Atur Manual)</option>
+                                    </select>
+                                    <p class="text-[11px] text-ink-400 mt-1">Default preset 33mm × 15mm adalah standar label rak dan sparepart HP.</p>
+                                </div>
+
+                                <!-- Dimensi Label (Width & Height) -->
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1">Lebar Label (mm)</label>
+                                        <input type="number" step="0.5" wire:model.live="printerForm.label_width" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono">
+                                        @error('printerForm.label_width') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1">Tinggi Label (mm)</label>
+                                        <input type="number" step="0.5" wire:model.live="printerForm.label_height" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono">
+                                        @error('printerForm.label_height') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
+                                    </div>
+                                </div>
+
+                                <!-- Margin Custom -->
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-2">Margin & Padding Kertas Label (mm)</label>
+                                    <div class="grid grid-cols-4 gap-2">
+                                        <div>
+                                            <span class="block text-[10px] text-ink-400 mb-1">Atas</span>
+                                            <input type="number" step="0.5" wire:model.live="printerForm.label_margin_top" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono text-center">
+                                        </div>
+                                        <div>
+                                            <span class="block text-[10px] text-ink-400 mb-1">Bawah</span>
+                                            <input type="number" step="0.5" wire:model.live="printerForm.label_margin_bottom" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono text-center">
+                                        </div>
+                                        <div>
+                                            <span class="block text-[10px] text-ink-400 mb-1">Kiri</span>
+                                            <input type="number" step="0.5" wire:model.live="printerForm.label_margin_left" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono text-center">
+                                        </div>
+                                        <div>
+                                            <span class="block text-[10px] text-ink-400 mb-1">Kanan</span>
+                                            <input type="number" step="0.5" wire:model.live="printerForm.label_margin_right" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono text-center">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Opsi Tampilan Label -->
+                                <div class="space-y-2 pt-2 border-t border-white/5">
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1">Konten Label QR</label>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/5">
+                                            <input type="checkbox" wire:model.live="printerForm.label_show_brand" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-xs text-ink-200">Brand Toko</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/5">
+                                            <input type="checkbox" wire:model.live="printerForm.label_show_price" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-xs text-ink-200">Harga Jual</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/5">
+                                            <input type="checkbox" wire:model.live="printerForm.label_show_sku" class="rounded border-white/20 text-up-primary focus:ring-up-primary/30">
+                                            <span class="text-xs text-ink-200">Teks SKU</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="pt-4 border-t border-white/5 flex items-center justify-between">
+                                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-mint/20">
+                                        Simpan Pengaturan Label QR
+                                    </button>
+                                    <span class="text-[11px] text-ink-400">Preset: <strong class="text-white">{{ $printerForm['label_width'] }}mm × {{ $printerForm['label_height'] }}mm</strong></span>
+                                </div>
+                            </form>
+                        </x-prism.glass-card>
+                    </div>
+
+                    <!-- Live Preview Interaktif Label -->
+                    <div class="lg:col-span-5 space-y-6">
+                        <x-prism.glass-card title="Simulasi Tampilan Label QR" subtitle="Ukuran proporsional: {{ $printerForm['label_width'] }}mm × {{ $printerForm['label_height'] }}mm">
+                            <div class="flex flex-col items-center justify-center p-6 bg-ink-950/40 rounded-2xl border border-white/5">
+                                <!-- Container Simulasi Label Fisik -->
+                                <div
+                                    class="bg-white text-black rounded shadow-lg overflow-hidden border border-gray-300 flex items-center transition-all duration-200"
+                                    style="
+                                        width: {{ min(360, max(180, (float)$printerForm['label_width'] * 7)) }}px;
+                                        height: {{ min(180, max(85, (float)$printerForm['label_height'] * 7)) }}px;
+                                        padding-top: {{ (float)$printerForm['label_margin_top'] * 2.5 }}px;
+                                        padding-bottom: {{ (float)$printerForm['label_margin_bottom'] * 2.5 }}px;
+                                        padding-left: {{ (float)$printerForm['label_margin_left'] * 2.5 }}px;
+                                        padding-right: {{ (float)$printerForm['label_margin_right'] * 2.5 }}px;
+                                    "
+                                >
+                                    <!-- Sisi Kiri: QR Code -->
+                                    <div class="shrink-0 flex items-center justify-center bg-gray-50 border border-gray-200 rounded p-1" style="width: {{ min(80, max(45, (float)$printerForm['label_height'] * 5)) }}px; height: {{ min(80, max(45, (float)$printerForm['label_height'] * 5)) }}px;">
+                                        {!! app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg('UTP-DEMO-001', 70, 0) !!}
+                                    </div>
+
+                                    <!-- Sisi Kanan: Detail Produk -->
+                                    <div class="ml-2.5 min-w-0 flex-1 flex flex-col justify-center font-sans leading-tight">
+                                        @if($printerForm['label_show_brand'])
+                                            <span class="text-[9px] font-black uppercase tracking-wider text-indigo-700 truncate">UTE PARTS</span>
+                                        @endif
+                                        <span class="text-[10px] font-bold text-gray-900 line-clamp-2 mt-0.5">LCD Touchscreen iPhone 13 Pro Max</span>
+                                        @if($printerForm['label_show_sku'])
+                                            <span class="text-[8px] font-mono font-semibold text-gray-600 mt-0.5 truncate">SKU: LCD-IP13PM-OLED</span>
+                                        @endif
+                                        @if($printerForm['label_show_price'])
+                                            <span class="text-[10px] font-black text-emerald-700 mt-1">Rp 1.450.000</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <span class="text-[11px] text-ink-400 mt-3 font-mono">Skala pratinjau ~7x layar</span>
+                            </div>
+
+                            <div class="mt-4 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-ink-300 space-y-1.5">
+                                <p class="font-bold text-white">💡 Panduan Printer Thermal Roll:</p>
+                                <p>• <strong>Ukuran 33mm × 15mm</strong> adalah ukuran standar label barcode 3 kolom / 1 kolom yang sangat umum digunakan di toko sparepart & servis.</p>
+                                <p>• QR Code vector SVG dapat di-scan secara presisi dari jarak dekat tanpa blur.</p>
+                                <p>• Margin dapat disesuaikan jika hasil cetak printer fisik Anda sedikit bergeser.</p>
+                            </div>
+
+                            <div class="mt-4 pt-4 border-t border-white/5 flex gap-2">
+                                <a href="{{ route('barcode.print') }}" target="_blank" class="flex-1 py-2.5 px-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs text-center shadow-md shadow-up-primary/25 transition-colors">
+                                    🖨️ Buka Sampel Cetak Label →
+                                </a>
+                            </div>
+                        </x-prism.glass-card>
+                    </div>
+                </div>
+            @endif
         </div>
     @endif
 
@@ -1001,6 +1500,51 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
                     <button wire:click="$set('showGudangModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button wire:click="saveGudang" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: RAK -->
+    @if($showRakModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-lg font-bold text-white">{{ $rakForm['id'] ? 'Edit Rak' : 'Rak Baru' }}</h3>
+                    <button wire:click="$set('showRakModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang *</label>
+                        <select wire:model="rakForm.gudang_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="" class="bg-ink-900">Pilih Gudang...</option>
+                            @foreach($gudangs as $g)
+                                <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }} ({{ $g->cabang?->nama ?? 'Cabang -' }})</option>
+                            @endforeach
+                        </select>
+                        @error('rakForm.gudang_id') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Rak *</label>
+                        <input type="text" wire:model="rakForm.nama" placeholder="misal: Rak Sparepart LCD A1" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        @error('rakForm.nama') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Rak *</label>
+                            <input type="text" wire:model="rakForm.kode" placeholder="misal: RAK-A1" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono uppercase" />
+                            @error('rakForm.kode') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Zona / Baris</label>
+                            <input type="text" wire:model="rakForm.zona" placeholder="misal: Zona A" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            @error('rakForm.zona') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                    <button wire:click="$set('showRakModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                    <button wire:click="saveRak" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan</button>
                 </div>
             </div>
         </div>

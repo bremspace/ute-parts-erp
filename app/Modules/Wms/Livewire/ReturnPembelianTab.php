@@ -2,9 +2,11 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Pos\Models\ReturnPenjualanItem;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\ReturnPembelian;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\ReturnPembelianService;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -14,7 +16,11 @@ class ReturnPembelianTab extends Component
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
+    public string $subTab = 'riwayat'; // riwayat | karantina
+
     public string $filterStatus = 'all';
+
+    public ?int $filterSupplierId = null;
 
     public bool $showCreateModal = false;
 
@@ -28,6 +34,17 @@ class ReturnPembelianTab extends Component
 
     public ?int $detailReturId = null;
 
+    // State untuk Retur Pool Karantina
+    public array $selectedPoolItemIds = [];
+
+    public bool $showPoolReturModal = false;
+
+    public ?int $selectedPoolSupplierId = null;
+
+    public string $poolAlasan = 'Retur akumulasi barang rusak dari garansi toko';
+
+    public string $poolMetodePengembalian = 'saldo'; // saldo | utang | kas
+
     public function mount(): void
     {
         $this->resetForm();
@@ -40,6 +57,10 @@ class ReturnPembelianTab extends Component
         $this->metodePengembalian = 'utang';
         $this->itemInputs = [];
         $this->showCreateModal = false;
+        $this->showPoolReturModal = false;
+        $this->selectedPoolSupplierId = null;
+        $this->poolAlasan = 'Retur akumulasi barang rusak dari garansi toko';
+        $this->poolMetodePengembalian = 'saldo';
     }
 
     public function updatedSelectedPoId($value): void
@@ -89,9 +110,6 @@ class ReturnPembelianTab extends Component
 
     public function simpanRetur(): void
     {
-        // [RBAC] `wms.view` (dimiliki kasir) hanyaIzIN LIHAT retur. Membuat retur
-        // = jalur API `POST /api/wms/retur-pembelian` yang butuh `wms.create`,
-        // dan tombol "Buat Retur Pembelian" di blade juga sudah `@can('wms.create')`.
         abort_unless(
             auth()->user()?->can('wms.create'),
             403,
@@ -101,7 +119,7 @@ class ReturnPembelianTab extends Component
         $this->validate([
             'selectedPoId' => 'required|exists:purchase_order,id',
             'alasan' => 'required|string|max:500',
-            'metodePengembalian' => 'required|in:utang,kas',
+            'metodePengembalian' => 'required|in:utang,kas,saldo',
         ]);
 
         $items = [];
@@ -152,6 +170,73 @@ class ReturnPembelianTab extends Component
         }
     }
 
+    public function bukaModalPoolRetur(?int $supplierId = null): void
+    {
+        $this->selectedPoolSupplierId = $supplierId;
+        $this->showPoolReturModal = true;
+    }
+
+    public function tutupModalPoolRetur(): void
+    {
+        $this->showPoolReturModal = false;
+        $this->selectedPoolSupplierId = null;
+    }
+
+    public function simpanReturPoolSupplier(): void
+    {
+        abort_unless(
+            auth()->user()?->can('wms.create'),
+            403,
+            'Anda tidak memiliki izin membuat retur pembelian.'
+        );
+
+        $this->validate([
+            'selectedPoolSupplierId' => 'required|exists:supplier,id',
+            'poolAlasan' => 'required|string|max:500',
+            'poolMetodePengembalian' => 'required|in:saldo,utang,kas',
+        ]);
+
+        $supplier = Supplier::findOrFail($this->selectedPoolSupplierId);
+
+        // Ambil item karantina yang dipilih (atau semua item milik supplier ini jika belum diceklis)
+        $itemsQuery = ReturnPenjualanItem::where('status_karantina', 'karantina')
+            ->where('supplier_id', $supplier->id);
+
+        if (! empty($this->selectedPoolItemIds)) {
+            $itemsQuery->whereIn('id', $this->selectedPoolItemIds);
+        }
+
+        $itemIds = $itemsQuery->pluck('id')->all();
+
+        if (empty($itemIds)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak ada barang karantina yang dipilih untuk supplier ini.']);
+
+            return;
+        }
+
+        try {
+            $retur = app(ReturnPembelianService::class)->buatReturDariPoolSupplier(
+                $supplier,
+                $itemIds,
+                $this->poolAlasan,
+                $this->poolMetodePengembalian,
+                session('cabang_id'),
+                null,
+                auth()->id()
+            );
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Retur {$retur->no_return} berhasil diproses ke supplier {$supplier->nama} — nilai: Rp ".number_format($retur->jumlah, 0, ',', '.'),
+            ]);
+
+            $this->selectedPoolItemIds = [];
+            $this->tutupModalPoolRetur();
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
     public function render()
     {
         $cabangId = session('cabang_id');
@@ -175,10 +260,24 @@ class ReturnPembelianTab extends Component
                 ->find($this->detailReturId);
         }
 
+        // Data Pool Karantina Barang Rusak
+        $karantinaQuery = ReturnPenjualanItem::with(['produk', 'supplier', 'returnPenjualan'])
+            ->where('status_karantina', 'karantina')
+            ->when($this->filterSupplierId, fn ($q) => $q->where('supplier_id', $this->filterSupplierId));
+
+        $karantinaItems = $karantinaQuery->latest()->get();
+
+        $karantinaGrouped = $karantinaItems->groupBy('supplier_id');
+
+        $suppliers = Supplier::where('is_active', true)->orderBy('nama')->get();
+
         return view('modules.wms.livewire.return-pembelian-tab', [
             'returList' => $returList,
             'poSiapRetur' => $poSiapRetur,
             'detailRetur' => $detailRetur,
+            'karantinaItems' => $karantinaItems,
+            'karantinaGrouped' => $karantinaGrouped,
+            'suppliers' => $suppliers,
         ]);
     }
 }

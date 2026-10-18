@@ -16,7 +16,6 @@ use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PembayaranPesananOnlineService;
 use App\Modules\Pos\Services\PricingService;
-use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Reseller\Services\KomisiService;
@@ -150,16 +149,7 @@ class PosKasir extends Component
     // Riwayat transaksi modal state
     public bool $showRiwayatTransaksiModal = false;
 
-    // Retur Penjualan modal state
-    public bool $showReturPenjualanModal = false;
-
-    public ?int $selectedTransaksiReturId = null;
-
-    public array $returItemInputs = [];
-
-    public string $returAlasan = '';
-
-    public string $returMetodePengembalian = 'kas';
+    public string $riwayatSearch = '';
 
     // [T-03] Transaksi ditahan (park)
     public bool $showDitahanPanel = false;
@@ -173,6 +163,15 @@ class PosKasir extends Component
 
     // [T-09] Kas sesi modal
     public bool $showKasModal = false;
+
+    // Pengaturan Garansi Sparepart Manual saat Transaksi & Serah Terima Online
+    public string $garansiPilihan = '3_hari'; // '3_hari', '7_hari', '14_hari', '30_hari', 'custom', 'tanpa_garansi'
+
+    public ?int $garansiCustomHari = 3;
+
+    public string $catatanGaransi = '';
+
+    public bool $konfirmasiGaransiOnline = false;
 
     public bool $kasModeBuka = true;
 
@@ -296,6 +295,16 @@ class PosKasir extends Component
             }
         } elseif (request()->boolean('pesanan_online')) {
             $this->bukaPesananOnlineModal();
+        }
+
+        // [POS-RETUR] Direct link untuk proses retur penjualan -> arahkan ke halaman dedicated /app/pos/retur
+        if (request()->has('retur_id') || request()->has('transaksi_retur_id')) {
+            $returTrxId = (int) (request()->query('retur_id') ?: request()->query('transaksi_retur_id'));
+            if ($returTrxId > 0) {
+                return redirect()->to("/app/pos/retur?transaksi_id={$returTrxId}");
+            }
+        } elseif (request()->boolean('retur')) {
+            return redirect()->to('/app/pos/retur');
         }
     }
 
@@ -1099,6 +1108,38 @@ class PosKasir extends Component
         $this->recalcPajak();
     }
 
+    public function setGaransiPilihan(string $pilihan, ?int $customHari = null): void
+    {
+        $this->garansiPilihan = $pilihan;
+        if ($customHari !== null) {
+            $this->garansiCustomHari = $customHari;
+        }
+    }
+
+    public function hitungDurasiGaransiHari(): int
+    {
+        return match ($this->garansiPilihan) {
+            '3_hari' => 3,
+            '7_hari' => 7,
+            '14_hari' => 14,
+            '30_hari' => 30,
+            'tanpa_garansi' => 0,
+            'custom' => max(0, (int) ($this->garansiCustomHari ?? 0)),
+            default => 3,
+        };
+    }
+
+    public function generateGaransiTeks(int $durasiHari): string
+    {
+        if ($durasiHari <= 0) {
+            return 'Tanpa Garansi';
+        }
+
+        $tanggalBerakhir = now()->addDays($durasiHari)->format('d/m/Y');
+
+        return "{$durasiHari} Hari Toko (s/d {$tanggalBerakhir})";
+    }
+
     public function openPaymentModal()
     {
         if (empty($this->cart)) {
@@ -1236,6 +1277,10 @@ class PosKasir extends Component
                     'metode_non_tunai' => $this->splitMetodeNonTunai,
                 ] : null;
 
+                $durasiGaransi = $this->hitungDurasiGaransiHari();
+                $garansiTeks = $this->generateGaransiTeks($durasiGaransi);
+                $garansiBerakhir = $durasiGaransi > 0 ? now()->addDays($durasiGaransi)->toDateString() : null;
+
                 $transaksi = Transaksi::create([
                     'no_transaksi' => $noTransaksi,
                     'cabang_id' => $cabangId,
@@ -1256,6 +1301,10 @@ class PosKasir extends Component
                     'split_detail' => $splitData,
                     'status' => 'selesai',
                     'catatan' => $this->catatan,
+                    'durasi_garansi_hari' => $durasiGaransi,
+                    'garansi_teks' => $garansiTeks,
+                    'garansi_berakhir_pada' => $garansiBerakhir,
+                    'catatan_garansi' => $this->catatanGaransi ?: null,
                 ]);
 
                 // Pre-load semua produk di cart sekali query (eliminasi N+1 query)
@@ -1417,6 +1466,7 @@ class PosKasir extends Component
                     'bayar' => $transaksi->jumlah_bayar,
                     'kembali' => $this->kembalian,
                     'metode' => strtoupper($this->metodeBayar),
+                    'garansi' => $garansiTeks,
                 ];
 
                 $this->completedTransactionId = $transaksi->id;
@@ -1481,102 +1531,21 @@ class PosKasir extends Component
         $this->showReceiptModal = true;
     }
 
-    public function bukaModalRetur(int $transaksiId): void
-    {
-        $this->selectedTransaksiReturId = $transaksiId;
-        $this->returAlasan = '';
-        $this->returMetodePengembalian = 'kas';
-        $this->returItemInputs = [];
-
-        $transaksi = Transaksi::with(['items.produk'])->find($transaksiId);
-        if (! $transaksi) {
-            return;
-        }
-
-        foreach ($transaksi->items as $item) {
-            $this->returItemInputs[$item->id] = [
-                'transaksi_item_id' => $item->id,
-                'produk_nama' => $item->produk?->nama ?? 'Produk',
-                'qty_beli' => (float) $item->jumlah,
-                'harga_final' => (float) ($item->harga_final ?? $item->harga_satuan ?? 0),
-                'jumlah' => 0,
-                'sn_raw' => '',
-            ];
-        }
-
-        $this->showReturPenjualanModal = true;
-    }
-
-    public function tutupModalRetur(): void
-    {
-        $this->showReturPenjualanModal = false;
-        $this->selectedTransaksiReturId = null;
-        $this->returItemInputs = [];
-    }
-
-    public function simpanReturPenjualan(): void
-    {
-        $this->validate([
-            'selectedTransaksiReturId' => 'required|exists:transaksi,id',
-            'returAlasan' => 'required|string|max:500',
-            'returMetodePengembalian' => 'required|in:kas,piutang,saldo',
-        ]);
-
-        $items = [];
-        foreach ($this->returItemInputs as $item) {
-            $qty = (float) ($item['jumlah'] ?? 0);
-            if ($qty > 0) {
-                $snList = [];
-                if (! empty($item['sn_raw'])) {
-                    $snList = preg_split('/[\r\n,;]+/', (string) $item['sn_raw']) ?: [];
-                    $snList = array_values(array_filter(array_map('trim', $snList)));
-                }
-
-                $items[] = [
-                    'transaksi_item_id' => (int) $item['transaksi_item_id'],
-                    'jumlah' => $qty,
-                    'sn' => $snList,
-                ];
-            }
-        }
-
-        if (empty($items)) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih minimal 1 barang dengan jumlah > 0 untuk diretur.']);
-
-            return;
-        }
-
-        $transaksi = Transaksi::findOrFail($this->selectedTransaksiReturId);
-
-        try {
-            $retur = app(ReturnPenjualanService::class)->buatRetur(
-                $transaksi,
-                $items,
-                $this->returAlasan,
-                $this->returMetodePengembalian,
-                auth()->id()
-            );
-
-            $this->dispatch('alert', [
-                'type' => 'success',
-                'message' => $retur->status === 'selesai'
-                    ? "Retur {$retur->no_return} berhasil diproses — stok bertambah & kas/piutang disesuaikan."
-                    : "Retur {$retur->no_return} dibuat — menunggu approval supervisor.",
-            ]);
-
-            $this->tutupModalRetur();
-        } catch (\Exception $e) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
-        }
-    }
-
     public function getRiwayatTransaksiHariIniProperty()
     {
         $cabangId = session('cabang_id');
+        $search = trim($this->riwayatSearch);
 
         return Transaksi::with(['pelanggan', 'kasir'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
-            ->whereDate('created_at', now()->toDateString())
+            ->when(! empty($search), function ($q) use ($search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('no_transaksi', 'like', "%{$search}%")
+                        ->orWhereHas('pelanggan', fn ($p) => $p->where('nama', 'like', "%{$search}%"));
+                });
+            }, function ($q) {
+                $q->whereDate('created_at', now()->toDateString());
+            })
             ->orderByDesc('id')
             ->limit(50)
             ->get();
@@ -2387,10 +2356,12 @@ class PosKasir extends Component
         $this->pesananOnlineTerpilih = null;
         $this->metodeBayarOnline = 'tunai';
         $this->nominalBayarOnline = 0;
+        $this->konfirmasiGaransiOnline = false;
     }
 
     public function pilihPesananOnline(int $id): void
     {
+        $this->konfirmasiGaransiOnline = false;
         // Guard server-side: order harus lolos filter cabang / status / pickup
         if (! $this->queryPesananOnlinePickup()->whereKey($id)->exists()) {
             $this->dispatch('alert', [
@@ -2458,6 +2429,15 @@ class PosKasir extends Component
             return;
         }
 
+        if (! $this->konfirmasiGaransiOnline) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Kasir wajib mengonfirmasi telah menginfokan T&C & masa garansi sparepart ke pelanggan saat penyerahan barang.',
+            ]);
+
+            return;
+        }
+
         // Anti-tamper: order lunas tidak boleh dibayar ulang di kasir
         if (! empty($detail['sudah_lunas'])) {
             $this->dispatch('alert', [
@@ -2491,6 +2471,14 @@ class PosKasir extends Component
             $hasil = $service->bayarDiToko($transaksi, $this->metodeBayarOnline, $nominalDiterima);
             // Serah terima fisik saat bayar di konter — samakan jalur PesananOnlineIndex
             $service->kirimNotifikasiSerahTerima($transaksi);
+
+            if (! $transaksi->durasi_garansi_hari) {
+                $transaksi->update([
+                    'durasi_garansi_hari' => 3,
+                    'garansi_teks' => '3 Hari Toko (Sesuai T&C Penyerahan)',
+                    'garansi_berakhir_pada' => now()->addDays(3)->toDateString(),
+                ]);
+            }
         } catch (\RuntimeException $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
 
@@ -2530,6 +2518,15 @@ class PosKasir extends Component
      */
     public function serahkanPesananOnline(): void
     {
+        if (! $this->konfirmasiGaransiOnline) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Kasir wajib mengonfirmasi telah menginfokan T&C & masa garansi sparepart ke pelanggan saat penyerahan barang.',
+            ]);
+
+            return;
+        }
+
         // Guard anti-tamper: harus lolos query cabang/status/pickup/sumber dulu
         $transaksi = $this->queryPesananOnlinePickup()
             ->whereKey($this->pesananOnlineTerpilih)
@@ -2547,6 +2544,14 @@ class PosKasir extends Component
 
         try {
             app(PembayaranPesananOnlineService::class)->serahkanDiToko($transaksi);
+
+            if (! $transaksi->durasi_garansi_hari) {
+                $transaksi->update([
+                    'durasi_garansi_hari' => 3,
+                    'garansi_teks' => '3 Hari Toko (Sesuai T&C Penyerahan)',
+                    'garansi_berakhir_pada' => now()->addDays(3)->toDateString(),
+                ]);
+            }
         } catch (\RuntimeException $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
 
@@ -2607,6 +2612,7 @@ class PosKasir extends Component
             'metode' => $kembalian === null
                 ? 'SUDAH DIBAYAR ONLINE'
                 : strtoupper($transaksi->metode_bayar ?? 'TUNAI'),
+            'garansi' => $transaksi->garansi_teks ?: '3 Hari Toko (Sesuai T&C Penyerahan)',
         ];
 
         $this->completedTransactionId = $transaksi->id;
@@ -2732,11 +2738,11 @@ class PosKasir extends Component
             ['kode' => 'bekas', 'nama' => 'Bekas / Copotan'],
         ];
 
-        $kategoriList = Cache::remember('pos_filter_kategori', 300, fn () => KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get());
-        $brandList = Cache::remember('pos_filter_brand', 300, fn () => Brand::where('is_active', true)->orderBy('nama')->get());
-        $kualitasList = Cache::remember('pos_filter_kualitas', 300, fn () => KualitasProduk::where('is_active', true)->orderBy('nama')->get());
-        $tipeHpList = Cache::remember('pos_filter_tipe_hp', 300, fn () => TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get());
-        $satuanList = Cache::remember('pos_filter_satuan', 300, fn () => SatuanUnit::where('is_active', true)->orderBy('nama')->get());
+        $kategoriList = KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get();
+        $brandList = Brand::where('is_active', true)->orderBy('nama')->get();
+        $kualitasList = KualitasProduk::where('is_active', true)->orderBy('nama')->get();
+        $tipeHpList = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get();
+        $satuanList = SatuanUnit::where('is_active', true)->orderBy('nama')->get();
 
         // Explicitly pass all data needed by the view
         return view('modules.pos.livewire.pos-kasir', [

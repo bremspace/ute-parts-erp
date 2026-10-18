@@ -21,6 +21,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable([
     'no_return', 'transaksi_id', 'pelanggan_id', 'cabang_id', 'gudang_id', 'user_id',
     'tanggal', 'jumlah', 'status', 'metode_pengembalian', 'alasan', 'is_migrasi_sid',
+    'tipe_penyelesaian', 'tukar_transaksi_id', 'selisih_nominal', 'foto_bukti', 'catatan_qc', 'channel',
 ])]
 class ReturnPenjualan extends Model
 {
@@ -37,8 +38,15 @@ class ReturnPenjualan extends Model
     protected $casts = [
         'tanggal' => 'date',
         'jumlah' => 'decimal:2',
+        'selisih_nominal' => 'decimal:2',
+        'foto_bukti' => 'array',
         'is_migrasi_sid' => 'boolean',
     ];
+
+    public function tukarTransaksi(): BelongsTo
+    {
+        return $this->belongsTo(Transaksi::class, 'tukar_transaksi_id');
+    }
 
     public function transaksi(): BelongsTo
     {

@@ -185,6 +185,21 @@
                                     </span>
                                 @endif
                             </a>
+
+                            <a href="/app/pos/retur" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pos/retur*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pos/retur*') ? 'bg-white' : 'bg-up-red/70' }}"></span>
+                                    <span>Retur Konsumen</span>
+                                </div>
+                                @php
+                                    $pendingReturCount = \App\Modules\Pos\Models\ReturnPenjualan::where('status', 'draft')->when(session('cabang_id'), fn($q, $cid) => $q->where('cabang_id', $cid))->count();
+                                @endphp
+                                @if($pendingReturCount > 0)
+                                    <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-up-red/20 text-up-red border border-up-red/30">
+                                        {{ $pendingReturCount }}
+                                    </span>
+                                @endif
+                            </a>
                         @endcanany
 
                         @can('servis.view')

@@ -171,6 +171,58 @@
                 </div>
             @endif
 
+            <!-- Pengaturan Garansi Sparepart Manual -->
+            <div class="mb-5 p-3.5 rounded-2xl bg-ink-50 dark:bg-white/[0.02] border border-ink-200/80 dark:border-white/10 space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-up-primary"></span>
+                        <span>Garansi Sparepart Toko</span>
+                    </label>
+                    <span class="text-[10px] text-ink-400">Atur manual per transaksi</span>
+                </div>
+
+                <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                    @foreach([
+                        '3_hari' => '3 Hari',
+                        '7_hari' => '7 Hari',
+                        '14_hari' => '14 Hari',
+                        '30_hari' => '30 Hari',
+                        'custom' => 'Custom',
+                        'tanpa_garansi' => 'Tanpa Grs',
+                    ] as $gKey => $gLabel)
+                        <button
+                            type="button"
+                            wire:click="setGaransiPilihan('{{ $gKey }}')"
+                            class="py-2 px-1.5 rounded-xl text-xs font-bold border transition text-center cursor-pointer min-h-[38px] flex items-center justify-center {{ $garansiPilihan === $gKey ? 'bg-up-primary text-white border-up-primary shadow-sm shadow-up-primary/30' : 'bg-white dark:bg-white/5 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300 hover:bg-ink-100 dark:hover:bg-white/10' }}"
+                        >
+                            {{ $gLabel }}
+                        </button>
+                    @endforeach
+                </div>
+
+                @if($garansiPilihan === 'custom')
+                    <div class="flex items-center gap-2 pt-1">
+                        <span class="text-xs text-ink-400 whitespace-nowrap">Durasi Garansi:</span>
+                        <input
+                            type="number"
+                            min="1"
+                            max="365"
+                            wire:model.live="garansiCustomHari"
+                            class="w-24 px-3 py-1.5 rounded-xl glass-input text-xs font-bold text-ink-900 dark:text-white"
+                            placeholder="Hari"
+                        />
+                        <span class="text-xs text-ink-400">Hari Kalender</span>
+                    </div>
+                @endif
+
+                <div class="text-[10px] text-ink-400 flex items-center gap-1.5 pt-0.5">
+                    <svg class="w-3.5 h-3.5 text-up-mint shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>T&C: Segel utuh, tidak ada cacat fisik/bekas lem, wajib membawa struk ber-QR saat klaim.</span>
+                </div>
+            </div>
+
             <!-- Submit Button Grid -->
             <div class="flex flex-col-reverse sm:flex-row gap-2.5">
                 <button

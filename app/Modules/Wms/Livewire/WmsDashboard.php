@@ -12,19 +12,16 @@ use Livewire\Component;
  */
 class WmsDashboard extends Component
 {
-    public string $activeTab = 'stok'; // stok, produk, transfer, opname, po, grn, retur
+    public string $activeTab = 'produk'; // produk, transfer, opname, po, grn, retur, stok
 
     public function mount(): void
     {
         // [FIX] Dukung deep-link ke tab via query param ?tab=...
-        // (mis. widget "Stok Kritis" di dashboard → /app/wms?tab=produk).
-        // Sebelumnya tab hanya bisa dipindah via $set('activeTab', ...) /
-        // event wms-pindah-tab (in-page), jadi link eksternal seperti
-        // /app/wms/produk tidak punya route → 404.
-        $allowed = ['stok', 'produk', 'transfer', 'opname', 'po', 'grn', 'retur'];
-        $tab = (string) request('tab', 'stok');
+        // Default langsung ke 'produk' (Master Produk & Stok terpadu)
+        $allowed = ['produk', 'stok', 'transfer', 'opname', 'po', 'grn', 'retur'];
+        $tab = (string) request('tab', 'produk');
 
-        $this->activeTab = in_array($tab, $allowed, true) ? $tab : 'stok';
+        $this->activeTab = in_array($tab, $allowed, true) ? $tab : 'produk';
     }
 
     #[On('wms-pindah-tab')]

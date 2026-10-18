@@ -377,6 +377,15 @@
                                         >
                                             Detail
                                         </button>
+                                        @if($row->status === 'selesai')
+                                            <a
+                                                href="/app/pos/retur?transaksi_id={{ $row->id }}"
+                                                class="px-2.5 py-1.5 rounded-lg bg-up-red/20 hover:bg-up-red/30 text-up-red text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                                title="Proses Retur / Tukar Barang Konsumen"
+                                            >
+                                                <span>↩ Retur</span>
+                                            </a>
+                                        @endif
                                         <button
                                             wire:click="cetakUlangStruk('pos', {{ $row->id }})"
                                             class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition cursor-pointer"

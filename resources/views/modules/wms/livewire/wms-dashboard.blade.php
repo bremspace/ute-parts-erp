@@ -4,7 +4,7 @@
         setSubModul(modul) {
             this.subModul = modul;
             if (modul === 'inventori' && !['stok', 'produk'].includes(@js($activeTab))) {
-                $wire.set('activeTab', 'stok');
+                $wire.set('activeTab', 'produk');
             } else if (modul === 'operasional' && !['transfer', 'opname'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'transfer');
             } else if (modul === 'pengadaan' && !['po', 'grn', 'retur'].includes(@js($activeTab))) {
@@ -54,8 +54,12 @@
 
             <!-- Tab-specific Quick Action (Desktop) -->
             <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
-                @if($activeTab === 'produk')
+                @if(in_array($activeTab, ['produk', 'stok']))
                     <div class="flex items-center gap-2">
+                        <a href="/app/pengaturan?tab=cabang" wire:navigate class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-ink-300 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap" title="Kelola Lokasi Rak di Pengaturan">
+                            <span>🏬</span>
+                            <span>Atur Rak</span>
+                        </a>
                         <button
                             wire:click="$dispatch('wms-import-modal')"
                             class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer"
@@ -94,11 +98,6 @@
                         <button wire:click="$dispatch('wms-supplier-baru')" class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Supplier</button>
                         <button wire:click="$dispatch('wms-po-baru')" class="px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Buat PO</button>
                     </div>
-                @elseif($activeTab === 'stok')
-                    <button wire:click="$dispatch('wms-rak-modal')" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
-                        <span>🏬</span>
-                        <span>Atur Rak</span>
-                    </button>
                 @endif
             </div>
         </div>
@@ -110,16 +109,21 @@
                 <!-- Group: Inventori -->
                 <div x-show="subModul === 'inventori'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
                     <button
-                        wire:click="$set('activeTab', 'stok')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'stok' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        Inventori & Stok
-                    </button>
-                    <button
                         wire:click="$set('activeTab', 'produk')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'produk' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ in_array($activeTab, ['produk', 'stok']) ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        Master Produk
+                        Master Produk & Stok
+                    </button>
+
+                    <!-- Tombol Auto ABC WMS Seluruh Produk (Sejajar dengan Master Produk & Stok) -->
+                    <button
+                        type="button"
+                        wire:click="$dispatch('wms-auto-abc')"
+                        wire:confirm="Jalankan klasifikasi otomatis kelas WMS (ABC Pareto) dan parameter ROP / Min-Max untuk seluruh master produk aktif berdasarkan pergerakan 90 hari terakhir?"
+                        class="px-3 sm:px-3.5 py-2 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[44px]"
+                        title="Kalkulasi otomatis kelas ABC dan parameter restock seluruh produk"
+                    >
+                        <span>⚡ Auto ABC (WMS)</span>
                     </button>
                 </div>
 
@@ -172,8 +176,12 @@
 
             <!-- Tab-specific Quick Action (Mobile/Tablet) -->
             <div class="lg:hidden w-full flex-shrink-0">
-                @if($activeTab === 'produk')
+                @if(in_array($activeTab, ['produk', 'stok']))
                     <div class="flex items-center gap-2 w-full">
+                        <a href="/app/pengaturan?tab=cabang" wire:navigate class="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-ink-300 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap" title="Kelola Lokasi Rak di Pengaturan">
+                            <span>🏬</span>
+                            <span>Rak</span>
+                        </a>
                         <button
                             wire:click="$dispatch('wms-import-modal')"
                             class="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer"
@@ -186,7 +194,7 @@
                             wire:click="$dispatch('wms-produk-modal')"
                             class="flex-1 px-3 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                         >
-                            <span>+ Tambah Produk</span>
+                            <span>+ Produk</span>
                         </button>
                     </div>
                 @elseif($activeTab === 'transfer')
@@ -212,11 +220,6 @@
                         <button wire:click="$dispatch('wms-supplier-baru')" class="flex-1 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Supplier</button>
                         <button wire:click="$dispatch('wms-po-baru')" class="flex-1 px-3 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ PO</button>
                     </div>
-                @elseif($activeTab === 'stok')
-                    <button wire:click="$dispatch('wms-rak-modal')" class="w-full px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
-                        <span>🏬</span>
-                        <span>Atur Rak</span>
-                    </button>
                 @endif
             </div>
         </div>

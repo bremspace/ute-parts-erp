@@ -8,16 +8,19 @@
     <!-- TAB 1b: MASTER PRODUK -->
         <div class="space-y-4">
             <!-- Search & Filters -->
-            <div class="space-y-2">
-                <div class="flex flex-col md:flex-row gap-3">
-                    <div class="flex-1">
-                        <x-prism.barcode-scan-input placeholder="Cari produk: nama, brand, model, SKU, barcode..." model="produkSearch" title="Scan Barcode Master Produk" />
-                    </div>
-                    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
+            <div class="space-y-3">
+                <!-- Baris 1: Search Box (Full Width agar tidak menumpuk dengan filter) -->
+                <div class="w-full">
+                    <x-prism.barcode-scan-input placeholder="Cari produk: nama, brand, model, SKU, barcode..." model="produkSearch" title="Scan Barcode Master Produk" />
+                </div>
+
+                <!-- Baris 2: Toolbar Filter & Kontrol Tampilan (Baris Baru) -->
+                <div class="flex flex-wrap items-center justify-between gap-2.5">
+                    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 flex-wrap">
                         <!-- Tombol Atur Filter Kustom -->
                         <button type="button"
                                 wire:click="$toggle('showCustomFilterSettings')"
-                                class="px-2.5 py-2 rounded-xl border border-white/10 text-xs font-medium text-ink-300 hover:text-white hover:bg-white/5 transition flex items-center gap-1.5 min-h-[44px]"
+                                class="px-2.5 py-2 rounded-xl border border-white/10 text-xs font-medium text-ink-300 hover:text-white hover:bg-white/5 transition flex items-center gap-1.5 min-h-[40px] cursor-pointer whitespace-nowrap {{ $showCustomFilterSettings ? 'bg-up-primary/20 text-up-primary border-up-primary/40' : '' }}"
                                 title="Atur checkbox filter kustom">
                             <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
@@ -25,8 +28,20 @@
                             <span class="hidden sm:inline">Filter</span>
                         </button>
 
+                        <!-- Tombol Atur Kolom Master Produk -->
+                        <button type="button"
+                                wire:click="$toggle('showColumnSettings')"
+                                class="px-2.5 py-2 rounded-xl border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[40px] {{ $showColumnSettings ? 'bg-up-primary/20 text-up-primary border-up-primary/40' : 'bg-white/5 text-ink-300 hover:text-white hover:bg-white/10' }}"
+                                title="Sesuaikan Kolom Tabel Master Produk">
+                            <span>📐</span>
+                            <span class="hidden sm:inline">Kolom</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-ink-200 font-bold">
+                                {{ count(array_filter($visibleColumns)) }}
+                            </span>
+                        </button>
+
                         @if($visibleFilters['kategori'] ?? true)
-                            <select wire:model.live="filterKategoriId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterKategoriId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Semua Kategori</option>
                                 @foreach($kategoriTree as $parent)
                                     <option value="{{ $parent->id }}" class="bg-ink-900 font-bold text-white">{{ $parent->nama }}</option>
@@ -38,7 +53,7 @@
                         @endif
 
                         @if($visibleFilters['brand'] ?? true)
-                            <select wire:model.live="filterBrandId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterBrandId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Semua Brand</option>
                                 @foreach($brands as $b)
                                     <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
@@ -47,7 +62,7 @@
                         @endif
 
                         @if($visibleFilters['kualitas'] ?? false)
-                            <select wire:model.live="filterKualitasId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterKualitasId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Semua Kualitas</option>
                                 @foreach($kualitasList as $k)
                                     <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}</option>
@@ -56,7 +71,7 @@
                         @endif
 
                         @if($visibleFilters['tipe_hp'] ?? false)
-                            <select wire:model.live="filterTipeHpId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterTipeHpId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Semua Tipe HP</option>
                                 @foreach($tipeHpList as $th)
                                     <option value="{{ $th->id }}" class="bg-ink-900">{{ $th->merk }} - {{ $th->model }}</option>
@@ -65,7 +80,7 @@
                         @endif
 
                         @if($visibleFilters['brand_kompatibel'] ?? false)
-                            <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Brand Kompatibel</option>
                                 @foreach($brandKompatibelList as $bk)
                                     <option value="{{ $bk }}" class="bg-ink-900">{{ $bk }}</option>
@@ -74,7 +89,7 @@
                         @endif
 
                         @if($visibleFilters['model_kompatibel'] ?? false)
-                            <select wire:model.live="filterModelKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterModelKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Model Kompatibel</option>
                                 @foreach($modelKompatibelList as $mk)
                                     <option value="{{ $mk }}" class="bg-ink-900">{{ $mk }}</option>
@@ -83,7 +98,7 @@
                         @endif
 
                         @if($visibleFilters['kondisi'] ?? false)
-                            <select wire:model.live="filterKondisi" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterKondisi" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Semua Kondisi</option>
                                 @foreach($kondisiList as $kd)
                                     <option value="{{ $kd['kode'] }}" class="bg-ink-900">{{ $kd['nama'] }}</option>
@@ -92,7 +107,7 @@
                         @endif
 
                         @if($visibleFilters['satuan'] ?? false)
-                            <select wire:model.live="filterSatuan" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterSatuan" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Semua Satuan</option>
                                 @foreach($satuanUnits as $su)
                                     <option value="{{ $su->kode }}" class="bg-ink-900">{{ $su->nama }} ({{ $su->kode }})</option>
@@ -101,7 +116,7 @@
                         @endif
 
                         @if($visibleFilters['abc_class'] ?? false)
-                            <select wire:model.live="filterAbcClass" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[44px]">
+                            <select wire:model.live="filterAbcClass" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Kelas ABC</option>
                                 <option value="A" class="bg-ink-900">Kelas A</option>
                                 <option value="B" class="bg-ink-900">Kelas B</option>
@@ -110,7 +125,7 @@
                         @endif
 
                         @if($visibleFilters['stok'] ?? false)
-                            <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ink-900/60 border border-white/10 text-xs text-ink-200 cursor-pointer select-none min-h-[44px]">
+                            <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ink-900/60 border border-white/10 text-xs text-ink-200 cursor-pointer select-none min-h-[40px]">
                                 <input type="checkbox" wire:model.live="filterHanyaReadyStok" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Ready Stok</span>
                             </label>
@@ -135,7 +150,9 @@
                                 </button>
                             </div>
                         @endif
+                    </div>
 
+                    <div class="flex items-center gap-2 ml-auto shrink-0 py-0.5">
                         <span class="text-[11px] text-ink-400 pl-1 whitespace-nowrap">{{ $produks->total() }} produk</span>
 
                         <!-- Per Page Selector -->
@@ -149,17 +166,8 @@
                             </select>
                         </div>
 
-                        <!-- Tombol Auto ABC WMS Seluruh Produk -->
-                        <button type="button"
-                                wire:click="autoKlasifikasiAbcSemua"
-                                wire:confirm="Jalankan klasifikasi otomatis kelas WMS (ABC Pareto) dan parameter ROP / Min-Max untuk seluruh master produk aktif berdasarkan pergerakan 90 hari terakhir?"
-                                class="px-3 py-1.5 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[36px]"
-                                title="Kalkulasi otomatis kelas ABC dan parameter restock seluruh produk">
-                            <span>⚡ Auto ABC (WMS)</span>
-                        </button>
-
                         <!-- View Switcher (Table vs Grid) -->
-                        <div class="inline-flex items-center p-0.5 rounded-xl bg-white/5 border border-white/10 ml-auto">
+                        <div class="inline-flex items-center p-0.5 rounded-xl bg-white/5 border border-white/10">
                             <button type="button"
                                     @click="setWmsView('table')"
                                     :class="wmsViewMode === 'table' ? 'bg-up-primary text-white shadow-sm font-bold' : 'text-ink-400 hover:text-white'"
@@ -241,9 +249,97 @@
                         </button>
                     </div>
                 @endif
-            </div>
 
-            <!-- Action Bar Saat Ada Produk Dipilih (Batch Action) -->
+                <!-- Custom Column Preferences Drawer -->
+                @if($showColumnSettings)
+                    <div class="p-3.5 bg-ink-950/90 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xl backdrop-blur-md">
+                        <div class="flex items-center gap-3.5 flex-wrap">
+                            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <span>📐</span> Kolom Master Produk:
+                            </span>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-400 select-none cursor-not-allowed" title="Kolom nama produk wajib tampil">
+                                <input type="checkbox" checked disabled class="rounded border-white/20 bg-ink-900 text-up-primary opacity-60">
+                                <span class="font-bold text-white">Produk (Wajib)</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-chk-{{ ($visibleColumns['checkbox'] ?? true) ? '1' : '0' }}" wire:click="toggleColumn('checkbox')" @checked($visibleColumns['checkbox'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Checkbox</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-sku-{{ ($visibleColumns['sku'] ?? true) ? '1' : '0' }}" wire:click="toggleColumn('sku')" @checked($visibleColumns['sku'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>SKU / Barcode</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-kategori-{{ ($visibleColumns['kategori'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('kategori')" @checked($visibleColumns['kategori'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Kategori</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-brand-{{ ($visibleColumns['brand'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('brand')" @checked($visibleColumns['brand'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Brand & Kualitas</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-kompatibilitas-{{ ($visibleColumns['kompatibilitas'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('kompatibilitas')" @checked($visibleColumns['kompatibilitas'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Kompatibilitas HP</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-harga_beli-{{ ($visibleColumns['harga_beli'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('harga_beli')" @checked($visibleColumns['harga_beli'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Harga Beli (HPP)</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-harga_jual-{{ ($visibleColumns['harga_jual'] ?? true) ? '1' : '0' }}" wire:click="toggleColumn('harga_jual')" @checked($visibleColumns['harga_jual'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Harga Jual</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-stok-{{ ($visibleColumns['stok'] ?? true) ? '1' : '0' }}" wire:click="toggleColumn('stok')" @checked($visibleColumns['stok'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Stok Total</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-gudang-{{ ($visibleColumns['gudang'] ?? true) ? '1' : '0' }}" wire:click="toggleColumn('gudang')" @checked($visibleColumns['gudang'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Gudang & Rak</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-reorder-{{ ($visibleColumns['reorder'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('reorder')" @checked($visibleColumns['reorder'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Parameter Pengadaan (ROP/ABC)</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-spesifikasi-{{ ($visibleColumns['spesifikasi'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('spesifikasi')" @checked($visibleColumns['spesifikasi'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Kondisi & Satuan</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-status-{{ ($visibleColumns['status'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('status')" @checked($visibleColumns['status'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Status Keaktifan</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-aksi-{{ ($visibleColumns['aksi'] ?? true) ? '1' : '0' }}" wire:click="toggleColumn('aksi')" @checked($visibleColumns['aksi'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Aksi</span>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" wire:click="showAllColumns" class="text-xs text-up-mint hover:underline cursor-pointer font-semibold">
+                                Tampilkan Semua
+                            </button>
+                            <span class="text-ink-500">•</span>
+                            <button type="button" wire:click="resetColumns" class="text-xs text-up-red hover:underline cursor-pointer">
+                                Reset Default
+                            </button>
+                        </div>
+                    </div>
+                @endif
             @if(!empty($selectedProdukIds))
                 <div class="p-3 bg-up-primary/10 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
                     <div class="flex items-center gap-3">
@@ -264,17 +360,46 @@
                     </div>
                     <div class="flex items-center gap-2 flex-wrap">
                         <button type="button"
+                                wire:click="openBulkEditModal"
+                                class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                                title="Edit masal produk terpilih">
+                            <span>✏️ Bulk Edit ({{ count($selectedProdukIds) }})</span>
+                        </button>
+
+                        <button type="button"
                                 wire:click="salinHargaTerpilih"
                                 class="px-3 py-1.5 rounded-xl bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
                                 title="Salin nama & harga produk terpilih ke clipboard (sesuai tier filter)">
-                            <span>📋 Salin Harga ({{ count($selectedProdukIds) }})</span>
+                            <span>📋 Salin Harga</span>
                         </button>
+
+                        <button type="button"
+                                wire:click="exportTerpilih('xlsx')"
+                                class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                                title="Ekspor produk terpilih ke Excel">
+                            <span>📥 Ekspor Terpilih</span>
+                        </button>
+
+                        <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                            <button type="button"
+                                    wire:click="bulkSetStatus(true)"
+                                    class="px-2.5 py-1 rounded-lg text-xs font-semibold text-up-mint hover:bg-up-mint/15 transition cursor-pointer"
+                                    title="Aktifkan produk terpilih">
+                                Set Aktif
+                            </button>
+                            <button type="button"
+                                    wire:click="bulkSetStatus(false)"
+                                    class="px-2.5 py-1 rounded-lg text-xs font-semibold text-ink-300 hover:bg-white/10 transition cursor-pointer"
+                                    title="Nonaktifkan produk terpilih">
+                                Set Nonaktif
+                            </button>
+                        </div>
 
                         <button type="button"
                                 wire:click="cetakBarcodeTerpilih"
                                 class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
                                 title="Cetak barcode produk yang dipilih">
-                            <span>🖨️ Cetak Barcode</span>
+                            <span>🖨️ Cetak Label QR</span>
                         </button>
 
                         <button type="button"
@@ -306,7 +431,729 @@
 
             <!-- 1. Table View -->
             <div x-show="wmsViewMode === 'table'">
-            <x-prism.data-table :headers="['<input type=\'checkbox\' wire:model.live=\'selectAll\' class=\'rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30 cursor-pointer\'>', 'Produk', 'SKU / Barcode', 'Harga (' . $labelTierAktif . ')', 'Stok', 'Gudang & Rak', 'Aksi']">
+            <x-prism.data-table>
+                <x-slot:thead>
+                    <tr>
+                        <!-- Checkbox Select All -->
+                        @if($visibleColumns['checkbox'] ?? true)
+                            <th class="py-3 px-3 w-10 text-center">
+                                <input type="checkbox" wire:model.live="selectAll" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30 cursor-pointer" title="Pilih Semua di Halaman Ini">
+                            </th>
+                        @endif
+
+                        <!-- Kolom Produk (Sort & Filter) -->
+                        <th class="py-3 px-3 min-w-[220px]">
+                            <div class="flex items-center justify-between gap-1.5">
+                                <div wire:click="sortByColumn('nama')" class="flex items-center gap-1 cursor-pointer select-none group" title="Klik untuk mengurutkan Nama Produk">
+                                    <span class="group-hover:text-up-primary transition-colors">Produk</span>
+                                    @if($sortBy === 'nama')
+                                        <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                    @else
+                                        <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                    @endif
+                                </div>
+
+                                <!-- Filter Popover Kolom Produk -->
+                                <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                    <button
+                                        type="button"
+                                        @click="open = !open"
+                                        class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ (!empty($produkSearch) || $filterKategoriId || $filterBrandId || $filterKualitasId) ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}"
+                                        title="Filter Kolom Produk"
+                                    >
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                        @if(!empty($produkSearch) || $filterKategoriId || $filterBrandId || $filterKualitasId)
+                                            <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                                        @endif
+                                    </button>
+
+                                    <div
+                                        x-show="open"
+                                        x-cloak
+                                        x-transition:enter="transition ease-out duration-150"
+                                        x-transition:enter-start="opacity-0 scale-95"
+                                        x-transition:enter-end="opacity-100 scale-100"
+                                        class="absolute left-0 mt-2 z-30 w-72 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                    >
+                                        <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                            <span class="text-xs font-bold text-white">Filter Produk</span>
+                                            <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <div>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Cari Nama / Model</label>
+                                                <input type="text" wire:model.live.debounce.300ms="produkSearch" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs" placeholder="Ketik kata kunci...">
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Kategori</label>
+                                                <select wire:model.live="filterKategoriId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Kategori</option>
+                                                    @foreach($kategoriTree as $kat)
+                                                        <option value="{{ $kat->id }}">{{ $kat->nama }}</option>
+                                                        @foreach($kat->children as $child)
+                                                            <option value="{{ $child->id }}">└ {{ $child->nama }}</option>
+                                                        @endforeach
+                                                    @endforeach
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Brand</label>
+                                                <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Brand</option>
+                                                    @foreach($brands as $b)
+                                                        <option value="{{ $b->id }}">{{ $b->nama }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Kualitas</label>
+                                                <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Kualitas</option>
+                                                    @foreach($kualitasList as $k)
+                                                        <option value="{{ $k->id }}">{{ $k->nama }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="pt-2 border-t border-white/10 flex justify-between">
+                                            <button type="button" wire:click="resetFilterKolom('produk')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                                Reset Kolom Ini
+                                            </button>
+                                            <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                Tutup
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </th>
+
+                        <!-- Kolom Kategori Tambahan -->
+                        @if($visibleColumns['kategori'] ?? false)
+                            <th class="py-3 px-3 min-w-[130px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('kategori')" class="flex items-center gap-1 cursor-pointer select-none group" title="Urutkan Kategori">
+                                        <span class="group-hover:text-up-primary transition-colors">Kategori</span>
+                                        @if($sortBy === 'kategori')
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button type="button" @click="open = !open" class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ $filterKategoriId ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterKategoriId) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
+                                        </button>
+                                        <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter Kategori</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+                                            <select wire:model.live="filterKategoriId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                <option value="">Semua Kategori</option>
+                                                @foreach($kategoriTree as $kat)
+                                                    <option value="{{ $kat->id }}">{{ $kat->nama }}</option>
+                                                    @foreach($kat->children as $child)
+                                                        <option value="{{ $child->id }}">└ {{ $child->nama }}</option>
+                                                    @endforeach
+                                                @endforeach
+                                            </select>
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('kategori')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Brand & Kualitas Tambahan -->
+                        @if($visibleColumns['brand'] ?? false)
+                            <th class="py-3 px-3 min-w-[130px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('brand')" class="flex items-center gap-1 cursor-pointer select-none group" title="Urutkan Brand">
+                                        <span class="group-hover:text-up-primary transition-colors">Brand & Kualitas</span>
+                                        @if($sortBy === 'brand')
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button type="button" @click="open = !open" class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ ($filterBrandId || $filterKualitasId) ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterBrandId || $filterKualitasId) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
+                                        </button>
+                                        <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter Brand & Kualitas</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Brand</option>
+                                                    @foreach($brands as $b) <option value="{{ $b->id }}">{{ $b->nama }}</option> @endforeach
+                                                </select>
+                                                <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Kualitas</option>
+                                                    @foreach($kualitasList as $k) <option value="{{ $k->id }}">{{ $k->nama }}</option> @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('brand')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Kompatibilitas HP Tambahan -->
+                        @if($visibleColumns['kompatibilitas'] ?? false)
+                            <th class="py-3 px-3 min-w-[140px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <span>Kompatibilitas</span>
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button type="button" @click="open = !open" class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ ($filterTipeHpId || $filterBrandKompatibel || $filterModelKompatibel) ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterTipeHpId || $filterBrandKompatibel || $filterModelKompatibel) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
+                                        </button>
+                                        <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter Kompatibilitas</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <select wire:model.live="filterTipeHpId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Tipe HP Resmi</option>
+                                                    @foreach($tipeHpList as $th) <option value="{{ $th->id }}">{{ $th->merk }} - {{ $th->model }}</option> @endforeach
+                                                </select>
+                                                <select wire:model.live="filterBrandKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Brand Kompatibel</option>
+                                                    @foreach($brandKompatibelList as $bk) <option value="{{ $bk }}">{{ $bk }}</option> @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('kompatibilitas')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom SKU / Barcode (Sort & Filter) -->
+                        @if($visibleColumns['sku'] ?? true)
+                            <th class="py-3 px-3 min-w-[130px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('sku')" class="flex items-center gap-1 cursor-pointer select-none group" title="Klik untuk mengurutkan SKU">
+                                        <span class="group-hover:text-up-primary transition-colors">SKU / Barcode</span>
+                                        @if($sortBy === 'sku')
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+
+                                    <!-- Filter Popover Kolom SKU -->
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button
+                                            type="button"
+                                            @click="open = !open"
+                                            class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ !empty($filterSku) ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}"
+                                            title="Filter Kolom SKU"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if(!empty($filterSku))
+                                                <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                                            @endif
+                                        </button>
+
+                                        <div
+                                            x-show="open"
+                                            x-cloak
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                        >
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter SKU / Barcode</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Cari Kode SKU atau Barcode</label>
+                                                <input type="text" wire:model.live.debounce.300ms="filterSku" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="Ketik kode SKU...">
+                                            </div>
+
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('sku')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                                    Reset Kolom Ini
+                                                </button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                    Tutup
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Harga Beli Tersendiri (HPP) -->
+                        @if($visibleColumns['harga_beli'] ?? false)
+                            <th class="py-3 px-3 min-w-[130px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('harga_beli')" class="flex items-center gap-1 cursor-pointer select-none group" title="Urutkan Harga Beli">
+                                        <span class="group-hover:text-up-primary transition-colors">Harga Beli</span>
+                                        @if($sortBy === 'harga_beli')
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button type="button" @click="open = !open" class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ ($filterMinHargaBeli !== null || $filterMaxHargaBeli !== null) ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}" title="Filter Harga Beli">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterMinHargaBeli !== null || $filterMaxHargaBeli !== null) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
+                                        </button>
+                                        <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter Harga Beli</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <input type="number" wire:model.live.debounce.400ms="filterMinHargaBeli" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="Min Rp">
+                                                <input type="number" wire:model.live.debounce.400ms="filterMaxHargaBeli" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="Maks Rp">
+                                            </div>
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('harga_beli')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Harga Jual (Sort & Filter) -->
+                        @if($visibleColumns['harga_jual'] ?? true)
+                            <th class="py-3 px-3 min-w-[140px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('harga_jual')" class="flex items-center gap-1 cursor-pointer select-none group" title="Klik untuk mengurutkan Harga Jual">
+                                        <span class="group-hover:text-up-primary transition-colors">Harga ({{ $labelTierAktif }})</span>
+                                        @if(in_array($sortBy, ['harga_jual', 'harga_jual_retail', 'harga_beli']))
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+
+                                    <!-- Filter Popover Kolom Harga -->
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button
+                                            type="button"
+                                            @click="open = !open"
+                                            class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ ($filterMinHarga !== null || $filterMaxHarga !== null || $filterTierHarga !== 'retail') ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}"
+                                            title="Filter Kolom Harga"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterMinHarga !== null || $filterMaxHarga !== null || $filterTierHarga !== 'retail')
+                                                <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                                            @endif
+                                        </button>
+
+                                        <div
+                                            x-show="open"
+                                            x-cloak
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            class="absolute left-0 mt-2 z-30 w-72 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                        >
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter & Urutkan Harga</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+
+                                            <!-- Opsi Sort Cepat Harga -->
+                                            <div class="space-y-1">
+                                                <span class="text-[10px] uppercase font-bold text-ink-400 tracking-wider">Urutan Cepat</span>
+                                                <div class="grid grid-cols-2 gap-1.5">
+                                                    <button type="button" wire:click="updatedSortPreset('harga_jual_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                        📈 Jual Tertinggi
+                                                    </button>
+                                                    <button type="button" wire:click="updatedSortPreset('harga_jual_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                        📉 Jual Terendah
+                                                    </button>
+                                                    <button type="button" wire:click="updatedSortPreset('harga_beli_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                        📦 Beli Tertinggi
+                                                    </button>
+                                                    <button type="button" wire:click="updatedSortPreset('harga_beli_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                        🏷️ Beli Terendah
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="space-y-2 pt-2 border-t border-white/10">
+                                                <div>
+                                                    <label class="block text-[11px] text-ink-300 mb-1">Tier Harga Aktif</label>
+                                                    <select wire:model.live="filterTierHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                        <option value="retail">Retail (Umum)</option>
+                                                        <option value="reseller">Reseller</option>
+                                                        <option value="agen">Agen</option>
+                                                        @foreach($tierMemberships as $tm)
+                                                            <option value="tier_{{ $tm->id }}">CRM: {{ $tm->nama_tier }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label class="block text-[11px] text-ink-300 mb-1">Min (Rp)</label>
+                                                        <input type="number" wire:model.live.debounce.400ms="filterMinHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="0">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] text-ink-300 mb-1">Maks (Rp)</label>
+                                                        <input type="number" wire:model.live.debounce.400ms="filterMaxHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="Tak terbatas">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('harga')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                                    Reset Kolom Ini
+                                                </button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                    Tutup
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Stok Total (WAJIB teks persis 'Stok Total' untuk test compatibility) -->
+                        @if($visibleColumns['stok'] ?? true)
+                            <th class="py-3 px-3 min-w-[120px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('stok')" class="flex items-center gap-1 cursor-pointer select-none group" title="Klik untuk mengurutkan Stok Total">
+                                        <span class="group-hover:text-up-primary transition-colors">Stok Total</span>
+                                        @if(in_array($sortBy, ['stok', 'total_stok']))
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+
+                                    <!-- Filter Popover Kolom Stok -->
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button
+                                            type="button"
+                                            @click="open = !open"
+                                            class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ ($filterStokStatus !== 'semua' || $filterHanyaReadyStok) ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}"
+                                            title="Filter Kolom Stok"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterStokStatus !== 'semua' || $filterHanyaReadyStok)
+                                                <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                                            @endif
+                                        </button>
+
+                                        <div
+                                            x-show="open"
+                                            x-cloak
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                        >
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter & Sort Stok</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+
+                                            <!-- Opsi Sort Cepat Stok -->
+                                            <div class="space-y-1">
+                                                <span class="text-[10px] uppercase font-bold text-ink-400 tracking-wider">Urutan Cepat</span>
+                                                <div class="grid grid-cols-2 gap-1.5">
+                                                    <button type="button" wire:click="updatedSortPreset('stok_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                        📦 Stok Terbanyak
+                                                    </button>
+                                                    <button type="button" wire:click="updatedSortPreset('stok_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                        ⚠️ Stok Menipis
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="space-y-2 pt-2 border-t border-white/10">
+                                                <div>
+                                                    <label class="block text-[11px] text-ink-300 mb-1">Status Ketersediaan</label>
+                                                    <select wire:model.live="filterStokStatus" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                        <option value="semua">Semua Stok</option>
+                                                        <option value="ready">✅ Ready Stok Saja (&gt; 0)</option>
+                                                        <option value="menipis">⚠️ Stok Menipis (≤ Min)</option>
+                                                        <option value="habis">❌ Stok Habis (= 0)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('stok')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                                    Reset Kolom Ini
+                                                </button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                    Tutup
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Gudang & Rak (Filter) -->
+                        @if($visibleColumns['gudang'] ?? true)
+                            <th class="py-3 px-3 min-w-[130px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <span>Gudang & Rak</span>
+
+                                    <!-- Filter Popover Kolom Gudang -->
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button
+                                            type="button"
+                                            @click="open = !open"
+                                            class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ $filterGudangId ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}"
+                                            title="Filter Kolom Gudang"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterGudangId)
+                                                <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                                            @endif
+                                        </button>
+
+                                        <div
+                                            x-show="open"
+                                            x-cloak
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            class="absolute right-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                        >
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter Gudang</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Pilih Gudang Cabang</label>
+                                                <select wire:model.live="filterGudangId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Gudang</option>
+                                                    @foreach($gudangsCabang as $g)
+                                                        <option value="{{ $g->id }}">{{ $g->nama }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('gudang')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                                    Reset Kolom Ini
+                                                </button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                    Tutup
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Parameter Pengadaan / Reorder (ROP & ABC) Tambahan -->
+                        @if($visibleColumns['reorder'] ?? false)
+                            <th class="py-3 px-3 min-w-[130px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('reorder_point')" class="flex items-center gap-1 cursor-pointer select-none group" title="Urutkan ROP">
+                                        <span class="group-hover:text-up-primary transition-colors">Parameter ROP</span>
+                                        @if($sortBy === 'reorder_point')
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button type="button" @click="open = !open" class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ $filterAbcClass ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterAbcClass) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
+                                        </button>
+                                        <div x-show="open" x-cloak class="absolute right-0 mt-2 z-30 w-56 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter Kelas ABC</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+                                            <select wire:model.live="filterAbcClass" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                <option value="">Semua Kelas</option>
+                                                <option value="A">Kelas A (Pareto 80% Nilai)</option>
+                                                <option value="B">Kelas B (15% Nilai)</option>
+                                                <option value="C">Kelas C (5% Nilai)</option>
+                                            </select>
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('reorder')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Spesifikasi & Satuan Tambahan -->
+                        @if($visibleColumns['spesifikasi'] ?? false)
+                            <th class="py-3 px-3 min-w-[120px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('kondisi')" class="flex items-center gap-1 cursor-pointer select-none group" title="Urutkan Kondisi">
+                                        <span class="group-hover:text-up-primary transition-colors">Spesifikasi</span>
+                                        @if(in_array($sortBy, ['kondisi', 'satuan']))
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button type="button" @click="open = !open" class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ ($filterKondisi || $filterSatuan) ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterKondisi || $filterSatuan) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
+                                        </button>
+                                        <div x-show="open" x-cloak class="absolute right-0 mt-2 z-30 w-56 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter Spesifikasi</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <select wire:model.live="filterKondisi" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Kondisi</option>
+                                                    @foreach($kondisiList as $kd) <option value="{{ $kd['kode'] }}">{{ $kd['nama'] }}</option> @endforeach
+                                                </select>
+                                                <select wire:model.live="filterSatuan" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="">Semua Satuan</option>
+                                                    @foreach($satuanUnits as $su) <option value="{{ $su->kode }}">{{ $su->nama ?? $su->kode }}</option> @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('spesifikasi')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Status Keaktifan Tambahan -->
+                        @if($visibleColumns['status'] ?? false)
+                            <th class="py-3 px-3 min-w-[110px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <div wire:click="sortByColumn('status')" class="flex items-center gap-1 cursor-pointer select-none group" title="Urutkan Status">
+                                        <span class="group-hover:text-up-primary transition-colors">Status</span>
+                                        @if(in_array($sortBy, ['status', 'is_active']))
+                                            <span class="text-up-primary font-black text-xs">{{ $sortDir === 'asc' ? '↑' : '↓' }}</span>
+                                        @else
+                                            <span class="text-ink-500/40 group-hover:text-ink-300 text-xs">↕</span>
+                                        @endif
+                                    </div>
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button type="button" @click="open = !open" class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ $filterStatusAktif !== 'semua' ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterStatusAktif !== 'semua') <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
+                                        </button>
+                                        <div x-show="open" x-cloak class="absolute right-0 mt-2 z-30 w-56 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Status Produk</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+                                            <select wire:model.live="filterStatusAktif" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                <option value="semua">Semua Status</option>
+                                                <option value="aktif">🟢 Aktif Saja</option>
+                                                <option value="nonaktif">🔴 Nonaktif Saja</option>
+                                            </select>
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('status')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Aksi / Status (Filter Status) -->
+                        @if($visibleColumns['aksi'] ?? true)
+                            <th class="py-3 px-3 text-right min-w-[90px]">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <span>Aksi</span>
+
+                                    <!-- Filter Popover Status -->
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button
+                                            type="button"
+                                            @click="open = !open"
+                                            class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ $filterStatusAktif !== 'semua' ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}"
+                                            title="Filter Status Produk"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterStatusAktif !== 'semua')
+                                                <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                                            @endif
+                                        </button>
+
+                                        <div
+                                            x-show="open"
+                                            x-cloak
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            class="absolute right-0 mt-2 z-30 w-56 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                        >
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Status Produk</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Status Keaktifan</label>
+                                                <select wire:model.live="filterStatusAktif" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <option value="semua">Semua Status</option>
+                                                    <option value="aktif">🟢 Aktif Saja</option>
+                                                    <option value="nonaktif">🔴 Nonaktif Saja</option>
+                                                </select>
+                                            </div>
+
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('status')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                                    Reset
+                                                </button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                    Tutup
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+                    </tr>
+                </x-slot:thead>
                 @forelse($produks as $p)
                     @php
                         $stokTotal = $p->stokItems->sum('jumlah');
@@ -315,12 +1162,14 @@
                         $isSelected = in_array($p->id, $selectedProdukIds, true);
                     @endphp
                     <tr class="hover:bg-white/[0.02] transition-colors {{ $isSelected ? 'bg-up-primary/5' : '' }}">
-                        <td class="py-2.5 px-3 w-10 text-center">
-                            <input type="checkbox"
-                                   value="{{ $p->id }}"
-                                   wire:model.live="selectedProdukIds"
-                                   class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30 cursor-pointer">
-                        </td>
+                        @if($visibleColumns['checkbox'] ?? true)
+                            <td class="py-2.5 px-3 w-10 text-center">
+                                <input type="checkbox"
+                                       value="{{ $p->id }}"
+                                       wire:model.live="selectedProdukIds"
+                                       class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30 cursor-pointer">
+                            </td>
+                        @endif
                         <td class="py-2.5 px-3 min-w-[220px]">
                             <div class="flex items-center gap-2.5">
                                 <div class="w-10 h-10 rounded-xl overflow-hidden bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 shrink-0 flex items-center justify-center relative">
@@ -363,105 +1212,203 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
-                            <span class="text-ink-300 block font-semibold">{{ $skuPertama ?? '-' }}</span>
-                            @if($p->barcode)
-                                <div class="flex items-center gap-1 mt-0.5">
-                                    <span class="text-[10px] text-up-primary font-mono block px-1.5 py-0.2 rounded bg-up-primary/10 border border-up-primary/20">{{ $p->barcode }}</span>
-                                </div>
-                            @else
-                                <span class="text-[11px] text-ink-500 font-mono block mt-0.5">-</span>
-                            @endif
-                        </td>
-                        <td class="py-2.5 px-3 tabular-nums text-xs whitespace-nowrap">
-                            @cansee('harga_beli')
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="text-ink-500 dark:text-ink-400">Beli</span>
-                                <span class="text-ink-900 dark:text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
-                                @if(($p->metode_harga_beli ?? 'manual') === 'average')
-                                    <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-bold border border-up-mint/30" title="Metode: Moving Average Otomatis dari PO">Avg</span>
-                                @endif
-                            </div>
-                            @cannotsee('harga_beli')
-                            <span class="text-ink-500 dark:text-ink-400">Beli</span> <span class="text-ink-900 dark:text-white font-semibold">—</span>
-                            @endcansee
-                            <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
-                                <span class="text-ink-400">{{ $filterTierHarga === 'retail' ? 'Jual' : $labelTierAktif }}</span>
-                                <span class="text-up-mint font-semibold">Rp {{ number_format($tierInfo['harga'], 0, ',', '.') }}</span>
-                                @if($filterTierHarga !== 'retail')
-                                    <span class="text-[9px] text-ink-500 line-through">({{ number_format($p->harga_jual_retail, 0, ',', '.') }})</span>
-                                @elseif($p->margin_persen > 0)
-                                    <span class="text-[9px] text-ink-400 font-mono" title="Margin {{ $p->margin_persen }}%">+{{ (float) $p->margin_persen }}%</span>
-                                @endif
-                            </div>
-                        </td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">
-                            <x-prism.stock-gauge :stok="$stokTotal" :min="$p->stokItems->min('jumlah_minimum') ?? 2" />
-                        </td>
-                        <td class="py-2.5 px-3 text-xs min-w-[130px]">
-                            @if($p->stokItems->isNotEmpty())
-                                <div class="space-y-0.5">
-                                    @foreach($p->stokItems as $si)
-                                        <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="text-ink-300 font-medium">{{ $si->gudang?->nama ?? '-' }}</span>
-                                            <span class="text-ink-400 font-bold tabular-nums">({{ $si->jumlah }})</span>
-                                            @if($si->rak)
-                                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-up-primary/10 border border-up-primary/20 text-up-primary text-[10px] font-bold">
-                                                    🏷️ {{ $si->rak->kode }}
-                                                </span>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @else
-                                <span class="text-ink-500 text-xs">-</span>
-                            @endif
-                        </td>
-                        <td class="py-2.5 px-3 whitespace-nowrap w-20">
-                            <div class="flex items-center gap-1.5" x-data="{ openMenu: false }">
-                                <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 text-up-mint border border-up-mint/30 font-bold text-xs cursor-pointer whitespace-nowrap active:scale-95 transition" title="Edit Master Produk">
-                                    ✏️ Edit
-                                </button>
 
-                                <!-- Dropdown Menu Lainnya (Semua aksi selain edit) -->
-                                <div class="relative" @click.away="openMenu = false">
-                                    <button @click="openMenu = !openMenu"
-                                            type="button"
-                                            class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 text-xs cursor-pointer active:scale-95 transition"
-                                            title="Menu lainnya">
-                                        •••
-                                    </button>
-                                    <div x-show="openMenu"
-                                         x-cloak
-                                         class="absolute right-0 top-full mt-1.5 w-44 rounded-xl bg-ink-900 border border-white/10 shadow-xl z-20 py-1 text-xs backdrop-blur-md">
-                                        <button type="button" wire:click="copySingleProduk({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                            <span>📋</span> Salin Harga
-                                        </button>
-                                        <button type="button" wire:click="orderPo({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                            <span>📦</span> Order PO
-                                        </button>
-                                        <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition">
-                                            <span>🖨️</span> Cetak Barcode
-                                        </a>
-                                        @can('lihat-audit-log')
-                                            <button type="button" wire:click="bukaRiwayat('produk', {{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                                <span>📜</span> Riwayat Audit
-                                            </button>
-                                        @endcan
-                                        @if(isSuperAdminOrOwner())
-                                            <div class="border-t border-white/5 my-1"></div>
-                                            <button type="button"
-                                                    wire:click="hapusProduk({{ $p->id }})"
-                                                    wire:confirm="Yakin ingin menghapus master produk '{{ $p->nama }}'? Jika produk memiliki riwayat transaksi/mutasi, status akan dinonaktifkan."
-                                                    @click="openMenu = false"
-                                                    class="w-full text-left flex items-center gap-2 px-3 py-2 text-up-red hover:bg-up-red/10 transition cursor-pointer">
-                                                <span>🗑️</span> Hapus Produk
-                                            </button>
+                        @if($visibleColumns['kategori'] ?? false)
+                            <td class="py-2.5 px-3 text-xs whitespace-nowrap">
+                                <span class="font-medium text-ink-200 block">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</span>
+                                @if($p->kategoriRelasi?->parent)
+                                    <span class="text-[10px] text-ink-400 block">Induk: {{ $p->kategoriRelasi->parent->nama }}</span>
+                                @endif
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['brand'] ?? false)
+                            <td class="py-2.5 px-3 text-xs whitespace-nowrap">
+                                <div class="flex flex-col gap-0.5">
+                                    <span class="font-semibold text-white">{{ $p->brand?->nama ?? '-' }}</span>
+                                    @if($p->kualitas)
+                                        <span class="text-[10px] text-up-mint font-medium">{{ $p->kualitas->nama }}</span>
+                                    @endif
+                                </div>
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['kompatibilitas'] ?? false)
+                            <td class="py-2.5 px-3 text-xs min-w-[140px]">
+                                <span class="font-medium text-ink-200 block truncate">{{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}</span>
+                                @if($p->tipeHps && $p->tipeHps->isNotEmpty())
+                                    <span class="text-[10px] text-ink-400 block line-clamp-1" title="{{ $p->tipeHps->map(fn($t) => $t->merk.' '.$t->model)->join(', ') }}">
+                                        {{ $p->tipeHps->count() }} Tipe HP: {{ $p->tipeHps->first()?->model }}
+                                    </span>
+                                @endif
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['sku'] ?? true)
+                            <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
+                                <span class="text-ink-300 block font-semibold">{{ $skuPertama ?? '-' }}</span>
+                                @if($p->barcode)
+                                    <div class="flex items-center gap-1 mt-0.5">
+                                        <span class="text-[10px] text-up-primary font-mono block px-1.5 py-0.2 rounded bg-up-primary/10 border border-up-primary/20">{{ $p->barcode }}</span>
+                                    </div>
+                                @else
+                                    <span class="text-[11px] text-ink-500 font-mono block mt-0.5">-</span>
+                                @endif
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['harga_beli'] ?? false)
+                            <td class="py-2.5 px-3 tabular-nums text-xs whitespace-nowrap">
+                                @if(canSeeField('harga_beli'))
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="text-ink-900 dark:text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
+                                        @if(($p->metode_harga_beli ?? 'manual') === 'average')
+                                            <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-bold border border-up-mint/30" title="Metode: Moving Average Otomatis dari PO">Avg</span>
                                         @endif
                                     </div>
+                                @else
+                                    <span class="text-ink-900 dark:text-white font-semibold">—</span>
+                                @endif
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['harga_jual'] ?? true)
+                            <td class="py-2.5 px-3 tabular-nums text-xs whitespace-nowrap">
+                                @if(!($visibleColumns['harga_beli'] ?? false))
+                                    @if(canSeeField('harga_beli'))
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="text-ink-500 dark:text-ink-400">Beli</span>
+                                            <span class="text-ink-900 dark:text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
+                                            @if(($p->metode_harga_beli ?? 'manual') === 'average')
+                                                <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-bold border border-up-mint/30" title="Metode: Moving Average Otomatis dari PO">Avg</span>
+                                            @endif
+                                        </div>
+                                    @else
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="text-ink-500 dark:text-ink-400">Beli</span> <span class="text-ink-900 dark:text-white font-semibold">—</span>
+                                        </div>
+                                    @endif
+                                @endif
+                                <div class="flex items-center gap-1.5 flex-wrap {{ !($visibleColumns['harga_beli'] ?? false) ? 'mt-0.5' : '' }}">
+                                    <span class="text-ink-400">{{ $filterTierHarga === 'retail' ? 'Jual' : $labelTierAktif }}</span>
+                                    <span class="text-up-mint font-semibold">Rp {{ number_format($tierInfo['harga'], 0, ',', '.') }}</span>
+                                    @if($filterTierHarga !== 'retail')
+                                        <span class="text-[9px] text-ink-500 line-through">({{ number_format($p->harga_jual_retail, 0, ',', '.') }})</span>
+                                    @elseif($p->margin_persen > 0)
+                                        <span class="text-[9px] text-ink-400 font-mono" title="Margin {{ $p->margin_persen }}%">+{{ (float) $p->margin_persen }}%</span>
+                                    @endif
                                 </div>
-                            </div>
-                        </td>
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['stok'] ?? true)
+                            <td class="py-2.5 px-3 whitespace-nowrap">
+                                <x-prism.stock-gauge :stok="$stokTotal" :min="$p->stokItems->min('jumlah_minimum') ?? 2" />
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['gudang'] ?? true)
+                            <td class="py-2.5 px-3 text-xs min-w-[130px]">
+                                @if($p->stokItems->isNotEmpty())
+                                    <div class="space-y-0.5">
+                                        @foreach($p->stokItems as $si)
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="text-ink-300 font-medium">{{ $si->gudang?->nama ?? '-' }}</span>
+                                                <span class="text-ink-400 font-bold tabular-nums">({{ $si->jumlah }})</span>
+                                                @if($si->rak)
+                                                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-up-primary/10 border border-up-primary/20 text-up-primary text-[10px] font-bold">
+                                                        🏷️ {{ $si->rak->kode }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="text-ink-500 text-xs">-</span>
+                                @endif
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['reorder'] ?? false)
+                            <td class="py-2.5 px-3 text-xs whitespace-nowrap">
+                                <div class="flex flex-col gap-0.5 font-mono">
+                                    <span class="text-ink-200">ROP: <strong class="text-white">{{ $p->reorder_point ?? '-' }}</strong></span>
+                                    <span class="text-[10px] text-ink-400">Min {{ $p->stok_minimum ?? 0 }} · Maks {{ $p->stok_maksimum ?? '-' }}</span>
+                                </div>
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['spesifikasi'] ?? false)
+                            <td class="py-2.5 px-3 text-xs whitespace-nowrap">
+                                <div class="flex flex-col gap-0.5">
+                                    <span class="text-ink-200 capitalize font-medium">{{ $p->kondisi ?? 'Baru' }}</span>
+                                    <span class="text-[10px] text-ink-400 uppercase font-mono">{{ $p->satuan ?? 'pcs' }}</span>
+                                </div>
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['status'] ?? false)
+                            <td class="py-2.5 px-3 text-xs whitespace-nowrap">
+                                <button type="button" wire:click="toggleStatusAktif({{ $p->id }})" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer {{ $p->is_active ? 'bg-up-mint/15 border-up-mint/30 text-up-mint hover:bg-up-mint/25' : 'bg-up-red/15 border-up-red/30 text-up-red hover:bg-up-red/25' }}" title="Klik untuk toggle status aktif/nonaktif">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $p->is_active ? 'bg-up-mint' : 'bg-up-red' }}"></span>
+                                    <span>{{ $p->is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                                </button>
+                            </td>
+                        @endif
+
+                        @if($visibleColumns['aksi'] ?? true)
+                            <td class="py-2.5 px-3 whitespace-nowrap w-20">
+                                <div class="flex items-center gap-1.5" x-data="{ openMenu: false }">
+                                    <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 text-up-mint border border-up-mint/30 font-bold text-xs cursor-pointer whitespace-nowrap active:scale-95 transition" title="Edit Master Produk">
+                                        ✏️ Edit
+                                    </button>
+
+                                    <!-- Dropdown Menu Lainnya (Semua aksi selain edit) -->
+                                    <div class="relative" @click.away="openMenu = false">
+                                        <button @click="openMenu = !openMenu"
+                                                type="button"
+                                                class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 text-xs cursor-pointer active:scale-95 transition"
+                                                title="Menu lainnya">
+                                            •••
+                                        </button>
+                                        <div x-show="openMenu"
+                                             x-cloak
+                                             class="absolute right-0 top-full mt-1.5 w-44 rounded-xl bg-ink-900 border border-white/10 shadow-xl z-20 py-1 text-xs backdrop-blur-md">
+                                            <button type="button" wire:click="duplikatProduk({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                <span>📑</span> Duplikat Produk
+                                            </button>
+                                            <button type="button" wire:click="toggleStatusAktif({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 {{ $p->is_active ? 'text-up-amber' : 'text-up-mint' }} hover:bg-white/5 transition cursor-pointer">
+                                                <span>{{ $p->is_active ? '⏸️' : '▶️' }}</span> {{ $p->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                                            </button>
+                                            <button type="button" wire:click="copySingleProduk({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                <span>📋</span> Salin Harga
+                                            </button>
+                                            <button type="button" wire:click="orderPo({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                <span>📦</span> Order PO
+                                            </button>
+                                            <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition">
+                                                <span>🖨️</span> Cetak Label QR
+                                            </a>
+                                            @can('lihat-audit-log')
+                                                <button type="button" wire:click="bukaRiwayat('produk', {{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                    <span>📜</span> Riwayat Audit
+                                                </button>
+                                            @endcan
+                                            @if(isSuperAdminOrOwner())
+                                                <div class="border-t border-white/5 my-1"></div>
+                                                <button type="button"
+                                                        wire:click="hapusProduk({{ $p->id }})"
+                                                        wire:confirm="Yakin ingin menghapus master produk '{{ $p->nama }}'? Jika produk memiliki riwayat transaksi/mutasi, status akan dinonaktifkan."
+                                                        @click="openMenu = false"
+                                                        class="w-full text-left flex items-center gap-2 px-3 py-2 text-up-red hover:bg-up-red/10 transition cursor-pointer">
+                                                    <span>🗑️</span> Hapus Produk
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        @endif
                     </tr>
                 @empty
                     <tr>
@@ -563,6 +1510,12 @@
                                     <div x-show="openGridMenu"
                                          x-cloak
                                          class="absolute right-0 bottom-full mb-1.5 w-44 rounded-xl bg-ink-900 border border-white/10 shadow-xl z-20 py-1 text-xs backdrop-blur-md">
+                                        <button type="button" wire:click="duplikatProduk({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                            <span>📑</span> Duplikat Produk
+                                        </button>
+                                        <button type="button" wire:click="toggleStatusAktif({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 {{ $p->is_active ? 'text-up-amber' : 'text-up-mint' }} hover:bg-white/5 transition cursor-pointer">
+                                            <span>{{ $p->is_active ? '⏸️' : '▶️' }}</span> {{ $p->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                                        </button>
                                         <button type="button" wire:click="copySingleProduk({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
                                             <span>📋</span> Salin Harga
                                         </button>
@@ -570,7 +1523,7 @@
                                             <span>📦</span> Order PO
                                         </button>
                                         <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition">
-                                            <span>🖨️</span> Cetak Barcode
+                                            <span>🖨️</span> Cetak Label QR
                                         </a>
                                         @can('lihat-audit-log')
                                             <button type="button" wire:click="bukaRiwayat('produk', {{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
@@ -2140,6 +3093,227 @@
                     >
                         <span wire:loading.remove wire:target="simpanQuickAdd">Simpan</span>
                         <span wire:loading wire:target="simpanQuickAdd">Menyimpan…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: BULK EDIT PRODUK TERPILIH -->
+    @if($showBulkEditModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" x-cloak>
+            <div class="w-full max-w-2xl glass-panel p-5 sm:p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto space-y-4 border border-white/10 shadow-2xl">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div>
+                        <h3 class="font-bold text-base text-white flex items-center gap-2">
+                            <span>✏️ Bulk Edit Master Produk</span>
+                            <span class="px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary text-xs font-bold font-mono">
+                                {{ count($selectedProdukIds) }} dipilih
+                            </span>
+                        </h3>
+                        <p class="text-xs text-ink-400 mt-0.5">Centang atribut yang ingin diubah masal secara bersamaan.</p>
+                    </div>
+                    <button type="button" wire:click="closeBulkEditModal" class="p-1.5 rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition cursor-pointer">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Form Fields -->
+                <div class="space-y-3.5">
+                    <!-- Kategori -->
+                    <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['kategori_id'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                        <label class="flex items-center justify-between cursor-pointer select-none">
+                            <span class="text-xs font-semibold text-ink-200">Ubah Kategori</span>
+                            <input type="checkbox" wire:model.live="bulkEditFields.kategori_id" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                        </label>
+                        @if($bulkEditFields['kategori_id'] ?? false)
+                            <select wire:model="bulkEditForm.kategori_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                <option value="">— Pilih Kategori Baru —</option>
+                                @foreach($kategoriTree as $p)
+                                    <option value="{{ $p->id }}" class="font-bold text-white">{{ $p->nama }}</option>
+                                    @foreach($p->children as $c)
+                                        <option value="{{ $c->id }}" class="text-ink-300">&nbsp;&nbsp;↳ {{ $c->nama }}</option>
+                                    @endforeach
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+
+                    <!-- Brand & Kualitas (Grid) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <!-- Brand -->
+                        <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['brand_id'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                            <label class="flex items-center justify-between cursor-pointer select-none">
+                                <span class="text-xs font-semibold text-ink-200">Ubah Brand</span>
+                                <input type="checkbox" wire:model.live="bulkEditFields.brand_id" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                            </label>
+                            @if($bulkEditFields['brand_id'] ?? false)
+                                <select wire:model="bulkEditForm.brand_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    <option value="">— Pilih Brand Baru —</option>
+                                    @foreach($brands as $b)
+                                        <option value="{{ $b->id }}">{{ $b->nama }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                        </div>
+
+                        <!-- Kualitas -->
+                        <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['kualitas_id'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                            <label class="flex items-center justify-between cursor-pointer select-none">
+                                <span class="text-xs font-semibold text-ink-200">Ubah Kualitas</span>
+                                <input type="checkbox" wire:model.live="bulkEditFields.kualitas_id" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                            </label>
+                            @if($bulkEditFields['kualitas_id'] ?? false)
+                                <select wire:model="bulkEditForm.kualitas_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    <option value="">— Pilih Kualitas Baru —</option>
+                                    @foreach($kualitasList as $k)
+                                        <option value="{{ $k->id }}">{{ $k->nama }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                        </div>
+                    </div>
+
+                    <!-- Kondisi & Satuan (Grid) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <!-- Kondisi -->
+                        <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['kondisi'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                            <label class="flex items-center justify-between cursor-pointer select-none">
+                                <span class="text-xs font-semibold text-ink-200">Ubah Kondisi</span>
+                                <input type="checkbox" wire:model.live="bulkEditFields.kondisi" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                            </label>
+                            @if($bulkEditFields['kondisi'] ?? false)
+                                <select wire:model="bulkEditForm.kondisi" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    @foreach($kondisiList as $kd)
+                                        <option value="{{ $kd['kode'] }}">{{ $kd['nama'] }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                        </div>
+
+                        <!-- Satuan -->
+                        <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['satuan'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                            <label class="flex items-center justify-between cursor-pointer select-none">
+                                <span class="text-xs font-semibold text-ink-200">Ubah Satuan Dasar</span>
+                                <input type="checkbox" wire:model.live="bulkEditFields.satuan" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                            </label>
+                            @if($bulkEditFields['satuan'] ?? false)
+                                <select wire:model="bulkEditForm.satuan" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    @foreach($satuanUnits as $su)
+                                        <option value="{{ $su->kode }}">{{ $su->nama }} ({{ $su->kode }})</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                        </div>
+                    </div>
+
+                    <!-- Kelas ABC & Status Aktif (Grid) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <!-- Kelas ABC -->
+                        <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['abc_class'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                            <label class="flex items-center justify-between cursor-pointer select-none">
+                                <span class="text-xs font-semibold text-ink-200">Ubah Kelas ABC</span>
+                                <input type="checkbox" wire:model.live="bulkEditFields.abc_class" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                            </label>
+                            @if($bulkEditFields['abc_class'] ?? false)
+                                <select wire:model="bulkEditForm.abc_class" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    <option value="A">Kelas A (Fast Moving)</option>
+                                    <option value="B">Kelas B (Normal)</option>
+                                    <option value="C">Kelas C (Slow Moving)</option>
+                                </select>
+                            @endif
+                        </div>
+
+                        <!-- Status Aktif -->
+                        <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['is_active'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                            <label class="flex items-center justify-between cursor-pointer select-none">
+                                <span class="text-xs font-semibold text-ink-200">Ubah Status Aktif</span>
+                                <input type="checkbox" wire:model.live="bulkEditFields.is_active" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                            </label>
+                            @if($bulkEditFields['is_active'] ?? false)
+                                <select wire:model="bulkEditForm.is_active" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    <option value="1">Aktif</option>
+                                    <option value="0">Nonaktif</option>
+                                </select>
+                            @endif
+                        </div>
+                    </div>
+
+                    <!-- Flags: Harga Fleksibel & Serial Number (Grid) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <!-- Harga Fleksibel -->
+                        <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['harga_fleksibel'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                            <label class="flex items-center justify-between cursor-pointer select-none">
+                                <span class="text-xs font-semibold text-ink-200">Flag Harga Fleksibel</span>
+                                <input type="checkbox" wire:model.live="bulkEditFields.harga_fleksibel" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                            </label>
+                            @if($bulkEditFields['harga_fleksibel'] ?? false)
+                                <select wire:model="bulkEditForm.harga_fleksibel" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    <option value="1">Aktifkan Harga Fleksibel di Kasir</option>
+                                    <option value="0">Nonaktifkan (Harga Tetap)</option>
+                                </select>
+                            @endif
+                        </div>
+
+                        <!-- Serial Number (SN) -->
+                        <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['sn'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                            <label class="flex items-center justify-between cursor-pointer select-none">
+                                <span class="text-xs font-semibold text-ink-200">Wajib Serial Number (SN)</span>
+                                <input type="checkbox" wire:model.live="bulkEditFields.sn" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                            </label>
+                            @if($bulkEditFields['sn'] ?? false)
+                                <select wire:model="bulkEditForm.sn" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                    <option value="1">Wajib SN saat Terima & Jual</option>
+                                    <option value="0">Tidak Menggunakan SN</option>
+                                </select>
+                            @endif
+                        </div>
+                    </div>
+
+                    <!-- Penyesuaian Harga / Margin Masal -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['penyesuaian_harga'] ?? false) ? 'border-up-mint/40 bg-up-mint/5' : 'border-white/5' }} space-y-3">
+                        <label class="flex items-center justify-between cursor-pointer select-none">
+                            <div>
+                                <span class="text-xs font-semibold text-ink-200 block">Penyesuaian Harga Jual / Margin Masal</span>
+                                <span class="text-[10px] text-ink-400">Atur ulang margin harga jual atau naikkan/turunkan harga jual secara masal.</span>
+                            </div>
+                            <input type="checkbox" wire:model.live="bulkEditFields.penyesuaian_harga" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                        </label>
+
+                        @if($bulkEditFields['penyesuaian_harga'] ?? false)
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1">Metode Penyesuaian</label>
+                                    <select wire:model="bulkEditForm.tipe_penyesuaian_harga" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                        <option value="margin_persen">Set Margin Harga Beli (%)</option>
+                                        <option value="tambah_persen">Naikkan Harga Jual (%)</option>
+                                        <option value="potong_persen">Turunkan Harga Jual (%)</option>
+                                        <option value="tambah_nominal">Naikkan Nominal Tetap (Rp)</option>
+                                        <option value="potong_nominal">Turunkan Nominal Tetap (Rp)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1">Nilai Penyesuaian</label>
+                                    <input type="number" step="any" wire:model="bulkEditForm.nilai_penyesuaian_harga" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-white tabular-nums bg-ink-900" placeholder="0">
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                    <button type="button" wire:click="closeBulkEditModal" class="px-4 py-2 rounded-xl text-ink-300 hover:text-white text-xs font-semibold hover:bg-white/5 transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="button"
+                            wire:click="simpanBulkEdit"
+                            wire:loading.attr="disabled"
+                            wire:confirm="Terapkan perubahan masal ini ke {{ count($selectedProdukIds) }} master produk terpilih?"
+                            class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-lg shadow-up-primary/25 transition active:scale-95 cursor-pointer">
+                        <span wire:loading.remove wire:target="simpanBulkEdit">Terapkan Perubahan Masal</span>
+                        <span wire:loading wire:target="simpanBulkEdit">Menyimpan Perubahan…</span>
                     </button>
                 </div>
             </div>

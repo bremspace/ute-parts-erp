@@ -23,6 +23,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'sumber', 'subtotal', 'diskon_persen', 'diskon_nominal', 'dpp', 'pajak_nominal', 'ppn_nominal',
     'total_akhir', 'metode_bayar', 'jumlah_bayar', 'kembalian', 'split_detail',
     'status', 'catatan',
+    'durasi_garansi_hari', 'garansi_teks', 'garansi_berakhir_pada', 'catatan_garansi',
     // [B-10f] Kolom payment Duitku (migrasi 2026_09_16_000027) TIDAK ADA di
     // tabel payment terpisah — semuanya langsung di tabel `transaksi`. Ketiganya
     // sebelumnya tertinggal dari daftar fillable sehingga Eloquent SILENTLY
@@ -56,6 +57,7 @@ class Transaksi extends Model
         'split_detail' => 'array',
         // [B-10f] paid_at kini benar-benar tersimpan (sebelumnya dibuang fillable)
         'paid_at' => 'datetime',
+        'garansi_berakhir_pada' => 'date',
     ];
 
     public function cabang(): BelongsTo

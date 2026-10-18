@@ -16,7 +16,9 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +56,7 @@ class SettingsRbac extends Component
      */
     private const PERM_JENIS_SERVIS = ['pengaturan.manage', 'servis.manage'];
 
-    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, database
+    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, printer, database
 
     // [T-22] Strategi Loyalitas (editable tanpa deploy, non-retroaktif)
     public array $loyalitasForm = [
@@ -76,8 +78,55 @@ class SettingsRbac extends Component
         'mode' => 'exclusive',
     ];
 
+    // Konfigurasi Printer Label QR Produk & Struk Kasir
+    public string $printerSubTab = 'struk'; // 'struk' | 'label'
+
+    public array $printerForm = [
+        'label_preset' => '33x15',
+        'label_width' => 33.0,
+        'label_height' => 15.0,
+        'label_margin_top' => 1.0,
+        'label_margin_bottom' => 1.0,
+        'label_margin_left' => 1.5,
+        'label_margin_right' => 1.5,
+        'label_show_brand' => true,
+        'label_show_price' => true,
+        'label_show_sku' => true,
+        'struk_default_width' => '80mm',
+        'struk_footer' => 'Terima kasih atas kunjungan Anda',
+    ];
+
+    public array $strukForm = [
+        'nama_toko' => 'UTE PARTS',
+        'slogan' => 'Pusat Sparepart & Servis HP',
+        'alamat' => 'Jl. Veteran No. 12',
+        'telepon' => '0812-3456-7890',
+        'website_medsos' => 'www.uteparts.id',
+        'show_cabang' => true,
+        'show_kasir' => true,
+        'show_pelanggan' => true,
+        'show_waktu' => true,
+        'show_subtotal_breakdown' => true,
+        'show_qr_retur' => true,
+        'qr_size' => 80,
+        'qr_caption' => 'Scan QR ini untuk retur & klaim garansi',
+        'footer_text' => 'Terima kasih atas kunjungan Anda!',
+        'kebijakan_retur' => 'Maksimal klaim retur / garansi 3 hari dengan membawa struk ber-QR ini.',
+        'catatan_kaki' => 'Segel toko wajib utuh & fisik barang tidak cacat.',
+        'default_width' => '80mm',
+        'font_size' => 'normal',
+        'auto_print' => false,
+    ];
+
     public function mount(): void
     {
+        if (request()->has('tab')) {
+            $tab = (string) request('tab');
+            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'loyalitas', 'pajak', 'printer', 'database'], true)) {
+                $this->activeTab = $tab;
+            }
+        }
+
         $config = app(KonfigurasiService::class);
 
         // Nilai TERSIMPAN dari tabel konfigurasi, fallback default bila kosong
@@ -91,6 +140,7 @@ class SettingsRbac extends Component
             ->toArray();
 
         $this->loadPajakConfig();
+        $this->loadPrinterConfig();
     }
 
     public function updatedPajakFormTarget(): void
@@ -143,6 +193,165 @@ class SettingsRbac extends Component
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => "Pengaturan pajak {$targetText} berhasil disimpan ({$statusText})",
+        ]);
+    }
+
+    public function loadPrinterConfig(): void
+    {
+        $config = app(KonfigurasiService::class);
+        $labelCfg = $config->getLabelQrConfig();
+        $strukCfg = $config->getStrukConfig();
+
+        $this->strukForm = array_merge($this->strukForm, $strukCfg);
+
+        $this->printerForm = [
+            'label_preset' => (string) ($labelCfg['preset'] ?? '33x15'),
+            'label_width' => (float) ($labelCfg['width'] ?? 33.0),
+            'label_height' => (float) ($labelCfg['height'] ?? 15.0),
+            'label_margin_top' => (float) ($labelCfg['margin_top'] ?? 1.0),
+            'label_margin_bottom' => (float) ($labelCfg['margin_bottom'] ?? 1.0),
+            'label_margin_left' => (float) ($labelCfg['margin_left'] ?? 1.5),
+            'label_margin_right' => (float) ($labelCfg['margin_right'] ?? 1.5),
+            'label_show_brand' => (bool) ($labelCfg['show_brand'] ?? true),
+            'label_show_price' => (bool) ($labelCfg['show_price'] ?? true),
+            'label_show_sku' => (bool) ($labelCfg['show_sku'] ?? true),
+            'struk_default_width' => (string) ($strukCfg['default_width'] ?? '80mm'),
+            'struk_footer' => (string) ($strukCfg['footer_text'] ?? 'Terima kasih atas kunjungan Anda'),
+        ];
+    }
+
+    public function updatedPrinterFormLabelPreset(string $preset): void
+    {
+        match ($preset) {
+            '33x15' => [
+                $this->printerForm['label_width'] = 33.0,
+                $this->printerForm['label_height'] = 15.0,
+                $this->printerForm['label_margin_top'] = 1.0,
+                $this->printerForm['label_margin_bottom'] = 1.0,
+                $this->printerForm['label_margin_left'] = 1.5,
+                $this->printerForm['label_margin_right'] = 1.5,
+            ],
+            '40x20' => [
+                $this->printerForm['label_width'] = 40.0,
+                $this->printerForm['label_height'] = 20.0,
+                $this->printerForm['label_margin_top'] = 1.5,
+                $this->printerForm['label_margin_bottom'] = 1.5,
+                $this->printerForm['label_margin_left'] = 2.0,
+                $this->printerForm['label_margin_right'] = 2.0,
+            ],
+            '50x30' => [
+                $this->printerForm['label_width'] = 50.0,
+                $this->printerForm['label_height'] = 30.0,
+                $this->printerForm['label_margin_top'] = 2.0,
+                $this->printerForm['label_margin_bottom'] = 2.0,
+                $this->printerForm['label_margin_left'] = 2.5,
+                $this->printerForm['label_margin_right'] = 2.5,
+            ],
+            '58x40' => [
+                $this->printerForm['label_width'] = 58.0,
+                $this->printerForm['label_height'] = 40.0,
+                $this->printerForm['label_margin_top'] = 3.0,
+                $this->printerForm['label_margin_bottom'] = 3.0,
+                $this->printerForm['label_margin_left'] = 3.0,
+                $this->printerForm['label_margin_right'] = 3.0,
+            ],
+            default => null,
+        };
+    }
+
+    public function simpanPengaturanPrinter(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi printer.')) {
+            return;
+        }
+
+        $this->validate([
+            'printerForm.label_width' => 'required|numeric|min:15|max:150',
+            'printerForm.label_height' => 'required|numeric|min:10|max:150',
+            'printerForm.label_margin_top' => 'required|numeric|min:0|max:20',
+            'printerForm.label_margin_bottom' => 'required|numeric|min:0|max:20',
+            'printerForm.label_margin_left' => 'required|numeric|min:0|max:20',
+            'printerForm.label_margin_right' => 'required|numeric|min:0|max:20',
+            'printerForm.struk_default_width' => 'required|in:80mm,58mm,a4',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+
+        $labelData = [
+            'preset' => $this->printerForm['label_preset'],
+            'width' => (float) $this->printerForm['label_width'],
+            'height' => (float) $this->printerForm['label_height'],
+            'margin_top' => (float) $this->printerForm['label_margin_top'],
+            'margin_bottom' => (float) $this->printerForm['label_margin_bottom'],
+            'margin_left' => (float) $this->printerForm['label_margin_left'],
+            'margin_right' => (float) $this->printerForm['label_margin_right'],
+            'show_brand' => (bool) $this->printerForm['label_show_brand'],
+            'show_price' => (bool) $this->printerForm['label_show_price'],
+            'show_sku' => (bool) $this->printerForm['label_show_sku'],
+        ];
+
+        $strukData = array_merge($config->getStrukConfig(), [
+            'default_width' => $this->printerForm['struk_default_width'],
+            'footer_text' => $this->printerForm['struk_footer'],
+        ]);
+
+        $config->set('label_qr_config', $labelData, 'Ukuran dan margin cetak label QR produk');
+        $config->set('struk_config', $strukData, 'Pengaturan default struk transaksi kasir POS');
+
+        // Sinkronkan ke strukForm
+        $this->strukForm['default_width'] = $this->printerForm['struk_default_width'];
+        $this->strukForm['footer_text'] = $this->printerForm['struk_footer'];
+
+        app(AuditService::class)->catat(
+            'Konfigurasi',
+            'update',
+            null,
+            "Pengaturan Printer & Label QR diperbarui (Label: {$labelData['width']}x{$labelData['height']}mm, Struk: {$strukData['default_width']})"
+        );
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Pengaturan Printer & Label QR berhasil disimpan.',
+        ]);
+    }
+
+    public function simpanTemplateStruk(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi template struk.')) {
+            return;
+        }
+
+        $this->validate([
+            'strukForm.nama_toko' => 'required|string|max:100',
+            'strukForm.slogan' => 'nullable|string|max:150',
+            'strukForm.alamat' => 'nullable|string|max:250',
+            'strukForm.telepon' => 'nullable|string|max:50',
+            'strukForm.website_medsos' => 'nullable|string|max:100',
+            'strukForm.qr_caption' => 'nullable|string|max:150',
+            'strukForm.footer_text' => 'required|string|max:200',
+            'strukForm.kebijakan_retur' => 'nullable|string|max:500',
+            'strukForm.catatan_kaki' => 'nullable|string|max:300',
+            'strukForm.default_width' => 'required|in:80mm,58mm,a4',
+            'strukForm.qr_size' => 'required|numeric|min:40|max:150',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+        $config->set('struk_config', $this->strukForm, 'Pengaturan kustomisasi template struk transaksi kasir');
+
+        // Sinkronkan ke printerForm
+        $this->printerForm['struk_default_width'] = $this->strukForm['default_width'];
+        $this->printerForm['struk_footer'] = $this->strukForm['footer_text'];
+
+        app(AuditService::class)->catat(
+            'Konfigurasi',
+            'update',
+            null,
+            "Template struk & faktur diperbarui (Lebar: {$this->strukForm['default_width']}, QR Retur: ".($this->strukForm['show_qr_retur'] ? 'Aktif' : 'Nonaktif').')'
+        );
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Kustomisasi template struk & faktur kasir berhasil disimpan.',
         ]);
     }
 
@@ -212,6 +421,11 @@ class SettingsRbac extends Component
     public bool $showGudangModal = false;
 
     public array $gudangForm = ['id' => null, 'cabang_id' => null, 'nama' => '', 'kode' => '', 'is_active' => true];
+
+    // Rak CRUD
+    public bool $showRakModal = false;
+
+    public array $rakForm = ['id' => null, 'gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => '', 'is_active' => true];
 
     // Master Produk & Katalog Sub-Tab & Modals
     public string $masterProdukSubTab = 'kategori'; // kategori, brand, kualitas, satuan, kondisi, tipe_hp
@@ -339,6 +553,17 @@ class SettingsRbac extends Component
     public function getGudangsProperty()
     {
         return Gudang::with('cabang')->get();
+    }
+
+    public function getRaksProperty()
+    {
+        $cabangId = session('cabang_id');
+
+        return Rak::with('gudang.cabang')
+            ->when($cabangId, fn ($q) => $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))
+            ->orderBy('gudang_id')
+            ->orderBy('kode')
+            ->get();
     }
 
     public function getUsersProperty()
@@ -701,6 +926,104 @@ class SettingsRbac extends Component
         $kode = $gudang->kode;
         $gudang->delete();
         $this->dispatch('alert', ['type' => 'success', 'message' => "Gudang '{$kode}' berhasil dihapus"]);
+    }
+
+    // ===== RAK =====
+    public function openRakModal(?int $id = null): void
+    {
+        if ($id) {
+            $r = Rak::findOrFail($id);
+            $this->rakForm = [
+                'id' => $r->id,
+                'gudang_id' => $r->gudang_id,
+                'nama' => $r->nama,
+                'kode' => $r->kode,
+                'zona' => $r->zona ?? '',
+                'is_active' => (bool) ($r->is_active ?? true),
+            ];
+        } else {
+            $cabangId = session('cabang_id');
+            $defaultGudangId = $cabangId ? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id') : null;
+            $this->rakForm = [
+                'id' => null,
+                'gudang_id' => $defaultGudangId,
+                'nama' => '',
+                'kode' => '',
+                'zona' => '',
+                'is_active' => true,
+            ];
+        }
+        $this->showRakModal = true;
+    }
+
+    public function saveRak(): void
+    {
+        if (! $this->boleh('cabang.manage', 'Anda tidak memiliki izin mengelola rak.')) {
+            return;
+        }
+
+        $this->validate([
+            'rakForm.gudang_id' => 'required|exists:gudang,id',
+            'rakForm.nama' => 'required|string|max:255',
+            'rakForm.kode' => 'required|string|max:20|unique:rak,kode,'.($this->rakForm['id'] ?: 'NULL'),
+            'rakForm.zona' => 'nullable|string|max:50',
+            'rakForm.is_active' => 'boolean',
+        ]);
+
+        $gudang = Gudang::find($this->rakForm['gudang_id']);
+        $user = auth()->user();
+        if ($user && ! $user->hasRole(['super-admin', 'owner'])) {
+            $cabangId = session('cabang_id') ?? $user->cabang_id;
+            if ($cabangId && $gudang && (int) $gudang->cabang_id !== (int) $cabangId) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda hanya dapat mengelola rak di gudang cabang Anda.']);
+
+                return;
+            }
+        }
+
+        if ($this->rakForm['id']) {
+            Rak::findOrFail($this->rakForm['id'])->update($this->rakForm);
+        } else {
+            Rak::create($this->rakForm);
+        }
+
+        $this->showRakModal = false;
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Rak berhasil disimpan']);
+    }
+
+    public function hapusRak(int $id): void
+    {
+        if (! $this->boleh('cabang.manage', 'Anda tidak memiliki izin menghapus rak.')) {
+            return;
+        }
+
+        $rak = Rak::find($id);
+        if (! $rak) {
+            return;
+        }
+
+        $user = auth()->user();
+        if ($user && ! $user->hasRole(['super-admin', 'owner'])) {
+            $cabangId = session('cabang_id') ?? $user->cabang_id;
+            if ($cabangId && $rak->gudang && (int) $rak->gudang->cabang_id !== (int) $cabangId) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda hanya dapat menghapus rak di gudang cabang Anda.']);
+
+                return;
+            }
+        }
+
+        if (StokItem::where('rak_id', $id)->where('jumlah', '>', 0)->exists()) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Rak '{$rak->nama}' masih berisi stok aktif (jumlah > 0). Pindahkan stok ke rak lain terlebih dahulu.",
+            ]);
+
+            return;
+        }
+
+        $nama = $rak->nama;
+        $rak->delete();
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Rak '{$nama}' berhasil dihapus"]);
     }
 
     // ===== MASTER DATA PRODUK & KATALOG =====
@@ -1391,6 +1714,7 @@ class SettingsRbac extends Component
             'permissionsList' => $this->permissionsList,
             'cabangs' => $this->cabangs,
             'gudangs' => $this->gudangs,
+            'raks' => $this->raks,
             'users' => $this->users,
             'jenisServis' => $this->jenisServis,
             'coaList' => $this->coaList,

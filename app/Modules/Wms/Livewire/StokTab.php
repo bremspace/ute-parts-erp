@@ -131,6 +131,16 @@ class StokTab extends Component
             'rakForm.zona' => 'nullable|string|max:50',
         ]);
 
+        $gudang = Gudang::find($this->rakForm['gudang_id']);
+        if (! isSuperAdminOrOwner($user)) {
+            $cabangId = session('cabang_id') ?? $user?->cabang_id;
+            if ($cabangId && $gudang && (int) $gudang->cabang_id !== (int) $cabangId) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda hanya dapat mengelola rak di gudang cabang Anda.']);
+
+                return;
+            }
+        }
+
         if ($this->editRakId) {
             $rak = Rak::findOrFail($this->editRakId);
             $rak->update($this->rakForm);
@@ -187,6 +197,15 @@ class StokTab extends Component
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Rak tidak ditemukan.']);
 
             return;
+        }
+
+        if (! isSuperAdminOrOwner($user)) {
+            $cabangId = session('cabang_id') ?? $user?->cabang_id;
+            if ($cabangId && $rak->gudang && (int) $rak->gudang->cabang_id !== (int) $cabangId) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda hanya dapat menghapus rak di gudang cabang Anda.']);
+
+                return;
+            }
         }
 
         if (StokItem::where('rak_id', $id)->where('jumlah', '>', 0)->exists()) {
@@ -277,7 +296,9 @@ class StokTab extends Component
         return view('modules.wms.livewire.stok-tab', [
             'gudangs' => $gudangs,
             'stokItems' => $stokItems,
-            'raks' => Rak::with('gudang')->get(),
+            'raks' => Rak::with('gudang')
+                ->when($cabangId, fn ($q) => $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))
+                ->get(),
         ]);
     }
 }

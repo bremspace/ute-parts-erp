@@ -177,4 +177,70 @@ class KonfigurasiService
         $this->set('ppn_enabled', false, 'Aktifkan Pajak Otomatis per cabang');
         $this->set('ppn_percent', 11, 'Persen PPN nasional default');
     }
+
+    /**
+     * Konfigurasi cetak label QR barcode produk.
+     * Default preset 33mm x 15mm sesuai kebutuhan label rak/produk.
+     */
+    public function getLabelQrConfig(): array
+    {
+        $default = [
+            'preset' => '33x15',
+            'width' => 33.0,
+            'height' => 15.0,
+            'margin_top' => 1.0,
+            'margin_bottom' => 1.0,
+            'margin_left' => 1.5,
+            'margin_right' => 1.5,
+            'show_brand' => true,
+            'show_price' => true,
+            'show_sku' => true,
+        ];
+
+        $cfg = $this->get('label_qr_config');
+
+        return is_array($cfg) ? array_merge($default, $cfg) : $default;
+    }
+
+    /**
+     * Konfigurasi struk kasir / POS thermal print.
+     * Default lebar 80mm, lengkap dengan header toko, QR code retur, dan garansi.
+     */
+    public function getStrukConfig(): array
+    {
+        $default = [
+            // Header Toko
+            'nama_toko' => 'UTE PARTS',
+            'slogan' => 'Pusat Sparepart & Servis HP',
+            'alamat' => 'Jl. Veteran No. 12',
+            'telepon' => '0812-3456-7890',
+            'website_medsos' => 'www.uteparts.id',
+
+            // Komponen Informasi
+            'show_cabang' => true,
+            'show_kasir' => true,
+            'show_pelanggan' => true,
+            'show_waktu' => true,
+            'show_subtotal_breakdown' => true,
+
+            // QR Code Faktur Retur & Garansi
+            'show_qr_retur' => true,
+            'qr_size' => 80,
+            'qr_caption' => 'Scan QR ini untuk retur & klaim garansi',
+
+            // Footer & Ketentuan
+            'footer_text' => 'Terima kasih atas kunjungan Anda!',
+            'kebijakan_retur' => 'Maksimal klaim retur / garansi 3 hari dengan membawa struk ber-QR ini.',
+            'catatan_kaki' => 'Segel toko wajib utuh & fisik barang tidak cacat.',
+
+            // Format Cetak
+            'default_width' => '80mm',
+            'font_size' => 'normal',
+            'auto_print' => false,
+        ];
+
+        $cfg = $this->get('struk_config');
+
+        return is_array($cfg) ? array_merge($default, $cfg) : $default;
+    }
 }

@@ -241,6 +241,7 @@ class RiwayatTransaksiIndex extends Component
                 'kembalian' => (float) ($trx->kembalian ?? 0),
                 'metode' => strtoupper($trx->metode_bayar ?: 'ONLINE'),
                 'cabang' => $trx->cabang?->nama ?? 'Ute Parts Store',
+                'garansi' => $trx->garansi_teks ?: null,
             ];
 
             $this->showReceiptModal = true;

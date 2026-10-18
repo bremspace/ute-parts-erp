@@ -6,6 +6,7 @@ use App\Modules\Omnichannel\Models\Channel;
 use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
+use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Support\Collection;
@@ -17,10 +18,23 @@ use Livewire\Component;
  */
 class OmnichannelCommandCenter extends Component
 {
-    public string $activeTab = 'channels'; // channels, mapping, orders
+    public string $activeTab = 'channels'; // channels, mapping, orders, returns
 
     // Modal hubungkan channel
     public bool $showConnectModal = false;
+
+    // Marketplace Return QC State
+    public bool $showQcModal = false;
+
+    public bool $showBandingModal = false;
+
+    public ?int $selectedChannelOrderId = null;
+
+    public string $qcKondisi = 'rusak';
+
+    public string $qcCatatan = '';
+
+    public string $bandingAlasan = 'Barang yang dikembalikan bukan produk dari toko Ute Parts / Segel rusak / Unit ditukar pembeli';
 
     public array $connectForm = [
         'nama' => '', 'platform' => 'shopee',
@@ -284,6 +298,109 @@ class OmnichannelCommandCenter extends Component
         } catch (\Throwable $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
+    }
+
+    public function bukaQcModal(int $channelOrderId): void
+    {
+        $this->selectedChannelOrderId = $channelOrderId;
+        $this->qcKondisi = 'rusak';
+        $this->qcCatatan = '';
+        $this->showQcModal = true;
+    }
+
+    public function tutupQcModal(): void
+    {
+        $this->showQcModal = false;
+        $this->selectedChannelOrderId = null;
+    }
+
+    public function konfirmasiTerimaReturChannel(): void
+    {
+        if (! $this->selectedChannelOrderId) {
+            return;
+        }
+
+        $order = ChannelOrder::with(['transaksi.items.produk', 'channel'])->find($this->selectedChannelOrderId);
+        if (! $order || ! $order->transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Transaksi untuk pesanan ini tidak ditemukan']);
+
+            return;
+        }
+
+        $items = [];
+        foreach ($order->transaksi->items as $tItem) {
+            $items[] = [
+                'transaksi_item_id' => $tItem->id,
+                'jumlah' => (float) $tItem->jumlah,
+                'kondisi_barang' => $this->qcKondisi,
+            ];
+        }
+
+        try {
+            $retur = app(ReturnPenjualanService::class)->buatRetur(
+                $order->transaksi,
+                $items,
+                'Retur Marketplace ('.$order->channel?->nama.' - No: '.$order->channel_order_id.'): '.($this->qcCatatan ?: 'Lolos verifikasi QC fisik'),
+                'saldo',
+                auth()->id(),
+                'refund',
+                [],
+                $order->channel?->platform ?? 'shopee',
+                [],
+                $this->qcCatatan
+            );
+
+            $order->update([
+                'channel_status' => 'return_completed',
+                'catatan' => trim(($order->catatan ? $order->catatan.' | ' : '').'Retur selesai '.$retur->no_return),
+            ]);
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Retur {$retur->no_return} berhasil diverifikasi — barang masuk ke ".($this->qcKondisi === 'rusak' ? 'Pool Karantina Supplier WMS' : 'Stok Aktif Siap Jual').'.',
+            ]);
+
+            $this->tutupQcModal();
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function bukaBandingModal(int $channelOrderId): void
+    {
+        $this->selectedChannelOrderId = $channelOrderId;
+        $this->bandingAlasan = 'Barang yang dikembalikan bukan produk dari toko Ute Parts / Segel rusak / Unit ditukar pembeli';
+        $this->showBandingModal = true;
+    }
+
+    public function tutupBandingModal(): void
+    {
+        $this->showBandingModal = false;
+        $this->selectedChannelOrderId = null;
+    }
+
+    public function konfirmasiBandingChannel(): void
+    {
+        if (! $this->selectedChannelOrderId) {
+            return;
+        }
+
+        $order = ChannelOrder::with('channel')->find($this->selectedChannelOrderId);
+        if (! $order) {
+            return;
+        }
+
+        $order->update([
+            'channel_status' => 'dispute_pending',
+            'catatan' => trim(($order->catatan ? $order->catatan.' | ' : '').'Banding diajukan: '.$this->bandingAlasan),
+        ]);
+
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => 'Banding berhasil dicatat. Buka portal penjual '.$order->channel?->nama.' dan upload berkas bukti foto/video unboxing serta nomor nota '.$order->channel_order_id.'.',
+        ]);
+
+        $this->tutupBandingModal();
     }
 
     public function render()

@@ -4,6 +4,8 @@ namespace App\Modules\Wms\Services;
 
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Pos\Models\ReturnPenjualanItem;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\ReturnPembelian;
@@ -11,6 +13,7 @@ use App\Modules\Wms\Models\ReturnPembelianItem;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -123,7 +126,7 @@ class ReturnPembelianService
                 'tanggal' => now()->toDateString(),
                 'jumlah' => $totalRetur,
                 'status' => 'draft',
-                'metode_pengembalian' => in_array($metodePengembalian, ['utang', 'kas'], true) ? $metodePengembalian : 'utang',
+                'metode_pengembalian' => in_array($metodePengembalian, ['utang', 'saldo', 'kas'], true) ? $metodePengembalian : 'utang',
                 'alasan' => $alasan,
             ]);
 
@@ -155,7 +158,101 @@ class ReturnPembelianService
     }
 
     /**
-     * Finalisasi eksekusi retur pembelian: potong stok fisik & jurnal AP/Kas.
+     * Buat retur pembelian langsung dari pool karantina barang rusak per supplier.
+     *
+     * @param  array<int, int>  $poolItemIds  Daftar ID dari return_penjualan_item
+     */
+    public function buatReturDariPoolSupplier(
+        Supplier $supplier,
+        array $poolItemIds,
+        string $alasan,
+        string $metodePengembalian = 'saldo',
+        ?int $cabangId = null,
+        ?int $gudangId = null,
+        ?int $userId = null
+    ): ReturnPembelian {
+        if (empty($poolItemIds)) {
+            throw ValidationException::withMessages(['items' => 'Pilih minimal satu barang dari pool karantina untuk diretur']);
+        }
+
+        $cabangId = $cabangId ?? session('cabang_id') ?? 1;
+        if (! $gudangId) {
+            $gudangId = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
+                ?? Gudang::value('id');
+        }
+
+        return DB::transaction(function () use ($supplier, $poolItemIds, $alasan, $metodePengembalian, $cabangId, $gudangId, $userId) {
+            $poolItems = ReturnPenjualanItem::with('produk')
+                ->whereIn('id', $poolItemIds)
+                ->where('status_karantina', 'karantina')
+                ->lockForUpdate()
+                ->get();
+
+            if ($poolItems->isEmpty()) {
+                throw ValidationException::withMessages(['items' => 'Tidak ada barang karantina yang valid untuk diproses']);
+            }
+
+            $totalRetur = 0;
+            $today = now()->format('Ymd');
+            $count = ReturnPembelian::whereDate('created_at', now()->toDateString())->count() + 1;
+            $noReturn = sprintf('RTB-%s-%04d', $today, $count);
+
+            $retur = ReturnPembelian::create([
+                'no_return' => $noReturn,
+                'purchase_order_id' => null,
+                'supplier_id' => $supplier->id,
+                'cabang_id' => $cabangId,
+                'gudang_id' => $gudangId,
+                'user_id' => $userId,
+                'tanggal' => now()->toDateString(),
+                'jumlah' => 0,
+                'status' => 'draft',
+                'metode_pengembalian' => in_array($metodePengembalian, ['saldo', 'utang', 'kas'], true) ? $metodePengembalian : 'saldo',
+                'alasan' => $alasan,
+            ]);
+
+            foreach ($poolItems as $pItem) {
+                $qty = (float) $pItem->jumlah;
+                $hargaBeli = (float) ($pItem->hpp ?? $pItem->produk?->harga_beli ?? 0);
+                $subtotal = round($hargaBeli * $qty, 2);
+
+                ReturnPembelianItem::create([
+                    'return_pembelian_id' => $retur->id,
+                    'produk_id' => $pItem->produk_id,
+                    'sku_variant_id' => $pItem->sku_variant_id,
+                    'jumlah' => $qty,
+                    'harga_beli' => $hargaBeli,
+                    'subtotal' => $subtotal,
+                ]);
+
+                // Update status di pool penjualan
+                $pItem->update([
+                    'status_karantina' => 'sudah_diretur_supplier',
+                    'return_pembelian_id' => $retur->id,
+                ]);
+
+                // Nomor seri
+                if (! empty($pItem->nomor_seri)) {
+                    $this->nomorSeriService->returPembelian($pItem->nomor_seri, (int) $pItem->produk_id, $cabangId);
+                }
+
+                $totalRetur += $subtotal;
+            }
+
+            $retur->update(['jumlah' => $totalRetur]);
+
+            // Cek persetujuan workflow
+            $needsApproval = $this->approvalService->adaPending('retur_pembelian', $retur->id);
+            if (! $needsApproval) {
+                $this->eksekusiRetur($retur, $userId);
+            }
+
+            return $retur->fresh(['items.produk', 'supplier']);
+        });
+    }
+
+    /**
+     * Finalisasi eksekusi retur pembelian: potong stok fisik (jika dari PO) & sesuaikan saldo/utang/kas.
      */
     public function eksekusiRetur(ReturnPembelian $retur, ?int $userId = null): void
     {
@@ -168,52 +265,57 @@ class ReturnPembelianService
             $gudangId = (int) $retur->gudang_id;
             $totalNilaiRetur = (float) $retur->jumlah;
 
-            foreach ($retur->items as $item) {
-                $qty = (int) $item->jumlah;
-                $produkId = (int) $item->produk_id;
-                $skuVariantId = $item->sku_variant_id ? (int) $item->sku_variant_id : null;
+            // Jika berasal dari PO (bukan pool karantina rusak), potong stok gudang
+            if ($retur->purchase_order_id) {
+                foreach ($retur->items as $item) {
+                    $qty = (int) $item->jumlah;
+                    $produkId = (int) $item->produk_id;
+                    $skuVariantId = $item->sku_variant_id ? (int) $item->sku_variant_id : null;
 
-                $stokItem = StokItem::where('gudang_id', $gudangId)
-                    ->where('produk_id', $produkId)
-                    ->where('sku_variant_id', $skuVariantId)
-                    ->lockForUpdate()
-                    ->firstOrFail();
+                    $stokItem = StokItem::where('gudang_id', $gudangId)
+                        ->where('produk_id', $produkId)
+                        ->where('sku_variant_id', $skuVariantId)
+                        ->lockForUpdate()
+                        ->first();
 
-                $saldoAwal = (int) $stokItem->jumlah;
-                $stokItem->decrement('jumlah', $qty);
-                $saldoAkhir = $saldoAwal - $qty;
+                    if ($stokItem) {
+                        $saldoAwal = (int) $stokItem->jumlah;
+                        $stokItem->decrement('jumlah', $qty);
+                        $saldoAkhir = $saldoAwal - $qty;
 
-                // Stok Log
-                StokLog::create([
-                    'gudang_id' => $gudangId,
-                    'produk_id' => $produkId,
-                    'sku_variant_id' => $skuVariantId,
-                    'user_id' => $userId,
-                    'jenis' => 'keluar',
-                    'referensi_tipe' => ReturnPembelian::class,
-                    'referensi_id' => $retur->id,
-                    'jumlah_sebelum' => $saldoAwal,
-                    'perubahan' => -$qty,
-                    'jumlah_setelah' => $saldoAkhir,
-                    'catatan' => "Retur Pembelian {$retur->no_return}",
-                ]);
+                        // Stok Log
+                        StokLog::create([
+                            'gudang_id' => $gudangId,
+                            'produk_id' => $produkId,
+                            'sku_variant_id' => $skuVariantId,
+                            'user_id' => $userId,
+                            'jenis' => 'keluar',
+                            'referensi_tipe' => ReturnPembelian::class,
+                            'referensi_id' => $retur->id,
+                            'jumlah_sebelum' => $saldoAwal,
+                            'perubahan' => -$qty,
+                            'jumlah_setelah' => $saldoAkhir,
+                            'catatan' => "Retur Pembelian {$retur->no_return}",
+                        ]);
 
-                // Stock Mutation Log
-                StockMutationLog::create([
-                    'produk_id' => $produkId,
-                    'sku_variant_id' => $skuVariantId,
-                    'gudang_id' => $gudangId,
-                    'user_id' => $userId,
-                    'delta' => -$qty,
-                    'sumber' => 'retur_pembelian',
-                    'referensi_tipe' => ReturnPembelian::class,
-                    'referensi_id' => $retur->id,
-                    'terjadi_at' => now(),
-                ]);
+                        // Stock Mutation Log
+                        StockMutationLog::create([
+                            'produk_id' => $produkId,
+                            'sku_variant_id' => $skuVariantId,
+                            'gudang_id' => $gudangId,
+                            'user_id' => $userId,
+                            'delta' => -$qty,
+                            'sumber' => 'retur_pembelian',
+                            'referensi_tipe' => ReturnPembelian::class,
+                            'referensi_id' => $retur->id,
+                            'terjadi_at' => now(),
+                        ]);
+                    }
+                }
             }
 
             // Jurnal Akuntansi Retur Pembelian:
-            // Debit: Utang Usaha (210-01) atau Kas (110-01)
+            // Debit: Utang Usaha / Deposit Supplier (210-01) atau Kas (110-01)
             // Kredit: Persediaan Barang Dagang (130-01)
             $akunDebit = $retur->metode_pengembalian === 'kas' ? '110-01' : '210-01';
 
@@ -226,7 +328,7 @@ class ReturnPembelianService
                         ['akun_kode' => $akunDebit, 'debit' => $totalNilaiRetur, 'kredit' => 0],
                         ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $totalNilaiRetur],
                     ],
-                    "Retur Pembelian {$retur->no_return} (PO: {$retur->purchaseOrder?->no_po})",
+                    "Retur Pembelian {$retur->no_return}".($retur->purchaseOrder ? " (PO: {$retur->purchaseOrder->no_po})" : " (Supplier: {$retur->supplier?->nama})"),
                     $cabangId,
                     $userId,
                     ReturnPembelian::class,
@@ -234,8 +336,38 @@ class ReturnPembelianService
                 );
             }
 
-            // Potong saldo Utang (AP) di subledger jika metode 'utang'
-            if ($retur->metode_pengembalian === 'utang' && $retur->purchase_order_id) {
+            // Penyelesaian Finansial Supplier
+            if ($retur->metode_pengembalian === 'saldo') {
+                $sisaAlokasi = $totalNilaiRetur;
+                $supplier = $retur->supplier;
+
+                // 1. Jika ada utang berjalan ke supplier ini, potong utang terlebih dahulu
+                $openUtangs = Utang::where('kreditor_nama', $supplier?->nama)
+                    ->where('status', '!=', 'lunas')
+                    ->orderBy('id')
+                    ->get();
+
+                foreach ($openUtangs as $utang) {
+                    if ($sisaAlokasi <= 0) {
+                        break;
+                    }
+                    $sisaTagihan = max(0, (float) $utang->jumlah - (float) $utang->jumlah_dibayar);
+                    $potong = min($sisaAlokasi, $sisaTagihan);
+
+                    $utang->increment('jumlah_dibayar', $potong);
+                    if ((float) $utang->jumlah_dibayar >= (float) $utang->jumlah - 0.01) {
+                        $utang->update(['status' => 'lunas']);
+                    } else {
+                        $utang->update(['status' => 'sebagian']);
+                    }
+                    $sisaAlokasi -= $potong;
+                }
+
+                // 2. Jika masih ada sisa, simpan ke saldo_deposit supplier (kredit belanja PO berikutnya)
+                if ($sisaAlokasi > 0 && $supplier) {
+                    $supplier->increment('saldo_deposit', $sisaAlokasi);
+                }
+            } elseif ($retur->metode_pengembalian === 'utang' && $retur->purchase_order_id) {
                 $utang = Utang::where('referensi_tipe', PurchaseOrder::class)
                     ->where('referensi_id', $retur->purchase_order_id)
                     ->first();
@@ -248,7 +380,6 @@ class ReturnPembelianService
                     ]);
                 }
 
-                // Update total PO
                 if ($retur->purchaseOrder) {
                     $retur->purchaseOrder->decrement('total', $totalNilaiRetur);
                 }

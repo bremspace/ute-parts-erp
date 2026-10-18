@@ -11,6 +11,7 @@ use App\Modules\Akunting\Livewire\LaporanPajak;
 use App\Modules\Crm\Livewire\CrmDashboard;
 use App\Modules\Crm\Livewire\LeadKanban;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Dashboard\Livewire\DashboardIndex;
 use App\Modules\Hr\Livewire\HrAbsensiKpiPage;
 use App\Modules\Hr\Livewire\HrSayaPage;
@@ -25,6 +26,7 @@ use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter;
 use App\Modules\Pos\Livewire\PesananOnlineIndex;
 use App\Modules\Pos\Livewire\PosKasir;
+use App\Modules\Pos\Livewire\ReturPenjualanIndex;
 use App\Modules\Pos\Livewire\RiwayatTransaksiIndex;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use App\Modules\Rbac\Livewire\SessionManagementPage;
@@ -377,17 +379,43 @@ Route::get('/account', CustomerAccount::class)
     ->middleware('auth:customer')
     ->name('customer.account');
 
-// [T-15] Cetak label barcode (multi-produk via ?ids=1,2,3)
+// [T-15] Cetak label barcode / QR Code produk (multi-produk via ?ids=1,2,3)
 Route::get('/print-barcode', function (Request $request) {
     $ids = collect(explode(',', (string) $request->query('ids', '')))
         ->filter(fn ($v) => is_numeric($v))
         ->map(fn ($v) => (int) $v);
 
     $produks = $ids->isEmpty()
-        ? Produk::where('is_active', true)->limit(20)->get()
-        : Produk::whereIn('id', $ids)->get();
+        ? Produk::with(['brand', 'kualitas', 'kategoriRelasi', 'skuVariants', 'hargaTier'])
+            ->where('is_active', true)
+            ->limit(20)
+            ->get()
+        : Produk::with(['brand', 'kualitas', 'kategoriRelasi', 'skuVariants', 'hargaTier'])
+            ->whereIn('id', $ids)
+            ->get();
 
-    return view('wms.barcode-label', ['produks' => $produks]);
+    $configService = app(KonfigurasiService::class);
+    $baseConfig = $configService->getLabelQrConfig();
+
+    // Izinkan custom override via query params bila perlu
+    $labelConfig = [
+        'preset' => (string) $request->query('preset', $baseConfig['preset'] ?? '33x15'),
+        'width' => (float) $request->query('w', $baseConfig['width'] ?? 33.0),
+        'height' => (float) $request->query('h', $baseConfig['height'] ?? 15.0),
+        'margin_top' => (float) $request->query('m_top', $baseConfig['margin_top'] ?? 1.0),
+        'margin_bottom' => (float) $request->query('m_bottom', $baseConfig['margin_bottom'] ?? 1.0),
+        'margin_left' => (float) $request->query('m_left', $baseConfig['margin_left'] ?? 1.5),
+        'margin_right' => (float) $request->query('m_right', $baseConfig['margin_right'] ?? 1.5),
+        'show_brand' => (bool) $request->query('show_brand', $baseConfig['show_brand'] ?? true),
+        'show_price' => (bool) $request->query('show_price', $baseConfig['show_price'] ?? true),
+        'show_sku' => (bool) $request->query('show_sku', $baseConfig['show_sku'] ?? true),
+        'copies' => max(1, min(50, (int) $request->query('copies', 1))),
+    ];
+
+    return view('wms.barcode-label', [
+        'produks' => $produks,
+        'labelConfig' => $labelConfig,
+    ]);
 })->middleware('auth')->name('barcode.print');
 
 // ===== Zona Backoffice (internal staff, dark mode) =====
@@ -516,6 +544,11 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
     // Pesanan Online (Fulfillment Marketplace Storefront)
     Route::get('/pos/online-orders', PesananOnlineIndex::class)
         ->name('pos.online-orders')
+        ->middleware('permission:pos.view|pos.view-own');
+
+    // Manajemen Retur Konsumen (Refund & Tukar Produk)
+    Route::get('/pos/retur', ReturPenjualanIndex::class)
+        ->name('pos.retur')
         ->middleware('permission:pos.view|pos.view-own');
 
     // WMS Gudang & Stok Screen — [F2-2] RBAC: permission wms.view (pola servis.view/crm.view)

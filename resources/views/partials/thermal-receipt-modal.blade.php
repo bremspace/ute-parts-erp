@@ -1,5 +1,11 @@
 {{-- [T-35] Modal Struk Thermal 58mm / 80mm Reusable (POS Kasir & Servis) --}}
 @if($showReceiptModal && $receiptData)
+    @php
+        $strukConfig = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getStrukConfig();
+        $showQrRetur = $strukConfig['show_qr_retur'] ?? true;
+        $qrSize = (int) ($strukConfig['qr_size'] ?? 80);
+        $qrCaption = $strukConfig['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
+    @endphp
     <script id="pos-receipt-data" type="application/json">
         {!! json_encode($receiptData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}
     </script>
@@ -33,12 +39,25 @@
                 <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-4 rounded-2xl font-mono text-xs shadow-inner space-y-2 select-text" id="thermalReceipt">
                     <!-- Brand Header -->
                     <div class="receipt-center pb-2 border-b border-dashed border-gray-400">
-                        <h3 class="receipt-title text-sm font-black tracking-wider text-gray-900">UTE PARTS</h3>
-                        <p class="text-[10px] text-gray-600 font-medium">Pusat Sparepart & Servis HP</p>
-                        @if(!empty($receiptData['cabang']))
+                        <h3 class="receipt-title text-sm font-black tracking-wider text-gray-900">{{ $strukConfig['nama_toko'] ?? 'UTE PARTS' }}</h3>
+                        @if(!empty($strukConfig['slogan']))
+                            <p class="text-[10px] text-gray-600 font-medium">{{ $strukConfig['slogan'] }}</p>
+                        @endif
+                        @if(!empty($strukConfig['alamat']))
+                            <p class="text-[9px] text-gray-500">{{ $strukConfig['alamat'] }}</p>
+                        @endif
+                        @if(!empty($strukConfig['telepon']))
+                            <p class="text-[9px] text-gray-500">Telp/WA: {{ $strukConfig['telepon'] }}</p>
+                        @endif
+                        @if(!empty($strukConfig['website_medsos']))
+                            <p class="text-[9px] text-gray-400">{{ $strukConfig['website_medsos'] }}</p>
+                        @endif
+                        @if(($strukConfig['show_cabang'] ?? true) && !empty($receiptData['cabang']))
                             <p class="text-[9px] text-gray-500">{{ $receiptData['cabang'] }}</p>
                         @endif
-                        <p class="text-[9px] text-gray-500 mt-0.5">{{ $receiptData['waktu'] }}</p>
+                        @if($strukConfig['show_waktu'] ?? true)
+                            <p class="text-[9px] text-gray-500 mt-0.5">{{ $receiptData['waktu'] }}</p>
+                        @endif
                     </div>
 
                     <!-- Meta Transaksi -->
@@ -59,14 +78,18 @@
                                 <span class="font-bold text-gray-900">{{ $receiptData['jenis_hp'] }}</span>
                             </div>
                         @endif
-                        <div class="receipt-row flex justify-between">
-                            <span class="text-gray-600">Kasir:</span>
-                            <span class="text-gray-900">{{ $receiptData['kasir'] }}</span>
-                        </div>
-                        <div class="receipt-row flex justify-between">
-                            <span class="text-gray-600">Pelanggan:</span>
-                            <span class="text-gray-900 font-medium">{{ $receiptData['pelanggan'] }}</span>
-                        </div>
+                        @if($strukConfig['show_kasir'] ?? true)
+                            <div class="receipt-row flex justify-between">
+                                <span class="text-gray-600">Kasir:</span>
+                                <span class="text-gray-900">{{ $receiptData['kasir'] }}</span>
+                            </div>
+                        @endif
+                        @if($strukConfig['show_pelanggan'] ?? true)
+                            <div class="receipt-row flex justify-between">
+                                <span class="text-gray-600">Pelanggan:</span>
+                                <span class="text-gray-900 font-medium">{{ $receiptData['pelanggan'] }}</span>
+                            </div>
+                        @endif
                     </div>
 
                     <!-- Daftar Item (Jasa & Part) -->
@@ -125,13 +148,29 @@
                         </div>
                     </div>
 
+                    <!-- QR Code Faktur / Retur & Garansi Anti-Fraud -->
+                    @if($showQrRetur && !empty($receiptData['no_transaksi']))
+                        <div class="receipt-center py-2 flex flex-col items-center justify-center border-t border-dashed border-gray-300">
+                            <div class="p-1 bg-white inline-block">
+                                {!! app(\App\Modules\Wms\Services\QrCodeService::class)->generateSvg($receiptData['no_transaksi'], $qrSize, 0) !!}
+                            </div>
+                            <p class="font-mono text-[9px] text-gray-900 font-bold mt-1 tracking-wider">{{ $receiptData['no_transaksi'] }}</p>
+                            <p class="text-[8px] text-gray-500 text-center mt-0.5">{{ $qrCaption }}</p>
+                        </div>
+                    @endif
+
                     <!-- Garansi & Footer -->
                     <div class="receipt-center pt-2 text-[9px] text-gray-500 border-t border-dashed border-gray-300 space-y-0.5">
                         @if(!empty($receiptData['garansi']))
                             <p class="font-bold text-gray-800">Garansi: {{ $receiptData['garansi'] }}</p>
                         @endif
-                        <p>Terima Kasih atas Kunjungan Anda!</p>
-                        <p class="text-[8px] text-gray-400">Garansi part & servis sesuai ketentuan nota toko.</p>
+                        <p class="font-medium text-gray-700">{{ $strukConfig['footer_text'] ?? 'Terima Kasih atas Kunjungan Anda!' }}</p>
+                        @if(!empty($strukConfig['kebijakan_retur']))
+                            <p class="text-[8px] text-gray-600 font-medium">{{ $strukConfig['kebijakan_retur'] }}</p>
+                        @endif
+                        @if(!empty($strukConfig['catatan_kaki']))
+                            <p class="text-[8px] text-gray-400">{{ $strukConfig['catatan_kaki'] }}</p>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -170,23 +209,23 @@
                 <div class="flex gap-2">
                     <button
                         type="button"
-                        @click="printStruk58()"
-                        :disabled="isPrinting"
-                        class="flex-1 py-2 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-[11px] border border-up-mint/30 cursor-pointer min-h-[38px] flex items-center justify-center gap-1 transition-[background-color,transform] duration-100 active:scale-[0.98] disabled:opacity-50"
-                        title="Cetak via Bluetooth BLE tanpa driver"
+                        @click="webPrint80()"
+                        class="flex-1 py-2 px-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-[11px] shadow-md shadow-up-primary/25 border border-up-primary/40 cursor-pointer min-h-[38px] flex items-center justify-center gap-1.5 transition-[background-color,transform] duration-100 active:scale-[0.98]"
+                        title="Cetak format struk 80mm standar"
                     >
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        <span x-text="isPrinting ? 'Menghubungkan...' : 'Bluetooth BLE'">Bluetooth BLE</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        <span>Cetak Struk 80mm</span>
                     </button>
 
                     <button
                         type="button"
-                        @click="webPrint80()"
-                        class="flex-1 py-2 px-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-[11px] border border-white/10 cursor-pointer min-h-[38px] flex items-center justify-center gap-1 transition-[background-color,transform] duration-100 active:scale-[0.98]"
-                        title="Cetak format lebar 80mm"
+                        @click="printStruk58()"
+                        :disabled="isPrinting"
+                        class="py-2 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint font-semibold text-[11px] border border-up-mint/30 cursor-pointer min-h-[38px] flex items-center justify-center gap-1 transition-[background-color,transform] duration-100 active:scale-[0.98] disabled:opacity-50"
+                        title="Cetak via Bluetooth BLE tanpa driver"
                     >
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <span>Faktur 80mm</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span x-text="isPrinting ? 'Menghubungkan...' : 'BLE (58mm)'">BLE (58mm)</span>
                     </button>
                 </div>
 

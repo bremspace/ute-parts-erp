@@ -2,7 +2,7 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
-            @foreach(['channels' => 'Channels', 'mapping' => 'Mapping Produk', 'orders' => 'Order Terpadu'] as $kode => $label)
+            @foreach(['channels' => 'Channels', 'mapping' => 'Mapping Produk', 'orders' => 'Order Terpadu', 'returns' => 'Retur & Komplain'] as $kode => $label)
                 <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">{{ $label }}</button>
             @endforeach
         </div>
@@ -160,6 +160,135 @@
                 </tr>
             @endforelse
         </x-prism.data-table>
+    @endif
+
+    <!-- TAB: RETURNS & KOMPLAIN MARKETPLACE -->
+    @if($activeTab === 'returns')
+        <div class="space-y-4">
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2 text-ink-300">
+                    <span class="text-lg">🛡️</span>
+                    <span><strong>Protokol Anti-Fraud:</strong> Sebelum konfirmasi terima retur paket dari Shopee/Marketplace, rekam video/foto unboxing dan periksa kecocokan nomor seri / segel garansi toko. Jika isi paket ditukar atau bukan unit toko, klik tombol <strong>"Banding / Sengketa"</strong> untuk melindungi saldo penjualan toko.</span>
+                </div>
+            </div>
+
+            <x-prism.data-table :headers="['Order ID', 'Channel', 'Transaksi Toko', 'Status Retur', 'Catatan / Alasan', 'Aksi QC']">
+                @forelse($orders as $o)
+                    <tr class="hover:bg-white/[0.02] transition-colors text-xs">
+                        <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $o->channel_order_id }}</td>
+                        <td class="py-3.5 px-4 text-up-accent font-semibold">{{ $o->channel?->nama }}</td>
+                        <td class="py-3.5 px-4 font-mono text-ink-200">{{ $o->transaksi?->no_transaksi ?? '-' }}</td>
+                        <td class="py-3.5 px-4">
+                            @if(str_contains(strtolower($o->channel_status ?? ''), 'return') || str_contains(strtolower($o->channel_status ?? ''), 'dispute'))
+                                <span class="px-2 py-0.5 rounded-full bg-up-red/20 text-up-red font-bold text-[10px]">{{ $o->channel_status }}</span>
+                            @else
+                                <span class="px-2 py-0.5 rounded-full bg-white/10 text-ink-300 font-bold text-[10px]">{{ $o->channel_status ?? 'normal' }}</span>
+                            @endif
+                        </td>
+                        <td class="py-3.5 px-4 text-ink-400 max-w-xs truncate">{{ $o->catatan ?? 'Tidak ada catatan' }}</td>
+                        <td class="py-3.5 px-4">
+                            @if($o->transaksi)
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        wire:click="bukaQcModal({{ $o->id }})"
+                                        class="px-2.5 py-1.5 rounded-xl bg-up-mint/20 hover:bg-up-mint/30 text-up-mint font-bold text-[10px] cursor-pointer whitespace-nowrap"
+                                        title="Lolos QC Fisik -> Masukkan ke Karantina Supplier / Restock"
+                                    >
+                                        ✓ QC Terima
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="bukaBandingModal({{ $o->id }})"
+                                        class="px-2.5 py-1.5 rounded-xl bg-up-red/20 hover:bg-up-red/30 text-up-red font-bold text-[10px] cursor-pointer whitespace-nowrap"
+                                        title="Barang Ditukar / Palsu -> Ajukan Banding ke Marketplace"
+                                    >
+                                        ⚠️ Banding
+                                    </button>
+                                </div>
+                            @else
+                                <span class="text-[10px] text-ink-500">Nota toko belum ada</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="6" class="py-12 text-center text-ink-400">
+                            Tidak ada data pesanan marketplace.
+                        </td>
+                    </tr>
+                @endforelse
+            </x-prism.data-table>
+        </div>
+    @endif
+
+    <!-- MODAL: QC TERIMA RETUR MARKETPLACE -->
+    @if($showQcModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-white/10">
+                    <h3 class="text-base font-bold text-white">Inspeksi QC Retur Marketplace</h3>
+                    <button wire:click="tutupQcModal" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+
+                <div class="space-y-4 text-xs">
+                    <div>
+                        <label class="block text-ink-300 font-bold mb-1.5">Hasil Pemeriksaan Fisik *</label>
+                        <select wire:model="qcKondisi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900">
+                            <option value="rusak">⚠️ Cacat / Rusak (Masuk Pool Karantina Retur Supplier)</option>
+                            <option value="bagus">✅ Normal / Layak Jual (Kembali ke Stok Toko)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-ink-300 font-bold mb-1.5">Catatan QC / Nomor Seri Unboxing</label>
+                        <textarea
+                            wire:model="qcCatatan"
+                            rows="3"
+                            placeholder="Tuliskan catatan segel, kondisi fisik, dan nomor seri yang tertera pada produk..."
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="flex gap-2.5 pt-4 border-t border-white/10 mt-5">
+                    <button wire:click="tutupQcModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-bold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="konfirmasiTerimaReturChannel" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer">Konfirmasi Terima</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: AJUKAN BANDING / SENGKETA FRAUD -->
+    @if($showBandingModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-white/10">
+                    <h3 class="text-base font-bold text-up-red">Ajukan Banding Fraud ke Marketplace</h3>
+                    <button wire:click="tutupBandingModal" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+
+                <div class="space-y-4 text-xs">
+                    <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/20 text-ink-300">
+                        Gunakan fitur ini jika pembeli mengirimkan <strong>bukan barang toko Ute Parts</strong>, segel toko rusak dibongkar, atau paket kosong/unit ditukar.
+                    </div>
+
+                    <div>
+                        <label class="block text-ink-300 font-bold mb-1.5">Alasan Penolakan / Bukti Sengketa *</label>
+                        <textarea
+                            wire:model="bandingAlasan"
+                            rows="3"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="flex gap-2.5 pt-4 border-t border-white/10 mt-5">
+                    <button wire:click="tutupBandingModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-bold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="konfirmasiBandingChannel" class="flex-1 py-3 rounded-xl bg-up-red hover:bg-up-red-dark text-white font-bold text-xs cursor-pointer">Catat & Ajukan Banding</button>
+                </div>
+            </div>
+        </div>
     @endif
 
     <!-- MODAL: CONNECT CHANNEL -->

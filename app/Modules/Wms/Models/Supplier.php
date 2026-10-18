@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['nama', 'kontak', 'telepon', 'alamat', 'termin_hari', 'is_active'])]
+#[Fillable(['nama', 'kontak', 'telepon', 'alamat', 'termin_hari', 'saldo_deposit', 'is_active'])]
 class Supplier extends Model
 {
     use CatatAktivitas;
@@ -24,6 +24,7 @@ class Supplier extends Model
 
     protected $casts = [
         'termin_hari' => 'integer',
+        'saldo_deposit' => 'decimal:2',
         'is_active' => 'boolean',
     ];
 

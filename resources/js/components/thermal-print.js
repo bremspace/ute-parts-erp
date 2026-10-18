@@ -559,7 +559,7 @@ function thermalPrinter(receiptData) {
         },
 
         webPrint() {
-            this.webPrint58();
+            this.webPrint80();
         },
     };
 }

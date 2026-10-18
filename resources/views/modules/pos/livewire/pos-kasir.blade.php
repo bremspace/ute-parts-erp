@@ -179,21 +179,8 @@
                 </button>
             </div>
 
-            <!-- Gudang Selector -->
-            <div class="w-40 sm:w-48 flex-shrink-0">
-                <select
-                    wire:model.live="selectedGudangId"
-                    class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-semibold"
-                >
-                    <option value="" class="bg-ink-900 text-white">Pilih Gudang...</option>
-                    @foreach($gudangs as $g)
-                        <option value="{{ $g->id }}" class="bg-ink-900 text-white">{{ $g->nama }} ({{ $g->kode }})</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- Customer Picker -->
-            <div class="w-56 sm:w-64 flex-shrink-0">
+            <!-- Customer Picker / CRM -->
+            <div class="w-60 sm:w-72 flex-shrink-0">
                 <div class="flex items-center gap-1.5">
                     <div class="flex-1 min-w-0">
                         <select
@@ -213,7 +200,7 @@
                         <button
                             type="button"
                             wire:click="setPelanggan(null)"
-                            class="p-2.5 rounded-xl bg-ink-100 dark:bg-white/5 hover:bg-ink-200 text-ink-500 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer min-h-[42px]"
+                            class="p-2.5 rounded-xl bg-ink-100 dark:bg-white/5 hover:bg-ink-200 text-ink-500 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer min-h-[42px] flex-shrink-0"
                             title="Reset Pelanggan Umum"
                         >
                             ✕
@@ -229,18 +216,52 @@
                 </div>
             </div>
 
+            <!-- SID RETAIL STYLE BIG DISPLAY TOTAL -->
+            <div class="px-3.5 py-1.5 rounded-xl bg-ink-900 dark:bg-black/80 border border-ink-700/80 dark:border-white/10 flex flex-col items-end min-w-[150px] flex-shrink-0 shadow-inner">
+                <span class="text-[9px] uppercase font-bold text-ink-400 tracking-wider">TOTAL TAGIHAN</span>
+                <span class="text-xl sm:text-2xl font-black font-mono text-up-mint tabular-nums leading-tight">
+                    Rp {{ number_format($totalAkhir, 0, ',', '.') }}
+                </span>
+            </div>
+        </div>
+
+        <!-- BARIS BARU: SHORTCUT AKSI KASIR (RETUR, RIWAYAT, ONLINE, SERVIS) & HELPER KEYBOARD -->
+        <div class="flex items-center justify-between gap-2 pt-2 border-t border-ink-200/50 dark:border-white/5 flex-wrap sm:flex-nowrap">
             <!-- Quick Action Links -->
-            <div class="flex items-center gap-1.5 flex-shrink-0">
+            <div class="flex items-center gap-2 flex-wrap">
+                <a
+                    href="/app/pos/retur"
+                    class="px-3 py-1.5 rounded-xl border border-up-red/30 bg-up-red/10 hover:bg-up-red/20 text-xs font-bold text-up-red transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98]"
+                    title="Buka Manajemen Retur Konsumen"
+                >
+                    <svg class="w-4 h-4 text-up-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                    <span>Retur Konsumen</span>
+                </a>
+
+                <button
+                    type="button"
+                    wire:click="bukaRiwayatTransaksi"
+                    class="px-3 py-1.5 rounded-xl border border-ink-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 text-xs font-bold text-ink-700 dark:text-ink-200 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98]"
+                    title="Riwayat Transaksi Kasir Hari Ini"
+                >
+                    <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <span>Riwayat Transaksi</span>
+                </button>
+
                 <button
                     type="button"
                     wire:click="bukaPesananOnlineModal"
-                    class="px-2.5 py-2.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition flex items-center gap-1.5 cursor-pointer min-h-[42px] active:scale-[0.98]"
-                    title="Pesanan Online Pickup"
+                    class="px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98]"
+                    title="Pesanan Online Pickup Cabang"
                 >
                     <svg class="w-4 h-4 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
-                    <span class="hidden xl:inline">Online</span>
+                    <span>Pesanan Online</span>
                     @if($jumlahPesananOnline > 0)
                         <span class="min-w-[18px] h-4.5 px-1 rounded-full bg-up-amber text-ink-950 text-[10px] font-black flex items-center justify-center tabular-nums">{{ $jumlahPesananOnline }}</span>
                     @endif
@@ -249,22 +270,22 @@
                 <button
                     type="button"
                     wire:click="bukaBayarServisModal"
-                    class="px-2.5 py-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-xs font-bold text-blue-500 dark:text-blue-400 transition flex items-center gap-1.5 cursor-pointer min-h-[42px] active:scale-[0.98]"
-                    title="Bayar Servis"
+                    class="px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-xs font-bold text-blue-500 dark:text-blue-400 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98]"
+                    title="Bayar Tiket Servis di Kasir"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     </svg>
-                    <span class="hidden xl:inline">Servis</span>
+                    <span>Bayar Servis</span>
                 </button>
             </div>
 
-            <!-- SID RETAIL STYLE BIG DISPLAY TOTAL -->
-            <div class="px-4 py-2 rounded-xl bg-ink-900 dark:bg-black/80 border border-ink-700/80 dark:border-white/10 flex flex-col items-end min-w-[160px] flex-shrink-0 shadow-inner">
-                <span class="text-[9px] uppercase font-bold text-ink-400 tracking-wider">TOTAL TAGIHAN</span>
-                <span class="text-xl sm:text-2xl font-black font-mono text-up-mint tabular-nums leading-tight">
-                    Rp {{ number_format($totalAkhir, 0, ',', '.') }}
-                </span>
+            <!-- Keyboard Shortcuts Helper Badge -->
+            <div class="hidden md:flex items-center gap-1.5 text-[10px] text-ink-400 font-mono">
+                <span class="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 font-bold">F2 Scan</span>
+                <span class="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 font-bold">F4 Bayar</span>
+                <span class="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 font-bold">F6 Tahan</span>
+                <span class="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 font-bold">ESC Batal</span>
             </div>
         </div>
 
@@ -609,8 +630,19 @@
                 </div>
 
                 <span class="text-ink-300 dark:text-white/20">|</span>
-                <a href="/app/pos/riwayat" class="text-xs font-semibold text-up-primary hover:underline flex items-center gap-1">
-                    <span>Riwayat Transaksi</span>
+                <button
+                    type="button"
+                    wire:click="bukaRiwayatTransaksi"
+                    class="text-xs font-semibold text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                >
+                    <span>Riwayat Kasir</span>
+                </button>
+                <span class="text-ink-300 dark:text-white/20">|</span>
+                <a
+                    href="/app/pos/retur"
+                    class="text-xs font-bold text-up-red hover:underline flex items-center gap-1"
+                >
+                    <span>↩ Retur Konsumen</span>
                 </a>
             </div>
 
@@ -673,7 +705,6 @@
     @include('modules.pos.livewire.modals.payment-modal')
     @include('partials.thermal-receipt-modal')
     @include('modules.pos.livewire.modals.riwayat-transaksi-modal')
-    @include('modules.pos.livewire.modals.retur-modal')
     @include('modules.pos.livewire.modals.pelanggan-baru-modal')
     @include('modules.pos.livewire.modals.kas-modal')
     @include('modules.pos.livewire.modals.mutasi-kas-modal')

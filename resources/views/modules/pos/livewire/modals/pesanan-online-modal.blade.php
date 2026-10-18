@@ -235,6 +235,38 @@
                                 </div>
                             @endif
                         @endif
+
+                        <!-- Edukasi T&C & Garansi Sparepart Online saat Serah Terima -->
+                        <div class="mt-4 p-4 rounded-2xl bg-up-primary/5 border border-up-primary/20 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-xs text-ink-900 dark:text-white flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-up-mint"></span>
+                                    <span>Ketentuan Garansi & T&C Serah Terima Sparepart</span>
+                                </span>
+                                <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary text-[10px] font-bold">Wajib Diinfokan</span>
+                            </div>
+
+                            <div class="text-[11px] text-ink-600 dark:text-ink-300 space-y-1.5 bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-black/5 dark:border-white/5">
+                                <p class="font-semibold text-ink-900 dark:text-white">Poin T&C yang wajib disampaikan kasir ke konsumen:</p>
+                                <ul class="list-disc list-inside space-y-1 text-ink-500 dark:text-ink-300 pl-1">
+                                    <li>Masa garansi toko <strong>3 hari kalender</strong> terhitung mulai tanggal penyerahan barang hari ini.</li>
+                                    <li>Segel toko & barcode pada sparepart wajib utuh tanpa sobek atau bekas modifikasi/solder.</li>
+                                    <li>Garansi gugur bila ada cacat fisik (LCD pecah, fleksibel sobek, terkena air, atau salah pasang).</li>
+                                    <li>Simpan struk transaksi ber-QR yang diberikan kasir sebagai bukti sah verifikasi retur anti-fraud.</li>
+                                </ul>
+                            </div>
+
+                            <label class="flex items-start gap-2.5 p-2.5 rounded-xl border border-up-mint/30 bg-up-mint/10 cursor-pointer hover:bg-up-mint/15 transition select-none">
+                                <input
+                                    type="checkbox"
+                                    wire:model.live="konfirmasiGaransiOnline"
+                                    class="mt-0.5 rounded border-up-mint text-up-mint focus:ring-up-mint/30"
+                                />
+                                <span class="text-xs font-bold text-ink-900 dark:text-white leading-tight">
+                                    Saya (Kasir) telah menginfokan masa garansi sparepart & seluruh poin T&C di atas langsung kepada konsumen saat penyerahan barang.
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 @endif
             </div>
@@ -253,15 +285,16 @@
                         <button
                             type="button"
                             wire:click="serahkanPesananOnline"
-                            class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs transition-transform active:scale-[0.98] shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px]"
+                            @disabled(! $konfirmasiGaransiOnline)
+                            class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs transition-transform active:scale-[0.98] shadow-md shadow-up-mint/20 cursor-pointer min-h-[42px] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Serahkan Barang
+                            Serahkan Barang Fisik
                         </button>
                     @else
                         <button
                             type="button"
                             wire:click="bayarOnlineOrder"
-                            @disabled($metodeBayarOnline === 'tunai' && ! $kasAktif)
+                            @disabled(($metodeBayarOnline === 'tunai' && ! $kasAktif) || ! $konfirmasiGaransiOnline)
                             class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs transition-transform active:scale-[0.98] shadow-md shadow-up-mint/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-h-[42px]"
                         >
                             Terima Pembayaran &amp; Serahkan

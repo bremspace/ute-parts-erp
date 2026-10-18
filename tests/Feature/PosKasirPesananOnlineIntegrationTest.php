@@ -164,6 +164,7 @@ class PosKasirPesananOnlineIntegrationTest extends TestCase
             ->assertSee('Terima Pembayaran') // tombol bayar (belum lunas) tampil
             ->set('metodeBayarOnline', 'tunai')
             ->set('nominalBayarOnline', number_format($total + 50000, 0, ',', '.'))
+            ->set('konfirmasiGaransiOnline', true)
             ->call('bayarOnlineOrder')
             ->assertSet('showPesananOnlineModal', false)
             ->assertSet('showReceiptModal', true) // struk bukti serah terima
@@ -223,6 +224,7 @@ class PosKasirPesananOnlineIntegrationTest extends TestCase
             ->assertSee('Lunas')
             ->assertSee('Serahkan Barang')
             ->assertDontSee('Terima Pembayaran')
+            ->set('konfirmasiGaransiOnline', true)
             ->call('serahkanPesananOnline')
             ->assertSet('showPesananOnlineModal', false)
             ->assertSet('showReceiptModal', true) // struk bukti serah terima
@@ -280,5 +282,18 @@ class PosKasirPesananOnlineIntegrationTest extends TestCase
             ->assertSet('showPesananOnlineModal', true)
             ->assertSet('pesananOnlineTerpilih', $transaksi->id)
             ->assertSee($transaksi->no_transaksi);
+    }
+
+    public function test_serahkan_online_pickup_ditolak_jika_belum_konfirmasi_tc_garansi(): void
+    {
+        $transaksi = $this->buatOrderPickup('lunas', 1);
+
+        Livewire::test(PosKasir::class)
+            ->call('bukaPesananOnlineModal')
+            ->set('pesananOnlineTerpilih', $transaksi->id)
+            ->set('konfirmasiGaransiOnline', false)
+            ->call('serahkanPesananOnline')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? $params['type'] ?? null) === 'error' && str_contains($params['message'] ?? $params[0]['message'] ?? '', 'T&C'))
+            ->assertSet('showReceiptModal', false);
     }
 }

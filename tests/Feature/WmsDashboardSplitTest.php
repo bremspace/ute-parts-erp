@@ -53,7 +53,7 @@ class WmsDashboardSplitTest extends TestCase
         $this->get('/app/wms')
             ->assertSuccessful()
             // $escape=false: teks & literal di blade (bukan {{ }}), jadi HTML mentah.
-            ->assertSee('Inventori & Stok', false)
+            ->assertSee('Master Produk & Stok', false)
             ->assertSee('PO & Supplier', false);
     }
 
@@ -62,9 +62,9 @@ class WmsDashboardSplitTest extends TestCase
         $this->authed();
 
         $shell = Livewire::test(WmsDashboard::class)
-            ->assertSet('activeTab', 'stok')
+            ->assertSet('activeTab', 'produk')
             // Header nav tab (milik shell)
-            ->assertSee('Master Produk')
+            ->assertSee('Master Produk & Stok', false)
             ->assertSee('Transfer Antar Gudang')
             ->assertSee('Stock Opname')
             // Konten tiap child tab ikut ter-render di shell (tersembunyi via CSS, bukan unmount)

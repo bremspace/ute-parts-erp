@@ -3,6 +3,52 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-18 — Pemisahan Manajemen Retur Konsumen ke Dedicated Sub Transaksi (`/app/pos/retur`) ✅
+
+- **[Pemisahan Halaman Mandiri Retur Konsumen]:**
+  - Membuat halaman dan komponen dedicated `ReturPenjualanIndex` (`/app/pos/retur`) di bawah menu **Transaksi** bersama Kasir POS & Pesanan Online.
+  - Memisahkan modal retur dari layar kasir `/app/pos` agar operasional kasir tetap fokus, cepat, dan tidak terbebani modal komprehensif.
+  - Tautan langsung dari Kasir POS (`Retur`), Riwayat Kasir, dan Riwayat Transaksi Index menuju `/app/pos/retur` dengan prefill faktur `?transaksi_id=`.
+- **[Scan QR / Barcode Faktur di Retur]:**
+  - Kolom verifikasi faktur kini dilengkapi pemindai barcode / QR code kamera terintegrasi (`openCameraScanner`) dan hardware scanner listener (`@ute:barcode-scanned`).
+  - Struk cetak otomatis memuat QR code vector SVG nomor transaksi faktur sehingga kasir cukup menembakkan scanner kamera / barcode reader untuk memverifikasi faktur secara instan.
+- **[Kustomisasi Template Struk & Faktur Lengkap di Menu Pengaturan]:**
+  - Penambahan sub-tab **Kustomisasi Template Struk & Faktur** pada menu Pengaturan (`/pengaturan?tab=printer`).
+  - Fitur kustomisasi lengkap: Nama Toko, Slogan, Alamat, No. Telp/WA, Website/Medsos, opsi toggle tampilan (Kasir, Pelanggan, Waktu, Subtotal Breakdown), toggle cetak QR Code Faktur Retur + ukuran + teks keterangan, serta ucapan terima kasih dan syarat/kebijakan retur garansi.
+  - Simulasi Live Pratinjau Struk Thermal interaktif (80mm / 58mm) yang merefleksikan perubahan secara realtime.
+- **[Validasi Sistematis & Wajib No Kwitansi / Faktur]:**
+  - Retur konsumen mewajibkan input & verifikasi nomor kwitansi/faktur sebelum barang bisa dipilih.
+  - Pengecekan otomatis histori retur sebelumnya per item sehingga tidak mungkin retur melebihi sisa barang yang dibeli.
+  - Form multi-step terstruktur: (1) Verifikasi Kwitansi, (2) Pilih Barang & Kondisi (Rusak/Bagus) + SN, (3) Bentuk Penyelesaian (Refund / Tukar Produk + Selisih), (4) Alasan & Catatan QC.
+  - Log audit aktivitas terekam jelas di seluruh modul via spatie activity log (`PunyaRiwayatAktivitas`).
+- **[Pengujian & Standarisasi]:**
+  - Feature test `tests/Feature/ReturPenjualanIndexTest.php` lulus 5/5 assertions.
+  - Seluruh pengujian retur `tests/Feature/ReturBarangTest.php` & `ReturPenjualanIndexTest` lulus 23/23 tests.
+  - Laravel Pint PSR-12 passed, Vite build passed.
+
+## 2026-10-18 — Optimasi Manajemen Retur Multi-Channel & Konsolidasi Pool Supplier ✅
+
+- **[Retur Konsumen & Anti-Fraud Penerimaan]:**
+  - Validasi ketat nomor seri (SN) pada transaksi retur: menolak barang yang nomor serinya tidak sesuai atau bukan dari faktur/transaksi tersebut.
+  - Dukungan dua skenario penyelesaian di POS (`retur-modal.blade.php`):
+    * `Pengembalian Uang (Refund)`: kas tunai atau potong piutang.
+    * `Tukar Produk (Exchange)`: pemilihan barang pengganti langsung dari katalog, kalkulasi otomatis selisih harga (konsumen tambah bayar / toko kembalikan sisa / impas), pembuatan transaksi pengganti dan pemotongan stok otomatis.
+  - Pemisahan kondisi fisik barang retur:
+    * `Layak Jual (Bagus)`: dikembalikan ke stok aktif siap jual.
+    * `Rusak / Cacat`: diisolasi dari stok aktif, otomatis masuk ke **Pool Karantina Retur WMS**.
+- **[Konsolidasi WMS ke Supplier]:**
+  - Penambahan sub-tab **Pool Karantina Retur** pada `ReturnPembelianTab` (`/app/wms`):
+    * Rekapitulasi barang rusak per Supplier asal.
+    * Fitur batch select dan pembuatan retur pembelian langsung dari pool karantina tanpa wajib terikat 1 nomor PO lama.
+    * Dukungan kompensasi `Saldo Deposit Supplier` (otomatis memotong sisa utang berjalan, atau menambah saldo kredit deposit supplier untuk memotong belanja PO berikutnya) serta refund kas.
+- **[Retur Marketplace & Omnichannel]:**
+  - Penambahan tab **Retur & Komplain** di `OmnichannelCommandCenter`:
+    * Modal inspeksi QC penerimaan paket kurir (pilihan barang rusak -> karantina supplier, atau barang normal -> restock).
+    * Fitur penolakan & sengketa / banding fraud ke Shopee/Marketplace bila barang yang dikembalikan bukan produk toko atau unit ditukar pembeli.
+- **[Database & Tests]:**
+  - Migrasi `2026_10_18_120000_optimize_return_management_and_pools`: penambahan kolom penyelesaian tukar barang, kondisi barang, audit QC, dan `saldo_deposit` pada tabel `supplier`.
+  - Feature test `tests/Feature/ReturBarangTest.php` lulus 9/9 (termasuk tes anti-fraud SN, isolasi barang rusak karantina, retur tukar produk, dan konsolidasi retur supplier saldo deposit).
+
 ## 2026-10-17 — Optimasi Integrasi Duitku (HMAC-SHA256, endpoint docs baru, rekonsiliasi) ✅
 
 - **[T-01] `DuitkuService` rewrite sesuai docs.duitku.com (30 Sep 2026):**

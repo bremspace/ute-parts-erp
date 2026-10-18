@@ -447,4 +447,309 @@ class ReturBarangTest extends TestCase
             'status' => 'pending',
         ]);
     }
+
+    public function test_validasi_anti_fraud_nomor_seri_menolak_sn_bukan_dari_transaksi_tersebut(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Pelanggan Anti-Fraud',
+            'tipe' => 'retail',
+        ]);
+
+        $transaksi = Transaksi::create([
+            'no_transaksi' => 'TRX-FRAUD-001',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 1,
+            'subtotal' => 150000,
+            'total_akhir' => 150000,
+            'status' => 'selesai',
+        ]);
+
+        $trxItem = TransaksiItem::create([
+            'transaksi_id' => $transaksi->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_satuan' => 150000,
+            'subtotal' => 150000,
+        ]);
+
+        $trxLain = Transaksi::create([
+            'no_transaksi' => 'TRX-LAIN-001',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 1,
+            'subtotal' => 150000,
+            'total_akhir' => 150000,
+            'status' => 'selesai',
+        ]);
+
+        $trxItemLain = TransaksiItem::create([
+            'transaksi_id' => $trxLain->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_satuan' => 150000,
+            'subtotal' => 150000,
+        ]);
+
+        // SN ini terdaftar pada transaksi LAIN (bukan $trxItem->id)
+        NomorSeri::create([
+            'nomor_seri' => 'SN-PALSU-999',
+            'produk_id' => $this->produk->id,
+            'cabang_id' => $this->cabang->id,
+            'status' => NomorSeri::STATUS_TERJUAL,
+            'transaksi_item_id' => $trxItemLain->id,
+        ]);
+
+        $service = app(ReturnPenjualanService::class);
+        $service->buatRetur(
+            $transaksi,
+            [
+                [
+                    'transaksi_item_id' => $trxItem->id,
+                    'jumlah' => 1,
+                    'sn' => ['SN-PALSU-999'],
+                ],
+            ],
+            'Mencoba retur dengan SN beda faktur',
+            'kas',
+            $this->user->id
+        );
+    }
+
+    public function test_retur_barang_rusak_masuk_karantina_dan_tidak_menambah_stok_siap_jual(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Pelanggan Rusak',
+            'tipe' => 'retail',
+        ]);
+
+        $stok = StokItem::create([
+            'gudang_id' => $this->gudang->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 10,
+        ]);
+
+        $transaksi = Transaksi::create([
+            'no_transaksi' => 'TRX-RUSAK-001',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 2,
+            'subtotal' => 300000,
+            'total_akhir' => 300000,
+            'status' => 'selesai',
+        ]);
+
+        $trxItem = TransaksiItem::create([
+            'transaksi_id' => $transaksi->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 2,
+            'harga_satuan' => 150000,
+            'subtotal' => 300000,
+            'hpp' => 100000,
+        ]);
+
+        $service = app(ReturnPenjualanService::class);
+        $retur = $service->buatRetur(
+            $transaksi,
+            [
+                [
+                    'transaksi_item_id' => $trxItem->id,
+                    'jumlah' => 2,
+                    'kondisi_barang' => 'rusak',
+                ],
+            ],
+            'LCD Pecah saat dipasang / cacat produksi',
+            'kas',
+            $this->user->id
+        );
+
+        $this->assertEquals('selesai', $retur->status);
+
+        // Stok fisik aktif di toko TIDAK BERTAMBAH (karena barang rusak)
+        $stok->refresh();
+        $this->assertEquals(10, (int) $stok->jumlah);
+
+        // Item berstatus karantina
+        $returItem = $retur->items()->first();
+        $this->assertEquals('rusak', $returItem->kondisi_barang);
+        $this->assertEquals('karantina', $returItem->status_karantina);
+    }
+
+    public function test_retur_penjualan_tukar_produk_memotong_stok_pengganti_dan_hitung_selisih(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Pelanggan Tukar',
+            'tipe' => 'retail',
+        ]);
+
+        $stokRetur = StokItem::create([
+            'gudang_id' => $this->gudang->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 5,
+        ]);
+
+        // Produk pengganti
+        $produkBaru = Produk::create([
+            'kode' => 'PRD-PENGGANTI',
+            'nama' => 'LCD Pengganti Premium',
+            'harga_beli' => 120000,
+            'harga_jual' => 200000,
+            'status' => 'aktif',
+        ]);
+
+        $stokPengganti = StokItem::create([
+            'gudang_id' => $this->gudang->id,
+            'produk_id' => $produkBaru->id,
+            'jumlah' => 8,
+        ]);
+
+        $transaksiLama = Transaksi::create([
+            'no_transaksi' => 'TRX-AWAL-001',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 1,
+            'subtotal' => 150000,
+            'total_akhir' => 150000,
+            'status' => 'selesai',
+        ]);
+
+        $trxItemLama = TransaksiItem::create([
+            'transaksi_id' => $transaksiLama->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_satuan' => 150000,
+            'subtotal' => 150000,
+            'hpp' => 100000,
+        ]);
+
+        $service = app(ReturnPenjualanService::class);
+        $retur = $service->buatRetur(
+            $transaksiLama,
+            [
+                [
+                    'transaksi_item_id' => $trxItemLama->id,
+                    'jumlah' => 1,
+                    'kondisi_barang' => 'bagus',
+                ],
+            ],
+            'Tukar tipe ke LCD Premium',
+            'kas',
+            $this->user->id,
+            'tukar_produk',
+            [
+                [
+                    'produk_id' => $produkBaru->id,
+                    'jumlah' => 1,
+                    'harga_satuan' => 200000,
+                ],
+            ]
+        );
+
+        $this->assertEquals('selesai', $retur->status);
+        $this->assertEquals('tukar_produk', $retur->tipe_penyelesaian);
+        $this->assertNotNull($retur->tukar_transaksi_id);
+        // Selisih: 200.000 - 150.000 = 50.000 (konsumen tambah bayar)
+        $this->assertEquals(50000, (float) $retur->selisih_nominal);
+
+        // Stok pengganti terpotong (8 - 1 = 7)
+        $stokPengganti->refresh();
+        $this->assertEquals(7, (int) $stokPengganti->jumlah);
+    }
+
+    public function test_konsolidasi_retur_ke_supplier_dari_pool_karantina_mengurangi_utang_dan_menambah_saldo_deposit(): void
+    {
+        $supplier = Supplier::create([
+            'nama' => 'Supplier Konsolidasi',
+            'termin_hari' => 30,
+            'saldo_deposit' => 0,
+        ]);
+
+        // Simulasikan ada Utang berjalan sebesar 150.000
+        $utang = Utang::create([
+            'no_utang' => 'UTG-TEST-001',
+            'referensi_tipe' => PurchaseOrder::class,
+            'referensi_id' => 1,
+            'kreditor_nama' => $supplier->nama,
+            'cabang_id' => $this->cabang->id,
+            'jumlah' => 150000,
+            'jumlah_dibayar' => 0,
+            'status' => 'belum_lunas',
+        ]);
+
+        // Simulasikan ada 2 barang rusak di karantina masing-masing bernilai HPP 100.000 (total retur 200.000)
+        $pelanggan = Pelanggan::create(['nama' => 'Pelanggan Pool']);
+        $transaksi = Transaksi::create([
+            'no_transaksi' => 'TRX-POOL-001',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 2,
+            'subtotal' => 300000,
+            'total_akhir' => 300000,
+            'status' => 'selesai',
+        ]);
+        $trxItem = TransaksiItem::create([
+            'transaksi_id' => $transaksi->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 2,
+            'harga_satuan' => 150000,
+            'subtotal' => 300000,
+            'hpp' => 100000,
+        ]);
+
+        $returJual = app(ReturnPenjualanService::class)->buatRetur(
+            $transaksi,
+            [
+                [
+                    'transaksi_item_id' => $trxItem->id,
+                    'jumlah' => 2,
+                    'kondisi_barang' => 'rusak',
+                    'supplier_id' => $supplier->id,
+                ],
+            ],
+            'Barang rusak',
+            'kas',
+            $this->user->id
+        );
+
+        $poolItemIds = $returJual->items->pluck('id')->all();
+
+        // Konsolidasi retur ke supplier
+        $returBeli = app(ReturnPembelianService::class)->buatReturDariPoolSupplier(
+            $supplier,
+            $poolItemIds,
+            'Retur barang rusak dari garansi toko',
+            'saldo',
+            $this->cabang->id,
+            $this->gudang->id,
+            $this->user->id
+        );
+
+        $this->assertEquals('selesai', $returBeli->status);
+        $this->assertEquals(200000, (float) $returBeli->jumlah);
+
+        // Utang 150.000 terbayar lunas
+        $utang->refresh();
+        $this->assertEquals(150000, (float) $utang->jumlah_dibayar);
+        $this->assertEquals('lunas', $utang->status);
+
+        // Sisa kelebihan retur (200.000 - 150.000 = 50.000) masuk ke saldo_deposit supplier
+        $supplier->refresh();
+        $this->assertEquals(50000, (float) $supplier->saldo_deposit);
+
+        // Item karantina berubah status menjadi sudah_diretur_supplier
+        $returJual->items()->first()->refresh();
+        $this->assertEquals('sudah_diretur_supplier', $returJual->items()->first()->status_karantina);
+    }
 }

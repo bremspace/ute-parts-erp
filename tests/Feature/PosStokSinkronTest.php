@@ -465,11 +465,11 @@ class PosStokSinkronTest extends TestCase
     {
         $key = $this->key($this->produk);
 
-        // 1) Dropdown hanya menampilkan gudang cabang aktif
+        // 1) Komponen hanya menyediakan gudang cabang aktif (UI dropdown telah disederhanakan/dihapus)
         $this->buatKomponen()
-            ->assertSee('Gudang Utama Pusat')
-            ->assertSee('Gudang Cadang Pusat') // gudang kedua, cabang yang sama
-            ->assertDontSee('Gudang Cabang Lain')
+            ->assertViewHas('gudangs', fn ($gudangs) => $gudangs->pluck('nama')->contains('Gudang Utama Pusat')
+                && $gudangs->pluck('nama')->contains('Gudang Cadang Pusat')
+                && ! $gudangs->pluck('nama')->contains('Gudang Cabang Lain'))
             // 2) Tamper selectedGudangId → addToCart reset ke gudang cabang aktif + pesan
             ->set('selectedGudangId', $this->gudangLain->id)
             ->call('addToCart', $this->produk->id)
