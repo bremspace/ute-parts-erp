@@ -105,6 +105,100 @@ class DatabaseManagementEnterpriseTest extends TestCase
         }
     }
 
+    public function test_transaksi_only_reset_with_new_confirmation_phrase(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        Livewire::test(DatabaseManagement::class)
+            ->set('resetMode', 'transaksi_only')
+            ->set('confirmResetText', 'RESET TRANSAKSI')
+            ->set('confirmPassword', 'Password123!')
+            ->call('eksekusiReset')
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success' && str_contains($payload['message'], 'Reset Data Transaksional');
+            });
+
+        // Bersihkan file test backup
+        $service = app(DatabaseManagementService::class);
+        foreach ($service->listBackups() as $b) {
+            $service->deleteBackup($b['filename']);
+        }
+    }
+
+    public function test_master_and_transaksi_reset(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        Livewire::test(DatabaseManagement::class)
+            ->set('resetMode', 'master_and_transaksi')
+            ->set('confirmResetText', 'RESET MASTER DAN TRANSAKSI')
+            ->set('confirmPassword', 'Password123!')
+            ->call('eksekusiReset')
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success' && str_contains($payload['message'], 'Reset Transaksi + Katalog');
+            });
+
+        $service = app(DatabaseManagementService::class);
+        foreach ($service->listBackups() as $b) {
+            $service->deleteBackup($b['filename']);
+        }
+    }
+
+    public function test_factory_reset_restores_default_seeders(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        Livewire::test(DatabaseManagement::class)
+            ->set('resetMode', 'factory_reset')
+            ->set('confirmResetText', 'RESET PABRIK')
+            ->set('confirmPassword', 'Password123!')
+            ->call('eksekusiReset')
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success' && str_contains($payload['message'], 'Factory Reset');
+            });
+
+        // Verifikasi akun super admin dan owner dipulihkan oleh seeder
+        $this->assertDatabaseHas('users', ['email' => 'superadmin@uteparts.id']);
+        $this->assertDatabaseHas('users', ['email' => 'owner@uteparts.id']);
+
+        $service = app(DatabaseManagementService::class);
+        foreach ($service->listBackups() as $b) {
+            $service->deleteBackup($b['filename']);
+        }
+    }
+
+    public function test_full_wipe_maintains_anti_lockout_superadmin(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        Livewire::test(DatabaseManagement::class)
+            ->set('resetMode', 'full_wipe')
+            ->set('confirmResetText', 'FULL WIPE DATABASE')
+            ->set('confirmPassword', 'Password123!')
+            ->call('eksekusiReset')
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success' && str_contains($payload['message'], 'Full Wipe');
+            });
+
+        // Anti-lockout: Akun super admin tetap ada dan memiliki role super-admin
+        $admin = User::where('email', 'superadmin@uteparts.id')->first();
+        $this->assertNotNull($admin);
+        $this->assertTrue($admin->hasRole('super-admin'));
+
+        $service = app(DatabaseManagementService::class);
+        foreach ($service->listBackups() as $b) {
+            $service->deleteBackup($b['filename']);
+        }
+    }
+
     public function test_health_check_command_berjalan_sukses(): void
     {
         $this->artisan('ute:db-health-check')

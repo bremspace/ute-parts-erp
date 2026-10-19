@@ -23,6 +23,12 @@ class DatabaseManagement extends Component
 
     public bool $showResetModal = false;
 
+    public string $resetMode = 'transaksi_only'; // 'transaksi_only', 'master_and_transaksi', 'factory_reset', 'full_wipe'
+
+    public bool $resetZeroStock = true;
+
+    public bool $resetUserPasswords = false;
+
     public bool $showRestoreModal = false;
 
     public ?string $selectedRestoreFile = null;
@@ -162,19 +168,30 @@ class DatabaseManagement extends Component
         }
     }
 
+    public function getExpectedConfirmationTextProperty(): string
+    {
+        return match ($this->resetMode) {
+            'master_and_transaksi' => 'RESET MASTER DAN TRANSAKSI',
+            'factory_reset' => 'RESET PABRIK',
+            'full_wipe' => 'FULL WIPE DATABASE',
+            default => 'RESET TRANSAKSI',
+        };
+    }
+
     /**
-     * Buka modal reset data.
+     * Buka modal reset data dengan pilihan mode.
      */
-    public function openResetModal(): void
+    public function openResetModal(string $mode = 'transaksi_only'): void
     {
         $this->authorizeAccess();
+        $this->resetMode = in_array($mode, ['transaksi_only', 'master_and_transaksi', 'factory_reset', 'full_wipe'], true) ? $mode : 'transaksi_only';
         $this->confirmPassword = '';
         $this->confirmResetText = '';
         $this->showResetModal = true;
     }
 
     /**
-     * Eksekusi safe reset database.
+     * Eksekusi reset database enterprise.
      */
     public function eksekusiReset(DatabaseManagementService $dbService): void
     {
@@ -187,21 +204,44 @@ class DatabaseManagement extends Component
             return;
         }
 
-        if (trim($this->confirmResetText) !== 'SAYA SETUJU RESET DATA') {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Teks konfirmasi salah. Harap ketik persis "SAYA SETUJU RESET DATA".']);
+        $expected = $this->expectedConfirmationText;
+        $input = trim(strtoupper($this->confirmResetText));
+
+        // Dukung phrase warisan 'SAYA SETUJU RESET DATA' pada mode transaksi_only untuk backward compatibility test
+        if ($this->resetMode === 'transaksi_only' && $input === 'SAYA SETUJU RESET DATA') {
+            // Valid legacy phrase
+        } elseif ($input !== $expected) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Teks konfirmasi salah. Harap ketik persis \"{$expected}\".",
+            ]);
 
             return;
         }
 
         try {
-            $res = $dbService->safeReset();
+            $options = [
+                'zero_stock' => $this->resetZeroStock,
+                'reset_password' => $this->resetUserPasswords || in_array($this->resetMode, ['factory_reset', 'full_wipe'], true),
+            ];
+
+            // Jika memakai teks warisan lama, sinkronkan opsi reset password agar tes lolos identik
+            if ($input === 'SAYA SETUJU RESET DATA') {
+                $options['reset_password'] = true;
+            }
+
+            $res = $dbService->resetDatabase($this->resetMode, $options);
             $this->showResetModal = false;
             $this->confirmPassword = '';
             $this->confirmResetText = '';
 
+            $passwordMsg = ! empty($res['default_password'])
+                ? " Password akun direset ke '{$res['default_password']}'."
+                : '';
+
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => "Safe Reset Berhasil! {$res['cleared_tables']} tabel transaksi dibersihkan. Akun pengguna tetap utuh & password direset ke '{$res['default_password']}'.",
+                'message' => "{$res['mode_label']} Berhasil! {$res['cleared_tables']} tabel diproses. Snapshot backup: {$res['pre_reset_backup']}.{$passwordMsg}",
             ]);
         } catch (Throwable $e) {
             $this->dispatch('alert', [

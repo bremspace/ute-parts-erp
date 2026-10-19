@@ -3,6 +3,32 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-20 — Optimasi Enterprise Reset Data & Pembersihan Database Berstandar Industri ✅
+
+- **[Multi-Tier Data Purge Suite (4 Skenario Reset Standar Enterprise)]:**
+  - **Reset Transaksional (Siap Go-Live)** (`transaksi_only`):
+    - Membersihkan seluruh data uji coba operasional (kasir POS, invoice, tiket servis, pergerakan stok, stok opname, jurnal akuntansi, kas laci, dan log aktivitas).
+    - Mempertahankan master produk, SKU, kategori, brand, supplier, pelanggan, cabang toko, dan akun staf RBAC.
+    - Opsi sakelar: Nolkan kuantitas stok fisik (`stok_items` = 0) dan opsi reset kata sandi staf.
+  - **Reset Transaksi + Katalog Part & Mitra** (`master_and_transaksi`):
+    - Membersihkan transaksi serta seluruh master katalog part (produk, varian SKU, brand, kategori, tipe HP, harga tier) dan mitra CRM (pelanggan & supplier).
+    - Mempertahankan struktur cabang, gudang, rak, akun staf, role RBAC, COA, dan konfigurasi toko.
+  - **Factory Reset (Kembali ke Setelan Pabrik Awal)** (`factory_reset`):
+    - Mengembalikan sistem ke kondisi default fresh install saat serah terima.
+    - Menghapus data kustom dan menjalankan ulang seeder bawaan aplikasi (`RolesAndPermissionsSeeder`, `CabangSeeder`, `TierMembershipSeeder`, `AdminUserSeeder`, `RoleUserSeeder`, `AkunCoaSeeder`, `JenisServisSeeder`, `KomisiSkemaSeeder`).
+    - Akun resmi bawaan dipulihkan dengan kata sandi default `Password123!`.
+  - **Pembersihan Total (Full Wipe)** (`full_wipe`):
+    - Mengosongkan seluruh tabel data operasional, master, cabang, dan riwayat.
+    - Dilengkapi **Safeguard Anti-Lockout**: Mempertahankan 1 akun Super Administrator aktif dan Cabang Utama agar sesi login tetap aman dan sistem tidak mengalami crash/lockout.
+- **[Mekanisme Keamanan Standar Industri (Enterprise Safeguards)]:**
+  - **Mandatory Pre-Reset Snapshot**: Sistem otomatis membuat cadangan snapshot SQL terkompresi sebelum pembersihan dijalankan; nama file langsung dilaporkan ke notifikasi dan audit log.
+  - **Dynamic Confirmation Phrase**: Mengharuskan pengetikan teks konfirmasi spesifik kapital sesuai mode (`RESET TRANSAKSI`, `RESET MASTER DAN TRANSAKSI`, `RESET PABRIK`, `FULL WIPE DATABASE`, dengan tetap mendukung legacy phrase `SAYA SETUJU RESET DATA`).
+  - **Verifikasi Kata Sandi**: Validasi kredensial pengguna Super Admin yang sedang aktif.
+  - **Dynamic Impact Summary**: Antarmuka interaktif menampilkan daftar data yang dihapus vs data yang dipertahankan secara real-time saat pengguna memilih opsi.
+- **[Pengujian & Verifikasi]:**
+  - Mengembangkan test suite `DatabaseManagementEnterpriseTest` mencakup pengujian seluruh skenario reset (`transaksi_only`, `master_and_transaksi`, `factory_reset`, `full_wipe`, anti-lockout protection, dan file snapshot cleanup) — semua lolos 100%.
+  - Format kode sesuai standar Laravel Pint dan build ulang aset Vite berhasil.
+
 ## 2026-10-20 — Penataan Submenu Sidebar Pengaturan & Integrasi UI Gateway (WhatsApp, Duitku, Biteship) ✅
 
 - **[Penyempurnaan Submenu Sidebar Backoffice Pengaturan & Sistem]:**

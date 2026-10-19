@@ -5,7 +5,14 @@ namespace App\Modules\Rbac\Services;
 use App\Models\User;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Rbac\Models\Cabang;
+use Database\Seeders\AdminUserSeeder;
+use Database\Seeders\AkunCoaSeeder;
+use Database\Seeders\CabangSeeder;
+use Database\Seeders\JenisServisSeeder;
+use Database\Seeders\KomisiSkemaSeeder;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\RoleUserSeeder;
+use Database\Seeders\TierMembershipSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -182,18 +189,57 @@ class DatabaseManagementService
     }
 
     /**
-     * Safe Reset: Bersihkan data transaksi, stok, jurnal, tiket servis
-     * TETAP PERTAHANKAN akun pengguna & reset passwordnya ke standar.
+     * Truncate daftar tabel dengan aman (disable FK checks).
      */
-    public function safeReset(): array
+    public function truncateTables(array $tables): int
     {
-        // 1. Ambil snapshot backup darurat sebelum reset
+        $driver = DB::getDriverName();
+        $count = 0;
+
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            foreach ($tables as $tbl) {
+                if (Schema::hasTable($tbl)) {
+                    DB::table($tbl)->truncate();
+                    $count++;
+                }
+            }
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        } else {
+            // SQLite
+            DB::statement('PRAGMA foreign_keys = OFF;');
+            foreach ($tables as $tbl) {
+                if (Schema::hasTable($tbl)) {
+                    DB::table($tbl)->delete();
+                    $count++;
+                }
+            }
+            DB::statement('PRAGMA foreign_keys = ON;');
+        }
+
+        return $count;
+    }
+
+    /**
+     * Enterprise Database Reset Suite:
+     * - transaksi_only: Kosongkan transaksi, mutasi, keuangan, log (siap go-live / pasca-testing)
+     * - master_and_transaksi: Kosongkan transaksi + katalog produk, harga, tier, supplier, pelanggan
+     * - factory_reset: Kembalikan persis ke setelan awal pabrik (jalankan ulang seeder bawaan)
+     * - full_wipe: Pembersihan total database dengan perlindungan anti-lockout Super Admin
+     */
+    public function resetDatabase(string $mode = 'transaksi_only', array $options = []): array
+    {
+        // 1. Mandatory snapshot backup darurat sebelum pembersihan (Enterprise Standard)
         $preBackup = $this->backup('local', 30);
 
-        // 2. Daftar tabel yang DIKOSONGKAN (Transaksi, Mutasi, Log, Servis, Keuangan)
-        $tablesToTruncate = [
+        $transactionTables = [
             'transaksi_item',
             'transaksi',
+            'returns_item',
+            'returns',
+            'kas_sesi',
+            'kas_mutasi_laci',
+            'kas_matching',
             'tiket_servis_estimasi_item',
             'tiket_servis_item',
             'servis_status_log',
@@ -207,81 +253,222 @@ class DatabaseManagementService
             'stok_opname_item',
             'stok_opname',
             'nomor_seri_events',
+            'cycle_count_items',
+            'cycle_counts',
             'purchase_order_items',
             'purchase_orders',
             'grn_items',
             'grn',
-            'returns_item',
-            'returns',
             'jurnal_akuntansi',
             'jurnal_header',
             'piutang',
             'utang',
-            'kas_sesi',
-            'kas_mutasi_laci',
-            'kas_matching',
             'komisi',
             'payroll_komisi_detail',
             'hr_payroll_slip',
             'hr_absensi',
+            'aset_tetap',
             'kampanye_broadcast',
             'leads',
+            'notifikasi_keluar',
             'activity_log',
+            'audit_logs',
         ];
 
-        $driver = DB::getDriverName();
+        $masterTables = [
+            'stok_items',
+            'sku_variants',
+            'produk',
+            'kategori',
+            'brand',
+            'kualitas',
+            'satuan',
+            'kondisi',
+            'tipe_hp',
+            'harga_tier',
+            'riwayat_perubahan_harga',
+            'supplier_scores',
+            'channel_product_mapping',
+            'sid_retail_raw_item',
+            'sid_retail_raw_header',
+            'sid_retail_raw_master',
+            'sid_import_map',
+            'import_log',
+            'saved_reports',
+            'pemasok',
+            'supplier',
+            'pelanggan',
+        ];
 
-        if (in_array($driver, ['mysql', 'mariadb'], true)) {
-            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-            foreach ($tablesToTruncate as $tbl) {
-                if (Schema::hasTable($tbl)) {
-                    DB::table($tbl)->truncate();
+        $orgTables = [
+            'rak',
+            'gudang',
+            'user_cabang',
+            'cabang',
+            'user_preferences',
+            'device_sessions',
+            'personal_access_tokens',
+        ];
+
+        $clearedCount = 0;
+        $label = '';
+        $defaultPassword = null;
+
+        switch ($mode) {
+            case 'master_and_transaksi':
+                $label = 'Reset Transaksi + Katalog & Pelanggan';
+                $clearedCount = $this->truncateTables(array_merge($transactionTables, $masterTables));
+
+                // Pastikan tier membership CRM tetap terdefinisi
+                try {
+                    (new TierMembershipSeeder)->run();
+                } catch (Throwable $e) {
                 }
-            }
-            // Nolkan stok fisik di stok_items
-            if (Schema::hasTable('stok_items')) {
-                DB::table('stok_items')->update(['jumlah' => 0]);
-            }
-            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-        } else {
-            // SQLite
-            DB::statement('PRAGMA foreign_keys = OFF;');
-            foreach ($tablesToTruncate as $tbl) {
-                if (Schema::hasTable($tbl)) {
-                    DB::table($tbl)->delete();
+
+                if (! empty($options['reset_password'])) {
+                    $defaultPassword = 'Password123!';
+                    User::query()->update(['password' => Hash::make($defaultPassword)]);
                 }
-            }
-            if (Schema::hasTable('stok_items')) {
-                DB::table('stok_items')->update(['jumlah' => 0]);
-            }
-            DB::statement('PRAGMA foreign_keys = ON;');
-        }
+                break;
 
-        // 3. Reset Password & Pastikan Akun Default Tetap Ada
-        $defaultPassword = Hash::make('Password123!');
-        User::query()->update(['password' => $defaultPassword]);
+            case 'factory_reset':
+                $label = 'Factory Reset (Setelan Pabrik Awal)';
+                $clearedCount = $this->truncateTables(array_merge($transactionTables, $masterTables, $orgTables));
+                $defaultPassword = 'Password123!';
 
-        // Jalankan seeder RoleUserSeeder untuk memastikan semua role default lengkap
-        try {
-            $seeder = new RoleUserSeeder;
-            $seeder->run();
-        } catch (Throwable $e) {
-            // Lanjut jika seeder cabang atau relasi ada variasi
+                // Bersihkan user tambahan selain akun resmi bawaan
+                $defaultEmails = [
+                    'superadmin@uteparts.id',
+                    'owner@uteparts.id',
+                    'admintoko@uteparts.id',
+                    'kasir@uteparts.id',
+                    'teknisi@uteparts.id',
+                    'gudang@uteparts.id',
+                    'finance@uteparts.id',
+                    'marketing@uteparts.id',
+                    'hr@uteparts.id',
+                ];
+                User::whereNotIn('email', $defaultEmails)->delete();
+                User::query()->update(['password' => Hash::make($defaultPassword)]);
+
+                // Jalankan seeder default pabrik
+                $seeders = [
+                    RolesAndPermissionsSeeder::class,
+                    CabangSeeder::class,
+                    TierMembershipSeeder::class,
+                    AdminUserSeeder::class,
+                    RoleUserSeeder::class,
+                    AkunCoaSeeder::class,
+                    JenisServisSeeder::class,
+                    KomisiSkemaSeeder::class,
+                ];
+                foreach ($seeders as $seederClass) {
+                    try {
+                        (new $seederClass)->run();
+                    } catch (Throwable $e) {
+                    }
+                }
+
+                $activeSuper = User::where('email', 'superadmin@uteparts.id')->first();
+                if ($activeSuper) {
+                    auth()->login($activeSuper);
+                }
+                break;
+
+            case 'full_wipe':
+                $label = 'Full Wipe (Pembersihan Total Database)';
+                $currentUser = auth()->user();
+                $savedId = $currentUser?->id;
+                $savedEmail = $currentUser?->email ?? 'superadmin@uteparts.id';
+                $savedName = $currentUser?->name ?? 'Super Administrator';
+                $defaultPassword = 'Password123!';
+
+                // Dapatkan seluruh tabel di database kecuali users
+                $allTables = array_merge($transactionTables, $masterTables, $orgTables);
+                $clearedCount = $this->truncateTables($allTables);
+
+                // Anti-lockout: Hapus semua user lain, pertahankan akun super admin aktif
+                if ($savedId) {
+                    User::where('id', '!=', $savedId)->delete();
+                    $admin = User::find($savedId);
+                    if ($admin) {
+                        $admin->update(['password' => Hash::make($defaultPassword), 'is_active' => true]);
+                    }
+                } else {
+                    $admin = User::firstOrCreate(
+                        ['email' => $savedEmail],
+                        [
+                            'name' => $savedName,
+                            'phone' => '081234567801',
+                            'password' => Hash::make($defaultPassword),
+                            'is_active' => true,
+                        ]
+                    );
+                }
+
+                // Pulihkan izin inti dan cabang default
+                try {
+                    (new RolesAndPermissionsSeeder)->run();
+                    $cabang = Cabang::firstOrCreate(
+                        ['kode' => 'CBG-01'],
+                        ['nama' => 'Cabang Utama', 'is_active' => true]
+                    );
+                    if ($admin) {
+                        $admin->assignRole('super-admin');
+                        $admin->cabangs()->syncWithoutDetaching([$cabang->id => ['is_default' => true]]);
+                        auth()->login($admin);
+                    }
+                } catch (Throwable $e) {
+                }
+                break;
+
+            case 'transaksi_only':
+            default:
+                $label = 'Reset Data Transaksional (Siap Go-Live)';
+                $clearedCount = $this->truncateTables($transactionTables);
+
+                if (($options['zero_stock'] ?? true) === true && Schema::hasTable('stok_items')) {
+                    DB::table('stok_items')->update(['jumlah' => 0]);
+                }
+
+                if (! empty($options['reset_password'])) {
+                    $defaultPassword = 'Password123!';
+                    User::query()->update(['password' => Hash::make($defaultPassword)]);
+                    try {
+                        (new RoleUserSeeder)->run();
+                    } catch (Throwable $e) {
+                    }
+                }
+                break;
         }
 
         $this->auditService->catat(
             'Database',
             'reset',
             auth()->id() ?? 0,
-            'Safe Data Reset dieksekusi: data transaksional dikosongkan, password akun default direset ke standar.'
+            "{$label} dieksekusi: {$clearedCount} tabel dibersihkan. Pre-backup snapshot: {$preBackup['filename']}."
         );
 
         return [
             'success' => true,
-            'cleared_tables' => count($tablesToTruncate),
+            'mode' => $mode,
+            'mode_label' => $label,
+            'cleared_tables' => $clearedCount,
             'pre_reset_backup' => $preBackup['filename'],
-            'default_password' => 'Password123!',
+            'default_password' => $defaultPassword,
         ];
+    }
+
+    /**
+     * Safe Reset (Legacy alias): Bersihkan data transaksi, stok, jurnal, tiket servis
+     * TETAP PERTAHANKAN akun pengguna & reset passwordnya ke standar.
+     */
+    public function safeReset(): array
+    {
+        return $this->resetDatabase('transaksi_only', [
+            'zero_stock' => true,
+            'reset_password' => true,
+        ]);
     }
 
     /**

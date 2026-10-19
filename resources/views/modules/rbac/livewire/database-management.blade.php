@@ -18,12 +18,12 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <button type="button" wire:click="openResetModal"
-                class="px-4 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 border border-up-red/30 text-up-red text-xs font-bold transition-[background-color,border-color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 shadow-sm min-h-[44px]">
+            <button type="button" wire:click="openResetModal('transaksi_only')"
+                class="px-4 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 border border-up-red/30 text-up-red text-xs font-bold transition-[background-color,border-color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 shadow-sm min-h-[44px] cursor-pointer">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                 </svg>
-                Reset Data Aman
+                Reset &amp; Pembersihan Data
             </button>
         </div>
     </div>
@@ -210,59 +210,166 @@
         </div>
     @endif
 
-    <!-- Modal Konfirmasi Safe Reset -->
+    <!-- Modal Konfirmasi Enterprise Reset & Purge Data -->
     @if($showResetModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div class="relative w-full max-w-lg bg-[#0f172a] border border-up-red/30 rounded-2xl shadow-2xl p-6 text-white space-y-4">
-                <div class="flex items-center gap-3 text-up-red">
-                    <svg class="w-7 h-7 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                    </svg>
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
+            <div class="relative w-full max-w-2xl bg-[#0b1120] border border-up-red/40 rounded-3xl shadow-2xl p-5 sm:p-7 text-white space-y-5 my-6 max-h-[92vh] overflow-y-auto">
+                <!-- Modal Header -->
+                <div class="flex items-start justify-between gap-3 pb-3 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-up-red/15 border border-up-red/30 flex items-center justify-center text-up-red flex-shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base sm:text-lg font-black text-white tracking-tight">Manajemen &amp; Reset Data Sistem (Enterprise Purge)</h3>
+                            <p class="text-xs text-ink-400">Pilih skenario pembersihan data yang sesuai dengan tahapan operasional bisnis Anda.</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="$set('showResetModal', false)" class="text-ink-400 hover:text-white p-1.5 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Pre-Backup Auto-Protection Notice -->
+                <div class="flex items-center gap-2.5 p-3 rounded-2xl bg-up-mint/10 border border-up-mint/25 text-xs text-up-mint">
+                    <span class="text-base">🛡️</span>
                     <div>
-                        <h3 class="text-base font-black text-white">Safe Reset: Kosongkan Transaksional</h3>
-                        <span class="text-[10px] text-up-red font-bold uppercase tracking-wider">Tindakan Sangat Berbahaya</span>
+                        <span class="font-bold">Perlindungan Snapshot Otomatis:</span>
+                        <span class="text-ink-300"> Sistem secara otomatis membuat file cadangan SQL darurat sebelum operasi pembersihan dijalankan.</span>
                     </div>
                 </div>
 
-                <div class="p-3.5 rounded-xl bg-up-red/10 border border-up-red/20 text-xs space-y-1.5 text-ink-300">
-                    <p class="font-bold text-white">Data yang akan DIHAPUS BERSIH:</p>
-                    <ul class="list-disc list-inside space-y-0.5 text-[11px] text-ink-300">
-                        <li>Seluruh transaksi POS, keranjang, dan order penjualan</li>
-                        <li>Seluruh tiket servis, estimasi, dan pemakaian sparepart</li>
-                        <li>Seluruh riwayat mutasi stok, stok opname (stok fisik kembali 0)</li>
-                        <li>Seluruh jurnal akuntansi, piutang, utang, dan riwayat kas laci</li>
-                    </ul>
-                    <p class="font-bold text-up-mint pt-1">Data yang AMAN & DIPERTAHANKAN:</p>
-                    <p class="text-[11px] text-ink-300">
-                        Akun pengguna (Super Admin, Owner, Kasir, dll) tetap ada, password direset ke standar: <code class="text-white bg-black/40 px-1 py-0.5 rounded font-mono">Password123!</code>.
-                    </p>
+                <!-- Pilihan Skenario Reset (4 Opsi Standar Industri) -->
+                <div>
+                    <label class="block text-xs font-bold text-ink-200 mb-2.5">Pilih Skenario Pembersihan Data:</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <!-- Opsi 1: Transaksi Saja (Go-Live) -->
+                        <div wire:click="$set('resetMode', 'transaksi_only')"
+                            class="p-3.5 rounded-2xl border text-left cursor-pointer transition-[transform,background-color,border-color] duration-140 active:scale-[0.98] {{ $resetMode === 'transaksi_only' ? 'bg-up-mint/15 border-up-mint text-white shadow-md shadow-up-mint/15' : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] text-ink-300' }}">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xl">🛒</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $resetMode === 'transaksi_only' ? 'bg-up-mint text-ink-950' : 'bg-white/10 text-ink-400' }}">SIAP GO-LIVE</span>
+                            </div>
+                            <h4 class="text-xs font-bold text-white">Reset Transaksional</h4>
+                            <p class="text-[11px] text-ink-400 mt-1 leading-snug">Hapus data uji coba (kasir, servis, jurnal, stok opname). Master part &amp; akun tetap utuh.</p>
+                        </div>
+
+                        <!-- Opsi 2: Transaksi + Master Katalog -->
+                        <div wire:click="$set('resetMode', 'master_and_transaksi')"
+                            class="p-3.5 rounded-2xl border text-left cursor-pointer transition-[transform,background-color,border-color] duration-140 active:scale-[0.98] {{ $resetMode === 'master_and_transaksi' ? 'bg-sky-500/15 border-sky-400 text-white shadow-md shadow-sky-500/15' : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] text-ink-300' }}">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xl">📦</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $resetMode === 'master_and_transaksi' ? 'bg-sky-400 text-ink-950' : 'bg-white/10 text-ink-400' }}">RE-MIGRASI</span>
+                            </div>
+                            <h4 class="text-xs font-bold text-white">Transaksi + Katalog Part</h4>
+                            <p class="text-[11px] text-ink-400 mt-1 leading-snug">Hapus transaksi &amp; master produk, brand, supplier, pelanggan. Cabang &amp; akun staf aman.</p>
+                        </div>
+
+                        <!-- Opsi 3: Factory Reset -->
+                        <div wire:click="$set('resetMode', 'factory_reset')"
+                            class="p-3.5 rounded-2xl border text-left cursor-pointer transition-[transform,background-color,border-color] duration-140 active:scale-[0.98] {{ $resetMode === 'factory_reset' ? 'bg-up-amber/15 border-up-amber text-white shadow-md shadow-up-amber/15' : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] text-ink-300' }}">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xl">🏭</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $resetMode === 'factory_reset' ? 'bg-up-amber text-ink-950' : 'bg-white/10 text-ink-400' }}">SETELAN AWAL</span>
+                            </div>
+                            <h4 class="text-xs font-bold text-white">Factory Reset</h4>
+                            <p class="text-[11px] text-ink-400 mt-1 leading-snug">Reset ke konfigurasi bawaan awal rilis. Seeder standar dipasang ulang, user kembali ke default.</p>
+                        </div>
+
+                        <!-- Opsi 4: Full Wipe -->
+                        <div wire:click="$set('resetMode', 'full_wipe')"
+                            class="p-3.5 rounded-2xl border text-left cursor-pointer transition-[transform,background-color,border-color] duration-140 active:scale-[0.98] {{ $resetMode === 'full_wipe' ? 'bg-up-red/20 border-up-red text-white shadow-md shadow-up-red/20' : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06] text-ink-300' }}">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xl">⚠️</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $resetMode === 'full_wipe' ? 'bg-up-red text-white' : 'bg-white/10 text-ink-400' }}">TOTAL ERASE</span>
+                            </div>
+                            <h4 class="text-xs font-bold text-white">Pembersihan Total (Full Wipe)</h4>
+                            <p class="text-[11px] text-ink-400 mt-1 leading-snug">Kosongkan seluruh data tabel aplikasi. Mempertahankan 1 akun super admin aktif.</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="space-y-3">
+                <!-- Dynamic Impact Box -->
+                <div class="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full {{ in_array($resetMode, ['factory_reset', 'full_wipe']) ? 'bg-up-red' : 'bg-up-amber' }}"></span>
+                        <h5 class="font-bold text-white uppercase tracking-wider text-[11px]">Dampak Pembersihan Terpilih:</h5>
+                    </div>
+
+                    @if($resetMode === 'transaksi_only')
+                        <div class="space-y-1.5 text-[11px] text-ink-300">
+                            <p class="font-semibold text-up-red">Data yang DIHAPUS:</p>
+                            <p>• Transaksi POS Kasir, tiket servis &amp; pemakaian sparepart, riwayat kas laci, pergerakan stok/mutasi/opname, PO, GRN, jurnal akuntansi, piutang &amp; utang.</p>
+                            <p class="font-semibold text-up-mint pt-1">Data yang DIPERTAHANKAN:</p>
+                            <p>• Master Produk, Varian SKU, Kategori, Brand, Tipe HP, Data Pelanggan, Supplier, Cabang Toko, Akun Staf &amp; Hak Akses RBAC.</p>
+                        </div>
+                    @elseif($resetMode === 'master_and_transaksi')
+                        <div class="space-y-1.5 text-[11px] text-ink-300">
+                            <p class="font-semibold text-up-red">Data yang DIHAPUS:</p>
+                            <p>• Seluruh data transaksi + seluruh katalog master part (produk, varian SKU, brand, kategori, tipe HP, harga tier) serta data kontak pelanggan &amp; supplier.</p>
+                            <p class="font-semibold text-up-mint pt-1">Data yang DIPERTAHANKAN:</p>
+                            <p>• Lokasi Cabang Toko Fisik, Gudang, Rak Part, Akun Staf &amp; Role Spatie RBAC, Chart of Accounts (COA), dan Konfigurasi Toko.</p>
+                        </div>
+                    @elseif($resetMode === 'factory_reset')
+                        <div class="space-y-1.5 text-[11px] text-ink-300">
+                            <p class="font-semibold text-up-red">Data yang DIHAPUS:</p>
+                            <p>• Seluruh data operasional, master kustom, cabang kustom, dan akun pengguna tambahan.</p>
+                            <p class="font-semibold text-up-mint pt-1">Setelan yang DIPASANG ULANG (Seeder Bawaan):</p>
+                            <p>• Role &amp; Izin standar (Spatie), Cabang Utama (CBG-01), Tier Membership standar, COA standar retail, dan Akun resmi bawaan (Super Admin, Owner, Kasir, Teknisi, dll) dengan password <code class="text-white bg-black/40 px-1 py-0.5 rounded font-mono">Password123!</code>.</p>
+                        </div>
+                    @elseif($resetMode === 'full_wipe')
+                        <div class="space-y-1.5 text-[11px] text-ink-300">
+                            <p class="font-semibold text-up-red">Data yang DIHAPUS BERSIH:</p>
+                            <p>• Seluruh tabel data aplikasi tanpa terkecuali (transaksi, produk, kontak, log, pengaturan, dan cabang).</p>
+                            <p class="font-semibold text-up-mint pt-1">Jaminan Anti-Lockout:</p>
+                            <p>• Sistem secara otomatis menjaga 1 akun Super Administrator aktif dan Cabang Utama agar sesi login Anda tidak terputus dan aplikasi tidak mengalami galat 500.</p>
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Opsi Tambahan (Khusus Transaksi Only) -->
+                @if($resetMode === 'transaksi_only')
+                    <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <label class="flex items-center gap-2.5 text-xs text-ink-300 cursor-pointer">
+                            <input type="checkbox" wire:model="resetZeroStock" class="accent-up-mint w-4 h-4 rounded" />
+                            <span>Nolkan kuantitas stok fisik di gudang (<code class="text-white font-mono">jumlah = 0</code>) untuk persiapan stock opname awal</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-xs text-ink-300 cursor-pointer">
+                            <input type="checkbox" wire:model="resetUserPasswords" class="accent-up-mint w-4 h-4 rounded" />
+                            <span>Reset kata sandi seluruh staf ke standar (<code class="text-white font-mono">Password123!</code>)</span>
+                        </label>
+                    </div>
+                @endif
+
+                <!-- Form Konfirmasi Keamanan -->
+                <div class="space-y-3 pt-2 border-t border-white/10">
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1">
-                            Ketik persis teks: <span class="text-white font-mono font-bold select-all">SAYA SETUJU RESET DATA</span>
+                            Ketik persis teks konfirmasi: <span class="text-white font-mono font-bold select-all bg-white/10 px-1.5 py-0.5 rounded">{{ $this->expectedConfirmationText }}</span>
                         </label>
                         <input type="text" wire:model="confirmResetText" placeholder="Ketik teks konfirmasi di sini"
-                            class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-red focus:ring-0">
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/15 text-xs text-white focus:border-up-red focus:ring-0 font-mono">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1">Masukkan Kata Sandi Akun Anda:</label>
-                        <input type="password" wire:model="confirmPassword" placeholder="Kata sandi akun saat ini"
-                            class="w-full px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-red focus:ring-0">
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Masukkan Kata Sandi Akun Anda Saat Ini:</label>
+                        <input type="password" wire:model="confirmPassword" placeholder="Kata sandi akun Anda untuk validasi"
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/15 text-xs text-white focus:border-up-red focus:ring-0">
                     </div>
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2">
+                <!-- Footer Aksi -->
+                <div class="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 pt-2">
                     <button type="button" wire:click="$set('showResetModal', false)"
-                        class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white text-xs font-semibold">
+                        class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white text-xs font-semibold cursor-pointer">
                         Batal
                     </button>
                     <button type="button" wire:click="eksekusiReset" wire:loading.attr="disabled"
-                        class="px-4 py-2 rounded-xl bg-up-red hover:bg-red-600 text-white text-xs font-bold shadow-md transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer">
-                        <span wire:loading.remove wire:target="eksekusiReset">Ya, Eksekusi Safe Reset</span>
-                        <span wire:loading wire:target="eksekusiReset">Memproses Reset...</span>
+                        class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-up-red hover:bg-red-600 text-white text-xs font-bold shadow-md shadow-up-red/25 transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2">
+                        <span wire:loading.remove wire:target="eksekusiReset">⚠️ Eksekusi Pembersihan Data</span>
+                        <span wire:loading wire:target="eksekusiReset">Memproses Pembersihan Database...</span>
                     </button>
                 </div>
             </div>
