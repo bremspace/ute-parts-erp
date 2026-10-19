@@ -3,6 +3,21 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-19 — Fitur Ambil Foto Produk Langsung dari Kamera (WMS Master Produk) ✅
+
+- **[Integrasi Kamera Native & Viewfinder Live]:**
+  - Menambahkan tombol aksi khusus `📸 Ambil Foto (Kamera)` dengan atribut `accept="image/*" capture="environment"` pada form Tambah Produk dan Edit Produk di WMS (`produk-tab.blade.php`).
+  - Mengaktifkan kamera belakang ponsel secara langsung saat diklik di perangkat smartphone (Android / iOS) tanpa harus membuka direktori file manager / galeri terlebih dahulu.
+  - Menyediakan modal viewfinder kamera live (`kameraProdukHandler` Alpine.js) dengan dukungan WebRTC `getUserMedia`, opsi switch kamera depan/belakang, overlay grid panduan, dan tombol jepret langsung untuk pengguna laptop / desktop / tablet yang memiliki webcam.
+  - Mempertahankan opsi `📁 Pilih dari Galeri / File` untuk upload file gambar jamak dari penyimpanan lokal.
+- **[Sinkronisasi & Manajemen Foto di Livewire]:**
+  - Menambahkan hook `updatedFotoKameraUpload` dan `updatedEditFotoKameraUpload` di `ProdukTab.php` untuk memvalidasi dan otomatis menggabungkan foto jepretan kamera ke antrean foto produk siap simpan.
+  - Menyediakan fitur hapus individual foto baru (`hapusFotoUploadBaru`, `hapusEditFotoUploadBaru`) dengan indikator foto utama otomatis.
+  - Semua foto hasil kamera tetap otomatis terkonversi dan terkompresi ke WebP responsive (full & thumbnail 250px) hemat storage melalui `ProductImageService`.
+- **[Pengujian & Verifikasi]:**
+  - Menambahkan unit/feature test `test_produk_tab_livewire_can_capture_photo_directly_from_camera` pada `ProdukFotoManagementTest.php` (lulus 5/5 tests, 38 assertions).
+  - Format kode sesuai PSR-12 dengan Laravel Pint dan build aset produksi Vite sukses.
+
 ## 2026-10-18 — Penyederhanaan Struk Transaksi, Pembersihan Pesan WA, Bulk Pindah Rak & Kustomisasi Salin Data WMS ✅
 
 - **[Penyederhanaan Menu Struk Transaksi Selesai]:**

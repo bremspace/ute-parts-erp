@@ -3,7 +3,8 @@
         setWmsView(mode) {
             this.wmsViewMode = mode;
             try { localStorage.setItem('ute-wms-view-mode', mode); } catch (e) {}
-        }
+        },
+        ...kameraProdukHandler()
      }">
     <!-- TAB 1b: MASTER PRODUK -->
         <div class="space-y-4">
@@ -2096,18 +2097,64 @@
                         </div>
                     </div>
 
-                    <!-- Foto Produk Upload -->
-                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
-                        <label class="block text-xs font-semibold text-ink-300">Foto Produk (WebP Otomatis)</label>
-                        <input type="file" wire:model="fotoUploads" multiple accept="image/*" class="w-full text-xs text-ink-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-xl file:border-0 file:bg-up-primary file:text-white file:font-bold file:text-xs file:cursor-pointer" />
-                        <p class="text-[9px] text-ink-500">Upload satu atau beberapa foto (JPG/PNG/WebP). Otomatis dikompresi ke WebP responsive (full &amp; thumbnail).</p>
-                        @if($fotoUploads)
-                            <div class="flex gap-2 flex-wrap pt-2">
-                                @foreach($fotoUploads as $fu)
-                                    <div class="w-14 h-14 rounded-lg overflow-hidden border border-white/20 bg-black/40 relative">
-                                        <img src="{{ $fu->temporaryUrl() }}" class="w-full h-full object-cover">
-                                    </div>
-                                @endforeach
+                    <!-- Foto Produk Upload & Kamera -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label class="block text-xs font-bold text-white">Foto Produk</label>
+                                <p class="text-[10px] text-ink-400">Otomatis kompresi WebP (full &amp; thumbnail 250px).</p>
+                            </div>
+                            <span wire:loading wire:target="fotoUploads, fotoKameraUpload" class="text-[10px] text-up-mint font-semibold animate-pulse flex items-center gap-1">
+                                <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                Mengunggah…
+                            </span>
+                        </div>
+
+                        <!-- Tombol Pilihan: Kamera Ponsel vs Galeri / File -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <!-- 1. Tombol Kamera HP (Memicu Kamera Belakang Ponsel Secara Langsung) -->
+                            <label for="input-kamera-tambah" class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-up-mint/20 to-teal-500/20 hover:from-up-mint/30 hover:to-teal-500/30 border border-up-mint/40 text-up-mint font-bold text-xs cursor-pointer transition active:scale-[0.98] text-center shadow-sm">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <span>📸 Ambil Foto (Kamera)</span>
+                                <input type="file" id="input-kamera-tambah" wire:model="fotoKameraUpload" accept="image/*" capture="environment" class="hidden" />
+                            </label>
+
+                            <!-- 2. Tombol Upload dari Galeri / File -->
+                            <label for="input-file-tambah" class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-semibold text-xs cursor-pointer transition active:scale-[0.98] text-center">
+                                <svg class="w-4 h-4 shrink-0 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                <span>📁 Pilih dari Galeri / File</span>
+                                <input type="file" id="input-file-tambah" wire:model="fotoUploads" multiple accept="image/*" class="hidden" />
+                            </label>
+                        </div>
+
+                        <!-- Opsi Live Viewfinder Webcam untuk Laptop / Desktop -->
+                        <div class="flex items-center justify-between pt-0.5">
+                            <button type="button" @click="bukaLiveKamera('tambah')" class="text-[11px] text-up-primary hover:underline flex items-center gap-1.5 cursor-pointer font-medium">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                <span>Buka Viewfinder Webcam / Kamera Live</span>
+                            </button>
+                        </div>
+
+                        <!-- Daftar Thumbnail Foto Baru Siap Simpan -->
+                        @if(!empty($fotoUploads))
+                            <div class="space-y-1.5 pt-2 border-t border-white/5">
+                                <div class="flex items-center justify-between text-[11px] text-ink-400">
+                                    <span>{{ count($fotoUploads) }} foto siap disimpan:</span>
+                                    <span class="text-[10px] text-up-mint font-semibold">Foto #1 otomatis jadi Foto Utama</span>
+                                </div>
+                                <div class="flex gap-2 flex-wrap">
+                                    @foreach($fotoUploads as $idx => $fu)
+                                        <div class="w-16 h-16 rounded-xl overflow-hidden border border-white/20 bg-black/40 relative group shadow-sm">
+                                            <img src="{{ $fu->temporaryUrl() }}" class="w-full h-full object-cover">
+                                            <span class="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-mono text-center text-white truncate py-0.5">
+                                                {{ $idx === 0 ? 'Utama' : '#' . ($idx + 1) }}
+                                            </span>
+                                            <button type="button" wire:click="hapusFotoUploadBaru({{ $idx }})" class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-up-red text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 cursor-pointer shadow" title="Hapus foto ini">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    @endforeach
+                                </div>
                             </div>
                         @endif
                     </div>
@@ -2953,18 +3000,58 @@
                             <p class="text-[11px] text-ink-500">Belum ada foto tersimpan untuk produk ini.</p>
                         @endif
 
-                        <!-- Tambah Foto Baru -->
-                        <div class="pt-2 border-t border-white/5 space-y-2">
-                            <label class="block text-[11px] font-semibold text-ink-300">Tambah Foto Baru</label>
-                            <input type="file" wire:model="editFotoUploads" multiple accept="image/*" class="w-full text-xs text-ink-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-xl file:border-0 file:bg-up-primary file:text-white file:font-bold file:text-xs file:cursor-pointer" />
-                            <p class="text-[9px] text-ink-500">Foto baru akan otomatis dikonversi ke WebP full + thumbnail 250px hemat storage.</p>
-                            @if($editFotoUploads)
-                                <div class="flex gap-2 flex-wrap pt-1">
-                                    @foreach($editFotoUploads as $efu)
-                                        <div class="w-12 h-12 rounded-lg overflow-hidden border border-white/20 bg-black/40">
-                                            <img src="{{ $efu->temporaryUrl() }}" class="w-full h-full object-cover">
-                                        </div>
-                                    @endforeach
+                        <!-- Tambah Foto Baru (Kamera & Galeri) -->
+                        <div class="pt-3 border-t border-white/5 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-white">Tambah Foto Baru</label>
+                                    <p class="text-[9px] text-ink-500">Foto baru otomatis dikonversi ke WebP full + thumbnail 250px hemat storage.</p>
+                                </div>
+                                <span wire:loading wire:target="editFotoUploads, editFotoKameraUpload" class="text-[10px] text-up-mint font-semibold animate-pulse flex items-center gap-1">
+                                    <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                    Mengunggah…
+                                </span>
+                            </div>
+
+                            <!-- Tombol Aksi: Kamera HP vs Galeri -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <!-- 1. Kamera HP -->
+                                <label for="input-kamera-edit" class="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-up-mint/20 to-teal-500/20 hover:from-up-mint/30 hover:to-teal-500/30 border border-up-mint/40 text-up-mint font-bold text-xs cursor-pointer transition active:scale-[0.98] text-center shadow-sm">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <span>📸 Ambil Foto (Kamera)</span>
+                                    <input type="file" id="input-kamera-edit" wire:model="editFotoKameraUpload" accept="image/*" capture="environment" class="hidden" />
+                                </label>
+
+                                <!-- 2. Galeri / File -->
+                                <label for="input-file-edit" class="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-semibold text-xs cursor-pointer transition active:scale-[0.98] text-center">
+                                    <svg class="w-4 h-4 shrink-0 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <span>📁 Pilih dari Galeri / File</span>
+                                    <input type="file" id="input-file-edit" wire:model="editFotoUploads" multiple accept="image/*" class="hidden" />
+                                </label>
+                            </div>
+
+                            <!-- Opsi Live Webcam -->
+                            <div class="flex items-center justify-between pt-0.5">
+                                <button type="button" @click="bukaLiveKamera('edit')" class="text-[11px] text-up-primary hover:underline flex items-center gap-1.5 cursor-pointer font-medium">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                    <span>Buka Viewfinder Webcam / Kamera Live</span>
+                                </button>
+                            </div>
+
+                            <!-- Thumbnail Foto Baru Siap Simpan -->
+                            @if(!empty($editFotoUploads))
+                                <div class="space-y-1 pt-1.5">
+                                    <span class="text-[10px] text-ink-400 block">{{ count($editFotoUploads) }} foto baru siap ditambahkan:</span>
+                                    <div class="flex gap-2 flex-wrap">
+                                        @foreach($editFotoUploads as $idx => $efu)
+                                            <div class="w-14 h-14 rounded-lg overflow-hidden border border-white/20 bg-black/40 relative group">
+                                                <img src="{{ $efu->temporaryUrl() }}" class="w-full h-full object-cover">
+                                                <button type="button" wire:click="hapusEditFotoUploadBaru({{ $idx }})" class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-up-red text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 cursor-pointer shadow" title="Hapus foto ini">
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </div>
                             @endif
                         </div>
@@ -3461,6 +3548,101 @@
         </div>
     @endif
 
+    <!-- MODAL: VIEWFINDER KAMERA LIVE (WEBCAM / KAMERA HP) -->
+    <div
+        x-show="showModalKamera"
+        x-cloak
+        class="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md p-4"
+    >
+        <div class="w-full max-w-md glass-panel p-4 sm:p-5 rounded-3xl border border-white/10 shadow-2xl space-y-3.5 relative">
+            <!-- Header Modal Kamera -->
+            <div class="flex items-center justify-between pb-2.5 border-b border-white/10">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-up-red animate-pulse"></span>
+                    <h3 class="text-sm font-bold text-white">Viewfinder Kamera Produk</h3>
+                </div>
+                <button type="button" @click="tutupKamera()" class="p-1 rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition cursor-pointer">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Area Viewfinder Video & Error -->
+            <div class="relative w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center">
+                <template x-if="isLoadingKamera">
+                    <div class="text-center space-y-2 text-ink-400">
+                        <svg class="animate-spin w-8 h-8 mx-auto text-up-mint" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                        <p class="text-xs">Mengaktifkan sensor kamera…</p>
+                    </div>
+                </template>
+
+                <template x-if="kameraError">
+                    <div class="p-4 text-center space-y-2">
+                        <p class="text-xs text-up-red font-semibold" x-text="kameraError"></p>
+                        <button type="button" @click="mulaiStream()" class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs text-white">
+                            Coba Lagi
+                        </button>
+                    </div>
+                </template>
+
+                <video
+                    x-ref="kameraVideo"
+                    autoplay
+                    playsinline
+                    muted
+                    class="w-full h-full object-cover"
+                    x-show="!isLoadingKamera && !kameraError"
+                ></video>
+
+                <!-- Grid Guide Overlay -->
+                <div class="absolute inset-0 pointer-events-none border border-white/15 grid grid-cols-3 grid-rows-3" x-show="!isLoadingKamera && !kameraError">
+                    <div class="border-r border-b border-white/10"></div>
+                    <div class="border-r border-b border-white/10"></div>
+                    <div class="border-b border-white/10"></div>
+                    <div class="border-r border-b border-white/10"></div>
+                    <div class="border-r border-b border-white/10"></div>
+                    <div class="border-b border-white/10"></div>
+                    <div class="border-r border-b border-white/10"></div>
+                    <div class="border-r border-b border-white/10"></div>
+                    <div></div>
+                </div>
+
+                <!-- Canvas Tersembunyi untuk Snapshot Frame -->
+                <canvas x-ref="kameraCanvas" class="hidden"></canvas>
+            </div>
+
+            <!-- Tombol Kontrol Jepret & Switch Kamera -->
+            <div class="flex items-center justify-between gap-2 pt-1">
+                <button
+                    type="button"
+                    @click="switchKamera()"
+                    class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                    title="Ganti kamera depan / belakang"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>Putar</span>
+                </button>
+
+                <button
+                    type="button"
+                    @click="jepretFoto()"
+                    :disabled="isLoadingKamera || !!kameraError"
+                    class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-xs shadow-lg shadow-up-mint/25 flex items-center justify-center gap-2 transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span>Jepret &amp; Gunakan Foto</span>
+                </button>
+
+                <button
+                    type="button"
+                    @click="tutupKamera()"
+                    class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white text-xs font-semibold transition cursor-pointer"
+                >
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- [F1-4] Modal riwayat audit trail per produk --}}
     @include('partials.riwayat-modal')
 
@@ -3477,6 +3659,148 @@
     </datalist>
 
     <script>
+        window.kameraProdukHandler = function() {
+            return {
+                showModalKamera: false,
+                kameraTarget: 'tambah',
+                streamKamera: null,
+                isLoadingKamera: false,
+                kameraError: '',
+                facingModeKamera: 'environment',
+
+                bukaLiveKamera(target = 'tambah') {
+                    this.kameraTarget = target;
+                    const hasMediaDevices = typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+                    const isSecure = typeof window !== 'undefined' && (window.isSecureContext || ['localhost', '127.0.0.1'].includes(window.location.hostname));
+
+                    if (!hasMediaDevices || !isSecure) {
+                        // Fallback praktis jika browser membatasi WebRTC (misal HTTP non-SSL di ponsel)
+                        const inputId = target === 'tambah' ? 'input-kamera-tambah' : 'input-kamera-edit';
+                        const inputEl = document.getElementById(inputId);
+                        if (inputEl) {
+                            inputEl.click();
+                            window.dispatchEvent(new CustomEvent('alert', {
+                                detail: { type: 'info', message: 'Membuka kamera native perangkat...' }
+                            }));
+                            return;
+                        }
+                    }
+
+                    this.showModalKamera = true;
+                    this.$nextTick(() => {
+                        this.mulaiStream();
+                    });
+                },
+
+                async mulaiStream() {
+                    this.hentikanStream();
+                    this.isLoadingKamera = true;
+                    this.kameraError = '';
+
+                    try {
+                        const constraints = {
+                            video: {
+                                facingMode: { ideal: this.facingModeKamera },
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            },
+                            audio: false
+                        };
+                        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        this.streamKamera = stream;
+                        if (this.$refs.kameraVideo) {
+                            this.$refs.kameraVideo.srcObject = stream;
+                            await this.$refs.kameraVideo.play().catch(() => {});
+                        }
+                    } catch (err) {
+                        console.error('Gagal akses kamera:', err);
+                        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                            this.kameraError = 'Izin akses kamera ditolak. Harap izinkan akses kamera di pengaturan browser.';
+                        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                            this.kameraError = 'Perangkat kamera tidak ditemukan.';
+                        } else {
+                            this.kameraError = 'Tidak dapat membuka kamera: ' + (err.message || 'Error hardware kamera');
+                        }
+                    } finally {
+                        this.isLoadingKamera = false;
+                    }
+                },
+
+                switchKamera() {
+                    this.facingModeKamera = (this.facingModeKamera === 'environment' ? 'user' : 'environment');
+                    this.mulaiStream();
+                },
+
+                hentikanStream() {
+                    if (this.streamKamera) {
+                        try {
+                            this.streamKamera.getTracks().forEach(track => track.stop());
+                        } catch (e) {}
+                        this.streamKamera = null;
+                    }
+                    if (this.$refs.kameraVideo) {
+                        this.$refs.kameraVideo.srcObject = null;
+                    }
+                },
+
+                tutupKamera() {
+                    this.hentikanStream();
+                    this.showModalKamera = false;
+                    this.kameraError = '';
+                },
+
+                jepretFoto() {
+                    const video = this.$refs.kameraVideo;
+                    const canvas = this.$refs.kameraCanvas;
+                    if (!video || !canvas || !video.videoWidth) {
+                        window.dispatchEvent(new CustomEvent('alert', {
+                            detail: { type: 'error', message: 'Kamera belum siap, tunggu sebentar.' }
+                        }));
+                        return;
+                    }
+
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            window.dispatchEvent(new CustomEvent('alert', {
+                                detail: { type: 'error', message: 'Gagal mengambil gambar dari sensor kamera.' }
+                            }));
+                            return;
+                        }
+
+                        const fileName = 'foto-kamera-' + Date.now() + '.jpg';
+                        const file = new File([blob], fileName, { type: 'image/jpeg' });
+                        const targetField = this.kameraTarget === 'tambah' ? 'fotoKameraUpload' : 'editFotoKameraUpload';
+
+                        this.tutupKamera();
+
+                        window.dispatchEvent(new CustomEvent('alert', {
+                            detail: { type: 'info', message: 'Mengompresi dan mengunggah foto kamera...' }
+                        }));
+
+                        // Unggah file ke Livewire component via Livewire upload API
+                        @this.upload(
+                            targetField,
+                            file,
+                            () => {
+                                // Selesai terunggah (ditangani hook updated*FotoKameraUpload di PHP)
+                            },
+                            (error) => {
+                                console.error('Upload foto kamera gagal:', error);
+                                window.dispatchEvent(new CustomEvent('alert', {
+                                    detail: { type: 'error', message: 'Gagal mengunggah foto kamera: ' + error }
+                                }));
+                            }
+                        );
+                    }, 'image/jpeg', 0.92);
+                }
+            };
+        };
+
         document.addEventListener('livewire:init', () => {
             Livewire.on('salin-teks', (event) => {
                 const data = Array.isArray(event) ? event[0] : event;

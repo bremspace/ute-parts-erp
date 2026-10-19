@@ -186,6 +186,8 @@ class ProdukTab extends Component
     // Foto Uploads (Tambah Produk)
     public $fotoUploads = [];
 
+    public $fotoKameraUpload = null;
+
     // Stok tab filter default (dipakai modal tambah stok) — sama dgn mount shell lama
     public ?int $filterGudangId = null;
 
@@ -239,6 +241,8 @@ class ProdukTab extends Component
     public array $editFotoExisting = [];
 
     public $editFotoUploads = [];
+
+    public $editFotoKameraUpload = null;
 
     // Quick Add Modal (Kategori, Brand, Kualitas, Satuan, Kondisi, Tipe HP)
     public bool $showQuickAddModal = false;
@@ -468,6 +472,7 @@ class ProdukTab extends Component
             'is_ondemand' => false,
         ];
         $this->fotoUploads = [];
+        $this->fotoKameraUpload = null;
         $this->showProdukModal = true;
     }
 
@@ -696,6 +701,7 @@ class ProdukTab extends Component
 
             $this->showProdukModal = false;
             $this->fotoUploads = [];
+            $this->fotoKameraUpload = null;
             $this->dispatch('alert', [
                 'type' => 'success',
                 'message' => 'Produk tersimpan'.((int) $this->produkForm['stok_awal'] > 0 ? ' + jurnal pembelian dibuat' : ''),
@@ -773,6 +779,7 @@ class ProdukTab extends Component
 
         $this->editFotoExisting = $p->galeri_foto;
         $this->editFotoUploads = [];
+        $this->editFotoKameraUpload = null;
 
         // Load lokasi rak & stok per gudang untuk produk ini
         $stokList = StokItem::with(['gudang', 'rak'])
@@ -833,6 +840,46 @@ class ProdukTab extends Component
             if (! empty($this->editFotoExisting) && ! collect($this->editFotoExisting)->contains('is_primary', true)) {
                 $this->editFotoExisting[0]['is_primary'] = true;
             }
+        }
+    }
+
+    public function updatedFotoKameraUpload($file): void
+    {
+        if ($file) {
+            $this->validateOnly('fotoKameraUpload', [
+                'fotoKameraUpload' => 'image|max:15360',
+            ]);
+            $this->fotoUploads[] = $file;
+            $this->fotoKameraUpload = null;
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Foto kamera berhasil ditambahkan ke daftar!']);
+        }
+    }
+
+    public function updatedEditFotoKameraUpload($file): void
+    {
+        if ($file) {
+            $this->validateOnly('editFotoKameraUpload', [
+                'editFotoKameraUpload' => 'image|max:15360',
+            ]);
+            $this->editFotoUploads[] = $file;
+            $this->editFotoKameraUpload = null;
+            $this->dispatch('alert', ['type' => 'success', 'message' => 'Foto kamera berhasil ditambahkan ke daftar!']);
+        }
+    }
+
+    public function hapusFotoUploadBaru(int $index): void
+    {
+        if (isset($this->fotoUploads[$index])) {
+            unset($this->fotoUploads[$index]);
+            $this->fotoUploads = array_values($this->fotoUploads);
+        }
+    }
+
+    public function hapusEditFotoUploadBaru(int $index): void
+    {
+        if (isset($this->editFotoUploads[$index])) {
+            unset($this->editFotoUploads[$index]);
+            $this->editFotoUploads = array_values($this->editFotoUploads);
         }
     }
 
@@ -924,6 +971,7 @@ class ProdukTab extends Component
 
             $this->showEditProdukModal = false;
             $this->editFotoUploads = [];
+            $this->editFotoKameraUpload = null;
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Master produk berhasil diperbarui']);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);

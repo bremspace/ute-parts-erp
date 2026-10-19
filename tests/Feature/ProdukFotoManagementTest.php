@@ -173,4 +173,58 @@ class ProdukFotoManagementTest extends TestCase
         $this->assertTrue($p->foto[1]['is_primary']);
         $this->assertEquals($p->foto[1]['url'], $p->foto_utama);
     }
+
+    public function test_produk_tab_livewire_can_capture_photo_directly_from_camera(): void
+    {
+        Storage::fake('public');
+        $this->authedAdmin();
+
+        $kat = KategoriProduk::create(['nama' => 'Camera Sparepart']);
+
+        $fotoKamera1 = UploadedFile::fake()->image('kamera_snap_1.jpg', 640, 480);
+        $fotoKamera2 = UploadedFile::fake()->image('kamera_snap_2.jpg', 640, 480);
+
+        // Test pada Tambah Produk via kamera langsung
+        $component = Livewire::test(ProdukTab::class)
+            ->call('openProdukModal')
+            ->set('fotoKameraUpload', $fotoKamera1);
+
+        // Verifikasi fotoKameraUpload otomatis pindah ke fotoUploads dan fotoKameraUpload di-reset
+        $this->assertCount(1, $component->get('fotoUploads'));
+        $this->assertNull($component->get('fotoKameraUpload'));
+
+        // Ambil foto kedua via kamera
+        $component->set('fotoKameraUpload', $fotoKamera2);
+        $this->assertCount(2, $component->get('fotoUploads'));
+
+        // Test hapus salah satu foto upload baru
+        $component->call('hapusFotoUploadBaru', 1);
+        $this->assertCount(1, $component->get('fotoUploads'));
+
+        // Simpan produk
+        $component->set('produkForm.nama', 'Kamera Modul Depan Original')
+            ->set('produkForm.kategori_id', $kat->id)
+            ->set('produkForm.harga_beli', 85000)
+            ->set('produkForm.harga_jual_retail', 150000)
+            ->set('produkForm.sku', 'CAM-MOD-01')
+            ->call('simpanProduk');
+
+        $p = Produk::where('sku', 'CAM-MOD-01')->orWhereHas('skuVariants', fn ($q) => $q->where('sku', 'CAM-MOD-01'))->first();
+        $this->assertNotNull($p);
+        $this->assertCount(1, $p->foto);
+
+        // Test pada Edit Produk via kamera langsung
+        $fotoKameraEdit = UploadedFile::fake()->image('kamera_snap_edit.jpg', 640, 480);
+        $editComponent = Livewire::test(ProdukTab::class)
+            ->call('openEditProdukModal', $p->id)
+            ->set('editFotoKameraUpload', $fotoKameraEdit);
+
+        $this->assertCount(1, $editComponent->get('editFotoUploads'));
+        $this->assertNull($editComponent->get('editFotoKameraUpload'));
+
+        $editComponent->call('simpanEditProduk');
+
+        $p->refresh();
+        $this->assertCount(2, $p->foto);
+    }
 }
