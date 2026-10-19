@@ -257,7 +257,7 @@
             </div>
 
             <!-- SID RETAIL STYLE BIG DISPLAY TOTAL -->
-            <div class="px-3.5 py-1.5 rounded-xl bg-ink-900 dark:bg-black/80 border border-ink-700/80 dark:border-white/10 flex flex-col items-end min-w-[150px] sm:min-w-[180px] min-h-[44px] justify-center flex-shrink-0 shadow-inner">
+            <div class="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-ink-900 dark:bg-black/80 border border-ink-700/80 dark:border-white/10 flex sm:flex-col justify-between sm:justify-center items-center sm:items-end min-w-[150px] sm:min-w-[180px] min-h-[44px] flex-shrink-0 shadow-inner">
                 <span class="text-[9px] uppercase font-bold text-ink-400 tracking-wider">TOTAL TAGIHAN</span>
                 <span class="text-xl sm:text-2xl font-black font-mono text-up-mint tabular-nums leading-tight">
                     Rp {{ number_format($totalAkhir, 0, ',', '.') }}
@@ -268,40 +268,40 @@
         <!-- BARIS 2: SHORTCUT AKSI KASIR (RETUR, RIWAYAT, ONLINE, SERVIS) & DATA KONSUMEN TERPILIH -->
         <div class="flex items-center justify-between gap-2.5 pt-2 border-t border-ink-200/50 dark:border-white/5 flex-wrap">
             <!-- Left: Shortcut Actions -->
-            <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none w-full sm:w-auto flex-nowrap sm:flex-wrap pb-0.5">
                 <a
                     href="/app/pos/retur"
-                    class="px-3 py-1.5 rounded-xl border border-up-red/30 bg-up-red/10 hover:bg-up-red/20 text-xs font-bold text-up-red transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98]"
+                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-up-red/30 bg-up-red/10 hover:bg-up-red/20 text-xs font-bold text-up-red transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
                     title="Buka Manajemen Retur Konsumen"
                 >
                     <svg class="w-4 h-4 text-up-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                     </svg>
-                    <span>Retur Konsumen</span>
+                    <span>Retur</span>
                 </a>
 
                 <button
                     type="button"
                     wire:click="bukaRiwayatTransaksi"
-                    class="px-3 py-1.5 rounded-xl border border-ink-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 text-xs font-bold text-ink-700 dark:text-ink-200 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98]"
+                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-ink-200/80 dark:border-white/10 bg-black/5 dark:bg-white/5 hover:bg-black/10 text-xs font-bold text-ink-700 dark:text-ink-200 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
                     title="Riwayat Transaksi Kasir Hari Ini"
                 >
                     <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
-                    <span>Riwayat Transaksi</span>
+                    <span>Riwayat</span>
                 </button>
 
                 <button
                     type="button"
                     wire:click="bukaPesananOnlineModal"
-                    class="px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98]"
+                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
                     title="Pesanan Online Pickup Cabang"
                 >
                     <svg class="w-4 h-4 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
-                    <span>Pesanan Online</span>
+                    <span>Online</span>
                     @if($jumlahPesananOnline > 0)
                         <span class="min-w-[18px] h-4.5 px-1 rounded-full bg-up-amber text-ink-950 text-[10px] font-black flex items-center justify-center tabular-nums">{{ $jumlahPesananOnline }}</span>
                     @endif
@@ -310,7 +310,7 @@
                 <button
                     type="button"
                     wire:click="bukaBayarServisModal"
-                    class="px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-xs font-bold text-blue-500 dark:text-blue-400 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98]"
+                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-xs font-bold text-blue-500 dark:text-blue-400 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
                     title="Bayar Tiket Servis di Kasir"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -752,9 +752,9 @@
             </div>
 
             <!-- Right Breakdown & Action Buttons -->
-            <div class="flex items-center gap-3 sm:gap-4 flex-wrap ml-auto">
+            <div class="flex items-center gap-3 sm:gap-4 flex-wrap ml-auto w-full sm:w-auto justify-between sm:justify-end">
                 <!-- Mini Breakdown -->
-                <div class="flex items-center gap-2.5 sm:gap-3 text-xs text-ink-600 dark:text-ink-400">
+                <div class="flex items-center gap-2 sm:gap-3 text-xs text-ink-600 dark:text-ink-400 flex-wrap">
                     <div>
                         <span>Subtotal:</span>
                         <span class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
@@ -774,11 +774,11 @@
                 </div>
 
                 <!-- Action Buttons: Batal, Tahan & BAYAR -->
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
                     <button
                         type="button"
                         wire:click="clearCart"
-                        class="px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-up-red/15 dark:bg-white/5 dark:hover:bg-up-red/20 text-ink-600 hover:text-up-red dark:text-ink-400 dark:hover:text-up-red font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px]"
+                        class="px-3 sm:px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-up-red/15 dark:bg-white/5 dark:hover:bg-up-red/20 text-ink-600 hover:text-up-red dark:text-ink-400 dark:hover:text-up-red font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px]"
                     >
                         Batal (ESC)
                     </button>
@@ -786,7 +786,7 @@
                     <button
                         type="button"
                         wire:click="tahanTransaksi"
-                        class="px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px]"
+                        class="px-3 sm:px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px]"
                     >
                         Tahan (F6)
                     </button>
@@ -794,7 +794,7 @@
                     <button
                         type="button"
                         wire:click="openPaymentModal"
-                        class="px-5 py-2 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-sm shadow-md shadow-up-mint/25 transition active:scale-95 cursor-pointer min-h-[44px] flex items-center gap-2"
+                        class="flex-1 sm:flex-initial px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-sm shadow-md shadow-up-mint/25 transition active:scale-95 cursor-pointer min-h-[44px] flex items-center justify-center gap-2"
                     >
                         <span>BAYAR (F4)</span>
                         <span class="px-2 py-0.5 rounded-md bg-ink-950/20 text-ink-950 text-xs font-mono font-black tabular-nums">

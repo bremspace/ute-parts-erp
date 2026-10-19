@@ -180,4 +180,34 @@ class TransaksiRoutesSmokeTest extends TestCase
             ->get('/app/servis')
             ->assertOk();
     }
+
+    public function test_screen_wake_lock_hanya_muncul_di_menu_pos(): void
+    {
+        // 1. Pada menu kasir POS, tombol wake lock (kunci layar) wajib tampil
+        $posResponse = $this->actingAs($this->user)
+            ->withSession(['cabang_id' => $this->cabang->id])
+            ->get('/app/pos');
+
+        $posResponse->assertOk()
+            ->assertSee('screenWakeLock()')
+            ->assertSee('Kunci Layar Tetap Menyala');
+
+        // 2. Pada menu Dashboard, tombol wake lock TIDAK boleh tampil
+        $dashboardResponse = $this->actingAs($this->user)
+            ->withSession(['cabang_id' => $this->cabang->id])
+            ->get('/app/dashboard');
+
+        $dashboardResponse->assertOk()
+            ->assertDontSee('screenWakeLock()')
+            ->assertDontSee('Kunci Layar Tetap Menyala');
+
+        // 3. Pada menu WMS, tombol wake lock TIDAK boleh tampil
+        $wmsResponse = $this->actingAs($this->user)
+            ->withSession(['cabang_id' => $this->cabang->id])
+            ->get('/app/wms');
+
+        $wmsResponse->assertOk()
+            ->assertDontSee('screenWakeLock()')
+            ->assertDontSee('Kunci Layar Tetap Menyala');
+    }
 }

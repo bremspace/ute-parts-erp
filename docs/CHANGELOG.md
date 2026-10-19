@@ -3,6 +3,23 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-20 — Penyesuaian Tombol Layar Kunci Header Khusus POS & Optimasi Layout Header/Modul Mobile ✅
+
+- **[Scoping Tombol Layar Kunci (Wake Lock) ke Menu Kasir POS]:**
+  - Mengisolasi tombol Screen Wake Lock di header backoffice (`backoffice.blade.php`) dengan kondisi `@if(request()->routeIs('pos*'))` agar HANYA muncul saat pengguna berada di modul Kasir POS (`/app/pos*`).
+  - Menghilangkan tombol kunci layar di modul lain (Dashboard, WMS, Servis, CRM, HR, Akunting, Report, Rbac, dll) untuk menghemat ruang header dan menghindari distraksi.
+- **[Optimalisasi Layout & Margin Header Mobile (HP)]:**
+  - Menyesuaikan tinggi header menjadi adaptif `h-14 sm:h-16` dan padding `px-2.5 sm:px-4 lg:px-6` agar memaksimalkan viewport vertikal pada layar ponsel.
+  - Menstandarkan ukuran touch target seluruh tombol header pada mobile (`min-w-[34px] min-h-[34px] p-1.5 sm:p-2`) dengan jarak antar-elemen `gap-1 sm:gap-2 lg:gap-3`.
+  - Mengoptimalkan tombol PWA installer menjadi icon button ringkas pada mobile dan label teks penuh pada tablet/desktop.
+  - Membatasi lebar judul header modul dengan `truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none` agar tidak bertabrakan dengan kelompok tombol aksi di sisi kanan.
+- **[Optimalisasi UX Mobile di Seluruh Modul Backoffice]:**
+  - Menyesuaikan padding kontainer `<main>` menjadi `p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6` agar seluruh kartu, tabel, dan form di semua modul tidak terhimpit di layar kecil (360px - 414px) serta tidak tertutup floating bottom dock navigation.
+  - Memperbaiki layout modul Kasir POS pada mobile: display Total Tagihan adaptif full-width horizontal, shortcut aksi kasir (Retur, Riwayat, Online, Servis) scrollable horizontal halus tanpa meluber, serta tombol BAYAR responsif full-width mudah dijangkau satu tangan.
+- **[Pengujian & Verifikasi]:**
+  - Menambahkan automated assertion `test_screen_wake_lock_hanya_muncul_di_menu_pos` di `TransaksiRoutesSmokeTest.php` (8 tests, 33 assertions passed 100%).
+  - Lulus formatting Laravel Pint dan kompilasi aset produksi Vite (`npm run build`).
+
 ## 2026-10-19 — Fitur Ambil Foto Produk Langsung dari Kamera (WMS Master Produk) ✅
 
 - **[Integrasi Kamera Native & Viewfinder Live]:**

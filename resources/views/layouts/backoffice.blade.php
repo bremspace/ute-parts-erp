@@ -474,25 +474,25 @@
         <!-- Main Content Area -->
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-ink-50 dark:bg-ink-950">
             <!-- Top App Bar -->
-            <header class="h-16 border-b border-ink-200/80 dark:border-white/5 bg-white/80 dark:bg-ink-900/60 backdrop-blur-md px-3 sm:px-4 lg:px-6 flex items-center justify-between z-20">
-                <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+            <header class="h-14 sm:h-16 border-b border-ink-200/80 dark:border-white/5 bg-white/80 dark:bg-ink-900/60 backdrop-blur-md px-2.5 sm:px-4 lg:px-6 flex items-center justify-between z-20">
+                <div class="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1 sm:flex-initial mr-1 sm:mr-0">
                     <!-- Menu Button: <768 toggle drawer · >=768 toggle collapse icon-rail (persist) -->
                     <button @click="toggleSidebar()"
-                            class="p-2 rounded-lg text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink-900 dark:hover:text-white transition-colors cursor-pointer flex-shrink-0"
+                            class="p-1.5 sm:p-2 rounded-xl text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink-900 dark:hover:text-white transition-colors cursor-pointer flex-shrink-0"
                             aria-label="Toggle menu"
                             aria-expanded="false"
                             :aria-expanded="(isMobile ? sidebarOpen : sidebarCollapsed).toString()">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                              :class="{ 'rotate-90': (isMobile ? sidebarOpen : sidebarCollapsed) }">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
-                    <h2 class="text-base sm:text-lg font-bold text-ink-900 dark:text-white tracking-wide lg:text-xl truncate">{{ $header ?? 'Ute Parts ERP' }}</h2>
+                    <h2 class="text-sm sm:text-base lg:text-xl font-bold text-ink-900 dark:text-white tracking-tight truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none">{{ $header ?? 'Ute Parts ERP' }}</h2>
                 </div>
 
                 <!-- Shortcuts, Install Button & Status Indicator -->
-                <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                <div class="flex items-center gap-1 sm:gap-2 lg:gap-3 flex-shrink-0">
                     <x-prism.pwa-install-prompt variant="button" />
 
                     <div class="hidden lg:flex items-center gap-2 text-xs text-ink-400">
@@ -508,16 +508,20 @@
 
                     <div class="h-4 w-[1px] bg-black/10 dark:bg-white/10 hidden lg:block"></div>
 
-                    <div class="flex items-center gap-1.5 sm:gap-2 text-xs font-medium text-up-mint">
-                        <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse flex-shrink-0"></span>
-                        <span class="hidden sm:inline">Online</span>
+                    <!-- Online Status Indicator: Green Dot (Hidden label on mobile) -->
+                    <div class="flex items-center gap-1.5 text-xs font-medium text-up-mint px-1 py-1 flex-shrink-0" title="Sistem Online & Terhubung">
+                        <span class="relative flex h-2 w-2 flex-shrink-0">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-up-mint opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-up-mint"></span>
+                        </span>
+                        <span class="hidden sm:inline text-[11px]">Online</span>
                     </div>
 
                     <!-- [2026] Font Size Switcher (Fluid rem scaling) -->
-                    <div class="relative" x-data="fontSizeManager()" @click.outside="open = false">
+                    <div class="relative flex-shrink-0" x-data="fontSizeManager()" @click.outside="open = false">
                         <button type="button" @click="open = !open"
                                 title="Ukuran Font" aria-label="Ukuran Font"
-                                class="p-2 sm:p-2.5 rounded-lg text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1">
+                                class="p-1.5 sm:p-2 rounded-xl text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-0.5 sm:gap-1 min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px]">
                             <span class="font-bold text-xs tracking-tighter">A<span class="text-[10px] font-normal">A</span></span>
                             <span class="hidden md:inline-block text-[10px] uppercase font-mono px-1 py-0.2 rounded bg-black/5 dark:bg-white/10" x-text="size"></span>
                         </button>
@@ -552,34 +556,36 @@
                         @livewire(\App\Modules\Notifikasi\Livewire\NotificationCenter::class)
                     @endauth
 
-                    <!-- [T-32] Screen Wake Lock Toggle (Kunci Layar Selalu Menyala) -->
-                    <div x-data="screenWakeLock()" x-init="init()" x-show="isSupported" class="flex-shrink-0" x-cloak>
-                        <button
-                            type="button"
-                            @click="toggle()"
-                            :class="isActive ? 'bg-up-mint/20 text-up-mint border-up-mint/40 dark:bg-up-mint/25' : 'text-ink-500 hover:text-ink-900 dark:text-ink-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 border-transparent'"
-                            class="p-2 sm:p-2.5 rounded-lg border transition flex items-center gap-1.5 cursor-pointer"
-                            :title="isActive ? 'Layar selalu menyala (Aktif) - Klik untuk matikan' : 'Kunci Layar: Cegah layar mati / sleep saat kasir & operasional'"
-                            aria-label="Kunci Layar Tetap Menyala"
-                        >
-                            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                            </svg>
-                            <span class="text-[11px] font-bold hidden xl:inline" x-text="isActive ? 'Layar ON' : 'Kunci Layar'"></span>
-                        </button>
-                    </div>
+                    <!-- [T-32] Screen Wake Lock Toggle (Kunci Layar Selalu Menyala) — HANYA DI MENU KASIR POS -->
+                    @if(request()->routeIs('pos*'))
+                        <div x-data="screenWakeLock()" x-init="init()" x-show="isSupported" class="flex-shrink-0" x-cloak>
+                            <button
+                                type="button"
+                                @click="toggle()"
+                                :class="isActive ? 'bg-up-mint/20 text-up-mint border-up-mint/40 dark:bg-up-mint/25' : 'text-ink-500 hover:text-ink-900 dark:text-ink-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 border-transparent'"
+                                class="p-1.5 sm:p-2 rounded-xl border transition flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px]"
+                                :title="isActive ? 'Layar selalu menyala (Aktif) - Klik untuk matikan' : 'Kunci Layar: Cegah layar mati / sleep saat kasir & operasional'"
+                                aria-label="Kunci Layar Tetap Menyala"
+                            >
+                                <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                </svg>
+                                <span class="text-[11px] font-bold hidden xl:inline" x-text="isActive ? 'Layar ON' : 'Kunci Layar'"></span>
+                            </button>
+                        </div>
+                    @endif
 
                     <!-- [T-32] Toggle tema: sun (gelap) / moon (terang) / monitor (auto) -->
                     <button type="button" x-data="themeManager()" @click="cycleTheme()"
                             title="Ganti tema" aria-label="Ganti tema"
-                            class="p-2 sm:p-2.5 rounded-lg text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'dark'" x-cloak>
+                            class="p-1.5 sm:p-2 rounded-xl text-ink-500 hover:bg-black/5 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors cursor-pointer min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'dark'" x-cloak>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
                         </svg>
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'light'" x-cloak>
+                        <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'light'" x-cloak>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
                         </svg>
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'auto'" x-cloak>
+                        <svg class="w-5 h-5 sm:w-5.5 sm:h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'auto'" x-cloak>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                         </svg>
                     </button>
@@ -587,7 +593,7 @@
             </header>
 
             <!-- Page Content -->
-            <main class="flex-1 overflow-y-auto p-3 lg:p-6 pb-24 md:pb-6 bg-transparent">
+            <main class="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6 bg-transparent">
                 {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out) --}}
                 @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
                     <div class="mb-4 p-3.5 rounded-xl bg-up-amber/15 border border-up-amber/30 text-up-amber text-sm font-medium flex items-center justify-between gap-3 flex-wrap">

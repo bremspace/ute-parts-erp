@@ -41,14 +41,14 @@
         <button
             type="button"
             @click="promptInstall()"
-            class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 border border-up-primary/30 text-up-primary hover:text-white text-xs font-semibold transition-[transform,background-color,color] duration-150 active:scale-[0.97] cursor-pointer shadow-sm min-h-[38px]"
+            class="inline-flex items-center justify-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 border border-up-primary/30 text-up-primary hover:text-white text-xs font-semibold transition-[transform,background-color,color] duration-150 active:scale-[0.97] cursor-pointer shadow-sm min-w-[34px] min-h-[34px] sm:min-w-[38px] sm:min-h-[38px]"
             :title="'Pasang ' + appName + ' sebagai aplikasi mandiri'"
+            aria-label="Pasang Aplikasi"
         >
-            <svg class="w-3.5 h-3.5 text-up-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 text-up-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             <span class="hidden sm:inline whitespace-nowrap">Pasang Aplikasi</span>
-            <span class="sm:hidden text-[11px] font-bold">Pasang</span>
         </button>
     @endif
 </div>
