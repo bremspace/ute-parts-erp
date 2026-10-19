@@ -122,8 +122,17 @@ class SettingsRbac extends Component
     {
         if (request()->has('tab')) {
             $tab = (string) request('tab');
-            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'loyalitas', 'pajak', 'printer', 'database'], true)) {
+            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'master', 'loyalitas', 'pajak', 'printer', 'database'], true)) {
                 $this->activeTab = $tab;
+            }
+        }
+
+        if (request()->has('sub')) {
+            $sub = (string) request('sub');
+            if (in_array($sub, ['kategori', 'brand', 'kualitas', 'satuan', 'kondisi', 'tipe_hp'], true)) {
+                $this->masterProdukSubTab = $sub;
+            } elseif (in_array($sub, ['struk', 'label'], true)) {
+                $this->printerSubTab = $sub;
             }
         }
 

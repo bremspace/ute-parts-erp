@@ -1,124 +1,325 @@
 <div class="space-y-6"
     x-data="{
-        subModul: @js(in_array($activeTab, ['users', 'role', 'cabang']) ? 'akses' : (in_array($activeTab, ['master_produk', 'master']) ? 'master' : 'bisnis')),
+        subModul: @js(in_array($activeTab, ['users', 'role', 'cabang']) ? 'akses' : ($activeTab === 'master_produk' ? 'katalog' : (in_array($activeTab, ['loyalitas', 'pajak']) ? 'kebijakan' : (in_array($activeTab, ['master', 'printer']) ? 'operasional' : 'sistem')))),
+        searchQuery: '',
+        searchOpen: false,
+        menuItems: [
+            { id: 'users', label: 'Manajemen Pengguna & Staf', subModul: 'akses', tab: 'users', subTab: null, icon: '👥', group: 'Akses & Organisasi', desc: 'Akun staf kasir, admin, teknisi, hak akses cabang toko', keywords: 'user pengguna staff staf kasir karyawan password email admin' },
+            { id: 'role', label: 'Role & Izin Akses (RBAC)', subModul: 'akses', tab: 'role', subTab: null, icon: '🔐', group: 'Akses & Organisasi', desc: 'Matriks kewenangan Spatie, batasan modul & persetujuan', keywords: 'role permission izin rbac wewenang hak akses otoritas' },
+            { id: 'cabang', label: 'Cabang, Gudang & Rak Part', subModul: 'akses', tab: 'cabang', subTab: null, icon: '🏬', group: 'Akses & Organisasi', desc: 'Lokasi cabang toko fisik, mapping gudang dan kode nomor rak', keywords: 'cabang toko gudang warehouse rak lokasi penyimpanan bin' },
+
+            { id: 'kategori', label: 'Kategori Produk Hierarkis', subModul: 'katalog', tab: 'master_produk', subTab: 'kategori', icon: '🗂️', group: 'Katalog & Master Produk', desc: 'Struktur pohon kategori induk dan sub-kategori sparepart', keywords: 'kategori subkategori grup kelompok jenis produk part' },
+            { id: 'brand', label: 'Brand & Merek Sparepart', subModul: 'katalog', tab: 'master_produk', subTab: 'brand', icon: '🏷️', group: 'Katalog & Master Produk', desc: 'Daftar pabrikan dan merek sparepart HP', keywords: 'brand merk merek pabrikan vendor produsen' },
+            { id: 'kualitas', label: 'Tingkat Kualitas (Grade)', subModul: 'katalog', tab: 'master_produk', subTab: 'kualitas', icon: '⭐', group: 'Katalog & Master Produk', desc: 'Grade kualitas: Original, OEM, High Copy, Copotan', keywords: 'kualitas grade ori original oem grade copy kw kualitas' },
+            { id: 'satuan', label: 'Satuan Unit Produk', subModul: 'katalog', tab: 'master_produk', subTab: 'satuan', icon: '📏', group: 'Katalog & Master Produk', desc: 'Pcs, Set, Rol, Box, Lembar, Strip', keywords: 'satuan unit pcs pieces pack dus box meter' },
+            { id: 'kondisi', label: 'Kondisi Fisik Barang', subModul: 'katalog', tab: 'master_produk', subTab: 'kondisi', icon: '🔄', group: 'Katalog & Master Produk', desc: 'Kondisi Baru, Refurbished, Bekas / Copotan normal', keywords: 'kondisi baru bekas second copotan refurbished reject' },
+            { id: 'tipe_hp', label: 'Tipe HP Kompatibel', subModul: 'katalog', tab: 'master_produk', subTab: 'tipe_hp', icon: '📱', group: 'Katalog & Master Produk', desc: 'Model tipe ponsel smartphone yang kompatibel dengan part', keywords: 'tipe model hp ponsel smartphone iphone samsung xiaomi oppo vivo infinix' },
+
+            { id: 'loyalitas', label: 'Strategi Loyalitas & Poin', subModul: 'kebijakan', tab: 'loyalitas', subTab: null, icon: '💎', group: 'Kebijakan & Transaksi', desc: 'Rasio earn/redeem poin belanja & diskon tier membership', keywords: 'loyalitas point poin tier membership diskon potongan cashback member' },
+            { id: 'komisi', label: 'Skema Komisi Reseller & Sales', subModul: 'kebijakan', tab: 'loyalitas', subTab: null, icon: '🤝', group: 'Kebijakan & Transaksi', desc: 'Komisi reseller, mitra teknisi dan insentif penjualan tim', keywords: 'komisi reseller komisi sales insentif bagi hasil affiliate bonus' },
+            { id: 'pajak', label: 'Pajak & Pengaturan PPN', subModul: 'kebijakan', tab: 'pajak', subTab: null, icon: '⚖️', group: 'Kebijakan & Transaksi', desc: 'Tarif PPN (11%/12%), target POS kasir & akun penampung', keywords: 'pajak ppn tax tarif faktur pajak kasir pos marketplace b2b persentase' },
+
+            { id: 'servis', label: 'Master Servis & Garansi', subModul: 'operasional', tab: 'master', subTab: null, icon: '🛠️', group: 'Operasional & Periferal', desc: 'Katalog jasa servis, estimasi waktu teknisi, masa garansi klaim', keywords: 'servis service jasa perbaikan teknisi garansi klaim pengerjaan tarif' },
+            { id: 'struk', label: 'Template Struk & Faktur POS', subModul: 'operasional', tab: 'printer', subTab: 'struk', icon: '🧾', group: 'Operasional & Periferal', desc: 'Kustomisasi header/footer struk thermal, QR retur, kertas 58/80mm', keywords: 'struk printer thermal nota faktur kasir thermal print kertas retur' },
+            { id: 'label', label: 'Format Label Barcode & QR SKU', subModul: 'operasional', tab: 'printer', subTab: 'label', icon: '🏷️', group: 'Operasional & Periferal', desc: 'Tata letak cetak stiker barcode produk untuk scanner gudang', keywords: 'label barcode qr code stiker cetak scanner printer bluetooth label' },
+
+            { id: 'coa', label: 'Chart of Accounts (COA)', subModul: 'sistem', tab: 'master', subTab: null, icon: '📊', group: 'Sistem & Keuangan', desc: 'Bagan akun buku besar akuntansi, debit, kredit, klasifikasi aset/beban', keywords: 'coa akun akuntansi buku besar jurnal debit kredit kas bank' },
+            { id: 'database', label: 'Basis Data & Backup Sistem', subModul: 'sistem', tab: 'database', subTab: null, icon: '💾', group: 'Sistem & Keuangan', desc: 'Backup snapshot SQL, optimasi database, riwayat pencadangan data', keywords: 'database basis data backup restore dump sql download arsip cadangan' }
+        ],
+        get filteredItems() {
+            if (!this.searchQuery.trim()) return [];
+            const q = this.searchQuery.toLowerCase();
+            return this.menuItems.filter(item => 
+                item.label.toLowerCase().includes(q) ||
+                item.desc.toLowerCase().includes(q) ||
+                item.group.toLowerCase().includes(q) ||
+                item.keywords.toLowerCase().includes(q)
+            );
+        },
+        selectMenuItem(item) {
+            this.subModul = item.subModul;
+            $wire.set('activeTab', item.tab);
+            if (item.subTab) {
+                if (item.tab === 'master_produk') {
+                    $wire.set('masterProdukSubTab', item.subTab);
+                } else if (item.tab === 'printer') {
+                    $wire.set('printerSubTab', item.subTab);
+                }
+            }
+            this.searchQuery = '';
+            this.searchOpen = false;
+        },
         setSubModul(modul) {
             this.subModul = modul;
             if (modul === 'akses' && !['users', 'role', 'cabang'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'users');
-            } else if (modul === 'master' && !['master_produk', 'master'].includes(@js($activeTab))) {
+            } else if (modul === 'katalog' && @js($activeTab) !== 'master_produk') {
                 $wire.set('activeTab', 'master_produk');
-            } else if (modul === 'bisnis' && !['loyalitas', 'pajak', 'printer', 'database'].includes(@js($activeTab))) {
+            } else if (modul === 'kebijakan' && !['loyalitas', 'pajak'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'loyalitas');
+            } else if (modul === 'operasional' && !['master', 'printer'].includes(@js($activeTab))) {
+                $wire.set('activeTab', 'master');
+            } else if (modul === 'sistem' && !['database', 'master'].includes(@js($activeTab))) {
+                $wire.set('activeTab', 'database');
             }
         }
     }"
     x-init="$watch('$wire.activeTab', value => {
         if (['users', 'role', 'cabang'].includes(value)) subModul = 'akses';
-        else if (['master_produk', 'master'].includes(value)) subModul = 'master';
-        else if (['loyalitas', 'pajak', 'printer', 'database'].includes(value)) subModul = 'bisnis';
+        else if (value === 'master_produk') subModul = 'katalog';
+        else if (['loyalitas', 'pajak'].includes(value)) subModul = 'kebijakan';
+        else if (['master', 'printer'].includes(value)) subModul = (value === 'master' && subModul === 'sistem') ? 'sistem' : 'operasional';
+        else if (value === 'database') subModul = 'sistem';
     })"
 >
-    <!-- Header with 2-Tier Sub-Modul Tabs and Actions (No Overlapping on Mobile/Desktop) -->
-    <div class="border-b border-black/10 dark:border-white/5 pb-4 space-y-3">
-        <!-- Tier 1: Sub-Modul Selector -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div class="flex items-center gap-1 p-1 bg-black/5 dark:bg-white/[0.04] rounded-2xl border border-black/10 dark:border-white/5 w-full sm:w-auto overflow-x-auto scrollbar-none flex-nowrap">
-                <button
-                    type="button"
-                    @click="setSubModul('akses')"
-                    :class="subModul === 'akses' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
-                    class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
+    <!-- TOP TOOLBAR: Redesigned Spotlight Finder & Overview -->
+    <div class="glass-panel p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 shadow-sm space-y-4">
+        <!-- Header Title & Quick Search -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-up-primary shadow-sm shadow-up-primary/50"></span>
+                    <h1 class="text-base sm:text-lg font-bold text-ink-900 dark:text-white tracking-tight">Pusat Konfigurasi & Pengaturan Sistem</h1>
+                </div>
+                <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Kelola hak akses, katalog produk, aturan bisnis, periferal kasir, dan basis data secara terpusat.</p>
+            </div>
+
+            <!-- Spotlight Search Input -->
+            <div class="relative w-full md:w-80 lg:w-96 flex-shrink-0" @click.outside="searchOpen = false">
+                <div class="relative flex items-center">
+                    <span class="absolute left-3.5 text-ink-400 pointer-events-none text-sm">🔍</span>
+                    <input
+                        type="text"
+                        x-model="searchQuery"
+                        @focus="searchOpen = true"
+                        @input="searchOpen = true"
+                        @keydown.escape="searchOpen = false; searchQuery = ''"
+                        placeholder="Cari pengaturan (contoh: PPN, Struk, Gudang)..."
+                        class="w-full pl-9 pr-8 py-2 rounded-xl text-xs bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-900 dark:text-white placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-up-primary/50 focus:border-up-primary transition min-h-[40px]"
+                    />
+                    <button
+                        type="button"
+                        x-show="searchQuery"
+                        @click="searchQuery = ''; searchOpen = false"
+                        class="absolute right-2.5 text-ink-400 hover:text-ink-700 dark:hover:text-white text-xs cursor-pointer"
+                        x-cloak
+                    >✕</button>
+                </div>
+
+                <!-- Floating Search Results Dropdown -->
+                <div
+                    x-show="searchOpen && searchQuery.trim().length > 0"
+                    x-cloak
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="opacity-0 translate-y-1"
+                    x-transition:enter-end="opacity-100 translate-y-0"
+                    x-transition:leave="transition ease-in duration-100"
+                    x-transition:leave-start="opacity-100 translate-y-0"
+                    x-transition:leave-end="opacity-0 translate-y-1"
+                    class="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#0B1120] border border-ink-200/90 dark:border-white/15 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto"
                 >
-                    <span>👥</span>
-                    <span>Akses & Cabang</span>
-                </button>
-                <button
-                    type="button"
-                    @click="setSubModul('master')"
-                    :class="subModul === 'master' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
-                    class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
-                >
-                    <span>📦</span>
-                    <span>Master Data</span>
-                </button>
-                <button
-                    type="button"
-                    @click="setSubModul('bisnis')"
-                    :class="subModul === 'bisnis' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-bold' : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'"
-                    class="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[40px] whitespace-nowrap cursor-pointer"
-                >
-                    <span>⚖️</span>
-                    <span>Bisnis & Pajak</span>
-                </button>
+                    <div class="p-2 border-b border-black/5 dark:border-white/5 text-[11px] font-semibold text-ink-400 flex items-center justify-between">
+                        <span>Hasil Pencarian</span>
+                        <span x-text="filteredItems.length + ' fitur ditemukan'"></span>
+                    </div>
+
+                    <template x-if="filteredItems.length === 0">
+                        <div class="p-4 text-center text-xs text-ink-400">
+                            Tidak ditemukan pengaturan dengan kata kunci "<span class="font-bold text-ink-900 dark:text-white" x-text="searchQuery"></span>"
+                        </div>
+                    </template>
+
+                    <div class="divide-y divide-black/5 dark:divide-white/5">
+                        <template x-for="item in filteredItems" :key="item.id">
+                            <button
+                                type="button"
+                                @click="selectMenuItem(item)"
+                                class="w-full p-2.5 sm:p-3 text-left hover:bg-black/5 dark:hover:bg-white/[0.06] transition flex items-start gap-3 cursor-pointer group"
+                            >
+                                <span class="text-xl p-1.5 rounded-lg bg-black/5 dark:bg-white/5 flex-shrink-0" x-text="item.icon"></span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs font-bold text-ink-900 dark:text-white group-hover:text-up-primary transition-colors" x-text="item.label"></span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold" x-text="item.group"></span>
+                                    </div>
+                                    <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5 line-clamp-1" x-text="item.desc"></p>
+                                </div>
+                                <span class="text-xs text-ink-400 opacity-0 group-hover:opacity-100 transition-opacity self-center">→</span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
             </div>
         </div>
 
+        <!-- Tier 1: Group Feature Categories (5 Kelompok Jelas & Terstruktur) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+            <!-- 1. Akses & Organisasi -->
+            <button
+                type="button"
+                @click="setSubModul('akses')"
+                :class="subModul === 'akses' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
+                class="p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
+            >
+                <div class="flex items-center justify-between">
+                    <span class="text-lg">👥</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'akses' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">3 Menu</span>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold leading-snug">Akses & Tim</h3>
+                    <p class="text-[10px] opacity-75 truncate">User, Role, Cabang</p>
+                </div>
+            </button>
+
+            <!-- 2. Katalog & Produk -->
+            <button
+                type="button"
+                @click="setSubModul('katalog')"
+                :class="subModul === 'katalog' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
+                class="p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
+            >
+                <div class="flex items-center justify-between">
+                    <span class="text-lg">📦</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'katalog' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">6 Atribut</span>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold leading-snug">Katalog Part</h3>
+                    <p class="text-[10px] opacity-75 truncate">Kategori, Brand, Tipe</p>
+                </div>
+            </button>
+
+            <!-- 3. Kebijakan & Transaksi -->
+            <button
+                type="button"
+                @click="setSubModul('kebijakan')"
+                :class="subModul === 'kebijakan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
+                class="p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
+            >
+                <div class="flex items-center justify-between">
+                    <span class="text-lg">💎</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'kebijakan' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">2 Aturan</span>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold leading-snug">Kebijakan Bisnis</h3>
+                    <p class="text-[10px] opacity-75 truncate">Loyalitas, PPN, Pajak</p>
+                </div>
+            </button>
+
+            <!-- 4. Operasional & Periferal -->
+            <button
+                type="button"
+                @click="setSubModul('operasional')"
+                :class="subModul === 'operasional' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
+                class="p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
+            >
+                <div class="flex items-center justify-between">
+                    <span class="text-lg">🛠️</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'operasional' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">3 Fitur</span>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold leading-snug">Operasional Toko</h3>
+                    <p class="text-[10px] opacity-75 truncate">Servis, Struk, Label</p>
+                </div>
+            </button>
+
+            <!-- 5. Sistem & Keuangan -->
+            <button
+                type="button"
+                @click="setSubModul('sistem')"
+                :class="subModul === 'sistem' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
+                class="col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
+            >
+                <div class="flex items-center justify-between">
+                    <span class="text-lg">💾</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'sistem' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">2 Modul</span>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold leading-snug">Sistem & COA</h3>
+                    <p class="text-[10px] opacity-75 truncate">Bagan Akun, Backup</p>
+                </div>
+            </button>
+        </div>
+
         <!-- Tier 2: Contextual Tabs & Quick Actions -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-black/5 dark:border-white/5">
             <!-- Contextual Tabs: smooth horizontal scroll on mobile, scrollbar-none, touch-pan-x -->
             <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x">
-                <!-- Group: Akses & Cabang -->
+                <!-- Group 1: Akses & Organisasi -->
                 <div x-show="subModul === 'akses'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
                     <button
                         wire:click="$set('activeTab', 'users')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'users' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'users' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        👥 Manajemen User
+                        👥 Manajemen Pengguna
                     </button>
                     <button
                         wire:click="$set('activeTab', 'role')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'role' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'role' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        🔐 Role & Permission
+                        🔐 Role & Hak Akses
                     </button>
                     <button
                         wire:click="$set('activeTab', 'cabang')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'cabang' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'cabang' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        🏬 Cabang & Gudang
+                        🏬 Cabang, Gudang & Rak
                     </button>
                 </div>
 
-                <!-- Group: Master Data -->
-                <div x-show="subModul === 'master'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
+                <!-- Group 2: Katalog & Produk -->
+                <div x-show="subModul === 'katalog'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
                     <button
                         wire:click="$set('activeTab', 'master_produk')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'master_produk' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer bg-up-primary text-white shadow-md shadow-up-primary/25"
                     >
-                        📦 Master Produk & Katalog
-                    </button>
-                    <button
-                        wire:click="$set('activeTab', 'master')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'master' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
-                    >
-                        📋 Master Operasional
+                        📦 Master Atribut Produk & Sparepart
                     </button>
                 </div>
 
-                <!-- Group: Bisnis & Finansial -->
-                <div x-show="subModul === 'bisnis'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
+                <!-- Group 3: Kebijakan & Transaksi -->
+                <div x-show="subModul === 'kebijakan'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
                     <button
                         wire:click="$set('activeTab', 'loyalitas')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'loyalitas' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'loyalitas' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        💎 Strategi Loyalitas
+                        💎 Strategi Loyalitas & Komisi
                     </button>
                     <button
                         wire:click="$set('activeTab', 'pajak')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'pajak' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'pajak' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        ⚖️ Pajak & PPN
+                        ⚖️ Pajak & Tarif PPN
+                    </button>
+                </div>
+
+                <!-- Group 4: Operasional & Periferal -->
+                <div x-show="subModul === 'operasional'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
+                    <button
+                        wire:click="$set('activeTab', 'master')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'master' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        🛠️ Master Servis & Garansi
                     </button>
                     <button
                         wire:click="$set('activeTab', 'printer')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'printer' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'printer' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        🖨️ Printer & Label QR
+                        🖨️ Printer Struk & Label Barcode
+                    </button>
+                </div>
+
+                <!-- Group 5: Sistem & Keuangan -->
+                <div x-show="subModul === 'sistem'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
+                    <button
+                        wire:click="$set('activeTab', 'master')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'master' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        📊 Bagan Akun (COA)
                     </button>
                     @if(isSuperAdminOrOwner())
                     <button
                         wire:click="$set('activeTab', 'database')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'database' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'database' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         💾 Basis Data & Backup
                     </button>
