@@ -3,6 +3,30 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-20 — Penataan Submenu Sidebar Pengaturan & Integrasi UI Gateway (WhatsApp, Duitku, Biteship) ✅
+
+- **[Penyempurnaan Submenu Sidebar Backoffice Pengaturan & Sistem]:**
+  - Mengubah submenu "Pengaturan & Sistem" dari yang sebelumnya hanya satu tautan umum menjadi kelompok menu terarah langsung ke sub-fitur:
+    - *Pusat Pengaturan* (`/app/pengaturan`)
+    - *Akses, User & Cabang* (`/app/pengaturan?tab=users`)
+    - *Katalog & Master Part* (`/app/pengaturan?tab=master_produk`)
+    - *Kebijakan Poin & PPN* (`/app/pengaturan?tab=loyalitas`)
+    - *Servis & Struk Kasir* (`/app/pengaturan?tab=printer`)
+    - *Gateway & Integrasi* (`/app/pengaturan?tab=integrasi`)
+    - *Basis Data & Backup* (`/app/pengaturan?tab=database`) (khusus super-admin/owner)
+    - *Keamanan Akun & 2FA*, *Sesi Perangkat*, dan *Audit Trail & Log*.
+- **[Penambahan Modul & Tab Gateway & Integrasi Eksternal]:**
+  - Mengisi kebutuhan pengaturan yang sebelumnya belum memiliki antarmuka (UI):
+    - **WhatsApp Gateway**: Konfigurasi multi-provider (Fonnte, Wablas, Custom HTTP URL), token API, Device ID, serta pemicu notifikasi otomatis untuk transaksi POS dan tiket servis.
+    - **Uji Coba WhatsApp Langsung**: Fitur kirim pesan tes live dari panel pengaturan ke nomor penerima untuk verifikasi koneksi gateway.
+    - **Payment Gateway Duitku**: Pengaturan mode Sandbox vs Production, Merchant Code, API Key, Passport Merchant Key, masa kedaluwarsa invoice, dan display webhook callback URL.
+    - **Ekspedisi Biteship**: Konfigurasi API Key logistik dan kebijakan penentuan titik asal pengiriman (origin) per cabang terdekat vs kantor pusat.
+- **[Konektivitas Dinamis ke KonfigurasiService]:**
+  - Menghubungkan `KirimNotifikasiJob`, `DuitkuService`, dan `BiteshipService` agar memprioritaskan konfigurasi tersimpan di tabel `konfigurasi` database sebelum fallback ke `.env` / `config()`.
+- **[Pengujian & Verifikasi]:**
+  - Menambahkan test `test_sidebar_pengaturan_links_render_properly` dan `test_tab_integrasi_and_configuration_saving` di `PengaturanSistemIntegrationTest` (semua lulus 100%).
+  - Memformat kode dengan Laravel Pint dan build ulang aset Vite.
+
 ## 2026-10-20 — Redesign Pusat Pengaturan Sistem (RBAC & Konfigurasi) ✅
 
 - **[Redesign Pengelompokan Menu Sesuai Fitur]:**

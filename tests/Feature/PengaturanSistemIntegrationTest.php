@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Rbac\Livewire\SessionManagementPage;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
@@ -185,5 +186,61 @@ class PengaturanSistemIntegrationTest extends TestCase
 
         $this->assertFalse(DeviceSession::where('device_token', 'other-token-456')->first()->is_active);
         $this->assertTrue(DeviceSession::where('device_token', 'current-token-123')->first()->is_active);
+    }
+
+    /**
+     * Test submenu sidebar pengaturan menampilkan link kategori terstruktur.
+     */
+    public function test_sidebar_pengaturan_links_render_properly(): void
+    {
+        $this->actingAs($this->superAdmin);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $response = $this->get('/app/pengaturan');
+        $response->assertStatus(200);
+        $response->assertSee('Pusat Pengaturan');
+        $response->assertSee('/app/pengaturan?tab=users');
+        $response->assertSee('/app/pengaturan?tab=master_produk');
+        $response->assertSee('/app/pengaturan?tab=loyalitas');
+        $response->assertSee('/app/pengaturan?tab=printer');
+        $response->assertSee('/app/pengaturan?tab=integrasi');
+        $response->assertSee('/app/pengaturan?tab=database');
+    }
+
+    /**
+     * Test integrasi tab mount dan penyimpanan konfigurasi gateway.
+     */
+    public function test_tab_integrasi_and_configuration_saving(): void
+    {
+        $this->actingAs($this->superAdmin);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $component = Livewire::withQueryParams(['tab' => 'integrasi'])
+            ->test(SettingsRbac::class)
+            ->assertSet('activeTab', 'integrasi')
+            ->set('integrasiForm.wa_provider', 'fonnte')
+            ->set('integrasiForm.wa_url', 'https://api.fonnte.com/send')
+            ->set('integrasiForm.wa_token', 'token-wa-secret-123')
+            ->set('integrasiForm.duitku_mode', 'production')
+            ->set('integrasiForm.duitku_merchant_code', 'D1234')
+            ->set('integrasiForm.duitku_api_key', 'duitku-api-key-test')
+            ->set('integrasiForm.duitku_merchant_key', 'duitku-mkey-test')
+            ->set('integrasiForm.biteship_api_key', 'biteship-api-key-test')
+            ->call('simpanIntegrasi')
+            ->assertDispatched('alert');
+
+        $config = app(KonfigurasiService::class);
+        $wa = $config->get('wa_gateway_config');
+        $this->assertIsArray($wa);
+        $this->assertEquals('token-wa-secret-123', $wa['token']);
+
+        $duitku = $config->get('duitku_gateway_config');
+        $this->assertIsArray($duitku);
+        $this->assertEquals('D1234', $duitku['merchant_code']);
+        $this->assertEquals('production', $duitku['mode']);
+
+        $biteship = $config->get('biteship_gateway_config');
+        $this->assertIsArray($biteship);
+        $this->assertEquals('biteship-api-key-test', $biteship['api_key']);
     }
 }

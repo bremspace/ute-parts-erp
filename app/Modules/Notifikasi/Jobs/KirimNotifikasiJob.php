@@ -2,6 +2,7 @@
 
 namespace App\Modules\Notifikasi\Jobs;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -85,14 +86,15 @@ class KirimNotifikasiJob implements ShouldQueue
     protected function kirimWhatsApp(NotifikasiKeluar $log): bool
     {
         /**
-         * Placeholder untuk integrasi WA gateway.
-         * User akan memilih provider: Fonnte / Wablas / WA Business API.
-         * Konfigurasi minimal disimpan di config/services.php dan .env.
-         *
-         * Tanpa kredensial, job HARUS gagal; status terkirim hanya boleh
-         * ditetapkan setelah provider benar-benar dikonfigurasi.
+         * Integrasi WA gateway: Utamakan konfigurasi yang disimpan via UI Pengaturan (tabel konfigurasi),
+         * fallback ke config('services.wa') dari .env bila belum ada di DB.
          */
-        $wa = config('services.wa', []);
+        $configService = app(KonfigurasiService::class);
+        $savedWa = $configService->get('wa_gateway_config');
+        $wa = (is_array($savedWa) && filled($savedWa['token'] ?? null))
+            ? $savedWa
+            : config('services.wa', []);
+
         if (! is_array($wa) || blank($wa['url'] ?? null) || blank($wa['token'] ?? null)) {
             $this->tandaiGagal(
                 $log,

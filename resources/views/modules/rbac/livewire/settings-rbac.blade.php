@@ -1,6 +1,6 @@
 <div class="space-y-6"
     x-data="{
-        subModul: @js(in_array($activeTab, ['users', 'role', 'cabang']) ? 'akses' : ($activeTab === 'master_produk' ? 'katalog' : (in_array($activeTab, ['loyalitas', 'pajak']) ? 'kebijakan' : (in_array($activeTab, ['master', 'printer']) ? 'operasional' : 'sistem')))),
+        subModul: @js(in_array($activeTab, ['users', 'role', 'cabang']) ? 'akses' : ($activeTab === 'master_produk' ? 'katalog' : (in_array($activeTab, ['loyalitas', 'pajak']) ? 'kebijakan' : (in_array($activeTab, ['master', 'printer']) ? 'operasional' : ($activeTab === 'integrasi' ? 'integrasi' : 'sistem'))))),
         searchQuery: '',
         searchOpen: false,
         menuItems: [
@@ -22,6 +22,10 @@
             { id: 'servis', label: 'Master Servis & Garansi', subModul: 'operasional', tab: 'master', subTab: null, icon: '🛠️', group: 'Operasional & Periferal', desc: 'Katalog jasa servis, estimasi waktu teknisi, masa garansi klaim', keywords: 'servis service jasa perbaikan teknisi garansi klaim pengerjaan tarif' },
             { id: 'struk', label: 'Template Struk & Faktur POS', subModul: 'operasional', tab: 'printer', subTab: 'struk', icon: '🧾', group: 'Operasional & Periferal', desc: 'Kustomisasi header/footer struk thermal, QR retur, kertas 58/80mm', keywords: 'struk printer thermal nota faktur kasir thermal print kertas retur' },
             { id: 'label', label: 'Format Label Barcode & QR SKU', subModul: 'operasional', tab: 'printer', subTab: 'label', icon: '🏷️', group: 'Operasional & Periferal', desc: 'Tata letak cetak stiker barcode produk untuk scanner gudang', keywords: 'label barcode qr code stiker cetak scanner printer bluetooth label' },
+
+            { id: 'wa', label: 'WhatsApp Gateway & Notifikasi', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '💬', group: 'Gateway & Integrasi', desc: 'Konfigurasi Fonnte / Wablas, token API, dan pengujian kirim WA', keywords: 'whatsapp wa fonnte wablas gateway notifikasi pesan chat token phone' },
+            { id: 'duitku', label: 'Payment Gateway Duitku', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '💳', group: 'Gateway & Integrasi', desc: 'Atur Merchant Code, API Key, Sandbox vs Production, dan callback URL', keywords: 'payment pembayaran duitku gateway qris va virtual account kartu kredit sandbox' },
+            { id: 'biteship', label: 'Logistik & Ekspedisi Biteship', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '🚚', group: 'Gateway & Integrasi', desc: 'API kurir ongkir otomatis (JNE, SiCepat, J&T, GoSend, Grab)', keywords: 'ekspedisi kurir shipping ongkir pengiriman biteship jne sicepat jnt' },
 
             { id: 'coa', label: 'Chart of Accounts (COA)', subModul: 'sistem', tab: 'master', subTab: null, icon: '📊', group: 'Sistem & Keuangan', desc: 'Bagan akun buku besar akuntansi, debit, kredit, klasifikasi aset/beban', keywords: 'coa akun akuntansi buku besar jurnal debit kredit kas bank' },
             { id: 'database', label: 'Basis Data & Backup Sistem', subModul: 'sistem', tab: 'database', subTab: null, icon: '💾', group: 'Sistem & Keuangan', desc: 'Backup snapshot SQL, optimasi database, riwayat pencadangan data', keywords: 'database basis data backup restore dump sql download arsip cadangan' }
@@ -59,6 +63,8 @@
                 $wire.set('activeTab', 'loyalitas');
             } else if (modul === 'operasional' && !['master', 'printer'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'master');
+            } else if (modul === 'integrasi' && @js($activeTab) !== 'integrasi') {
+                $wire.set('activeTab', 'integrasi');
             } else if (modul === 'sistem' && !['database', 'master'].includes(@js($activeTab))) {
                 $wire.set('activeTab', 'database');
             }
@@ -69,6 +75,7 @@
         else if (value === 'master_produk') subModul = 'katalog';
         else if (['loyalitas', 'pajak'].includes(value)) subModul = 'kebijakan';
         else if (['master', 'printer'].includes(value)) subModul = (value === 'master' && subModul === 'sistem') ? 'sistem' : 'operasional';
+        else if (value === 'integrasi') subModul = 'integrasi';
         else if (value === 'database') subModul = 'sistem';
     })"
 >
@@ -152,8 +159,8 @@
             </div>
         </div>
 
-        <!-- Tier 1: Group Feature Categories (5 Kelompok Jelas & Terstruktur) -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+        <!-- Tier 1: Group Feature Categories (6 Kelompok Jelas & Terstruktur) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-black/5 dark:border-white/5">
             <!-- 1. Akses & Organisasi -->
             <button
                 type="button"
@@ -222,12 +229,29 @@
                 </div>
             </button>
 
-            <!-- 5. Sistem & Keuangan -->
+            <!-- 5. Gateway & Integrasi -->
+            <button
+                type="button"
+                @click="setSubModul('integrasi')"
+                :class="subModul === 'integrasi' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
+                class="p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
+            >
+                <div class="flex items-center justify-between">
+                    <span class="text-lg">🔌</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold" :class="subModul === 'integrasi' ? 'bg-white/20 text-white' : 'bg-black/5 dark:bg-white/10 text-ink-400'">3 Gateway</span>
+                </div>
+                <div>
+                    <h3 class="text-xs font-bold leading-snug">Gateway Integrasi</h3>
+                    <p class="text-[10px] opacity-75 truncate">WhatsApp, Duitku, Biteship</p>
+                </div>
+            </button>
+
+            <!-- 6. Sistem & Keuangan -->
             <button
                 type="button"
                 @click="setSubModul('sistem')"
                 :class="subModul === 'sistem' ? 'bg-up-primary text-white shadow-md shadow-up-primary/30 border-up-primary' : 'bg-black/5 dark:bg-white/[0.03] text-ink-600 dark:text-ink-300 border-black/5 dark:border-white/5 hover:bg-black/10 dark:hover:bg-white/[0.08]'"
-                class="col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
+                class="p-2.5 sm:p-3 rounded-2xl border text-left transition-[transform,background-color] active:scale-[0.98] cursor-pointer flex flex-col justify-between min-h-[72px]"
             >
                 <div class="flex items-center justify-between">
                     <span class="text-lg">💾</span>
@@ -308,7 +332,17 @@
                     </button>
                 </div>
 
-                <!-- Group 5: Sistem & Keuangan -->
+                <!-- Group 5: Gateway & Integrasi -->
+                <div x-show="subModul === 'integrasi'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
+                    <button
+                        wire:click="$set('activeTab', 'integrasi')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer bg-up-primary text-white shadow-md shadow-up-primary/25"
+                    >
+                        🔌 Gateway & Integrasi Eksternal (WA, Duitku, Biteship)
+                    </button>
+                </div>
+
+                <!-- Group 6: Sistem & Keuangan -->
                 <div x-show="subModul === 'sistem'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
                     <button
                         wire:click="$set('activeTab', 'master')"
@@ -351,6 +385,8 @@
                     @elseif($masterProdukSubTab === 'tipe_hp')
                         <button wire:click="openTipeHpModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Tipe HP Baru</button>
                     @endif
+                @elseif($activeTab === 'integrasi')
+                    <button wire:click="simpanIntegrasi" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">💾 Simpan Konfigurasi Integrasi</button>
                 @endif
             </div>
         </div>
@@ -1563,6 +1599,171 @@
                 </div>
                 <p class="text-[10px] text-ink-500 mt-3">Kelola di Modul Akunting → COA (editable terbatas super-admin/finance).</p>
             </x-prism.glass-card>
+        </div>
+    @endif
+
+    @if($activeTab === 'integrasi')
+        <div class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Main Form (Col Span 2) -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- WhatsApp Gateway Card -->
+                    <x-prism.glass-card title="WhatsApp Gateway & Notifikasi Otomatis" subtitle="Koneksi gateway pesan keluar via WhatsApp (Fonnte, Wablas, atau Custom)">
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Provider Gateway *</label>
+                                    <select wire:model.live="integrasiForm.wa_provider" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                        <option value="fonnte" class="bg-ink-900">Fonnte (Rekomendasi)</option>
+                                        <option value="wablas" class="bg-ink-900">Wablas</option>
+                                        <option value="custom" class="bg-ink-900">Custom Webhook / HTTP Gateway</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">API Endpoint URL *</label>
+                                    <input type="url" wire:model="integrasiForm.wa_url" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="https://api.fonnte.com/send" />
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Token / API Key *</label>
+                                    <input type="password" wire:model="integrasiForm.wa_token" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Masukkan token API gateway WA" />
+                                    <p class="text-[10px] text-ink-400 mt-1">Dapatkan dari dashboard penyedia WA gateway Anda.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Device ID (Opsional)</label>
+                                    <input type="text" wire:model="integrasiForm.wa_device_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Kosongkan bila single-device" />
+                                </div>
+                            </div>
+
+                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                                <h4 class="text-xs font-bold text-white mb-1.5">Pemicu Otomatis (Automation Triggers)</h4>
+                                <label class="flex items-center gap-2.5 text-xs text-ink-300 cursor-pointer">
+                                    <input type="checkbox" wire:model="integrasiForm.wa_auto_notif_transaksi" class="accent-up-mint w-4 h-4 rounded" />
+                                    <span>Kirim struk / notifikasi otomatis via WA saat transaksi kasir POS selesai</span>
+                                </label>
+                                <label class="flex items-center gap-2.5 text-xs text-ink-300 cursor-pointer">
+                                    <input type="checkbox" wire:model="integrasiForm.wa_auto_notif_servis" class="accent-up-mint w-4 h-4 rounded" />
+                                    <span>Kirim update progres servis otomatis saat status tiket servis berubah</span>
+                                </label>
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
+
+                    <!-- Duitku Payment Gateway Card -->
+                    <x-prism.glass-card title="Payment Gateway Duitku" subtitle="Integrasi pembayaran online (QRIS, VA Bank, E-Wallet, Kartu Kredit)">
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Mode Lingkungan (Environment) *</label>
+                                    <select wire:model="integrasiForm.duitku_mode" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                        <option value="sandbox" class="bg-ink-900">🧪 Sandbox (Mode Percobaan)</option>
+                                        <option value="production" class="bg-ink-900">🚀 Production (Transaksi Nyata)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Masa Berlaku Invoice (Menit) *</label>
+                                    <input type="number" min="15" max="10080" wire:model="integrasiForm.duitku_expiry_period" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium tabular-nums" />
+                                    <p class="text-[10px] text-ink-400 mt-1">Default 1440 menit (24 jam).</p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Merchant Code</label>
+                                    <input type="text" wire:model="integrasiForm.duitku_merchant_code" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="DXXXX" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">API Key</label>
+                                    <input type="password" wire:model="integrasiForm.duitku_api_key" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="API Key Duitku" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Merchant Key (Passport)</label>
+                                    <input type="password" wire:model="integrasiForm.duitku_merchant_key" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="Merchant Key" />
+                                </div>
+                            </div>
+
+                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <span class="text-xs font-semibold text-white">Callback URL Webhook Duitku</span>
+                                    <p class="text-[11px] text-ink-400 mt-0.5">Pasang URL ini di dashboard Merchant Duitku → Proyek → Callback URL:</p>
+                                </div>
+                                <code class="px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-up-mint font-mono text-[11px] select-all truncate">
+                                    {{ url('/webhook/duitku') }}
+                                </code>
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
+
+                    <!-- Biteship Logistics Card -->
+                    <x-prism.glass-card title="Logistik & Ekspedisi Biteship" subtitle="Perhitungan ongkos kirim real-time dan booking kurir multi-ekspedisi">
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Biteship API Key</label>
+                                    <input type="password" wire:model="integrasiForm.biteship_api_key" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium font-mono" placeholder="biteship_test.xxx..." />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kebijakan Titik Asal Pengiriman (Origin)</label>
+                                    <select wire:model="integrasiForm.biteship_origin_type" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                        <option value="closest_branch" class="bg-ink-900">🏬 Cabang Terdekat dengan Stok Lengkap</option>
+                                        <option value="head_office" class="bg-ink-900">🏢 Kantor Pusat / Gudang Utama Saja</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
+                </div>
+
+                <!-- Sidebar Test & Status (Col Span 1) -->
+                <div class="space-y-6">
+                    <x-prism.glass-card title="Uji Coba WhatsApp" subtitle="Pastikan pesan gateway dapat terkirim">
+                        <div class="space-y-3.5">
+                            <div>
+                                <label class="block text-xs font-semibold text-ink-300 mb-1">Nomor WhatsApp Penerima Tes</label>
+                                <input type="text" wire:model="integrasiForm.wa_test_number" placeholder="Contoh: 081234567890" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                                <p class="text-[10px] text-ink-400 mt-1">Format: 08xx atau 628xx</p>
+                            </div>
+                            <button
+                                type="button"
+                                wire:click="testKirimWa"
+                                wire:loading.attr="disabled"
+                                class="w-full py-2.5 px-4 rounded-xl bg-up-primary hover:opacity-95 text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-[transform,opacity] active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                <span wire:loading.remove wire:target="testKirimWa">📲 Kirim Pesan Uji Coba</span>
+                                <span wire:loading wire:target="testKirimWa">Mengirim pesan...</span>
+                            </button>
+
+                            <div class="pt-3 border-t border-white/5 space-y-2 text-[11px] text-ink-400">
+                                <p class="font-semibold text-white">Panduan Singkat Gateway:</p>
+                                <ul class="list-disc list-inside space-y-1">
+                                    <li>Scan QR di dasbor provider WA pilihan Anda.</li>
+                                    <li>Salin token API ke formulir ini dan klik Simpan.</li>
+                                    <li>Lakukan tes kirim di atas untuk memvalidasi nomor terhubung.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
+
+                    <div class="p-4 rounded-2xl glass-panel border border-white/10 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🛡️</span>
+                            <h4 class="text-xs font-bold text-white">Keamanan Kredensial</h4>
+                        </div>
+                        <p class="text-[11px] text-ink-300 leading-relaxed">
+                            Semua token dan kunci API disimpan terenkripsi di database sistem dan hanya dapat diubah oleh pengguna yang memiliki kewenangan <span class="text-up-primary font-semibold">pengaturan.manage</span>.
+                        </p>
+                        <button
+                            type="button"
+                            wire:click="simpanIntegrasi"
+                            class="w-full py-2.5 px-4 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.98] cursor-pointer"
+                        >
+                            💾 Simpan Semua Konfigurasi
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 

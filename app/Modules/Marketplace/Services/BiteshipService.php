@@ -2,6 +2,7 @@
 
 namespace App\Modules\Marketplace\Services;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -17,7 +18,10 @@ class BiteshipService
 
     public function __construct()
     {
-        $this->apiKey = (string) env('BITESHIP_API_KEY', '');
+        $cfg = app(KonfigurasiService::class)->get('biteship_gateway_config');
+        $this->apiKey = (is_array($cfg) && filled($cfg['api_key'] ?? null))
+            ? (string) $cfg['api_key']
+            : (string) env('BITESHIP_API_KEY', '');
         $this->baseUrl = env('BITESHIP_BASE_URL', 'https://api.biteship.com/v1');
     }
 

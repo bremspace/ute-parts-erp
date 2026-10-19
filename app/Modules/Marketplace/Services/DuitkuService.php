@@ -2,6 +2,7 @@
 
 namespace App\Modules\Marketplace\Services;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -44,10 +45,19 @@ class DuitkuService
 
     public function __construct()
     {
-        $this->merchantCode = config('duitku.merchant_code');
-        $this->apiKey = config('duitku.api_key');
-        $this->merchantKey = config('duitku.merchant_key');
-        $this->sandbox = (bool) config('duitku.sandbox');
+        $cfg = app(KonfigurasiService::class)->get('duitku_gateway_config');
+        if (is_array($cfg) && filled($cfg['merchant_code'] ?? null)) {
+            $this->merchantCode = (string) ($cfg['merchant_code'] ?? '');
+            $this->apiKey = (string) ($cfg['api_key'] ?? '');
+            $this->merchantKey = (string) ($cfg['merchant_key'] ?? '');
+            $this->sandbox = ($cfg['mode'] ?? 'sandbox') === 'sandbox';
+        } else {
+            $this->merchantCode = (string) config('duitku.merchant_code');
+            $this->apiKey = (string) config('duitku.api_key');
+            $this->merchantKey = (string) config('duitku.merchant_key');
+            $this->sandbox = (bool) config('duitku.sandbox');
+        }
+
         $this->baseUrl = $this->sandbox
             ? config('duitku.sandbox_url')
             : config('duitku.production_url');

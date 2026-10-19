@@ -23,6 +23,7 @@ use App\Modules\Wms\Models\TipeHp;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -118,11 +119,35 @@ class SettingsRbac extends Component
         'auto_print' => false,
     ];
 
+    public array $integrasiForm = [
+        // WhatsApp Gateway
+        'wa_provider' => 'fonnte', // fonnte, wablas, custom
+        'wa_url' => 'https://api.fonnte.com/send',
+        'wa_token' => '',
+        'wa_device_id' => '',
+        'wa_test_number' => '',
+        'wa_auto_notif_transaksi' => true,
+        'wa_auto_notif_servis' => true,
+
+        // Duitku Payment Gateway
+        'duitku_mode' => 'sandbox',
+        'duitku_merchant_code' => '',
+        'duitku_api_key' => '',
+        'duitku_merchant_key' => '',
+        'duitku_expiry_period' => 1440,
+
+        // Biteship Logistics Gateway
+        'biteship_api_key' => '',
+        'biteship_origin_type' => 'closest_branch',
+    ];
+
+    public ?string $waTestStatus = null;
+
     public function mount(): void
     {
         if (request()->has('tab')) {
             $tab = (string) request('tab');
-            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'master', 'loyalitas', 'pajak', 'printer', 'database'], true)) {
+            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database'], true)) {
                 $this->activeTab = $tab;
             }
         }
@@ -150,6 +175,7 @@ class SettingsRbac extends Component
 
         $this->loadPajakConfig();
         $this->loadPrinterConfig();
+        $this->loadIntegrasiConfig();
     }
 
     public function updatedPajakFormTarget(): void
@@ -362,6 +388,171 @@ class SettingsRbac extends Component
             'type' => 'success',
             'message' => 'Kustomisasi template struk & faktur kasir berhasil disimpan.',
         ]);
+    }
+
+    public function loadIntegrasiConfig(): void
+    {
+        $config = app(KonfigurasiService::class);
+        $savedWa = $config->get('wa_gateway_config');
+        if (is_array($savedWa)) {
+            $this->integrasiForm['wa_provider'] = $savedWa['provider'] ?? 'fonnte';
+            $this->integrasiForm['wa_url'] = $savedWa['url'] ?? 'https://api.fonnte.com/send';
+            $this->integrasiForm['wa_token'] = $savedWa['token'] ?? '';
+            $this->integrasiForm['wa_device_id'] = $savedWa['device_id'] ?? '';
+            $this->integrasiForm['wa_auto_notif_transaksi'] = (bool) ($savedWa['auto_notif_transaksi'] ?? true);
+            $this->integrasiForm['wa_auto_notif_servis'] = (bool) ($savedWa['auto_notif_servis'] ?? true);
+        } else {
+            // Fallback ke config('services.wa')
+            $envWa = config('services.wa', []);
+            if (is_array($envWa)) {
+                $this->integrasiForm['wa_url'] = $envWa['url'] ?: 'https://api.fonnte.com/send';
+                $this->integrasiForm['wa_token'] = $envWa['token'] ?: '';
+                $this->integrasiForm['wa_device_id'] = $envWa['device_id'] ?: '';
+            }
+        }
+
+        $savedDuitku = $config->get('duitku_gateway_config');
+        if (is_array($savedDuitku)) {
+            $this->integrasiForm['duitku_mode'] = $savedDuitku['mode'] ?? 'sandbox';
+            $this->integrasiForm['duitku_merchant_code'] = $savedDuitku['merchant_code'] ?? '';
+            $this->integrasiForm['duitku_api_key'] = $savedDuitku['api_key'] ?? '';
+            $this->integrasiForm['duitku_merchant_key'] = $savedDuitku['merchant_key'] ?? '';
+            $this->integrasiForm['duitku_expiry_period'] = (int) ($savedDuitku['expiry_period'] ?? 1440);
+        } else {
+            $this->integrasiForm['duitku_mode'] = config('duitku.sandbox') ? 'sandbox' : 'production';
+            $this->integrasiForm['duitku_merchant_code'] = (string) config('duitku.merchant_code', '');
+            $this->integrasiForm['duitku_api_key'] = (string) config('duitku.api_key', '');
+            $this->integrasiForm['duitku_merchant_key'] = (string) config('duitku.merchant_key', '');
+            $this->integrasiForm['duitku_expiry_period'] = (int) config('duitku.expiry_period', 1440);
+        }
+
+        $savedBiteship = $config->get('biteship_gateway_config');
+        if (is_array($savedBiteship)) {
+            $this->integrasiForm['biteship_api_key'] = $savedBiteship['api_key'] ?? '';
+            $this->integrasiForm['biteship_origin_type'] = $savedBiteship['origin_type'] ?? 'closest_branch';
+        } else {
+            $this->integrasiForm['biteship_api_key'] = (string) env('BITESHIP_API_KEY', '');
+        }
+    }
+
+    public function updatedIntegrasiFormWaProvider(): void
+    {
+        if ($this->integrasiForm['wa_provider'] === 'fonnte') {
+            $this->integrasiForm['wa_url'] = 'https://api.fonnte.com/send';
+        } elseif ($this->integrasiForm['wa_provider'] === 'wablas') {
+            $this->integrasiForm['wa_url'] = 'https://kudus.wablas.com/api/send-message';
+        }
+    }
+
+    public function simpanIntegrasi(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi integrasi gateway.')) {
+            return;
+        }
+
+        $this->validate([
+            'integrasiForm.wa_provider' => 'required|in:fonnte,wablas,custom',
+            'integrasiForm.wa_url' => 'required|url',
+            'integrasiForm.wa_token' => 'nullable|string|max:255',
+            'integrasiForm.wa_device_id' => 'nullable|string|max:100',
+            'integrasiForm.duitku_mode' => 'required|in:sandbox,production',
+            'integrasiForm.duitku_merchant_code' => 'nullable|string|max:100',
+            'integrasiForm.duitku_api_key' => 'nullable|string|max:255',
+            'integrasiForm.duitku_merchant_key' => 'nullable|string|max:255',
+            'integrasiForm.duitku_expiry_period' => 'required|integer|min:15|max:10080',
+            'integrasiForm.biteship_api_key' => 'nullable|string|max:255',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+
+        // 1. WhatsApp Config
+        $config->set('wa_gateway_config', [
+            'provider' => $this->integrasiForm['wa_provider'],
+            'url' => $this->integrasiForm['wa_url'],
+            'token' => $this->integrasiForm['wa_token'],
+            'device_id' => $this->integrasiForm['wa_device_id'],
+            'auto_notif_transaksi' => (bool) $this->integrasiForm['wa_auto_notif_transaksi'],
+            'auto_notif_servis' => (bool) $this->integrasiForm['wa_auto_notif_servis'],
+        ], 'Konfigurasi WhatsApp Gateway');
+
+        // 2. Duitku Config
+        $config->set('duitku_gateway_config', [
+            'mode' => $this->integrasiForm['duitku_mode'],
+            'merchant_code' => $this->integrasiForm['duitku_merchant_code'],
+            'api_key' => $this->integrasiForm['duitku_api_key'],
+            'merchant_key' => $this->integrasiForm['duitku_merchant_key'],
+            'expiry_period' => (int) $this->integrasiForm['duitku_expiry_period'],
+        ], 'Konfigurasi Payment Gateway Duitku');
+
+        // 3. Biteship Config
+        $config->set('biteship_gateway_config', [
+            'api_key' => $this->integrasiForm['biteship_api_key'],
+            'origin_type' => $this->integrasiForm['biteship_origin_type'],
+        ], 'Konfigurasi Ekspedisi Biteship');
+
+        app(AuditService::class)->catat(
+            'Konfigurasi',
+            'update',
+            null,
+            "Pengaturan integrasi gateway eksternal diperbarui (WA: {$this->integrasiForm['wa_provider']}, Duitku: {$this->integrasiForm['duitku_mode']})"
+        );
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Konfigurasi integrasi gateway (WhatsApp, Duitku, Biteship) berhasil disimpan.',
+        ]);
+    }
+
+    public function testKirimWa(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin menguji gateway WhatsApp.')) {
+            return;
+        }
+
+        $this->validate([
+            'integrasiForm.wa_token' => 'required|string',
+            'integrasiForm.wa_url' => 'required|url',
+            'integrasiForm.wa_test_number' => 'required|string|min:9|max:20',
+        ], [
+            'integrasiForm.wa_test_number.required' => 'Nomor WhatsApp tujuan tes wajib diisi.',
+            'integrasiForm.wa_token.required' => 'Token / API Key WhatsApp wajib diisi sebelum melakukan tes.',
+        ]);
+
+        $target = preg_replace('/[^0-9]/', '', $this->integrasiForm['wa_test_number']);
+        if (str_starts_with($target, '0')) {
+            $target = '62'.substr($target, 1);
+        }
+
+        $pesan = "🔔 *Uji Coba WhatsApp Gateway Ute Parts ERP*\n\nKoneksi WhatsApp Gateway berhasil terhubung dengan sistem Ute Parts.\n\n📅 Waktu: ".now()->format('d M Y H:i:s')."\n👤 Diuji oleh: ".auth()->user()->name."\n\n_Pesan ini dikirim otomatis oleh sistem._";
+
+        try {
+            $response = Http::timeout(12)->withHeaders([
+                'Authorization' => $this->integrasiForm['wa_token'],
+            ])->post($this->integrasiForm['wa_url'], [
+                'target' => $target,
+                'message' => $pesan,
+            ]);
+
+            if ($response->successful()) {
+                $this->waTestStatus = 'success';
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => "Pesan tes WhatsApp berhasil dikirim ke {$target}!",
+                ]);
+            } else {
+                $this->waTestStatus = 'error';
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Gagal kirim WA (HTTP {$response->status()}): {$response->body()}",
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $this->waTestStatus = 'error';
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Koneksi ke gateway WA gagal: '.$e->getMessage(),
+            ]);
+        }
     }
 
     /** [T-22] Simpan strategi loyalitas → tabel konfigurasi + diskon tier + skema komisi default. Non-retroaktif: hanya berlaku utk transaksi baru. */

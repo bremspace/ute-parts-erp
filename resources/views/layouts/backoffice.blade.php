@@ -422,10 +422,36 @@
                     <div x-show="isDropdownOpen('pengaturan')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
-                        <a href="/app/pengaturan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pengaturan') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pengaturan') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Role &amp; Hak Akses RBAC</span>
+                        <a href="/app/pengaturan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pengaturan') && !request()->has('tab') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pengaturan') && !request()->has('tab') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                            <span>Pusat Pengaturan</span>
                         </a>
+                        <a href="/app/pengaturan?tab=users" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'users' || request('tab') === 'role' || request('tab') === 'cabang' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'users' || request('tab') === 'role' || request('tab') === 'cabang' ? 'bg-white' : 'bg-indigo-400' }}"></span>
+                            <span>Akses, User &amp; Cabang</span>
+                        </a>
+                        <a href="/app/pengaturan?tab=master_produk" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'master_produk' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'master_produk' ? 'bg-white' : 'bg-sky-400' }}"></span>
+                            <span>Katalog &amp; Master Part</span>
+                        </a>
+                        <a href="/app/pengaturan?tab=loyalitas" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'loyalitas' || request('tab') === 'pajak' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'loyalitas' || request('tab') === 'pajak' ? 'bg-white' : 'bg-up-amber' }}"></span>
+                            <span>Kebijakan Poin &amp; PPN</span>
+                        </a>
+                        <a href="/app/pengaturan?tab=printer" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'printer' || request('tab') === 'master' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'printer' || request('tab') === 'master' ? 'bg-white' : 'bg-up-mint' }}"></span>
+                            <span>Servis &amp; Struk Kasir</span>
+                        </a>
+                        <a href="/app/pengaturan?tab=integrasi" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'integrasi' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'integrasi' ? 'bg-white' : 'bg-emerald-400' }}"></span>
+                            <span>Gateway &amp; Integrasi</span>
+                        </a>
+                        @if(isSuperAdminOrOwner())
+                        <a href="/app/pengaturan?tab=database" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'database' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'database' ? 'bg-white' : 'bg-purple-400' }}"></span>
+                            <span>Basis Data &amp; Backup</span>
+                        </a>
+                        @endif
                         <a href="{{ route('two-factor.setup') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/keamanan/dua-faktor*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/keamanan/dua-faktor*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
                             <span>Keamanan Akun &amp; 2FA</span>
