@@ -450,12 +450,28 @@
                         <h4 class="text-sm font-bold text-white">Edit Permission — <span class="text-up-primary">{{ $roleEdit?->name }}</span></h4>
                         <button wire:click="$set('editRoleId', null)" class="text-ink-400 hover:text-white text-xs cursor-pointer">✕ tutup</button>
                     </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-96 overflow-y-auto pr-1">
-                        @foreach($permissionsList as $perm)
-                            <label class="flex items-center gap-2 text-[11px] text-ink-200 cursor-pointer p-1.5 rounded-lg hover:bg-white/5">
-                                <input type="checkbox" wire:model="editRolePermissions" value="{{ $perm->name }}" class="accent-up-mint w-3.5 h-3.5" />
-                                <span class="font-mono">{{ $perm->name }}</span>
-                            </label>
+                    <div class="space-y-4 max-h-[30rem] overflow-y-auto pr-1">
+                        @foreach($groupedPermissions as $modul => $items)
+                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                                <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-white/5">
+                                    <span class="text-xs font-bold text-up-primary flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
+                                        {{ $modul }}
+                                    </span>
+                                    <span class="text-[10px] text-ink-400">{{ count($items) }} hak akses</span>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    @foreach($items as $item)
+                                        <label class="flex items-start gap-2.5 text-xs text-ink-200 cursor-pointer p-2.5 rounded-xl hover:bg-white/5 border border-white/5 transition-colors">
+                                            <input type="checkbox" wire:model="editRolePermissions" value="{{ $item['name'] }}" class="accent-up-mint w-4 h-4 mt-0.5 rounded cursor-pointer shrink-0" />
+                                            <div class="flex-1 min-w-0">
+                                                <div class="font-semibold text-white leading-tight">{{ $item['label'] }}</div>
+                                                <div class="text-[10px] text-ink-400 mt-1 leading-snug">{{ $item['deskripsi'] }}</div>
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
                         @endforeach
                     </div>
                     <div class="mt-4 flex gap-2">
@@ -491,22 +507,38 @@
         <!-- MODAL: ROLE BARU -->
         @if($showRoleModal)
             <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div class="w-full max-w-lg glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
+                <div class="w-full max-w-3xl glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
                     <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                         <h3 class="text-lg font-bold text-white">Role Baru</h3>
                         <button wire:click="$set('showRoleModal', false)" class="text-ink-400 hover:text-white">✕</button>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Role *</label>
-                        <input type="text" wire:model="roleBaruNama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="opsi-gudang-regional" />
+                        <input type="text" wire:model="roleBaruNama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Contoh: koordinator-servis, audit-stok" />
                     </div>
-                    <p class="text-xs font-bold text-ink-300 mb-2">Pilih Permission</p>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                        @foreach($permissionsList as $perm)
-                            <label class="flex items-center gap-2 text-[11px] text-ink-200 cursor-pointer p-1.5 rounded-lg hover:bg-white/5">
-                                <input type="checkbox" wire:model="roleBaruPermissions" value="{{ $perm->name }}" class="accent-up-mint w-3.5 h-3.5" />
-                                <span class="font-mono">{{ $perm->name }}</span>
-                            </label>
+                    <p class="text-xs font-bold text-ink-200 mb-2.5">Pilih Hak Akses (Permission)</p>
+                    <div class="space-y-4 max-h-96 overflow-y-auto pr-1">
+                        @foreach($groupedPermissions as $modul => $items)
+                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                                <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-white/5">
+                                    <span class="text-xs font-bold text-up-primary flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
+                                        {{ $modul }}
+                                    </span>
+                                    <span class="text-[10px] text-ink-400">{{ count($items) }} hak akses</span>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    @foreach($items as $item)
+                                        <label class="flex items-start gap-2.5 text-xs text-ink-200 cursor-pointer p-2.5 rounded-xl hover:bg-white/5 border border-white/5 transition-colors">
+                                            <input type="checkbox" wire:model="roleBaruPermissions" value="{{ $item['name'] }}" class="accent-up-mint w-4 h-4 mt-0.5 rounded cursor-pointer shrink-0" />
+                                            <div class="flex-1 min-w-0">
+                                                <div class="font-semibold text-white leading-tight">{{ $item['label'] }}</div>
+                                                <div class="text-[10px] text-ink-400 mt-1 leading-snug">{{ $item['deskripsi'] }}</div>
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
                         @endforeach
                     </div>
                     <div class="flex gap-3 pt-4 border-t border-white/5 mt-4">

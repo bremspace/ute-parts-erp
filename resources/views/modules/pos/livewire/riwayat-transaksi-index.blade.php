@@ -8,14 +8,18 @@
             </p>
         </div>
         <div class="flex items-center gap-2">
+            @canany(['pos.view', 'pos.view-own', 'pos.create'])
             <a href="/app/pos" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-semibold shadow-sm transition active:scale-[0.98]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                 <span>Buka Kasir POS (F2)</span>
             </a>
+            @endcanany
+            @canany(['servis.view', 'servis.create'])
             <a href="/app/servis" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold border border-white/10 transition active:scale-[0.98]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
                 <span>Kanban Servis</span>
             </a>
+            @endcanany
         </div>
     </div>
 
@@ -397,6 +401,7 @@
                                             Detail
                                         </button>
                                         @if($row->status === 'selesai')
+                                            @canany(['pos.view', 'pos.view-own', 'pos.create'])
                                             <a
                                                 href="/app/pos/retur?transaksi_id={{ $row->id }}"
                                                 class="px-2.5 py-1.5 rounded-lg bg-up-red/20 hover:bg-up-red/30 text-up-red text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
@@ -404,6 +409,7 @@
                                             >
                                                 <span>↩ Retur</span>
                                             </a>
+                                            @endcanany
                                         @endif
                                         <button
                                             wire:click="cetakUlangStruk('pos', {{ $row->id }})"

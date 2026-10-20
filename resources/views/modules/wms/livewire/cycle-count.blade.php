@@ -18,7 +18,7 @@
                         <h4 class="text-sm font-bold text-white">Buat Jadwal Cycle Count Baru</h4>
                         <p class="text-xs text-ink-400">Konfigurasi jadwal audit stok acak berkala secara otomatis</p>
                     </div>
-                    <button type="button" wire:click="showScheduleForm=false" class="text-xs text-ink-400 hover:text-white">✕ Batal</button>
+                    <button type="button" wire:click="batalSchedule" class="text-xs text-ink-400 hover:text-white cursor-pointer">✕ Batal</button>
                 </div>
 
                 {{-- 1. Nama Jadwal --}}
@@ -36,7 +36,7 @@
                     @error('scheduleNama') <span class="text-[11px] text-up-red font-semibold block mt-0.5">{{ $message }}</span> @enderror
                 </div>
 
-                {{-- 2. Target Sampling: Tipe & Lokasi/Kategori --}}
+                {{-- 2. Target Sampling: Tipe & Lokasi/Kategori/Brand/Semua --}}
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
                     <div>
                         <label class="block text-xs font-semibold text-ink-200 mb-1">
@@ -48,6 +48,8 @@
                         >
                             <option value="rak">Per Rak (Berdasarkan Lokasi Bin)</option>
                             <option value="kategori">Per Kategori Produk</option>
+                            <option value="brand">Per Brand Produk</option>
+                            <option value="semua">Semua Stok di Cabang Ini</option>
                         </select>
                         <p class="text-[11px] text-ink-400 mt-1">Metode pengelompokan produk yang akan diacak.</p>
                     </div>
@@ -70,7 +72,7 @@
                             </select>
                             <p class="text-[11px] text-ink-400 mt-1">Hanya sparepart pada rak ini yang akan diundi menjadi sampel.</p>
                         </div>
-                    @else
+                    @elseif($tipeTarget === 'kategori')
                         <div>
                             <label class="block text-xs font-semibold text-ink-200 mb-1">
                                 Pilih Kategori Sasaran
@@ -85,6 +87,29 @@
                                 @endforeach
                             </select>
                             <p class="text-[11px] text-ink-400 mt-1">Hanya sparepart dalam kategori ini yang akan diundi menjadi sampel.</p>
+                        </div>
+                    @elseif($tipeTarget === 'brand')
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-200 mb-1">
+                                Pilih Brand Sasaran
+                            </label>
+                            <select
+                                wire:model="targetBrandId"
+                                class="w-full px-3 py-2 bg-ink-900 border border-white/10 rounded-xl text-ink-100 text-xs min-h-[44px]"
+                            >
+                                <option value="">Semua Brand</option>
+                                @foreach($brands as $b)
+                                    <option value="{{ $b->id }}">{{ $b->nama }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-[11px] text-ink-400 mt-1">Hanya sparepart dengan brand ini yang akan diundi.</p>
+                        </div>
+                    @else
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-ink-300 w-full">
+                                <span class="font-bold text-white block mb-0.5">Semua Barang:</span>
+                                Seluruh sparepart aktif pada seluruh gudang di cabang ini akan masuk ke dalam undian sampel acak.
+                            </div>
                         </div>
                     @endif
                 </div>
@@ -230,7 +255,7 @@
                     </button>
                     <button
                         type="button"
-                        wire:click="showScheduleForm=false"
+                        wire:click="batalSchedule"
                         class="px-5 py-2.5 bg-white/10 hover:bg-white/15 text-ink-300 rounded-xl text-xs font-semibold transition active:scale-[0.97] min-h-[44px] cursor-pointer"
                     >
                         Batal
@@ -348,12 +373,50 @@
                     $sampleItems = $countTask->sample_items ?? [];
                 @endphp
 
+                <!-- Barcode Scanner Cepat untuk Hitung Sampel -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                    <div class="relative flex-1">
+                        <input
+                            type="text"
+                            wire:model="countScanInput"
+                            wire:keydown.enter.prevent="scanBarcodeDirect(countScanInput)"
+                            placeholder="Scan barcode / ketik SKU barang sampel (Enter untuk hitung +1)..."
+                            class="w-full px-3.5 py-2 rounded-xl glass-input text-xs text-white placeholder-ink-400 min-h-[42px] focus:ring-1 focus:ring-teal-500"
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="scanBarcodeDirect(countScanInput)"
+                        class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold min-h-[42px] flex items-center justify-center cursor-pointer transition active:scale-95 shrink-0"
+                    >
+                        + Hitung Scan
+                    </button>
+                    <button
+                        type="button"
+                        x-data="{}"
+                        @click="if (window.uteBarcode && window.uteBarcode.openCameraScanner) {
+                            window.uteBarcode.openCameraScanner({
+                                title: 'Scan Barcode Cycle Count',
+                                continuous: true,
+                                onScan: (code) => { $wire.scanBarcodeDirect(code); }
+                            });
+                        } else {
+                            alert('Modul scanner kamera sedang memuat...');
+                        }"
+                        class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-teal-300 text-xs font-bold min-h-[42px] flex items-center justify-center gap-1 cursor-pointer transition shrink-0 active:scale-95"
+                        title="Scan Barcode via Kamera HP"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+                        <span class="hidden sm:inline">Kamera</span>
+                    </button>
+                </div>
+
                 <div class="space-y-2">
                     @forelse($sampleItems as $item)
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition">
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-xs text-white font-bold block truncate">
+                                    <span class="text-xs sm:text-sm text-white font-bold block truncate">
                                         {{ !empty($item['nama']) ? $item['nama'] : ('Produk #' . ($item['produk_id'] ?? $item['stok_item_id'])) }}
                                     </span>
                                 </div>
@@ -373,16 +436,28 @@
                                     @endif
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2 self-end sm:self-center shrink-0">
+                            <div class="flex items-center justify-between sm:justify-end gap-2 self-stretch sm:self-center shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
                                 <label class="text-xs text-ink-300 font-medium whitespace-nowrap">Hitungan Fisik:</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    wire:model="fisikPerItem.{{ $item['stok_item_id'] }}"
-                                    placeholder="0"
-                                    class="w-28 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs font-bold text-center tabular-nums min-h-[44px] focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-                                >
-                                <span class="text-xs text-ink-400">unit</span>
+                                <div class="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        wire:click="kurangHitungan({{ $item['stok_item_id'] }})"
+                                        class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white flex items-center justify-center font-bold text-sm cursor-pointer active:scale-95"
+                                    >-</button>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        wire:model="fisikPerItem.{{ $item['stok_item_id'] }}"
+                                        placeholder="0"
+                                        class="w-20 px-2 py-1.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs font-bold text-center tabular-nums min-h-[40px] focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                                    >
+                                    <button
+                                        type="button"
+                                        wire:click="tambahHitungan({{ $item['stok_item_id'] }})"
+                                        class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white flex items-center justify-center font-bold text-sm cursor-pointer active:scale-95"
+                                    >+</button>
+                                    <span class="text-xs text-ink-400 ml-1">unit</span>
+                                </div>
                             </div>
                         </div>
                     @empty

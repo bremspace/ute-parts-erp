@@ -22,7 +22,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'metode_harga_beli', 'harga_jual_retail', 'margin_persen', 'gambar', 'foto', 'meta_title', 'meta_description',
     'kompatibilitas_hp', 'is_active',
     // [T-44]
-    'brand_id', 'kualitas_id',
+    'brand_id', 'kualitas_id', 'supplier_id',
     // [HARGA FLEKSIBEL]
     'harga_fleksibel',
     // [F2-3] Serial number tracking
@@ -90,6 +90,11 @@ class Produk extends Model
     public function kategoriRelasi(): BelongsTo
     {
         return $this->belongsTo(KategoriProduk::class, 'kategori_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id');
     }
 
     public function produkKompatibel(): BelongsToMany
@@ -443,7 +448,8 @@ class Produk extends Model
                                 ->orWhere('deskripsi', 'like', "%{$word}%")
                                 ->orWhereHas('brand', fn ($bq) => $bq->where('nama', 'like', "%{$word}%"))
                                 ->orWhereHas('kualitas', fn ($kq) => $kq->where('nama', 'like', "%{$word}%"))
-                                ->orWhereHas('kategoriRelasi', fn ($cq) => $cq->where('nama', 'like', "%{$word}%"));
+                                ->orWhereHas('kategoriRelasi', fn ($cq) => $cq->where('nama', 'like', "%{$word}%"))
+                                ->orWhereHas('supplier', fn ($sq) => $sq->where('nama', 'like', "%{$word}%"));
                         });
                     }
                 });
@@ -457,7 +463,8 @@ class Produk extends Model
                     ->orWhere('deskripsi', 'like', "%{$term}%")
                     ->orWhereHas('brand', fn ($bq) => $bq->where('nama', 'like', "%{$term}%"))
                     ->orWhereHas('kualitas', fn ($kq) => $kq->where('nama', 'like', "%{$term}%"))
-                    ->orWhereHas('kategoriRelasi', fn ($cq) => $cq->where('nama', 'like', "%{$term}%"));
+                    ->orWhereHas('kategoriRelasi', fn ($cq) => $cq->where('nama', 'like', "%{$term}%"))
+                    ->orWhereHas('supplier', fn ($sq) => $sq->where('nama', 'like', "%{$term}%"));
             }
         });
     }

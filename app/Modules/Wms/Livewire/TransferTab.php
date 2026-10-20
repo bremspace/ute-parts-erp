@@ -40,6 +40,8 @@ class TransferTab extends Component
 
     public array $transferItems = []; // [['produk_id' => ..., 'sku_variant_id' => ..., 'jumlah' => ...]]
 
+    public string $quickBarcodeInput = '';
+
     public function mount()
     {
         $cabangId = session('cabang_id');
@@ -93,6 +95,101 @@ class TransferTab extends Component
     {
         unset($this->transferItems[$index]);
         $this->transferItems = array_values($this->transferItems);
+    }
+
+    /**
+     * Stepper tambah kuantitas transfer (touch-friendly mobile).
+     */
+    public function tambahJumlahItem(int $index): void
+    {
+        if (isset($this->transferItems[$index])) {
+            $this->transferItems[$index]['jumlah'] = max(1, (int) ($this->transferItems[$index]['jumlah'] ?? 0) + 1);
+        }
+    }
+
+    /**
+     * Stepper kurangi kuantitas transfer (touch-friendly mobile).
+     */
+    public function kurangJumlahItem(int $index): void
+    {
+        if (isset($this->transferItems[$index])) {
+            $current = (int) ($this->transferItems[$index]['jumlah'] ?? 1);
+            $this->transferItems[$index]['jumlah'] = max(1, $current - 1);
+        }
+    }
+
+    /**
+     * Scan Barcode / Input SKU Cepat untuk form Transfer Antar Gudang.
+     */
+    public function scanBarcodeDirect(string $code): void
+    {
+        $term = trim($code);
+        if ($term === '') {
+            return;
+        }
+
+        $query = Produk::query()->where('is_active', true);
+        $this->scopeStokCabangAktif($query);
+
+        $produk = $query->where(function ($q) use ($term) {
+            $q->where('barcode', $term)
+                ->orWhere('sku', $term)
+                ->orWhereHas('skuVariants', fn ($sv) => $sv->where('barcode', $term)->orWhere('sku', $term));
+        })->first();
+
+        if (! $produk) {
+            // Coba cari kata kunci pertama jika bukan exact barcode
+            $produk = $query->cariPintar($term)->first();
+        }
+
+        if (! $produk) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Produk dengan barcode/kode '{$term}' tidak ditemukan.",
+            ]);
+
+            return;
+        }
+
+        // Cek apakah produk sudah ada di transferItems
+        $foundIndex = null;
+        foreach ($this->transferItems as $idx => $item) {
+            if ($item['produk_id'] === $produk->id) {
+                $foundIndex = $idx;
+                break;
+            }
+        }
+
+        if ($foundIndex !== null) {
+            $this->transferItems[$foundIndex]['jumlah'] = ((int) $this->transferItems[$foundIndex]['jumlah']) + 1;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Jumlah '{$produk->nama}' ditambah menjadi {$this->transferItems[$foundIndex]['jumlah']}.",
+            ]);
+        } else {
+            // Jika row pertama masih kosong (produk_id null), gunakan baris itu
+            if (count($this->transferItems) === 1 && empty($this->transferItems[0]['produk_id'])) {
+                $this->transferItems[0]['produk_id'] = $produk->id;
+                $this->transferItems[0]['produk_nama'] = $produk->nama;
+                $this->transferItems[0]['sku_variant_id'] = $produk->skuVariants()->first()?->id;
+                $this->transferItems[0]['jumlah'] = 1;
+            } else {
+                $this->transferItems[] = [
+                    'produk_id' => $produk->id,
+                    'produk_nama' => $produk->nama,
+                    'sku_variant_id' => $produk->skuVariants()->first()?->id,
+                    'rak_id' => null,
+                    'jumlah' => 1,
+                ];
+            }
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "'{$produk->nama}' berhasil ditambahkan ke transfer.",
+            ]);
+        }
+
+        $this->quickBarcodeInput = '';
     }
 
     #[On('produk-dipilih-global')]

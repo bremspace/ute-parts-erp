@@ -92,6 +92,7 @@
                                                     Detail
                                                 </button>
                                                 @if($trx->status === 'selesai')
+                                                    @can('pos.void')
                                                     <!-- Tombol Void Transaksi Kasir -->
                                                     <button
                                                         type="button"
@@ -101,12 +102,15 @@
                                                     >
                                                         <span>Void</span>
                                                     </button>
+                                                    @endcan
+                                                    @canany(['pos.view', 'pos.view-own', 'pos.create'])
                                                     <a
                                                         href="/app/pos/retur?transaksi_id={{ $trx->id }}"
                                                         class="px-2.5 py-1 rounded-lg bg-up-amber/10 hover:bg-up-amber/20 text-up-amber font-bold text-[11px] transition-colors border border-up-amber/25 cursor-pointer flex items-center"
                                                     >
                                                         Retur
                                                     </a>
+                                                    @endcanany
                                                 @endif
                                                 @can('lihat-audit-log')
                                                     <button

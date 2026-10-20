@@ -89,14 +89,24 @@
                 }"
                 @submit.prevent="validasiStok() && $wire.saveTransfer()"
             >
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Buat Transfer Antar Gudang</h3>
-                    <button type="button" wire:click="$set('showTransferModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-4 border-b border-white/10">
+                    <div>
+                        <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                            <span>Buat Transfer Antar Gudang</span>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary border border-up-primary/30">WMS</span>
+                        </h3>
+                        <p class="text-[11px] text-ink-400">Pindahkan stok fisik dari gudang asal ke gudang cabang tujuan</p>
+                    </div>
+                    <button type="button" wire:click="$set('showTransferModal', false)" class="p-1.5 rounded-xl text-ink-400 hover:text-white hover:bg-white/5 transition cursor-pointer">✕</button>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+                <!-- Gudang Asal & Tujuan Selection -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 p-3.5 rounded-2xl bg-white/[0.02] border border-white/5">
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang Asal</label>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-up-amber"></span>
+                            <span>Gudang Asal (Pengirim)</span>
+                        </label>
                         <select wire:model.live="transferGudangAsalId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                             <option value="" class="bg-ink-900">Pilih Gudang Asal...</option>
                             @foreach($gudangs as $g)
@@ -106,7 +116,10 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang Tujuan</label>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-up-mint"></span>
+                            <span>Gudang Tujuan (Penerima)</span>
+                        </label>
                         <select wire:model.live="transferGudangTujuanId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                             <option value="" class="bg-ink-900">Pilih Gudang Tujuan...</option>
                             @foreach($gudangs as $g)
@@ -116,19 +129,86 @@
                     </div>
                 </div>
 
-                <!-- Items Row -->
-                <div class="space-y-3 mb-4 max-h-72 overflow-y-auto pr-1">
-                    <div class="flex justify-between items-center text-xs font-semibold text-ink-400">
-                        <span>Daftar Sparepart yang Ditransfer</span>
-                        <button type="button" wire:click="addTransferRow" class="text-up-primary hover:text-indigo-400 font-bold">+ Tambah Baris</button>
+                <!-- Scan Barcode Cepat & Quick Actions -->
+                <div class="p-3 sm:p-3.5 rounded-2xl bg-up-primary/5 border border-up-primary/15 mb-4 space-y-2.5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+                                <span>Scan Barcode / Input Cepat</span>
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-ink-300 font-mono">
+                                {{ count($transferItems) }} Item ({{ collect($transferItems)->sum('jumlah') }} unit)
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ count($transferItems) - 1 >= 0 ? count($transferItems) - 1 : 0 }}, context: 'transfer' })"
+                                class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 text-xs font-semibold flex items-center gap-1 cursor-pointer transition active:scale-95"
+                            >
+                                <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                <span>Cari Katalog</span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="addTransferRow"
+                                class="px-2.5 py-1.5 rounded-xl bg-up-primary/20 hover:bg-up-primary text-up-primary hover:text-white border border-up-primary/30 text-xs font-semibold flex items-center gap-1 cursor-pointer transition active:scale-95"
+                            >
+                                <span>+ Baris</span>
+                            </button>
+                        </div>
                     </div>
 
+                    <div class="flex items-center gap-2">
+                        <div class="relative flex-1">
+                            <input
+                                type="text"
+                                wire:model="quickBarcodeInput"
+                                wire:keydown.enter.prevent="scanBarcodeDirect(quickBarcodeInput)"
+                                placeholder="Scan barcode fisik atau ketik SKU lalu tekan Enter..."
+                                class="w-full px-3.5 py-2 rounded-xl glass-input text-xs text-white placeholder-ink-400 min-h-[42px] focus:ring-1 focus:ring-up-primary"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="scanBarcodeDirect(quickBarcodeInput)"
+                            class="px-3.5 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-bold min-h-[42px] flex items-center justify-center cursor-pointer transition active:scale-95 shrink-0"
+                            title="Tambah Barang"
+                        >
+                            Tambah
+                        </button>
+                        <button
+                            type="button"
+                            x-data="{}"
+                            @click="if (window.uteBarcode && window.uteBarcode.openCameraScanner) {
+                                window.uteBarcode.openCameraScanner({
+                                    title: 'Scan Barcode Transfer',
+                                    continuous: true,
+                                    onScan: (code) => { $wire.scanBarcodeDirect(code); }
+                                });
+                            } else {
+                                alert('Modul scanner kamera sedang memuat...');
+                            }"
+                            class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-up-primary text-xs font-bold min-h-[42px] flex items-center gap-1 cursor-pointer transition shrink-0 active:scale-95"
+                            title="Scan Barcode via Kamera HP"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+                            <span class="hidden sm:inline">Kamera</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Items Row: Mobile Cards / Desktop Compact -->
+                <div class="space-y-3 mb-4 max-h-80 overflow-y-auto pr-1">
                     @foreach($transferItems as $index => $row)
                         @php
                             $trfInfo = $transferStokRows[$index] ?? null;
                         @endphp
-                        <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
+                        <div class="p-3 sm:p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition">
+                            <!-- Desktop & Mobile Unified Row -->
+                            <div class="flex flex-col sm:flex-row gap-2.5 sm:gap-3 sm:items-center">
+                                <!-- Pilih Produk Input -->
                                 <div class="flex-1 flex gap-1.5 items-center">
                                     <div class="flex-1 relative">
                                         <input type="text"
@@ -140,7 +220,7 @@
                                         @if($row['produk_id'])
                                             <button type="button"
                                                     wire:click="$set('transferItems.{{ $index }}.produk_id', null); $set('transferItems.{{ $index }}.produk_nama', ''); $set('transferItems.{{ $index }}.sku_variant_id', null)"
-                                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white">
+                                                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-ink-400 hover:text-white cursor-pointer">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                                 </svg>
@@ -158,9 +238,11 @@
                                         </svg>
                                     </button>
                                 </div>
-                                <div class="w-full sm:w-32">
+
+                                <!-- Rak Tujuan -->
+                                <div class="w-full sm:w-36">
                                     <select wire:model="transferItems.{{ $index }}.rak_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px]">
-                                        <option value="" class="bg-ink-900">Rak Tujuan</option>
+                                        <option value="" class="bg-ink-900">Rak Tujuan...</option>
                                         @foreach($raks as $rk)
                                             @if($rk->gudang_id == $transferGudangTujuanId)
                                                 <option value="{{ $rk->id }}" class="bg-ink-900">{{ $rk->kode }}</option>
@@ -168,41 +250,60 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="w-full sm:w-24">
-                                    <input
-                                        type="number"
-                                        wire:model.live="transferItems.{{ $index }}.jumlah"
-                                        data-trf-qty="{{ $index }}"
-                                        min="1"
-                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-center tabular-nums min-h-[44px]"
-                                    />
-                                </div>
-                                <div class="flex items-center justify-end">
+
+                                <!-- Qty Stepper (Touch-Friendly Mobile & Desktop) -->
+                                <div class="flex items-center justify-between sm:justify-start gap-2">
+                                    <div class="flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden p-0.5">
+                                        <button
+                                            type="button"
+                                            wire:click="kurangJumlahItem({{ $index }})"
+                                            class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer active:scale-95 transition"
+                                        >
+                                            -
+                                        </button>
+                                        <input
+                                            type="number"
+                                            wire:model.live="transferItems.{{ $index }}.jumlah"
+                                            data-trf-qty="{{ $index }}"
+                                            min="1"
+                                            class="w-14 px-1 py-1 bg-transparent text-xs font-bold text-center tabular-nums text-white focus:outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            wire:click="tambahJumlahItem({{ $index }})"
+                                            class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer active:scale-95 transition"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+
+                                    <!-- Tombol Hapus Baris -->
                                     <button
                                         type="button"
                                         wire:click="removeTransferRow({{ $index }})"
-                                        class="p-2 text-up-red hover:bg-white/5 rounded-lg text-xs min-h-[44px] flex items-center justify-center cursor-pointer"
+                                        class="p-2 text-up-red hover:bg-up-red/10 rounded-xl text-xs min-h-[40px] flex items-center justify-center cursor-pointer transition shrink-0"
+                                        title="Hapus Baris"
                                     >
-                                        ✕
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     </button>
                                 </div>
                             </div>
 
                             <!-- [T-41] Info stok real-time per item -->
-                            <div class="grid grid-cols-3 gap-2 mt-2 text-[10px] text-ink-400">
-                                <div class="rounded-lg bg-white/[0.03] px-2 py-1.5">
-                                    Stok Sumber:
+                            <div class="grid grid-cols-3 gap-2 mt-2.5 text-[10px] text-ink-400">
+                                <div class="rounded-xl bg-white/[0.03] px-2.5 py-1.5 border border-white/5">
+                                    <span class="block text-[9px] text-ink-400">Stok Asal:</span>
                                     <strong class="text-white tabular-nums">{{ $trfInfo ? $trfInfo['stok_sumber'].' unit' : '-' }}</strong>
                                     @if($trfInfo && $trfInfo['stok_dikunci'] > 0)
-                                        <span class="text-up-amber">({{ $trfInfo['stok_dikunci'] }} terkunci)</span>
+                                        <span class="text-up-amber">({{ $trfInfo['stok_dikunci'] }} lock)</span>
                                     @endif
                                 </div>
-                                <div class="rounded-lg bg-white/[0.03] px-2 py-1.5">
-                                    Tersedia:
+                                <div class="rounded-xl bg-white/[0.03] px-2.5 py-1.5 border border-white/5">
+                                    <span class="block text-[9px] text-ink-400">Tersedia:</span>
                                     <strong class="text-up-mint tabular-nums">{{ $trfInfo ? $trfInfo['stok_tersedia'].' unit' : '-' }}</strong>
                                 </div>
-                                <div class="rounded-lg bg-white/[0.03] px-2 py-1.5">
-                                    Est. Stok Tujuan:
+                                <div class="rounded-xl bg-white/[0.03] px-2.5 py-1.5 border border-white/5">
+                                    <span class="block text-[9px] text-ink-400">Est. Tujuan:</span>
                                     <strong class="text-white tabular-nums">{{ $trfInfo ? ($trfInfo['stok_tujuan'].' + '.$row['jumlah'].' = '.$trfInfo['estimasi_tujuan']) : '-' }}</strong>
                                 </div>
                             </div>

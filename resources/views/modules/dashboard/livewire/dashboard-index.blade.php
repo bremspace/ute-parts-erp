@@ -136,13 +136,13 @@
         </div>
 
         <div class="flex items-center gap-2 w-full sm:w-auto pt-1 sm:pt-0">
-            @can('pos.kasir')
+            @canany(['pos.view', 'pos.view-own', 'pos.create'])
                 <a href="/app/pos" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-semibold shadow-md transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     Buka Kasir
                 </a>
-            @endcan
-            @can('servis.tiket')
+            @endcanany
+            @can('servis.create')
                 <a href="/app/servis" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-ink-200 hover:text-white text-xs font-semibold border border-white/10 transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
                     <svg class="w-3.5 h-3.5 text-up-amber" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     Tiket Servis
@@ -189,7 +189,11 @@
         </x-prism.glass-card>
 
         <!-- 2. Antrian Servis -->
+        @canany(['servis.view', 'servis.create'])
         <a href="/app/servis" class="block group relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5 hover:border-up-amber/40 transition-all duration-200 active:scale-[0.98]">
+        @else
+        <div class="block relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5">
+        @endcanany
             <div class="flex items-center justify-between">
                 <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-ink-400 group-hover:text-ink-200">Antrian Servis</span>
                 <div class="w-8 h-8 rounded-xl bg-up-amber/10 border border-up-amber/20 flex items-center justify-center text-up-amber">
@@ -205,10 +209,18 @@
                     <span class="font-bold text-up-mint tabular-nums">{{ $antrianServis['selesai_hari_ini'] ?? 0 }} unit</span>
                 </div>
             </div>
+        @canany(['servis.view', 'servis.create'])
         </a>
+        @else
+        </div>
+        @endcanany
 
         <!-- 3. Stok Kritis -->
+        @can('wms.view')
         <a href="/app/wms?tab=produk" class="block group relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5 hover:border-up-red/40 transition-all duration-200 active:scale-[0.98]">
+        @else
+        <div class="block relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5">
+        @endcan
             <div class="flex items-center justify-between">
                 <span class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-ink-400 group-hover:text-ink-200">Stok Kritis</span>
                 <div class="w-8 h-8 rounded-xl bg-up-red/10 border border-up-red/20 flex items-center justify-center text-up-red">
@@ -224,7 +236,11 @@
                     <span class="font-bold text-up-red tabular-nums">Perlu PO</span>
                 </div>
             </div>
+        @can('wms.view')
         </a>
+        @else
+        </div>
+        @endcan
 
         <!-- 4. Piutang Jatuh Tempo -->
         <x-prism.glass-card class="p-4 sm:p-5 relative overflow-hidden group hover:border-up-accent/40 transition-all duration-200">
@@ -493,7 +509,9 @@
                 <div class="pt-3 border-t border-white/5">
                     <div class="flex justify-between text-xs text-ink-400 mb-1.5 font-medium">
                         <span>Total Antrian: <strong class="text-white tabular-nums">{{ $totalServis }} unit</strong></span>
-                        <a href="/app/servis" class="text-up-primary hover:text-indigo-400 font-semibold">Buka Board Kanban →</a>
+                        @canany(['servis.view', 'servis.create'])
+                            <a href="/app/servis" class="text-up-primary hover:text-indigo-400 font-semibold">Buka Board Kanban →</a>
+                        @endcanany
                     </div>
                     <div class="h-2 w-full rounded-full bg-white/5 overflow-hidden flex">
                         @foreach($servisLabels as $i => $label)
@@ -1040,9 +1058,11 @@
                         </h3>
                         <p class="text-xs text-ink-400">Total {{ $omzetShiftKasir['jumlah_transaksi'] ?? 0 }} transaksi berhasil pada shift ini.</p>
                     </div>
+                    @canany(['pos.view', 'pos.view-own', 'pos.create'])
                     <a href="/app/pos" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-indigo-600 text-white font-semibold text-xs shadow-md transition-all active:scale-[0.98]">
                         Lanjutkan Transaksi Kasir →
                     </a>
+                    @endcanany
                 </div>
             </x-prism.glass-card>
         @endif

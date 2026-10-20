@@ -278,6 +278,7 @@ class PoTab extends Component
         $this->dispatch('open-global-product-search', [
             'targetIndex' => $targetIndex,
             'context' => $context,
+            'supplierId' => ! empty($this->poForm['supplier_id']) ? (int) $this->poForm['supplier_id'] : null,
         ])->to(ProductSearchModal::class);
     }
 
@@ -285,6 +286,11 @@ class PoTab extends Component
     {
         $produk = Produk::with('satuanKonversi')->find($this->poForm['items'][$idx]['produk_id']);
         if ($produk) {
+            // Jika supplier PO belum dipilih dan produk memiliki default supplier terdaftar, otomatis gunakan supplier tersebut
+            if (empty($this->poForm['supplier_id']) && ! empty($produk->supplier_id)) {
+                $this->poForm['supplier_id'] = $produk->supplier_id;
+            }
+
             $supplierId = ! empty($this->poForm['supplier_id']) ? (int) $this->poForm['supplier_id'] : null;
             $histori = app(ProcurementService::class)->getHistoriPembelian($produk->id, $supplierId);
 
@@ -625,10 +631,13 @@ class PoTab extends Component
             'supplierForm.nama' => 'required|string|max:255',
         ]);
 
-        Supplier::create($this->supplierForm);
+        $supplier = Supplier::create($this->supplierForm);
+        if ($this->showPoModal) {
+            $this->poForm['supplier_id'] = $supplier->id;
+        }
         $this->showSupplierModal = false;
         $this->supplierForm = ['nama' => '', 'kontak' => '', 'telepon' => '', 'alamat' => '', 'termin_hari' => 30];
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier disimpan']);
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Supplier '.$supplier->nama.' berhasil ditambahkan dan dipilih']);
     }
 
     public function hapusSupplier(int $id): void
@@ -714,6 +723,13 @@ class PoTab extends Component
                 ->find($this->detailPoId);
         }
 
+        $totalEstimasiPo = 0;
+        foreach ($this->poForm['items'] ?? [] as $i) {
+            $h = $this->parseNominal($i['harga_beli'] ?? 0);
+            $qty = (float) ($i['jumlah'] ?? 0);
+            $totalEstimasiPo += ($h * $qty);
+        }
+
         return view('modules.wms.livewire.po-tab', [
             'gudangs' => $gudangs,
             'allProducts' => $allProducts,
@@ -723,6 +739,7 @@ class PoTab extends Component
             'procurementData' => $procurementData,
             'procurementSummary' => $procurementSummary,
             'akunKasBankList' => AkunCOA::whereIn('kelompok', ['kas', 'bank'])->where('is_active', true)->orderBy('kode')->get(),
+            'totalEstimasiPo' => $totalEstimasiPo,
         ]);
     }
 }

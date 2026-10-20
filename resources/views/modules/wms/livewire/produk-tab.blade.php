@@ -132,6 +132,15 @@
                             </label>
                         @endif
 
+                        @if($visibleFilters['supplier'] ?? false)
+                            <select wire:model.live="filterSupplierId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
+                                <option value="">Semua Supplier</option>
+                                @foreach($suppliers as $sup)
+                                    <option value="{{ $sup->id }}" class="bg-ink-900">{{ $sup->nama }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+
                         @if($visibleFilters['tier'] ?? true)
                             <!-- Filter Tier Harga Pricelist & Export -->
                             <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 p-1 rounded-xl">
@@ -242,6 +251,10 @@
                                 <input type="checkbox" wire:key="pt-chk-tier-{{ ($visibleFilters['tier'] ?? true) ? '1' : '0' }}" wire:click="toggleFilter('tier')" @checked($visibleFilters['tier'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Tier & Export</span>
                             </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-supplier-{{ ($visibleFilters['supplier'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('supplier')" @checked($visibleFilters['supplier'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Supplier</span>
+                            </label>
                         </div>
                         <button type="button"
                                 wire:click="resetCustomFilters"
@@ -287,6 +300,11 @@
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
                                 <input type="checkbox" wire:key="pt-col-kompatibilitas-{{ ($visibleColumns['kompatibilitas'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('kompatibilitas')" @checked($visibleColumns['kompatibilitas'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Kompatibilitas HP</span>
+                            </label>
+
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-col-supplier-{{ ($visibleColumns['supplier'] ?? false) ? '1' : '0' }}" wire:click="toggleColumn('supplier')" @checked($visibleColumns['supplier'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Supplier</span>
                             </label>
 
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
@@ -654,6 +672,62 @@
                                             <div class="pt-2 border-t border-white/10 flex justify-between">
                                                 <button type="button" wire:click="resetFilterKolom('kompatibilitas')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
                                                 <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        @endif
+
+                        <!-- Kolom Supplier (Filter) -->
+                        @if($visibleColumns['supplier'] ?? false)
+                            <th class="py-3 px-3 min-w-[130px]">
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <span class="text-ink-400 font-semibold text-xs">Supplier</span>
+                                    <!-- Filter Popover Kolom Supplier -->
+                                    <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                        <button
+                                            type="button"
+                                            @click="open = !open"
+                                            class="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer relative {{ $filterSupplierId ? 'text-up-primary bg-up-primary/10' : 'text-ink-400 hover:text-white' }}"
+                                            title="Filter Kolom Supplier"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                                            @if($filterSupplierId)
+                                                <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span>
+                                            @endif
+                                        </button>
+
+                                        <div
+                                            x-show="open"
+                                            x-cloak
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                        >
+                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                                                <span class="text-xs font-bold text-white">Filter Supplier</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Pilih Supplier</label>
+                                                <select wire:model.live="filterSupplierId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium">
+                                                    <option value="">Semua Supplier</option>
+                                                    @foreach($suppliers as $sup)
+                                                        <option value="{{ $sup->id }}">{{ $sup->nama }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+
+                                            <div class="pt-2 border-t border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('supplier')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                                    Reset Kolom Ini
+                                                </button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                    Tutup
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1254,6 +1328,21 @@
                             </td>
                         @endif
 
+                        @if($visibleColumns['supplier'] ?? false)
+                            <td class="py-2.5 px-3 text-xs whitespace-nowrap min-w-[130px]">
+                                @if($p->supplier)
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-xs font-semibold text-white">{{ $p->supplier->nama }}</span>
+                                    </div>
+                                    @if($p->supplier->telepon)
+                                        <span class="text-[10px] text-ink-500 font-mono block">{{ $p->supplier->telepon }}</span>
+                                    @endif
+                                @else
+                                    <span class="text-ink-500 text-xs">-</span>
+                                @endif
+                            </td>
+                        @endif
+
                         @if($visibleColumns['sku'] ?? true)
                             <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
                                 <span class="text-ink-300 block font-semibold">{{ $skuPertama ?? '-' }}</span>
@@ -1368,53 +1457,111 @@
 
                         @if($visibleColumns['aksi'] ?? true)
                             <td class="py-2.5 px-3 whitespace-nowrap w-20">
-                                <div class="flex items-center gap-1.5" x-data="{ openMenu: false }">
+                                <div class="flex items-center gap-1.5"
+                                     x-data="{
+                                         openMenu: false,
+                                         coords: { top: 0, left: 0 },
+                                         updatePosition() {
+                                             const btn = this.$refs.triggerBtn;
+                                             if (!btn) return;
+                                             const rect = btn.getBoundingClientRect();
+                                             const menuWidth = 176;
+                                             const menuEl = this.$refs.menuDropdown;
+                                             const menuHeight = menuEl ? (menuEl.offsetHeight || 260) : 260;
+                                             const spaceBelow = window.innerHeight - rect.bottom;
+                                             const spaceAbove = rect.top;
+
+                                             let top;
+                                             if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+                                                 top = Math.max(10, rect.top - menuHeight - 6);
+                                             } else {
+                                                 top = Math.min(window.innerHeight - menuHeight - 10, rect.bottom + 6);
+                                             }
+
+                                             let left = rect.right - menuWidth;
+                                             if (left < 10) left = 10;
+                                             if (left + menuWidth > window.innerWidth - 10) {
+                                                 left = window.innerWidth - menuWidth - 10;
+                                             }
+
+                                             this.coords = { top: Math.round(top), left: Math.round(left) };
+                                         },
+                                         toggleMenu() {
+                                             if (!this.openMenu) {
+                                                 this.openMenu = true;
+                                                 this.updatePosition();
+                                                 this.$nextTick(() => {
+                                                     this.updatePosition();
+                                                 });
+                                             } else {
+                                                 this.openMenu = false;
+                                             }
+                                         },
+                                         init() {
+                                             const closeOnScroll = (e) => {
+                                                 if (!this.openMenu) return;
+                                                 if (this.$refs.menuDropdown && !this.$refs.menuDropdown.contains(e.target)) {
+                                                     this.openMenu = false;
+                                                 }
+                                             };
+                                             window.addEventListener('scroll', closeOnScroll, true);
+                                             window.addEventListener('resize', closeOnScroll);
+                                         }
+                                     }">
                                     <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 text-up-mint border border-up-mint/30 font-bold text-xs cursor-pointer whitespace-nowrap active:scale-95 transition" title="Edit Master Produk">
                                         ✏️ Edit
                                     </button>
 
-                                    <!-- Dropdown Menu Lainnya (Semua aksi selain edit) -->
-                                    <div class="relative" @click.away="openMenu = false">
-                                        <button @click="openMenu = !openMenu"
+                                    <!-- Dropdown Menu Lainnya (Fixed Floating Teleport - 100% bebas dari potongan overflow/table) -->
+                                    <div class="relative">
+                                        <button x-ref="triggerBtn"
+                                                @click.stop="toggleMenu()"
                                                 type="button"
                                                 class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 text-xs cursor-pointer active:scale-95 transition"
                                                 title="Menu lainnya">
                                             •••
                                         </button>
-                                        <div x-show="openMenu"
-                                             x-cloak
-                                             class="absolute right-0 top-full mt-1.5 w-44 rounded-xl bg-ink-900 border border-white/10 shadow-xl z-20 py-1 text-xs backdrop-blur-md">
-                                            <button type="button" wire:click="duplikatProduk({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                                <span>📑</span> Duplikat Produk
-                                            </button>
-                                            <button type="button" wire:click="toggleStatusAktif({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 {{ $p->is_active ? 'text-up-amber' : 'text-up-mint' }} hover:bg-white/5 transition cursor-pointer">
-                                                <span>{{ $p->is_active ? '⏸️' : '▶️' }}</span> {{ $p->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                            </button>
-                                            <button type="button" wire:click="copySingleProduk({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                                <span>📋</span> Salin Harga
-                                            </button>
-                                            <button type="button" wire:click="orderPo({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                                <span>📦</span> Order PO
-                                            </button>
-                                            <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition">
-                                                <span>🖨️</span> Cetak Label QR
-                                            </a>
-                                            @can('lihat-audit-log')
-                                                <button type="button" wire:click="bukaRiwayat('produk', {{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                                    <span>📜</span> Riwayat Audit
+
+                                        <template x-teleport="body">
+                                            <div x-show="openMenu"
+                                                 x-cloak
+                                                 x-ref="menuDropdown"
+                                                 @click.outside="openMenu = false"
+                                                 @keydown.escape.window="openMenu = false"
+                                                 :style="`position: fixed; top: ${coords.top}px; left: ${coords.left}px; z-index: 9999;`"
+                                                 class="w-44 rounded-xl bg-ink-900 border border-white/20 shadow-[0_12px_36px_rgba(0,0,0,0.85)] py-1 text-xs backdrop-blur-xl">
+                                                <button type="button" wire:click="duplikatProduk({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                    <span>📑</span> Duplikat Produk
                                                 </button>
-                                            @endcan
-                                            @if(isSuperAdminOrOwner())
-                                                <div class="border-t border-white/5 my-1"></div>
-                                                <button type="button"
-                                                        wire:click="hapusProduk({{ $p->id }})"
-                                                        wire:confirm="Yakin ingin menghapus master produk '{{ $p->nama }}'? Jika produk memiliki riwayat transaksi/mutasi, status akan dinonaktifkan."
-                                                        @click="openMenu = false"
-                                                        class="w-full text-left flex items-center gap-2 px-3 py-2 text-up-red hover:bg-up-red/10 transition cursor-pointer">
-                                                    <span>🗑️</span> Hapus Produk
+                                                <button type="button" wire:click="toggleStatusAktif({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 {{ $p->is_active ? 'text-up-amber' : 'text-up-mint' }} hover:bg-white/5 transition cursor-pointer">
+                                                    <span>{{ $p->is_active ? '⏸️' : '▶️' }}</span> {{ $p->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
                                                 </button>
-                                            @endif
-                                        </div>
+                                                <button type="button" wire:click="copySingleProduk({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                    <span>📋</span> Salin Harga
+                                                </button>
+                                                <button type="button" wire:click="orderPo({{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                    <span>📦</span> Order PO
+                                                </button>
+                                                <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition">
+                                                    <span>🖨️</span> Cetak Label QR
+                                                </a>
+                                                @can('lihat-audit-log')
+                                                    <button type="button" wire:click="bukaRiwayat('produk', {{ $p->id }})" @click="openMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                        <span>📜</span> Riwayat Audit
+                                                    </button>
+                                                @endcan
+                                                @if(isSuperAdminOrOwner())
+                                                    <div class="border-t border-white/5 my-1"></div>
+                                                    <button type="button"
+                                                            wire:click="hapusProduk({{ $p->id }})"
+                                                            wire:confirm="Yakin ingin menghapus master produk '{{ $p->nama }}'? Jika produk memiliki riwayat transaksi/mutasi, status akan dinonaktifkan."
+                                                            @click="openMenu = false"
+                                                            class="w-full text-left flex items-center gap-2 px-3 py-2 text-up-red hover:bg-up-red/10 transition cursor-pointer">
+                                                        <span>🗑️</span> Hapus Produk
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                             </td>
@@ -1422,7 +1569,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="py-12 text-center text-ink-400">Belum ada produk. Klik "Tambah Produk" untuk menambahkan master produk baru (tersinkron jurnal akunting).</td>
+                        <td colspan="{{ count(array_filter($visibleColumns)) ?: 7 }}" class="py-12 text-center text-ink-400">Belum ada produk. Klik "Tambah Produk" untuk menambahkan master produk baru (tersinkron jurnal akunting).</td>
                     </tr>
                 @endforelse
 
@@ -1456,23 +1603,72 @@
                             </div>
 
                             <div>
+                                <div class="flex items-center gap-1.5 flex-wrap mb-1">
+                                    @if($p->kualitas)
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                                            {{ $p->kualitas->nama }}
+                                        </span>
+                                    @elseif(!empty($p->kondisi))
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/10 text-ink-300">
+                                            {{ ucfirst($p->kondisi) }}
+                                        </span>
+                                    @endif
+
+                                    @if($p->brand)
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-white/5 text-ink-400">
+                                            {{ $p->brand->nama }}
+                                        </span>
+                                    @endif
+
+                                    @if($p->supplier)
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-up-primary/10 text-up-primary border border-up-primary/20 flex items-center gap-1" title="Supplier: {{ $p->supplier->nama }}">
+                                            <span>🏢</span> {{ $p->supplier->nama }}
+                                        </span>
+                                    @endif
+                                </div>
+
                                 <h4 class="font-bold text-sm text-white group-hover:text-up-primary transition-colors line-clamp-2 leading-snug">
                                     {{ $p->nama }}
                                 </h4>
-                                <p class="text-[10px] text-ink-400 mt-1 truncate">
-                                    {{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }} · {{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}
+                                <p class="text-[10px] text-ink-400 mt-0.5 truncate">
+                                    {{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}
                                 </p>
                             </div>
 
+                            @php
+                                $kompatibelGrid = trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
+                                if (empty($kompatibelGrid) && !empty($p->kompatibilitas_hp) && is_array($p->kompatibilitas_hp)) {
+                                    $kompatibelGrid = collect($p->kompatibilitas_hp)->map(fn($k) => trim(($k['merk'] ?? '').' '.($k['model'] ?? '')))->filter()->implode(', ');
+                                }
+                                if (empty($kompatibelGrid) && $p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
+                                    $kompatibelGrid = $p->tipeHps->map(fn($t) => trim("{$t->merk} {$t->model}"))->filter()->implode(', ');
+                                }
+                            @endphp
+                            <div class="px-2.5 py-2 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] flex items-center justify-between gap-2">
+                                <span class="text-ink-400 text-[10px] uppercase font-semibold shrink-0 flex items-center gap-1">
+                                    <span>📱</span> Kompatibel:
+                                </span>
+                                <span class="text-ink-200 font-medium truncate text-right text-[11px]" title="{{ $kompatibelGrid ?: 'Universal / Semua' }}">
+                                    {{ $kompatibelGrid ?: 'Universal' }}
+                                </span>
+                            </div>
+
                             <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs">
-                                <div>
-                                    <span class="text-[9px] text-ink-500 uppercase block font-semibold">Beli</span>
-                                    <span class="text-ink-300 font-medium">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-[9px] text-ink-500 uppercase block font-semibold">Jual</span>
-                                    <span class="font-bold text-up-mint">Rp {{ number_format($p->harga_jual_retail, 0, ',', '.') }}</span>
-                                </div>
+                                @if(isSuperAdminOrOwner())
+                                    <div>
+                                        <span class="text-[9px] text-ink-500 uppercase block font-semibold">Beli</span>
+                                        <span class="text-ink-300 font-medium">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-[9px] text-ink-500 uppercase block font-semibold">Jual</span>
+                                        <span class="font-bold text-up-mint">Rp {{ number_format($p->harga_jual_retail, 0, ',', '.') }}</span>
+                                    </div>
+                                @else
+                                    <div class="w-full flex items-center justify-between">
+                                        <span class="text-[10px] text-ink-400 uppercase font-semibold">Harga Jual</span>
+                                        <span class="font-bold text-sm text-up-mint">Rp {{ number_format($p->harga_jual_retail, 0, ',', '.') }}</span>
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="p-2 rounded-xl bg-white/[0.02] border border-white/5 text-[10px] space-y-1">
@@ -1510,47 +1706,105 @@
                                 <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 text-up-mint text-[11px] font-bold border border-up-mint/20 cursor-pointer active:scale-95 transition">
                                     ✏️ Edit
                                 </button>
-                                <div class="relative" @click.away="openGridMenu = false">
-                                    <button @click="openGridMenu = !openGridMenu"
+                                <div class="relative"
+                                     x-data="{
+                                         openGridMenu: false,
+                                         coords: { top: 0, left: 0 },
+                                         updatePosition() {
+                                             const btn = this.$refs.triggerGridBtn;
+                                             if (!btn) return;
+                                             const rect = btn.getBoundingClientRect();
+                                             const menuWidth = 176;
+                                             const menuEl = this.$refs.gridMenuDropdown;
+                                             const menuHeight = menuEl ? (menuEl.offsetHeight || 260) : 260;
+                                             const spaceBelow = window.innerHeight - rect.bottom;
+                                             const spaceAbove = rect.top;
+
+                                             let top;
+                                             if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+                                                 top = Math.max(10, rect.top - menuHeight - 6);
+                                             } else {
+                                                 top = Math.min(window.innerHeight - menuHeight - 10, rect.bottom + 6);
+                                             }
+
+                                             let left = rect.right - menuWidth;
+                                             if (left < 10) left = 10;
+                                             if (left + menuWidth > window.innerWidth - 10) {
+                                                 left = window.innerWidth - menuWidth - 10;
+                                             }
+
+                                             this.coords = { top: Math.round(top), left: Math.round(left) };
+                                         },
+                                         toggleMenu() {
+                                             if (!this.openGridMenu) {
+                                                 this.openGridMenu = true;
+                                                 this.updatePosition();
+                                                 this.$nextTick(() => {
+                                                     this.updatePosition();
+                                                 });
+                                             } else {
+                                                 this.openGridMenu = false;
+                                             }
+                                         },
+                                         init() {
+                                             const closeOnScroll = (e) => {
+                                                 if (!this.openGridMenu) return;
+                                                 if (this.$refs.gridMenuDropdown && !this.$refs.gridMenuDropdown.contains(e.target)) {
+                                                     this.openGridMenu = false;
+                                                 }
+                                             };
+                                             window.addEventListener('scroll', closeOnScroll, true);
+                                             window.addEventListener('resize', closeOnScroll);
+                                         }
+                                     }">
+                                    <button x-ref="triggerGridBtn"
+                                            @click.stop="toggleMenu()"
                                             type="button"
                                             class="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 text-xs cursor-pointer active:scale-95 transition"
                                             title="Menu lainnya">
                                         •••
                                     </button>
-                                    <div x-show="openGridMenu"
-                                         x-cloak
-                                         class="absolute right-0 bottom-full mb-1.5 w-44 rounded-xl bg-ink-900 border border-white/10 shadow-xl z-20 py-1 text-xs backdrop-blur-md">
-                                        <button type="button" wire:click="duplikatProduk({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                            <span>📑</span> Duplikat Produk
-                                        </button>
-                                        <button type="button" wire:click="toggleStatusAktif({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 {{ $p->is_active ? 'text-up-amber' : 'text-up-mint' }} hover:bg-white/5 transition cursor-pointer">
-                                            <span>{{ $p->is_active ? '⏸️' : '▶️' }}</span> {{ $p->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                        </button>
-                                        <button type="button" wire:click="copySingleProduk({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                            <span>📋</span> Salin Harga
-                                        </button>
-                                        <button type="button" wire:click="orderPo({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                            <span>📦</span> Order PO
-                                        </button>
-                                        <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition">
-                                            <span>🖨️</span> Cetak Label QR
-                                        </a>
-                                        @can('lihat-audit-log')
-                                            <button type="button" wire:click="bukaRiwayat('produk', {{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
-                                                <span>📜</span> Riwayat Audit
+
+                                    <template x-teleport="body">
+                                        <div x-show="openGridMenu"
+                                             x-cloak
+                                             x-ref="gridMenuDropdown"
+                                             @click.outside="openGridMenu = false"
+                                             @keydown.escape.window="openGridMenu = false"
+                                             :style="`position: fixed; top: ${coords.top}px; left: ${coords.left}px; z-index: 9999;`"
+                                             class="w-44 rounded-xl bg-ink-900 border border-white/20 shadow-[0_12px_36px_rgba(0,0,0,0.85)] py-1 text-xs backdrop-blur-xl">
+                                            <button type="button" wire:click="duplikatProduk({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                <span>📑</span> Duplikat Produk
                                             </button>
-                                        @endcan
-                                        @if(isSuperAdminOrOwner())
-                                            <div class="border-t border-white/5 my-1"></div>
-                                            <button type="button"
-                                                    wire:click="hapusProduk({{ $p->id }})"
-                                                    wire:confirm="Yakin ingin menghapus master produk '{{ $p->nama }}'? Jika produk memiliki riwayat transaksi/mutasi, status akan dinonaktifkan."
-                                                    @click="openGridMenu = false"
-                                                    class="w-full text-left flex items-center gap-2 px-3 py-2 text-up-red hover:bg-up-red/10 transition cursor-pointer">
-                                                <span>🗑️</span> Hapus Produk
+                                            <button type="button" wire:click="toggleStatusAktif({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 {{ $p->is_active ? 'text-up-amber' : 'text-up-mint' }} hover:bg-white/5 transition cursor-pointer">
+                                                <span>{{ $p->is_active ? '⏸️' : '▶️' }}</span> {{ $p->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
                                             </button>
-                                        @endif
-                                    </div>
+                                            <button type="button" wire:click="copySingleProduk({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                <span>📋</span> Salin Harga
+                                            </button>
+                                            <button type="button" wire:click="orderPo({{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                <span>📦</span> Order PO
+                                            </button>
+                                            <a href="{{ route('barcode.print') }}?ids={{ $p->id }}" target="_blank" class="flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition">
+                                                <span>🖨️</span> Cetak Label QR
+                                            </a>
+                                            @can('lihat-audit-log')
+                                                <button type="button" wire:click="bukaRiwayat('produk', {{ $p->id }})" @click="openGridMenu = false" class="w-full text-left flex items-center gap-2 px-3 py-2 text-ink-200 hover:bg-white/5 hover:text-white transition cursor-pointer">
+                                                    <span>📜</span> Riwayat Audit
+                                                </button>
+                                            @endcan
+                                            @if(isSuperAdminOrOwner())
+                                                <div class="border-t border-white/5 my-1"></div>
+                                                <button type="button"
+                                                        wire:click="hapusProduk({{ $p->id }})"
+                                                        wire:confirm="Yakin ingin menghapus master produk '{{ $p->nama }}'? Jika produk memiliki riwayat transaksi/mutasi, status akan dinonaktifkan."
+                                                        @click="openGridMenu = false"
+                                                        class="w-full text-left flex items-center gap-2 px-3 py-2 text-up-red hover:bg-up-red/10 transition cursor-pointer">
+                                                    <span>🗑️</span> Hapus Produk
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -1711,6 +1965,19 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-semibold text-ink-300">Supplier Utama / Default</label>
+                                <button type="button" wire:click="openQuickAdd('supplier')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Supplier Baru</button>
+                            </div>
+                            <select wire:model="produkForm.supplier_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                <option value="" class="bg-ink-900">— Tanpa / Belum Ditentukan —</option>
+                                @foreach($suppliers as $sup)
+                                    <option value="{{ $sup->id }}" class="bg-ink-900">{{ $sup->nama }} {{ $sup->telepon ? '('.$sup->telepon.')' : '' }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-[9px] text-ink-500 mt-1">Otomatis terhubung ke PO dan pembelian supplier</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Satuan Dasar *</label>
                                 <button type="button" wire:click="openQuickAdd('satuan')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Baru</button>
                             </div>
@@ -1721,10 +1988,10 @@
                             </select>
                             <p class="text-[9px] text-ink-500 mt-1">Satuan terkecil inventori (cth: pcs, meter)</p>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode SKU (opsional)</label>
-                            <input type="text" wire:model="produkForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" placeholder="Otomatis ikuti Barcode jika kosong" />
-                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode SKU (opsional)</label>
+                        <input type="text" wire:model="produkForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" placeholder="Otomatis ikuti Barcode jika kosong" />
                     </div>
 
                     <!-- Skema Harga Beli Dinamis & Harga Jual Margin -->
@@ -2697,6 +2964,19 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-semibold text-ink-300">Supplier Utama / Default</label>
+                                <button type="button" wire:click="openQuickAdd('supplier')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Supplier Baru</button>
+                            </div>
+                            <select wire:model="editProdukForm.supplier_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                <option value="" class="bg-ink-900">— Tanpa / Belum Ditentukan —</option>
+                                @foreach($suppliers as $sup)
+                                    <option value="{{ $sup->id }}" class="bg-ink-900">{{ $sup->nama }} {{ $sup->telepon ? '('.$sup->telepon.')' : '' }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-[9px] text-ink-500 mt-1">Otomatis terhubung ke PO dan pembelian supplier</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Satuan Dasar *</label>
                                 <button type="button" wire:click="openQuickAdd('satuan')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Baru</button>
                             </div>
@@ -2707,9 +2987,16 @@
                             </select>
                             <p class="text-[9px] text-ink-500 mt-1">Satuan terkecil inventori (cth: pcs, meter)</p>
                         </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Brand Kompatibel</label>
                             <input type="text" wire:model="editProdukForm.brand_kompatibel" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Cth: Samsung, iPhone" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Model Kompatibel</label>
+                            <input type="text" wire:model="editProdukForm.model_kompatibel" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Cth: A52, Note 10" />
                         </div>
                     </div>
 
@@ -3394,6 +3681,36 @@
                         </div>
                     @endif
 
+                    @if($quickAddTipe === 'supplier')
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">No. Telepon / WhatsApp</label>
+                            <input
+                                type="text"
+                                wire:model="quickAddForm.telepon"
+                                placeholder="Cth: 081234567890"
+                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Kontak (PIC / Sales)</label>
+                            <input
+                                type="text"
+                                wire:model="quickAddForm.kontak"
+                                placeholder="Cth: Pak Budi (Distributor)"
+                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat / Lokasi</label>
+                            <input
+                                type="text"
+                                wire:model="quickAddForm.alamat"
+                                placeholder="Cth: Harco Mangga Dua Lt. 3"
+                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
+                            />
+                        </div>
+                    @endif
+
                     @if(in_array($quickAddTipe, ['brand', 'kualitas']))
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Keterangan (Opsional)</label>
@@ -3732,6 +4049,24 @@
                             <span class="text-xs font-semibold">Kode SKU</span>
                         </label>
 
+                        <!-- Kualitas -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['kualitas'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.kualitas" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Kualitas</span>
+                        </label>
+
+                        <!-- Kompatibilitas -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['kompatibilitas'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.kompatibilitas" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Kompatibilitas</span>
+                        </label>
+
+                        <!-- Kondisi -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['kondisi'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.kondisi" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Kondisi</span>
+                        </label>
+
                         <!-- Stok Ready -->
                         <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['stok'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
                             <input type="checkbox" wire:model.live="salinOptions.stok" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
@@ -3761,7 +4096,51 @@
                             <input type="checkbox" wire:model.live="salinOptions.garansi" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
                             <span class="text-xs font-semibold">Garansi</span>
                         </label>
+
+                        <!-- Deskripsi / Catatan -->
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.02] border {{ ($salinOptions['deskripsi'] ?? false) ? 'border-up-mint/40 bg-up-mint/5 text-white' : 'border-white/5 text-ink-400' }} cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="salinOptions.deskripsi" class="rounded border-white/20 bg-ink-900 text-up-mint focus:ring-0">
+                            <span class="text-xs font-semibold">Deskripsi</span>
+                        </label>
                     </div>
+                </div>
+
+                <!-- Preview Output Salinan -->
+                <div class="p-3 rounded-2xl bg-black/40 border border-white/5 space-y-1.5 font-mono text-[11px] text-ink-300">
+                    <div class="text-[10px] uppercase font-bold text-ink-400 flex items-center justify-between">
+                        <span>Contoh Tampilan Salinan WhatsApp:</span>
+                        <span class="text-up-mint font-sans">Preview Rapi</span>
+                    </div>
+                    <div class="whitespace-pre-wrap leading-relaxed text-ink-200 bg-white/[0.02] p-2.5 rounded-xl border border-white/5 font-sans text-xs">📦 *Contoh Nama Produk* [SKU-001]
+💰 Harga: *Rp 250.000*
+@if(!empty($salinOptions['kualitas']))
+⭐ Kualitas: Original Equipment Manufacturer
+@endif
+@if(!empty($salinOptions['kompatibilitas']))
+📱 Kompatibel: Samsung Galaxy A50 / A50s
+@endif
+@if(!empty($salinOptions['kondisi']))
+⚙️ Kondisi: Baru
+@endif
+@if(!empty($salinOptions['stok']))
+📊 Stok: 15 pcs
+@endif
+@if(!empty($salinOptions['rak']))
+📍 Rak: RAK-B2
+@endif
+@if(!empty($salinOptions['brand']))
+🏷️ Brand: Samsung
+@endif
+@if(!empty($salinOptions['kategori']))
+📁 Kategori: Sparepart LCD
+@endif
+@if(!empty($salinOptions['garansi']))
+🛡️ Garansi: 1 bln
+@endif
+@if(!empty($salinOptions['deskripsi']))
+📝 Catatan: Sparepart original teruji
+@endif
+</div>
                 </div>
 
                 <!-- Footer Action Buttons -->

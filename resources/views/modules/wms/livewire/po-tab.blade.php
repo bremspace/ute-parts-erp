@@ -109,139 +109,240 @@
 
     <!-- MODAL: BUAT PO [T-10] -->
     @if($showPoModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Buat Purchase Order (PO)</h3>
-                    <button wire:click="$set('showPoModal', false)" class="text-ink-400 hover:text-white">✕</button>
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4">
+            <div class="w-full max-w-3xl glass-panel rounded-t-3xl sm:rounded-3xl flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl border border-white/10">
+                <!-- Header Modal -->
+                <div class="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-white/10 shrink-0 bg-ink-950/60 backdrop-blur-sm">
+                    <div>
+                        <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                            <span>Buat Purchase Order (PO)</span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary font-bold border border-up-primary/30">Draft</span>
+                        </h3>
+                        <p class="text-[11px] text-ink-400 mt-0.5">Input pemesanan barang ke supplier &amp; estimasi biaya</p>
+                    </div>
+                    <button wire:click="$set('showPoModal', false)" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer" title="Tutup">
+                        ✕
+                    </button>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Supplier *</label>
-                        <select wire:model="poForm.supplier_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
-                            <option value="" class="bg-ink-900">Pilih Supplier...</option>
-                            @foreach($suppliers as $sp)
-                                <option value="{{ $sp->id }}" class="bg-ink-900">{{ $sp->nama }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang Tujuan *</label>
-                        <select wire:model="poForm.gudang_tujuan_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
-                            <option value="" class="bg-ink-900">Pilih Gudang...</option>
-                            @foreach($gudangs as $g)
-                                <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Metode Bayar *</label>
-                        <select wire:model.live="poForm.metode_bayar" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
-                            <option value="kredit" class="bg-ink-900">Kredit (utang)</option>
-                            <option value="tunai" class="bg-ink-900">Tunai</option>
-                        </select>
-                    </div>
-                    @if(($poForm['metode_bayar'] ?? 'kredit') === 'tunai')
+                <!-- Body Modal (Scrollable) -->
+                <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                    <!-- Informasi Utama PO -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kas / Bank Pembayaran *</label>
-                            <select wire:model="poForm.akun_kas_bank" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
-                                @foreach($akunKasBankList ?? [] as $ak)
-                                    <option value="{{ $ak->kode }}" class="bg-ink-900">[{{ $ak->kode }}] {{ $ak->nama }}</option>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-semibold text-ink-300">Supplier *</label>
+                                <button type="button" wire:click="$set('showSupplierModal', true)" class="text-[11px] text-up-mint hover:underline font-bold cursor-pointer flex items-center gap-1">
+                                    <span>+ Supplier Baru</span>
+                                </button>
+                            </div>
+                            <select wire:model="poForm.supplier_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                <option value="" class="bg-ink-900">— Pilih Supplier Terdaftar —</option>
+                                @foreach($suppliers as $sp)
+                                    <option value="{{ $sp->id }}" class="bg-ink-900">{{ $sp->nama }} {{ $sp->telepon ? '('.$sp->telepon.')' : '' }}</option>
                                 @endforeach
                             </select>
                         </div>
-                    @else
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jatuh Tempo (kosong = termin supplier)</label>
-                            <input type="date" wire:model="poForm.jatuh_tempo" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs min-h-[44px]" />
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang Tujuan *</label>
+                            <select wire:model="poForm.gudang_tujuan_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                <option value="" class="bg-ink-900">— Pilih Gudang Penerimaan —</option>
+                                @foreach($gudangs as $g)
+                                    <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }}</option>
+                                @endforeach
+                            </select>
                         </div>
-                    @endif
-                </div>
+                    </div>
 
-                <div class="mb-3 flex items-center justify-between">
-                    <span class="text-xs font-bold text-ink-300 uppercase">Items</span>
-                    <button wire:click="addPoItem" class="text-up-primary text-xs font-bold cursor-pointer min-h-[44px] flex items-center">+ Tambah Item</button>
-                </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Metode Bayar *</label>
+                            <select wire:model.live="poForm.metode_bayar" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                <option value="kredit" class="bg-ink-900">Kredit / Termin Utang</option>
+                                <option value="tunai" class="bg-ink-900">Tunai Langsung</option>
+                            </select>
+                        </div>
+                        @if(($poForm['metode_bayar'] ?? 'kredit') === 'tunai')
+                            <div>
+                                <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kas / Bank Pembayaran *</label>
+                                <select wire:model="poForm.akun_kas_bank" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                    @foreach($akunKasBankList ?? [] as $ak)
+                                        <option value="{{ $ak->kode }}" class="bg-ink-900">[{{ $ak->kode }}] {{ $ak->nama }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @else
+                            <div>
+                                <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jatuh Tempo (opsional)</label>
+                                <input type="date" wire:model="poForm.jatuh_tempo" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs min-h-[44px]" />
+                                <p class="text-[9px] text-ink-500 mt-1">Kosongkan jika mengikuti termin default supplier</p>
+                            </div>
+                        @endif
+                    </div>
 
-                <div class="space-y-2 mb-4 max-h-56 overflow-y-auto pr-1">
-                    @foreach($poForm['items'] as $idx => $item)
-                        <div class="flex flex-col gap-1 p-2 rounded-xl bg-white/[0.02] border border-white/5">
-                            <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
-                                <div class="flex-1 flex gap-1.5 items-center">
-                                    <div class="flex-1 relative">
-                                        <input type="text"
-                                               wire:model="poForm.items.{{ $idx }}.produk_nama"
-                                               wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po' })"
-                                               class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px] cursor-pointer"
-                                               placeholder="Klik untuk cari produk..."
-                                               readonly>
-                                        @if($item['produk_id'])
-                                            <button type="button"
-                                                    wire:click="$set('poForm.items.{{ $idx }}.produk_id', null); $set('poForm.items.{{ $idx }}.produk_nama', ''); $set('poForm.items.{{ $idx }}.sku_variant_id', null); $set('poForm.items.{{ $idx }}.info_terakhir', null)"
-                                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white">
+                    <!-- Header Items Section -->
+                    <div class="pt-2 border-t border-white/5">
+                        <div class="flex items-center justify-between mb-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-white uppercase tracking-wider">Item Barang</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-ink-300 font-bold tabular-nums">
+                                    {{ count($poForm['items'] ?? []) }} Item
+                                </span>
+                            </div>
+                            <button type="button" wire:click="addPoItem" class="px-3 py-1.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/20 text-xs font-bold cursor-pointer flex items-center gap-1.5 min-h-[36px] transition active:scale-95">
+                                <span>+ Tambah Baris</span>
+                            </button>
+                        </div>
+
+                        <!-- Cards Item List -->
+                        <div class="space-y-3">
+                            @forelse($poForm['items'] as $idx => $item)
+                                <div class="p-3 sm:p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition space-y-3">
+                                    <!-- Baris 1: Produk Picker & Hapus -->
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-6 h-6 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-ink-400 flex items-center justify-center shrink-0 tabular-nums">
+                                            #{{ $idx + 1 }}
+                                        </span>
+                                        <div class="flex-1 relative flex items-center gap-1.5">
+                                            <div class="flex-1 relative">
+                                                <input type="text"
+                                                       wire:model="poForm.items.{{ $idx }}.produk_nama"
+                                                       wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po', supplierId: {{ !empty($poForm['supplier_id']) ? (int)$poForm['supplier_id'] : 'null' }} })"
+                                                       class="w-full pl-3 pr-8 py-2 rounded-xl glass-input text-xs min-h-[44px] cursor-pointer font-medium"
+                                                       placeholder="Klik untuk cari produk..."
+                                                       readonly>
+                                                @if(!empty($item['produk_id']))
+                                                    <button type="button"
+                                                            wire:click="$set('poForm.items.{{ $idx }}.produk_id', null); $set('poForm.items.{{ $idx }}.produk_nama', ''); $set('poForm.items.{{ $idx }}.sku_variant_id', null); $set('poForm.items.{{ $idx }}.info_terakhir', null)"
+                                                            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white p-1"
+                                                            title="Hapus pilihan">
+                                                        ✕
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            <button
+                                                type="button"
+                                                wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po', supplierId: {{ !empty($poForm['supplier_id']) ? (int)$poForm['supplier_id'] : 'null' }} })"
+                                                class="px-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 text-xs min-h-[44px] flex items-center justify-center cursor-pointer shrink-0 transition"
+                                                title="Cari Produk">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                                 </svg>
                                             </button>
-                                        @endif
+                                        </div>
+                                        <button type="button"
+                                                wire:click="removePoItem({{ $idx }})"
+                                                class="w-10 h-10 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/20 flex items-center justify-center shrink-0 cursor-pointer transition active:scale-95"
+                                                title="Hapus baris item">
+                                            ✕
+                                        </button>
                                     </div>
-                                    <button
-                                        type="button"
-                                        wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po' })"
-                                        class="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 text-xs min-h-[44px] flex items-center justify-center cursor-pointer shrink-0 transition"
-                                        title="Cari Produk Lengkap"
-                                    >
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                        </svg>
+
+                                    <!-- Baris 2: Grid Input Qty, Satuan, Harga Beli -->
+                                    <div class="grid grid-cols-12 gap-2 sm:gap-3 items-end">
+                                        <div class="col-span-4 sm:col-span-3">
+                                            <label class="block text-[10px] font-semibold text-ink-400 mb-1">Qty</label>
+                                            <input type="number"
+                                                   wire:model="poForm.items.{{ $idx }}.jumlah"
+                                                   wire:change="onPoSatuanChanged({{ $idx }})"
+                                                   min="1"
+                                                   class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold text-center tabular-nums min-h-[44px]"
+                                                   placeholder="1" />
+                                        </div>
+                                        <div class="col-span-8 sm:col-span-3">
+                                            <label class="block text-[10px] font-semibold text-ink-400 mb-1">Satuan</label>
+                                            <select wire:model="poForm.items.{{ $idx }}.satuan"
+                                                    wire:change="onPoSatuanChanged({{ $idx }})"
+                                                    class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 min-h-[44px] cursor-pointer">
+                                                @foreach($item['daftar_satuan'] ?? [['satuan_kode' => ($item['satuan'] ?? 'pcs')]] as $ds)
+                                                    <option value="{{ $ds['satuan_kode'] }}" class="bg-ink-900">{{ $ds['satuan_kode'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-span-12 sm:col-span-6">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <label class="text-[10px] font-semibold text-ink-400">Harga Beli Satuan (Rp)</label>
+                                                @if(!empty($item['produk_id']))
+                                                    <button type="button" wire:click="bukaHistoriPembelian({{ $item['produk_id'] }}, '{{ addslashes($item['produk_nama'] ?? '') }}')" class="text-[10px] text-up-primary hover:underline font-bold flex items-center gap-1 cursor-pointer">
+                                                        <span>📊 Histori</span>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            @cansee('harga_beli')
+                                                <input type="text"
+                                                       inputmode="numeric"
+                                                       x-format-number
+                                                       wire:model="poForm.items.{{ $idx }}.harga_beli"
+                                                       class="w-full px-3 py-2 rounded-xl glass-input text-xs tabular-nums font-semibold min-h-[44px]"
+                                                       placeholder="Harga Beli" />
+                                            @cannotsee('harga_beli')
+                                                <input type="text"
+                                                       class="w-full px-3 py-2 rounded-xl glass-input text-xs tabular-nums text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed min-h-[44px]"
+                                                       placeholder="Harga (Superadmin only)"
+                                                       disabled />
+                                            @endcansee
+                                        </div>
+                                    </div>
+
+                                    <!-- Baris 3: Subtotal & Catatan Satuan / Histori -->
+                                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-[11px]">
+                                        <div class="space-y-1">
+                                            @if((float)($item['konversi'] ?? 1) > 1)
+                                                <div class="text-[10px] text-amber-300 font-medium flex items-center gap-1.5">
+                                                    <span>📦 1 {{ $item['satuan'] }} = {{ (float)($item['konversi'] ?? 1) + 0 }} {{ $item['daftar_satuan'][0]['satuan_kode'] ?? 'pcs' }} &rarr; Total: <strong class="text-white tabular-nums">{{ (float)($item['jumlah'] ?? 1) * (float)($item['konversi'] ?? 1) }}</strong> {{ $item['daftar_satuan'][0]['satuan_kode'] ?? 'pcs' }}</span>
+                                                </div>
+                                            @endif
+                                            @if(!empty($item['info_terakhir']))
+                                                <div class="text-[10px] text-up-mint font-medium flex items-center gap-1">
+                                                    <span>ℹ️ {{ $item['info_terakhir'] }}</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                        <div class="ml-auto text-right">
+                                            @cansee('harga_beli')
+                                                <span class="text-ink-400 text-[10px]">Subtotal:</span>
+                                                <span class="text-xs font-bold text-white tabular-nums ml-1">
+                                                    Rp {{ number_format($this->parseNominal($item['harga_beli'] ?? 0) * (float)($item['jumlah'] ?? 0), 0, ',', '.') }}
+                                                </span>
+                                            @endcansee
+                                        </div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="py-8 text-center rounded-2xl border border-dashed border-white/10 p-6 space-y-2">
+                                    <p class="text-xs text-ink-400">Belum ada item barang dalam daftar PO ini.</p>
+                                    <button type="button" wire:click="addPoItem" class="px-4 py-2 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary text-xs font-bold border border-up-primary/20 cursor-pointer transition">
+                                        + Tambah Baris Barang
                                     </button>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    @cansee('harga_beli')
-                                    <input type="text" inputmode="numeric" x-format-number wire:model="poForm.items.{{ $idx }}.harga_beli" class="w-full sm:w-28 px-2 py-2 rounded-xl glass-input text-xs tabular-nums min-h-[44px]" placeholder="Harga Beli" />
-                                    @cannotsee('harga_beli')
-                                    <input type="text" class="w-full sm:w-28 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed min-h-[44px]" placeholder="Harga (superadmin)" disabled />
-                                    @endcansee
-                                    <input type="number" wire:model="poForm.items.{{ $idx }}.jumlah" wire:change="onPoSatuanChanged({{ $idx }})" min="1" class="w-16 sm:w-14 px-2 py-2 rounded-xl glass-input text-xs tabular-nums text-center min-h-[44px]" placeholder="Qty" />
-
-                                    <!-- Satuan Dropdown -->
-                                    <select wire:model="poForm.items.{{ $idx }}.satuan"
-                                            wire:change="onPoSatuanChanged({{ $idx }})"
-                                            class="px-2 py-2 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 min-h-[44px] cursor-pointer">
-                                        @foreach($item['daftar_satuan'] ?? [['satuan_kode' => ($item['satuan'] ?? 'pcs')]] as $ds)
-                                            <option value="{{ $ds['satuan_kode'] }}" class="bg-ink-900">{{ $ds['satuan_kode'] }}</option>
-                                        @endforeach
-                                    </select>
-
-                                    @if(!empty($item['produk_id']))
-                                        <button type="button" wire:click="bukaHistoriPembelian({{ $item['produk_id'] }}, '{{ addslashes($item['produk_nama'] ?? '') }}')" class="p-2 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/20 text-[10px] font-bold cursor-pointer min-h-[44px] flex items-center justify-center whitespace-nowrap" title="Lihat Histori Pembelian Supplier">
-                                            📊 Histori
-                                        </button>
-                                    @endif
-                                    <button wire:click="removePoItem({{ $idx }})" class="p-2 text-up-red cursor-pointer text-xs min-h-[44px] flex items-center justify-center">✕</button>
-                                </div>
-                            </div>
-                            @if((float)($item['konversi'] ?? 1) > 1)
-                                <div class="text-[10px] text-amber-300 font-medium px-1 flex items-center gap-1.5">
-                                    <span>📦 1 {{ $item['satuan'] }} = {{ (float)($item['konversi'] ?? 1) + 0 }} {{ $item['daftar_satuan'][0]['satuan_kode'] ?? 'pcs' }} &rarr; Total: <strong class="text-white tabular-nums">{{ (float)($item['jumlah'] ?? 1) * (float)($item['konversi'] ?? 1) }}</strong> {{ $item['daftar_satuan'][0]['satuan_kode'] ?? 'pcs' }}</span>
-                                </div>
-                            @endif
-                            @if(!empty($item['info_terakhir']))
-                                <div class="text-[10px] text-up-mint font-medium px-1 flex items-center gap-1">
-                                    <span>ℹ️ {{ $item['info_terakhir'] }}</span>
-                                </div>
-                            @endif
+                            @endforelse
                         </div>
-                    @endforeach
+                    </div>
                 </div>
 
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <button wire:click="$set('showPoModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.97]">Batal</button>
-                    <button wire:click="simpanPo" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-primary/25 transition active:scale-[0.97]">Simpan PO (Draft)</button>
+                <!-- Sticky Footer Modal -->
+                <div class="p-3.5 sm:p-5 bg-ink-950/90 border-t border-white/10 shrink-0 backdrop-blur-md flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div class="flex items-center justify-between sm:justify-start gap-3">
+                        <div>
+                            <span class="text-[10px] text-ink-400 block uppercase tracking-wider font-semibold">Total Estimasi PO</span>
+                            @cansee('harga_beli')
+                                <span class="text-base sm:text-xl font-bold text-up-mint tabular-nums">
+                                    Rp {{ number_format($totalEstimasiPo, 0, ',', '.') }}
+                                </span>
+                            @cannotsee('harga_beli')
+                                <span class="text-xs text-ink-400">Disembunyikan (Superadmin only)</span>
+                            @endcansee
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" wire:click="$set('showPoModal', false)" class="flex-1 sm:flex-none px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-95 text-center">
+                            Batal
+                        </button>
+                        <button type="button" wire:click="simpanPo" wire:loading.attr="disabled" class="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-primary/25 transition active:scale-95 text-center flex items-center justify-center gap-2">
+                            <span wire:loading.remove wire:target="simpanPo">Simpan PO (Draft)</span>
+                            <span wire:loading wire:target="simpanPo">Menyimpan…</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -249,7 +350,7 @@
 
     <!-- MODAL: TAMBAH SUPPLIER [T-10] -->
     @if($showSupplierModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                     <h3 class="text-lg font-bold text-white">Tambah Supplier</h3>

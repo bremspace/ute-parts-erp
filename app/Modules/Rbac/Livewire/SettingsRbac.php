@@ -679,6 +679,347 @@ class SettingsRbac extends Component
         return Permission::orderBy('name')->get();
     }
 
+    public static function getPermissionMetadata(): array
+    {
+        return [
+            // Kasir & POS
+            'pos.create' => [
+                'modul' => 'Kasir & Penjualan (POS)',
+                'label' => 'Buka & Buat Transaksi Kasir',
+                'deskripsi' => 'Membuka layar kasir dan membuat transaksi penjualan baru.',
+            ],
+            'pos.view' => [
+                'modul' => 'Kasir & Penjualan (POS)',
+                'label' => 'Lihat Seluruh Transaksi Kasir',
+                'deskripsi' => 'Melihat riwayat transaksi kasir dari seluruh staf di cabang.',
+            ],
+            'pos.view-own' => [
+                'modul' => 'Kasir & Penjualan (POS)',
+                'label' => 'Lihat Transaksi Kasir Sendiri',
+                'deskripsi' => 'Hanya melihat riwayat penjualan yang diproses akun kasir sendiri.',
+            ],
+            'pos.void' => [
+                'modul' => 'Kasir & Penjualan (POS)',
+                'label' => 'Batalkan / Void Transaksi Kasir',
+                'deskripsi' => 'Membatalkan transaksi kasir yang telah dibayar.',
+            ],
+
+            // Gudang & Inventaris (WMS)
+            'wms.view' => [
+                'modul' => 'Gudang & Inventaris (WMS)',
+                'label' => 'Lihat Stok & Master Produk',
+                'deskripsi' => 'Melihat katalog produk, posisi stok gudang, dan riwayat mutasi.',
+            ],
+            'wms.create' => [
+                'modul' => 'Gudang & Inventaris (WMS)',
+                'label' => 'Tambah & Edit Produk',
+                'deskripsi' => 'Menambah produk baru, impor Excel, dan edit master barang.',
+            ],
+            'wms.transfer' => [
+                'modul' => 'Gudang & Inventaris (WMS)',
+                'label' => 'Transfer Antar Gudang',
+                'deskripsi' => 'Membuat dan mengirim mutasi barang antar gudang/cabang.',
+            ],
+            'wms.opname' => [
+                'modul' => 'Gudang & Inventaris (WMS)',
+                'label' => 'Input Stok Opname & Cycle Count',
+                'deskripsi' => 'Melakukan penghitungan fisik stok berkala di gudang.',
+            ],
+            'wms.approve-opname' => [
+                'modul' => 'Gudang & Inventaris (WMS)',
+                'label' => 'Persetujuan Hasil Opname',
+                'deskripsi' => 'Menyetujui selisih penyesuaian stok opname.',
+            ],
+            'wms.receive-po' => [
+                'modul' => 'Gudang & Inventaris (WMS)',
+                'label' => 'Penerimaan Barang Supplier (PO/GRN)',
+                'deskripsi' => 'Memproses penerimaan barang masuk dari purchase order supplier.',
+            ],
+
+            // Servis & Reparasi
+            'servis.view' => [
+                'modul' => 'Servis & Reparasi',
+                'label' => 'Lihat Papan & Tiket Servis',
+                'deskripsi' => 'Melihat kanban antrean servis, status unit, dan riwayat perbaikan.',
+            ],
+            'servis.create' => [
+                'modul' => 'Servis & Reparasi',
+                'label' => 'Terima Unit & Buat Tiket Servis',
+                'deskripsi' => 'Menerima perangkat pelanggan dan menerbitkan tanda terima servis.',
+            ],
+            'servis.update-status' => [
+                'modul' => 'Servis & Reparasi',
+                'label' => 'Ubah Status Pengerjaan Servis',
+                'deskripsi' => 'Mengupdate progres servis (pemeriksaan, pengerjaan teknisi, selesai).',
+            ],
+            'servis.input-sparepart' => [
+                'modul' => 'Servis & Reparasi',
+                'label' => 'Pasang Sparepart & Jasa Servis',
+                'deskripsi' => 'Menambahkan komponen sparepart dan biaya jasa ke tiket servis.',
+            ],
+            'servis.approve-estimasi' => [
+                'modul' => 'Servis & Reparasi',
+                'label' => 'Persetujuan Estimasi Biaya Servis',
+                'deskripsi' => 'Menyetujui estimasi rincian biaya setelah konfirmasi pelanggan.',
+            ],
+            'servis.override-status' => [
+                'modul' => 'Servis & Reparasi',
+                'label' => 'Override / Batalkan Status Servis',
+                'deskripsi' => 'Mengubah paksa atau membatalkan tahapan pengerjaan tiket servis.',
+            ],
+            'servis.manage' => [
+                'modul' => 'Servis & Reparasi',
+                'label' => 'Kelola Master Jenis Servis',
+                'deskripsi' => 'Mengatur katalog jenis perbaikan, estimasi biaya, dan durasi.',
+            ],
+
+            // Pelanggan & CRM
+            'crm.view' => [
+                'modul' => 'Pelanggan & CRM',
+                'label' => 'Lihat Data Pelanggan',
+                'deskripsi' => 'Melihat profil pelanggan, riwayat transaksi belanja, dan kontak.',
+            ],
+            'crm.create' => [
+                'modul' => 'Pelanggan & CRM',
+                'label' => 'Tambah Pelanggan Baru',
+                'deskripsi' => 'Mendaftarkan data profil pelanggan baru ke sistem.',
+            ],
+            'crm.edit' => [
+                'modul' => 'Pelanggan & CRM',
+                'label' => 'Ubah Data Pelanggan',
+                'deskripsi' => 'Memperbarui nomor kontak, alamat, dan data pelanggan.',
+            ],
+            'crm.delete' => [
+                'modul' => 'Pelanggan & CRM',
+                'label' => 'Hapus Pelanggan',
+                'deskripsi' => 'Menghapus akun data pelanggan dari sistem.',
+            ],
+            'crm.broadcast' => [
+                'modul' => 'Pelanggan & CRM',
+                'label' => 'Kirim Broadcast Pesan / Promo',
+                'deskripsi' => 'Mengirim pesan promosi massal via WhatsApp atau Email.',
+            ],
+            'tier.manage' => [
+                'modul' => 'Pelanggan & CRM',
+                'label' => 'Kelola Tier Level Pelanggan',
+                'deskripsi' => 'Mengatur level harga tier (Retail, Reseller, Grosir) dan rekalkulasi.',
+            ],
+
+            // Kemitraan & Reseller
+            'reseller.view' => [
+                'modul' => 'Kemitraan & Reseller',
+                'label' => 'Lihat Mitra Reseller',
+                'deskripsi' => 'Melihat daftar mitra agen/reseller dan performa penjualan.',
+            ],
+            'reseller.manage' => [
+                'modul' => 'Kemitraan & Reseller',
+                'label' => 'Kelola Pendaftaran Reseller',
+                'deskripsi' => 'Menerima, memverifikasi, dan mengatur komisi mitra reseller.',
+            ],
+            'komisi.view' => [
+                'modul' => 'Kemitraan & Reseller',
+                'label' => 'Lihat Laporan Komisi',
+                'deskripsi' => 'Melihat rekap perolehan komisi staf, teknisi, dan reseller.',
+            ],
+            'komisi.approve' => [
+                'modul' => 'Kemitraan & Reseller',
+                'label' => 'Setujui Pembayaran Komisi',
+                'deskripsi' => 'Menyetujui pencairan dan pembayaran komisi.',
+            ],
+
+            // Keuangan & Akuntansi
+            'akunting.view' => [
+                'modul' => 'Keuangan & Akuntansi',
+                'label' => 'Lihat Jurnal & Buku Besar',
+                'deskripsi' => 'Melihat laporan jurnal umum, neraca saldo, dan laba rugi.',
+            ],
+            'akunting.create' => [
+                'modul' => 'Keuangan & Akuntansi',
+                'label' => 'Buat Jurnal & Kas Masuk/Keluar',
+                'deskripsi' => 'Mencatat transaksi keuangan kas, bank, dan biaya operasional.',
+            ],
+            'akunting.edit' => [
+                'modul' => 'Keuangan & Akuntansi',
+                'label' => 'Koreksi Jurnal Keuangan',
+                'deskripsi' => 'Mengubah entri jurnal sebelum proses tutup buku.',
+            ],
+            'akunting.approve' => [
+                'modul' => 'Keuangan & Akuntansi',
+                'label' => 'Tutup Buku & Setujui Jurnal',
+                'deskripsi' => 'Menyetujui penutupan periode akuntansi dan penguncian laporan.',
+            ],
+            'piutang.view' => [
+                'modul' => 'Keuangan & Akuntansi',
+                'label' => 'Lihat Piutang Pelanggan',
+                'deskripsi' => 'Melihat saldo tagihan jatuh tempo pelanggan.',
+            ],
+            'piutang.manage' => [
+                'modul' => 'Keuangan & Akuntansi',
+                'label' => 'Terima Pembayaran Piutang',
+                'deskripsi' => 'Mencatat pelunasan atau cicilan piutang pelanggan.',
+            ],
+            'utang.view' => [
+                'modul' => 'Keuangan & Akuntansi',
+                'label' => 'Lihat Utang Supplier',
+                'deskripsi' => 'Melihat tagihan faktur utang pembelian ke supplier.',
+            ],
+            'utang.manage' => [
+                'modul' => 'Keuangan & Akuntansi',
+                'label' => 'Bayar Tagihan Utang Supplier',
+                'deskripsi' => 'Mencatat pengeluaran kas/bank untuk pelunasan utang supplier.',
+            ],
+
+            // Laporan
+            'laporan.cabang' => [
+                'modul' => 'Laporan & Analitik',
+                'label' => 'Lihat Laporan Operasional Cabang',
+                'deskripsi' => 'Mengakses laporan laba rugi, penjualan, dan stok cabang aktif.',
+            ],
+            'laporan.konsolidasi' => [
+                'modul' => 'Laporan & Analitik',
+                'label' => 'Lihat Laporan Konsolidasi Seluruh Cabang',
+                'deskripsi' => 'Melihat laporan gabungan seluruh cabang secara terpusat.',
+            ],
+
+            // Pengguna & Cabang
+            'user.view' => [
+                'modul' => 'Pengguna & Cabang',
+                'label' => 'Lihat Daftar Pengguna / Staf',
+                'deskripsi' => 'Melihat daftar akun staf, role akses, dan cabang penugasan.',
+            ],
+            'user.create' => [
+                'modul' => 'Pengguna & Cabang',
+                'label' => 'Tambah Pengguna / Staf Baru',
+                'deskripsi' => 'Membuat akun staf baru dan menentukan peran akses.',
+            ],
+            'user.edit' => [
+                'modul' => 'Pengguna & Cabang',
+                'label' => 'Edit Akun & Role Pengguna',
+                'deskripsi' => 'Mengubah password, cabang, dan peran akses staf.',
+            ],
+            'user.delete' => [
+                'modul' => 'Pengguna & Cabang',
+                'label' => 'Nonaktifkan / Hapus Pengguna',
+                'deskripsi' => 'Menonaktifkan akses staf yang sudah tidak bertugas.',
+            ],
+            'cabang.view' => [
+                'modul' => 'Pengguna & Cabang',
+                'label' => 'Lihat Struktur Cabang & Gudang',
+                'deskripsi' => 'Melihat daftar cabang toko fisik, gudang, dan rak penyimpanan.',
+            ],
+            'cabang.manage' => [
+                'modul' => 'Pengguna & Cabang',
+                'label' => 'Kelola Cabang, Gudang, & Rak',
+                'deskripsi' => 'Menambah atau mengedit cabang baru, lokasi gudang, dan rak.',
+            ],
+
+            // Pengaturan Sistem & Keamanan
+            'pengaturan.manage' => [
+                'modul' => 'Sistem & Keamanan',
+                'label' => 'Kelola Pengaturan Sistem & Toko',
+                'deskripsi' => 'Mengatur profil toko, struk kasir, printer, dan konfigurasi pajak.',
+            ],
+            'omnichannel.view' => [
+                'modul' => 'Sistem & Keamanan',
+                'label' => 'Lihat Integrasi Marketplace',
+                'deskripsi' => 'Melihat channel e-commerce yang terhubung (Shopee, Tokopedia, dll).',
+            ],
+            'omnichannel.manage' => [
+                'modul' => 'Sistem & Keamanan',
+                'label' => 'Kelola Integrasi Marketplace',
+                'deskripsi' => 'Menghubungkan akun toko marketplace dan sinkronisasi pesanan.',
+            ],
+            'approve-workflow' => [
+                'modul' => 'Sistem & Keamanan',
+                'label' => 'Persetujuan Workflow & Otorisasi',
+                'deskripsi' => 'Otorisasi pengajuan dokumen bertingkat (PO besar, payroll, dll).',
+            ],
+            'lihat-audit-log' => [
+                'modul' => 'Sistem & Keamanan',
+                'label' => 'Lihat Log Audit Jejak Aktivitas',
+                'deskripsi' => 'Memantau seluruh jejak riwayat aktivitas staf pada data sistem.',
+            ],
+            'kelola-sesi' => [
+                'modul' => 'Sistem & Keamanan',
+                'label' => 'Kelola Sesi & Perangkat Login',
+                'deskripsi' => 'Melihat dan memutuskan sesi login aktif pada perangkat lain.',
+            ],
+
+            // Akses Data Sensitif (Keuangan Barang)
+            'lihat.harga_beli' => [
+                'modul' => 'Akses Data Sensitif (Keuangan Barang)',
+                'label' => 'Lihat Harga Beli Modal (HPP)',
+                'deskripsi' => 'Menampilkan nominal modal harga beli pada tabel produk dan transaksi.',
+            ],
+            'lihat.margin' => [
+                'modul' => 'Akses Data Sensitif (Keuangan Barang)',
+                'label' => 'Lihat Margin Keuntungan',
+                'deskripsi' => 'Menampilkan nilai margin persentase laba di laporan dan kasir.',
+            ],
+
+            // SDM, Absensi & Payroll
+            'kelola-hr' => [
+                'modul' => 'SDM, Absensi & Penggajian (HR)',
+                'label' => 'Kelola Data Karyawan & Shift Kerja',
+                'deskripsi' => 'Mengatur jadwal kerja shift, absensi staf, dan data kepegawaian.',
+            ],
+            'kelola-payroll' => [
+                'modul' => 'SDM, Absensi & Penggajian (HR)',
+                'label' => 'Kelola Sistem Penggajian (Payroll)',
+                'deskripsi' => 'Mengatur komponen gaji pokok, tunjangan, dan skema potongan.',
+            ],
+            'payroll.view' => [
+                'modul' => 'SDM, Absensi & Penggajian (HR)',
+                'label' => 'Lihat Rekap Gaji Karyawan',
+                'deskripsi' => 'Melihat rekap perhitungan dan slip gaji seluruh karyawan.',
+            ],
+            'payroll.create' => [
+                'modul' => 'SDM, Absensi & Penggajian (HR)',
+                'label' => 'Buat & Hitung Periode Penggajian',
+                'deskripsi' => 'Membuat draf slip penggajian bulanan staf.',
+            ],
+            'payroll.approve' => [
+                'modul' => 'SDM, Absensi & Penggajian (HR)',
+                'label' => 'Setujui Pembayaran Gaji',
+                'deskripsi' => 'Menyetujui pencairan dan transfer pembayaran gaji karyawan.',
+            ],
+            'hr.lihat-sendiri' => [
+                'modul' => 'SDM, Absensi & Penggajian (HR)',
+                'label' => 'Lihat Absensi & Slip Gaji Sendiri',
+                'deskripsi' => 'Staf dapat melihat rekap kehadiran, KPI, dan slip gaji milik sendiri.',
+            ],
+        ];
+    }
+
+    public function getGroupedPermissionsProperty(): array
+    {
+        $meta = self::getPermissionMetadata();
+        $permissions = Permission::orderBy('name')->get();
+
+        $grouped = [];
+        foreach ($permissions as $perm) {
+            $info = $meta[$perm->name] ?? [
+                'modul' => 'Lainnya / Tambahan',
+                'label' => ucwords(str_replace(['.', '-', '_'], ' ', $perm->name)),
+                'deskripsi' => 'Hak akses sistem untuk '.$perm->name,
+            ];
+
+            $modul = $info['modul'];
+            if (! isset($grouped[$modul])) {
+                $grouped[$modul] = [];
+            }
+
+            $grouped[$modul][] = [
+                'id' => $perm->id,
+                'name' => $perm->name,
+                'label' => $info['label'],
+                'deskripsi' => $info['deskripsi'],
+            ];
+        }
+
+        return $grouped;
+    }
+
     // Role: semua role + permission (recompute)
     public function getRolesFullProperty()
     {
@@ -1912,6 +2253,7 @@ class SettingsRbac extends Component
             'roles' => $this->roles,
             'rolesFull' => $this->rolesFull,
             'permissionsList' => $this->permissionsList,
+            'groupedPermissions' => $this->groupedPermissions,
             'cabangs' => $this->cabangs,
             'gudangs' => $this->gudangs,
             'raks' => $this->raks,

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\CycleCountSchedule;
 use App\Modules\Wms\Models\CycleCountTask;
 use App\Modules\Wms\Models\KategoriProduk;
@@ -37,6 +38,8 @@ class CycleCountPage extends Component
 
     public int|string $targetId = 0;
 
+    public ?int $targetBrandId = null;
+
     public string $targetKategori = '';
 
     public string $frekuensi = 'mingguan';
@@ -57,6 +60,8 @@ class CycleCountPage extends Component
     public ?CycleCountTask $activeTask = null;
 
     public array $fisikPerItem = [];
+
+    public string $countScanInput = '';
 
     protected $listeners = ['taskGenerated', 'countSubmitted'];
 
@@ -103,6 +108,7 @@ class CycleCountPage extends Component
         $this->scheduleNama = '';
         $this->tipeTarget = 'rak';
         $this->targetId = 0;
+        $this->targetBrandId = null;
         $this->targetKategori = '';
         $this->frekuensi = 'mingguan';
         $this->hari = 1;
@@ -110,6 +116,12 @@ class CycleCountPage extends Component
         $this->sampleSize = 10;
         $this->thresholdUnit = 0;
         $this->thresholdPersen = 0;
+    }
+
+    public function batalSchedule(): void
+    {
+        $this->showScheduleForm = false;
+        $this->resetScheduleForm();
     }
 
     public function simpanSchedule(): void
@@ -122,7 +134,7 @@ class CycleCountPage extends Component
 
         $this->validate([
             'scheduleNama' => 'required|string|max:255',
-            'tipeTarget' => 'required|string|in:rak,kategori',
+            'tipeTarget' => 'required|string|in:rak,kategori,brand,semua',
             'frekuensi' => 'required|string|in:mingguan,bulanan',
             'jam' => 'required|date_format:H:i',
             'sampleSize' => 'required|integer|min:1|max:100',
@@ -135,14 +147,19 @@ class CycleCountPage extends Component
 
         $cabangId = session('cabang_id');
 
-        $targetId = ! empty($this->targetId) ? (int) $this->targetId : null;
+        $targetId = null;
+        if ($this->tipeTarget === 'rak') {
+            $targetId = ! empty($this->targetId) ? (int) $this->targetId : null;
+        } elseif ($this->tipeTarget === 'brand') {
+            $targetId = ! empty($this->targetBrandId) ? (int) $this->targetBrandId : null;
+        }
 
         CycleCountSchedule::create([
             'cabang_id' => $cabangId,
             'nama' => $this->scheduleNama,
             'tipe_target' => $this->tipeTarget,
             'target_id' => $targetId,
-            'target_kategori' => $this->targetKategori ?: null,
+            'target_kategori' => $this->tipeTarget === 'kategori' ? ($this->targetKategori ?: null) : null,
             'frekuensi' => $this->frekuensi,
             'hari' => (int) $this->hari,
             'jam' => $this->jam,
@@ -333,6 +350,50 @@ class CycleCountPage extends Component
 
     // ===== Display =====
 
+    public function tambahHitungan(int $stokItemId): void
+    {
+        $current = isset($this->fisikPerItem[$stokItemId]) && is_numeric($this->fisikPerItem[$stokItemId]) ? (int) $this->fisikPerItem[$stokItemId] : 0;
+        $this->fisikPerItem[$stokItemId] = $current + 1;
+    }
+
+    public function kurangHitungan(int $stokItemId): void
+    {
+        $current = isset($this->fisikPerItem[$stokItemId]) && is_numeric($this->fisikPerItem[$stokItemId]) ? (int) $this->fisikPerItem[$stokItemId] : 0;
+        $this->fisikPerItem[$stokItemId] = max(0, $current - 1);
+    }
+
+    public function scanBarcodeDirect(string $code): void
+    {
+        $clean = trim($code);
+        if ($clean === '' || empty($this->selectedTaskId)) {
+            return;
+        }
+
+        $activeTask = CycleCountTask::find($this->selectedTaskId);
+        if (! $activeTask || empty($activeTask->sample_items)) {
+            return;
+        }
+
+        $foundItem = null;
+        foreach ($activeTask->sample_items as $item) {
+            $prod = Produk::find($item['produk_id']);
+            if ($prod && (strcasecmp((string) $prod->barcode, $clean) === 0 || strcasecmp((string) $prod->sku, $clean) === 0 || strcasecmp((string) $prod->kode, $clean) === 0)) {
+                $foundItem = $item;
+                break;
+            }
+        }
+
+        if ($foundItem) {
+            $itemId = $foundItem['stok_item_id'];
+            $this->tambahHitungan($itemId);
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Hitungan '{$foundItem['nama']}' bertambah: {$this->fisikPerItem[$itemId]} unit"]);
+        } else {
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Item dengan barcode/SKU '{$clean}' tidak ada dalam sampel cycle count ini."]);
+        }
+
+        $this->countScanInput = '';
+    }
+
     public function getSchedulesProperty()
     {
         return CycleCountSchedule::where('cabang_id', session('cabang_id'))
@@ -371,6 +432,11 @@ class CycleCountPage extends Component
         return $fromMaster->merge($fromProduk)->filter()->unique()->sort()->values();
     }
 
+    public function getBrandsProperty(): Collection
+    {
+        return Brand::where('is_active', true)->orderBy('nama')->get();
+    }
+
     public function render()
     {
         $detailTask = null;
@@ -394,6 +460,7 @@ class CycleCountPage extends Component
             'tasks' => $this->tasks,
             'raks' => $this->raks,
             'kategoris' => $this->kategoris,
+            'brands' => $this->brands,
             'detailTask' => $detailTask,
             'mutasiLogs' => $mutasiLogs,
         ])->layout('layouts.backoffice', ['header' => 'Cycle Count Otomatis']);

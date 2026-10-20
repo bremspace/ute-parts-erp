@@ -18,6 +18,7 @@ use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\ImportSidRetailService;
@@ -67,6 +68,8 @@ class ProdukTab extends Component
     public ?string $filterSatuan = null;
 
     public ?string $filterAbcClass = null;
+
+    public ?int $filterSupplierId = null;
 
     public bool $filterHanyaReadyStok = false;
 
@@ -138,12 +141,16 @@ class ProdukTab extends Component
         'nama' => true,
         'harga' => true,
         'sku' => false,
+        'kualitas' => false,
+        'kompatibilitas' => false,
+        'kondisi' => false,
         'stok' => false,
         'rak' => false,
         'kategori' => false,
         'brand' => false,
         'garansi' => false,
-        'format' => 'teks', // 'teks' (Chat / Catatan) | 'tsv' (Excel / Spreadsheet)
+        'deskripsi' => false,
+        'format' => 'teks', // 'teks' (Chat WA / Catatan) | 'tsv' (Excel / Spreadsheet)
     ];
 
     // Filter toggle preferences (checkbox custom)
@@ -159,6 +166,7 @@ class ProdukTab extends Component
         'abc_class' => false,
         'stok' => false,
         'tier' => true,
+        'supplier' => false,
     ];
 
     public bool $showCustomFilterSettings = false;
@@ -170,6 +178,7 @@ class ProdukTab extends Component
         'kategori' => false,
         'brand' => false,
         'kompatibilitas' => false,
+        'supplier' => false,
         'sku' => true,
         'harga_beli' => false,
         'harga_jual' => true,
@@ -200,7 +209,7 @@ class ProdukTab extends Component
         'sku' => '', 'gudang_id' => null, 'rak_id' => null, 'stok_awal' => 0, 'stok_minimum' => 0,
         'deskripsi' => '',
         // [T-44]
-        'brand_id' => null, 'kualitas_id' => null, 'satuan_kode' => 'pcs',
+        'brand_id' => null, 'kualitas_id' => null, 'supplier_id' => null, 'satuan_kode' => 'pcs',
         'tipe_hp_ids' => [], 'produk_kompatibel_ids' => [],
         'harga_tier' => [
             'retail' => ['nominal_tetap' => 0, 'persen_diskon' => null],
@@ -341,6 +350,7 @@ class ProdukTab extends Component
             'kategori' => false,
             'brand' => false,
             'kompatibilitas' => false,
+            'supplier' => false,
             'sku' => true,
             'harga_beli' => false,
             'harga_jual' => true,
@@ -379,6 +389,7 @@ class ProdukTab extends Component
                     'abc_class' => $this->filterAbcClass = null,
                     'stok' => $this->filterHanyaReadyStok = false,
                     'tier' => $this->filterTierHarga = 'retail',
+                    'supplier' => $this->filterSupplierId = null,
                     default => null,
                 };
                 $this->resetPage();
@@ -401,6 +412,7 @@ class ProdukTab extends Component
             'abc_class' => false,
             'stok' => false,
             'tier' => true,
+            'supplier' => false,
         ];
 
         $this->filterKategoriId = null;
@@ -412,6 +424,7 @@ class ProdukTab extends Component
         $this->filterKondisi = null;
         $this->filterSatuan = null;
         $this->filterAbcClass = null;
+        $this->filterSupplierId = null;
         $this->filterHanyaReadyStok = false;
         $this->filterTierHarga = 'retail';
         $this->resetPage();
@@ -448,7 +461,7 @@ class ProdukTab extends Component
             'sku' => '', 'gudang_id' => null, 'stok_awal' => 0, 'stok_minimum' => 0,
             'deskripsi' => '',
             // [T-44]
-            'brand_id' => null, 'kualitas_id' => null, 'satuan_kode' => 'pcs',
+            'brand_id' => null, 'kualitas_id' => null, 'supplier_id' => null, 'satuan_kode' => 'pcs',
             'tipe_hp_ids' => [], 'produk_kompatibel_ids' => [], 'harga_tier' => [
                 'retail' => ['nominal_tetap' => 0, 'persen_diskon' => null],
                 'reseller' => ['nominal_tetap' => null, 'persen_diskon' => null],
@@ -712,7 +725,8 @@ class ProdukTab extends Component
                 metodeHargaBeli: $this->produkForm['metode_harga_beli'] ?? 'average',
                 marginPersen: ! empty($this->produkForm['margin_persen']) ? (float) $this->produkForm['margin_persen'] : null,
                 rakId: ! empty($this->produkForm['rak_id']) ? (int) $this->produkForm['rak_id'] : null,
-                multiSatuan: $this->produkForm['multi_satuan'] ?? []
+                multiSatuan: $this->produkForm['multi_satuan'] ?? [],
+                supplierId: ! empty($this->produkForm['supplier_id']) ? (int) $this->produkForm['supplier_id'] : null
             );
 
             $this->showProdukModal = false;
@@ -761,6 +775,7 @@ class ProdukTab extends Component
             'harga_jual_retail' => (float) $p->harga_jual_retail,
             'brand_id' => $p->brand_id,
             'kualitas_id' => $p->kualitas_id,
+            'supplier_id' => $p->supplier_id,
             'tipe_hp_ids' => $p->tipeHps->pluck('id')->all(),
             'produk_kompatibel_ids' => $p->produkKompatibel->pluck('id')->all(),
             'harga_tier' => $tierMap,
@@ -997,7 +1012,8 @@ class ProdukTab extends Component
                 barcode: isset($this->editProdukForm['barcode']) ? trim((string) $this->editProdukForm['barcode']) : null,
                 metodeHargaBeli: $this->editProdukForm['metode_harga_beli'] ?? 'manual',
                 marginPersen: ! empty($this->editProdukForm['margin_persen']) ? (float) $this->editProdukForm['margin_persen'] : null,
-                multiSatuan: $this->editProdukForm['multi_satuan'] ?? []
+                multiSatuan: $this->editProdukForm['multi_satuan'] ?? [],
+                supplierId: ! empty($this->editProdukForm['supplier_id']) ? (int) $this->editProdukForm['supplier_id'] : null
             );
 
             // Simpan perubahan lokasi rak stok per gudang
@@ -1288,6 +1304,9 @@ class ProdukTab extends Component
             'keterangan' => '',
             'merk' => $defaultMerk,
             'model' => $defaultModel,
+            'telepon' => '',
+            'kontak' => '',
+            'alamat' => '',
         ];
         $this->showQuickAddModal = true;
     }
@@ -1430,6 +1449,25 @@ class ProdukTab extends Component
                     $this->produkForm['kondisi'] = $kode;
                 }
                 $pesan = "Kondisi '{$nama}' berhasil ditambahkan";
+                break;
+
+            case 'supplier':
+                $supplier = Supplier::firstOrCreate(
+                    ['nama' => $nama],
+                    [
+                        'telepon' => ! empty($this->quickAddForm['telepon']) ? trim($this->quickAddForm['telepon']) : null,
+                        'kontak' => ! empty($this->quickAddForm['kontak']) ? trim($this->quickAddForm['kontak']) : null,
+                        'alamat' => ! empty($this->quickAddForm['alamat']) ? trim($this->quickAddForm['alamat']) : null,
+                        'termin_hari' => 30,
+                        'is_active' => true,
+                    ]
+                );
+                if ($this->showEditProdukModal) {
+                    $this->editProdukForm['supplier_id'] = $supplier->id;
+                } else {
+                    $this->produkForm['supplier_id'] = $supplier->id;
+                }
+                $pesan = "Supplier '{$nama}' berhasil didaftarkan dan dipilih";
                 break;
 
             default:
@@ -1837,6 +1875,9 @@ class ProdukTab extends Component
         if ($this->filterGudangId) {
             $count++;
         }
+        if ($this->filterSupplierId) {
+            $count++;
+        }
 
         return $count;
     }
@@ -1882,6 +1923,7 @@ class ProdukTab extends Component
                 $this->filterKondisi = null,
                 $this->filterSatuan = null,
             ],
+            'supplier' => $this->filterSupplierId = null,
             'status' => $this->filterStatusAktif = 'semua',
             default => null,
         };
@@ -1900,6 +1942,7 @@ class ProdukTab extends Component
         $this->filterKondisi = null;
         $this->filterSatuan = null;
         $this->filterAbcClass = null;
+        $this->filterSupplierId = null;
         $this->filterHanyaReadyStok = false;
         $this->filterTierHarga = 'retail';
         $this->filterSku = null;
@@ -2007,6 +2050,8 @@ class ProdukTab extends Component
             'hargaTier.tierMembership',
             'kategoriRelasi',
             'brand',
+            'kualitas',
+            'tipeHps',
             'stokItems' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->with('rak'),
         ])->find($produkId);
 
@@ -2044,68 +2089,91 @@ class ProdukTab extends Component
         $hasNama = ! empty($options['nama']);
         $hasHarga = ! empty($options['harga']);
         $hasSku = ! empty($options['sku']);
+        $hasKualitas = ! empty($options['kualitas']);
+        $hasKompatibilitas = ! empty($options['kompatibilitas']);
+        $hasKondisi = ! empty($options['kondisi']);
         $hasStok = ! empty($options['stok']);
         $hasRak = ! empty($options['rak']);
         $hasKategori = ! empty($options['kategori']);
         $hasBrand = ! empty($options['brand']);
         $hasGaransi = ! empty($options['garansi']);
+        $hasDeskripsi = ! empty($options['deskripsi']);
 
         $tierInfo = $this->resolveHargaTierProduk($p);
         $hargaFmt = 'Rp '.number_format($tierInfo['harga'], 0, ',', '.');
 
         // Jika hanya nama & harga yang dipilih: format klasik standar (nama - harga)
-        if ($hasNama && $hasHarga && ! $hasSku && ! $hasStok && ! $hasRak && ! $hasKategori && ! $hasBrand && ! $hasGaransi) {
+        if ($hasNama && $hasHarga && ! $hasSku && ! $hasStok && ! $hasRak && ! $hasKategori && ! $hasBrand && ! $hasGaransi && ! $hasKompatibilitas && ! $hasKualitas && ! $hasKondisi && ! $hasDeskripsi) {
             return "{$p->nama} - {$hargaFmt}";
-        }
-
-        $output = '';
-        if ($hasNama) {
-            $output .= $p->nama;
         }
 
         $sku = $p->relationLoaded('skuVariants') ? $p->skuVariants->first()?->sku : null;
         $sku = $sku ?? $p->barcode ?? ($p->getAttribute('sku') ?: null);
 
+        $stok = $p->relationLoaded('stokItems') ? $p->stokItems->sum('jumlah') : $p->stok_total;
+        $raks = $p->relationLoaded('stokItems') ? $p->stokItems->map(fn ($s) => $s->rak ? $s->rak->kode : null)->filter()->unique()->implode(', ') : null;
+        $brand = $p->brand?->nama ?? (is_string($p->brand) ? $p->brand : null);
+        $kat = $p->kategoriRelasi?->nama ?? $p->kategori;
+        $kualitas = $p->kualitas?->nama ?? ($p->kualitas_id ? KualitasProduk::where('id', $p->kualitas_id)->value('nama') : null);
+
+        $kompatibel = trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
+        if (empty($kompatibel) && ! empty($p->kompatibilitas_hp) && is_array($p->kompatibilitas_hp)) {
+            $kompatibel = collect($p->kompatibilitas_hp)->map(fn ($k) => trim(($k['merk'] ?? '').' '.($k['model'] ?? '')))->filter()->implode(', ');
+        }
+        if (empty($kompatibel) && $p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
+            $kompatibel = $p->tipeHps->map(fn ($t) => trim("{$t->merk} {$t->model}"))->filter()->implode(', ');
+        }
+
+        $kondisi = ! empty($p->kondisi) ? ucfirst($p->kondisi) : null;
+        $garansi = ! empty($p->garansi) ? $p->garansi.' bln' : null;
+        $deskripsi = ! empty($p->deskripsi) ? trim(strip_tags($p->deskripsi)) : null;
+
+        // Susun baris rapi dan estetik untuk WhatsApp
+        $lines = [];
+
+        $titleParts = [];
+        if ($hasNama) {
+            $titleParts[] = "*{$p->nama}*";
+        }
         if ($hasSku && ! empty($sku)) {
-            $output .= ($output ? ' ' : '')."[{$sku}]";
+            $titleParts[] = "[{$sku}]";
+        }
+        if (! empty($titleParts)) {
+            $lines[] = '📦 '.implode(' ', $titleParts);
         }
 
         if ($hasHarga) {
-            $output .= ($output ? ' - ' : '').$hargaFmt;
+            $lines[] = "💰 Harga: *{$hargaFmt}*";
         }
-
-        $extras = [];
+        if ($hasKualitas && ! empty($kualitas)) {
+            $lines[] = "⭐ Kualitas: {$kualitas}";
+        }
+        if ($hasKompatibilitas && ! empty($kompatibel)) {
+            $lines[] = "📱 Kompatibel: {$kompatibel}";
+        }
+        if ($hasKondisi && ! empty($kondisi)) {
+            $lines[] = "⚙️ Kondisi: {$kondisi}";
+        }
         if ($hasStok) {
-            $stok = $p->relationLoaded('stokItems') ? $p->stokItems->sum('jumlah') : $p->stok_total;
-            $extras[] = "Stok: {$stok}";
+            $lines[] = "📊 Stok: {$stok}";
         }
-        if ($hasRak && $p->relationLoaded('stokItems')) {
-            $raks = $p->stokItems->map(fn ($s) => $s->rak ? $s->rak->kode : null)->filter()->unique()->implode(', ');
-            if ($raks) {
-                $extras[] = "Rak: {$raks}";
-            }
+        if ($hasRak && ! empty($raks)) {
+            $lines[] = "📍 Rak: {$raks}";
         }
-        if ($hasBrand) {
-            $brand = $p->brand?->nama ?? (is_string($p->brand) ? $p->brand : null);
-            if ($brand) {
-                $extras[] = "Brand: {$brand}";
-            }
+        if ($hasBrand && ! empty($brand)) {
+            $lines[] = "🏷️ Brand: {$brand}";
         }
-        if ($hasKategori) {
-            $kat = $p->kategoriRelasi?->nama ?? $p->kategori;
-            if ($kat) {
-                $extras[] = "Kat: {$kat}";
-            }
+        if ($hasKategori && ! empty($kat)) {
+            $lines[] = "📁 Kategori: {$kat}";
         }
-        if ($hasGaransi && ! empty($p->garansi)) {
-            $extras[] = "Garansi: {$p->garansi} bln";
+        if ($hasGaransi && ! empty($garansi)) {
+            $lines[] = "🛡️ Garansi: {$garansi}";
+        }
+        if ($hasDeskripsi && ! empty($deskripsi)) {
+            $lines[] = "📝 Catatan: {$deskripsi}";
         }
 
-        if (! empty($extras)) {
-            $output .= ($output ? ' ' : '').'('.implode(' | ', $extras).')';
-        }
-
-        return $output ?: $p->nama;
+        return implode("\n", $lines) ?: $p->nama;
     }
 
     public function eksekusiSalinData(): void
@@ -2122,6 +2190,8 @@ class ProdukTab extends Component
             'hargaTier.tierMembership',
             'kategoriRelasi',
             'brand',
+            'kualitas',
+            'tipeHps',
             'stokItems' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->with('rak'),
         ])
             ->whereIn('id', $this->selectedProdukIds)
@@ -2148,6 +2218,15 @@ class ProdukTab extends Component
             if (! empty($this->salinOptions['harga'])) {
                 $headers[] = 'Harga';
             }
+            if (! empty($this->salinOptions['kualitas'])) {
+                $headers[] = 'Kualitas';
+            }
+            if (! empty($this->salinOptions['kompatibilitas'])) {
+                $headers[] = 'Kompatibilitas';
+            }
+            if (! empty($this->salinOptions['kondisi'])) {
+                $headers[] = 'Kondisi';
+            }
             if (! empty($this->salinOptions['stok'])) {
                 $headers[] = 'Stok Ready';
             }
@@ -2163,6 +2242,9 @@ class ProdukTab extends Component
             if (! empty($this->salinOptions['garansi'])) {
                 $headers[] = 'Garansi';
             }
+            if (! empty($this->salinOptions['deskripsi'])) {
+                $headers[] = 'Deskripsi';
+            }
             $lines[] = implode("\t", $headers);
 
             foreach ($produks as $p) {
@@ -2170,6 +2252,16 @@ class ProdukTab extends Component
                 $tierInfo = $this->resolveHargaTierProduk($p);
                 $sku = $p->relationLoaded('skuVariants') ? $p->skuVariants->first()?->sku : null;
                 $sku = $sku ?? $p->barcode ?? ($p->getAttribute('sku') ?: null);
+
+                $kualitas = $p->kualitas?->nama ?? ($p->kualitas_id ? KualitasProduk::where('id', $p->kualitas_id)->value('nama') : '-');
+                $kompatibel = trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
+                if (empty($kompatibel) && ! empty($p->kompatibilitas_hp) && is_array($p->kompatibilitas_hp)) {
+                    $kompatibel = collect($p->kompatibilitas_hp)->map(fn ($k) => trim(($k['merk'] ?? '').' '.($k['model'] ?? '')))->filter()->implode(', ');
+                }
+                if (empty($kompatibel) && $p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
+                    $kompatibel = $p->tipeHps->map(fn ($t) => trim("{$t->merk} {$t->model}"))->filter()->implode(', ');
+                }
+
                 if (! empty($this->salinOptions['nama'])) {
                     $cols[] = $p->nama;
                 }
@@ -2178,6 +2270,15 @@ class ProdukTab extends Component
                 }
                 if (! empty($this->salinOptions['harga'])) {
                     $cols[] = (string) $tierInfo['harga'];
+                }
+                if (! empty($this->salinOptions['kualitas'])) {
+                    $cols[] = $kualitas ?: '-';
+                }
+                if (! empty($this->salinOptions['kompatibilitas'])) {
+                    $cols[] = $kompatibel ?: '-';
+                }
+                if (! empty($this->salinOptions['kondisi'])) {
+                    $cols[] = $p->kondisi ? ucfirst($p->kondisi) : '-';
                 }
                 if (! empty($this->salinOptions['stok'])) {
                     $cols[] = (string) $p->stokItems->sum('jumlah');
@@ -2195,6 +2296,9 @@ class ProdukTab extends Component
                 if (! empty($this->salinOptions['garansi'])) {
                     $cols[] = $p->garansi ? $p->garansi.' bln' : '-';
                 }
+                if (! empty($this->salinOptions['deskripsi'])) {
+                    $cols[] = $p->deskripsi ? str_replace(["\r", "\n", "\t"], ' ', strip_tags($p->deskripsi)) : '-';
+                }
                 $lines[] = implode("\t", $cols);
             }
         } else {
@@ -2203,7 +2307,19 @@ class ProdukTab extends Component
             }
         }
 
-        $text = implode("\n", $lines);
+        $hasExtraOptions = ! empty($this->salinOptions['sku'])
+            || ! empty($this->salinOptions['stok'])
+            || ! empty($this->salinOptions['rak'])
+            || ! empty($this->salinOptions['kualitas'])
+            || ! empty($this->salinOptions['kompatibilitas'])
+            || ! empty($this->salinOptions['kondisi'])
+            || ! empty($this->salinOptions['kategori'])
+            || ! empty($this->salinOptions['brand'])
+            || ! empty($this->salinOptions['garansi'])
+            || ! empty($this->salinOptions['deskripsi']);
+
+        $separator = $isTsv ? "\n" : ($hasExtraOptions ? "\n\n" : "\n");
+        $text = implode($separator, $lines);
 
         $this->dispatch('salin-teks', teks: $text, message: "{$produks->count()} data produk berhasil disalin ke clipboard!");
         $this->showSalinDataModal = false;
@@ -2223,6 +2339,8 @@ class ProdukTab extends Component
             'hargaTier.tierMembership',
             'kategoriRelasi',
             'brand',
+            'kualitas',
+            'tipeHps',
             'stokItems' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->with('rak'),
         ])
             ->whereIn('id', $this->selectedProdukIds)
@@ -2240,7 +2358,18 @@ class ProdukTab extends Component
             $lines[] = $this->formatTeksProduk($p, $this->salinOptions);
         }
 
-        $text = implode("\n", $lines);
+        $hasExtraOptions = ! empty($this->salinOptions['sku'])
+            || ! empty($this->salinOptions['stok'])
+            || ! empty($this->salinOptions['rak'])
+            || ! empty($this->salinOptions['kualitas'])
+            || ! empty($this->salinOptions['kompatibilitas'])
+            || ! empty($this->salinOptions['kondisi'])
+            || ! empty($this->salinOptions['kategori'])
+            || ! empty($this->salinOptions['brand'])
+            || ! empty($this->salinOptions['garansi'])
+            || ! empty($this->salinOptions['deskripsi']);
+
+        $text = implode($hasExtraOptions ? "\n\n" : "\n", $lines);
 
         $this->dispatch('salin-teks', teks: $text, message: "{$produks->count()} harga produk berhasil disalin ke clipboard!");
     }
@@ -2767,6 +2896,7 @@ class ProdukTab extends Component
             'stokItems' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->with(['gudang', 'rak']),
             'brand',
             'kualitas',
+            'supplier',
             'tipeHps',
             'kategoriRelasi',
             'hargaTier.tierMembership',
@@ -2810,6 +2940,10 @@ class ProdukTab extends Component
 
         if ($this->filterAbcClass) {
             $query->where('abc_class', $this->filterAbcClass);
+        }
+
+        if ($this->filterSupplierId) {
+            $query->where('supplier_id', $this->filterSupplierId);
         }
 
         if ($this->filterHanyaReadyStok) {
@@ -3105,12 +3239,14 @@ class ProdukTab extends Component
             'filterStokStatus' => $this->filterStokStatus,
             'filterStatusAktif' => $this->filterStatusAktif,
             'filterGudangId' => $this->filterGudangId,
+            'filterSupplierId' => $this->filterSupplierId,
             'kategoriTree' => $kategoriTree,
             'tierMemberships' => TierMembership::where('is_active', true)->orderBy('urutan')->get(),
             // [T-44] master data pendukung
             'brands' => Brand::where('is_active', true)->orderBy('nama')->get(),
             'kualitasList' => KualitasProduk::where('is_active', true)->orderBy('nama')->get(),
             'satuanUnits' => SatuanUnit::where('is_active', true)->orderBy('kode')->get(),
+            'suppliers' => Supplier::where('is_active', true)->orderBy('nama')->get(),
             'kondisiList' => $kondisiList,
             'tipeHpList' => $tipeHpList,
             'tipeHpOptions' => $tipeHpOptions,

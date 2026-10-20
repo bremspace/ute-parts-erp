@@ -3,7 +3,9 @@
 namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\StockMutationLog;
@@ -29,6 +31,22 @@ class OpnameTab extends Component
 
     public ?int $opnameRakId = null; // [T-14] scope opname per rak
 
+    public string $opnameTipeTarget = 'rak'; // 'rak', 'kategori', 'brand', 'semua'
+
+    public ?int $opnameKategoriId = null;
+
+    public ?int $opnameBrandId = null;
+
+    public string $opnameSearch = '';
+
+    public string $opnameScanInput = '';
+
+    public ?int $activeItemIndex = null;
+
+    public string $activeItemFisik = '';
+
+    public string $filterStatusHitung = 'semua'; // 'semua', 'terhitung', 'belum'
+
     public string $opnameCatatan = '';
 
     public array $opnameRows = []; // [['produk_id' => ..., 'nama' => ..., 'stok_sistem' => ..., 'stok_fisik' => ...]]
@@ -52,37 +70,258 @@ class OpnameTab extends Component
     {
         $this->opnameGudangId = $this->filterGudangId;
         $this->opnameRakId = null;
+        $this->opnameTipeTarget = 'rak';
+        $this->opnameKategoriId = null;
+        $this->opnameBrandId = null;
+        $this->opnameSearch = '';
+        $this->opnameScanInput = '';
+        $this->activeItemIndex = null;
+        $this->activeItemFisik = '';
+        $this->filterStatusHitung = 'semua';
         $this->opnameCatatan = '';
 
-        // Pre-fill with all products in warehouse (optionally filtered by rak)
-        $stokQuery = StokItem::where('gudang_id', $this->filterGudangId);
-        if ($this->opnameRakId) {
-            $stokQuery->where('rak_id', $this->opnameRakId);
+        $this->muatItemOpname();
+
+        $this->showOpnameModal = true;
+    }
+
+    public function updatedOpnameGudangId(): void
+    {
+        $this->muatItemOpname();
+    }
+
+    public function updatedOpnameRakId(): void
+    {
+        $this->muatItemOpname();
+    }
+
+    public function updatedOpnameTipeTarget(): void
+    {
+        $this->muatItemOpname();
+    }
+
+    public function updatedOpnameKategoriId(): void
+    {
+        $this->muatItemOpname();
+    }
+
+    public function updatedOpnameBrandId(): void
+    {
+        $this->muatItemOpname();
+    }
+
+    /**
+     * Muat item yang akan di-opname sesuai filter target yang dipilih (Rak, Kategori, Brand, Semua).
+     */
+    public function muatItemOpname(): void
+    {
+        $gudangId = $this->opnameGudangId ?: $this->filterGudangId;
+        if (! $gudangId) {
+            $this->opnameRows = [];
+
+            return;
         }
-        $products = Produk::where('is_active', true)
-            ->whereHas('stokItems', fn ($q) => $q->where('gudang_id', $this->filterGudangId)
-                ->when($this->opnameRakId, fn ($q2) => $q2->where('rak_id', $this->opnameRakId)))
-            ->take(20)->get();
+
+        $query = Produk::query()
+            ->with(['skuVariants' => fn ($q) => $q->where('is_active', true), 'brand', 'kategoriRelasi'])
+            ->where('is_active', true)
+            ->whereHas('stokItems', function ($q) use ($gudangId) {
+                $q->where('gudang_id', $gudangId);
+                if ($this->opnameTipeTarget === 'rak' && $this->opnameRakId) {
+                    $q->where('rak_id', $this->opnameRakId);
+                }
+            });
+
+        if ($this->opnameTipeTarget === 'kategori' && $this->opnameKategoriId) {
+            $kat = KategoriProduk::with('children')->find($this->opnameKategoriId);
+            $katIds = $kat ? array_merge([$kat->id], $kat->children->pluck('id')->all()) : [$this->opnameKategoriId];
+            $query->whereIn('kategori_id', $katIds);
+        } elseif ($this->opnameTipeTarget === 'brand' && $this->opnameBrandId) {
+            $query->where('brand_id', $this->opnameBrandId);
+        }
+
+        $products = $query->take(100)->get();
         $this->opnameRows = [];
 
         foreach ($products as $prod) {
-            $stok = $this->opnameGudangId
-                ? StokItem::where('produk_id', $prod->id)->where('gudang_id', $this->opnameGudangId)
-                    ->when($this->opnameRakId, fn ($q) => $q->where('rak_id', $this->opnameRakId))
-                    ->value('jumlah') ?? 0
-                : 0;
+            $stok = StokItem::where('produk_id', $prod->id)
+                ->where('gudang_id', $gudangId)
+                ->when($this->opnameTipeTarget === 'rak' && $this->opnameRakId, fn ($q) => $q->where('rak_id', $this->opnameRakId))
+                ->value('jumlah') ?? 0;
 
-            // Blind Opname: stok_fisik tidak diisi otomatis (kosong) agar pelaksana menghitung fisik riil
+            $sku = $prod->skuVariants->first()?->sku ?: $prod->kode;
+            $barcode = $prod->barcode ?: $prod->skuVariants->first()?->barcode;
+
+            // Blind Opname: stok_fisik kosong di awal
             $this->opnameRows[] = [
                 'produk_id' => $prod->id,
                 'nama' => $prod->nama,
-                'stok_sistem' => $stok,
+                'sku' => $sku,
+                'barcode' => $barcode,
+                'brand' => $prod->brand?->nama,
+                'kategori' => $prod->kategoriRelasi?->nama,
+                'stok_sistem' => (int) $stok,
                 'stok_fisik' => '',
                 'selisih' => 0,
             ];
         }
+    }
 
-        $this->showOpnameModal = true;
+    public function tambahFisik(int $index): void
+    {
+        if (isset($this->opnameRows[$index])) {
+            $current = is_numeric($this->opnameRows[$index]['stok_fisik']) ? (int) $this->opnameRows[$index]['stok_fisik'] : 0;
+            $new = $current + 1;
+            $this->updateOpnameFisik($index, $new);
+            if ($this->activeItemIndex === $index) {
+                $this->activeItemFisik = (string) $new;
+            }
+        }
+    }
+
+    public function kurangFisik(int $index): void
+    {
+        if (isset($this->opnameRows[$index])) {
+            $current = is_numeric($this->opnameRows[$index]['stok_fisik']) ? (int) $this->opnameRows[$index]['stok_fisik'] : 0;
+            $new = max(0, $current - 1);
+            $this->updateOpnameFisik($index, $new);
+            if ($this->activeItemIndex === $index) {
+                $this->activeItemFisik = (string) $new;
+            }
+        }
+    }
+
+    public function pilihItemAktif(int $index): void
+    {
+        if (isset($this->opnameRows[$index])) {
+            $this->activeItemIndex = $index;
+            $val = $this->opnameRows[$index]['stok_fisik'];
+            $this->activeItemFisik = is_numeric($val) ? (string) $val : '';
+            $this->dispatch('focus-active-qty');
+        }
+    }
+
+    public function tambahActiveFisik(): void
+    {
+        $current = is_numeric($this->activeItemFisik) ? (int) $this->activeItemFisik : 0;
+        $new = $current + 1;
+        $this->activeItemFisik = (string) $new;
+        if ($this->activeItemIndex !== null) {
+            $this->updateOpnameFisik($this->activeItemIndex, $new);
+        }
+    }
+
+    public function kurangActiveFisik(): void
+    {
+        $current = is_numeric($this->activeItemFisik) ? (int) $this->activeItemFisik : 0;
+        $new = max(0, $current - 1);
+        $this->activeItemFisik = (string) $new;
+        if ($this->activeItemIndex !== null) {
+            $this->updateOpnameFisik($this->activeItemIndex, $new);
+        }
+    }
+
+    public function updatedActiveItemFisik($val): void
+    {
+        if ($this->activeItemIndex !== null && isset($this->opnameRows[$this->activeItemIndex])) {
+            $qty = $val === '' ? '' : (int) $val;
+            $this->updateOpnameFisik($this->activeItemIndex, $qty);
+        }
+    }
+
+    public function simpanDanLanjut(): void
+    {
+        if ($this->activeItemIndex !== null && isset($this->opnameRows[$this->activeItemIndex])) {
+            $qty = is_numeric($this->activeItemFisik) ? (int) $this->activeItemFisik : 0;
+            $this->updateOpnameFisik($this->activeItemIndex, $qty);
+            $nama = $this->opnameRows[$this->activeItemIndex]['nama'];
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Hitungan '{$nama}' ({$qty} unit) tersimpan. Siap scan barang berikutnya.",
+            ]);
+        }
+
+        $this->activeItemIndex = null;
+        $this->activeItemFisik = '';
+        $this->opnameScanInput = '';
+        $this->dispatch('focus-scan-input');
+    }
+
+    public function lewatiActiveItem(): void
+    {
+        $this->activeItemIndex = null;
+        $this->activeItemFisik = '';
+        $this->opnameScanInput = '';
+        $this->dispatch('focus-scan-input');
+    }
+
+    public function scanBarcodeDirect(string $code): void
+    {
+        $clean = trim($code);
+        if ($clean === '') {
+            return;
+        }
+
+        $foundIdx = null;
+        foreach ($this->opnameRows as $idx => $r) {
+            if (($r['barcode'] && strcasecmp((string) $r['barcode'], $clean) === 0) ||
+                ($r['sku'] && strcasecmp((string) $r['sku'], $clean) === 0) ||
+                (stripos((string) $r['nama'], $clean) !== false)) {
+                $foundIdx = $idx;
+                break;
+            }
+        }
+
+        if ($foundIdx !== null) {
+            $this->activeItemIndex = $foundIdx;
+            $current = is_numeric($this->opnameRows[$foundIdx]['stok_fisik']) ? (int) $this->opnameRows[$foundIdx]['stok_fisik'] : 0;
+            $newQty = $current + 1;
+            $this->activeItemFisik = (string) $newQty;
+            $this->updateOpnameFisik($foundIdx, $newQty);
+
+            $nama = $this->opnameRows[$foundIdx]['nama'];
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Produk '{$nama}' aktif. Hitungan: {$newQty} unit."]);
+            $this->dispatch('focus-active-qty');
+        } else {
+            // Coba cari produk di database yang ada di gudang ini
+            $gudangId = $this->opnameGudangId ?: $this->filterGudangId;
+            $prod = Produk::where('is_active', true)
+                ->where(function ($q) use ($clean) {
+                    $q->where('barcode', $clean)
+                        ->orWhere('sku', $clean)
+                        ->orWhere('kode', $clean)
+                        ->orWhereHas('skuVariants', fn ($sv) => $sv->where('barcode', $clean)->orWhere('sku', $clean));
+                })
+                ->first();
+
+            if (! $prod) {
+                $prod = Produk::where('is_active', true)->cariPintar($clean)->first();
+            }
+
+            if ($prod) {
+                $stok = StokItem::where('produk_id', $prod->id)->where('gudang_id', $gudangId)->value('jumlah') ?? 0;
+                $newIndex = count($this->opnameRows);
+                $this->opnameRows[] = [
+                    'produk_id' => $prod->id,
+                    'nama' => $prod->nama,
+                    'sku' => $prod->skuVariants->first()?->sku ?: $prod->kode,
+                    'barcode' => $prod->barcode,
+                    'brand' => $prod->brand?->nama,
+                    'kategori' => $prod->kategoriRelasi?->nama,
+                    'stok_sistem' => (int) $stok,
+                    'stok_fisik' => 1,
+                    'selisih' => 1 - (int) $stok,
+                ];
+                $this->activeItemIndex = $newIndex;
+                $this->activeItemFisik = '1';
+                $this->dispatch('alert', ['type' => 'success', 'message' => "Produk '{$prod->nama}' ditambahkan ke list opname dengan hitungan 1."]);
+                $this->dispatch('focus-active-qty');
+            } else {
+                $this->dispatch('alert', ['type' => 'error', 'message' => "Barcode/SKU '{$clean}' tidak ditemukan."]);
+            }
+        }
+
+        $this->opnameScanInput = '';
     }
 
     public function updateOpnameFisik(int $index, $value)
@@ -295,6 +534,8 @@ class OpnameTab extends Component
             'gudangs' => $gudangs,
             'opnames' => $opnames,
             'raks' => Rak::with('gudang')->get(),
+            'kategoris' => KategoriProduk::where('is_active', true)->orderBy('nama')->get(),
+            'brands' => Brand::where('is_active', true)->orderBy('nama')->get(),
             'selectedOpname' => $selectedOpname,
             'mutasiLogs' => $mutasiLogs,
         ]);

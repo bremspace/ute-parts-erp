@@ -195,10 +195,20 @@ class CycleCountService
                 fn ($q) => $q->where('rak_id', $schedule->target_id)
             )
             ->when(
-                $schedule->tipe_target === 'kategori' && ! empty($schedule->target_kategori),
-                fn ($q) => $q->whereHas('produk', fn ($p) => $p->where('kategori', $schedule->target_kategori))
+                $schedule->tipe_target === 'kategori' && (! empty($schedule->target_id) || ! empty($schedule->target_kategori)),
+                fn ($q) => $q->whereHas('produk', function ($p) use ($schedule) {
+                    if (! empty($schedule->target_id)) {
+                        $p->where('kategori_id', $schedule->target_id);
+                    } else {
+                        $p->where('kategori', $schedule->target_kategori);
+                    }
+                })
             )
-            ->with(['produk:id,nama,kategori', 'skuVariant:id,nama_varian', 'rak:id,kode,nama', 'gudang:id,nama'])
+            ->when(
+                $schedule->tipe_target === 'brand' && ! empty($schedule->target_id),
+                fn ($q) => $q->whereHas('produk', fn ($p) => $p->where('brand_id', $schedule->target_id))
+            )
+            ->with(['produk:id,nama,kategori,brand_id', 'skuVariant:id,nama_varian', 'rak:id,kode,nama', 'gudang:id,nama'])
             ->get();
     }
 

@@ -73,9 +73,10 @@ class ProdukService
         string $metodeHargaBeli = 'average',
         ?float $marginPersen = null,
         ?int $rakId = null,
-        array $multiSatuan = []
+        array $multiSatuan = [],
+        ?int $supplierId = null
     ): Produk {
-        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $rakId, $multiSatuan) {
+        return DB::transaction(function () use ($nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $sku, $gudangId, $stokAwal, $stokMinimum, $userId, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $rakId, $multiSatuan, $supplierId) {
             $satuan = $satuanKode ?: 'pcs';
             $satuanRef = $satuanKode ? SatuanUnit::where('kode', $satuanKode)->first() : null;
             if ($satuanKode && ! $satuanRef) {
@@ -145,6 +146,7 @@ class ProdukService
                 'kategori_id' => $finalKategoriId,
                 'brand_id' => $brandId,
                 'kualitas_id' => $kualitasId,
+                'supplier_id' => $supplierId,
                 'brand_kompatibel' => $brand,
                 'model_kompatibel' => $model,
                 'kondisi' => ! empty($kondisi) ? trim($kondisi) : 'baru',
@@ -246,9 +248,10 @@ class ProdukService
         ?string $barcode = null,
         ?string $metodeHargaBeli = null,
         ?float $marginPersen = null,
-        ?array $multiSatuan = null
+        ?array $multiSatuan = null,
+        ?int $supplierId = null
     ): Produk {
-        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $multiSatuan) {
+        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $multiSatuan, $supplierId) {
             $produk = Produk::findOrFail($produkId);
 
             $satuan = $satuanKode ?: ($produk->satuan ?: 'pcs');
@@ -311,6 +314,7 @@ class ProdukService
                 'kategori_id' => $finalKategoriId,
                 'brand_id' => $brandId,
                 'kualitas_id' => $kualitasId,
+                'supplier_id' => $supplierId,
                 'brand_kompatibel' => $brand,
                 'model_kompatibel' => $model,
                 'kondisi' => ! empty($kondisi) ? trim($kondisi) : 'baru',

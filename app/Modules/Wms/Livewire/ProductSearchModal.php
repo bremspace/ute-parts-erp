@@ -9,6 +9,7 @@ use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -27,6 +28,10 @@ class ProductSearchModal extends Component
     public $targetIndex = null; // For PO/Transfer item index
 
     public $context = 'general'; // po, transfer, servis, etc.
+
+    public ?int $curatedSupplierId = null;
+
+    public string $supplierScope = 'curated'; // 'curated' (Supplier PO) | 'all' (Semua Produk)
 
     public bool $isOpen = false; // State modal (dicek test & UI)
 
@@ -166,19 +171,28 @@ class ProductSearchModal extends Component
 
     #[On('open-global-product-search')]
     #[On('buka-pencarian-produk')]
-    public function openModal($targetIndex = null, $context = 'general')
+    public function openModal($targetIndex = null, $context = 'general', $supplierId = null)
     {
         if (is_array($targetIndex)) {
             $context = $targetIndex['context'] ?? 'general';
+            $supplierId = $targetIndex['supplierId'] ?? $supplierId;
             $targetIndex = $targetIndex['targetIndex'] ?? null;
         }
 
         $this->reset(['search', 'selectedProductId']);
         $this->targetIndex = $targetIndex;
         $this->context = $context;
+        $this->curatedSupplierId = $supplierId ? (int) $supplierId : null;
+        $this->supplierScope = ($this->curatedSupplierId && $this->context === 'po') ? 'curated' : 'all';
         $this->isOpen = true;
         $this->loadUserPreferences();
         $this->dispatch('open-product-search-modal');
+    }
+
+    public function setSupplierScope(string $scope): void
+    {
+        $this->supplierScope = in_array($scope, ['curated', 'all'], true) ? $scope : 'all';
+        $this->resetPage();
     }
 
     #[On('close-global-product-search')]
@@ -243,6 +257,39 @@ class ProductSearchModal extends Component
         $this->resetPage();
     }
 
+    public function scanBarcodeDirect(string $code): void
+    {
+        $term = trim($code);
+        if ($term === '') {
+            return;
+        }
+
+        // Cari exact match barcode/sku
+        $product = Produk::where('is_active', true)
+            ->where(function ($q) use ($term) {
+                $q->where('barcode', $term)
+                    ->orWhere('sku', $term)
+                    ->orWhereHas('skuVariants', fn ($sv) => $sv->where('barcode', $term)->orWhere('sku', $term));
+            })
+            ->first();
+
+        if ($product) {
+            $this->pilihProduk($product->id);
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Produk ditemukan: {$product->nama}",
+            ]);
+        } else {
+            // Jika bukan exact match, masukkan ke search query agar menampilkan hasil pencarian mirip
+            $this->search = $term;
+            $this->resetPage();
+            $this->dispatch('alert', [
+                'type' => 'info',
+                'message' => "Mencari '{$term}'...",
+            ]);
+        }
+    }
+
     public function pilihProduk($productId)
     {
         $this->selectedProductId = $productId;
@@ -266,10 +313,15 @@ class ProductSearchModal extends Component
                 'brand',
                 'kategoriRelasi',
                 'kualitas',
+                'supplier',
                 'satuanKonversi',
             ])
             ->withSum('stokItems as total_stok', 'jumlah')
             ->where('is_active', true);
+
+        if ($this->context === 'po' && $this->curatedSupplierId && $this->supplierScope === 'curated') {
+            $query->where('supplier_id', $this->curatedSupplierId);
+        }
 
         if (! empty($this->search)) {
             $query->cariPintar($this->search);
@@ -350,8 +402,17 @@ class ProductSearchModal extends Component
             ['kode' => 'bekas', 'nama' => 'Bekas / Copotan'],
         ];
 
+        $curatedSupplier = $this->curatedSupplierId ? Supplier::find($this->curatedSupplierId) : null;
+        $curatedProductCount = 0;
+        if ($curatedSupplier) {
+            $curatedProductCount = Produk::where('is_active', true)->where('supplier_id', $this->curatedSupplierId)->count();
+        }
+
         return view('modules.wms.livewire.product-search-modal', [
             'products' => $products,
+            'curatedSupplier' => $curatedSupplier,
+            'curatedProductCount' => $curatedProductCount,
+            'supplierScope' => $this->supplierScope,
             'kategoriList' => KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get(),
             'brandList' => Brand::where('is_active', true)->orderBy('nama')->get(),
             'kualitasList' => KualitasProduk::where('is_active', true)->orderBy('nama')->get(),

@@ -147,6 +147,7 @@
                 </div>
 
                 <!-- 2. Menu Transaksi (Kasir POS, Servis HP, Riwayat Transaksi) -->
+                @canany(['pos.view', 'pos.view-own', 'servis.view'])
                 <div class="sidebar-group">
                     <button
                         type="button"
@@ -217,8 +218,10 @@
                         @endcanany
                     </div>
                 </div>
+                @endcanany
 
                 <!-- 3. Gudang & WMS -->
+                @canany(['wms.view', 'laporan.cabang'])
                 <div class="sidebar-group">
                     <button
                         type="button"
@@ -237,22 +240,28 @@
                     <div x-show="isDropdownOpen('wms')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
-                        <a href="/app/wms" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Inventori & Stok</span>
-                        </a>
-                        <a href="/app/wms/cycle-count" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms/cycle-count*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms/cycle-count*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
-                            <span>Cycle Count & Opname</span>
-                        </a>
-                        <a href="/app/laporan/nomor-seri" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/laporan/nomor-seri*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/laporan/nomor-seri*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
-                            <span>Nomor Seri & Garansi</span>
-                        </a>
+                        @can('wms.view')
+                            <a href="/app/wms" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                                <span>Inventori & Stok</span>
+                            </a>
+                            <a href="/app/wms/cycle-count" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms/cycle-count*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms/cycle-count*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
+                                <span>Cycle Count & Opname</span>
+                            </a>
+                        @endcan
+                        @can('laporan.cabang')
+                            <a href="/app/laporan/nomor-seri" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/laporan/nomor-seri*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/laporan/nomor-seri*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
+                                <span>Nomor Seri & Garansi</span>
+                            </a>
+                        @endcan
                     </div>
                 </div>
+                @endcanany
 
                 <!-- 5. CRM & Member -->
+                @canany(['crm.view', 'reseller.view'])
                 <div class="sidebar-group">
                     <button
                         type="button"
@@ -271,11 +280,11 @@
                     <div x-show="isDropdownOpen('crm')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
-                        <a href="/app/crm" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/crm') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/crm') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Data Pelanggan & Loyalty</span>
-                        </a>
                         @can('crm.view')
+                            <a href="/app/crm" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/crm') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/crm') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                                <span>Data Pelanggan & Loyalty</span>
+                            </a>
                             <a href="/app/crm/leads" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/crm/leads*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/crm/leads*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
                                 <span>Pipeline Leads Kanban</span>
@@ -289,8 +298,10 @@
                         @endcan
                     </div>
                 </div>
+                @endcanany
 
                 <!-- 6. Akunting & Laporan -->
+                @canany(['akunting.view', 'laporan.cabang'])
                 <div class="sidebar-group">
                     <button
                         type="button"
@@ -309,25 +320,28 @@
                     <div x-show="isDropdownOpen('akunting')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
-                        <a href="/app/akunting" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/akunting') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/akunting') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Buku Besar & Neraca</span>
-                        </a>
                         @can('akunting.view')
+                            <a href="/app/akunting" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/akunting') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/akunting') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                                <span>Buku Besar & Neraca</span>
+                            </a>
                             <a href="/app/akunting/aset" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/akunting/aset*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/akunting/aset*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
                                 <span>Aset Tetap & Depresiasi</span>
                             </a>
+                        @endcan
+                        @canany(['akunting.view', 'laporan.cabang'])
                             <a href="{{ route('laporan.pajak') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/laporan-pajak*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/laporan-pajak*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
                                 <span>Laporan Pajak (PPN/PPh)</span>
                             </a>
-                        @endcan
+                        @endcanany
                     </div>
                 </div>
+                @endcanany
 
-                <!-- 7. HR & Payroll (RBAC: kelola-hr) -->
-                @can('kelola-hr')
+                <!-- 7. HR & Payroll (RBAC: kelola-hr / kelola-payroll / hr.lihat-sendiri) -->
+                @canany(['kelola-hr', 'kelola-payroll', 'payroll.view', 'hr.lihat-sendiri'])
                     <div class="sidebar-group">
                         <button
                             type="button"
@@ -347,27 +361,36 @@
                         <div x-show="isDropdownOpen('hr')"
                              x-collapse
                              class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
-                            <a href="/app/hr/absensi" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/absensi*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/absensi*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
-                                <span>Absensi &amp; KPI</span>
-                            </a>
-                            <a href="/app/hr/payroll" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/payroll*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/payroll*') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                                <span>Payroll Karyawan</span>
-                            </a>
-                            <a href="/app/hr/saya" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/saya*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/saya*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
-                                <span>Portal Karyawan</span>
-                            </a>
-                            <a href="/app/hr/komisi-skema" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/komisi-skema*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/komisi-skema*') ? 'bg-white' : 'bg-up-amber/60' }}"></span>
-                                <span>Skema Komisi</span>
-                            </a>
+                            @can('kelola-hr')
+                                <a href="/app/hr/absensi" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/absensi*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/absensi*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
+                                    <span>Absensi &amp; KPI</span>
+                                </a>
+                            @endcan
+                            @canany(['kelola-payroll', 'payroll.view'])
+                                <a href="/app/hr/payroll" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/payroll*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/payroll*') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                                    <span>Payroll Karyawan</span>
+                                </a>
+                            @endcanany
+                            @can('hr.lihat-sendiri')
+                                <a href="/app/hr/saya" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/saya*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/saya*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
+                                    <span>Portal Karyawan</span>
+                                </a>
+                            @endcan
+                            @can('kelola-hr')
+                                <a href="/app/hr/komisi-skema" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/komisi-skema*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/komisi-skema*') ? 'bg-white' : 'bg-up-amber/60' }}"></span>
+                                    <span>Skema Komisi</span>
+                                </a>
+                            @endcan
                         </div>
                     </div>
-                @endcan
+                @endcanany
 
                 <!-- 8. Omnichannel -->
+                @can('omnichannel.view')
                 <div class="sidebar-group">
                     <a href="/app/omnichannel" title="Omnichannel" class="sidebar-nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium {{ request()->is('app/omnichannel*') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }} transition-[background-color,color,box-shadow] duration-140">
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -377,6 +400,7 @@
                         <span class="sidebar-badge ml-auto text-[9px] font-semibold text-up-mint bg-up-mint/10 border border-up-mint/20 px-1.5 py-0.5 rounded">Shopee</span>
                     </a>
                 </div>
+                @endcan
 
                 <!-- 10. Approval Inbox (RBAC: approve-workflow) -->
                 @can('approve-workflow')
@@ -422,14 +446,19 @@
                     <div x-show="isDropdownOpen('pengaturan')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
+                        @canany(['pengaturan.manage', 'user.view'])
                         <a href="/app/pengaturan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pengaturan') && !request()->has('tab') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pengaturan') && !request()->has('tab') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
                             <span>Pusat Pengaturan</span>
                         </a>
+                        @endcanany
+                        @can('user.view')
                         <a href="/app/pengaturan?tab=users" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'users' || request('tab') === 'role' || request('tab') === 'cabang' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'users' || request('tab') === 'role' || request('tab') === 'cabang' ? 'bg-white' : 'bg-indigo-400' }}"></span>
                             <span>Akses, User &amp; Cabang</span>
                         </a>
+                        @endcan
+                        @can('pengaturan.manage')
                         <a href="/app/pengaturan?tab=master_produk" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'master_produk' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'master_produk' ? 'bg-white' : 'bg-sky-400' }}"></span>
                             <span>Katalog &amp; Master Part</span>
@@ -446,6 +475,7 @@
                             <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'integrasi' ? 'bg-white' : 'bg-emerald-400' }}"></span>
                             <span>Gateway &amp; Integrasi</span>
                         </a>
+                        @endcan
                         @if(isSuperAdminOrOwner())
                         <a href="/app/pengaturan?tab=database" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'database' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'database' ? 'bg-white' : 'bg-purple-400' }}"></span>
@@ -675,6 +705,7 @@
                         <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Home</span>
                     </a>
 
+                    @canany(['pos.view', 'pos.view-own', 'pos.create'])
                     <a href="/app/pos"
                        class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('app/pos*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                         <div class="relative flex items-center justify-center">
@@ -684,7 +715,9 @@
                         </div>
                         <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Kasir</span>
                     </a>
+                    @endcanany
 
+                    @canany(['servis.view', 'servis.create'])
                     <a href="/app/servis"
                        class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('app/servis*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                         <div class="relative flex items-center justify-center">
@@ -695,7 +728,9 @@
                         </div>
                         <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Servis</span>
                     </a>
+                    @endcanany
 
+                    @can('wms.view')
                     <a href="/app/wms"
                        class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold transition-[background-color,color,transform] duration-140 active:scale-[0.93] {{ request()->is('app/wms*') ? 'text-up-primary dark:text-white bg-up-primary/10 dark:bg-white/10' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white' }}">
                         <div class="relative flex items-center justify-center">
@@ -705,6 +740,7 @@
                         </div>
                         <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">WMS</span>
                     </a>
+                    @endcan
 
                     <button type="button" @click="sidebarOpen = true"
                             class="group relative flex-1 flex flex-col items-center justify-center min-h-[44px] px-1 py-1 rounded-full text-[11px] font-semibold text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white transition-[background-color,color,transform] duration-140 active:scale-[0.93] cursor-pointer">

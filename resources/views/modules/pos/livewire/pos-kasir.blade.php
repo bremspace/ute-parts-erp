@@ -346,6 +346,7 @@
         <div class="flex items-center justify-between gap-2.5 pt-2 border-t border-ink-200/50 dark:border-white/5 flex-wrap">
             <!-- Left: Shortcut Actions -->
             <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none w-full sm:w-auto flex-nowrap sm:flex-wrap pb-0.5">
+                @canany(['pos.view', 'pos.view-own', 'pos.create'])
                 <a
                     href="/app/pos/retur"
                     class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-up-red/30 bg-up-red/10 hover:bg-up-red/20 text-xs font-bold text-up-red transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
@@ -356,6 +357,7 @@
                     </svg>
                     <span>Retur</span>
                 </a>
+                @endcanany
 
                 <button
                     type="button"

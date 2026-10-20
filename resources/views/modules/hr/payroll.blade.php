@@ -6,6 +6,7 @@
             <p class="mt-1 text-sm text-ink-500 dark:text-ink-400">Penggajian terpadu, master kompensasi karyawan, tunjangan, potongan, dan posting jurnal double-entry otomatis.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+            @can('kelola-hr')
             <a href="/app/hr/komisi-skema" class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <span>Skema Komisi</span>
@@ -14,11 +15,14 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 <span>Absensi &amp; KPI</span>
             </a>
+            @endcan
+            @can('payroll.create')
             <button wire:click="bukaBuatPeriode"
                 class="inline-flex items-center gap-1.5 px-4 py-2 border border-transparent text-sm font-semibold rounded-xl shadow-sm text-white bg-up-primary hover:bg-up-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-up-primary active:scale-[0.98] transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                 <span>Buat Periode Baru</span>
             </button>
+            @endcan
         </div>
     </div>
 

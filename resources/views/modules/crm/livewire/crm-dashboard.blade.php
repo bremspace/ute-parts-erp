@@ -19,15 +19,19 @@
             </div>
         </div>
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
+            @can('crm.create')
             <x-prism.prism-button variant="mint" size="sm" wire:click="$set('showPelangganBaruModal', true)" class="whitespace-nowrap min-h-[44px]">
                 + Tambah Pelanggan
             </x-prism.prism-button>
+            @endcan
+            @can('tier.manage')
             <x-prism.prism-button variant="primary" size="sm" wire:click="openTierModal()" class="whitespace-nowrap min-h-[44px]">
                 + Tambah Tier
             </x-prism.prism-button>
             <x-prism.prism-button variant="ghost" size="sm" wire:click="recalcTier" class="whitespace-nowrap min-h-[44px]">
                 ⟳ Rekalkulasi Tier
             </x-prism.prism-button>
+            @endcan
             @can('crm.broadcast')
                 <x-prism.prism-button variant="accent" size="sm" wire:click="$set('showBroadcastModal', true)" class="whitespace-nowrap min-h-[44px]">
                     📢 Broadcast Promo
@@ -67,8 +71,10 @@
                 <td class="py-3.5 px-4">
                     <div class="flex items-center gap-1.5">
                         <button wire:click="$set('selectedCustomerId', {{ $c->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-up-primary/20 hover:text-white text-ink-300 font-semibold text-[11px] transition-[background-color,color] duration-140 cursor-pointer active:scale-95">Detail 360°</button>
+                        @can('crm.edit')
                         <button wire:click="openEditPelangganModal({{ $c->id }})" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-up-mint hover:text-white transition text-xs cursor-pointer active:scale-95" title="Edit Pelanggan">✏️</button>
-                        @if(isSuperAdminOrOwner())
+                        @endcan
+                        @if(isSuperAdminOrOwner() || auth()->user()?->can('crm.delete'))
                             <button wire:click="hapusPelanggan({{ $c->id }})" wire:confirm="Yakin ingin menghapus pelanggan '{{ $c->nama }}'?" class="p-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 transition text-xs cursor-pointer active:scale-95" title="Hapus Pelanggan">🗑️</button>
                         @endif
                     </div>

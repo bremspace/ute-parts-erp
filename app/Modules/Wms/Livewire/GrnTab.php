@@ -42,6 +42,10 @@ class GrnTab extends Component
 
     public string $barcodeInput = '';
 
+    public ?int $activeItemIndex = null;
+
+    public string $activeItemQty = '';
+
     public array $gudangRaks = [];
 
     public array $grnForm = [
@@ -139,6 +143,8 @@ class GrnTab extends Component
         }
 
         $this->barcodeInput = '';
+        $this->activeItemIndex = null;
+        $this->activeItemQty = '';
         $this->grnForm = [
             'po_id' => $poId,
             'item_qty' => $itemForms,
@@ -168,6 +174,10 @@ class GrnTab extends Component
                 break;
             }
             if (! empty($item['sku']) && strcasecmp($item['sku'], $barcode) === 0) {
+                $matchedIndex = $idx;
+                break;
+            }
+            if (! empty($item['produk_nama']) && stripos($item['produk_nama'], $barcode) !== false) {
                 $matchedIndex = $idx;
                 break;
             }
@@ -202,21 +212,26 @@ class GrnTab extends Component
             return;
         }
 
+        $this->activeItemIndex = $matchedIndex;
         $item = &$this->grnForm['item_qty'][$matchedIndex];
         $qtyPo = (int) $item['qty_po'];
         $currentReceived = (int) $item['qty_received'];
 
         if ($currentReceived >= $qtyPo) {
+            $this->activeItemQty = (string) $qtyPo;
             $this->dispatch('alert', [
                 'type' => 'warning',
                 'message' => "Item '{$item['produk_nama']}' sudah diterima lengkap ({$qtyPo}/{$qtyPo} pcs).",
             ]);
             $this->dispatch('ute:barcode-beep', ['success' => false]);
+            $this->dispatch('focus-active-grn-qty');
 
             return;
         }
 
-        $item['qty_received'] = $currentReceived + 1;
+        $newReceived = $currentReceived + 1;
+        $item['qty_received'] = $newReceived;
+        $this->activeItemQty = (string) $newReceived;
 
         if ($item['sn_flag'] ?? false) {
             if (strcasecmp($barcode, $item['barcode'] ?? '') !== 0 && strcasecmp($barcode, $item['sku'] ?? '') !== 0) {
@@ -230,6 +245,91 @@ class GrnTab extends Component
             'message' => "✓ Scan berhasil: {$item['produk_nama']} ({$item['qty_received']}/{$qtyPo} pcs)",
         ]);
         $this->dispatch('ute:barcode-beep', ['success' => true]);
+        $this->dispatch('focus-active-grn-qty');
+    }
+
+    public function pilihItemGrn(int $idx): void
+    {
+        if (isset($this->grnForm['item_qty'][$idx])) {
+            $this->activeItemIndex = $idx;
+            $rcv = (int) ($this->grnForm['item_qty'][$idx]['qty_received'] ?? 0);
+            $this->activeItemQty = $rcv > 0 ? (string) $rcv : '1';
+            if ($rcv === 0) {
+                $this->grnForm['item_qty'][$idx]['qty_received'] = 1;
+            }
+            $this->dispatch('focus-active-grn-qty');
+        }
+    }
+
+    public function tambahActiveQtyGrn(): void
+    {
+        if ($this->activeItemIndex !== null && isset($this->grnForm['item_qty'][$this->activeItemIndex])) {
+            $item = &$this->grnForm['item_qty'][$this->activeItemIndex];
+            $max = (int) $item['qty_po'];
+            $current = (int) $item['qty_received'];
+            $new = min($max, $current + 1);
+            $item['qty_received'] = $new;
+            $this->activeItemQty = (string) $new;
+        }
+    }
+
+    public function kurangActiveQtyGrn(): void
+    {
+        if ($this->activeItemIndex !== null && isset($this->grnForm['item_qty'][$this->activeItemIndex])) {
+            $item = &$this->grnForm['item_qty'][$this->activeItemIndex];
+            $current = (int) $item['qty_received'];
+            $new = max(0, $current - 1);
+            $item['qty_received'] = $new;
+            $this->activeItemQty = (string) $new;
+        }
+    }
+
+    public function updatedActiveItemQty($val): void
+    {
+        if ($this->activeItemIndex !== null && isset($this->grnForm['item_qty'][$this->activeItemIndex])) {
+            $item = &$this->grnForm['item_qty'][$this->activeItemIndex];
+            $max = (int) $item['qty_po'];
+            $qty = $val === '' ? 0 : max(0, min($max, (int) $val));
+            $item['qty_received'] = $qty;
+        }
+    }
+
+    public function setActiveItemLengkap(): void
+    {
+        if ($this->activeItemIndex !== null && isset($this->grnForm['item_qty'][$this->activeItemIndex])) {
+            $item = &$this->grnForm['item_qty'][$this->activeItemIndex];
+            $max = (int) $item['qty_po'];
+            $item['qty_received'] = $max;
+            $this->activeItemQty = (string) $max;
+        }
+    }
+
+    public function simpanDanLanjutGrn(): void
+    {
+        if ($this->activeItemIndex !== null && isset($this->grnForm['item_qty'][$this->activeItemIndex])) {
+            $item = &$this->grnForm['item_qty'][$this->activeItemIndex];
+            $max = (int) $item['qty_po'];
+            $qty = is_numeric($this->activeItemQty) ? max(0, min($max, (int) $this->activeItemQty)) : 0;
+            $item['qty_received'] = $qty;
+            $nama = $item['produk_nama'];
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Penerimaan '{$nama}' ({$qty}/{$max} {$item['satuan']}) disimpan. Siap scan barang berikutnya.",
+            ]);
+        }
+
+        $this->activeItemIndex = null;
+        $this->activeItemQty = '';
+        $this->barcodeInput = '';
+        $this->dispatch('focus-grn-scan-input');
+    }
+
+    public function lewatiActiveGrn(): void
+    {
+        $this->activeItemIndex = null;
+        $this->activeItemQty = '';
+        $this->barcodeInput = '';
+        $this->dispatch('focus-grn-scan-input');
     }
 
     public function terimaSemuaItem(): void
@@ -258,6 +358,9 @@ class GrnTab extends Component
     public function cancelGrnModal(): void
     {
         $this->showGrnModal = false;
+        $this->activeItemIndex = null;
+        $this->activeItemQty = '';
+        $this->barcodeInput = '';
         $this->grnForm = ['po_id' => null, 'item_qty' => [], 'catatan' => ''];
     }
 

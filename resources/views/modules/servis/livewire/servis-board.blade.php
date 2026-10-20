@@ -173,6 +173,7 @@
                                                 @if($tiket->status_pembayaran === 'lunas')
                                                     <span class="bg-up-mint/20 text-up-mint text-[9px] font-bold px-1.5 py-0.5 rounded">LUNAS</span>
                                                 @elseif(in_array($tiket->status, ['selesai', 'diambil'], true))
+                                                    @canany(['pos.view', 'pos.view-own', 'pos.create'])
                                                     <a
                                                         href="/app/pos?bayar_servis_id={{ $tiket->id }}"
                                                         @click.stop
@@ -181,6 +182,7 @@
                                                         class="bg-up-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-lg hover:bg-up-primary/80 cursor-pointer inline-flex items-center gap-1"
                                                         title="Bayar di Kasir POS"
                                                     >Bayar Kasir</a>
+                                                    @endcanany
                                                 @endif
                                                 @if($tiket->garansi && $tiket->garansi->active)
                                                     <span class="text-[9px] font-bold text-up-mint bg-up-mint/10 border border-up-mint/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">Dalam Garansi</span>
@@ -1405,6 +1407,7 @@
                                 <span>Cetak Struk</span>
                             </button>
                         @if($selectedTiket->status_pembayaran !== 'lunas' && in_array($selectedTiket->status, ['selesai', 'diambil'], true))
+                            @canany(['pos.view', 'pos.view-own', 'pos.create'])
                             <a
                                 href="/app/pos?bayar_servis_id={{ $selectedTiket->id }}"
                                 class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer self-start sm:self-auto inline-flex items-center gap-1.5 shadow-sm"
@@ -1412,6 +1415,7 @@
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                                 <span>Bayar di Kasir POS</span>
                             </a>
+                            @endcanany
                             @if($selectedTiket->sumber === 'online')
                                 <button
                                     type="button"
@@ -2012,7 +2016,7 @@
                 <div class="space-y-4">
                     <!-- Info Banner Integrasi Kasir POS -->
                     <div class="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-                        Pembayaran tunai / di toko wajib melalui <a href="/app/pos?bayar_servis_id={{ $bayarTiketId }}" class="underline font-bold text-white hover:text-blue-200">Kasir POS</a> agar tercatat di sesi kas laci. Form ini khusus pelunasan online / transfer.
+                        Pembayaran tunai / di toko wajib melalui @canany(['pos.view', 'pos.view-own', 'pos.create'])<a href="/app/pos?bayar_servis_id={{ $bayarTiketId }}" class="underline font-bold text-white hover:text-blue-200">Kasir POS</a>@else<strong>Kasir POS</strong>@endcanany agar tercatat di sesi kas laci. Form ini khusus pelunasan online / transfer.
                     </div>
 
                     <!-- Ringkasan Total Tagihan -->
