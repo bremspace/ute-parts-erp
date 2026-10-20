@@ -45,6 +45,11 @@
             <form action="{{ route('login.post') }}" method="POST" class="space-y-4" x-data="{
                 rememberEmail: true,
                 savedEmail: '',
+                fillDefault(email, pass) {
+                    this.$refs.emailInput.value = email;
+                    this.$refs.passwordInput.value = pass;
+                    this.savedEmail = email;
+                },
                 init() {
                     const cached = localStorage.getItem('up_last_login_email');
                     if (cached && !this.$refs.emailInput.value) {
@@ -82,14 +87,14 @@
                         </template>
                     </div>
                     <input
-                        type="email"
+                        type="text"
                         id="email"
                         name="email"
                         x-ref="emailInput"
                         required
                         autofocus
-                        autocomplete="email"
-                        placeholder="nama@uteparts.id"
+                        autocomplete="username"
+                        placeholder="nama@uteparts.id atau nama pengguna"
                         class="w-full px-4 py-3 rounded-xl glass-input text-sm"
                         value="{{ old('email') }}"
                     />
@@ -103,12 +108,34 @@
                         type="password"
                         id="password"
                         name="password"
+                        x-ref="passwordInput"
                         required
                         autocomplete="current-password"
                         placeholder="••••••••"
                         class="w-full px-4 py-3 rounded-xl glass-input text-sm"
                         value=""
                     />
+                </div>
+
+                <!-- Bantuan Akses Cepat Kredensial Bawaan -->
+                <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/10 text-xs text-ink-300 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-white flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-up-mint"></span>
+                            Akses Cepat Akun Bawaan:
+                        </span>
+                        <button
+                            type="button"
+                            @click="fillDefault('superadmin@uteparts.id', 'Password123!')"
+                            class="text-[11px] text-up-mint hover:text-emerald-400 font-semibold underline underline-offset-2 cursor-pointer"
+                        >
+                            Gunakan Super Admin
+                        </button>
+                    </div>
+                    <div class="text-[11px] font-mono text-ink-400 flex items-center justify-between">
+                        <span>superadmin@uteparts.id</span>
+                        <span>Password123!</span>
+                    </div>
                 </div>
 
                 <div class="flex items-center justify-between pt-1">

@@ -535,12 +535,12 @@
                     <div class="h-4 w-[1px] bg-black/10 dark:bg-white/10 hidden lg:block"></div>
 
                     <!-- Online Status Indicator: Green Dot (Hidden label on mobile) -->
-                    <div class="flex items-center gap-1.5 text-xs font-medium text-up-mint px-1 py-1 flex-shrink-0" title="Sistem Online & Terhubung">
+                    <div class="flex items-center gap-1.5 text-xs font-medium text-up-mint px-1 py-1 flex-shrink-0" title="Status Database & Sistem Online">
                         <span class="relative flex h-2 w-2 flex-shrink-0">
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-up-mint opacity-75"></span>
                             <span class="relative inline-flex rounded-full h-2 w-2 bg-up-mint"></span>
                         </span>
-                        <span class="hidden sm:inline text-[11px]">Online</span>
+                        <span class="hidden sm:inline text-[11px] font-semibold">DB Online</span>
                     </div>
 
                     <!-- [2026] Font Size Switcher (Fluid rem scaling) -->
@@ -620,9 +620,18 @@
 
             <!-- Page Content -->
             <main class="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6 bg-transparent">
-                {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out, bisa skip per sesi) --}}
+                {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out, bisa skip per sesi/disimpan) --}}
                 @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
-                    <div x-data="{ dismissed: sessionStorage.getItem('dismiss_2fa_banner') === '1' }"
+                    <div x-data="{
+                            dismissed: (localStorage.getItem('dismiss_2fa_banner_{{ auth()->id() }}') === '1' || sessionStorage.getItem('dismiss_2fa_banner') === '1'),
+                            dismiss() {
+                                this.dismissed = true;
+                                try {
+                                    localStorage.setItem('dismiss_2fa_banner_{{ auth()->id() }}', '1');
+                                    sessionStorage.setItem('dismiss_2fa_banner', '1');
+                                } catch (e) {}
+                            }
+                         }"
                          x-show="!dismissed"
                          x-cloak
                          class="mb-4 p-3 sm:p-3.5 rounded-xl bg-up-amber/15 border border-up-amber/30 text-up-amber text-xs sm:text-sm font-medium flex items-center justify-between gap-2.5 sm:gap-3">
@@ -637,7 +646,7 @@
                                 Aktifkan 2FA
                             </a>
                             <button type="button"
-                                    @click="dismissed = true; sessionStorage.setItem('dismiss_2fa_banner', '1')"
+                                    @click="dismiss()"
                                     class="p-1 rounded-lg text-up-amber/70 hover:text-up-amber hover:bg-up-amber/20 transition-colors cursor-pointer"
                                     aria-label="Tutup notifikasi"
                                     title="Lewati untuk sekarang">

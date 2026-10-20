@@ -14,23 +14,30 @@ class AdminUserSeeder extends Seeder
 
     public function run(): void
     {
-        $user = User::firstOrCreate(
-            ['email' => 'superadmin@uteparts.id'],
-            [
-                'name' => 'Super Admin UteParts',
-                'phone' => '081234567801',
-                'password' => Hash::make('Password123!'),
-                'is_active' => true,
-            ]
-        );
-
-        $user->assignRole('super-admin');
+        $emails = [
+            'superadmin@uteparts.id' => 'Super Admin UteParts',
+            'super-admin@uteparts.id' => 'Super Admin UteParts (Alias)',
+        ];
 
         $cabangs = Cabang::orderBy('id')->get();
 
-        foreach ($cabangs as $cabang) {
-            if (! $user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
-                $user->cabangs()->attach($cabang->id, ['is_default' => $cabang->kode === 'CBG-01']);
+        foreach ($emails as $email => $name) {
+            $user = User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'name' => $name,
+                    'phone' => '081234567801',
+                    'password' => Hash::make('Password123!'),
+                    'is_active' => true,
+                ]
+            );
+
+            $user->assignRole('super-admin');
+
+            foreach ($cabangs as $cabang) {
+                if (! $user->cabangs()->where('cabang_id', $cabang->id)->exists()) {
+                    $user->cabangs()->attach($cabang->id, ['is_default' => $cabang->kode === 'CBG-01']);
+                }
             }
         }
     }

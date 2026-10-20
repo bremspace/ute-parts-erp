@@ -111,11 +111,41 @@
             </div>
         </div>
 
-        <!-- Baris 2: Filter Channel Sumber, Metode Ambil & Search Box -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div class="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+        <!-- Baris 2: Filter Channel Sumber, Metode Ambil & Search Box (Compact Collapsible on Mobile) -->
+        <div x-data="{ openFilter: false }" class="space-y-2">
+            <div class="flex items-center gap-2">
+                <!-- Search Field -->
+                <div class="flex-1 relative">
+                    <input
+                        type="text"
+                        wire:model.live.debounce.300ms="search"
+                        placeholder="No. Order, Pelanggan, Resi, Channel ID..."
+                        class="w-full px-3.5 py-2 pl-9 rounded-xl bg-ink-50 dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-medium text-ink-900 dark:text-white outline-none focus:border-up-primary"
+                    />
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </div>
+                </div>
+
+                <!-- Mobile Toggle Filter -->
+                <button
+                    type="button"
+                    @click="openFilter = !openFilter"
+                    class="sm:hidden px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer flex-shrink-0"
+                    :class="openFilter || ('{{ $sumberFilter }}' !== 'semua' || '{{ $metodeFilter }}' !== 'semua') ? 'bg-up-primary text-white border-up-primary' : 'bg-ink-50 dark:bg-ink-950 text-ink-600 dark:text-ink-400 border-ink-200 dark:border-white/10'"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                    <span>Filter</span>
+                    @if($sumberFilter !== 'semua' || $metodeFilter !== 'semua')
+                        <span class="w-2 h-2 rounded-full bg-up-accent animate-pulse"></span>
+                    @endif
+                </button>
+            </div>
+
+            <!-- Dropdown Platform & Metode (Expandable on Mobile, Inline on Desktop) -->
+            <div :class="openFilter ? 'flex' : 'hidden sm:flex'" class="flex-wrap sm:flex-nowrap items-center gap-2 pt-1 sm:pt-0">
                 <!-- Dropdown Sumber Platform -->
-                <select wire:model.live="sumberFilter" class="px-3 py-1.5 rounded-xl bg-ink-50 dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-bold text-ink-900 dark:text-white outline-none cursor-pointer">
+                <select wire:model.live="sumberFilter" class="w-full sm:w-auto px-3 py-1.5 rounded-xl bg-ink-50 dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-bold text-ink-900 dark:text-white outline-none cursor-pointer">
                     <option value="semua">Semua Platform (Web &amp; Omni)</option>
                     <option value="marketplace">🌐 Web Ute Parts Store</option>
                     <option value="shopee">🧡 Shopee</option>
@@ -124,24 +154,11 @@
                 </select>
 
                 <!-- Dropdown Metode Pengambilan -->
-                <select wire:model.live="metodeFilter" class="px-3 py-1.5 rounded-xl bg-ink-50 dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-bold text-ink-900 dark:text-white outline-none cursor-pointer">
+                <select wire:model.live="metodeFilter" class="w-full sm:w-auto px-3 py-1.5 rounded-xl bg-ink-50 dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-bold text-ink-900 dark:text-white outline-none cursor-pointer">
                     <option value="semua">Semua Metode Ambil</option>
                     <option value="ambil_ke_toko">🏬 Ambil di Toko (Pickup Kasir)</option>
                     <option value="pengiriman">🚚 Kirim Ekspedisi / Kurir</option>
                 </select>
-            </div>
-
-            <!-- Search Field -->
-            <div class="w-full sm:w-72 relative">
-                <input
-                    type="text"
-                    wire:model.live.debounce.300ms="search"
-                    placeholder="No. Order, Pelanggan, Resi, Channel ID..."
-                    class="w-full px-3.5 py-2 pl-9 rounded-xl bg-ink-50 dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-medium text-ink-900 dark:text-white outline-none focus:border-up-primary"
-                />
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                </div>
             </div>
         </div>
     </div>

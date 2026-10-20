@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class LoginFlowTest extends TestCase
@@ -54,5 +57,49 @@ class LoginFlowTest extends TestCase
         ])->assertSessionHasErrors('email');
 
         $this->assertGuest();
+    }
+
+    public function test_superadmin_login_with_alias_and_fallback_passwords(): void
+    {
+        $cabang = Cabang::create([
+            'kode' => 'CBG-01',
+            'nama' => 'Pusat',
+            'is_active' => true,
+        ]);
+
+        Role::firstOrCreate(['name' => 'super-admin']);
+
+        $admin = User::factory()->create([
+            'email' => 'superadmin@uteparts.id',
+            'password' => Hash::make('Password123!'),
+            'is_active' => true,
+        ]);
+        $admin->assignRole('super-admin');
+        $admin->cabangs()->attach($cabang->id, ['is_default' => true]);
+
+        // 1. Login dengan Password123!
+        $this->post('/app/login', [
+            'email' => 'superadmin@uteparts.id',
+            'password' => 'Password123!',
+        ])->assertRedirect('/app/dashboard');
+        $this->assertAuthenticatedAs($admin);
+
+        Auth::logout();
+
+        // 2. Login dengan variasi password123 (lowercase)
+        $this->post('/app/login', [
+            'email' => 'superadmin@uteparts.id',
+            'password' => 'password123',
+        ])->assertRedirect('/app/dashboard');
+        $this->assertAuthenticatedAs($admin);
+
+        Auth::logout();
+
+        // 3. Login dengan alias super-admin@uteparts.id (dengan strip)
+        $this->post('/app/login', [
+            'email' => 'super-admin@uteparts.id',
+            'password' => 'password123',
+        ])->assertRedirect('/app/dashboard');
+        $this->assertAuthenticatedAs($admin);
     }
 }

@@ -104,98 +104,117 @@
         </button>
     </div>
 
-    {{-- Filter Bar --}}
-    <div class="flex flex-wrap items-center gap-3">
-        <div class="flex-1 min-w-[220px]">
-            <input
-                type="text"
-                wire:model.live.debounce.300ms="search"
-                placeholder="Cari no transaksi / no tiket / nama / keterangan..."
-                class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-white border border-white/10"
-            />
-        </div>
-        <div class="w-auto">
-            <input
-                type="date"
-                wire:model.live="filterTanggal"
-                class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-white border border-white/10 cursor-pointer"
-            />
+    {{-- Filter Bar (Compact Collapsible on Mobile, Expanded on Desktop) --}}
+    <div x-data="{ openFilter: false }" class="space-y-2">
+        <div class="flex items-center gap-2">
+            <div class="flex-1">
+                <input
+                    type="text"
+                    wire:model.live.debounce.300ms="search"
+                    placeholder="Cari no transaksi / no tiket / nama / keterangan..."
+                    class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-white border border-white/10"
+                />
+            </div>
+            {{-- Mobile Toggle Button --}}
+            <button
+                type="button"
+                @click="openFilter = !openFilter"
+                class="sm:hidden px-3 py-2.5 rounded-xl border border-white/10 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                :class="openFilter || ('{{ $filterTanggal }}' || '{{ $filterStatus }}' || '{{ $filterMetode }}') ? 'bg-up-primary text-white border-up-primary' : 'bg-white/5 text-ink-300 hover:bg-white/10'"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                <span>Filter</span>
+                @if($filterTanggal || $filterStatus || $filterMetode)
+                    <span class="w-2 h-2 rounded-full bg-up-accent animate-pulse"></span>
+                @endif
+            </button>
         </div>
 
-        @if($activeTab === 'global')
-            <div class="w-auto">
-                <select wire:model.live="filterStatus" class="px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
-                    <option value="">Semua Jenis Transaksi</option>
-                    <option value="pos">Penjualan Kasir POS</option>
-                    <option value="online">Pesanan Online (Web & Omni)</option>
-                    <option value="servis">Pelunasan Servis Gadget</option>
-                    <option value="mutasi_masuk">Kas Masuk (Laci)</option>
-                    <option value="mutasi_keluar">Kas Keluar (Laci)</option>
-                </select>
+        {{-- Filter Parameters (Always visible on sm+, expandable on mobile) --}}
+        <div :class="openFilter ? 'flex' : 'hidden sm:flex'" class="flex-wrap items-center gap-2 pt-1 sm:pt-0">
+            <div class="w-full sm:w-auto">
+                <input
+                    type="date"
+                    wire:model.live="filterTanggal"
+                    class="w-full sm:w-auto px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-white border border-white/10 cursor-pointer"
+                />
             </div>
-            <div class="w-auto">
-                <select wire:model.live="filterMetode" class="px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
-                    <option value="">Semua Metode Bayar</option>
-                    <option value="tunai">Tunai</option>
-                    <option value="transfer">Transfer Bank</option>
-                    <option value="qris">QRIS</option>
-                    <option value="split">Split</option>
-                    <option value="piutang">Piutang / Kasbon</option>
-                </select>
-            </div>
-        @elseif($activeTab === 'pos')
-            <div class="w-auto">
-                <select wire:model.live="filterMetode" class="px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
-                    <option value="">Semua Metode</option>
-                    <option value="tunai">Tunai</option>
-                    <option value="transfer">Transfer Bank</option>
-                    <option value="qris">QRIS</option>
-                    <option value="split">Split</option>
-                    <option value="piutang">Piutang / Kasbon</option>
-                </select>
-            </div>
-            <div class="w-auto">
-                <select wire:model.live="filterStatus" class="px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
-                    <option value="">Semua Status</option>
-                    <option value="selesai">Selesai</option>
-                    <option value="dibatalkan">Dibatalkan</option>
-                </select>
-            </div>
-        @elseif($activeTab === 'servis')
-            <div class="w-auto">
-                <select wire:model.live="filterStatus" class="px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
-                    <option value="">Selesai & Lunas (Rekap Penuh)</option>
-                    <option value="selesai">Selesai (Siap Diambil)</option>
-                    <option value="diambil">Selesai (Sudah Diambil)</option>
-                    <option value="lunas">Sudah Lunas</option>
-                    <option value="belum_lunas">Selesai Belum Lunas</option>
-                    <option value="semua">Semua Status Tiket</option>
-                </select>
-            </div>
-            <div class="w-auto">
-                <select wire:model.live="filterMetode" class="px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
-                    <option value="">Semua Metode</option>
-                    <option value="tunai">Tunai</option>
-                    <option value="transfer">Transfer Bank</option>
-                    <option value="qris">QRIS</option>
-                    <option value="split">Split</option>
-                </select>
-            </div>
-        @elseif($activeTab === 'mutasi_kas')
-            <div class="w-auto">
-                <select wire:model.live="filterStatus" class="px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
-                    <option value="">Semua Jenis Mutasi</option>
-                    <option value="keluar">Pengeluaran (Kas Keluar)</option>
-                    <option value="masuk">Pemasukan (Kas Masuk)</option>
-                </select>
-            </div>
-        @endif
 
-        <button
-            wire:click="resetFilter"
-            class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-semibold cursor-pointer transition">
-            Reset
-        </button>
+            @if($activeTab === 'global')
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
+                        <option value="">Semua Jenis Transaksi</option>
+                        <option value="pos">Penjualan Kasir POS</option>
+                        <option value="online">Pesanan Online (Web & Omni)</option>
+                        <option value="servis">Pelunasan Servis Gadget</option>
+                        <option value="mutasi_masuk">Kas Masuk (Laci)</option>
+                        <option value="mutasi_keluar">Kas Keluar (Laci)</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterMetode" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
+                        <option value="">Semua Metode Bayar</option>
+                        <option value="tunai">Tunai</option>
+                        <option value="transfer">Transfer Bank</option>
+                        <option value="qris">QRIS</option>
+                        <option value="split">Split</option>
+                        <option value="piutang">Piutang / Kasbon</option>
+                    </select>
+                </div>
+            @elseif($activeTab === 'pos')
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterMetode" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
+                        <option value="">Semua Metode</option>
+                        <option value="tunai">Tunai</option>
+                        <option value="transfer">Transfer Bank</option>
+                        <option value="qris">QRIS</option>
+                        <option value="split">Split</option>
+                        <option value="piutang">Piutang / Kasbon</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
+                        <option value="">Semua Status</option>
+                        <option value="selesai">Selesai</option>
+                        <option value="dibatalkan">Dibatalkan</option>
+                    </select>
+                </div>
+            @elseif($activeTab === 'servis')
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
+                        <option value="">Selesai & Lunas (Rekap Penuh)</option>
+                        <option value="selesai">Selesai (Siap Diambil)</option>
+                        <option value="diambil">Selesai (Sudah Diambil)</option>
+                        <option value="lunas">Sudah Lunas</option>
+                        <option value="belum_lunas">Selesai Belum Lunas</option>
+                        <option value="semua">Semua Status Tiket</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterMetode" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
+                        <option value="">Semua Metode</option>
+                        <option value="tunai">Tunai</option>
+                        <option value="transfer">Transfer Bank</option>
+                        <option value="qris">QRIS</option>
+                        <option value="split">Split</option>
+                    </select>
+                </div>
+            @elseif($activeTab === 'mutasi_kas')
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer">
+                        <option value="">Semua Jenis Mutasi</option>
+                        <option value="keluar">Pengeluaran (Kas Keluar)</option>
+                        <option value="masuk">Pemasukan (Kas Masuk)</option>
+                    </select>
+                </div>
+            @endif
+
+            <button
+                wire:click="resetFilter"
+                class="w-full sm:w-auto px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-semibold cursor-pointer transition text-center">
+                Reset Filter
+            </button>
+        </div>
     </div>
 
     {{-- Content Table --}}
