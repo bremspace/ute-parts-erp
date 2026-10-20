@@ -4,7 +4,11 @@ namespace App\Modules\Rbac\Services;
 
 use App\Modules\Rbac\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Audit log (PRD §6): semua perubahan sensitif tercatat:
@@ -80,7 +84,7 @@ class AuditService
         // (bukan input user), jadi mass-assignment tidak jadi risiko.
         $log = new AuditLog;
         $log->forceFill([
-            'user_id' => auth()->id() ?? auth('customer')->id(),
+            'user_id' => $this->userIdAktif(),
             'cabang_id' => $this->cabangAktif(),
             'entitas' => $entitas,
             'aksi' => $aksi,
@@ -90,7 +94,26 @@ class AuditService
             'sesudah' => $sesudah,
             'ip' => request()->ip(),
         ]);
-        $log->save();
+
+        try {
+            $log->save();
+        } catch (QueryException $e) {
+            // Hindari kegagalan jika ada foreign key constraint violation (SQLSTATE 23000 / code 1452)
+            // pada cabang_id atau user_id
+            if ($e->getCode() === '23000' || str_contains($e->getMessage(), '1452')) {
+                $log->cabang_id = null;
+                $log->user_id = null;
+                try {
+                    $log->save();
+                } catch (\Throwable $nested) {
+                    Log::warning('AuditLog fallback save gagal: '.$nested->getMessage());
+                }
+            } else {
+                throw $e;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('AuditLog save gagal: '.$e->getMessage());
+        }
 
         return $log;
     }
@@ -132,7 +155,7 @@ class AuditService
     }
 
     /**
-     * Cabang aktif dari session; NULL di CLI/queue/tanpa session.
+     * Cabang aktif dari session; NULL di CLI/queue/tanpa session atau jika ID tidak ada di DB.
      */
     private function cabangAktif(): ?int
     {
@@ -145,7 +168,56 @@ class AuditService
             ? $request->session()->get('cabang_id')
             : session('cabang_id');
 
-        return $cabangId === null ? null : (int) $cabangId;
+        if ($cabangId === null) {
+            return null;
+        }
+
+        $cabangId = (int) $cabangId;
+        if ($cabangId <= 0) {
+            return null;
+        }
+
+        try {
+            if (Schema::hasTable('cabang')) {
+                $exists = DB::table('cabang')->where('id', $cabangId)->exists();
+                if (! $exists) {
+                    return null;
+                }
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $cabangId;
+    }
+
+    /**
+     * User ID aktif yang tervalidasi di database.
+     */
+    private function userIdAktif(): ?int
+    {
+        $userId = auth()->id() ?? auth('customer')->id();
+        if ($userId === null) {
+            return null;
+        }
+
+        $userId = (int) $userId;
+        if ($userId <= 0) {
+            return null;
+        }
+
+        try {
+            if (Schema::hasTable('users')) {
+                $exists = DB::table('users')->where('id', $userId)->exists();
+                if (! $exists) {
+                    return null;
+                }
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $userId;
     }
 
     /**

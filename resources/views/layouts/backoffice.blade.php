@@ -620,13 +620,32 @@
 
             <!-- Page Content -->
             <main class="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6 bg-transparent">
-                {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out) --}}
+                {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out, bisa skip per sesi) --}}
                 @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
-                    <div class="mb-4 p-3.5 rounded-xl bg-up-amber/15 border border-up-amber/30 text-up-amber text-sm font-medium flex items-center justify-between gap-3 flex-wrap">
-                        <span>Keamanan akun: aktifkan verifikasi dua faktor (2FA) untuk role Anda.</span>
-                        <a href="{{ route('two-factor.setup') }}" class="px-3 py-1.5 rounded-lg bg-up-amber text-ink-950 text-xs font-bold hover:opacity-90 transition-opacity whitespace-nowrap">
-                            Aktifkan 2FA
-                        </a>
+                    <div x-data="{ dismissed: sessionStorage.getItem('dismiss_2fa_banner') === '1' }"
+                         x-show="!dismissed"
+                         x-cloak
+                         class="mb-4 p-3 sm:p-3.5 rounded-xl bg-up-amber/15 border border-up-amber/30 text-up-amber text-xs sm:text-sm font-medium flex items-center justify-between gap-2.5 sm:gap-3">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <svg class="w-4 h-4 flex-shrink-0 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                            <span class="truncate sm:whitespace-normal">Keamanan akun: aktifkan verifikasi 2FA untuk role Anda.</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                            <a href="{{ route('two-factor.setup') }}" class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-up-amber text-ink-950 text-xs font-bold hover:opacity-90 transition-opacity whitespace-nowrap">
+                                Aktifkan 2FA
+                            </a>
+                            <button type="button"
+                                    @click="dismissed = true; sessionStorage.setItem('dismiss_2fa_banner', '1')"
+                                    class="p-1 rounded-lg text-up-amber/70 hover:text-up-amber hover:bg-up-amber/20 transition-colors cursor-pointer"
+                                    aria-label="Tutup notifikasi"
+                                    title="Lewati untuk sekarang">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 @endif
 

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Rbac\Livewire;
 
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\DatabaseManagementService;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -231,6 +232,13 @@ class DatabaseManagement extends Component
             }
 
             $res = $dbService->resetDatabase($this->resetMode, $options);
+
+            // Sinkronkan session cabang_id ke cabang aktif yang valid
+            $defaultCabang = Cabang::where('is_active', true)->first();
+            if ($defaultCabang) {
+                session(['cabang_id' => $defaultCabang->id]);
+            }
+
             $this->showResetModal = false;
             $this->confirmPassword = '';
             $this->confirmResetText = '';

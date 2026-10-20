@@ -20,8 +20,8 @@
     </div>
 
     {{-- Kartu Ringkasan (Hari / Tanggal Terpilih) --}}
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-        <div class="p-4 rounded-2xl glass-panel border border-white/10">
+    <div class="flex items-stretch gap-3 overflow-x-auto scrollbar-none py-1 sm:grid sm:grid-cols-2 lg:grid-cols-5 -mx-4 px-4 sm:mx-0 sm:px-0 flex-nowrap">
+        <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
                 <span>Penjualan POS</span>
                 <span class="px-1.5 py-0.5 rounded bg-white/5 text-[10px] font-mono">{{ $ringkasan['count_penjualan_pos'] }} Trx</span>
@@ -30,7 +30,7 @@
                 Rp {{ number_format($ringkasan['total_penjualan_pos'], 0, ',', '.') }}
             </p>
         </div>
-        <div class="p-4 rounded-2xl glass-panel border border-white/10">
+        <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
                 <span>Pesanan Online</span>
                 <span class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[10px] font-mono">{{ $ringkasan['count_pesanan_online'] }} Trx</span>
@@ -39,7 +39,7 @@
                 Rp {{ number_format($ringkasan['total_pesanan_online'], 0, ',', '.') }}
             </p>
         </div>
-        <div class="p-4 rounded-2xl glass-panel border border-white/10">
+        <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
                 <span>Servis Selesai & Lunas</span>
                 <span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 text-[10px] font-mono">{{ $ringkasan['count_servis_selesai'] }} Unit</span>
@@ -48,7 +48,7 @@
                 Rp {{ number_format($ringkasan['total_servis_selesai'], 0, ',', '.') }}
             </p>
         </div>
-        <div class="p-4 rounded-2xl glass-panel border border-white/10">
+        <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
                 <span>Mutasi Kas Laci</span>
                 <span class="text-[10px] text-ink-500">In / Out</span>
@@ -59,7 +59,7 @@
                 <span class="text-xs font-bold text-up-accent tabular-nums">-{{ number_format($ringkasan['total_mutasi_keluar'], 0, ',', '.') }}</span>
             </div>
         </div>
-        <div class="p-4 rounded-2xl glass-panel border border-white/10">
+        <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
                 <span>Total Kas / Arus Bersih</span>
                 <span class="px-1.5 py-0.5 rounded bg-up-mint/10 text-up-mint text-[10px] font-bold">Net</span>
@@ -70,36 +70,36 @@
         </div>
     </div>
 
-    {{-- Tab Navigasi --}}
-    <div class="flex flex-wrap items-center gap-2 border-b border-white/10 pb-2">
+    {{-- Tab Navigasi (Horizontal Scroll on Mobile) --}}
+    <div class="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto scrollbar-none flex-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
         <button
             wire:click="$set('activeTab', 'global')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'global' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0 {{ $activeTab === 'global' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <span>Semua Transaksi (Global)</span>
         </button>
         <button
             wire:click="$set('activeTab', 'pos')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'pos' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0 {{ $activeTab === 'pos' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
             <span>Penjualan Kasir POS</span>
         </button>
         <button
             wire:click="$set('activeTab', 'online')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'online' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0 {{ $activeTab === 'online' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
             <span>Pesanan Online (Web & Omni)</span>
         </button>
         <button
             wire:click="$set('activeTab', 'servis')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'servis' ? 'bg-up-mint text-white shadow-sm shadow-up-mint/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0 {{ $activeTab === 'servis' ? 'bg-up-mint text-white shadow-sm shadow-up-mint/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
             <span>Rekap Servis Selesai & Lunas</span>
         </button>
         <button
             wire:click="$set('activeTab', 'mutasi_kas')"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 {{ $activeTab === 'mutasi_kas' ? 'bg-up-accent text-white shadow-sm shadow-up-accent/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0 {{ $activeTab === 'mutasi_kas' ? 'bg-up-accent text-white shadow-sm shadow-up-accent/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <span>Mutasi Kas Laci (In / Out)</span>
         </button>
     </div>
@@ -203,9 +203,9 @@
         @if($activeTab === 'global')
             {{-- TAB 0: RIWAYAT TRANSAKSI GLOBAL --}}
             <x-prism.dual-scroll>
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs min-w-[850px]">
                     <thead>
-                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
+                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02] whitespace-nowrap">
                             <th class="py-3 px-4">No Referensi</th>
                             <th class="py-3 px-4">Jenis Transaksi</th>
                             <th class="py-3 px-4">Waktu</th>
@@ -222,7 +222,7 @@
                             @php
                                 $waktuCarbon = $row->waktu ? \Illuminate\Support\Carbon::parse($row->waktu) : null;
                             @endphp
-                            <tr class="hover:bg-white/[0.02] transition-colors">
+                            <tr class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
                                 <td class="py-3.5 px-4 font-mono font-bold text-white">
                                     {{ $row->no_referensi }}
                                 </td>
@@ -338,9 +338,9 @@
         @elseif($activeTab === 'pos')
             {{-- TAB 1: PENJUALAN KASIR POS --}}
             <x-prism.dual-scroll>
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs min-w-[780px]">
                     <thead>
-                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
+                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02] whitespace-nowrap">
                             <th class="py-3 px-4">No Transaksi</th>
                             <th class="py-3 px-4">Waktu</th>
                             <th class="py-3 px-4">Kasir</th>
@@ -353,7 +353,7 @@
                     </thead>
                     <tbody class="divide-y divide-white/5">
                         @forelse($dataList as $row)
-                            <tr class="hover:bg-white/[0.02] transition-colors">
+                            <tr class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
                                 <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $row->no_transaksi }}</td>
                                 <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $row->created_at?->format('d/m/Y H:i') }}</td>
                                 <td class="py-3.5 px-4 text-white font-medium">{{ $row->kasir?->name ?? '-' }}</td>
@@ -410,9 +410,9 @@
         @elseif($activeTab === 'online')
             {{-- TAB: PESANAN ONLINE & OMNICHANNEL --}}
             <x-prism.dual-scroll>
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs min-w-[850px]">
                     <thead>
-                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
+                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02] whitespace-nowrap">
                             <th class="py-3 px-4">No Pesanan</th>
                             <th class="py-3 px-4">Platform</th>
                             <th class="py-3 px-4">Waktu</th>
@@ -429,7 +429,7 @@
                                 $platformLabel = $row->sumber === 'marketplace' ? 'Web Ute' : (str_starts_with((string) $row->sumber, 'channel:') ? ucfirst(str_replace('channel:', '', $row->sumber)) : 'Online');
                                 $isPickup = str_contains(strtolower($row->catatan ?? ''), 'ambil_ke_toko');
                             @endphp
-                            <tr class="hover:bg-white/[0.02] transition-colors">
+                            <tr class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
                                 <td class="py-3.5 px-4 font-mono font-bold text-white">
                                     {{ $row->no_transaksi }}
                                     @if($row->channelOrder)
@@ -501,9 +501,9 @@
         @elseif($activeTab === 'servis')
             {{-- TAB 2: REKAP SERVIS SELESAI & LUNAS SECARA PENUH --}}
             <x-prism.dual-scroll>
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs min-w-[920px]">
                     <thead>
-                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
+                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02] whitespace-nowrap">
                             <th class="py-3 px-4">No Tiket & Pelunasan</th>
                             <th class="py-3 px-4">Waktu Selesai & Bayar</th>
                             <th class="py-3 px-4">Pelanggan & Perangkat</th>
@@ -522,7 +522,7 @@
                                 $rincian = $row->getRincianBiayaLengkap();
                                 $isLunas = $row->status_pembayaran === 'lunas';
                             @endphp
-                            <tr class="hover:bg-white/[0.02] transition-colors">
+                            <tr class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
                                 <td class="py-3.5 px-4 font-mono">
                                     <div class="font-bold text-white">{{ $row->no_tiket }}</div>
                                     @if($row->transaksi)
@@ -603,9 +603,9 @@
         @elseif($activeTab === 'mutasi_kas')
             {{-- TAB 3: MUTASI KAS LACI --}}
             <x-prism.dual-scroll>
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs min-w-[740px]">
                     <thead>
-                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02]">
+                        <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02] whitespace-nowrap">
                             <th class="py-3 px-4">No Jurnal</th>
                             <th class="py-3 px-4">Waktu</th>
                             <th class="py-3 px-4">Kasir Operator</th>
@@ -618,7 +618,7 @@
                     </thead>
                     <tbody class="divide-y divide-white/5">
                         @forelse($dataList as $row)
-                            <tr class="hover:bg-white/[0.02] transition-colors">
+                            <tr class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
                                 <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $row->no_jurnal ?? ('MUT-#'.$row->id) }}</td>
                                 <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ \Illuminate\Support\Carbon::parse($row->created_at)->format('d/m/Y H:i') }}</td>
                                 <td class="py-3.5 px-4 text-white font-medium">{{ $row->user_name }}</td>

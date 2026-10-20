@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Rbac\Livewire\DatabaseManagement;
+use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\DatabaseManagementService;
 use Database\Seeders\RoleUserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -192,6 +193,36 @@ class DatabaseManagementEnterpriseTest extends TestCase
         $admin = User::where('email', 'superadmin@uteparts.id')->first();
         $this->assertNotNull($admin);
         $this->assertTrue($admin->hasRole('super-admin'));
+
+        $service = app(DatabaseManagementService::class);
+        foreach ($service->listBackups() as $b) {
+            $service->deleteBackup($b['filename']);
+        }
+    }
+
+    public function test_audit_service_and_reset_graceful_when_session_cabang_id_invalid(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        // Pasang session cabang_id yang tidak ada di database (simulasi cabang telah dihapus / invalid)
+        session(['cabang_id' => 999999]);
+
+        // 1. AuditService harus mencatat log tanpa memicu Integrity constraint violation
+        $auditService = app(AuditService::class);
+        $log = $auditService->catat('TestEntity', 'create', 1, 'Uji coba audit saat cabang_id basi');
+        $this->assertNull($log->cabang_id);
+
+        // 2. Eksekusi reset data harus tetap berjalan lancar tanpa error 1452
+        Livewire::test(DatabaseManagement::class)
+            ->set('resetMode', 'transaksi_only')
+            ->set('confirmResetText', 'RESET TRANSAKSI')
+            ->set('confirmPassword', 'Password123!')
+            ->call('eksekusiReset')
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success';
+            });
 
         $service = app(DatabaseManagementService::class);
         foreach ($service->listBackups() as $b) {

@@ -104,16 +104,28 @@
     @endphp
 
     <!-- Greeting & Quick Actions Bar -->
-    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/10 backdrop-blur-md">
-        <div class="space-y-1">
-            <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-up-primary/20 text-indigo-300 border border-up-primary/30">
-                    {{ session('cabang_nama', 'Semua Cabang') }}
-                </span>
-                <span class="inline-flex items-center gap-1.5 text-[11px] text-ink-400">
-                    <span class="w-1.5 h-1.5 rounded-full bg-up-mint animate-pulse"></span>
-                    Live Sync 60s
-                </span>
+    <div class="p-4 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/10 backdrop-blur-md space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
+        <div class="space-y-1.5 flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-up-primary/20 text-indigo-300 border border-up-primary/30">
+                        {{ session('cabang_nama', 'Semua Cabang') }}
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 text-[11px] text-ink-400">
+                        <span class="w-1.5 h-1.5 rounded-full bg-up-mint animate-pulse"></span>
+                        Live Sync 60s
+                    </span>
+                </div>
+
+                <!-- Tombol Atur Widget: pojok kanan atas (mobile) -->
+                <button type="button" @click="showCustomizer = true"
+                    class="sm:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-ink-300 hover:text-white text-[11px] font-semibold border border-white/10 transition-all active:scale-[0.97] cursor-pointer"
+                    title="Atur Tata Letak / Urutan Widget">
+                    <svg class="w-3.5 h-3.5 text-up-mint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                    </svg>
+                    <span>Atur Widget</span>
+                </button>
             </div>
             <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
                 {{ $salam }}, {{ auth()->user()?->name }} <span class="text-lg">👋</span>
@@ -123,28 +135,23 @@
             </p>
         </div>
 
-        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
+        <div class="flex items-center gap-2 w-full sm:w-auto pt-1 sm:pt-0">
             @can('pos.kasir')
-                <a href="/app/pos" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-semibold shadow-md transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
+                <a href="/app/pos" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-up-primary hover:bg-indigo-600 text-white text-xs font-semibold shadow-md transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     Buka Kasir
                 </a>
             @endcan
             @can('servis.tiket')
-                <a href="/app/servis" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-ink-200 hover:text-white text-xs font-semibold border border-white/10 transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
+                <a href="/app/servis" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-ink-200 hover:text-white text-xs font-semibold border border-white/10 transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
                     <svg class="w-3.5 h-3.5 text-up-amber" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     Tiket Servis
                 </a>
             @endcan
-            @role('super-admin')
-                <span class="text-[10px] font-mono text-ink-400 bg-black/40 border border-white/10 px-2.5 py-2 rounded-lg whitespace-nowrap min-h-[44px] flex items-center">
-                    {{ $serverStatus['env'] }} · {{ $serverStatus['queue'] }}
-                </span>
-            @endrole
 
-            <!-- Tombol Atur Tata Letak / Urutan Widget -->
+            <!-- Tombol Atur Tata Letak / Urutan Widget (Desktop) -->
             <button type="button" @click="showCustomizer = true"
-                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-ink-300 hover:text-white text-xs font-semibold border border-white/10 transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px]">
+                class="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-ink-300 hover:text-white text-xs font-semibold border border-white/10 transition-all duration-150 active:scale-[0.97] whitespace-nowrap min-h-[44px] cursor-pointer">
                 <svg class="w-3.5 h-3.5 text-up-mint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                 </svg>
@@ -603,38 +610,38 @@
         <!-- Transaksi Terkini Feed -->
         <x-prism.glass-card class="lg:col-span-2" title="Aktivitas Transaksi Terkini" subtitle="Penjualan dan pesanan yang baru masuk di cabang">
             <x-prism.dual-scroll class="-mt-1">
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs min-w-[580px]">
                     <thead>
-                        <tr class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold border-b border-white/5">
-                            <th class="pb-2">No. Transaksi</th>
-                            <th class="pb-2">Sumber</th>
-                            <th class="pb-2">Cabang</th>
-                            <th class="pb-2">Waktu</th>
-                            <th class="pb-2 text-right">Total Akhir</th>
-                            <th class="pb-2 text-center">Status</th>
+                        <tr class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold border-b border-white/5 whitespace-nowrap">
+                            <th class="py-2.5 px-3">No. Transaksi</th>
+                            <th class="py-2.5 px-3">Sumber</th>
+                            <th class="py-2.5 px-3">Cabang</th>
+                            <th class="py-2.5 px-3">Waktu</th>
+                            <th class="py-2.5 px-3 text-right">Total Akhir</th>
+                            <th class="py-2.5 px-3 text-center">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-white/5">
                         @forelse($transaksiTerbaru as $t)
-                            <tr class="hover:bg-white/[0.02] transition-colors duration-150">
-                                <td class="py-2.5 font-mono font-semibold text-white">
+                            <tr class="hover:bg-white/[0.02] transition-colors duration-150 whitespace-nowrap">
+                                <td class="py-2.5 px-3 font-mono font-semibold text-white">
                                     {{ $t->no_transaksi }}
                                 </td>
-                                <td class="py-2.5">
+                                <td class="py-2.5 px-3">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/5 border border-white/10 text-ink-300">
                                         {{ ucfirst($t->sumber) }}
                                     </span>
                                 </td>
-                                <td class="py-2.5 text-ink-400">
+                                <td class="py-2.5 px-3 text-ink-400">
                                     {{ $t->cabang?->nama ?? '-' }}
                                 </td>
-                                <td class="py-2.5 text-ink-500 tabular-nums">
+                                <td class="py-2.5 px-3 text-ink-500 tabular-nums">
                                     {{ $t->created_at->format('H:i') }}
                                 </td>
-                                <td class="py-2.5 text-right font-black text-white tabular-nums">
+                                <td class="py-2.5 px-3 text-right font-black text-white tabular-nums">
                                     Rp {{ number_format($t->total_akhir, 0, ',', '.') }}
                                 </td>
-                                <td class="py-2.5 text-center">
+                                <td class="py-2.5 px-3 text-center">
                                     <x-prism.status-pill :status="$t->status" size="sm" />
                                 </td>
                             </tr>
@@ -662,33 +669,33 @@
             <!-- Filter Bar & Kontrol Periode -->
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pb-4 border-b border-white/5">
                 <!-- Pills Pilihan Periode Dinamis -->
-                <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 text-xs">
+                <div class="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 text-xs overflow-x-auto scrollbar-none flex-nowrap sm:flex-wrap">
                     <button type="button" wire:click="setPeriodePenjualan('today')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'today' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'today' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Hari Ini
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('yesterday')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'yesterday' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'yesterday' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Kemarin
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('this_week')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'this_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'this_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Minggu Ini
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('last_week')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'last_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'last_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Minggu Lalu
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('this_month')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'this_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'this_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Bulan Ini
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('last_month')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'last_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'last_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Bulan Lalu
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('custom')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all {{ $periodePenjualan === 'custom' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'custom' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Kustom
                     </button>
                 </div>
@@ -696,18 +703,18 @@
                 <!-- Input Custom & Filter Dropdown & Aksi Export -->
                 <div class="flex flex-wrap items-center gap-2">
                     @if($periodePenjualan === 'custom')
-                        <div class="flex items-center gap-1.5 bg-white/[0.02] border border-white/10 rounded-xl px-2 py-1 text-xs">
+                        <div class="flex items-center gap-1.5 bg-white/[0.02] border border-white/10 rounded-xl px-2 py-1 text-xs w-full sm:w-auto">
                             <input type="date" wire:model.live="penjualanCustomDari"
-                                class="bg-transparent text-white border-0 text-xs p-1 focus:ring-0">
+                                class="bg-transparent text-white border-0 text-xs p-1 focus:ring-0 flex-1 sm:flex-initial">
                             <span class="text-ink-500">s/d</span>
                             <input type="date" wire:model.live="penjualanCustomSampai"
-                                class="bg-transparent text-white border-0 text-xs p-1 focus:ring-0">
+                                class="bg-transparent text-white border-0 text-xs p-1 focus:ring-0 flex-1 sm:flex-initial">
                         </div>
                     @endif
 
                     <!-- Filter Sumber -->
                     <select wire:model.live="penjualanFilterSumber"
-                        class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">
+                        class="flex-1 sm:flex-initial min-w-[120px] px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">
                         <option value="" class="bg-gray-900 text-white">Semua Sumber</option>
                         <option value="pos" class="bg-gray-900 text-white">Kasir (POS)</option>
                         <option value="marketplace" class="bg-gray-900 text-white">Marketplace</option>
@@ -717,7 +724,7 @@
 
                     <!-- Filter Status -->
                     <select wire:model.live="penjualanFilterStatus"
-                        class="px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">
+                        class="flex-1 sm:flex-initial min-w-[120px] px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white focus:border-up-primary focus:ring-0">
                         <option value="" class="bg-gray-900 text-white">Semua Status</option>
                         <option value="selesai" class="bg-gray-900 text-white">Selesai</option>
                         <option value="pending" class="bg-gray-900 text-white">Pending</option>
@@ -725,10 +732,10 @@
                     </select>
 
                     <!-- Search Input -->
-                    <div class="relative">
+                    <div class="relative w-full sm:w-48">
                         <input type="text" wire:model.live.debounce.300ms="penjualanSearch"
                             placeholder="Cari no trx / pelanggan..."
-                            class="w-40 sm:w-48 pl-7 pr-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white placeholder-ink-500 focus:border-up-primary focus:ring-0">
+                            class="w-full pl-7 pr-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white placeholder-ink-500 focus:border-up-primary focus:ring-0">
                         <svg class="w-3.5 h-3.5 absolute left-2 top-2 text-ink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
@@ -736,7 +743,7 @@
 
                     <!-- Tombol Export Excel -->
                     <button type="button" wire:click="exportPenjualanExcel" wire:loading.attr="disabled"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-up-mint/20 hover:bg-up-mint/30 border border-up-mint/40 text-up-mint text-xs font-semibold shadow-sm transition-all active:scale-[0.98]">
+                        class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-up-mint/20 hover:bg-up-mint/30 border border-up-mint/40 text-up-mint text-xs font-semibold shadow-sm transition-all active:scale-[0.98]">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
@@ -838,52 +845,52 @@
                     <span class="text-[11px] text-ink-500">Menampilkan 15 transaksi teratas</span>
                 </div>
                 <x-prism.dual-scroll>
-                    <table class="w-full text-left text-xs">
+                    <table class="w-full text-left text-xs min-w-[820px]">
                         <thead>
-                            <tr class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold border-b border-white/5">
-                                <th class="pb-2">No. Transaksi</th>
-                                <th class="pb-2">Sumber</th>
-                                <th class="pb-2">Pelanggan</th>
-                                <th class="pb-2">Kasir</th>
-                                <th class="pb-2">Waktu</th>
-                                <th class="pb-2 text-center">Metode</th>
-                                <th class="pb-2 text-right">Total Akhir</th>
-                                <th class="pb-2 text-center">Status</th>
-                                <th class="pb-2 text-center">Aksi</th>
+                            <tr class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold border-b border-white/5 whitespace-nowrap">
+                                <th class="py-2.5 px-3">No. Transaksi</th>
+                                <th class="py-2.5 px-3">Sumber</th>
+                                <th class="py-2.5 px-3">Pelanggan</th>
+                                <th class="py-2.5 px-3">Kasir</th>
+                                <th class="py-2.5 px-3">Waktu</th>
+                                <th class="py-2.5 px-3 text-center">Metode</th>
+                                <th class="py-2.5 px-3 text-right">Total Akhir</th>
+                                <th class="py-2.5 px-3 text-center">Status</th>
+                                <th class="py-2.5 px-3 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/5">
                             @forelse($dataPenjualan['items'] ?? [] as $item)
-                                <tr wire:key="penjualan-row-{{ $item['id'] }}" class="hover:bg-white/[0.02] transition-colors">
-                                    <td class="py-2.5 font-mono font-semibold text-white">
+                                <tr wire:key="penjualan-row-{{ $item['id'] }}" class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
+                                    <td class="py-2.5 px-3 font-mono font-semibold text-white">
                                         {{ $item['no_transaksi'] }}
                                     </td>
-                                    <td class="py-2.5">
+                                    <td class="py-2.5 px-3">
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/5 border border-white/10 text-ink-300">
                                             {{ ucfirst($item['sumber']) }}
                                         </span>
                                     </td>
-                                    <td class="py-2.5 text-ink-300">
+                                    <td class="py-2.5 px-3 text-ink-300 max-w-[160px] truncate" title="{{ $item['pelanggan_nama'] }}">
                                         {{ $item['pelanggan_nama'] }}
                                     </td>
-                                    <td class="py-2.5 text-ink-400">
+                                    <td class="py-2.5 px-3 text-ink-400">
                                         {{ $item['kasir_nama'] }}
                                     </td>
-                                    <td class="py-2.5 text-ink-500 tabular-nums">
+                                    <td class="py-2.5 px-3 text-ink-500 tabular-nums">
                                         {{ $item['waktu'] }}
                                     </td>
-                                    <td class="py-2.5 text-center text-ink-300 text-[11px] font-mono">
+                                    <td class="py-2.5 px-3 text-center text-ink-300 text-[11px] font-mono">
                                         {{ $item['metode_bayar'] }}
                                     </td>
-                                    <td class="py-2.5 text-right font-black text-white tabular-nums">
+                                    <td class="py-2.5 px-3 text-right font-black text-white tabular-nums">
                                         Rp {{ number_format($item['total_akhir'], 0, ',', '.') }}
                                     </td>
-                                    <td class="py-2.5 text-center">
+                                    <td class="py-2.5 px-3 text-center">
                                         <x-prism.status-pill :status="$item['status']" size="sm" />
                                     </td>
-                                    <td class="py-2.5 text-center">
+                                    <td class="py-2.5 px-3 text-center">
                                         <button type="button" wire:click="lihatDetailTransaksi({{ $item['id'] }})"
-                                            class="px-2 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/30 text-up-primary text-[10px] font-semibold transition-all">
+                                            class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/30 text-up-primary text-[10px] font-semibold transition-all cursor-pointer whitespace-nowrap">
                                             Detail & Tracking
                                         </button>
                                     </td>

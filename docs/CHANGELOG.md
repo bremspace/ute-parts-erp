@@ -3,6 +3,18 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-20 — Hotfix Foreign Key Constraint Violation pada Audit Log saat Backup & Reset Database ✅
+
+- **[Perbaikan FK Constraint `audit_logs_cabang_id_foreign` (Error 1452)]:**
+  - **Penyebab:** Pada database production/staging, `session('cabang_id')` pengguna menyimpan ID cabang yang sudah tidak ada di tabel `cabang` (misalnya akibat manipulasi cabang sebelumnya atau session lama). Saat `DatabaseManagementService::backup()` dipanggil pada langkah awal reset, `AuditService::catat()` mencoba meng-insert baris ke `audit_logs` dengan `cabang_id` yang melanggar foreign key constraint MySQL.
+  - **Solusi Komprehensif:**
+    1. `AuditService::cabangAktif()` kini memvalidasi keberadaan `id` di tabel `cabang` sebelum mencantumkannya. Jika tidak ditemukan, otomatis fallback ke `NULL` (karena kolom `cabang_id` di `audit_logs` bersifat nullable).
+    2. Menambahkan `AuditService::userIdAktif()` dengan validasi serupa untuk memastikan `user_id` juga aman dari pelanggaran constraint.
+    3. Menambahkan fallback catch `QueryException` pada `AuditService::catat()`: jika terjadi SQLSTATE 23000 / error 1452, sistem otomatis men-nullkan relasi dan menyimpan kembali, sehingga pencatatan audit log tidak pernah menggagalkan operasi kritis seperti backup dan reset database.
+    4. Membungkus pemanggilan audit log di `DatabaseManagementService` dengan `try-catch` terisolasi.
+    5. Mensinkronkan kembali `session('cabang_id')` di `DatabaseManagement` ke cabang aktif yang sah setelah operasi reset database selesai.
+  - **Pengujian:** Menambahkan unit test `test_audit_service_and_reset_graceful_when_session_cabang_id_invalid` di `DatabaseManagementEnterpriseTest` (lulus 100%).
+
 ## 2026-10-20 — Optimasi Enterprise Reset Data & Pembersihan Database Berstandar Industri ✅
 
 - **[Multi-Tier Data Purge Suite (4 Skenario Reset Standar Enterprise)]:**

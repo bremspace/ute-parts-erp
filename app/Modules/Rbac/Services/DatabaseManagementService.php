@@ -119,12 +119,16 @@ class DatabaseManagementService
             }
         }
 
-        $this->auditService->catat(
-            'Database',
-            'backup',
-            auth()->id() ?? 0,
-            "Backup database dibuat: {$filename} ({$this->formatSize($size)})"
-        );
+        try {
+            $this->auditService->catat(
+                'Database',
+                'backup',
+                auth()->id() ?? 0,
+                "Backup database dibuat: {$filename} ({$this->formatSize($size)})"
+            );
+        } catch (Throwable $e) {
+            Log::warning('Gagal mencatat audit log backup: '.$e->getMessage());
+        }
 
         return [
             'success' => true,
@@ -442,12 +446,16 @@ class DatabaseManagementService
                 break;
         }
 
-        $this->auditService->catat(
-            'Database',
-            'reset',
-            auth()->id() ?? 0,
-            "{$label} dieksekusi: {$clearedCount} tabel dibersihkan. Pre-backup snapshot: {$preBackup['filename']}."
-        );
+        try {
+            $this->auditService->catat(
+                'Database',
+                'reset',
+                auth()->id() ?? 0,
+                "{$label} dieksekusi: {$clearedCount} tabel dibersihkan. Pre-backup snapshot: {$preBackup['filename']}."
+            );
+        } catch (Throwable $e) {
+            Log::warning('Gagal mencatat audit log reset: '.$e->getMessage());
+        }
 
         return [
             'success' => true,

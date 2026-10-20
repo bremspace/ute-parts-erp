@@ -26,11 +26,11 @@
     </div>
 
     <!-- Quick Metrics Bar -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div class="flex items-stretch gap-3 overflow-x-auto scrollbar-none py-1 sm:grid sm:grid-cols-3 lg:grid-cols-6 -mx-3 px-3 sm:mx-0 sm:px-0 flex-nowrap">
         <!-- Perlu Dikemas (Lunas) - Priority Blinking -->
-        <div wire:click="$set('statusFilter', 'lunas')" class="p-4 rounded-2xl border transition-all duration-150 cursor-pointer relative overflow-hidden {{ $statusFilter === 'lunas' ? 'bg-up-primary/10 border-up-primary ring-2 ring-up-primary/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-up-primary/50' }}">
+        <div wire:click="$set('statusFilter', 'lunas')" class="w-[145px] min-w-[145px] sm:w-auto sm:min-w-0 flex-shrink-0 p-3.5 sm:p-4 rounded-2xl border transition-all duration-150 cursor-pointer relative overflow-hidden {{ $statusFilter === 'lunas' ? 'bg-up-primary/10 border-up-primary ring-2 ring-up-primary/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-up-primary/50' }}">
             <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400">Siap Dikemas</span>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 whitespace-nowrap">Siap Dikemas</span>
                 @if($counts['lunas'] > 0)
                     <span class="relative flex h-2 w-2">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-up-primary opacity-75"></span>
@@ -39,50 +39,50 @@
                 @endif
             </div>
             <p class="text-2xl font-black text-up-primary mt-1 tabular-nums">{{ $counts['lunas'] }}</p>
-            <p class="text-[10px] text-ink-400 mt-0.5">Sudah lunas, perlu packing</p>
+            <p class="text-[10px] text-ink-400 mt-0.5 line-clamp-1">Sudah lunas, packing</p>
         </div>
 
         <!-- Menunggu Pembayaran -->
-        <div wire:click="$set('statusFilter', 'menunggu_pembayaran')" class="p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'menunggu_pembayaran' ? 'bg-up-amber/10 border-up-amber ring-2 ring-up-amber/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-up-amber/50' }}">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400">Menunggu Bayar</span>
+        <div wire:click="$set('statusFilter', 'menunggu_pembayaran')" class="w-[145px] min-w-[145px] sm:w-auto sm:min-w-0 flex-shrink-0 p-3.5 sm:p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'menunggu_pembayaran' ? 'bg-up-amber/10 border-up-amber ring-2 ring-up-amber/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-up-amber/50' }}">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 whitespace-nowrap">Menunggu Bayar</span>
             <p class="text-2xl font-black text-up-amber mt-1 tabular-nums">{{ $counts['menunggu_pembayaran'] }}</p>
-            <p class="text-[10px] text-ink-400 mt-0.5">Gateway / Pay at Counter</p>
+            <p class="text-[10px] text-ink-400 mt-0.5 line-clamp-1">Gateway / Konter</p>
         </div>
 
         <!-- Sedang Dikemas -->
-        <div wire:click="$set('statusFilter', 'diproses')" class="p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'diproses' ? 'bg-indigo-500/10 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-indigo-500/50' }}">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400">Sedang Dikemas</span>
+        <div wire:click="$set('statusFilter', 'diproses')" class="w-[145px] min-w-[145px] sm:w-auto sm:min-w-0 flex-shrink-0 p-3.5 sm:p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'diproses' ? 'bg-indigo-500/10 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-indigo-500/50' }}">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 whitespace-nowrap">Sedang Dikemas</span>
             <p class="text-2xl font-black text-indigo-400 mt-1 tabular-nums">{{ $counts['diproses'] }}</p>
-            <p class="text-[10px] text-ink-400 mt-0.5">Gudang menyiapkan item</p>
+            <p class="text-[10px] text-ink-400 mt-0.5 line-clamp-1">Proses penyiapan</p>
         </div>
 
         <!-- Dikirim / Siap Diambil -->
-        <div wire:click="$set('statusFilter', 'dikirim')" class="p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'dikirim' ? 'bg-sky-500/10 border-sky-500 ring-2 ring-sky-500/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-sky-500/50' }}">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400">Pengiriman / Ready</span>
+        <div wire:click="$set('statusFilter', 'dikirim')" class="w-[145px] min-w-[145px] sm:w-auto sm:min-w-0 flex-shrink-0 p-3.5 sm:p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'dikirim' ? 'bg-sky-500/10 border-sky-500 ring-2 ring-sky-500/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-sky-500/50' }}">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 whitespace-nowrap">Pengiriman / Ready</span>
             <p class="text-2xl font-black text-sky-400 mt-1 tabular-nums">{{ $counts['dikirim'] }}</p>
-            <p class="text-[10px] text-ink-400 mt-0.5">Kurir / Siap Ambil Toko</p>
+            <p class="text-[10px] text-ink-400 mt-0.5 line-clamp-1">Kurir / Siap Ambil</p>
         </div>
 
         <!-- Selesai -->
-        <div wire:click="$set('statusFilter', 'selesai')" class="p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'selesai' ? 'bg-up-mint/10 border-up-mint ring-2 ring-up-mint/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-up-mint/50' }}">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400">Pesanan Selesai</span>
+        <div wire:click="$set('statusFilter', 'selesai')" class="w-[145px] min-w-[145px] sm:w-auto sm:min-w-0 flex-shrink-0 p-3.5 sm:p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'selesai' ? 'bg-up-mint/10 border-up-mint ring-2 ring-up-mint/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-up-mint/50' }}">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 whitespace-nowrap">Pesanan Selesai</span>
             <p class="text-2xl font-black text-up-mint mt-1 tabular-nums">{{ $counts['selesai'] }}</p>
-            <p class="text-[10px] text-ink-400 mt-0.5">Terkirim / Diambil di Toko</p>
+            <p class="text-[10px] text-ink-400 mt-0.5 line-clamp-1">Terkirim / Diambil</p>
         </div>
 
         <!-- Total Semua -->
-        <div wire:click="$set('statusFilter', 'semua')" class="p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'semua' ? 'bg-ink-200 dark:bg-ink-800 border-ink-400' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400">Total Semua</span>
+        <div wire:click="$set('statusFilter', 'semua')" class="w-[145px] min-w-[145px] sm:w-auto sm:min-w-0 flex-shrink-0 p-3.5 sm:p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'semua' ? 'bg-ink-200 dark:bg-ink-800 border-ink-400' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-ink-400' }}">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 whitespace-nowrap">Total Semua</span>
             <p class="text-2xl font-black text-ink-900 dark:text-white mt-1 tabular-nums">{{ $counts['semua'] }}</p>
-            <p class="text-[10px] text-ink-400 mt-0.5">Web + Omnichannel</p>
+            <p class="text-[10px] text-ink-400 mt-0.5 line-clamp-1">Web + Omnichannel</p>
         </div>
     </div>
 
     <!-- Filter & Search Panel -->
     <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-4 shadow-sm space-y-3">
         <!-- Baris 1: Filter Status Tabs -->
-        <div class="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-ink-100 dark:border-white/10">
-            <div class="flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
+        <div class="flex items-center justify-between pb-3 border-b border-ink-100 dark:border-white/10 overflow-hidden">
+            <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 w-full flex-nowrap -mx-1 px-1">
                 @php
                     $tabs = [
                         'lunas' => 'Siap Dikemas',
@@ -98,7 +98,7 @@
                     <button
                         type="button"
                         wire:click="$set('statusFilter', '{{ $k }}')"
-                        class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors {{ $statusFilter === $k ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30' : 'text-ink-600 dark:text-ink-400 hover:bg-black/5 dark:hover:bg-white/5' }}"
+                        class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors flex-shrink-0 {{ $statusFilter === $k ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30' : 'text-ink-600 dark:text-ink-400 hover:bg-black/5 dark:hover:bg-white/5' }}"
                     >
                         {{ $label }}
                         @if(isset($counts[$k]) && $counts[$k] > 0 && $k !== 'semua')
@@ -149,8 +149,8 @@
     <!-- Orders Table / List -->
     <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 overflow-hidden shadow-sm">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-                <thead class="bg-ink-50/70 dark:bg-white/[0.02] border-b border-ink-200/70 dark:border-white/10 text-ink-500 dark:text-ink-400 uppercase tracking-wider font-bold text-[10px]">
+            <table class="w-full text-left text-xs min-w-[860px]">
+                <thead class="bg-ink-50/70 dark:bg-white/[0.02] border-b border-ink-200/70 dark:border-white/10 text-ink-500 dark:text-ink-400 uppercase tracking-wider font-bold text-[10px] whitespace-nowrap">
                     <tr>
                         <th class="px-4 py-3.5">Sumber &amp; No. Pesanan</th>
                         <th class="px-4 py-3.5">Pelanggan / Cabang</th>
@@ -169,7 +169,7 @@
                             $isTokopedia = str_contains($o->sumber, 'tokopedia');
                             $isChannel = str_starts_with($o->sumber, 'channel:');
                         @endphp
-                        <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
+                        <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors whitespace-nowrap">
                             <td class="px-4 py-3.5">
                                 <div class="flex items-center gap-1.5 mb-1">
                                     @if($isShopee)

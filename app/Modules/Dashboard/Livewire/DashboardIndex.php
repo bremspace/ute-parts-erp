@@ -1018,11 +1018,6 @@ class DashboardIndex extends Component
         }
 
         return view('modules.dashboard.livewire.dashboard-index', [
-            'serverStatus' => [
-                'queue' => config('queue.default'),
-                'cache' => config('cache.default'),
-                'env' => app()->environment(),
-            ],
             'omzetHariIni' => $this->omzetHariIni,
             'antrianServis' => $this->antrianServis,
             'stokKritis' => $this->stokKritis,
