@@ -511,6 +511,7 @@ class ProdukTab extends Component
                 $this->produkForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
             }
         }
+        $this->hitungKonversiMultiSatuan('create');
     }
 
     public function updatedProdukFormHitungDariMargin($value): void
@@ -528,6 +529,7 @@ class ProdukTab extends Component
         if ($hargaBeli > 0 && empty($this->produkForm['hitung_dari_margin'])) {
             $this->produkForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
         }
+        $this->hitungKonversiMultiSatuan('create');
     }
 
     public function updatedEditProdukFormMarginPersen($value): void
@@ -538,6 +540,7 @@ class ProdukTab extends Component
             $hargaJual = round($hargaBeli * (1 + ($margin / 100)));
             $this->editProdukForm['harga_jual_retail'] = $hargaJual;
             $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = $hargaJual;
+            $this->hitungKonversiMultiSatuan('edit');
         }
     }
 
@@ -555,6 +558,7 @@ class ProdukTab extends Component
                 $this->editProdukForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
             }
         }
+        $this->hitungKonversiMultiSatuan('edit');
     }
 
     public function updatedEditProdukFormHitungDariMargin($value): void
@@ -572,6 +576,7 @@ class ProdukTab extends Component
         if ($hargaBeli > 0 && empty($this->editProdukForm['hitung_dari_margin'])) {
             $this->editProdukForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
         }
+        $this->hitungKonversiMultiSatuan('edit');
     }
 
     public function simpanProduk()
@@ -662,6 +667,17 @@ class ProdukTab extends Component
 
         $minStokVal = ! empty($this->produkForm['min_stock']) ? (int) $this->produkForm['min_stock'] : (int) $this->produkForm['stok_minimum'];
 
+        if (! empty($this->produkForm['multi_satuan'])) {
+            foreach ($this->produkForm['multi_satuan'] as $k => $ms) {
+                if (isset($ms['harga_jual']) && $ms['harga_jual'] !== '' && $ms['harga_jual'] !== null) {
+                    $this->produkForm['multi_satuan'][$k]['harga_jual'] = $this->parseNominal($ms['harga_jual']);
+                }
+                if (isset($ms['harga_beli']) && $ms['harga_beli'] !== '' && $ms['harga_beli'] !== null) {
+                    $this->produkForm['multi_satuan'][$k]['harga_beli'] = $this->parseNominal($ms['harga_beli']);
+                }
+            }
+        }
+
         try {
             app(ProdukService::class)->buatProduk(
                 nama: $this->produkForm['nama'],
@@ -713,7 +729,7 @@ class ProdukTab extends Component
 
     public function openEditProdukModal(int $produkId)
     {
-        $p = Produk::with(['brand', 'kualitas', 'tipeHps', 'produkKompatibel', 'hargaTier', 'skuVariants'])->findOrFail($produkId);
+        $p = Produk::with(['brand', 'kualitas', 'tipeHps', 'produkKompatibel', 'hargaTier', 'skuVariants', 'satuanKonversi'])->findOrFail($produkId);
         $this->editProdukId = $p->id;
 
         $tierMap = [
@@ -753,13 +769,24 @@ class ProdukTab extends Component
             'metode_harga_beli' => $p->metode_harga_beli ?? 'manual',
             'margin_persen' => $p->margin_persen !== null ? (float) $p->margin_persen : null,
             'hitung_dari_margin' => $p->margin_persen !== null && (float) $p->margin_persen > 0,
-            'multi_satuan' => $p->satuanKonversi->map(function ($sk) use ($existingCodes) {
+            'multi_satuan' => $p->satuanKonversi->map(function ($sk) use ($existingCodes, $p) {
+                $faktor = (float) $sk->faktor_konversi > 0 ? (float) $sk->faktor_konversi : 1.0;
+                $hargaRetail = (float) $p->harga_jual_retail;
+                $hargaKotorAuto = round($faktor * $hargaRetail);
+                $isManual = ($sk->harga_jual !== null && (float) $sk->harga_jual > 0 && abs((float) $sk->harga_jual - $hargaKotorAuto) > 0.01);
+                $diskonPersen = 0.0;
+                if (! $isManual && $hargaKotorAuto > 0 && $sk->harga_jual !== null && (float) $sk->harga_jual < $hargaKotorAuto) {
+                    $diskonPersen = round((($hargaKotorAuto - (float) $sk->harga_jual) / $hargaKotorAuto) * 100, 1);
+                }
+
                 return [
                     'id' => $sk->id,
                     'satuan_kode' => $sk->satuan_kode,
                     'satuan_asal' => $sk->satuan_asal,
                     'pengali' => (float) $sk->pengali + 0,
-                    'faktor_konversi' => (float) $sk->faktor_konversi + 0,
+                    'faktor_konversi' => $faktor + 0,
+                    'mode_harga' => $isManual ? 'manual' : 'auto',
+                    'diskon_persen' => $diskonPersen,
                     'harga_beli' => $sk->harga_beli !== null ? (float) $sk->harga_beli : null,
                     'harga_jual' => $sk->harga_jual !== null ? (float) $sk->harga_jual : null,
                     'barcode' => $sk->barcode ?? '',
@@ -930,6 +957,17 @@ class ProdukTab extends Component
             }
         }
 
+        if (! empty($this->editProdukForm['multi_satuan'])) {
+            foreach ($this->editProdukForm['multi_satuan'] as $k => $ms) {
+                if (isset($ms['harga_jual']) && $ms['harga_jual'] !== '' && $ms['harga_jual'] !== null) {
+                    $this->editProdukForm['multi_satuan'][$k]['harga_jual'] = $this->parseNominal($ms['harga_jual']);
+                }
+                if (isset($ms['harga_beli']) && $ms['harga_beli'] !== '' && $ms['harga_beli'] !== null) {
+                    $this->editProdukForm['multi_satuan'][$k]['harga_beli'] = $this->parseNominal($ms['harga_beli']);
+                }
+            }
+        }
+
         try {
             app(ProdukService::class)->updateProduk(
                 produkId: $this->editProdukId,
@@ -992,15 +1030,26 @@ class ProdukTab extends Component
             'satuan_asal' => $satuanAsal,
             'pengali' => 10,
             'faktor_konversi' => 10,
+            'mode_harga' => 'auto',
+            'diskon_persen' => 0,
             'harga_beli' => null,
             'harga_jual' => null,
             'barcode' => '',
             'is_satuan_beli' => empty($currentRows),
-            'is_satuan_jual' => false,
+            'is_satuan_jual' => true,
             'is_custom' => false,
         ];
 
         $this->hitungKonversiMultiSatuan($target);
+    }
+
+    public function setModeHargaMultiSatuan(string $target, int $index, string $mode): void
+    {
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        if (isset($this->{$formKey}['multi_satuan'][$index])) {
+            $this->{$formKey}['multi_satuan'][$index]['mode_harga'] = $mode;
+            $this->hitungKonversiMultiSatuan($target);
+        }
     }
 
     public function pilihSatuanUnit(string $target, int $index, string $val): void
@@ -1045,6 +1094,8 @@ class ProdukTab extends Component
     {
         $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
         $base = strtolower(trim($this->{$formKey}['satuan_kode'] ?? 'pcs')) ?: 'pcs';
+        $hargaJualDasar = $this->parseNominal($this->{$formKey}['harga_jual_retail'] ?? 0);
+        $hargaBeliDasar = $this->parseNominal($this->{$formKey}['harga_beli'] ?? 0);
 
         $factors = [$base => 1.0];
 
@@ -1071,6 +1122,18 @@ class ProdukTab extends Component
             }
 
             $this->{$formKey}['multi_satuan'][$idx]['faktor_konversi'] = $faktorKonversi;
+
+            // Mode perhitungan harga multi satuan: auto vs manual
+            $modeHarga = $row['mode_harga'] ?? 'auto';
+            if ($modeHarga === 'auto') {
+                $diskon = isset($row['diskon_persen']) ? (float) $row['diskon_persen'] : 0.0;
+                $totalKotor = $faktorKonversi * $hargaJualDasar;
+                $potongan = ($totalKotor * max(0, min(100, $diskon))) / 100;
+                $hargaFinal = max(0, round($totalKotor - $potongan));
+
+                $this->{$formKey}['multi_satuan'][$idx]['harga_jual'] = $hargaFinal;
+                $this->{$formKey}['multi_satuan'][$idx]['harga_beli'] = round($faktorKonversi * $hargaBeliDasar);
+            }
         }
     }
 
@@ -1283,15 +1346,16 @@ class ProdukTab extends Component
                 $pesan = "Tipe HP '{$tipe->nama}' berhasil ditambahkan";
                 break;
             case 'kategori':
-                $kat = KategoriProduk::create([
-                    'nama' => $nama,
-                    'parent_id' => $this->quickAddForm['parent_id'] ?: null,
-                    'is_active' => true,
-                ]);
+                $kat = KategoriProduk::firstOrCreate(
+                    ['nama' => $nama],
+                    ['parent_id' => $this->quickAddForm['parent_id'] ?: null, 'is_active' => true]
+                );
                 if ($this->showEditProdukModal) {
                     $this->editProdukForm['kategori_id'] = $kat->id;
+                    $this->editProdukForm['kategori'] = $kat->nama;
                 } else {
                     $this->produkForm['kategori_id'] = $kat->id;
+                    $this->produkForm['kategori'] = $kat->nama;
                 }
                 $pesan = "Kategori '{$nama}' berhasil ditambahkan";
                 break;

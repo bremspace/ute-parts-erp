@@ -322,12 +322,39 @@ html[data-theme="dark"] select option {
 }
 
 /* Safety Fallback: Kontras teks putih yang tidak memiliki variant dark: di tema terang */
+html[data-theme="light"]:not(.dark) select option,
+html:not(.dark) select option {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+}
+
 html[data-theme="light"]:not(.dark) table td.text-white:not([class*="bg-"]),
 html[data-theme="light"]:not(.dark) table td > span.text-white:not([class*="bg-"]),
 html:not(.dark) table td.text-white:not([class*="bg-"]),
 html:not(.dark) table td > span.text-white:not([class*="bg-"]),
 html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-white,
 html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-white {
+    color: #0F172A !important;
+}
+
+html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-200,
+html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-200 {
+    color: #334155 !important;
+}
+
+html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-300,
+html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-300 {
+    color: #475569 !important;
+}
+
+html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-400,
+html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-400 {
+    color: #64748B !important;
+}
+
+html[data-theme="light"]:not(.dark) select.glass-input,
+html:not(.dark) select.glass-input {
+    background-color: #FFFFFF !important;
     color: #0F172A !important;
 }
 

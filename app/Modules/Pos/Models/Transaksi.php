@@ -31,6 +31,7 @@ use Spatie\Activitylog\Support\LogOptions;
     // diam-diam, payment_reference/payment_url juga. Sumber kebenaran paid_at
     // tetap `transaksi.paid_at` (tidak ada duplikasi ke tabel lain).
     'payment_reference', 'payment_url', 'paid_at',
+    'void_by_id', 'void_at', 'void_alasan',
 ])]
 class Transaksi extends Model
 {
@@ -98,5 +99,10 @@ class Transaksi extends Model
     public function channelOrder(): HasOne
     {
         return $this->hasOne(ChannelOrder::class, 'transaksi_id');
+    }
+
+    public function voidBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'void_by_id');
     }
 }

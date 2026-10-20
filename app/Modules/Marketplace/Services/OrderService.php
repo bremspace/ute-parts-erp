@@ -102,6 +102,8 @@ class OrderService
                     'produk_id' => $row['produk']->id,
                     'sku_variant_id' => $row['sku_variant_id'],
                     'jumlah' => $row['jumlah'],
+                    'satuan' => $row['satuan'] ?? ($row['produk']->satuan ?: 'pcs'),
+                    'konversi' => $row['konversi'] ?? 1,
                     'harga_satuan' => $row['harga_satuan'],
                     'diskon_nominal' => 0,
                     'subtotal' => $row['subtotal'],

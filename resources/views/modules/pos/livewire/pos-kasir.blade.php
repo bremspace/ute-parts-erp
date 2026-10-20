@@ -3,6 +3,11 @@
     x-data="{
         flexSet: {},
         searchOpen: false,
+        cartViewMode: localStorage.getItem('pos_cart_view_mode') || 'card',
+        setCartViewMode(mode) {
+            this.cartViewMode = mode;
+            localStorage.setItem('pos_cart_view_mode', mode);
+        }
     }"
     @keydown.window.f4.prevent="$wire.openPaymentModal()"
     @keydown.window.f6.prevent="$wire.tahanTransaksi()"
@@ -30,31 +35,36 @@
                 <div
                     x-show="searchOpen && $wire.search.length > 0"
                     x-transition:enter="transition ease-out duration-150"
-                    x-transition:enter-start="opacity-0 translate-y-1 scale-[0.99]"
+                    x-transition:enter-start="opacity-0 translate-y-2 scale-[0.98]"
                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
                     x-transition:leave="transition ease-in duration-100"
                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                    x-transition:leave-end="opacity-0 translate-y-1 scale-[0.99]"
-                    class="absolute left-0 right-0 top-full mt-2 z-50 bg-white dark:bg-[#0B1120] border border-ink-200/90 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden max-h-[65vh] flex flex-col"
+                    x-transition:leave-end="opacity-0 translate-y-2 scale-[0.98]"
+                    class="absolute left-0 right-0 sm:left-0 sm:right-auto sm:w-[580px] lg:w-[680px] top-full mt-2 z-50 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border border-ink-200/90 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden max-h-[70vh] flex flex-col"
                     x-cloak
                 >
-                    <div class="px-4 py-2.5 bg-ink-50 dark:bg-white/[0.04] border-b border-ink-200/80 dark:border-white/10 flex items-center justify-between text-xs">
+                    <div class="px-3.5 sm:px-4 py-2.5 bg-ink-50/90 dark:bg-white/[0.04] border-b border-ink-200/80 dark:border-white/10 flex items-center justify-between text-xs flex-shrink-0">
                         <div class="flex items-center gap-2">
-                            <span class="font-bold text-ink-900 dark:text-white">Hasil Pencarian Produk</span>
-                            <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold text-[10px] tabular-nums">
+                            <span class="font-bold text-ink-900 dark:text-white flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                Hasil Pencarian Produk
+                            </span>
+                            <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold text-[10px] tabular-nums border border-up-primary/20">
                                 {{ count($products) }} item
                             </span>
                         </div>
                         <button
                             type="button"
                             @click="searchOpen = false"
-                            class="text-xs text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer px-1 py-0.5 rounded hover:bg-ink-200 dark:hover:bg-white/10"
+                            class="text-xs text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer px-2 py-1 rounded-lg hover:bg-ink-200/70 dark:hover:bg-white/10 transition-colors"
                         >
                             ✕ Tutup (ESC)
                         </button>
                     </div>
 
-                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-1">
+                    <div class="overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 p-1.5 sm:p-2 space-y-1">
                         @forelse($products as $prod)
                             @php
                                 $stokTotal = $stokPerProduk[$prod->id] ?? (\App\Modules\Pos\Livewire\PosKasir::STOK_TANPA_GUDANG);
@@ -64,6 +74,9 @@
                                     ? 'Pilih gudang terlebih dahulu untuk melihat stok & memilih produk ini.'
                                     : "Stok {$prod->nama} habis di gudang ini — tidak bisa dipilih. Pilih gudang lain yang punya stok.";
                                 $pricing = app(\App\Modules\Pos\Services\PricingService::class)->resolve($prod, $customer);
+                                $baseHarga = (float) $pricing['harga'];
+                                $satuanDasar = strtoupper($prod->satuan ?: 'PCS');
+                                $satuanList = $prod->satuanKonversi ?? collect();
                             @endphp
                             <div
                                 wire:key="search-product-{{ $prod->id }}"
@@ -71,44 +84,59 @@
                                     role="button"
                                     aria-disabled="true"
                                     title="{{ $alasanTidakBisaDipilih }}"
-                                    class="p-3 rounded-xl flex items-center justify-between gap-3 opacity-55 grayscale cursor-not-allowed select-none bg-ink-50/50 dark:bg-white/[0.01]"
-                                @else
-                                    role="button"
-                                    wire:click="addToCart({{ $prod->id }})"
-                                    @click="searchOpen = false"
-                                    title="{{ $prod->nama }} — stok {{ $stokTotal }} unit. Klik untuk menambah."
-                                    class="p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:bg-ink-100/80 dark:hover:bg-white/[0.06] transition group select-none active:scale-[0.99]"
                                 @endif
+                                class="p-2.5 sm:p-3 rounded-xl border border-transparent transition-all flex flex-col gap-2 {{ $stokKosong ? 'opacity-60 grayscale-[40%] bg-ink-50/40 dark:bg-white/[0.01]' : 'hover:bg-ink-50/90 dark:hover:bg-white/[0.04] hover:border-ink-200/60 dark:border-white/10' }}"
                             >
-                                <div class="min-w-0 flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center font-bold text-ink-400 text-[10px]">
-                                        @if($prod->thumbnail_url ?: $prod->gambar)
-                                            <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" class="w-full h-full object-cover rounded-xl" onerror="this.style.display='none';">
-                                        @else
-                                            UTE
-                                        @endif
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="flex items-center gap-2 flex-wrap">
-                                            <span class="font-mono text-[11px] font-bold text-ink-500">{{ $prod->sku }}</span>
-                                            <span class="text-[10px] uppercase font-semibold text-ink-400">
-                                                {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
-                                            </span>
-                                            @if($prod->tipeHps->count() > 0)
-                                                <span class="text-[10px] text-up-primary font-medium">
-                                                    📱 {{ $prod->tipeHps->pluck('model')->take(2)->join(', ') }}
-                                                </span>
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0 flex items-start gap-2.5 sm:gap-3 flex-1">
+                                        <!-- Thumbnail with fallback icon -->
+                                        <div class="w-12 h-12 rounded-xl bg-ink-100 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                            @if($prod->thumbnail_url ?: $prod->gambar)
+                                                <img src="{{ $prod->thumbnail_url ?: $prod->gambar }}" alt="{{ $prod->nama }}" class="w-full h-full object-cover rounded-xl" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
+                                                <div class="hidden w-full h-full items-center justify-center text-ink-400 dark:text-ink-500">
+                                                    <svg class="w-5 h-5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                    </svg>
+                                                </div>
+                                            @else
+                                                <svg class="w-5 h-5 text-ink-400 dark:text-ink-500 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                                </svg>
                                             @endif
                                         </div>
-                                        <h4 class="font-semibold text-xs sm:text-sm text-ink-900 dark:text-white truncate group-hover:text-up-primary transition-colors">
-                                            {{ $prod->nama }}
-                                        </h4>
-                                    </div>
-                                </div>
 
-                                <div class="flex items-center gap-3 flex-shrink-0">
-                                    <!-- Stock -->
-                                    <div class="text-right">
+                                        <!-- Title, SKU, Chips -->
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                                <span class="font-mono text-[10px] sm:text-[11px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
+                                                    {{ $prod->sku }}
+                                                </span>
+                                                <span class="text-[10px] uppercase font-semibold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded">
+                                                    {{ $prod->kategoriRelasi?->nama ?? $prod->kategori ?? 'Sparepart' }}
+                                                </span>
+                                                <span class="text-[10px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded uppercase">
+                                                    Satuan: {{ $satuanDasar }}
+                                                </span>
+                                                @if($prod->tipeHps->count() > 0)
+                                                    <span class="text-[10px] text-up-primary font-medium bg-up-primary/10 px-1.5 py-0.5 rounded border border-up-primary/20">
+                                                        📱 {{ $prod->tipeHps->pluck('model')->take(2)->join(', ') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+
+                                            <h4 class="font-bold text-xs sm:text-sm text-ink-900 dark:text-white leading-snug line-clamp-1">
+                                                {{ $prod->nama }}
+                                            </h4>
+                                        </div>
+                                    </div>
+
+                                    <!-- Price & Stock Badge -->
+                                    <div class="text-right flex-shrink-0 flex flex-col items-end gap-1">
+                                        <span class="text-xs sm:text-sm font-black text-up-mint tabular-nums">
+                                            Rp {{ number_format($baseHarga, 0, ',', '.') }}
+                                            <span class="text-[10px] font-normal text-ink-400">/{{ $satuanDasar }}</span>
+                                        </span>
+
                                         @if($stokKosong)
                                             <x-prism.status-pill status="batal">
                                                 {{ $gudangDipilih ? 'Stok kosong' : 'Pilih gudang dulu' }}
@@ -118,32 +146,81 @@
                                             <x-prism.stock-gauge :stok="$stokTotal" :min="5" />
                                         @endif
                                     </div>
+                                </div>
 
-                                    <!-- Price & Action -->
-                                    <div class="text-right min-w-[90px]">
-                                        <span class="text-xs sm:text-sm font-bold text-up-mint tabular-nums block">
-                                            Rp {{ number_format($pricing['harga'], 0, ',', '.') }}
-                                        </span>
-                                        @if(! $stokKosong)
-                                            <span class="text-[10px] font-bold text-up-primary group-hover:underline">
-                                                + Tambah
-                                            </span>
+                                <!-- Action Buttons & Multi-Satuan Quick-Add -->
+                                <div class="flex items-center justify-between gap-2 pt-2 border-t border-ink-100 dark:border-white/5 flex-wrap">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        @if($satuanList->isNotEmpty())
+                                            <span class="text-[10px] font-semibold text-ink-400 uppercase tracking-wider hidden sm:inline">Pilihan Kemasan:</span>
+                                            @foreach($satuanList as $sk)
+                                                @php
+                                                    $fKonv = max(0.0001, (float) $sk->faktor_konversi);
+                                                    $hargaSk = $sk->harga_jual > 0 ? (float) $sk->harga_jual : round($baseHarga * $fKonv, 2);
+                                                @endphp
+                                                <span class="text-[10px] px-2 py-0.5 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 text-ink-600 dark:text-ink-300 tabular-nums">
+                                                    1 {{ strtoupper($sk->satuan_kode) }} ({{ $fKonv + 0 }} {{ $satuanDasar }}) • Rp {{ number_format($hargaSk, 0, ',', '.') }}
+                                                </span>
+                                            @endforeach
+                                        @endif
+                                    </div>
+
+                                    <!-- Quick Add Buttons -->
+                                    <div class="flex items-center gap-1.5 ml-auto">
+                                        @if($stokKosong)
+                                            <button
+                                                type="button"
+                                                disabled
+                                                title="{{ $alasanTidakBisaDipilih }}"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-ink-200/50 dark:bg-white/5 text-ink-400 cursor-not-allowed select-none"
+                                            >
+                                                Stok Habis
+                                            </button>
+                                        @else
+                                            <!-- Tombol Tambah Satuan Dasar -->
+                                            <button
+                                                type="button"
+                                                wire:click="addToCart({{ $prod->id }})"
+                                                @click="searchOpen = false"
+                                                title="Tambah 1 {{ $satuanDasar }}"
+                                                class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold bg-up-primary hover:bg-up-primary-dark text-white cursor-pointer transition active:scale-95 flex items-center gap-1 shadow-sm shadow-up-primary/20 min-h-[34px]"
+                                            >
+                                                <span>+ {{ $satuanDasar }}</span>
+                                            </button>
+
+                                            <!-- Tombol Tambah Tiap Multi-Satuan Konversi -->
+                                            @foreach($satuanList as $sk)
+                                                <button
+                                                    type="button"
+                                                    wire:click="addToCart({{ $prod->id }}, null, '{{ $sk->satuan_kode }}')"
+                                                    @click="searchOpen = false"
+                                                    title="Tambah 1 {{ strtoupper($sk->satuan_kode) }}"
+                                                    class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 cursor-pointer transition active:scale-95 flex items-center gap-1 min-h-[34px]"
+                                                >
+                                                    <span>+ {{ strtoupper($sk->satuan_kode) }}</span>
+                                                </button>
+                                            @endforeach
                                         @endif
                                     </div>
                                 </div>
                             </div>
                         @empty
-                            <div class="py-10 text-center text-ink-400 text-xs">
+                            <div class="py-12 text-center text-ink-400 text-xs">
+                                <div class="w-10 h-10 rounded-2xl bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/10 mx-auto mb-2 flex items-center justify-center text-ink-400">
+                                    <svg class="w-5 h-5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
                                 <p>Tidak ada produk ditemukan untuk pencarian "<span class="text-ink-900 dark:text-white font-semibold">{{ $search }}</span>"</p>
                             </div>
                         @endforelse
 
                         @if($adaLebihBanyak)
-                            <div class="p-2 text-center">
+                            <div class="p-2.5 text-center">
                                 <button
                                     type="button"
                                     wire:click="muatLebihBanyak"
-                                    class="text-xs font-bold text-up-primary hover:underline cursor-pointer"
+                                    class="text-xs font-bold text-up-primary hover:underline cursor-pointer py-1 px-3 rounded-lg hover:bg-up-primary/10 transition"
                                 >
                                     Muat lebih banyak…
                                 </button>
@@ -317,6 +394,35 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     </svg>
                     <span>Bayar Servis</span>
+                </button>
+
+                <!-- Shortcut Mutasi Kas Laci (Sejajar dengan Retur & Riwayat) -->
+                <button
+                    type="button"
+                    wire:click="bukaMutasiKasModal('keluar')"
+                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
+                    title="Catat Mutasi Kas Masuk / Keluar Laci"
+                >
+                    <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Mutasi Kas</span>
+                </button>
+
+                <!-- Shortcut Transaksi Ditahan (Park) -->
+                <button
+                    type="button"
+                    wire:click="bukaDitahanPanel"
+                    class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-up-amber/30 bg-up-amber/10 hover:bg-up-amber/20 text-xs font-bold text-up-amber transition flex items-center gap-1.5 cursor-pointer min-h-[36px] active:scale-[0.98] flex-shrink-0 whitespace-nowrap"
+                    title="Lihat & Lanjutkan Transaksi yang Ditahan"
+                >
+                    <svg class="w-4 h-4 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Ditahan</span>
+                    @if($ditahanList->count() > 0)
+                        <span class="min-w-[18px] h-4.5 px-1 rounded-full bg-up-amber text-ink-950 text-[10px] font-black flex items-center justify-center tabular-nums">{{ $ditahanList->count() }}</span>
+                    @endif
                 </button>
             </div>
 
@@ -512,14 +618,405 @@
 
     <!-- MAIN STAGE: TABEL TRANSAKSI KASIR (LELUASA, MODERN & BERSIH) -->
     <div class="flex-1 min-h-[300px] sm:min-h-0 bg-white dark:bg-[#0F172A]/70 backdrop-blur-md border border-ink-200/80 dark:border-white/5 rounded-2xl p-3 sm:p-4 flex flex-col shadow-sm overflow-hidden">
-        <!-- Table Area -->
-        <div class="flex-1 overflow-x-auto overflow-y-auto pr-0.5">
+        <!-- Mobile Cart Header: Counter & View Toggle (sm:hidden) -->
+        <div class="sm:hidden flex items-center justify-between pb-2.5 mb-2 border-b border-ink-200/70 dark:border-white/10 flex-shrink-0">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-ink-900 dark:text-white">Keranjang Belanja</span>
+                <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold text-[10px] tabular-nums border border-up-primary/20">
+                    {{ count($cart) }} item
+                </span>
+            </div>
+
+            <!-- Toggle View Mode: Card vs List -->
+            <div class="flex items-center bg-ink-100 dark:bg-white/5 rounded-xl p-0.5 border border-ink-200/80 dark:border-white/10">
+                <button
+                    type="button"
+                    @click="setCartViewMode('card')"
+                    :class="cartViewMode === 'card' ? 'bg-white dark:bg-ink-800 text-up-primary shadow-sm font-bold' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'"
+                    class="px-2.5 py-1 rounded-lg text-xs transition flex items-center gap-1 cursor-pointer min-h-[30px]"
+                    title="Tampilan Kartu"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                    <span>Card</span>
+                </button>
+                <button
+                    type="button"
+                    @click="setCartViewMode('list')"
+                    :class="cartViewMode === 'list' ? 'bg-white dark:bg-ink-800 text-up-primary shadow-sm font-bold' : 'text-ink-500 hover:text-ink-900 dark:hover:text-white'"
+                    class="px-2.5 py-1 rounded-lg text-xs transition flex items-center gap-1 cursor-pointer min-h-[30px]"
+                    title="Tampilan List Kompak"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <span>List</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 1. Mobile Cart: Card View Mode -->
+        <div x-show="cartViewMode === 'card'" class="sm:hidden flex-1 overflow-y-auto space-y-2.5 pr-0.5">
+            @forelse($cart as $key => $item)
+                <div
+                    wire:key="cart-mobile-card-{{ $key }}"
+                    x-data="{
+                        flexOpen: false,
+                        flexHarga: '{{ number_format($item['harga'] ?? 0, 0, '', '') }}',
+                        saveFlexHarga(k) {
+                            const raw = this.flexHarga.replace(/\./g, '').replace(/,/g, '.');
+                            const val = Number(raw);
+                            if (isNaN(val)) {
+                                $dispatch('alert', { type: 'error', message: 'Harga tidak valid' });
+                                return;
+                            }
+                            @if(canSeeField('harga_beli'))
+                            if (val < {{ $item['harga_beli'] ?? $item['harga'] ?? 0 }}) {
+                                $dispatch('alert', { type: 'error', message: 'Harga tidak boleh di bawah modal' });
+                                return;
+                            }
+                            @endif
+                            @this.setHargaFleksibel(k, val);
+                            this.flexOpen = false;
+                        }
+                    }"
+                    class="p-3.5 rounded-2xl bg-ink-50/80 dark:bg-white/[0.03] border border-ink-200/70 dark:border-white/5 flex flex-col gap-2.5 shadow-sm"
+                >
+                    <!-- Header Kartu: SKU, Nama, Satuan & Tombol Hapus -->
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5 flex-wrap mb-1">
+                                <span class="font-mono text-[10px] font-bold text-ink-600 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded border border-ink-200/60 dark:border-white/5">
+                                    {{ $item['sku'] ?? $key }}
+                                </span>
+                                @if(($item['varian'] ?? 'Standar') !== 'Standar')
+                                    <span class="px-1.5 py-0.5 rounded bg-ink-200/70 dark:bg-white/10 text-ink-700 dark:text-ink-300 text-[10px] font-medium">
+                                        {{ $item['varian'] }}
+                                    </span>
+                                @endif
+                                @if(isset($item['flex']) && $item['flex'])
+                                    <span class="px-1.5 py-0.5 rounded-full bg-up-amber/15 text-up-amber text-[10px] font-bold border border-up-amber/30">
+                                        Fleksibel
+                                    </span>
+                                @endif
+                                @if(($item['stok_max'] ?? 1) <= 0)
+                                    <span class="px-1.5 py-0.5 rounded-full bg-up-red/15 text-up-red text-[10px] font-bold border border-up-red/30">
+                                        Stok habis
+                                    </span>
+                                @endif
+                            </div>
+                            <h5 class="text-xs font-bold text-ink-900 dark:text-white leading-snug line-clamp-2">
+                                {{ $item['nama'] }}
+                            </h5>
+                        </div>
+
+                        <!-- Tombol Hapus Touch Friendly (min 44px) -->
+                        <button
+                            type="button"
+                            wire:click="removeFromCart('{{ $key }}')"
+                            class="w-11 h-11 rounded-xl text-ink-400 hover:text-up-red hover:bg-up-red/10 flex items-center justify-center transition-colors cursor-pointer active:scale-90 flex-shrink-0 -mr-1 -mt-1"
+                            title="Hapus item"
+                            aria-label="Hapus item dari keranjang"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Satuan Selector / Dropdown Interaktif Mobile -->
+                    <div class="flex items-center justify-between gap-2 py-2 px-3 rounded-xl bg-white dark:bg-white/[0.02] border border-ink-200/70 dark:border-white/5">
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-bold text-ink-700 dark:text-ink-300">Satuan / Kemasan:</span>
+                            @if(($item['konversi'] ?? 1) > 1)
+                                <span class="text-[10px] text-ink-400 font-medium">1 {{ strtoupper($item['satuan']) }} = {{ (float)$item['konversi'] }} {{ strtoupper($item['satuan_dasar'] ?? 'pcs') }}</span>
+                            @endif
+                        </div>
+                        @if(count($item['daftar_satuan'] ?? []) > 1)
+                            <div class="relative flex-1 max-w-[190px]">
+                                <select
+                                    wire:change="ubahSatuanItem('{{ $key }}', $event.target.value)"
+                                    class="w-full text-xs font-black uppercase py-2 pl-3 pr-8 rounded-lg bg-up-primary/10 border-2 border-up-primary/30 text-up-primary dark:text-up-primary hover:bg-up-primary/20 cursor-pointer focus:outline-none focus:ring-1 focus:ring-up-primary appearance-none min-h-[40px]"
+                                    title="Ganti Satuan / Kemasan"
+                                >
+                                    @foreach($item['daftar_satuan'] as $ds)
+                                        <option value="{{ $ds['satuan_kode'] }}" {{ ($item['satuan'] ?? 'pcs') === $ds['satuan_kode'] ? 'selected' : '' }} class="bg-white dark:bg-[#0B1120] text-ink-900 dark:text-white font-bold">
+                                            {{ strtoupper($ds['satuan_kode']) }} ({{ (float)$ds['faktor_konversi'] }}x)
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-up-primary">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </div>
+                        @else
+                            <span class="px-2.5 py-1.5 rounded-md bg-ink-100 dark:bg-white/5 text-ink-700 dark:text-ink-300 text-xs font-bold uppercase tracking-wider border border-ink-200/60 dark:border-white/5">
+                                {{ strtoupper($item['satuan'] ?? 'pcs') }}
+                            </span>
+                        @endif
+                    </div>
+
+                    <!-- Harga, Stepper Qty & Subtotal -->
+                    <div class="flex items-center justify-between gap-2 pt-1 border-t border-ink-200/60 dark:border-white/5">
+                        <!-- Harga per satuan -->
+                        <div class="relative">
+                            @if(isset($item['flex']) && $item['flex'])
+                                <div class="flex items-center gap-1.5">
+                                    <span class="tabular-nums font-bold text-xs text-up-amber">
+                                        Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                    </span>
+                                    @if($canHargaFleksibel)
+                                        <button
+                                            type="button"
+                                            @click="flexOpen = true"
+                                            class="px-2 py-0.5 rounded-md text-[10px] font-bold text-up-amber bg-up-amber/10 border border-up-amber/30 hover:bg-up-amber/20 cursor-pointer"
+                                        >
+                                            Edit
+                                        </button>
+                                    @endif
+                                </div>
+
+                                <!-- Popover Atur Harga Mobile -->
+                                <div
+                                    x-show="flexOpen"
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0 scale-95"
+                                    x-transition:enter-end="opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-100"
+                                    x-transition:leave-start="opacity-100 scale-100"
+                                    x-transition:leave-end="opacity-0 scale-95"
+                                    @click.outside="flexOpen = false"
+                                    @keydown.escape="flexOpen = false"
+                                    class="absolute left-0 bottom-full mb-1 z-30 min-w-[210px] p-3 rounded-2xl glass-panel border border-ink-200/90 dark:border-white/10 shadow-2xl bg-white dark:bg-[#0B1120]"
+                                    x-cloak
+                                >
+                                    <label class="block text-[10px] font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider mb-1">Ubah Harga (Rp)</label>
+                                    <input
+                                        type="text"
+                                        inputmode="numeric"
+                                        x-format-number
+                                        x-model="flexHarga"
+                                        @keydown.enter.prevent="saveFlexHarga('{{ $key }}')"
+                                        class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs font-bold tabular-nums text-ink-900 dark:text-white mb-1.5"
+                                    />
+                                    @cansee('harga_beli')
+                                        <p class="text-[9px] text-up-amber font-medium mb-2">Batas Modal: Rp {{ number_format($item['harga_beli'] ?? $item['harga'], 0, ',', '.') }}</p>
+                                    @endcansee
+                                    <div class="flex gap-1.5">
+                                        <button
+                                            type="button"
+                                            @click="saveFlexHarga('{{ $key }}')"
+                                            class="flex-1 py-1.5 rounded-lg bg-up-amber hover:opacity-95 text-ink-950 font-bold text-[11px] cursor-pointer"
+                                        >
+                                            Simpan
+                                        </button>
+                                        <button
+                                            type="button"
+                                            @click="flexOpen = false"
+                                            class="px-2.5 py-1.5 rounded-lg bg-ink-200/80 dark:bg-white/10 text-ink-700 dark:text-ink-300 text-[11px] cursor-pointer"
+                                        >
+                                            Batal
+                                        </button>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] text-ink-400">Harga Satuan</span>
+                                    <span class="tabular-nums font-semibold text-xs text-ink-700 dark:text-ink-300">
+                                        Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                    </span>
+                                </div>
+                            @endif
+                        </div>
+
+                        <!-- Stepper & Subtotal -->
+                        <div class="flex items-center gap-2.5">
+                            <div class="inline-flex items-center bg-ink-100 dark:bg-white/5 rounded-xl p-0.5 border border-ink-200/80 dark:border-white/10">
+                                <button
+                                    type="button"
+                                    wire:click="updateQty('{{ $key }}', -1)"
+                                    class="w-8 h-8 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    aria-label="Kurangi"
+                                >-</button>
+                                <span class="w-8 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white">{{ $item['qty'] }}</span>
+                                <button
+                                    type="button"
+                                    wire:click="updateQty('{{ $key }}', 1)"
+                                    class="w-8 h-8 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    aria-label="Tambah"
+                                >+</button>
+                            </div>
+
+                            <div class="text-right min-w-[75px]">
+                                <span class="text-[10px] text-ink-400 block">Subtotal</span>
+                                <span class="text-xs sm:text-sm font-black text-up-mint tabular-nums block">
+                                    Rp {{ number_format($item['subtotal'] ?? ($item['harga'] * $item['qty']), 0, ',', '.') }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SN Control Partial -->
+                    @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
+                </div>
+            @empty
+                <div class="py-12 text-center text-ink-400">
+                    <div class="w-14 h-14 rounded-3xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary mx-auto mb-3">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-sm font-bold text-ink-900 dark:text-white">Keranjang Masih Kosong</h3>
+                    <p class="text-xs text-ink-500 mt-1">Scan barcode atau ketik nama barang di atas.</p>
+                </div>
+            @endforelse
+        </div>
+
+        <!-- 2. Mobile Cart: List View Mode (Kompak & Padat untuk Banyak Item) -->
+        <div x-show="cartViewMode === 'list'" class="sm:hidden flex-1 overflow-y-auto divide-y divide-ink-200/60 dark:divide-white/5 pr-0.5">
+            @forelse($cart as $key => $item)
+                <div
+                    wire:key="cart-mobile-list-{{ $key }}"
+                    x-data="{
+                        flexOpen: false,
+                        flexHarga: '{{ number_format($item['harga'] ?? 0, 0, '', '') }}',
+                        saveFlexHarga(k) {
+                            const raw = this.flexHarga.replace(/\./g, '').replace(/,/g, '.');
+                            const val = Number(raw);
+                            if (isNaN(val)) {
+                                $dispatch('alert', { type: 'error', message: 'Harga tidak valid' });
+                                return;
+                            }
+                            @if(canSeeField('harga_beli'))
+                            if (val < {{ $item['harga_beli'] ?? $item['harga'] ?? 0 }}) {
+                                $dispatch('alert', { type: 'error', message: 'Harga tidak boleh di bawah modal' });
+                                return;
+                            }
+                            @endif
+                            @this.setHargaFleksibel(k, val);
+                            this.flexOpen = false;
+                        }
+                    }"
+                    class="py-2.5 px-1.5 flex flex-col gap-1.5 transition-colors hover:bg-ink-50/50 dark:hover:bg-white/[0.02]"
+                >
+                    <!-- Top Row: SKU, Nama (truncate), Satuan & Tombol Hapus -->
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="min-w-0 flex items-center gap-1.5 flex-1">
+                            <span class="font-mono text-[9px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100 dark:bg-white/5 px-1.5 py-0.5 rounded flex-shrink-0">
+                                {{ $item['sku'] ?? $key }}
+                            </span>
+                            <h5 class="text-xs font-semibold text-ink-900 dark:text-white truncate" title="{{ $item['nama'] }}">
+                                {{ $item['nama'] }}
+                            </h5>
+                        </div>
+
+                        <!-- Dropdown / Badge Satuan Ringkas -->
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            @if(count($item['daftar_satuan'] ?? []) > 1)
+                                <select
+                                    wire:change="ubahSatuanItem('{{ $key }}', $event.target.value)"
+                                    class="text-[10px] font-bold uppercase py-1 px-1.5 rounded-lg bg-up-primary/10 border border-up-primary/25 text-up-primary dark:text-up-primary cursor-pointer focus:outline-none min-h-[34px]"
+                                    title="Ganti Satuan"
+                                >
+                                    @foreach($item['daftar_satuan'] as $ds)
+                                        <option value="{{ $ds['satuan_kode'] }}" {{ ($item['satuan'] ?? 'pcs') === $ds['satuan_kode'] ? 'selected' : '' }} class="bg-white dark:bg-[#0B1120] text-ink-900 dark:text-white">
+                                            {{ strtoupper($ds['satuan_kode']) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @else
+                                <span class="px-1.5 py-0.5 rounded bg-ink-100 dark:bg-white/5 text-ink-600 dark:text-ink-300 text-[10px] font-bold uppercase">
+                                    {{ strtoupper($item['satuan'] ?? 'pcs') }}
+                                </span>
+                            @endif
+
+                            <!-- Tombol Hapus Touch Friendly (min 38-44px) -->
+                            <button
+                                type="button"
+                                wire:click="removeFromCart('{{ $key }}')"
+                                class="w-10 h-10 rounded-lg text-ink-400 hover:text-up-red hover:bg-up-red/10 flex items-center justify-center transition-colors cursor-pointer active:scale-90"
+                                title="Hapus item"
+                                aria-label="Hapus item"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Row: Harga Satuan, Stepper (+ -), Subtotal -->
+                    <div class="flex items-center justify-between gap-2">
+                        <!-- Harga Satuan / Flex -->
+                        <div class="relative min-w-0">
+                            @if(isset($item['flex']) && $item['flex'])
+                                <div class="flex items-center gap-1">
+                                    <span class="tabular-nums font-bold text-[11px] text-up-amber">
+                                        Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                    </span>
+                                    @if($canHargaFleksibel)
+                                        <button
+                                            type="button"
+                                            @click="flexOpen = true"
+                                            class="px-1.5 py-0.5 rounded text-[9px] font-bold text-up-amber bg-up-amber/10 border border-up-amber/30 cursor-pointer"
+                                        >
+                                            Edit
+                                        </button>
+                                    @endif
+                                </div>
+                            @else
+                                <span class="text-[11px] tabular-nums font-medium text-ink-500 dark:text-ink-400">
+                                    @ Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                </span>
+                            @endif
+                        </div>
+
+                        <!-- Stepper & Subtotal -->
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <div class="inline-flex items-center bg-ink-100 dark:bg-white/5 rounded-lg p-0.5 border border-ink-200/80 dark:border-white/10">
+                                <button
+                                    type="button"
+                                    wire:click="updateQty('{{ $key }}', -1)"
+                                    class="w-8 h-8 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    aria-label="Kurangi"
+                                >-</button>
+                                <span class="w-7 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white">{{ $item['qty'] }}</span>
+                                <button
+                                    type="button"
+                                    wire:click="updateQty('{{ $key }}', 1)"
+                                    class="w-8 h-8 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
+                                    aria-label="Tambah"
+                                >+</button>
+                            </div>
+
+                            <span class="text-xs font-black text-up-mint tabular-nums min-w-[75px] text-right">
+                                Rp {{ number_format($item['subtotal'] ?? ($item['harga'] * $item['qty']), 0, ',', '.') }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- SN Control Partial -->
+                    @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
+                </div>
+            @empty
+                <div class="py-12 text-center text-ink-400">
+                    <p class="text-xs font-semibold text-ink-700 dark:text-ink-300">Keranjang masih kosong</p>
+                </div>
+            @endforelse
+        </div>
+
+        <!-- 3. Table Area (Desktop sm:block) -->
+        <div class="hidden sm:block flex-1 overflow-x-auto overflow-y-auto pr-0.5">
             <table class="w-full text-left text-xs border-collapse">
                 <thead class="sticky top-0 z-10 bg-white dark:bg-[#0F172A] border-b border-ink-200/80 dark:border-white/10">
                     <tr class="text-[11px] font-bold text-ink-500 uppercase tracking-wider">
                         <th class="py-2.5 px-2.5 text-center w-10">#</th>
                         <th class="py-2.5 px-3 w-28 sm:w-32">Kode / SKU</th>
                         <th class="py-2.5 px-3 min-w-[180px]">Nama Barang & Spesifikasi</th>
+                        <th class="py-2.5 px-3 text-center w-28 sm:w-36">Satuan</th>
                         <th class="py-2.5 px-3 text-right w-28 sm:w-36">Harga Satuan</th>
                         <th class="py-2.5 px-3 text-center w-28 sm:w-32">Qty</th>
                         <th class="py-2.5 px-3 text-right w-32 sm:w-36">Subtotal</th>
@@ -563,6 +1060,40 @@
                                     <!-- SN Control Partial -->
                                     @include('modules.pos.livewire.partials.sn-control', ['itemKey' => $key, 'item' => $item])
                                 </div>
+                            </td>
+                            <!-- Kolom Satuan / Kemasan Interaktif Desktop -->
+                            <td class="py-2.5 px-3 text-center">
+                                @if(count($item['daftar_satuan'] ?? []) > 1)
+                                    <div class="inline-flex flex-col items-center gap-1">
+                                        <div class="relative w-full min-w-[110px]">
+                                            <select
+                                                wire:change="ubahSatuanItem('{{ $key }}', $event.target.value)"
+                                                class="w-full text-xs font-bold uppercase py-1.5 pl-2.5 pr-7 rounded-lg bg-up-primary/10 border border-up-primary/30 text-up-primary hover:bg-up-primary/20 cursor-pointer focus:outline-none focus:ring-1 focus:ring-up-primary appearance-none transition shadow-sm text-center"
+                                                title="Ganti Satuan / Kemasan"
+                                            >
+                                                @foreach($item['daftar_satuan'] as $ds)
+                                                    <option value="{{ $ds['satuan_kode'] }}" {{ ($item['satuan'] ?? 'pcs') === $ds['satuan_kode'] ? 'selected' : '' }} class="bg-white dark:bg-[#0B1120] text-ink-900 dark:text-white font-bold">
+                                                        {{ strtoupper($ds['satuan_kode']) }} ({{ (float)$ds['faktor_konversi'] }}x)
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-up-primary">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        @if(($item['konversi'] ?? 1) > 1)
+                                            <span class="text-[9px] text-ink-400 font-medium whitespace-nowrap">
+                                                1 {{ strtoupper($item['satuan']) }} = {{ (float)$item['konversi'] }} {{ strtoupper($item['satuan_dasar'] ?? 'pcs') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                @else
+                                    <span class="inline-flex items-center px-2 py-1 rounded-md bg-ink-100 dark:bg-white/5 border border-ink-200/60 dark:border-white/5 text-ink-600 dark:text-ink-400 text-xs font-bold uppercase tracking-wider">
+                                        {{ strtoupper($item['satuan'] ?? 'pcs') }}
+                                    </span>
+                                @endif
                             </td>
                             <td class="py-2.5 px-3 text-right">
                                 @if(isset($item['flex']) && $item['flex'])
@@ -623,9 +1154,16 @@
                                         </div>
                                     </div>
                                 @else
-                                    <span class="font-semibold tabular-nums text-xs text-ink-700 dark:text-ink-300">
-                                        Rp {{ number_format($item['harga'], 0, ',', '.') }}
-                                    </span>
+                                    <div class="flex flex-col items-end">
+                                        <span class="font-semibold tabular-nums text-xs text-ink-700 dark:text-ink-300">
+                                            Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                        </span>
+                                        @if(($item['konversi'] ?? 1) > 1)
+                                            <span class="text-[9px] text-ink-400 tabular-nums">
+                                                isi {{ (float)$item['konversi'] }} unit
+                                            </span>
+                                        @endif
+                                    </div>
                                 @endif
                             </td>
                             <td class="py-2.5 px-3 text-center">
@@ -693,7 +1231,7 @@
             <!-- Left Info & Sesi Kas -->
             <div class="flex items-center gap-2.5 flex-wrap">
                 <!-- Sesi Kas Indicator -->
-                <div class="flex items-center gap-2 text-xs">
+                <div class="flex items-center gap-1.5 flex-wrap">
                     @if($kasAktif)
                         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-up-mint/15 text-up-mint border border-up-mint/30 font-bold">
                             <span class="w-1.5 h-1.5 rounded-full bg-up-mint animate-pulse"></span>
@@ -716,38 +1254,21 @@
                     @endif
                 </div>
 
-                <span class="text-ink-300 dark:text-white/20">|</span>
+                <span class="hidden sm:inline text-ink-300 dark:text-white/20">|</span>
 
-                <!-- Transaksi Ditahan Dropdown -->
-                <div class="relative" x-data="{ openDitahan: false }">
+                <!-- Transaksi Ditahan Modal Trigger -->
+                <div>
                     <button
                         type="button"
-                        @click="openDitahan = !openDitahan"
-                        class="text-xs font-semibold text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                        wire:click="bukaDitahanPanel"
+                        class="text-xs font-semibold text-ink-600 dark:text-ink-400 hover:text-up-amber dark:hover:text-up-amber flex items-center gap-1.5 cursor-pointer py-1 transition"
+                        title="Buka Daftar Transaksi Ditahan (F6)"
                     >
-                        <span>Ditahan ({{ $ditahanList->count() }})</span>
-                        <span class="text-[10px]">▼</span>
+                        <span>Ditahan</span>
+                        <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold {{ $ditahanList->isNotEmpty() ? 'bg-up-amber/20 text-up-amber border border-up-amber/30' : 'bg-ink-100 dark:bg-white/10 text-ink-500' }}">
+                            {{ $ditahanList->count() }}
+                        </span>
                     </button>
-
-                    <div
-                        x-show="openDitahan && {{ $ditahanList->isNotEmpty() ? 'true' : 'false' }}"
-                        @click.outside="openDitahan = false"
-                        class="absolute left-0 bottom-full mb-2 z-40 w-72 p-2 bg-white dark:bg-[#0B1120] border border-ink-200/90 dark:border-white/10 rounded-2xl shadow-2xl space-y-1.5 max-h-48 overflow-y-auto"
-                        x-cloak
-                    >
-                        @foreach($ditahanList as $dt)
-                            <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-ink-50 dark:bg-white/[0.03] text-xs">
-                                <div class="min-w-0">
-                                    <span class="font-mono font-bold text-ink-900 dark:text-white truncate block">{{ $dt->no_transaksi }}</span>
-                                    <span class="text-[10px] text-ink-500">{{ $dt->items->count() }} item</span>
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <button wire:click="resumeTransaksi({{ $dt->id }})" @click="openDitahan = false" class="px-2 py-1 rounded-lg bg-up-primary text-white text-[10px] font-bold">Lanjut</button>
-                                    <button wire:click="hapusDitahan({{ $dt->id }})" class="p-1 text-ink-400 hover:text-up-red">✕</button>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
                 </div>
             </div>
 
@@ -773,31 +1294,42 @@
                     @endif
                 </div>
 
-                <!-- Action Buttons: Batal, Tahan & BAYAR -->
-                <div class="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
-                    <button
-                        type="button"
-                        wire:click="clearCart"
-                        class="px-3 sm:px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-up-red/15 dark:bg-white/5 dark:hover:bg-up-red/20 text-ink-600 hover:text-up-red dark:text-ink-400 dark:hover:text-up-red font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px]"
-                    >
-                        Batal (ESC)
-                    </button>
+                <!-- Action Buttons: Batal, Tahan & BAYAR (Responsif Mobile & Desktop) -->
+                <div class="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2">
+                    <!-- Baris Atas Mobile: Batal & Tahan -->
+                    <div class="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2">
+                        <button
+                            type="button"
+                            wire:click="clearCart"
+                            class="w-full sm:w-auto px-3 sm:px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-up-red/15 dark:bg-white/5 dark:hover:bg-up-red/20 text-ink-600 hover:text-up-red dark:text-ink-400 dark:hover:text-up-red font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px] flex items-center justify-center gap-1"
+                        >
+                            <span>Batal</span>
+                            <span class="text-[10px] font-mono text-ink-400 dark:text-ink-500">(ESC)</span>
+                        </button>
 
-                    <button
-                        type="button"
-                        wire:click="tahanTransaksi"
-                        class="px-3 sm:px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px]"
-                    >
-                        Tahan (F6)
-                    </button>
+                        <button
+                            type="button"
+                            wire:click="tahanTransaksi"
+                            class="w-full sm:w-auto px-3 sm:px-3.5 py-2 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs transition border border-ink-200/80 dark:border-white/5 cursor-pointer active:scale-95 min-h-[44px] flex items-center justify-center gap-1"
+                        >
+                            <span>Tahan</span>
+                            <span class="text-[10px] font-mono text-ink-400 dark:text-ink-500">(F6)</span>
+                        </button>
+                    </div>
 
+                    <!-- Baris Bawah Mobile / Tombol Utama: BAYAR Penuh & Lega -->
                     <button
                         type="button"
                         wire:click="openPaymentModal"
-                        class="flex-1 sm:flex-initial px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-sm shadow-md shadow-up-mint/25 transition active:scale-95 cursor-pointer min-h-[44px] flex items-center justify-center gap-2"
+                        class="w-full sm:w-auto px-4 sm:px-5 py-2.5 sm:py-2 rounded-xl bg-gradient-to-r from-up-mint to-teal-500 hover:opacity-95 text-ink-950 font-black text-sm shadow-md shadow-up-mint/25 transition active:scale-95 cursor-pointer min-h-[44px] flex items-center justify-between sm:justify-center gap-2"
                     >
-                        <span>BAYAR (F4)</span>
-                        <span class="px-2 py-0.5 rounded-md bg-ink-950/20 text-ink-950 text-xs font-mono font-black tabular-nums">
+                        <span class="flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-ink-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <span>BAYAR (F4)</span>
+                        </span>
+                        <span class="px-2.5 py-1 rounded-lg bg-ink-950/20 text-ink-950 text-xs font-mono font-black tabular-nums whitespace-nowrap">
                             Rp {{ number_format($totalAkhir, 0, ',', '.') }}
                         </span>
                     </button>
@@ -815,5 +1347,7 @@
     @include('modules.pos.livewire.modals.mutasi-kas-modal')
     @include('modules.pos.livewire.modals.bayar-servis-modal')
     @include('modules.pos.livewire.modals.pesanan-online-modal')
+    @include('modules.pos.livewire.modals.transaksi-ditahan-modal')
+    @include('modules.pos.livewire.modals.void-transaksi-modal')
     @include('partials.riwayat-modal')
 </div>

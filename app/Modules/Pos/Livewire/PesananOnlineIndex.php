@@ -205,10 +205,11 @@ class PesananOnlineIndex extends Component
             $cabangId = $transaksi->cabang_id ?: Cabang::firstOrFail()->id;
 
             foreach ($transaksi->items as $item) {
+                $qtyDasar = (int) round($item->jumlah * ($item->konversi ?? 1));
                 $stokDeduction->kurangiDariGudangTersedia(
                     $item->produk_id,
                     $item->sku_variant_id,
-                    (int) $item->jumlah,
+                    $qtyDasar,
                     $cabangId,
                     'penjualan',
                     Transaksi::class,

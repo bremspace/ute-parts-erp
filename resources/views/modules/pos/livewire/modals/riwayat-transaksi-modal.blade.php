@@ -78,8 +78,8 @@
                                         <td class="py-3 px-3.5 text-right font-black text-up-mint tabular-nums">Rp {{ number_format($trx->total_akhir, 0, ',', '.') }}</td>
                                         <td class="py-3 px-3.5 text-center uppercase text-[10px] text-ink-700 dark:text-ink-300 font-bold">{{ $trx->metode_bayar }}</td>
                                         <td class="py-3 px-3.5 text-center">
-                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $trx->status === 'selesai' ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : ($trx->status === 'dibatalkan' ? 'bg-up-red/15 text-up-red border border-up-red/30' : 'bg-up-amber/15 text-up-amber border border-up-amber/30') }}">
-                                                {{ ucfirst($trx->status) }}
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $trx->status === 'selesai' ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : ($trx->status === 'void' ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30' : ($trx->status === 'dibatalkan' ? 'bg-up-red/15 text-up-red border border-up-red/30' : 'bg-up-amber/15 text-up-amber border border-up-amber/30')) }}">
+                                                {{ strtoupper($trx->status) }}
                                             </span>
                                         </td>
                                         <td class="py-3 px-3.5 text-right whitespace-nowrap">
@@ -92,9 +92,18 @@
                                                     Detail
                                                 </button>
                                                 @if($trx->status === 'selesai')
+                                                    <!-- Tombol Void Transaksi Kasir -->
+                                                    <button
+                                                        type="button"
+                                                        wire:click="bukaVoidModal({{ $trx->id }})"
+                                                        class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red font-bold text-[11px] transition-colors border border-up-red/25 cursor-pointer flex items-center gap-1"
+                                                        title="Batalkan & Void Transaksi Ini"
+                                                    >
+                                                        <span>Void</span>
+                                                    </button>
                                                     <a
                                                         href="/app/pos/retur?transaksi_id={{ $trx->id }}"
-                                                        class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red font-bold text-[11px] transition-colors border border-up-red/25 cursor-pointer flex items-center"
+                                                        class="px-2.5 py-1 rounded-lg bg-up-amber/10 hover:bg-up-amber/20 text-up-amber font-bold text-[11px] transition-colors border border-up-amber/25 cursor-pointer flex items-center"
                                                     >
                                                         Retur
                                                     </a>

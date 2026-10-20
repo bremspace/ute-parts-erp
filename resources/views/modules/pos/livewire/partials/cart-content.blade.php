@@ -42,6 +42,25 @@
                                     {{ $item['varian'] }}
                                 </span>
                             @endif
+                            @if(count($item['daftar_satuan'] ?? []) > 1)
+                                <div class="inline-flex items-center">
+                                    <select
+                                        wire:change="ubahSatuanItem('{{ $key }}', $event.target.value)"
+                                        class="text-[10px] font-bold uppercase py-0.5 px-1.5 rounded-md bg-up-primary/10 border border-up-primary/20 text-up-primary dark:text-up-primary hover:bg-up-primary/20 cursor-pointer focus:outline-none"
+                                        title="Ganti Satuan / Kemasan"
+                                    >
+                                        @foreach($item['daftar_satuan'] as $ds)
+                                            <option value="{{ $ds['satuan_kode'] }}" {{ ($item['satuan'] ?? 'pcs') === $ds['satuan_kode'] ? 'selected' : '' }} class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">
+                                                {{ strtoupper($ds['satuan_kode']) }} ({{ (float)$ds['faktor_konversi'] }}x)
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @else
+                                <span class="px-1.5 py-0.5 rounded-md bg-ink-200/80 dark:bg-white/5 text-ink-500 dark:text-ink-400 text-[10px] font-bold uppercase tracking-wider">
+                                    {{ strtoupper($item['satuan'] ?? 'pcs') }}
+                                </span>
+                            @endif
                             @if(($item['stok_max'] ?? 1) <= 0)
                                 <span class="px-2 py-0.5 rounded-full bg-up-red/15 text-up-red text-[10px] font-bold border border-up-red/30">
                                     Stok habis
@@ -50,18 +69,47 @@
                         </div>
                     </div>
 
-                    <!-- Delete Button -->
+                    <!-- Delete Button Touch Friendly (min 44px) -->
                     <button
                         type="button"
                         wire:click="removeFromCart('{{ $key }}')"
-                        class="w-7 h-7 rounded-lg text-ink-400 hover:text-up-red hover:bg-up-red/10 flex items-center justify-center transition-colors cursor-pointer active:scale-90"
+                        class="w-11 h-11 rounded-xl text-ink-400 hover:text-up-red hover:bg-up-red/10 flex items-center justify-center transition-colors cursor-pointer active:scale-90 flex-shrink-0 -mr-1.5 -mt-1.5"
                         title="Hapus dari keranjang"
                         aria-label="Hapus item"
                     >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                     </button>
+                </div>
+
+                <!-- Satuan Selector / Dropdown Interaktif Mobile -->
+                <div class="flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-xl bg-white dark:bg-white/[0.02] border border-ink-200/60 dark:border-white/5">
+                    <span class="text-[11px] font-semibold text-ink-500 dark:text-ink-400">Pilihan Satuan:</span>
+                    @if(count($item['daftar_satuan'] ?? []) > 1)
+                        <div class="relative flex-1 max-w-[200px]">
+                            <select
+                                wire:change="ubahSatuanItem('{{ $key }}', $event.target.value)"
+                                class="w-full text-xs font-bold uppercase py-1.5 pl-2.5 pr-7 rounded-lg bg-up-primary/10 border border-up-primary/25 text-up-primary dark:text-up-primary hover:bg-up-primary/20 cursor-pointer focus:outline-none appearance-none"
+                                title="Ganti Satuan / Kemasan"
+                            >
+                                @foreach($item['daftar_satuan'] as $ds)
+                                    <option value="{{ $ds['satuan_kode'] }}" {{ ($item['satuan'] ?? 'pcs') === $ds['satuan_kode'] ? 'selected' : '' }} class="bg-white dark:bg-[#0B1120] text-ink-900 dark:text-white">
+                                        {{ strtoupper($ds['satuan_kode']) }} ({{ (float)$ds['faktor_konversi'] }}x)
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-up-primary">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </div>
+                    @else
+                        <span class="px-2.5 py-1 rounded-md bg-ink-100 dark:bg-white/5 text-ink-700 dark:text-ink-300 text-xs font-bold uppercase tracking-wider border border-ink-200/60 dark:border-white/5">
+                            {{ strtoupper($item['satuan'] ?? 'pcs') }}
+                        </span>
+                    @endif
                 </div>
 
                 <!-- Price, Stepper & Line Total -->

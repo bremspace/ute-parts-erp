@@ -1578,8 +1578,8 @@
 
     <!-- MODAL: TAMBAH PRODUK -->
     @if($showProdukModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto" x-data="{ tab: 'utama' }">
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4">
+            <div class="w-full max-w-2xl glass-panel p-4 sm:p-6 rounded-t-3xl sm:rounded-3xl relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto" x-data="{ tab: 'utama' }">
                 <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
                     <div>
                         <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
@@ -1587,14 +1587,14 @@
                         </h3>
                         <p class="text-[11px] text-ink-400 mt-0.5">Kelola data master barang, harga bertingkat, dan multi-satuan kemasan.</p>
                     </div>
-                    <button wire:click="$set('showProdukModal', false)" class="text-ink-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition cursor-pointer">✕</button>
+                    <button wire:click="$set('showProdukModal', false)" class="text-ink-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition cursor-pointer">✕</button>
                 </div>
 
                 <!-- Tab Navigasi Sederhana -->
-                <div class="flex items-center gap-1.5 p-1 bg-white/[0.04] rounded-2xl border border-white/10 mb-4">
+                <div class="flex items-center gap-1.5 p-1 bg-white/[0.04] rounded-2xl border border-white/10 mb-4 overflow-x-auto scrollbar-none flex-nowrap -mx-1 px-1 sm:mx-0 sm:px-1">
                     <button type="button" @click="tab = 'utama'"
                             :class="tab === 'utama' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
-                            class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            class="flex-shrink-0 sm:flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
                         <span>📦 Info Pokok &amp; Harga</span>
                         @if($errors->has('produkForm.nama') || $errors->has('produkForm.kategori_id') || $errors->has('produkForm.harga_beli') || $errors->has('produkForm.harga_jual_retail'))
                             <span class="w-2 h-2 rounded-full bg-up-red animate-pulse" title="Input belum lengkap"></span>
@@ -1603,7 +1603,7 @@
 
                     <button type="button" @click="tab = 'satuan'"
                             :class="tab === 'satuan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
-                            class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            class="flex-shrink-0 sm:flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
                         <span>🔄 Multi-Satuan</span>
                         @if(!empty($produkForm['multi_satuan']))
                             <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-up-mint text-ink-950 font-black">
@@ -1614,7 +1614,7 @@
 
                     <button type="button" @click="tab = 'lanjutan'"
                             :class="tab === 'lanjutan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
-                            class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            class="flex-shrink-0 sm:flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
                         <span>⚙️ Detail &amp; Foto</span>
                         @if(!empty($fotoUploads))
                             <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-up-accent text-ink-950 font-black">
@@ -1639,19 +1639,21 @@
                                 <button type="button" wire:click="generateBarcodeForm('create')" class="text-[10px] text-up-amber hover:underline font-semibold cursor-pointer" title="Buat kode barcode otomatis">⚡ Auto</button>
                             </div>
                             <div class="relative flex items-center">
-                                <input type="text" wire:model="produkForm.barcode" class="w-full pl-3 pr-16 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001" />
                                 <button type="button"
                                         onclick="window.uteBarcode && window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Produk', onScan: (code) => { @this.set('produkForm.barcode', code); } })"
-                                        class="absolute right-1.5 px-2 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary text-[10px] font-bold flex items-center gap-1 cursor-pointer active:scale-95"
-                                        title="Scan Barcode via Kamera HP/Web">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                    <span>Scan</span>
+                                        class="absolute left-2.5 p-1 rounded-lg text-up-primary hover:text-white hover:bg-up-primary/20 active:scale-95 transition-[transform,background-color,color] duration-150 flex items-center justify-center cursor-pointer z-10"
+                                        title="Buka Scanner Barcode (Kamera HP / Web)"
+                                        aria-label="Scan barcode kamera">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                    </svg>
                                 </button>
+                                <input type="text" wire:model="produkForm.barcode" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
                             </div>
                             @error('produkForm.barcode') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Kategori Utama / Sub *</label>
@@ -1679,7 +1681,7 @@
                             </select>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Brand Sparepart / Merk</label>
@@ -1706,7 +1708,7 @@
                             <p class="text-[9px] text-ink-500 mt-1">Original / Grade A / Grade B / Refurbished</p>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Satuan Dasar *</label>
@@ -1721,7 +1723,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode SKU (opsional)</label>
-                            <input type="text" wire:model="produkForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" placeholder="Auto-generate jika kosong" />
+                            <input type="text" wire:model="produkForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" placeholder="Otomatis ikuti Barcode jika kosong" />
                         </div>
                     </div>
 
@@ -1822,8 +1824,8 @@
 
                 <!-- TAB 2: MULTI-SATUAN & KEMASAN -->
                 <div x-show="tab === 'satuan'" class="space-y-4">
-                    <div class="p-4 rounded-2xl bg-up-primary/10 border border-up-primary/20">
-                        <div class="flex items-start justify-between gap-3">
+                    <div class="p-3.5 sm:p-4 rounded-2xl bg-up-primary/10 border border-up-primary/20 space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                             <div>
                                 <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
                                     <span>📦 Konversi Multi-Satuan Khusus Produk Ini</span>
@@ -1833,7 +1835,7 @@
                                     Pilih satuan dari master agar tidak duplikat, atau ketik baru bila belum tersedia. Konversi berantai akan dihitung otomatis saat pembelian (PO) dan stok gudang (GRN).
                                 </p>
                             </div>
-                            <button type="button" wire:click="addMultiSatuan('create')" class="px-3 py-2 rounded-xl bg-up-primary hover:bg-up-primary/80 text-white text-xs font-bold cursor-pointer transition shadow-sm shadow-up-primary/30 flex items-center gap-1.5 whitespace-nowrap">
+                            <button type="button" wire:click="addMultiSatuan('create')" class="w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl bg-up-primary hover:bg-up-primary/80 text-white text-xs font-bold cursor-pointer transition shadow-sm shadow-up-primary/30 flex items-center gap-1.5 whitespace-nowrap min-h-[38px]">
                                 <span>+ Tambah Satuan</span>
                             </button>
                         </div>
@@ -1864,10 +1866,44 @@
                     @if(!empty($produkForm['multi_satuan']))
                         <div class="space-y-3">
                             @foreach($produkForm['multi_satuan'] as $idx => $sk)
-                                <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5 hover:border-white/20 transition">
-                                    <div class="flex flex-col sm:flex-row gap-2.5 sm:items-center">
-                                        <!-- Satuan Kemasan (Pilih dari Master atau Ketik Baru) -->
-                                        <div class="flex-1 min-w-[150px]">
+                                <div class="p-3.5 sm:p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition space-y-3">
+                                    <!-- Header: Level Satuan + Checkbox PO + Tombol Hapus -->
+                                    <div class="flex items-center justify-between gap-2 pb-2 border-b border-white/5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-up-primary/20 text-up-primary text-[10px] font-bold">
+                                                {{ $idx + 1 }}
+                                            </span>
+                                            <span class="text-xs font-bold text-white tracking-wide">
+                                                Satuan Kemasan #{{ $idx + 1 }}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-2.5">
+                                            <label class="inline-flex items-center gap-1.5 text-[10px] text-ink-300 hover:text-white cursor-pointer select-none">
+                                                <input type="checkbox"
+                                                       wire:model="produkForm.multi_satuan.{{ $idx }}.is_satuan_jual"
+                                                       class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                                                <span class="{{ !empty($sk['is_satuan_jual']) ? 'text-up-primary font-bold' : '' }}">Bisa Dijual (POS)</span>
+                                            </label>
+                                            <label class="inline-flex items-center gap-1.5 text-[10px] text-ink-300 hover:text-white cursor-pointer select-none">
+                                                <input type="checkbox"
+                                                       wire:model="produkForm.multi_satuan.{{ $idx }}.is_satuan_beli"
+                                                       wire:click="toggleSatuanBeli('create', {{ $idx }})"
+                                                       class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                                                <span class="{{ !empty($sk['is_satuan_beli']) ? 'text-up-mint font-bold' : '' }}">Default Beli (PO)</span>
+                                            </label>
+                                            <button type="button"
+                                                    wire:click="removeMultiSatuan({{ $idx }}, 'create')"
+                                                    class="p-1.5 text-ink-400 hover:text-up-red hover:bg-up-red/10 rounded-lg text-xs cursor-pointer transition"
+                                                    title="Hapus Satuan Kemasan">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Grid Input Utama Responsif (Satuan Kemasan, Rasio, Satuan Asal) -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                                        <!-- Satuan Kemasan -->
+                                        <div class="sm:col-span-5">
                                             <label class="block text-[10px] font-semibold text-ink-400 mb-1">Satuan Kemasan</label>
                                             @if(!($sk['is_custom'] ?? false))
                                                 <select wire:change="pilihSatuanUnit('create', {{ $idx }}, $event.target.value)"
@@ -1883,7 +1919,7 @@
                                                     <option value="__custom__" class="bg-ink-900 text-up-mint font-bold">+ Ketik Satuan Baru...</option>
                                                 </select>
                                             @else
-                                                <div class="flex items-center gap-1">
+                                                <div class="flex items-center gap-1.5">
                                                     <input type="text"
                                                            wire:model="produkForm.multi_satuan.{{ $idx }}.satuan_kode"
                                                            wire:change="hitungKonversiMultiSatuan('create')"
@@ -1891,7 +1927,7 @@
                                                            class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-semibold text-white">
                                                     <button type="button"
                                                             wire:click="batalCustomSatuan('create', {{ $idx }})"
-                                                            class="px-2 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] text-ink-300 whitespace-nowrap cursor-pointer"
+                                                            class="px-2.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[10px] text-ink-300 whitespace-nowrap cursor-pointer transition"
                                                             title="Pilih dari daftar satuan yang ada">
                                                         Daftar
                                                     </button>
@@ -1899,10 +1935,8 @@
                                             @endif
                                         </div>
 
-                                        <div class="text-ink-400 text-sm text-center self-end pb-2.5 font-bold">=</div>
-
                                         <!-- Pengali / Isi -->
-                                        <div class="w-28">
+                                        <div class="sm:col-span-3">
                                             <label class="block text-[10px] font-semibold text-ink-400 mb-1">Isi / Rasio</label>
                                             <input type="number"
                                                    step="any"
@@ -1914,7 +1948,7 @@
                                         </div>
 
                                         <!-- Dari Satuan -->
-                                        <div class="w-36">
+                                        <div class="sm:col-span-4">
                                             <label class="block text-[10px] font-semibold text-ink-400 mb-1">Dari Satuan</label>
                                             <select wire:model="produkForm.multi_satuan.{{ $idx }}.satuan_asal"
                                                     wire:change="hitungKonversiMultiSatuan('create')"
@@ -1927,34 +1961,118 @@
                                                 @endforeach
                                             </select>
                                         </div>
-
-                                        <!-- Action Hapus -->
-                                        <div class="self-end pb-1">
-                                            <button type="button" wire:click="removeMultiSatuan({{ $idx }}, 'create')" class="p-2 text-up-red hover:bg-up-red/10 rounded-lg text-xs cursor-pointer" title="Hapus Satuan">✕</button>
-                                        </div>
                                     </div>
 
-                                    <!-- Detail Konversi, Harga & Barcode -->
-                                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-[11px]">
-                                        <div class="flex items-center gap-1.5 text-up-mint font-medium">
+                                    <!-- Sub-Card: Informasi & Skema Harga Satuan Kemasan -->
+                                    <div class="p-2.5 sm:p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="text-xs font-bold text-white">💰 Harga Satuan Kemasan</span>
+                                                <span class="text-[10px] text-ink-400">({{ $sk['satuan_kode'] ?: 'Satuan' }})</span>
+                                            </div>
+                                            <!-- Toggle Mode Harga: Otomatis vs Manual -->
+                                            <div class="inline-flex p-0.5 rounded-lg bg-black/40 border border-white/10 text-[10px] font-semibold">
+                                                <button type="button"
+                                                        wire:click="setModeHargaMultiSatuan('create', {{ $idx }}, 'auto')"
+                                                        class="px-2 py-0.5 rounded-md transition cursor-pointer {{ ($sk['mode_harga'] ?? 'auto') === 'auto' ? 'bg-up-primary text-white shadow-sm font-bold' : 'text-ink-400 hover:text-white' }}">
+                                                    ⚡ Otomatis
+                                                </button>
+                                                <button type="button"
+                                                        wire:click="setModeHargaMultiSatuan('create', {{ $idx }}, 'manual')"
+                                                        class="px-2 py-0.5 rounded-md transition cursor-pointer {{ ($sk['mode_harga'] ?? 'auto') === 'manual' ? 'bg-up-mint text-ink-950 shadow-sm font-bold' : 'text-ink-400 hover:text-white' }}">
+                                                    ✏️ Manual
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        @if(($sk['mode_harga'] ?? 'auto') === 'auto')
+                                            <!-- Mode Otomatis (Perhitungan dari Harga Dasar / Diskon) -->
+                                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center text-xs">
+                                                <div class="sm:col-span-7 flex flex-wrap items-center gap-1.5 text-ink-300 text-[11px]">
+                                                    <span>Dasar: <b class="text-white font-mono">Rp {{ number_format((float)($produkForm['harga_jual_retail'] ?? 0), 0, ',', '.') }}</b></span>
+                                                    <span>× <b class="text-white font-mono">{{ (float)($sk['faktor_konversi'] ?? 1) + 0 }}</b></span>
+                                                    <span>=</span>
+                                                    <span class="text-white font-mono font-bold">Rp {{ number_format(round(((float)($sk['faktor_konversi'] ?? 1)) * ((float)($produkForm['harga_jual_retail'] ?? 0))), 0, ',', '.') }}</span>
+                                                </div>
+                                                <div class="sm:col-span-5 flex items-center justify-end gap-2">
+                                                    <span class="text-[10px] text-ink-400 whitespace-nowrap">Diskon Kemasan (%):</span>
+                                                    <input type="number"
+                                                           step="0.5"
+                                                           min="0"
+                                                           max="100"
+                                                           wire:model="produkForm.multi_satuan.{{ $idx }}.diskon_persen"
+                                                           wire:change="hitungKonversiMultiSatuan('create')"
+                                                           placeholder="0"
+                                                           class="w-16 px-2 py-1 rounded-lg glass-input text-xs text-center font-bold font-mono">
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center justify-between pt-1 border-t border-white/5 text-xs">
+                                                <span class="text-[10px] text-ink-400">Harga Jual Otomatis:</span>
+                                                <div class="flex items-center gap-2">
+                                                    @if(!empty($sk['diskon_persen']) && (float)$sk['diskon_persen'] > 0)
+                                                        <span class="text-[10px] text-ink-400 line-through">Rp {{ number_format(round(((float)($sk['faktor_konversi'] ?? 1)) * ((float)($produkForm['harga_jual_retail'] ?? 0))), 0, ',', '.') }}</span>
+                                                        <span class="text-[10px] text-up-amber font-semibold">(-{{ (float)$sk['diskon_persen'] }}%)</span>
+                                                    @endif
+                                                    <span class="text-sm font-bold text-up-mint font-mono">
+                                                        Rp {{ number_format((float)($sk['harga_jual'] ?? 0), 0, ',', '.') }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <!-- Mode Manual (Input Nominal Bebas) -->
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 items-center">
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold text-ink-400 mb-1">Harga Jual Kemasan (Manual) *</label>
+                                                    <div class="relative flex items-center">
+                                                        <span class="absolute left-2.5 text-xs text-ink-400 font-bold">Rp</span>
+                                                        <input type="number"
+                                                               min="0"
+                                                               wire:model="produkForm.multi_satuan.{{ $idx }}.harga_jual"
+                                                               placeholder="0"
+                                                               class="w-full pl-8 pr-2.5 py-1.5 rounded-lg glass-input text-xs font-bold font-mono text-up-mint">
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold text-ink-400 mb-1">Estimasi HPP / Harga Beli</label>
+                                                    <div class="relative flex items-center">
+                                                        <span class="absolute left-2.5 text-xs text-ink-400 font-bold">Rp</span>
+                                                        <input type="number"
+                                                               min="0"
+                                                               wire:model="produkForm.multi_satuan.{{ $idx }}.harga_beli"
+                                                               placeholder="0"
+                                                               class="w-full pl-8 pr-2.5 py-1.5 rounded-lg glass-input text-xs font-mono text-ink-200">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p class="text-[9px] text-ink-400 italic">Harga satuan kemasan diset manual tetap, tidak berubah otomatis bila harga retail dasar diubah.</p>
+                                        @endif
+                                    </div>
+
+                                    <!-- Footer: Detail Rumus Konversi & Input Barcode Kemasan dengan Scan Icon -->
+                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-white/5 text-[11px]">
+                                        <div class="flex items-center gap-1.5 text-up-mint font-medium flex-wrap">
                                             <span>⚡ 1 {{ $sk['satuan_kode'] ?: '...' }} = {{ ((float)($sk['pengali'] ?? 1) + 0) }} {{ $sk['satuan_asal'] ?: ($produkForm['satuan_kode'] ?: 'pcs') }}</span>
                                             @if(strtolower($sk['satuan_asal'] ?? '') !== strtolower($produkForm['satuan_kode'] ?? 'pcs'))
                                                 <span>= <b class="text-white">{{ (float)($sk['faktor_konversi'] ?? 1) + 0 }}</b> {{ $produkForm['satuan_kode'] ?: 'pcs' }}</span>
                                             @endif
                                         </div>
 
-                                        <div class="flex items-center gap-2">
-                                            <label class="inline-flex items-center gap-1.5 text-[10px] text-ink-300 cursor-pointer">
-                                                <input type="checkbox"
-                                                       wire:model="produkForm.multi_satuan.{{ $idx }}.is_satuan_beli"
-                                                       wire:click="toggleSatuanBeli('create', {{ $idx }})"
-                                                       class="rounded border-white/20 bg-ink-900 text-up-primary text-[10px]">
-                                                <span class="{{ !empty($sk['is_satuan_beli']) ? 'text-up-mint font-bold' : '' }}">Default Beli (PO)</span>
-                                            </label>
-                                            <input type="text"
-                                                   wire:model="produkForm.multi_satuan.{{ $idx }}.barcode"
-                                                   placeholder="Barcode kemasan..."
-                                                   class="w-36 px-2 py-1 rounded-lg glass-input text-[10px] font-mono">
+                                        <div class="flex items-center gap-1.5 w-full sm:w-auto">
+                                            <span class="text-[10px] text-ink-400 whitespace-nowrap">Barcode:</span>
+                                            <div class="relative flex items-center flex-1 sm:w-48">
+                                                <button type="button"
+                                                        onclick="window.uteBarcode && window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Kemasan', onScan: (code) => { @this.set('produkForm.multi_satuan.{{ $idx }}.barcode', code); } })"
+                                                        class="absolute left-1.5 p-1 rounded-md text-up-primary hover:text-white hover:bg-up-primary/20 active:scale-95 transition flex items-center justify-center cursor-pointer z-10"
+                                                        title="Scan Barcode Kemasan via Kamera">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                    </svg>
+                                                </button>
+                                                <input type="text"
+                                                       wire:model="produkForm.multi_satuan.{{ $idx }}.barcode"
+                                                       placeholder="Scan / ketik..."
+                                                       class="w-full pl-7 pr-2.5 py-1.5 rounded-lg glass-input text-[11px] font-mono">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2073,26 +2191,24 @@
                             Sistem secara berkala menghitung pergerakan omzet barang (Pareto 80/20) dan menetapkan kelas ABC, ROP, serta Min-Max secara otomatis. Untuk produk baru, awal diberikan Kelas B (Normal).
                         </p>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div>
-                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">Klasifikasi ABC (Sistem / Manual)</label>
-                                <select wire:model="produkForm.abc_class" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold">
-                                    <option value="A" class="bg-ink-900">Kelas A (Fast Moving - Pareto 80%)</option>
-                                    <option value="B" class="bg-ink-900">Kelas B (Normal - Pareto 15%)</option>
-                                    <option value="C" class="bg-ink-900">Kelas C (Slow Moving / Long-tail)</option>
-                                </select>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 sm:col-span-1">
+                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">Klasifikasi ABC</label>
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-1 rounded-lg bg-up-primary/20 text-up-primary font-bold text-xs border border-up-primary/30">
+                                        Kelas {{ $produkForm['abc_class'] ?? 'B' }}
+                                    </span>
+                                    <span class="text-[10px] text-ink-400">Otomatis Sistem</span>
+                                </div>
+                                <input type="hidden" wire:model="produkForm.abc_class" value="{{ $produkForm['abc_class'] ?? 'B' }}">
                             </div>
                             <div>
                                 <label class="block text-[11px] font-semibold text-ink-300 mb-1">Reorder Point (ROP)</label>
-                                <input type="number" wire:model="produkForm.reorder_point" min="0" placeholder="Pemicu Kelas A" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
+                                <input type="number" wire:model="produkForm.reorder_point" min="0" placeholder="Pemicu Order Otomatis" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
                             </div>
                             <div>
                                 <label class="block text-[11px] font-semibold text-ink-300 mb-1">Min Stock</label>
-                                <input type="number" wire:model="produkForm.min_stock" min="0" placeholder="Pemicu Kelas B/C" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
-                            </div>
-                            <div>
-                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">Max Stock</label>
-                                <input type="number" wire:model="produkForm.max_stock" min="0" placeholder="Batas Atas Order" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
+                                <input type="number" wire:model="produkForm.min_stock" min="0" placeholder="Batas Bawah" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
                             </div>
                         </div>
                     </div>
@@ -2446,8 +2562,8 @@
 
     <!-- MODAL: EDIT PRODUK -->
     @if($showEditProdukModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto" x-data="{ tab: 'utama' }">
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4">
+            <div class="w-full max-w-2xl glass-panel p-4 sm:p-6 rounded-t-3xl sm:rounded-3xl relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto" x-data="{ tab: 'utama' }">
                 <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
                     <div>
                         <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
@@ -2455,14 +2571,14 @@
                         </h3>
                         <p class="text-[11px] text-ink-400 mt-0.5">Ubah data master, harga bertingkat, dan multi-satuan kemasan.</p>
                     </div>
-                    <button wire:click="$set('showEditProdukModal', false)" class="text-ink-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition cursor-pointer">✕</button>
+                    <button wire:click="$set('showEditProdukModal', false)" class="text-ink-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition cursor-pointer">✕</button>
                 </div>
 
                 <!-- Tab Navigasi -->
-                <div class="flex items-center gap-1.5 p-1 bg-white/[0.04] rounded-2xl border border-white/10 mb-4">
+                <div class="flex items-center gap-1.5 p-1 bg-white/[0.04] rounded-2xl border border-white/10 mb-4 overflow-x-auto scrollbar-none flex-nowrap -mx-1 px-1 sm:mx-0 sm:px-1">
                     <button type="button" @click="tab = 'utama'"
                             :class="tab === 'utama' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
-                            class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            class="flex-shrink-0 sm:flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
                         <span>📦 Info Pokok &amp; Harga</span>
                         @if($errors->has('editProdukForm.nama') || $errors->has('editProdukForm.kategori_id') || $errors->has('editProdukForm.harga_beli') || $errors->has('editProdukForm.harga_jual_retail'))
                             <span class="w-2 h-2 rounded-full bg-up-red animate-pulse" title="Input belum lengkap"></span>
@@ -2471,7 +2587,7 @@
 
                     <button type="button" @click="tab = 'satuan'"
                             :class="tab === 'satuan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
-                            class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            class="flex-shrink-0 sm:flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
                         <span>🔄 Multi-Satuan</span>
                         @if(!empty($editProdukForm['multi_satuan']))
                             <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-up-mint text-ink-950 font-black">
@@ -2482,7 +2598,7 @@
 
                     <button type="button" @click="tab = 'lanjutan'"
                             :class="tab === 'lanjutan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
-                            class="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            class="flex-shrink-0 sm:flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
                         <span>⚙️ Detail &amp; Foto</span>
                         @if(!empty($editFotoExisting) || !empty($editFotoUploads))
                             <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-up-accent text-ink-950 font-black">
@@ -2507,20 +2623,22 @@
                                 <button type="button" wire:click="generateBarcodeForm('edit')" class="text-[10px] text-up-amber hover:underline font-semibold cursor-pointer" title="Buat kode barcode otomatis">⚡ Auto</button>
                             </div>
                             <div class="relative flex items-center">
-                                <input type="text" wire:model="editProdukForm.barcode" class="w-full pl-3 pr-16 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001" />
                                 <button type="button"
                                         onclick="window.uteBarcode && window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Produk', onScan: (code) => { @this.set('editProdukForm.barcode', code); } })"
-                                        class="absolute right-1.5 px-2 py-1 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary text-[10px] font-bold flex items-center gap-1 cursor-pointer active:scale-95"
-                                        title="Scan Barcode via Kamera HP/Web">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                    <span>Scan</span>
+                                        class="absolute left-2.5 p-1 rounded-lg text-up-primary hover:text-white hover:bg-up-primary/20 active:scale-95 transition-[transform,background-color,color] duration-150 flex items-center justify-center cursor-pointer z-10"
+                                        title="Buka Scanner Barcode (Kamera HP / Web)"
+                                        aria-label="Scan barcode kamera">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                    </svg>
                                 </button>
+                                <input type="text" wire:model="editProdukForm.barcode" class="w-full pl-9 pr-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: 8991234500001 (klik icon barcode untuk scan)" />
                             </div>
                             @error('editProdukForm.barcode') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Kategori Utama / Sub *</label>
@@ -2549,7 +2667,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Brand Sparepart / Merk</label>
@@ -2576,7 +2694,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Satuan Dasar *</label>
@@ -2694,8 +2812,8 @@
 
                 <!-- TAB 2: MULTI-SATUAN & KEMASAN (Edit) -->
                 <div x-show="tab === 'satuan'" class="space-y-4">
-                    <div class="p-4 rounded-2xl bg-up-primary/10 border border-up-primary/20">
-                        <div class="flex items-start justify-between gap-3">
+                    <div class="p-3.5 sm:p-4 rounded-2xl bg-up-primary/10 border border-up-primary/20 space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                             <div>
                                 <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
                                     <span>📦 Konversi Multi-Satuan Khusus Produk Ini</span>
@@ -2705,7 +2823,7 @@
                                     Pilih satuan dari master agar tidak duplikat, atau ketik baru bila belum tersedia.
                                 </p>
                             </div>
-                            <button type="button" wire:click="addMultiSatuan('edit')" class="px-3 py-2 rounded-xl bg-up-primary hover:bg-up-primary/80 text-white text-xs font-bold cursor-pointer transition shadow-sm shadow-up-primary/30 flex items-center gap-1.5 whitespace-nowrap">
+                            <button type="button" wire:click="addMultiSatuan('edit')" class="w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl bg-up-primary hover:bg-up-primary/80 text-white text-xs font-bold cursor-pointer transition shadow-sm shadow-up-primary/30 flex items-center gap-1.5 whitespace-nowrap min-h-[38px]">
                                 <span>+ Tambah Satuan</span>
                             </button>
                         </div>
@@ -2736,10 +2854,44 @@
                     @if(!empty($editProdukForm['multi_satuan']))
                         <div class="space-y-3">
                             @foreach($editProdukForm['multi_satuan'] as $idx => $sk)
-                                <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5 hover:border-white/20 transition">
-                                    <div class="flex flex-col sm:flex-row gap-2.5 sm:items-center">
+                                <div class="p-3.5 sm:p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition space-y-3">
+                                    <!-- Header: Level Satuan + Checkbox PO + Tombol Hapus -->
+                                    <div class="flex items-center justify-between gap-2 pb-2 border-b border-white/5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-up-primary/20 text-up-primary text-[10px] font-bold">
+                                                {{ $idx + 1 }}
+                                            </span>
+                                            <span class="text-xs font-bold text-white tracking-wide">
+                                                Satuan Kemasan #{{ $idx + 1 }}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-2.5">
+                                            <label class="inline-flex items-center gap-1.5 text-[10px] text-ink-300 hover:text-white cursor-pointer select-none">
+                                                <input type="checkbox"
+                                                       wire:model="editProdukForm.multi_satuan.{{ $idx }}.is_satuan_jual"
+                                                       class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                                                <span class="{{ !empty($sk['is_satuan_jual']) ? 'text-up-primary font-bold' : '' }}">Bisa Dijual (POS)</span>
+                                            </label>
+                                            <label class="inline-flex items-center gap-1.5 text-[10px] text-ink-300 hover:text-white cursor-pointer select-none">
+                                                <input type="checkbox"
+                                                       wire:model="editProdukForm.multi_satuan.{{ $idx }}.is_satuan_beli"
+                                                       wire:click="toggleSatuanBeli('edit', {{ $idx }})"
+                                                       class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                                                <span class="{{ !empty($sk['is_satuan_beli']) ? 'text-up-mint font-bold' : '' }}">Default Beli (PO)</span>
+                                            </label>
+                                            <button type="button"
+                                                    wire:click="removeMultiSatuan({{ $idx }}, 'edit')"
+                                                    class="p-1.5 text-ink-400 hover:text-up-red hover:bg-up-red/10 rounded-lg text-xs cursor-pointer transition"
+                                                    title="Hapus Satuan Kemasan">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Grid Input Utama Responsif (Satuan Kemasan, Rasio, Satuan Asal) -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
                                         <!-- Satuan Kemasan -->
-                                        <div class="flex-1 min-w-[150px]">
+                                        <div class="sm:col-span-5">
                                             <label class="block text-[10px] font-semibold text-ink-400 mb-1">Satuan Kemasan</label>
                                             @if(!($sk['is_custom'] ?? false))
                                                 <select wire:change="pilihSatuanUnit('edit', {{ $idx }}, $event.target.value)"
@@ -2755,7 +2907,7 @@
                                                     <option value="__custom__" class="bg-ink-900 text-up-mint font-bold">+ Ketik Satuan Baru...</option>
                                                 </select>
                                             @else
-                                                <div class="flex items-center gap-1">
+                                                <div class="flex items-center gap-1.5">
                                                     <input type="text"
                                                            wire:model="editProdukForm.multi_satuan.{{ $idx }}.satuan_kode"
                                                            wire:change="hitungKonversiMultiSatuan('edit')"
@@ -2763,7 +2915,7 @@
                                                            class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-semibold text-white">
                                                     <button type="button"
                                                             wire:click="batalCustomSatuan('edit', {{ $idx }})"
-                                                            class="px-2 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] text-ink-300 whitespace-nowrap cursor-pointer"
+                                                            class="px-2.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[10px] text-ink-300 whitespace-nowrap cursor-pointer transition"
                                                             title="Pilih dari daftar satuan yang ada">
                                                         Daftar
                                                     </button>
@@ -2771,10 +2923,8 @@
                                             @endif
                                         </div>
 
-                                        <div class="text-ink-400 text-sm text-center self-end pb-2.5 font-bold">=</div>
-
                                         <!-- Pengali / Isi -->
-                                        <div class="w-28">
+                                        <div class="sm:col-span-3">
                                             <label class="block text-[10px] font-semibold text-ink-400 mb-1">Isi / Rasio</label>
                                             <input type="number" step="any" min="0.01"
                                                    wire:model="editProdukForm.multi_satuan.{{ $idx }}.pengali"
@@ -2784,7 +2934,7 @@
                                         </div>
 
                                         <!-- Dari Satuan -->
-                                        <div class="w-36">
+                                        <div class="sm:col-span-4">
                                             <label class="block text-[10px] font-semibold text-ink-400 mb-1">Dari Satuan</label>
                                             <select wire:model="editProdukForm.multi_satuan.{{ $idx }}.satuan_asal"
                                                     wire:change="hitungKonversiMultiSatuan('edit')"
@@ -2797,34 +2947,118 @@
                                                 @endforeach
                                             </select>
                                         </div>
-
-                                        <!-- Hapus -->
-                                        <div class="self-end pb-1">
-                                            <button type="button" wire:click="removeMultiSatuan({{ $idx }}, 'edit')" class="p-2 text-up-red hover:bg-up-red/10 rounded-lg text-xs cursor-pointer" title="Hapus Satuan">✕</button>
-                                        </div>
                                     </div>
 
-                                    <!-- Detail Konversi, Harga & Barcode -->
-                                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-[11px]">
-                                        <div class="flex items-center gap-1.5 text-up-mint font-medium">
+                                    <!-- Sub-Card: Informasi & Skema Harga Satuan Kemasan -->
+                                    <div class="p-2.5 sm:p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="text-xs font-bold text-white">💰 Harga Satuan Kemasan</span>
+                                                <span class="text-[10px] text-ink-400">({{ $sk['satuan_kode'] ?: 'Satuan' }})</span>
+                                            </div>
+                                            <!-- Toggle Mode Harga: Otomatis vs Manual -->
+                                            <div class="inline-flex p-0.5 rounded-lg bg-black/40 border border-white/10 text-[10px] font-semibold">
+                                                <button type="button"
+                                                        wire:click="setModeHargaMultiSatuan('edit', {{ $idx }}, 'auto')"
+                                                        class="px-2 py-0.5 rounded-md transition cursor-pointer {{ ($sk['mode_harga'] ?? 'auto') === 'auto' ? 'bg-up-primary text-white shadow-sm font-bold' : 'text-ink-400 hover:text-white' }}">
+                                                    ⚡ Otomatis
+                                                </button>
+                                                <button type="button"
+                                                        wire:click="setModeHargaMultiSatuan('edit', {{ $idx }}, 'manual')"
+                                                        class="px-2 py-0.5 rounded-md transition cursor-pointer {{ ($sk['mode_harga'] ?? 'auto') === 'manual' ? 'bg-up-mint text-ink-950 shadow-sm font-bold' : 'text-ink-400 hover:text-white' }}">
+                                                    ✏️ Manual
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        @if(($sk['mode_harga'] ?? 'auto') === 'auto')
+                                            <!-- Mode Otomatis (Perhitungan dari Harga Dasar / Diskon) -->
+                                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center text-xs">
+                                                <div class="sm:col-span-7 flex flex-wrap items-center gap-1.5 text-ink-300 text-[11px]">
+                                                    <span>Dasar: <b class="text-white font-mono">Rp {{ number_format((float)($editProdukForm['harga_jual_retail'] ?? 0), 0, ',', '.') }}</b></span>
+                                                    <span>× <b class="text-white font-mono">{{ (float)($sk['faktor_konversi'] ?? 1) + 0 }}</b></span>
+                                                    <span>=</span>
+                                                    <span class="text-white font-mono font-bold">Rp {{ number_format(round(((float)($sk['faktor_konversi'] ?? 1)) * ((float)($editProdukForm['harga_jual_retail'] ?? 0))), 0, ',', '.') }}</span>
+                                                </div>
+                                                <div class="sm:col-span-5 flex items-center justify-end gap-2">
+                                                    <span class="text-[10px] text-ink-400 whitespace-nowrap">Diskon Kemasan (%):</span>
+                                                    <input type="number"
+                                                           step="0.5"
+                                                           min="0"
+                                                           max="100"
+                                                           wire:model="editProdukForm.multi_satuan.{{ $idx }}.diskon_persen"
+                                                           wire:change="hitungKonversiMultiSatuan('edit')"
+                                                           placeholder="0"
+                                                           class="w-16 px-2 py-1 rounded-lg glass-input text-xs text-center font-bold font-mono">
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center justify-between pt-1 border-t border-white/5 text-xs">
+                                                <span class="text-[10px] text-ink-400">Harga Jual Otomatis:</span>
+                                                <div class="flex items-center gap-2">
+                                                    @if(!empty($sk['diskon_persen']) && (float)$sk['diskon_persen'] > 0)
+                                                        <span class="text-[10px] text-ink-400 line-through">Rp {{ number_format(round(((float)($sk['faktor_konversi'] ?? 1)) * ((float)($editProdukForm['harga_jual_retail'] ?? 0))), 0, ',', '.') }}</span>
+                                                        <span class="text-[10px] text-up-amber font-semibold">(-{{ (float)$sk['diskon_persen'] }}%)</span>
+                                                    @endif
+                                                    <span class="text-sm font-bold text-up-mint font-mono">
+                                                        Rp {{ number_format((float)($sk['harga_jual'] ?? 0), 0, ',', '.') }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <!-- Mode Manual (Input Nominal Bebas) -->
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 items-center">
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold text-ink-400 mb-1">Harga Jual Kemasan (Manual) *</label>
+                                                    <div class="relative flex items-center">
+                                                        <span class="absolute left-2.5 text-xs text-ink-400 font-bold">Rp</span>
+                                                        <input type="number"
+                                                               min="0"
+                                                               wire:model="editProdukForm.multi_satuan.{{ $idx }}.harga_jual"
+                                                               placeholder="0"
+                                                               class="w-full pl-8 pr-2.5 py-1.5 rounded-lg glass-input text-xs font-bold font-mono text-up-mint">
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold text-ink-400 mb-1">Estimasi HPP / Harga Beli</label>
+                                                    <div class="relative flex items-center">
+                                                        <span class="absolute left-2.5 text-xs text-ink-400 font-bold">Rp</span>
+                                                        <input type="number"
+                                                               min="0"
+                                                               wire:model="editProdukForm.multi_satuan.{{ $idx }}.harga_beli"
+                                                               placeholder="0"
+                                                               class="w-full pl-8 pr-2.5 py-1.5 rounded-lg glass-input text-xs font-mono text-ink-200">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p class="text-[9px] text-ink-400 italic">Harga satuan kemasan diset manual tetap, tidak berubah otomatis bila harga retail dasar diubah.</p>
+                                        @endif
+                                    </div>
+
+                                    <!-- Footer: Detail Rumus Konversi & Input Barcode Kemasan dengan Scan Icon -->
+                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-white/5 text-[11px]">
+                                        <div class="flex items-center gap-1.5 text-up-mint font-medium flex-wrap">
                                             <span>⚡ 1 {{ $sk['satuan_kode'] ?: '...' }} = {{ ((float)($sk['pengali'] ?? 1) + 0) }} {{ $sk['satuan_asal'] ?: ($editProdukForm['satuan_kode'] ?: 'pcs') }}</span>
                                             @if(strtolower($sk['satuan_asal'] ?? '') !== strtolower($editProdukForm['satuan_kode'] ?? 'pcs'))
                                                 <span>= <b class="text-white">{{ (float)($sk['faktor_konversi'] ?? 1) + 0 }}</b> {{ $editProdukForm['satuan_kode'] ?: 'pcs' }}</span>
                                             @endif
                                         </div>
 
-                                        <div class="flex items-center gap-2">
-                                            <label class="inline-flex items-center gap-1.5 text-[10px] text-ink-300 cursor-pointer">
-                                                <input type="checkbox"
-                                                       wire:model="editProdukForm.multi_satuan.{{ $idx }}.is_satuan_beli"
-                                                       wire:click="toggleSatuanBeli('edit', {{ $idx }})"
-                                                       class="rounded border-white/20 bg-ink-900 text-up-primary text-[10px]">
-                                                <span class="{{ !empty($sk['is_satuan_beli']) ? 'text-up-mint font-bold' : '' }}">Default Beli (PO)</span>
-                                            </label>
-                                            <input type="text"
-                                                   wire:model="editProdukForm.multi_satuan.{{ $idx }}.barcode"
-                                                   placeholder="Barcode kemasan..."
-                                                   class="w-36 px-2 py-1 rounded-lg glass-input text-[10px] font-mono">
+                                        <div class="flex items-center gap-1.5 w-full sm:w-auto">
+                                            <span class="text-[10px] text-ink-400 whitespace-nowrap">Barcode:</span>
+                                            <div class="relative flex items-center flex-1 sm:w-48">
+                                                <button type="button"
+                                                        onclick="window.uteBarcode && window.uteBarcode.openCameraScanner({ title: 'Scan Barcode Kemasan', onScan: (code) => { @this.set('editProdukForm.multi_satuan.{{ $idx }}.barcode', code); } })"
+                                                        class="absolute left-1.5 p-1 rounded-md text-up-primary hover:text-white hover:bg-up-primary/20 active:scale-95 transition flex items-center justify-center cursor-pointer z-10"
+                                                        title="Scan Barcode Kemasan via Kamera">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                    </svg>
+                                                </button>
+                                                <input type="text"
+                                                       wire:model="editProdukForm.multi_satuan.{{ $idx }}.barcode"
+                                                       placeholder="Scan / ketik..."
+                                                       class="w-full pl-7 pr-2.5 py-1.5 rounded-lg glass-input text-[11px] font-mono">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2907,26 +3141,24 @@
                             </p>
                         @endif
 
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 sm:col-span-1">
                                 <label class="block text-[11px] font-semibold text-ink-300 mb-1">Klasifikasi ABC</label>
-                                <select wire:model="editProdukForm.abc_class" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold">
-                                    <option value="A" class="bg-ink-900">Kelas A (Fast Moving - Pareto 80%)</option>
-                                    <option value="B" class="bg-ink-900">Kelas B (Normal - Pareto 15%)</option>
-                                    <option value="C" class="bg-ink-900">Kelas C (Slow Moving / Long-tail)</option>
-                                </select>
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-1 rounded-lg bg-up-primary/20 text-up-primary font-bold text-xs border border-up-primary/30">
+                                        Kelas {{ $editProdukForm['abc_class'] ?? 'B' }}
+                                    </span>
+                                    <span class="text-[10px] text-ink-400">Otomatis Pareto</span>
+                                </div>
+                                <input type="hidden" wire:model="editProdukForm.abc_class" value="{{ $editProdukForm['abc_class'] ?? 'B' }}">
                             </div>
                             <div>
                                 <label class="block text-[11px] font-semibold text-ink-300 mb-1">Reorder Point (ROP)</label>
-                                <input type="number" wire:model="editProdukForm.reorder_point" min="0" placeholder="Pemicu Kelas A" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
+                                <input type="number" wire:model="editProdukForm.reorder_point" min="0" placeholder="Pemicu Order Otomatis" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
                             </div>
                             <div>
                                 <label class="block text-[11px] font-semibold text-ink-300 mb-1">Min Stock</label>
-                                <input type="number" wire:model="editProdukForm.min_stock" min="0" placeholder="Pemicu Kelas B/C" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
-                            </div>
-                            <div>
-                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">Max Stock</label>
-                                <input type="number" wire:model="editProdukForm.max_stock" min="0" placeholder="Batas Atas Order" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
+                                <input type="number" wire:model="editProdukForm.min_stock" min="0" placeholder="Batas Bawah" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs tabular-nums" />
                             </div>
                         </div>
                     </div>

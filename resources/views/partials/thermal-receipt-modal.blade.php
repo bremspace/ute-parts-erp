@@ -62,6 +62,14 @@
 
                     <!-- Meta Transaksi -->
                     <div class="text-[10px] space-y-0.5 border-b border-dashed border-gray-300 pb-2">
+                        @if(($receiptData['status'] ?? '') === 'void')
+                            <div class="p-1.5 mb-1.5 text-center bg-red-100 border border-red-300 rounded text-red-700 font-bold uppercase text-xs tracking-wider">
+                                *** TRANSAKSI VOID (BATAL) ***
+                                @if(!empty($receiptData['void_alasan']))
+                                    <div class="text-[9px] font-normal normal-case mt-0.5">{{ $receiptData['void_alasan'] }}</div>
+                                @endif
+                            </div>
+                        @endif
                         <div class="receipt-row flex justify-between">
                             <span class="text-gray-600">No. TRX:</span>
                             <span class="font-bold text-gray-900">{{ $receiptData['no_transaksi'] }}</span>
@@ -111,7 +119,7 @@
                                     </div>
                                 </div>
                                 <div class="receipt-row flex justify-between text-[10px] text-gray-600 mt-0.5">
-                                    <span>{{ $it['qty'] }} x {{ number_format($it['harga'], 0, ',', '.') }}</span>
+                                    <span>{{ $it['qty'] }}{{ !empty($it['satuan']) ? ' ' . strtoupper($it['satuan']) : '' }} x {{ number_format($it['harga'], 0, ',', '.') }}</span>
                                     <span class="font-bold text-gray-900">{{ number_format($it['subtotal'], 0, ',', '.') }}</span>
                                 </div>
                             </div>

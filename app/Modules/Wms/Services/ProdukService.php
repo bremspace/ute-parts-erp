@@ -147,7 +147,7 @@ class ProdukService
                 'kualitas_id' => $kualitasId,
                 'brand_kompatibel' => $brand,
                 'model_kompatibel' => $model,
-                'kondisi' => in_array($kondisi, ['baru', 'oem', 'compatible'], true) ? $kondisi : 'baru',
+                'kondisi' => ! empty($kondisi) ? trim($kondisi) : 'baru',
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,
                 'metode_harga_beli' => in_array($metodeHargaBeli, ['manual', 'average'], true) ? $metodeHargaBeli : 'manual',
@@ -165,9 +165,12 @@ class ProdukService
                 'is_ondemand' => $isOndemand,
             ]);
 
+            $barcodeFallback = $cleanBarcode ?: null;
+            $finalSku = $sku ? trim($sku) : ($barcodeFallback ?: 'SKU-'.strtoupper(Str::random(6)));
+
             $variant = SkuVariant::create([
                 'produk_id' => $produk->id,
-                'sku' => $sku ?: 'SKU-'.strtoupper(Str::random(6)),
+                'sku' => $finalSku,
                 'barcode' => $cleanBarcode,
                 'nama_varian' => 'Standar',
                 'satuan_kode' => $satuanRef?->kode,
@@ -310,7 +313,7 @@ class ProdukService
                 'kualitas_id' => $kualitasId,
                 'brand_kompatibel' => $brand,
                 'model_kompatibel' => $model,
-                'kondisi' => in_array($kondisi, ['baru', 'oem', 'compatible'], true) ? $kondisi : 'baru',
+                'kondisi' => ! empty($kondisi) ? trim($kondisi) : 'baru',
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,
                 'metode_harga_beli' => $metodeHargaBeli !== null && in_array($metodeHargaBeli, ['manual', 'average'], true) ? $metodeHargaBeli : $produk->metode_harga_beli,
@@ -336,7 +339,13 @@ class ProdukService
             // Update primary SKU variant harga
             $variant = $produk->skuVariants()->first();
             if ($variant) {
+                $skuToUpdate = $variant->sku;
+                if (empty($skuToUpdate) && ! empty($cleanBarcode)) {
+                    $skuToUpdate = $cleanBarcode;
+                }
+
                 $variant->update([
+                    'sku' => $skuToUpdate,
                     'barcode' => $cleanBarcode,
                     'satuan_kode' => $satuanRef?->kode ?? $variant->satuan_kode,
                     'harga_beli' => $hargaBeli,
@@ -406,7 +415,7 @@ class ProdukService
                 'harga_jual' => $hargaJual,
                 'barcode' => ! empty($row['barcode']) ? trim($row['barcode']) : null,
                 'is_satuan_beli' => (bool) ($row['is_satuan_beli'] ?? false),
-                'is_satuan_jual' => (bool) ($row['is_satuan_jual'] ?? false),
+                'is_satuan_jual' => (bool) ($row['is_satuan_jual'] ?? true),
                 'urutan' => (int) ($row['urutan'] ?? ($idx + 1)),
             ]);
         }

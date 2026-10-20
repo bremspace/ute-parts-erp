@@ -668,34 +668,34 @@
         <div class="space-y-5">
             <!-- Filter Bar & Kontrol Periode -->
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pb-4 border-b border-white/5">
-                <!-- Pills Pilihan Periode Dinamis -->
-                <div class="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 text-xs overflow-x-auto scrollbar-none flex-nowrap sm:flex-wrap">
+                <!-- Pills Pilihan Periode Dinamis (Horizontal Scroll on Mobile, No Wrap to Avoid Stacking) -->
+                <div class="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 text-xs overflow-x-auto scrollbar-none flex-nowrap -mx-1 px-1 sm:mx-0 sm:px-1">
                     <button type="button" wire:click="setPeriodePenjualan('today')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'today' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer {{ $periodePenjualan === 'today' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Hari Ini
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('yesterday')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'yesterday' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer {{ $periodePenjualan === 'yesterday' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Kemarin
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('this_week')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'this_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer {{ $periodePenjualan === 'this_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Minggu Ini
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('last_week')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'last_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer {{ $periodePenjualan === 'last_week' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Minggu Lalu
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('this_month')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'this_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer {{ $periodePenjualan === 'this_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Bulan Ini
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('last_month')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'last_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer {{ $periodePenjualan === 'last_month' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Bulan Lalu
                     </button>
                     <button type="button" wire:click="setPeriodePenjualan('custom')"
-                        class="px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap {{ $periodePenjualan === 'custom' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+                        class="px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer {{ $periodePenjualan === 'custom' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
                         Kustom
                     </button>
                 </div>

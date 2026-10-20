@@ -293,15 +293,21 @@ class PosController extends Controller
 
                 // Buat item transaksi & kurangi stok
                 foreach ($itemsData as $row) {
+                    $satuanItem = $row['satuan'] ?? ($row['produk']->satuan ?: 'pcs');
+                    $konversi = max(0.0001, (float) ($row['konversi'] ?? 1));
+                    $qtyDasar = (int) round($row['jumlah'] * $konversi);
+
                     TransaksiItem::create([
                         'transaksi_id' => $transaksi->id,
                         'produk_id' => $row['produk']->id,
                         'sku_variant_id' => $row['sku_variant_id'],
                         'jumlah' => $row['jumlah'],
+                        'satuan' => $satuanItem,
+                        'konversi' => $konversi,
                         'harga_satuan' => $row['harga_satuan'],
                         'diskon_nominal' => $row['diskon_nominal'],
                         'subtotal' => $row['subtotal'],
-                        'hpp' => $row['hpp'],
+                        'hpp' => (float) $row['hpp'] * $konversi,
                     ]);
 
                     if ($gudangId) {
@@ -316,12 +322,12 @@ class PosController extends Controller
                             produkId: (int) $row['produk']->id,
                             skuVariantId: $row['sku_variant_id'] ?: null,
                             gudangId: (int) $gudangId,
-                            qty: (int) $row['jumlah'],
+                            qty: $qtyDasar,
                             jenis: 'penjualan',
                             referensiTipe: Transaksi::class,
                             referensiId: $transaksi->id,
                             userId: auth()->id(),
-                            catatan: "POS Penjualan {$transaksi->no_transaksi}",
+                            catatan: "POS Penjualan {$transaksi->no_transaksi} ({$row['jumlah']} {$satuanItem})",
                         );
                     }
                 }

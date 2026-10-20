@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'transaksi_id', 'produk_id', 'sku_variant_id', 'jumlah',
-    'harga_satuan', 'diskon_nominal', 'subtotal', 'hpp',
+    'satuan', 'konversi', 'harga_satuan', 'diskon_nominal', 'subtotal', 'hpp',
 ])]
 class TransaksiItem extends Model
 {
@@ -18,6 +18,7 @@ class TransaksiItem extends Model
 
     protected $casts = [
         'jumlah' => 'integer',
+        'konversi' => 'decimal:4',
         'harga_satuan' => 'decimal:2',
         'diskon_nominal' => 'decimal:2',
         'subtotal' => 'decimal:2',

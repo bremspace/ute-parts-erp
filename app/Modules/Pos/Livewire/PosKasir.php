@@ -16,6 +16,7 @@ use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PembayaranPesananOnlineService;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Pos\Services\TransaksiVoidService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Reseller\Services\KomisiService;
@@ -26,6 +27,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\ProdukSatuanKonversi;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
@@ -150,6 +152,21 @@ class PosKasir extends Component
     public bool $showRiwayatTransaksiModal = false;
 
     public string $riwayatSearch = '';
+
+    // [VOID TRANSAKSI] State Modal Otorisasi Void
+    public bool $showVoidModal = false;
+
+    public ?int $voidTransaksiId = null;
+
+    public ?string $voidNoTransaksi = null;
+
+    public float $voidTotalAkhir = 0;
+
+    public string $voidAlasan = '';
+
+    public string $voidSupervisorAuth = '';
+
+    public string $voidSupervisorPassword = '';
 
     // [T-03] Transaksi ditahan (park)
     public bool $showDitahanPanel = false;
@@ -693,7 +710,25 @@ class PosKasir extends Component
             return;
         }
 
-        // 2. Cek exact match barcode produk, ID (aman non-overflow), atau nama produk
+        // 2. Cek exact match barcode kemasan multi-satuan
+        $satuanKonversi = ProdukSatuanKonversi::where('barcode', $q)
+            ->whereNotNull('barcode')
+            ->where('barcode', '!=', '')
+            ->with('produk')
+            ->first();
+
+        if ($satuanKonversi && $satuanKonversi->produk && $satuanKonversi->produk->is_active) {
+            $this->addToCart($satuanKonversi->produk_id, null, $satuanKonversi->satuan_kode);
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Item '{$satuanKonversi->produk->nama}' ({$satuanKonversi->satuan_kode}) ditambahkan ke keranjang.",
+            ]);
+            $this->search = '';
+
+            return;
+        }
+
+        // 3. Cek exact match barcode produk, ID (aman non-overflow), atau nama produk
         $produk = Produk::where('is_active', true)
             ->where(function ($query) use ($q) {
                 $query->where('barcode', $q)
@@ -747,29 +782,70 @@ class PosKasir extends Component
         ]);
     }
 
-    public function addToCart(int $produkId, ?int $variantId = null)
+    public function addToCart(int $produkId, ?int $variantId = null, ?string $satuanKode = null)
     {
-        $produk = Produk::findOrFail($produkId);
+        $produk = Produk::with('satuanKonversi')->findOrFail($produkId);
         $variant = $variantId ? SkuVariant::find($variantId) : null;
-        $itemKey = $variantId ? "{$produkId}-{$variantId}" : "{$produkId}-0";
 
         // [B-02/P1-2] Gudang terpilih wajib milik cabang aktif (anti tamper lintas cabang)
         $this->validasiGudangCabang();
 
-        // [B-02/P0-1] Hard-block stok kosong — dicek SEBELUM ada efek apa pun
-        // (tidak ada item, tidak ada PPN yang bergeser). Stok dgn kriteria yg
-        // sama persis dgn gauge di kartu produk.
-        $stokTersedia = $this->hitungStokTersedia($produkId, $variantId, $this->selectedGudangId);
-        if ($stokTersedia <= 0) {
-            $this->blokirStokKosong($produk);
+        // Resolusi satuan & daftar satuan multi-satuan
+        $satuanDasar = $produk->satuan ?: 'pcs';
+        $satuanTarget = $satuanKode ?: $satuanDasar;
 
-            return;
-        }
-
-        // Resolusi harga
+        // Resolusi harga dasar
         $pricingService = app(PricingService::class);
         $pricing = $pricingService->resolve($produk, $this->customer, $variant);
-        $harga = $pricing['harga'];
+        $baseHarga = (float) $pricing['harga'];
+
+        $daftarSatuan = [
+            [
+                'satuan_kode' => $satuanDasar,
+                'faktor_konversi' => 1.0,
+                'harga_jual' => $baseHarga,
+                'is_dasar' => true,
+                'label' => strtoupper($satuanDasar).' (1 '.$satuanDasar.')',
+            ],
+        ];
+
+        $konversiDipakai = null;
+        if ($produk->satuanKonversi && $produk->satuanKonversi->isNotEmpty()) {
+            foreach ($produk->satuanKonversi as $sk) {
+                $bisaJual = ($sk->is_satuan_jual === null || (bool) $sk->is_satuan_jual || $sk->satuan_kode === $satuanTarget);
+                if ($bisaJual) {
+                    $fKonv = max(0.0001, (float) $sk->faktor_konversi);
+                    $hargaKonv = $sk->harga_jual > 0
+                        ? (float) $sk->harga_jual
+                        : round($baseHarga * $fKonv, 2);
+
+                    $daftarSatuan[] = [
+                        'satuan_kode' => $sk->satuan_kode,
+                        'faktor_konversi' => $fKonv,
+                        'harga_jual' => $hargaKonv,
+                        'is_dasar' => false,
+                        'label' => strtoupper($sk->satuan_kode).' ('.$fKonv.' '.$satuanDasar.')',
+                    ];
+
+                    if ($sk->satuan_kode === $satuanTarget) {
+                        $konversiDipakai = $sk;
+                    }
+                }
+            }
+        }
+
+        $faktorKonversi = 1.0;
+        if ($satuanTarget !== $satuanDasar && $konversiDipakai) {
+            $faktorKonversi = max(0.0001, (float) $konversiDipakai->faktor_konversi);
+            if ($konversiDipakai->harga_jual > 0) {
+                $hargaTierSatuan = round($baseHarga * $faktorKonversi, 2);
+                $harga = min((float) $konversiDipakai->harga_jual, $hargaTierSatuan);
+            } else {
+                $harga = round($baseHarga * $faktorKonversi, 2);
+            }
+        } else {
+            $harga = $baseHarga;
+        }
 
         // Harga fleksibel: hanya superadmin boleh input manual
         if ($produk->harga_fleksibel) {
@@ -782,37 +858,56 @@ class PosKasir extends Component
                 return;
             }
 
-            // Superadmin: pakai harga minimum (HPP) sebagai default, flag flex=true
             $hargaMin = app(HargaFleksibelService::class)->hargaMinimum($produk);
-            $harga = max($harga, $hargaMin);
+            $harga = max($harga, $hargaMin * $faktorKonversi);
         }
 
+        // Cek stok fisik di gudang aktif
+        $stokTersedia = $this->hitungStokTersedia($produkId, $variantId, $this->selectedGudangId);
+        $stokMaxSatuan = (int) floor($stokTersedia / $faktorKonversi);
+
+        if ($stokMaxSatuan <= 0) {
+            $this->blokirStokKosong($produk);
+
+            return;
+        }
+
+        $satuanSuffix = ($satuanTarget !== $satuanDasar) ? "-{$satuanTarget}" : '';
+        $itemKey = ($variantId ? "{$produkId}-{$variantId}" : "{$produkId}-0").$satuanSuffix;
+
         if (isset($this->cart[$itemKey])) {
-            // Batas keras = stok tersedia riil di gudang aktif
-            if ($this->cart[$itemKey]['qty'] + 1 > $stokTersedia) {
+            if ($this->cart[$itemKey]['qty'] + 1 > $stokMaxSatuan) {
+                $pesan = $faktorKonversi > 1
+                    ? "Stok {$produk->nama} maksimal {$stokMaxSatuan} {$satuanTarget} di gudang ini (tersedia {$stokTersedia} {$satuanDasar})"
+                    : "Stok {$produk->nama} maksimal {$stokTersedia} unit di gudang ini";
+
                 $this->dispatch('alert', [
                     'type' => 'warning',
-                    'message' => "Stok {$produk->nama} maksimal {$stokTersedia} unit di gudang ini",
+                    'message' => $pesan,
                 ]);
 
                 return;
             }
             $this->cart[$itemKey]['qty'] += 1;
             $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $harga;
-            $this->cart[$itemKey]['stok_max'] = $stokTersedia;
+            $this->cart[$itemKey]['stok_max'] = $stokMaxSatuan;
         } else {
             $this->cart[$itemKey] = [
                 'produk_id' => $produkId,
                 'sku_variant_id' => $variantId,
                 'nama' => $produk->nama,
                 'varian' => $variant?->nama_varian ?? 'Standar',
+                'satuan' => $satuanTarget,
+                'konversi' => $faktorKonversi,
+                'daftar_satuan' => $daftarSatuan,
                 'harga' => $harga,
+                'harga_dasar' => (float) ($pricing['harga_dasar'] * $faktorKonversi),
+                'harga_beli' => (float) ($produk->harga_beli * $faktorKonversi),
                 'qty' => 1,
-                'diskon' => (float) ($pricing['diskon_nominal'] ?? 0.0),
+                'diskon' => (float) ($pricing['diskon_nominal'] ?? 0.0) * $faktorKonversi,
                 'subtotal' => $harga,
-                'stok_max' => $stokTersedia,
-                'flex' => $produk->harga_fleksibel ? true : false,
-                // [F2-3] sn=true → wajib isi SN sebelum bayar
+                'stok_max' => $stokMaxSatuan,
+                'flex' => (bool) $produk->harga_fleksibel,
                 'sn' => (bool) $produk->sn,
                 'sn_list' => [],
             ];
@@ -821,6 +916,90 @@ class PosKasir extends Component
         // Reset computed properties cache & recalc pajak SETELAH item masuk keranjang
         $this->resetComputedTotals();
         $this->recalcPajak();
+    }
+
+    /** Ubah satuan item keranjang (Multi-Satuan POS). */
+    public function ubahSatuanItem(string $itemKey, string $newSatuanKode): void
+    {
+        if (! isset($this->cart[$itemKey])) {
+            return;
+        }
+
+        $item = $this->cart[$itemKey];
+        $produk = Produk::with('satuanKonversi')->find($item['produk_id']);
+        if (! $produk) {
+            return;
+        }
+
+        $satuanDasar = $produk->satuan ?: 'pcs';
+        $variant = $item['sku_variant_id'] ? SkuVariant::find($item['sku_variant_id']) : null;
+        $pricing = app(PricingService::class)->resolve($produk, $this->customer, $variant);
+        $baseHarga = (float) $pricing['harga'];
+
+        $faktorKonversi = 1.0;
+        $harga = $baseHarga;
+
+        if ($newSatuanKode !== $satuanDasar) {
+            $sk = $produk->satuanKonversi ? $produk->satuanKonversi->firstWhere('satuan_kode', $newSatuanKode) : null;
+            if (! $sk) {
+                return;
+            }
+            $faktorKonversi = max(0.0001, (float) $sk->faktor_konversi);
+            if ($sk->harga_jual > 0) {
+                $hargaTierSatuan = round($baseHarga * $faktorKonversi, 2);
+                $harga = min((float) $sk->harga_jual, $hargaTierSatuan);
+            } else {
+                $harga = round($baseHarga * $faktorKonversi, 2);
+            }
+        }
+
+        // Cek stok riil gudang aktif untuk satuan baru
+        $stokTersedia = $this->hitungStokTersedia((int) $item['produk_id'], $item['sku_variant_id'] ?: null, $this->selectedGudangId);
+        $maxQty = (int) floor($stokTersedia / $faktorKonversi);
+
+        if ($maxQty <= 0) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Stok {$produk->nama} tidak mencukupi untuk satuan {$newSatuanKode} di gudang ini (tersedia {$stokTersedia} {$satuanDasar})",
+            ]);
+
+            return;
+        }
+
+        $currentQty = (int) $item['qty'];
+        $newQty = max(1, min($currentQty, $maxQty));
+
+        $satuanSuffix = ($newSatuanKode !== $satuanDasar) ? "-{$newSatuanKode}" : '';
+        $newItemKey = ($item['sku_variant_id'] ? "{$item['produk_id']}-{$item['sku_variant_id']}" : "{$item['produk_id']}-0").$satuanSuffix;
+
+        $item['satuan'] = $newSatuanKode;
+        $item['konversi'] = $faktorKonversi;
+        $item['harga'] = $harga;
+        $item['harga_dasar'] = (float) ($pricing['harga_dasar'] * $faktorKonversi);
+        $item['harga_beli'] = (float) ($produk->harga_beli * $faktorKonversi);
+        $item['qty'] = $newQty;
+        $item['stok_max'] = $maxQty;
+        $item['subtotal'] = $newQty * $harga;
+
+        if ($newItemKey !== $itemKey) {
+            unset($this->cart[$itemKey]);
+            if (isset($this->cart[$newItemKey])) {
+                $mergedQty = min($this->cart[$newItemKey]['qty'] + $newQty, $maxQty);
+                $item['qty'] = $mergedQty;
+                $item['subtotal'] = $mergedQty * $harga;
+            }
+            $this->cart[$newItemKey] = $item;
+        } else {
+            $this->cart[$itemKey] = $item;
+        }
+
+        $this->resetComputedTotals();
+        $this->recalcPajak();
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Satuan {$produk->nama} diubah ke {$newSatuanKode} (1 {$newSatuanKode} = {$faktorKonversi} {$satuanDasar})",
+        ]);
     }
 
     /** [B-02/P1-5] Load-more katalog (seluruh produk aktif bisa diakses). */
@@ -968,8 +1147,11 @@ class PosKasir extends Component
             $this->selectedGudangId
         );
 
+        $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+        $stokMaxSatuan = (int) floor($stokMax / $konversi);
+
         // Stok habis (atau gudang belum dipilih) → tidak boleh ada item sama sekali
-        if ($stokMax <= 0) {
+        if ($stokMaxSatuan <= 0) {
             $this->removeFromCart($itemKey);
             $this->dispatch('alert', [
                 'type' => 'error',
@@ -981,17 +1163,21 @@ class PosKasir extends Component
             return;
         }
 
-        if ($newQty > $stokMax) {
+        if ($newQty > $stokMaxSatuan) {
+            $pesan = $konversi > 1
+                ? "Stok {$item['nama']} maksimal {$stokMaxSatuan} {$item['satuan']} di gudang ini (tersedia {$stokMax} unit dasar)"
+                : "Stok {$item['nama']} maksimal {$stokMaxSatuan} unit di gudang ini";
+
             $this->dispatch('alert', [
                 'type' => 'warning',
-                'message' => "Stok {$item['nama']} maksimal {$stokMax} unit di gudang ini",
+                'message' => $pesan,
             ]);
 
             return;
         }
 
         // Sinkronkan batas keras di keranjang (dipakai cart-content & resume)
-        $this->cart[$itemKey]['stok_max'] = $stokMax;
+        $this->cart[$itemKey]['stok_max'] = $stokMaxSatuan;
         $this->cart[$itemKey]['qty'] = $newQty;
         $this->cart[$itemKey]['subtotal'] = $newQty * $this->cart[$itemKey]['harga'];
 
@@ -1112,12 +1298,29 @@ class PosKasir extends Component
         // Recalculate cart prices when customer/tier changes
         $pricingService = app(PricingService::class);
         foreach ($this->cart as $key => $item) {
-            $produk = Produk::find($item['produk_id']);
+            $produk = Produk::with('satuanKonversi')->find($item['produk_id']);
             $variant = $item['sku_variant_id'] ? SkuVariant::find($item['sku_variant_id']) : null;
             if ($produk) {
                 $pricing = $pricingService->resolve($produk, $this->customer, $variant);
-                $this->cart[$key]['harga'] = $pricing['harga'];
-                $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $pricing['harga'];
+                $baseHarga = (float) $pricing['harga'];
+                $satuanDasar = $produk->satuan ?: 'pcs';
+                $satuanTarget = $item['satuan'] ?? $satuanDasar;
+                $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+
+                if ($satuanTarget !== $satuanDasar) {
+                    $sk = $produk->satuanKonversi ? $produk->satuanKonversi->firstWhere('satuan_kode', $satuanTarget) : null;
+                    if ($sk && $sk->harga_jual > 0) {
+                        $hargaTierSatuan = round($baseHarga * $konversi, 2);
+                        $harga = min((float) $sk->harga_jual, $hargaTierSatuan);
+                    } else {
+                        $harga = round($baseHarga * $konversi, 2);
+                    }
+                } else {
+                    $harga = $baseHarga;
+                }
+
+                $this->cart[$key]['harga'] = $harga;
+                $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $harga;
             }
         }
         $this->resetComputedTotals();
@@ -1203,22 +1406,36 @@ class PosKasir extends Component
      */
     private function validasiStokKeranjang(): ?string
     {
+        $dibutuhkanPerProduk = [];
+        $namaProduk = [];
+
         foreach ($this->cart as $item) {
+            $pId = (int) $item['produk_id'];
+            $vId = $item['sku_variant_id'] ?: 0;
+            $prodKey = "{$pId}-{$vId}";
+            $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+            $qtyDasar = (int) round($item['qty'] * $konversi);
+
+            $dibutuhkanPerProduk[$prodKey] = ($dibutuhkanPerProduk[$prodKey] ?? 0) + $qtyDasar;
+            $namaProduk[$prodKey] = $item['nama'];
+        }
+
+        foreach ($dibutuhkanPerProduk as $prodKey => $totalQtyDasar) {
+            [$pId, $vId] = explode('-', $prodKey);
             $stokTersedia = $this->hitungStokTersedia(
-                (int) $item['produk_id'],
-                $item['sku_variant_id'] ?: null,
+                (int) $pId,
+                $vId ? (int) $vId : null,
                 $this->selectedGudangId
             );
-            $qty = (int) $item['qty'];
 
             if ($stokTersedia <= 0) {
                 return $this->selectedGudangId
-                    ? "Stok {$item['nama']} habis di gudang ini — hapus dari keranjang atau pilih gudang lain."
+                    ? "Stok {$namaProduk[$prodKey]} habis di gudang ini — hapus dari keranjang atau pilih gudang lain."
                     : 'Pilih gudang terlebih dahulu sebelum membayar.';
             }
 
-            if ($qty > $stokTersedia) {
-                return "Stok {$item['nama']} tidak cukup — tersedia {$stokTersedia} unit, keranjang {$qty} unit.";
+            if ($totalQtyDasar > $stokTersedia) {
+                return "Stok {$namaProduk[$prodKey]} tidak cukup — tersedia {$stokTersedia} unit dasar, total keranjang {$totalQtyDasar} unit dasar.";
             }
         }
 
@@ -1330,16 +1547,23 @@ class PosKasir extends Component
                 // Create items & deduct stock
                 foreach ($this->cart as $item) {
                     $produk = $produkMap->get($item['produk_id']);
+                    $satuanDasar = $produk?->satuan ?: 'pcs';
+                    $satuanItem = $item['satuan'] ?? $satuanDasar;
+                    $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+                    $qtyDasar = (int) round($item['qty'] * $konversi);
+                    $hppPerSatuan = $produk ? (float) $produk->harga_beli * $konversi : 0;
 
                     $transaksiItem = TransaksiItem::create([
                         'transaksi_id' => $transaksi->id,
                         'produk_id' => $item['produk_id'],
                         'sku_variant_id' => $item['sku_variant_id'],
                         'jumlah' => $item['qty'],
+                        'satuan' => $satuanItem,
+                        'konversi' => $konversi,
                         'harga_satuan' => $item['harga'],
-                        'diskon_nominal' => $item['diskon'],
+                        'diskon_nominal' => $item['diskon'] ?? 0,
                         'subtotal' => $item['subtotal'],
-                        'hpp' => $produk ? (float) $produk->harga_beli : 0,
+                        'hpp' => $hppPerSatuan,
                     ]);
 
                     // [F2-3] Klaim SN → status terjual + tautan transaksi_item
@@ -1352,7 +1576,7 @@ class PosKasir extends Component
                             $item['sn_list'] ?? [],
                             (int) $item['produk_id'],
                             (int) $cabangId,
-                            (int) $item['qty'],
+                            $qtyDasar,
                             $transaksiItem->id
                         );
                     }
@@ -1369,12 +1593,12 @@ class PosKasir extends Component
                             produkId: (int) $item['produk_id'],
                             skuVariantId: $item['sku_variant_id'] ?: null,
                             gudangId: (int) $this->selectedGudangId,
-                            qty: (int) $item['qty'],
+                            qty: $qtyDasar,
                             jenis: 'penjualan',
                             referensiTipe: Transaksi::class,
                             referensiId: $transaksi->id,
                             userId: auth()->id(),
-                            catatan: "POS Kasir {$transaksi->no_transaksi}",
+                            catatan: "POS Kasir {$transaksi->no_transaksi} ({$item['qty']} {$satuanItem})",
                         );
                     }
                 }
@@ -1388,9 +1612,10 @@ class PosKasir extends Component
                 $jurnalService = app(JurnalService::class);
                 $totalHpp = 0.0;
                 foreach ($this->cart as $item) {
-                    $produk = Produk::find($item['produk_id']);
-                    $hppSatuan = $produk ? (float) $produk->harga_beli : 0;
-                    $totalHpp += $hppSatuan * (int) $item['qty'];
+                    $produk = $produkMap->get($item['produk_id']) ?? Produk::find($item['produk_id']);
+                    $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+                    $hppSatuanDasar = $produk ? (float) $produk->harga_beli : 0;
+                    $totalHpp += $hppSatuanDasar * ((int) round($item['qty'] * $konversi));
                 }
                 $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
                 $kasbon = $this->metodeBayar === 'piutang';
@@ -1519,6 +1744,9 @@ class PosKasir extends Component
                 'nama' => $item->produk?->nama ?? 'Produk',
                 'sku' => $item->produk?->sku ?? '-',
                 'jumlah' => (int) $item->jumlah,
+                'qty' => (int) $item->jumlah,
+                'satuan' => $item->satuan,
+                'konversi' => $item->konversi,
                 'harga' => (float) $item->harga_satuan,
                 'subtotal' => (float) $item->subtotal,
             ];
@@ -1541,10 +1769,105 @@ class PosKasir extends Component
             'bayar' => (float) $transaksi->jumlah_bayar,
             'kembali' => (float) $transaksi->kembalian,
             'metode' => strtoupper($transaksi->metode_bayar ?? 'TUNAI'),
+            'status' => $transaksi->status,
+            'void_alasan' => $transaksi->void_alasan,
         ];
 
         $this->completedTransactionId = $transaksi->id;
         $this->showReceiptModal = true;
+    }
+
+    /** [VOID TRANSAKSI] Buka modal otorisasi void transaksi. */
+    public function bukaVoidModal(int $id): void
+    {
+        $cabangId = session('cabang_id');
+        $transaksi = Transaksi::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('id', $id)
+            ->first();
+
+        if (! $transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Transaksi tidak ditemukan']);
+
+            return;
+        }
+
+        if ($transaksi->status !== 'selesai') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Hanya transaksi berstatus 'selesai' yang dapat di-void (status saat ini: {$transaksi->status})"]);
+
+            return;
+        }
+
+        $this->voidTransaksiId = $transaksi->id;
+        $this->voidNoTransaksi = $transaksi->no_transaksi;
+        $this->voidTotalAkhir = (float) $transaksi->total_akhir;
+        $this->voidAlasan = '';
+        $this->voidSupervisorAuth = '';
+        $this->voidSupervisorPassword = '';
+        $this->resetValidation(['voidAlasan', 'voidSupervisorAuth', 'voidSupervisorPassword']);
+
+        $this->showVoidModal = true;
+    }
+
+    public function tutupVoidModal(): void
+    {
+        $this->showVoidModal = false;
+        $this->voidTransaksiId = null;
+        $this->voidNoTransaksi = null;
+    }
+
+    /** [VOID TRANSAKSI] Eksekusi void dengan otorisasi supervisor / admin. */
+    public function prosesVoidTransaksi(): void
+    {
+        $this->validate([
+            'voidAlasan' => 'required|string|min:4|max:255',
+            'voidSupervisorAuth' => 'required|string',
+            'voidSupervisorPassword' => 'required|string',
+        ], [
+            'voidAlasan.required' => 'Alasan pembatalan (void) wajib diisi',
+            'voidAlasan.min' => 'Alasan minimal 4 karakter',
+            'voidSupervisorAuth.required' => 'Username/Email Supervisor wajib diisi',
+            'voidSupervisorPassword.required' => 'Password Supervisor wajib diisi',
+        ]);
+
+        if (! $this->voidTransaksiId) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak ada transaksi yang dipilih untuk di-void']);
+
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $transaksi = Transaksi::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('id', $this->voidTransaksiId)
+            ->first();
+
+        if (! $transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Data transaksi tidak ditemukan']);
+
+            return;
+        }
+
+        try {
+            $voidService = app(TransaksiVoidService::class);
+
+            // Verifikasi kredensial supervisor
+            $supervisor = $voidService->verifikasiSupervisor($this->voidSupervisorAuth, $this->voidSupervisorPassword);
+
+            // Jalankan alur void lengkap
+            $voidService->voidTransaksi($transaksi, $supervisor, $this->voidAlasan);
+
+            $noTrx = $transaksi->no_transaksi;
+            $this->tutupVoidModal();
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Transaksi {$noTrx} berhasil di-VOID oleh {$supervisor->name}. Stok dan pembukuan jurnal telah dibalikkan.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function getRiwayatTransaksiHariIniProperty()
@@ -1656,9 +1979,14 @@ class PosKasir extends Component
         // Muat ulang keranjang ke state (tanpa duplikat — reset dulu)
         $this->clearCart();
         foreach ($cartItems as $item) {
-            $key = isset($item['sku_variant_id']) && $item['sku_variant_id']
-                ? $item['produk_id'].'-'.$item['sku_variant_id']
-                : $item['produk_id'].'-0';
+            $pId = (int) ($item['produk_id'] ?? 0);
+            $vId = $item['sku_variant_id'] ?? null;
+            $satuanItem = $item['satuan'] ?? null;
+            $produk = $pId ? Produk::find($pId) : null;
+            $satuanDasar = $produk?->satuan ?: 'pcs';
+            $satuanSuffix = ($satuanItem && $satuanItem !== $satuanDasar) ? "-{$satuanItem}" : '';
+
+            $key = ($vId ? "{$pId}-{$vId}" : "{$pId}-0").$satuanSuffix;
             // [F2-3][P2-3] Compat keranjang lama — flag sn SELALU di-derive ulang
             // dari produk (server-side). Array + mempertahankan key kiri (payload
             // lama), jadi pakai array_merge agar 'sn' selalu nilai segar.
@@ -1676,7 +2004,48 @@ class PosKasir extends Component
         // Tandai transaksi asli dipindahkan → status 'batal' (tidak dipakai lagi), tanpa jurnal
         $transaksi->update(['status' => 'dibatalkan', 'catatan' => 'Dilanjutkan (resume) oleh '.(auth()->user()?->name ?? 'kasir')]);
 
+        $this->showDitahanPanel = false;
+
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Transaksi ditahan dilanjutkan — silakan lanjut bayar']);
+    }
+
+    /** Alias untuk resumeDitahan agar kompatibel dengan template lama/baru. */
+    public function resumeTransaksi(int $id): void
+    {
+        $this->resumeDitahan($id);
+    }
+
+    /** Hapus / batalkan transaksi yang ditahan. */
+    public function hapusDitahan(int $id): void
+    {
+        $transaksi = Transaksi::where('id', $id)
+            ->where('cabang_id', session('cabang_id'))
+            ->where('status', 'ditahan')
+            ->first();
+
+        if (! $transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Transaksi ditahan tidak ditemukan']);
+
+            return;
+        }
+
+        $noTrx = $transaksi->no_transaksi;
+        $transaksi->update([
+            'status' => 'dibatalkan',
+            'catatan' => 'Dibatalkan/dihapus dari kasir oleh '.(auth()->user()?->name ?? 'kasir'),
+        ]);
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Transaksi ditahan {$noTrx} berhasil dihapus"]);
+    }
+
+    public function bukaDitahanPanel(): void
+    {
+        $this->showDitahanPanel = true;
+    }
+
+    public function tutupDitahanPanel(): void
+    {
+        $this->showDitahanPanel = false;
     }
 
     // ==================== [T-08] PELANGGAN QUICK-ADD ====================
@@ -2642,6 +3011,7 @@ class PosKasir extends Component
             ->with([
                 'skuVariants' => fn ($q) => $q->where('is_active', true),
                 'tipeHps',
+                'satuanKonversi' => fn ($q) => $q->where(fn ($sub) => $sub->where('is_satuan_jual', true)->orWhereNull('is_satuan_jual'))->orderBy('urutan'),
                 'kategoriRelasi',
                 'hargaTier',
                 'brand',

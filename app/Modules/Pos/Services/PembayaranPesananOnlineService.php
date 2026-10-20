@@ -120,10 +120,11 @@ class PembayaranPesananOnlineService
             // Aman sekali-jalan karena status dijamin 'menunggu_pembayaran' di atas.
             $stokDeduction = app(StokDeductionService::class);
             foreach ($transaksi->items as $item) {
+                $qtyDasar = (int) round($item->jumlah * ($item->konversi ?? 1));
                 $stokDeduction->kurangiDariGudangTersedia(
                     $item->produk_id,
                     $item->sku_variant_id,
-                    (int) $item->jumlah,
+                    $qtyDasar,
                     $cabangId,
                     'penjualan',
                     Transaksi::class,
