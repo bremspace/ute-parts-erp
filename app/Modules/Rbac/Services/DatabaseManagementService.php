@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 use Throwable;
@@ -340,9 +341,10 @@ class DatabaseManagementService
                 $clearedCount = $this->truncateTables(array_merge($transactionTables, $masterTables, $orgTables));
                 $defaultPassword = 'Password123!';
 
-                // Bersihkan user tambahan selain akun resmi bawaan
+                // Bersihkan user tambahan selain akun resmi bawaan & reset 2FA
                 $defaultEmails = [
                     'superadmin@uteparts.id',
+                    'super-admin@uteparts.id',
                     'owner@uteparts.id',
                     'admintoko@uteparts.id',
                     'kasir@uteparts.id',
@@ -353,7 +355,12 @@ class DatabaseManagementService
                     'hr@uteparts.id',
                 ];
                 User::whereNotIn('email', $defaultEmails)->delete();
-                User::query()->update(['password' => Hash::make($defaultPassword)]);
+                User::query()->update([
+                    'password' => Hash::make($defaultPassword),
+                    'two_factor_secret' => null,
+                    'two_factor_confirmed_at' => null,
+                    'two_factor_backup_codes' => null,
+                ]);
 
                 // Jalankan seeder default pabrik
                 $seeders = [
@@ -373,6 +380,19 @@ class DatabaseManagementService
                     }
                 }
 
+                // Jaminan cabang utama & relasi pivot seluruh akun bawaan
+                $cabangUtama = Cabang::firstOrCreate(
+                    ['kode' => 'CBG-01'],
+                    ['nama' => 'Cabang Pusat', 'is_active' => true]
+                );
+                foreach (User::all() as $u) {
+                    if (! $u->cabangs()->where('cabang_id', $cabangUtama->id)->exists()) {
+                        $u->cabangs()->attach($cabangUtama->id, ['is_default' => true]);
+                    }
+                }
+
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
+
                 $activeSuper = User::where('email', 'superadmin@uteparts.id')->first();
                 if ($activeSuper) {
                     auth()->login($activeSuper);
@@ -391,12 +411,18 @@ class DatabaseManagementService
                 $allTables = array_merge($transactionTables, $masterTables, $orgTables);
                 $clearedCount = $this->truncateTables($allTables);
 
-                // Anti-lockout: Hapus semua user lain, pertahankan akun super admin aktif
+                // Anti-lockout: Hapus semua user lain, pertahankan akun super admin aktif & reset 2FA
                 if ($savedId) {
                     User::where('id', '!=', $savedId)->delete();
                     $admin = User::find($savedId);
                     if ($admin) {
-                        $admin->update(['password' => Hash::make($defaultPassword), 'is_active' => true]);
+                        $admin->update([
+                            'password' => Hash::make($defaultPassword),
+                            'is_active' => true,
+                            'two_factor_secret' => null,
+                            'two_factor_confirmed_at' => null,
+                            'two_factor_backup_codes' => null,
+                        ]);
                     }
                 } else {
                     $admin = User::firstOrCreate(
@@ -406,6 +432,9 @@ class DatabaseManagementService
                             'phone' => '081234567801',
                             'password' => Hash::make($defaultPassword),
                             'is_active' => true,
+                            'two_factor_secret' => null,
+                            'two_factor_confirmed_at' => null,
+                            'two_factor_backup_codes' => null,
                         ]
                     );
                 }
@@ -424,6 +453,8 @@ class DatabaseManagementService
                     }
                 } catch (Throwable $e) {
                 }
+
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
                 break;
 
             case 'transaksi_only':
@@ -437,7 +468,12 @@ class DatabaseManagementService
 
                 if (! empty($options['reset_password'])) {
                     $defaultPassword = 'Password123!';
-                    User::query()->update(['password' => Hash::make($defaultPassword)]);
+                    User::query()->update([
+                        'password' => Hash::make($defaultPassword),
+                        'two_factor_secret' => null,
+                        'two_factor_confirmed_at' => null,
+                        'two_factor_backup_codes' => null,
+                    ]);
                     try {
                         (new RoleUserSeeder)->run();
                     } catch (Throwable $e) {

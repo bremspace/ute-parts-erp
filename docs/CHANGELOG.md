@@ -3,6 +3,20 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-20 — Hotfix 403 Pasca-Reset Database & Penghapusan Bantuan Akses Cepat Login ✅
+
+- **[Akar Masalah 403 Forbidden Semua Akun]:**
+  - Truncate tabel cabang pada skenario reset `factory_reset`/`full_wipe` menyebabkan tabel `cabang` kosong di database operasional.
+  - Middleware `EnsureCabangSelected` menolak request ke `/app/*` dengan HTTP 403 karena `session('cabang_id')` kosong dan `$user->cabangDefault()` mengembalikan `null`.
+  - Record 2FA (`two_factor_secret`, `two_factor_confirmed_at`) pada akun superadmin tidak terhapus saat reset data, memaksa redirect ke `/app/login/2fa`.
+  - Role `owner` belum dimasukkan ke dalam daftar role HQ di `User::bisaAksesCabang()`.
+- **[Perbaikan]:**
+  1. Menghapus blok bantuan akses cepat akun bawaan dari `resources/views/auth/login.blade.php`.
+  2. Menambahkan self-healing anti-lockout pada `EnsureCabangSelected`: otomatis membuat `Cabang Pusat` (`CBG-01`) dan mengaitkannya ke user bila sistem tidak memiliki cabang sama sekali pasca-reset.
+  3. Memastikan `DatabaseManagementService` selalu mereset kolom 2FA (`two_factor_secret`, `two_factor_confirmed_at`, `two_factor_backup_codes`) ke `null` saat opsi reset dijalankan.
+  4. Menambahkan role `owner` ke daftar role HQ di `User::bisaAksesCabang()` dan `cabangTersedia()`.
+  5. Menjalankan sinkronisasi seeder cabang dan mereset 2FA pada database produksi `uteparts.id`.
+
 ## 2026-10-20 — Penyesuaian Akses & Pemulihan Login Super Admin Pasca-Reset Data ✅
 
 - **[Perbaikan Akses & Fleksibilitas Login Super Admin]:**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Rbac\Models\Cabang;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +31,22 @@ class EnsureCabangSelected
         // Validasi: cabang_id harus ada dan user harus berhak mengakses cabang tersebut
         if (! $cabangId || ! $user->bisaAksesCabang((int) $cabangId)) {
             $defaultCabang = $user->cabangDefault();
+
+            // Self-Healing Anti-Lockout: Jika belum ada cabang di sistem sama sekali (misal pasca reset)
+            if (! $defaultCabang) {
+                try {
+                    $defaultCabang = Cabang::firstOrCreate(
+                        ['kode' => 'CBG-01'],
+                        ['nama' => 'Cabang Pusat', 'is_active' => true]
+                    );
+
+                    if (! $user->cabangs()->where('cabang_id', $defaultCabang->id)->exists()) {
+                        $user->cabangs()->attach($defaultCabang->id, ['is_default' => true]);
+                    }
+                } catch (\Throwable) {
+                    $defaultCabang = null;
+                }
+            }
 
             if ($defaultCabang) {
                 session([

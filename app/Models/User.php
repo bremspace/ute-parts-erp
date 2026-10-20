@@ -79,7 +79,7 @@ class User extends Authenticatable
         }
 
         // Role tingkat manajemen/pusat (HQ) memiliki akses ke seluruh cabang aktif
-        if ($this->hasAnyRole(['super-admin', 'finance', 'marketing', 'kelola-hr'])) {
+        if ($this->hasAnyRole(['super-admin', 'owner', 'finance', 'marketing', 'kelola-hr'])) {
             return true;
         }
 
@@ -103,7 +103,7 @@ class User extends Authenticatable
     public function daftarCabangAkses()
     {
         // Role tingkat manajemen/pusat (HQ) dapat memilih dan berpindah ke semua cabang aktif
-        if ($this->hasAnyRole(['super-admin', 'finance', 'marketing', 'kelola-hr'])) {
+        if ($this->hasAnyRole(['super-admin', 'owner', 'finance', 'marketing', 'kelola-hr'])) {
             return Cabang::where('is_active', true)->orderBy('id')->get();
         }
 
