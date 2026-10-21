@@ -436,19 +436,52 @@ class PosKasir extends Component
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
     }
 
-    public function updatedFilterTipeHpId(): void
+    public function updatedFilterTipeHpId($val = null): void
     {
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
+        if (! empty($val)) {
+            $th = TipeHp::find($val);
+            if ($th) {
+                $this->filterBrandKompatibel = $th->merk;
+                $this->filterModelKompatibel = $th->model;
+            }
+        }
     }
 
-    public function updatedFilterBrandKompatibel(): void
+    public function updatedFilterBrandKompatibel($val = null): void
     {
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
+        if (! empty($val)) {
+            if ($this->filterTipeHpId) {
+                $th = TipeHp::find($this->filterTipeHpId);
+                if ($th && strcasecmp($th->merk, $val) !== 0) {
+                    $this->filterTipeHpId = null;
+                }
+            }
+            if ($this->filterModelKompatibel) {
+                $exists = TipeHp::where('merk', $val)->where('model', $this->filterModelKompatibel)->exists()
+                    || Produk::where('brand_kompatibel', $val)->where('model_kompatibel', $this->filterModelKompatibel)->exists();
+                if (! $exists) {
+                    $this->filterModelKompatibel = null;
+                }
+            }
+        }
     }
 
-    public function updatedFilterModelKompatibel(): void
+    public function updatedFilterModelKompatibel($val = null): void
     {
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
+        if (! empty($val) && empty($this->filterBrandKompatibel)) {
+            $th = TipeHp::where('model', $val)->first();
+            if ($th) {
+                $this->filterBrandKompatibel = $th->merk;
+            } else {
+                $prod = Produk::where('model_kompatibel', $val)->first();
+                if ($prod && $prod->brand_kompatibel) {
+                    $this->filterBrandKompatibel = $prod->brand_kompatibel;
+                }
+            }
+        }
     }
 
     public function updatedFilterKondisi(): void
@@ -3039,15 +3072,30 @@ class PosKasir extends Component
         }
 
         if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
-            $productsQuery->whereHas('tipeHps', fn ($q) => $q->where('tipe_hp.id', $this->filterTipeHpId));
+            $targetTipe = TipeHp::find($this->filterTipeHpId);
+            $productsQuery->where(function ($q) use ($targetTipe) {
+                $q->whereHas('tipeHps', fn ($th) => $th->where('tipe_hp.id', $this->filterTipeHpId));
+                if ($targetTipe) {
+                    $q->orWhere(function ($sub) use ($targetTipe) {
+                        $sub->where('brand_kompatibel', $targetTipe->merk)
+                            ->where('model_kompatibel', $targetTipe->model);
+                    });
+                }
+            });
         }
 
         if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
-            $productsQuery->where('brand_kompatibel', $this->filterBrandKompatibel);
+            $productsQuery->where(function ($q) {
+                $q->where('brand_kompatibel', $this->filterBrandKompatibel)
+                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel));
+            });
         }
 
         if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
-            $productsQuery->where('model_kompatibel', $this->filterModelKompatibel);
+            $productsQuery->where(function ($q) {
+                $q->where('model_kompatibel', $this->filterModelKompatibel)
+                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel));
+            });
         }
 
         if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
@@ -3105,17 +3153,22 @@ class PosKasir extends Component
                 ->all();
         });
 
-        $modelKompatibelList = Cache::remember('pos_filter_model_kompatibel', 300, function () {
-            return TipeHp::where('is_active', true)
-                ->distinct()
-                ->pluck('model')
-                ->merge(Produk::whereNotNull('model_kompatibel')->where('model_kompatibel', '!=', '')->distinct()->pluck('model_kompatibel'))
-                ->filter()
-                ->unique()
-                ->sort()
-                ->values()
-                ->all();
-        });
+        $modelKompatibelList = TipeHp::where('is_active', true)
+            ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
+            ->distinct()
+            ->pluck('model')
+            ->merge(
+                Produk::whereNotNull('model_kompatibel')
+                    ->where('model_kompatibel', '!=', '')
+                    ->when($this->filterBrandKompatibel, fn ($q) => $q->where('brand_kompatibel', $this->filterBrandKompatibel))
+                    ->distinct()
+                    ->pluck('model_kompatibel')
+            )
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
 
         $config = app(KonfigurasiService::class);
         $kondisiList = $config->get('master_produk_kondisi_list') ?? [
@@ -3128,7 +3181,11 @@ class PosKasir extends Component
         $kategoriList = KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get();
         $brandList = Brand::where('is_active', true)->orderBy('nama')->get();
         $kualitasList = KualitasProduk::where('is_active', true)->orderBy('nama')->get();
-        $tipeHpList = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get();
+        $tipeHpList = TipeHp::where('is_active', true)
+            ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
+            ->orderBy('merk')
+            ->orderBy('model')
+            ->get();
         $satuanList = SatuanUnit::where('is_active', true)->orderBy('nama')->get();
 
         // Explicitly pass all data needed by the view

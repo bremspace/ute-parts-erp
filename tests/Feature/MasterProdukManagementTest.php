@@ -300,4 +300,71 @@ class MasterProdukManagementTest extends TestCase
         $this->assertStringStartsWith('LCD-IP11PRO-COPY-', $copy3->skuVariants->first()->sku);
         $this->assertStringNotContainsString('COPY-COPY', $copy3->skuVariants->first()->sku);
     }
+
+    public function test_filter_kompatibilitas_interlinked_dan_multi_kompatibilitas(): void
+    {
+        $this->authedAdmin();
+        $service = app(ProdukService::class);
+
+        // Buat Tipe HP: Oppo A11 dan Realme 5
+        $thOppo = TipeHp::create(['merk' => 'Oppo', 'model' => 'A11', 'is_active' => true]);
+        $thRealme = TipeHp::create(['merk' => 'Realme', 'model' => '5', 'is_active' => true]);
+        $thSamsung = TipeHp::create(['merk' => 'Samsung', 'model' => 'A50', 'is_active' => true]);
+
+        // Produk 1: Multi-kompatibilitas (Oppo A11 dan Realme 5) lewat pivot tipeHps
+        $pMulti = $service->buatProduk(
+            nama: 'LCD Multi Oppo Realme',
+            kategori: 'LCD',
+            brand: 'Crown',
+            model: null,
+            kondisi: 'baru',
+            hargaBeli: 120000,
+            hargaJual: 180000,
+            sku: 'LCD-OP-RL-01'
+        );
+        $pMulti->tipeHps()->attach([$thOppo->id, $thRealme->id]);
+
+        // Produk 2: Samsung A50 (kompatibel lewat legacy string kolom)
+        $pSamsung = $service->buatProduk(
+            nama: 'LCD Samsung A50 Standar',
+            kategori: 'LCD',
+            brand: 'Crown',
+            model: 'A50',
+            kondisi: 'baru',
+            hargaBeli: 150000,
+            hargaJual: 220000,
+            sku: 'LCD-SAM-A50'
+        );
+        $pSamsung->update([
+            'brand_kompatibel' => 'Samsung',
+            'model_kompatibel' => 'A50',
+        ]);
+
+        $testTab = Livewire::test(ProdukTab::class);
+
+        // 1. Filter brand_kompatibel = Oppo -> harus memuat $pMulti
+        $testTab->set('filterBrandKompatibel', 'Oppo');
+        $produksOppo = $testTab->viewData('produks');
+        $this->assertTrue($produksOppo->pluck('id')->contains($pMulti->id));
+        $this->assertFalse($produksOppo->pluck('id')->contains($pSamsung->id));
+
+        // 2. Filter brand_kompatibel = Realme -> juga harus memuat $pMulti karena multi-kompatibel
+        $testTab->set('filterBrandKompatibel', 'Realme');
+        $produksRealme = $testTab->viewData('produks');
+        $this->assertTrue($produksRealme->pluck('id')->contains($pMulti->id));
+        $this->assertFalse($produksRealme->pluck('id')->contains($pSamsung->id));
+
+        // Model dropdown hanya berisi model Realme (Realme 5), tidak menampilkan model Samsung
+        $modelsRealme = $testTab->viewData('modelKompatibelList');
+        $this->assertContains('5', $modelsRealme);
+        $this->assertNotContains('A50', $modelsRealme);
+
+        // 3. Cascading: memilih filterTipeHpId = thSamsung otomatis mengisi brand & model kompatibel
+        $testTab->set('filterTipeHpId', $thSamsung->id);
+        $testTab->assertSet('filterBrandKompatibel', 'Samsung');
+        $testTab->assertSet('filterModelKompatibel', 'A50');
+        $produksSamsung = $testTab->viewData('produks');
+        $this->assertTrue($produksSamsung->pluck('id')->contains($pSamsung->id));
+        $this->assertFalse($produksSamsung->pluck('id')->contains($pMulti->id));
+    }
 }

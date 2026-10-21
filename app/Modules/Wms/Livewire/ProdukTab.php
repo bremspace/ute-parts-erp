@@ -1758,19 +1758,52 @@ class ProdukTab extends Component
         $this->resetPage();
     }
 
-    public function updatingFilterTipeHpId()
+    public function updatedFilterTipeHpId($val): void
     {
         $this->resetPage();
+        if (! empty($val)) {
+            $th = TipeHp::find($val);
+            if ($th) {
+                $this->filterBrandKompatibel = $th->merk;
+                $this->filterModelKompatibel = $th->model;
+            }
+        }
     }
 
-    public function updatingFilterBrandKompatibel()
+    public function updatedFilterBrandKompatibel($val): void
     {
         $this->resetPage();
+        if (! empty($val)) {
+            if ($this->filterTipeHpId) {
+                $th = TipeHp::find($this->filterTipeHpId);
+                if ($th && strcasecmp($th->merk, $val) !== 0) {
+                    $this->filterTipeHpId = null;
+                }
+            }
+            if ($this->filterModelKompatibel) {
+                $exists = TipeHp::where('merk', $val)->where('model', $this->filterModelKompatibel)->exists()
+                    || Produk::where('brand_kompatibel', $val)->where('model_kompatibel', $this->filterModelKompatibel)->exists();
+                if (! $exists) {
+                    $this->filterModelKompatibel = null;
+                }
+            }
+        }
     }
 
-    public function updatingFilterModelKompatibel()
+    public function updatedFilterModelKompatibel($val): void
     {
         $this->resetPage();
+        if (! empty($val) && empty($this->filterBrandKompatibel)) {
+            $th = TipeHp::where('model', $val)->first();
+            if ($th) {
+                $this->filterBrandKompatibel = $th->merk;
+            } else {
+                $prod = Produk::where('model_kompatibel', $val)->first();
+                if ($prod && $prod->brand_kompatibel) {
+                    $this->filterBrandKompatibel = $prod->brand_kompatibel;
+                }
+            }
+        }
     }
 
     public function updatingFilterKondisi()
@@ -2974,15 +3007,30 @@ class ProdukTab extends Component
         }
 
         if ($this->filterTipeHpId) {
-            $query->whereHas('tipeHps', fn ($q) => $q->where('tipe_hp.id', $this->filterTipeHpId));
+            $targetTipe = TipeHp::find($this->filterTipeHpId);
+            $query->where(function ($q) use ($targetTipe) {
+                $q->whereHas('tipeHps', fn ($th) => $th->where('tipe_hp.id', $this->filterTipeHpId));
+                if ($targetTipe) {
+                    $q->orWhere(function ($sub) use ($targetTipe) {
+                        $sub->where('brand_kompatibel', $targetTipe->merk)
+                            ->where('model_kompatibel', $targetTipe->model);
+                    });
+                }
+            });
         }
 
         if ($this->filterBrandKompatibel) {
-            $query->where('brand_kompatibel', $this->filterBrandKompatibel);
+            $query->where(function ($q) {
+                $q->where('brand_kompatibel', $this->filterBrandKompatibel)
+                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel));
+            });
         }
 
         if ($this->filterModelKompatibel) {
-            $query->where('model_kompatibel', $this->filterModelKompatibel);
+            $query->where(function ($q) {
+                $q->where('model_kompatibel', $this->filterModelKompatibel)
+                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel));
+            });
         }
 
         if ($this->filterKondisi) {
@@ -3224,7 +3272,11 @@ class ProdukTab extends Component
                 ['kode' => 'bekas', 'nama' => 'Bekas / Copotan'],
             ];
 
-        $tipeHpList = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get();
+        $tipeHpList = TipeHp::where('is_active', true)
+            ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
+            ->orderBy('merk')
+            ->orderBy('model')
+            ->get();
         $tipeHpOptions = $tipeHpList->map(fn ($t) => [
             'id' => $t->id,
             'label' => "{$t->merk} {$t->model}",
@@ -3263,9 +3315,16 @@ class ProdukTab extends Component
             ->all();
 
         $modelKompatibelList = TipeHp::where('is_active', true)
+            ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
             ->distinct()
             ->pluck('model')
-            ->merge(Produk::whereNotNull('model_kompatibel')->where('model_kompatibel', '!=', '')->distinct()->pluck('model_kompatibel'))
+            ->merge(
+                Produk::whereNotNull('model_kompatibel')
+                    ->where('model_kompatibel', '!=', '')
+                    ->when($this->filterBrandKompatibel, fn ($q) => $q->where('brand_kompatibel', $this->filterBrandKompatibel))
+                    ->distinct()
+                    ->pluck('model_kompatibel')
+            )
             ->filter()
             ->unique()
             ->sort()
