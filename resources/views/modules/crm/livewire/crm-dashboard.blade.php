@@ -71,9 +71,16 @@
                         @endforeach
                     </select>
 
-                    <label class="flex items-center gap-2 text-xs text-ink-300 font-medium cursor-pointer select-none px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition min-h-[44px]" title="Tampilkan hanya pelanggan yang terdaftar sebagai mitra reseller">
+                    <select wire:model.live="filterTipeKonsumen" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                        <option value="" class="bg-ink-900">Semua Tipe Konsumen</option>
+                        <option value="retail" class="bg-ink-900">Retail (Umum)</option>
+                        <option value="reseller" class="bg-ink-900">Mitra Reseller</option>
+                        <option value="agen" class="bg-ink-900">Agen / Mitra B2B</option>
+                    </select>
+
+                    <label class="flex items-center gap-2 text-xs text-ink-300 font-medium cursor-pointer select-none px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition min-h-[44px]" title="Tampilkan hanya pelanggan yang terdaftar sebagai mitra reseller atau agen">
                         <input type="checkbox" wire:model.live="filterReseller" class="accent-up-accent w-4 h-4 rounded cursor-pointer" />
-                        <span class="whitespace-nowrap">Hanya Reseller</span>
+                        <span class="whitespace-nowrap">Mitra Aktif</span>
                     </label>
                 </div>
             </div>
@@ -109,15 +116,25 @@
             @forelse($customers as $c)
                 <tr class="hover:bg-white/[0.02] transition-colors">
                     <td class="py-3.5 px-4 font-semibold text-white">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span>{{ $c->nama }}</span>
-                            @if($c->is_reseller)
+                            @if($c->tipe_konsumen === 'agen' || $c->kode_agen)
+                                <span class="text-[9px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/35 px-2 py-0.5 rounded-full tracking-wide">AGEN B2B</span>
+                            @elseif($c->is_reseller || $c->tipe_konsumen === 'reseller')
                                 <span class="text-[9px] font-bold text-up-accent bg-up-accent/10 border border-up-accent/30 px-1.5 py-0.5 rounded-full">RESELLER</span>
                             @endif
                         </div>
-                        @if($c->email)
-                            <span class="block text-[11px] text-ink-400 font-normal mt-0.5">{{ $c->email }}</span>
-                        @endif
+                        <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                            @if($c->email)
+                                <span class="text-[11px] text-ink-400 font-normal">{{ $c->email }}</span>
+                            @endif
+                            @if($c->kode_agen)
+                                <span class="text-[10px] font-mono font-semibold text-amber-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">Kode: {{ $c->kode_agen }}</span>
+                            @endif
+                            @if($c->referral_kode)
+                                <span class="text-[10px] font-mono text-ink-400">Ref: {{ $c->referral_kode }}</span>
+                            @endif
+                        </div>
                     </td>
                     <td class="py-3.5 px-4 text-xs text-ink-300 font-mono">{{ $c->telepon ?? '-' }}</td>
                     <td class="py-3.5 px-4">
@@ -130,7 +147,13 @@
                         <span class="font-bold text-up-primary">{{ number_format($c->poin_loyalty) }}</span> pts
                     </td>
                     <td class="py-3.5 px-4">
-                        <span class="text-[11px] text-ink-300 capitalize">{{ $c->tipe_konsumen ?? ($c->is_reseller ? 'reseller' : 'retail') }}</span>
+                        @if($c->tipe_konsumen === 'agen' || $c->kode_agen)
+                            <span class="text-[11px] font-bold text-amber-300">Agen / B2B</span>
+                        @elseif($c->is_reseller || $c->tipe_konsumen === 'reseller')
+                            <span class="text-[11px] font-semibold text-up-accent">Reseller</span>
+                        @else
+                            <span class="text-[11px] text-ink-300">Retail</span>
+                        @endif
                     </td>
                     <td class="py-3.5 px-4">
                         <div class="flex items-center gap-1.5">
@@ -522,11 +545,56 @@
                                 <p class="text-[10px] text-ink-400 uppercase">Belanja 12 Bln</p>
                             </div>
                             <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
-                                <p class="text-sm font-bold {{ $p->is_reseller ? 'text-up-accent' : 'text-ink-100' }}">{{ $p->is_reseller ? 'Reseller' : 'Retail' }}</p>
+                                <p class="text-sm font-bold {{ $p->tipe_konsumen === 'agen' || $p->kode_agen ? 'text-amber-300' : ($p->is_reseller ? 'text-up-accent' : 'text-ink-100') }}">
+                                    {{ $p->tipe_konsumen === 'agen' || $p->kode_agen ? 'Agen B2B' : ($p->is_reseller ? 'Reseller' : 'Retail') }}
+                                </p>
                                 <p class="text-[10px] text-ink-400 uppercase">Tipe Member</p>
                             </div>
                         </div>
+
+                        @if(!empty($selectedCustomer['upline_agen']))
+                            <div class="mt-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs">
+                                <span class="text-ink-400">Terdaftar via Agen Referral:</span>
+                                <span class="text-amber-400 font-semibold">{{ $selectedCustomer['upline_agen']->nama }} ({{ $p->referral_kode }})</span>
+                            </div>
+                        @endif
                     </div>
+
+                    <!-- Khusus Agen: Jaringan Downline & Kode Agen -->
+                    @if($p->kode_agen || $p->tipe_konsumen === 'agen')
+                        <div class="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-base">🏢</span>
+                                    <p class="text-xs text-amber-400 uppercase font-bold tracking-wider">Jaringan Downline & Komisi Agen</p>
+                                </div>
+                                <span class="text-xs font-mono font-bold text-amber-300 bg-amber-400/20 px-2.5 py-1 rounded-lg border border-amber-400/30">
+                                    Kode Agen: {{ $p->kode_agen ?? '-' }}
+                                </span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-center">
+                                <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                                    <p class="text-base font-bold text-white tabular-nums">{{ number_format($selectedCustomer['downline_count'] ?? 0) }}</p>
+                                    <p class="text-[10px] text-ink-400 uppercase">Downline Binaan</p>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                                    <p class="text-base font-bold text-up-mint tabular-nums">Rp {{ number_format($selectedCustomer['downline_omzet'] ?? 0, 0, ',', '.') }}</p>
+                                    <p class="text-[10px] text-ink-400 uppercase">Omzet Belanja Downline</p>
+                                </div>
+                            </div>
+                            @if(!empty($selectedCustomer['downlines']) && count($selectedCustomer['downlines']) > 0)
+                                <div class="mt-3 pt-3 border-t border-white/5 space-y-1.5">
+                                    <p class="text-[10px] text-ink-400 uppercase font-semibold">Daftar Mitra / Pelanggan Downline:</p>
+                                    @foreach($selectedCustomer['downlines'] as $dl)
+                                        <div class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-white/[0.02] border border-white/5">
+                                            <span class="text-white font-medium">{{ $dl->nama }} <span class="text-[10px] text-ink-400">({{ $dl->telepon ?? '-' }})</span></span>
+                                            <span class="text-up-mint font-semibold tabular-nums">Rp {{ number_format($dl->total_belanja_12bulan, 0, ',', '.') }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endif
 
                     <!-- Riwayat Pembelian POS Terakhir -->
                     <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5">
@@ -630,11 +698,26 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tipe Konsumen</label>
-                            <select wire:model="pelangganBaruForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model.live="pelangganBaruForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="retail" class="bg-ink-900">Retail (Umum)</option>
                                 <option value="reseller" class="bg-ink-900">Reseller</option>
                                 <option value="agen" class="bg-ink-900">Agen / Mitra B2B</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @if(($pelangganBaruForm['tipe_konsumen'] ?? '') === 'agen')
+                        <div>
+                            <label class="block text-xs font-semibold text-amber-300 mb-1.5">Kode Unik Agen</label>
+                            <input type="text" wire:model="pelangganBaruForm.kode_agen" placeholder="Otomatis jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono uppercase" />
+                            @error('pelangganBaruForm.kode_agen') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
+                        </div>
+                        @endif
+                        <div class="{{ ($pelangganBaruForm['tipe_konsumen'] ?? '') === 'agen' ? '' : 'sm:col-span-2' }}">
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Referral Upline (Opsional)</label>
+                            <input type="text" wire:model="pelangganBaruForm.referral_kode" placeholder="Masukkan Kode Agen Upline jika ada (misal: AGN-XXXXXX)" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono uppercase" />
+                            @error('pelangganBaruForm.referral_kode') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
                         </div>
                     </div>
 
@@ -701,11 +784,26 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tipe Konsumen</label>
-                            <select wire:model="editPelangganForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model.live="editPelangganForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="retail" class="bg-ink-900">Retail (Umum)</option>
                                 <option value="reseller" class="bg-ink-900">Reseller</option>
                                 <option value="agen" class="bg-ink-900">Agen / Mitra B2B</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        @if(($editPelangganForm['tipe_konsumen'] ?? '') === 'agen')
+                        <div>
+                            <label class="block text-xs font-semibold text-amber-300 mb-1.5">Kode Unik Agen</label>
+                            <input type="text" wire:model="editPelangganForm.kode_agen" placeholder="Otomatis jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono uppercase" />
+                            @error('editPelangganForm.kode_agen') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
+                        </div>
+                        @endif
+                        <div class="{{ ($editPelangganForm['tipe_konsumen'] ?? '') === 'agen' ? '' : 'sm:col-span-2' }}">
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Referral Upline (Opsional)</label>
+                            <input type="text" wire:model="editPelangganForm.referral_kode" placeholder="Kode Agen Upline (misal: AGN-XXXXXX)" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono uppercase" />
+                            @error('editPelangganForm.referral_kode') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
                         </div>
                     </div>
 

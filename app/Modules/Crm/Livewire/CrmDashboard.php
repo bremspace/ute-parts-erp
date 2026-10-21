@@ -25,12 +25,15 @@ class CrmDashboard extends Component
 
     public bool $filterReseller = false;
 
+    public string $filterTipeKonsumen = ''; // '', 'retail', 'reseller', 'agen'
+
     public string $activeTab = 'pelanggan'; // 'pelanggan' | 'tier'
 
     protected $queryString = [
         'search' => ['except' => ''],
         'filterTierId' => ['except' => null],
         'filterReseller' => ['except' => false],
+        'filterTipeKonsumen' => ['except' => ''],
         'activeTab' => ['except' => 'pelanggan'],
     ];
 
@@ -66,7 +69,11 @@ class CrmDashboard extends Component
     // [T-04] Tambah pelanggan dari CRM (CRM-06)
     public bool $showPelangganBaruModal = false;
 
-    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail'];
+    public array $pelangganBaruForm = [
+        'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
+        'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail',
+        'kode_agen' => '', 'referral_kode' => '',
+    ];
 
     public bool $showEditPelangganModal = false;
 
@@ -74,7 +81,8 @@ class CrmDashboard extends Component
 
     public array $editPelangganForm = [
         'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
-        'tanggal_lahir' => '', 'tier_membership_id' => null, 'is_reseller' => false, 'tipe_konsumen' => 'retail',
+        'tanggal_lahir' => '', 'tier_membership_id' => null, 'is_reseller' => false,
+        'tipe_konsumen' => 'retail', 'kode_agen' => '', 'referral_kode' => '',
     ];
 
     public function simpanPelangganBaruCrm()
@@ -87,6 +95,8 @@ class CrmDashboard extends Component
             'pelangganBaruForm.nama' => 'required|string|max:255',
             'pelangganBaruForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon',
             'pelangganBaruForm.email' => 'nullable|email|unique:pelanggan,email',
+            'pelangganBaruForm.kode_agen' => 'nullable|string|max:40|unique:pelanggan,kode_agen',
+            'pelangganBaruForm.referral_kode' => 'nullable|string|max:40',
         ]);
 
         $pelanggan = app(PelangganService::class)->create([
@@ -95,11 +105,18 @@ class CrmDashboard extends Component
             'email' => $this->pelangganBaruForm['email'] ?: null,
             'alamat' => $this->pelangganBaruForm['alamat'] ?: null,
             'tanggal_lahir' => $this->pelangganBaruForm['tanggal_lahir'] ?: null,
-            'is_reseller' => $this->pelangganBaruForm['is_reseller'],
+            'is_reseller' => $this->pelangganBaruForm['is_reseller'] || $this->pelangganBaruForm['tipe_konsumen'] === 'agen' || $this->pelangganBaruForm['tipe_konsumen'] === 'reseller',
+            'tipe_konsumen' => $this->pelangganBaruForm['tipe_konsumen'] ?: 'retail',
+            'kode_agen' => $this->pelangganBaruForm['kode_agen'] ?: null,
+            'referral_kode' => $this->pelangganBaruForm['referral_kode'] ?: null,
         ]);
 
         $this->showPelangganBaruModal = false;
-        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => '', 'is_reseller' => false];
+        $this->pelangganBaruForm = [
+            'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
+            'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail',
+            'kode_agen' => '', 'referral_kode' => '',
+        ];
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan (tersedia di POS & Servis)']);
     }
 
@@ -123,6 +140,8 @@ class CrmDashboard extends Component
             'tier_membership_id' => $p->tier_membership_id,
             'is_reseller' => (bool) $p->is_reseller,
             'tipe_konsumen' => $p->tipe_konsumen ?? ($p->is_reseller ? 'reseller' : 'retail'),
+            'kode_agen' => $p->kode_agen ?? '',
+            'referral_kode' => $p->referral_kode ?? '',
         ];
         $this->showEditPelangganModal = true;
     }
@@ -135,6 +154,14 @@ class CrmDashboard extends Component
 
             return;
         }
+
+        $this->validate([
+            'editPelangganForm.nama' => 'required|string|max:255',
+            'editPelangganForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon,'.$this->editPelangganId,
+            'editPelangganForm.email' => 'nullable|email|unique:pelanggan,email,'.$this->editPelangganId,
+            'editPelangganForm.kode_agen' => 'nullable|string|max:40|unique:pelanggan,kode_agen,'.$this->editPelangganId,
+            'editPelangganForm.referral_kode' => 'nullable|string|max:40',
+        ]);
 
         $pelanggan = Pelanggan::findOrFail($this->editPelangganId);
         app(PelangganService::class)->update($pelanggan, $this->editPelangganForm);
@@ -191,13 +218,17 @@ class CrmDashboard extends Component
             $query->where(function ($q) {
                 $q->where('nama', 'like', "%{$this->search}%")
                     ->orWhere('telepon', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
+                    ->orWhere('email', 'like', "%{$this->search}%")
+                    ->orWhere('kode_agen', 'like', "%{$this->search}%")
+                    ->orWhere('referral_kode', 'like', "%{$this->search}%");
             });
         }
         if ($this->filterTierId) {
             $query->where('tier_membership_id', $this->filterTierId);
         }
-        if ($this->filterReseller) {
+        if ($this->filterTipeKonsumen) {
+            $query->where('tipe_konsumen', $this->filterTipeKonsumen);
+        } elseif ($this->filterReseller) {
             $query->where('is_reseller', true);
         }
 
@@ -241,6 +272,22 @@ class CrmDashboard extends Component
             $sisa = max(0, (float) $next->min_belanja_12bulan - $belanja);
         }
 
+        // Data Jaringan Downline & Upline jika Agen atau memakai Referral
+        $downlines = collect();
+        $downlineCount = 0;
+        $downlineOmzet = 0.0;
+        if ($pelanggan->kode_agen) {
+            $downlineQuery = Pelanggan::where('referral_kode', $pelanggan->kode_agen);
+            $downlineCount = $downlineQuery->count();
+            $downlineOmzet = (float) $downlineQuery->sum('total_belanja_12bulan');
+            $downlines = $downlineQuery->take(5)->get();
+        }
+
+        $uplineAgen = null;
+        if ($pelanggan->referral_kode) {
+            $uplineAgen = Pelanggan::where('kode_agen', $pelanggan->referral_kode)->first();
+        }
+
         return [
             'pelanggan' => $pelanggan,
             'transaksi' => $transaksi,
@@ -249,6 +296,10 @@ class CrmDashboard extends Component
             'tier_berikutnya' => $next?->nama,
             'progress_tier' => min(100, max(0, $progress)),
             'sisa_belanja' => $sisa,
+            'downlines' => $downlines,
+            'downline_count' => $downlineCount,
+            'downline_omzet' => $downlineOmzet,
+            'upline_agen' => $uplineAgen,
         ];
     }
 

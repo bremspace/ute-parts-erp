@@ -44,6 +44,10 @@ class PelangganService
             ? 'nullable|email|unique:pelanggan,email,'.$pelangganId
             : 'nullable|email|unique:pelanggan,email';
 
+        $kodeAgenRule = $isUpdate
+            ? 'sometimes|nullable|string|max:40|unique:pelanggan,kode_agen,'.$pelangganId
+            : 'sometimes|nullable|string|max:40|unique:pelanggan,kode_agen';
+
         return [
             'nama' => $isUpdate ? 'sometimes|required|string|max:255' : 'required|string|max:255',
             'telepon' => $teleponRule,
@@ -53,7 +57,18 @@ class PelangganService
             'is_reseller' => 'sometimes|boolean',
             'tipe_konsumen' => 'sometimes|nullable|in:retail,reseller,agen',
             'tier_membership_id' => 'sometimes|nullable|exists:tier_memberships,id',
+            'kode_agen' => $kodeAgenRule,
+            'referral_kode' => 'sometimes|nullable|string|max:40',
         ];
+    }
+
+    public function generateUniqueKodeAgen(): string
+    {
+        do {
+            $kode = 'AGN-'.strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        } while (Pelanggan::where('kode_agen', $kode)->exists());
+
+        return $kode;
     }
 
     public function create(array $data): Pelanggan
@@ -66,6 +81,16 @@ class PelangganService
 
         $isReseller = (bool) ($validated['is_reseller'] ?? false);
         $tipeKonsumen = $validated['tipe_konsumen'] ?? ($isReseller ? 'reseller' : 'retail');
+        if ($tipeKonsumen === 'agen' || $tipeKonsumen === 'reseller') {
+            $isReseller = true;
+        }
+
+        $kodeAgen = ! empty($validated['kode_agen']) ? strtoupper(trim($validated['kode_agen'])) : null;
+        if ($tipeKonsumen === 'agen' && empty($kodeAgen)) {
+            $kodeAgen = $this->generateUniqueKodeAgen();
+        }
+
+        $referralKode = ! empty($validated['referral_kode']) ? strtoupper(trim($validated['referral_kode'])) : null;
 
         $pelanggan = Pelanggan::create([
             'nama' => $validated['nama'],
@@ -76,6 +101,8 @@ class PelangganService
             'tier_membership_id' => $validated['tier_membership_id'] ?? $tierTerendah?->id,
             'is_reseller' => $isReseller,
             'tipe_konsumen' => $tipeKonsumen,
+            'kode_agen' => $kodeAgen,
+            'referral_kode' => $referralKode,
             'total_belanja_12bulan' => 0,
             'poin_loyalty' => 0,
         ]);
@@ -106,6 +133,12 @@ class PelangganService
         if (array_key_exists('tier_membership_id', $validated)) {
             $updateData['tier_membership_id'] = $validated['tier_membership_id'] ?: null;
         }
+        if (array_key_exists('kode_agen', $validated)) {
+            $updateData['kode_agen'] = $validated['kode_agen'] ? strtoupper(trim($validated['kode_agen'])) : null;
+        }
+        if (array_key_exists('referral_kode', $validated)) {
+            $updateData['referral_kode'] = $validated['referral_kode'] ? strtoupper(trim($validated['referral_kode'])) : null;
+        }
 
         if (array_key_exists('is_reseller', $validated)) {
             $isReseller = (bool) $validated['is_reseller'];
@@ -124,6 +157,13 @@ class PelangganService
                 $updateData['is_reseller'] = true;
             } elseif ($tipe === 'retail') {
                 $updateData['is_reseller'] = false;
+            }
+        }
+
+        if (($updateData['tipe_konsumen'] ?? $pelanggan->tipe_konsumen) === 'agen') {
+            $updateData['is_reseller'] = true;
+            if (empty($pelanggan->kode_agen) && empty($updateData['kode_agen'])) {
+                $updateData['kode_agen'] = $this->generateUniqueKodeAgen();
             }
         }
 

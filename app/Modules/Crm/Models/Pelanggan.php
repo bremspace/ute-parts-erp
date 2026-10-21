@@ -52,4 +52,14 @@ class Pelanggan extends Model implements Authenticatable
     {
         return $this->hasMany(Transaksi::class);
     }
+
+    public function downlines(): HasMany
+    {
+        return $this->hasMany(Pelanggan::class, 'referral_kode', 'kode_agen');
+    }
+
+    public function uplineAgen(): BelongsTo
+    {
+        return $this->belongsTo(Pelanggan::class, 'referral_kode', 'kode_agen');
+    }
 }

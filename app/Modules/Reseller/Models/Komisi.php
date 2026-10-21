@@ -79,6 +79,10 @@ class Komisi extends Model
             return $this->karyawan?->nama ?? 'Karyawan #'.$this->aktor_id;
         }
 
+        if ($this->aktor_tipe === 'agen') {
+            return $this->pelanggan?->nama ?? 'Agen #'.($this->pelanggan_id ?? $this->aktor_id);
+        }
+
         return $this->pelanggan?->nama ?? 'Reseller #'.($this->pelanggan_id ?? $this->aktor_id);
     }
 

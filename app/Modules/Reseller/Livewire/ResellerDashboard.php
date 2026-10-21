@@ -18,14 +18,27 @@ class ResellerDashboard extends Component
     use ParsesNominal;
     use WithPagination;
 
-    public string $activeTab = 'reseller'; // reseller, komisi
+    public string $activeTab = 'reseller'; // reseller, komisi, skema
+
+    // Mitra filter & search
+    public string $filterMitra = ''; // '', 'reseller', 'agen'
+
+    public string $search = '';
 
     // Komisi filter
     public string $filterStatus = '';
 
-    public string $filterAktor = ''; // '', 'reseller', 'karyawan'
+    public string $filterAktor = ''; // '', 'reseller', 'agen', 'karyawan'
 
     public array $selectedKomisiIds = [];
+
+    protected $queryString = [
+        'activeTab' => ['except' => 'reseller'],
+        'filterMitra' => ['except' => ''],
+        'search' => ['except' => ''],
+        'filterStatus' => ['except' => ''],
+        'filterAktor' => ['except' => ''],
+    ];
 
     // Skema komisi modal
     public bool $showSkemaModal = false;
@@ -34,15 +47,49 @@ class ResellerDashboard extends Component
 
     public function getResellersProperty()
     {
-        return Pelanggan::with(['tierMembership', 'komisi'])
-            ->where('is_reseller', true)
-            ->latest()
+        $query = Pelanggan::with(['tierMembership', 'komisi', 'downlines'])
+            ->where(function ($q) {
+                $q->where('is_reseller', true)
+                    ->orWhere('tipe_konsumen', 'agen')
+                    ->orWhereNotNull('kode_agen');
+            });
+
+        if ($this->filterMitra === 'agen') {
+            $query->where(function ($q) {
+                $q->where('tipe_konsumen', 'agen')
+                    ->orWhereNotNull('kode_agen');
+            });
+        } elseif ($this->filterMitra === 'reseller') {
+            $query->where(function ($q) {
+                $q->where('tipe_konsumen', '!=', 'agen')
+                    ->orWhereNull('tipe_konsumen');
+            })->whereNull('kode_agen');
+        }
+
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('nama', 'like', "%{$this->search}%")
+                    ->orWhere('telepon', 'like', "%{$this->search}%")
+                    ->orWhere('kode_agen', 'like', "%{$this->search}%");
+            });
+        }
+
+        return $query->latest()
             ->get()
             ->map(function ($r) {
+                $isAgen = $r->tipe_konsumen === 'agen' || ! empty($r->kode_agen);
+                $downlines = $r->downlines;
+
                 return [
                     'id' => $r->id,
                     'nama' => $r->nama,
                     'telepon' => $r->telepon,
+                    'is_agen' => $isAgen,
+                    'tipe_mitra' => $isAgen ? 'agen' : 'reseller',
+                    'kode_agen' => $r->kode_agen,
+                    'referral_kode' => $r->referral_kode,
+                    'downline_count' => $downlines->count(),
+                    'downline_omzet' => (float) $downlines->sum('total_belanja_12bulan'),
                     'total_belanja' => $r->total_belanja_12bulan,
                     'tier' => $r->tierMembership?->nama,
                     'komisi_terhutang' => $r->komisi->where('status', 'disetujui')->sum('nominal_komisi'),
@@ -175,10 +222,25 @@ class ResellerDashboard extends Component
 
     public function render()
     {
+        $semuaMitra = Pelanggan::where(function ($q) {
+            $q->where('is_reseller', true)
+                ->orWhere('tipe_konsumen', 'agen')
+                ->orWhereNotNull('kode_agen');
+        })->get();
+
+        $totalMitra = $semuaMitra->count();
+        $totalAgen = $semuaMitra->filter(fn ($m) => $m->tipe_konsumen === 'agen' || ! empty($m->kode_agen))->count();
+        $totalReseller = $totalMitra - $totalAgen;
+
         return view('modules.reseller.livewire.reseller-dashboard', [
             'resellers' => $this->resellers,
             'komisiList' => $this->komisiList,
             'skemaList' => $this->skemaList,
+            'statsMitra' => [
+                'total' => $totalMitra,
+                'agen' => $totalAgen,
+                'reseller' => $totalReseller,
+            ],
         ])->layout('layouts.backoffice', ['header' => 'Reseller & Komisi']);
     }
 }
