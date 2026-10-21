@@ -8,10 +8,10 @@
                     <p class="text-xs text-ink-400">Pengadaan barang ke supplier dengan tracking harga otomatis &amp; strategi reorder ABC</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                    <button wire:click="openProcurementModal" class="px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97]" title="Rekomendasi Pengadaan Berdasarkan Stok & Demand">
+                    <button wire:click="openProcurementModal" wire:loading.attr="disabled" class="px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97]" title="Rekomendasi Pengadaan Berdasarkan Stok & Demand">
                         <span>📊</span> Rekomendasi Pengadaan
                     </button>
-                    <button wire:click="openPoModal" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.97]">
+                    <button wire:click="openPoModal" wire:loading.attr="disabled" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.97]">
                         + Buat PO
                     </button>
                 </div>
@@ -59,6 +59,11 @@
                 @empty
                     <tr><td colspan="9" class="py-12 text-center text-ink-400">Belum ada PO. Klik "+ Buat PO" untuk input pembelian ke supplier.</td></tr>
                 @endforelse
+                @if($poList->hasPages())
+                    <x-slot:pagination>
+                        {{ $poList->links() }}
+                    </x-slot:pagination>
+                @endif
             </x-prism.data-table>
 
             <!-- Supplier Cards -->
@@ -132,7 +137,7 @@
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="text-xs font-semibold text-ink-300">Supplier *</label>
-                                <button type="button" wire:click="$set('showSupplierModal', true)" class="text-[11px] text-up-mint hover:underline font-bold cursor-pointer flex items-center gap-1">
+                                <button type="button" wire:click="$set('showSupplierModal', true)" wire:loading.attr="disabled" class="text-[11px] text-up-mint hover:underline font-bold cursor-pointer flex items-center gap-1">
                                     <span>+ Supplier Baru</span>
                                 </button>
                             </div>
@@ -364,8 +369,11 @@
                     <div><label class="block text-xs font-semibold text-ink-300 mb-1.5">Termin (hari)</label><input type="number" wire:model="supplierForm.termin_hari" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" /></div>
                 </div>
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
-                    <button wire:click="$set('showSupplierModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="simpanSupplier" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan</button>
+                    <button type="button" wire:click="$set('showSupplierModal', false)" wire:loading.attr="disabled" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-95 text-center">Batal</button>
+                    <button type="button" wire:click="simpanSupplier" wire:loading.attr="disabled" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[44px] transition active:scale-95 text-center flex items-center justify-center gap-1.5">
+                        <span wire:loading.remove wire:target="simpanSupplier">Simpan</span>
+                        <span wire:loading wire:target="simpanSupplier">Menyimpan…</span>
+                    </button>
                 </div>
             </div>
         </div>

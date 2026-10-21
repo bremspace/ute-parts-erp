@@ -68,6 +68,13 @@ class GrnTab extends Component
 
     public ?int $detailGrnId = null;
 
+    public function mount(): void
+    {
+        if ($poId = session('wms_grn_po_id')) {
+            $this->openGrnModal((int) $poId);
+        }
+    }
+
     public function bukaDetailGrn(int $id): void
     {
         $this->detailGrnId = $id;

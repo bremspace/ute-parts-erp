@@ -100,12 +100,12 @@
                 @elseif($activeTab === 'po')
                     @can('wms.create')
                     <div class="flex items-center gap-2">
-                        <button wire:click="$dispatch('wms-procurement-modal')" class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap" title="Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, JIT)">
+                        <button @click="$dispatch('wms-procurement-modal')" class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap" title="Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, JIT)">
                             <span>📊</span>
                             <span>Rekomendasi Pengadaan</span>
                         </button>
-                        <button wire:click="$dispatch('wms-supplier-baru')" class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Supplier</button>
-                        <button wire:click="$dispatch('wms-po-baru')" class="px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Buat PO</button>
+                        <button @click="$dispatch('wms-supplier-baru')" class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Supplier</button>
+                        <button @click="$dispatch('wms-po-baru')" class="px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Buat PO</button>
                     </div>
                     @endcan
                 @endif
@@ -238,8 +238,8 @@
                             <span>📊</span>
                             <span>Rekomendasi</span>
                         </button>
-                        <button wire:click="$dispatch('wms-supplier-baru')" class="flex-1 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Supplier</button>
-                        <button wire:click="$dispatch('wms-po-baru')" class="flex-1 px-3 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ PO</button>
+                        <button @click="$dispatch('wms-supplier-baru')" class="flex-1 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Supplier</button>
+                        <button @click="$dispatch('wms-po-baru')" class="flex-1 px-3 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ PO</button>
                     </div>
                     @endcan
                 @endif
@@ -247,40 +247,36 @@
         </div>
     </div>
 
-    <!-- TAB 1: INVENTORI & STOK — child selalu terpasang (tampil/sembunyi tanpa unmount, state paritas dgn component lama) -->
-    <div @unless($activeTab === 'stok') class="hidden" @endunless>
-        @livewire(\App\Modules\Wms\Livewire\StokTab::class)
-    </div>
-
-    <!-- TAB 1b: MASTER PRODUK -->
-    <div @unless($activeTab === 'produk') class="hidden" @endunless>
-        @livewire(\App\Modules\Wms\Livewire\ProdukTab::class)
-    </div>
-
-    <!-- TAB 2: TRANSFER ANTAR GUDANG -->
-    <div @unless($activeTab === 'transfer') class="hidden" @endunless>
-        @livewire(\App\Modules\Wms\Livewire\TransferTab::class)
-    </div>
-
-    <!-- TAB 3: STOCK OPNAME -->
-    <div @unless($activeTab === 'opname') class="hidden" @endunless>
-        @livewire(\App\Modules\Wms\Livewire\OpnameTab::class)
-    </div>
-
-    <!-- TAB 4: PO & SUPPLIER [T-10] -->
-    <div @unless($activeTab === 'po') class="hidden" @endunless>
-        @livewire(\App\Modules\Wms\Livewire\PoTab::class)
-    </div>
-
-    <!-- TAB 5: GRN (penerimaan barang) [F2-2] -->
-    <div @unless($activeTab === 'grn') class="hidden" @endunless>
-        @livewire(\App\Modules\Wms\Livewire\GrnTab::class)
-    </div>
-
-    <!-- TAB 6: RETUR PEMBELIAN -->
-    <div @unless($activeTab === 'retur') class="hidden" @endunless>
-        @livewire(\App\Modules\Wms\Livewire\ReturnPembelianTab::class)
-    </div>
+    <!-- TAB CONTENT: Lazy Unmount On-Demand (Hanya me-render tab aktif agar hemat memori & performa instan di semua perangkat) -->
+    @if($activeTab === 'stok')
+        <div key="tab-stok">
+            @livewire(\App\Modules\Wms\Livewire\StokTab::class)
+        </div>
+    @elseif($activeTab === 'produk')
+        <div key="tab-produk">
+            @livewire(\App\Modules\Wms\Livewire\ProdukTab::class)
+        </div>
+    @elseif($activeTab === 'transfer')
+        <div key="tab-transfer">
+            @livewire(\App\Modules\Wms\Livewire\TransferTab::class)
+        </div>
+    @elseif($activeTab === 'opname')
+        <div key="tab-opname">
+            @livewire(\App\Modules\Wms\Livewire\OpnameTab::class)
+        </div>
+    @elseif($activeTab === 'po')
+        <div key="tab-po">
+            @livewire(\App\Modules\Wms\Livewire\PoTab::class)
+        </div>
+    @elseif($activeTab === 'grn')
+        <div key="tab-grn">
+            @livewire(\App\Modules\Wms\Livewire\GrnTab::class)
+        </div>
+    @elseif($activeTab === 'retur')
+        <div key="tab-retur">
+            @livewire(\App\Modules\Wms\Livewire\ReturnPembelianTab::class)
+        </div>
+    @endif
 
     <!-- MODAL PENCARIAN PRODUK GLOBAL -->
     @livewire(\App\Modules\Wms\Livewire\ProductSearchModal::class)

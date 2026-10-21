@@ -67,14 +67,28 @@ class WmsDashboardSplitTest extends TestCase
             ->assertSee('Master Produk & Stok', false)
             ->assertSee('Transfer Antar Gudang')
             ->assertSee('Stock Opname')
-            // Konten tiap child tab ikut ter-render di shell (tersembunyi via CSS, bukan unmount)
-            ->assertSee('Kompatibilitas')     // StokTab
-            ->assertSee('No. Transfer')       // TransferTab
-            ->assertSee('No. Opname')         // OpnameTab
-            ->assertSee('Jatuh Tempo')        // PoTab
-            ->assertSee('Stok Total');        // ProdukTab
+            // Konten child tab aktif ter-render on-demand (lazy unmount untuk performa optimal di semua perangkat)
+            ->assertSee('Stok Total');        // ProdukTab (default tab aktif)
 
-        $shell->call('$set', 'activeTab', 'po')->assertSet('activeTab', 'po');
+        // Pindah ke tab PO -> PoTab di-mount on-demand
+        $shell->call('$set', 'activeTab', 'po')
+            ->assertSet('activeTab', 'po')
+            ->assertSee('Jatuh Tempo');
+
+        // Pindah ke tab Transfer -> TransferTab di-mount on-demand
+        $shell->call('$set', 'activeTab', 'transfer')
+            ->assertSet('activeTab', 'transfer')
+            ->assertSee('No. Transfer');
+
+        // Pindah ke tab Opname -> OpnameTab di-mount on-demand
+        $shell->call('$set', 'activeTab', 'opname')
+            ->assertSet('activeTab', 'opname')
+            ->assertSee('No. Opname');
+
+        // Pindah ke tab Stok -> StokTab di-mount on-demand
+        $shell->call('$set', 'activeTab', 'stok')
+            ->assertSet('activeTab', 'stok')
+            ->assertSee('Kompatibilitas');
     }
 
     public function test_tab_stok_merender(): void

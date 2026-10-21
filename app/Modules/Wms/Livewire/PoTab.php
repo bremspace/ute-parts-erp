@@ -79,6 +79,22 @@ class PoTab extends Component
         'urgensi' => '',
     ];
 
+    public function mount(): void
+    {
+        if (session('wms_buka_po_modal')) {
+            $this->openPoModal();
+        }
+        if (session('wms_buka_supplier_modal')) {
+            $this->openSupplierModal();
+        }
+        if (session('wms_buka_procurement_modal')) {
+            $this->openProcurementModal();
+        }
+        if ($produkId = session('wms_order_produk_id')) {
+            $this->orderPoProduk((int) $produkId);
+        }
+    }
+
     #[On('wms-procurement-modal')]
     public function openProcurementModal(): void
     {
@@ -513,6 +529,7 @@ class PoTab extends Component
         }
 
         // Pindah ke tab GRN dan buka modal input GRN untuk PO ini
+        session()->flash('wms_grn_po_id', $id);
         $this->dispatch('wms-pindah-tab', tab: 'grn');
         $this->dispatch('buka-grn-po', poId: $id);
         $this->dispatch('alert', [
@@ -734,7 +751,13 @@ class PoTab extends Component
             'gudangs' => $gudangs,
             'allProducts' => $allProducts,
             'suppliers' => Supplier::orderBy('nama')->get(),
-            'poList' => PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk'])->latest()->paginate(15, pageName: 'po'),
+            'poList' => PurchaseOrder::whereHas('gudangTujuan', function ($q) use ($cabangId) {
+                $q->where('is_active', true)
+                    ->when($cabangId, fn ($qq) => $qq->where('cabang_id', $cabangId));
+            })
+                ->with(['supplier', 'gudangTujuan', 'items.produk'])
+                ->latest()
+                ->paginate(15, pageName: 'po'),
             'detailPo' => $detailPo,
             'procurementData' => $procurementData,
             'procurementSummary' => $procurementSummary,

@@ -1480,8 +1480,9 @@ class ProdukTab extends Component
 
     public function orderPo(int $produkId): void
     {
-        $this->dispatch('order-po-produk', produkId: $produkId);
+        session()->flash('wms_order_produk_id', $produkId);
         $this->dispatch('wms-pindah-tab', tab: 'po');
+        $this->dispatch('order-po-produk', produkId: $produkId);
     }
 
     public function openTambahStokModal(int $produkId): void
