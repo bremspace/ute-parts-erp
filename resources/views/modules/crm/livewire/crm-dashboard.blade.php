@@ -1,13 +1,13 @@
 <div class="space-y-6" x-data="{ activeTab: @entangle('activeTab').live }">
     <!-- ===== HEADER: SUBMENU & TABS NAVIGATION ===== -->
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-4">
         <!-- Tab Switcher Utama CRM -->
-        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/5 w-fit">
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/5 overflow-x-auto scrollbar-none max-w-full flex-nowrap py-1">
             <button
                 type="button"
                 @click="activeTab = 'pelanggan'"
                 wire:click="switchTab('pelanggan')"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[40px]"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0"
                 :class="activeTab === 'pelanggan' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
             >
                 <span>👥</span>
@@ -22,7 +22,7 @@
                 type="button"
                 @click="activeTab = 'tier'"
                 wire:click="switchTab('tier')"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[40px]"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0"
                 :class="activeTab === 'tier' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
             >
                 <span>🏷️</span>
@@ -32,20 +32,24 @@
                     {{ $tiers->count() }}
                 </span>
             </button>
+
+            <a
+                href="/app/crm/leads"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] text-ink-400 hover:text-white hover:bg-white/5 whitespace-nowrap flex-shrink-0"
+                title="Buka papan kanban prospek & negosiasi leads"
+            >
+                <span>🎯</span>
+                <span>Pipeline Leads</span>
+                <span class="text-[10px] text-ink-500">&rarr;</span>
+            </a>
         </div>
 
         <!-- Quick Submenu Links (Hubungan Modul Lain) -->
-        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
-            <a href="/app/crm/leads" class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white text-xs font-semibold transition active:scale-95 whitespace-nowrap min-h-[40px] cursor-pointer" title="Kelola prospek & alur negosiasi leads">
-                <span>🎯</span>
-                <span>Lead Pipeline</span>
-                <span class="text-[10px] text-ink-500">&rarr;</span>
-            </a>
-
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none flex-nowrap py-0.5 self-start md:self-auto">
             @can('reseller.view')
-            <a href="/app/reseller" class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-up-accent/10 hover:bg-up-accent/20 border border-up-accent/25 text-up-accent hover:text-white text-xs font-semibold transition active:scale-95 whitespace-nowrap min-h-[40px] cursor-pointer" title="Portal mitra reseller, saldo komisi & penarikan">
+            <a href="/app/reseller" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-up-accent/10 hover:bg-up-accent/20 border border-up-accent/25 text-up-accent hover:text-white text-xs font-semibold transition active:scale-95 whitespace-nowrap min-h-[38px] cursor-pointer" title="Portal mitra reseller, saldo komisi & penarikan">
                 <span>🤝</span>
-                <span>Mitra Reseller</span>
+                <span>Mitra Reseller & Agen</span>
                 <span class="text-[10px] text-up-accent/70">&rarr;</span>
             </a>
             @endcan
@@ -57,28 +61,28 @@
     <!-- ========================================== -->
     <div x-show="activeTab === 'pelanggan'" class="space-y-4">
         <!-- Toolbar: Pencarian, Filter & Action Buttons -->
-        <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3 sm:p-3.5 rounded-2xl">
             <!-- Filter & Pencarian -->
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-3xl">
-                <div class="flex-1 min-w-[240px]">
-                    <x-prism.barcode-scan-input placeholder="Cari nama, nomor HP, atau email pelanggan..." model="search" />
+            <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2.5 flex-1 min-w-0">
+                <div class="flex-1 min-w-0 sm:min-w-[240px]">
+                    <x-prism.barcode-scan-input placeholder="Cari nama, HP, email, kode agen..." model="search" />
                 </div>
-                <div class="flex items-center gap-2">
-                    <select wire:model.live="filterTierId" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                    <select wire:model.live="filterTierId" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
                         <option value="" class="bg-ink-900">Semua Tier</option>
                         @foreach($tiers as $t)
                             <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>
                         @endforeach
                     </select>
 
-                    <select wire:model.live="filterTipeKonsumen" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
-                        <option value="" class="bg-ink-900">Semua Tipe Konsumen</option>
-                        <option value="retail" class="bg-ink-900">Retail (Umum)</option>
-                        <option value="reseller" class="bg-ink-900">Mitra Reseller</option>
-                        <option value="agen" class="bg-ink-900">Agen / Mitra B2B</option>
+                    <select wire:model.live="filterTipeKonsumen" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
+                        <option value="" class="bg-ink-900">Semua Tipe</option>
+                        <option value="retail" class="bg-ink-900">Retail</option>
+                        <option value="reseller" class="bg-ink-900">Reseller</option>
+                        <option value="agen" class="bg-ink-900">Agen B2B</option>
                     </select>
 
-                    <label class="flex items-center gap-2 text-xs text-ink-300 font-medium cursor-pointer select-none px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition min-h-[44px]" title="Tampilkan hanya pelanggan yang terdaftar sebagai mitra reseller atau agen">
+                    <label class="col-span-2 sm:col-span-1 flex items-center justify-center sm:justify-start gap-2 text-xs text-ink-300 font-medium cursor-pointer select-none px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition min-h-[44px] flex-shrink-0" title="Tampilkan hanya pelanggan yang terdaftar sebagai mitra reseller atau agen">
                         <input type="checkbox" wire:model.live="filterReseller" class="accent-up-accent w-4 h-4 rounded cursor-pointer" />
                         <span class="whitespace-nowrap">Mitra Aktif</span>
                     </label>
@@ -86,12 +90,12 @@
             </div>
 
             <!-- Action Buttons Pelanggan -->
-            <div class="flex items-center gap-2 self-end lg:self-auto">
+            <div class="flex items-center gap-2 pt-2 xl:pt-0 border-t xl:border-t-0 border-white/5 justify-stretch sm:justify-end flex-wrap sm:flex-nowrap">
                 @can('crm.create')
                 <button
                     type="button"
                     wire:click="$set('showPelangganBaruModal', true)"
-                    class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-up-primary/20 transition active:scale-95 cursor-pointer min-h-[44px]"
+                    class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-up-primary/20 transition active:scale-95 cursor-pointer min-h-[44px] whitespace-nowrap"
                 >
                     <span>+ Tambah Pelanggan</span>
                 </button>
@@ -101,7 +105,7 @@
                 <button
                     type="button"
                     wire:click="$set('showBroadcastModal', true)"
-                    class="px-3.5 py-2.5 rounded-xl bg-up-accent/15 hover:bg-up-accent/25 border border-up-accent/30 text-up-accent font-semibold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[44px]"
+                    class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-up-accent/15 hover:bg-up-accent/25 border border-up-accent/30 text-up-accent font-semibold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[44px] whitespace-nowrap"
                     title="Kirim pesan massal via WA, Email, atau In-App Notifikasi"
                 >
                     <span>📢</span>
@@ -204,41 +208,75 @@
             <x-slot:mobileCards>
                 @foreach($customers as $c)
                     <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <h4 class="font-bold text-white text-sm">{{ $c->nama }}</h4>
-                                <span class="text-xs text-ink-400 font-mono">{{ $c->telepon ?? '-' }}</span>
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <h4 class="font-bold text-white text-sm truncate">{{ $c->nama }}</h4>
+                                    @if($c->tipe_konsumen === 'agen' || $c->kode_agen)
+                                        <span class="text-[9px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/35 px-1.5 py-0.5 rounded-full">AGEN B2B</span>
+                                    @elseif($c->is_reseller || $c->tipe_konsumen === 'reseller')
+                                        <span class="text-[9px] font-bold text-up-accent bg-up-accent/10 border border-up-accent/30 px-1.5 py-0.5 rounded-full">RESELLER</span>
+                                    @endif
+                                </div>
+                                <div class="flex items-center gap-2 mt-1 text-xs text-ink-400 font-mono flex-wrap">
+                                    <span>{{ $c->telepon ?? '-' }}</span>
+                                    @if($c->kode_agen)
+                                        <span class="text-[10px] text-amber-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">Kode: {{ $c->kode_agen }}</span>
+                                    @endif
+                                    @if($c->referral_kode)
+                                        <span class="text-[10px] text-ink-400">Ref: {{ $c->referral_kode }}</span>
+                                    @endif
+                                </div>
+                                @if($c->email)
+                                    <span class="block text-[11px] text-ink-500 truncate mt-0.5">{{ $c->email }}</span>
+                                @endif
                             </div>
-                            <x-prism.tier-badge :tier="$c->tierMembership?->nama ?? ($c->is_reseller ? 'Reseller' : 'Retail')" />
+                            <div class="flex-shrink-0">
+                                <x-prism.tier-badge :tier="$c->tierMembership?->nama ?? ($c->is_reseller ? 'Reseller' : 'Retail')" />
+                            </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-white/5">
-                            <div>
-                                <span class="text-ink-400 text-[10px] uppercase block">Belanja 12 Bln</span>
-                                <span class="font-bold text-white tabular-nums">Rp {{ number_format($c->total_belanja_12bulan, 0, ',', '.') }}</span>
+
+                        <div class="grid grid-cols-2 gap-2 text-xs pt-2.5 border-t border-white/5">
+                            <div class="p-2 rounded-xl bg-white/[0.02] border border-white/5">
+                                <span class="text-ink-400 text-[10px] uppercase font-semibold block">Belanja 12 Bln</span>
+                                <span class="font-bold text-white tabular-nums text-xs">Rp {{ number_format($c->total_belanja_12bulan, 0, ',', '.') }}</span>
                             </div>
-                            <div>
-                                <span class="text-ink-400 text-[10px] uppercase block">Poin Loyalty</span>
-                                <span class="font-bold text-up-primary tabular-nums">{{ number_format($c->poin_loyalty) }} pts</span>
+                            <div class="p-2 rounded-xl bg-white/[0.02] border border-white/5">
+                                <span class="text-ink-400 text-[10px] uppercase font-semibold block">Poin Loyalty</span>
+                                <span class="font-bold text-up-primary tabular-nums text-xs">{{ number_format($c->poin_loyalty) }} pts</span>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 pt-2">
+
+                        <div class="flex items-center gap-2 pt-1">
                             <button
                                 type="button"
                                 wire:click="$set('selectedCustomerId', {{ $c->id }})"
-                                class="flex-1 py-2 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary font-bold text-xs transition duration-140 cursor-pointer text-center"
+                                class="flex-1 py-2.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary font-bold text-xs transition duration-140 cursor-pointer text-center active:scale-95 min-h-[40px] flex items-center justify-center gap-1.5"
                             >
-                                Lihat Detail 360°
+                                <span>🔍</span>
+                                <span>Detail 360°</span>
                             </button>
                             @can('crm.edit')
                             <button
                                 type="button"
                                 wire:click="openEditPelangganModal({{ $c->id }})"
-                                class="p-2 rounded-xl bg-white/5 text-up-mint hover:text-white text-xs"
-                                title="Edit"
+                                class="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint hover:text-white transition text-xs cursor-pointer active:scale-95 min-h-[40px] min-w-[40px] flex items-center justify-center"
+                                title="Edit Data Pelanggan"
                             >
                                 ✏️
                             </button>
                             @endcan
+                            @if(isSuperAdminOrOwner() || auth()->user()?->can('crm.delete'))
+                            <button
+                                type="button"
+                                wire:click="hapusPelanggan({{ $c->id }})"
+                                wire:confirm="Yakin ingin menghapus pelanggan '{{ $c->nama }}'?"
+                                class="p-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 transition text-xs cursor-pointer active:scale-95 min-h-[40px] min-w-[40px] flex items-center justify-center"
+                                title="Hapus Pelanggan"
+                            >
+                                🗑️
+                            </button>
+                            @endif
                         </div>
                     </div>
                 @endforeach
@@ -253,7 +291,7 @@
     <!-- ========================================== -->
     <div x-show="activeTab === 'tier'" x-cloak class="space-y-4">
         <!-- Header Info & Actions Tier -->
-        <div class="p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="p-4 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
                     <span>🏷️</span>
@@ -264,12 +302,12 @@
                 </p>
             </div>
 
-            <div class="flex items-center gap-2 self-start md:self-auto flex-shrink-0">
+            <div class="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap justify-stretch md:justify-end flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
                 @can('tier.manage')
                 <button
                     type="button"
                     wire:click="openTierModal()"
-                    class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-up-primary/20 transition active:scale-95 cursor-pointer min-h-[44px]"
+                    class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-up-primary/20 transition active:scale-95 cursor-pointer min-h-[44px] whitespace-nowrap"
                 >
                     <span>+ Tambah Tier</span>
                 </button>
@@ -278,7 +316,7 @@
                     type="button"
                     wire:click="recalcTier"
                     wire:confirm="Jalankan rekalkulasi tier untuk semua pelanggan berdasarkan total belanja 12 bulan terakhir?"
-                    class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white font-semibold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[44px]"
+                    class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[44px] whitespace-nowrap"
                     title="Hitung ulang status tier seluruh pelanggan sekarang"
                 >
                     <span>⟳ Rekalkulasi Tier</span>
@@ -371,11 +409,11 @@
     <!-- MODAL: TIER (TAMBAH / EDIT) -->
     <!-- ========================================== -->
     @if($showTierModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">{{ $tierForm['id'] ? 'Edit Tier Membership' : 'Tambah Tier Baru' }}</h3>
-                    <button wire:click="$set('showTierModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-md glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl relative max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-white/10">
+                    <h3 class="text-base sm:text-lg font-bold text-white">{{ $tierForm['id'] ? 'Edit Tier Membership' : 'Tambah Tier Baru' }}</h3>
+                    <button wire:click="$set('showTierModal', false)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
                 </div>
 
                 <div class="space-y-4">
@@ -436,11 +474,11 @@
     <!-- MODAL: BROADCAST PROMO MASSAL -->
     <!-- ========================================== -->
     @if($showBroadcastModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Broadcast Promo & Pengumuman</h3>
-                    <button wire:click="$set('showBroadcastModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-md glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl relative">
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-white/10">
+                    <h3 class="text-base sm:text-lg font-bold text-white">Broadcast Promo & Pengumuman</h3>
+                    <button wire:click="$set('showBroadcastModal', false)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
                 </div>
 
                 <div class="space-y-4">
@@ -494,14 +532,14 @@
     <!-- DRAWER / MODAL: DETAIL PELANGGAN 360° -->
     <!-- ========================================== -->
     @if($selectedCustomer && $selectedCustomerId)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative max-h-[90vh] flex flex-col">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-2xl glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl relative max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-white/10">
                     <div class="flex items-center gap-2">
                         <span class="text-lg">🔍</span>
-                        <h3 class="text-lg font-bold text-white">Profil Pelanggan 360°</h3>
+                        <h3 class="text-base sm:text-lg font-bold text-white">Profil Pelanggan 360°</h3>
                     </div>
-                    <button wire:click="$set('selectedCustomerId', null)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                    <button wire:click="$set('selectedCustomerId', null)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
                 </div>
 
                 <div class="overflow-y-auto pr-1 flex-1 space-y-4">
@@ -563,12 +601,12 @@
                     <!-- Khusus Agen: Jaringan Downline & Kode Agen -->
                     @if($p->kode_agen || $p->tipe_konsumen === 'agen')
                         <div class="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25">
-                            <div class="flex items-center justify-between mb-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                                 <div class="flex items-center gap-2">
                                     <span class="text-base">🏢</span>
                                     <p class="text-xs text-amber-400 uppercase font-bold tracking-wider">Jaringan Downline & Komisi Agen</p>
                                 </div>
-                                <span class="text-xs font-mono font-bold text-amber-300 bg-amber-400/20 px-2.5 py-1 rounded-lg border border-amber-400/30">
+                                <span class="text-xs font-mono font-bold text-amber-300 bg-amber-400/20 px-2.5 py-1 rounded-lg border border-amber-400/30 w-fit">
                                     Kode Agen: {{ $p->kode_agen ?? '-' }}
                                 </span>
                             </div>
@@ -586,9 +624,9 @@
                                 <div class="mt-3 pt-3 border-t border-white/5 space-y-1.5">
                                     <p class="text-[10px] text-ink-400 uppercase font-semibold">Daftar Mitra / Pelanggan Downline:</p>
                                     @foreach($selectedCustomer['downlines'] as $dl)
-                                        <div class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                                            <span class="text-white font-medium">{{ $dl->nama }} <span class="text-[10px] text-ink-400">({{ $dl->telepon ?? '-' }})</span></span>
-                                            <span class="text-up-mint font-semibold tabular-nums">Rp {{ number_format($dl->total_belanja_12bulan, 0, ',', '.') }}</span>
+                                        <div class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-white/[0.02] border border-white/5 gap-2">
+                                            <span class="text-white font-medium truncate">{{ $dl->nama }} <span class="text-[10px] text-ink-400 font-mono">({{ $dl->telepon ?? '-' }})</span></span>
+                                            <span class="text-up-mint font-semibold tabular-nums flex-shrink-0">Rp {{ number_format($dl->total_belanja_12bulan, 0, ',', '.') }}</span>
                                         </div>
                                     @endforeach
                                 </div>
@@ -658,11 +696,11 @@
     <!-- MODAL: TAMBAH PELANGGAN BARU -->
     <!-- ========================================== -->
     @if($showPelangganBaruModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Tambah Pelanggan Baru</h3>
-                    <button wire:click="$set('showPelangganBaruModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-lg glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl relative max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-white/10">
+                    <h3 class="text-base sm:text-lg font-bold text-white">Tambah Pelanggan Baru</h3>
+                    <button wire:click="$set('showPelangganBaruModal', false)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
                 </div>
 
                 <div class="space-y-3.5">
@@ -745,11 +783,11 @@
     <!-- MODAL: EDIT DATA PELANGGAN -->
     <!-- ========================================== -->
     @if($showEditPelangganModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Edit Data Pelanggan</h3>
-                    <button wire:click="$set('showEditPelangganModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-lg glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl relative max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-white/10">
+                    <h3 class="text-base sm:text-lg font-bold text-white">Edit Data Pelanggan</h3>
+                    <button wire:click="$set('showEditPelangganModal', false)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
                 </div>
 
                 <div class="space-y-3.5">

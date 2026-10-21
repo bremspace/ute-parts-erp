@@ -27,12 +27,12 @@
      @keydown.escape.window="showConfirm = false">
 
     <!-- ===== SUBMENU & TABS NAVIGATION ===== -->
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-4">
         <!-- Tab Switcher CRM -->
-        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/5 w-fit">
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/5 overflow-x-auto scrollbar-none max-w-full flex-nowrap py-1">
             <a
                 href="/app/crm"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[40px] text-ink-400 hover:text-white hover:bg-white/5"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] text-ink-400 hover:text-white hover:bg-white/5 whitespace-nowrap flex-shrink-0"
             >
                 <span>👥</span>
                 <span>Pelanggan & Member</span>
@@ -40,13 +40,13 @@
 
             <a
                 href="/app/crm?activeTab=tier"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[40px] text-ink-400 hover:text-white hover:bg-white/5"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] text-ink-400 hover:text-white hover:bg-white/5 whitespace-nowrap flex-shrink-0"
             >
                 <span>🏷️</span>
                 <span>Tier Loyalty & Poin</span>
             </a>
 
-            <div class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-up-primary text-white shadow-lg shadow-up-primary/25 min-h-[40px]">
+            <div class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold bg-up-primary text-white shadow-lg shadow-up-primary/25 min-h-[38px] whitespace-nowrap flex-shrink-0">
                 <span>🎯</span>
                 <span>Lead Pipeline</span>
                 <span class="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
@@ -56,11 +56,11 @@
         </div>
 
         <!-- Quick Submenu Links (Hubungan Modul Lain) -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none flex-nowrap py-0.5 self-start md:self-auto">
             @can('reseller.view')
-            <a href="/app/reseller" class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-up-accent/10 hover:bg-up-accent/20 border border-up-accent/25 text-up-accent hover:text-white text-xs font-semibold transition active:scale-95 whitespace-nowrap min-h-[40px] cursor-pointer" title="Portal mitra reseller, saldo komisi & penarikan">
+            <a href="/app/reseller" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-up-accent/10 hover:bg-up-accent/20 border border-up-accent/25 text-up-accent hover:text-white text-xs font-semibold transition active:scale-95 whitespace-nowrap min-h-[38px] cursor-pointer" title="Portal mitra reseller, saldo komisi & penarikan">
                 <span>🤝</span>
-                <span>Mitra Reseller</span>
+                <span>Mitra Reseller & Agen</span>
                 <span class="text-[10px] text-up-accent/70">&rarr;</span>
             </a>
             @endcan
@@ -68,45 +68,45 @@
     </div>
 
     <!-- ===== HEADER + FILTERS ===== -->
-    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-3xl">
-            <div class="flex-1 min-w-[240px]">
+    <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3 sm:p-3.5 rounded-2xl">
+        <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2.5 flex-1 min-w-0">
+            <div class="flex-1 min-w-0 sm:min-w-[240px]">
                 <x-prism.barcode-scan-input placeholder="Cari nama, telepon, atau email lead..." model="search" />
             </div>
-            <div class="flex items-center gap-2">
-                <select wire:model.live="filterSumber" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+            <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                <select wire:model.live="filterSumber" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
                     <option value="" class="bg-ink-900">Semua Sumber</option>
                     @foreach($sumberOptions as $key => $label)
                         <option value="{{ $key }}" class="bg-ink-900">{{ $label }}</option>
                     @endforeach
                 </select>
-                <select wire:model.live="filterAssignedTo" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                <select wire:model.live="filterAssignedTo" class="px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
                     <option value="" class="bg-ink-900">Semua Penanggung Jawab</option>
                     @foreach($salesUsers as $u)
                         <option value="{{ $u->id }}" class="bg-ink-900">{{ $u->name }}</option>
                     @endforeach
                 </select>
+                @if($search !== '' || $filterSumber || $filterAssignedTo)
+                    <button
+                        type="button"
+                        @click="$wire.set('search', ''); $wire.set('filterSumber', null); $wire.set('filterAssignedTo', null)"
+                        class="col-span-2 sm:col-span-1 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white font-semibold text-xs transition active:scale-95 cursor-pointer min-h-[44px] whitespace-nowrap text-center"
+                    >
+                        ✕ Reset
+                    </button>
+                @endif
             </div>
         </div>
 
-        <div class="flex items-center gap-2 self-end lg:self-auto">
+        <div class="flex items-center gap-2 pt-2 xl:pt-0 border-t xl:border-t-0 border-white/5 justify-stretch sm:justify-end">
             <button
                 type="button"
                 wire:click="openCreateModal"
-                class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-up-primary/20 transition active:scale-95 cursor-pointer min-h-[44px]"
+                class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-up-primary/20 transition active:scale-95 cursor-pointer min-h-[44px] whitespace-nowrap"
             >
                 <span>+</span>
                 <span>Tambah Lead</span>
             </button>
-            @if($search !== '' || $filterSumber || $filterAssignedTo)
-                <button
-                    type="button"
-                    @click="$wire.set('search', ''); $wire.set('filterSumber', null); $wire.set('filterAssignedTo', null)"
-                    class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white font-semibold text-xs transition active:scale-95 cursor-pointer min-h-[44px]"
-                >
-                    ✕ Reset
-                </button>
-            @endif
         </div>
     </div>
 
