@@ -119,6 +119,11 @@ class ApprovalService
             throw ValidationException::withMessages(['msg' => 'Anda tidak memiliki hak untuk menyetujui permintaan ini']);
         }
 
+        // [FOUR-EYES PRINCIPLE] Pemohon workflow tidak boleh approve pengajuannya sendiri kecuali Super Admin / Owner
+        if ($request->requested_by && $request->requested_by === $actionedBy && ! $isSuperOrOwner) {
+            throw ValidationException::withMessages(['msg' => 'Prinsip 4-Mata (Four-Eyes Principle): Pemohon tidak boleh menyetujui pengajuannya sendiri.']);
+        }
+
         $status = self::normalisasiStatus($action);
 
         return DB::transaction(function () use ($request, $status, $actionedBy, $catatan) {

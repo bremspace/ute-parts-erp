@@ -30,12 +30,21 @@
                                     Detail
                                 </button>
                                 @if($opn->status === 'menunggu_approval')
-                                    <button
-                                        wire:click="approveOpname({{ $opn->id }})"
-                                        class="px-3 py-1 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs transition-[opacity,transform] duration-100 active:scale-95 shadow-md shadow-up-mint/20 cursor-pointer"
-                                    >
-                                        Approve & Sesuaikan
-                                    </button>
+                                    @can('wms.approve-opname')
+                                        @if($opn->user_id !== auth()->id() || isSuperAdminOrOwner())
+                                            <button
+                                                wire:click="approveOpname({{ $opn->id }})"
+                                                wire:confirm="Setujui stock opname ini? Stok fisik akan disesuaikan dan jurnal penyesuaian akuntansi otomatis diposting."
+                                                class="px-3 py-1 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs transition-[opacity,transform] duration-100 active:scale-95 shadow-md shadow-up-mint/20 cursor-pointer"
+                                            >
+                                                Approve & Sesuaikan
+                                            </button>
+                                        @else
+                                            <span class="text-ink-400 text-[11px] italic" title="Prinsip 4-Mata: Anda pembuat pengajuan ini. Persetujuan harus dilakukan oleh staf lain atau atasan.">
+                                                Menunggu Approval Rekan/Atasan
+                                            </span>
+                                        @endif
+                                    @endcan
                                 @else
                                     <span class="text-ink-500 text-[11px]">
                                         {{ $opn->approver ? "Approved by {$opn->approver->name}" : '-' }}

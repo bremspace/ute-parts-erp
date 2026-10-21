@@ -387,6 +387,22 @@ class OpnameTab extends Component
 
         $opname = StokOpname::with(['items.produk', 'gudang'])->findOrFail($opnameId);
 
+        if ($opname->status !== 'menunggu_approval') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya stock opname berstatus menunggu approval yang dapat disetujui.']);
+
+            return;
+        }
+
+        // [FOUR-EYES PRINCIPLE] Pembuat pengajuan dilarang menyetujui dokumen buatannya sendiri
+        if ($opname->user_id && $opname->user_id === auth()->id() && ! isSuperAdminOrOwner()) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Prinsip 4-Mata (Four-Eyes Principle): Pembuat stock opname tidak boleh menyetujui dokumen buatannya sendiri demi mencegah fraud. Persetujuan harus dilakukan oleh staf lain atau atasan.',
+            ]);
+
+            return;
+        }
+
         DB::transaction(function () use ($opname) {
             $jurnalLines = [];
             foreach ($opname->items as $item) {

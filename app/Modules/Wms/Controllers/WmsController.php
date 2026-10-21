@@ -390,6 +390,11 @@ class WmsController extends Controller
             return $this->error('Hanya opname berstatus menunggu_approval yang dapat disetujui', 400);
         }
 
+        // [FOUR-EYES PRINCIPLE] Pembuat pengajuan dilarang menyetujui dokumen buatannya sendiri
+        if ($opname->user_id && $opname->user_id === auth()->id() && ! isSuperAdminOrOwner($request->user())) {
+            return $this->error('Prinsip 4-Mata (Four-Eyes Principle): Pembuat stock opname tidak boleh menyetujui dokumen buatannya sendiri demi mencegah fraud. Persetujuan harus dilakukan oleh staf lain atau atasan.', 403);
+        }
+
         $action = $request->input('action', 'approve'); // approve / reject
 
         if ($action === 'reject') {
