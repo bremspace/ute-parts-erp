@@ -3,6 +3,14 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-22 — Peningkatan Penamaan & SKU Duplikasi Produk Multi-Copy ✅
+
+- **[Smart Auto-Numbering Duplikasi Produk]:**
+  - Menerapkan penomoran otomatis berurutan saat produk diduplikasi lebih dari satu kali (`Produk (Salinan)`, `Produk (Salinan 2)`, `Produk (Salinan 3)`, dst.).
+  - Membersihkan suffix salinan lama sehingga menduplikasi produk salinan tidak menghasilkan nama bertumpuk seperti `... (Salinan) (Salinan)`.
+  - Merapikan pembuatan SKU kloning dengan pembersihan format `COPY` berulang agar tetap bersih (`SKU-ORIGINAL-COPY-{id}`).
+  - Menambahkan pengujian integrasi `test_duplikasi_produk_berkali_kali_menghasilkan_penamaan_dan_sku_yang_rapi` di `MasterProdukManagementTest`.
+
 ## 2026-10-22 — Fitur Edit SKU Master Produk & Penanganan Produk Berelasi Transaksi ✅
 
 - **[Fitur Edit Kode SKU]:**

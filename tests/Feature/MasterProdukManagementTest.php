@@ -10,6 +10,7 @@ use App\Modules\Wms\Livewire\ProdukTab;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
@@ -260,5 +261,43 @@ class MasterProdukManagementTest extends TestCase
             ->set('editProdukForm.sku', 'SKU-AWAL-B')
             ->call('simpanEditProduk')
             ->assertHasErrors(['editProdukForm.sku']);
+    }
+
+    public function test_duplikasi_produk_berkali_kali_menghasilkan_penamaan_dan_sku_yang_rapi(): void
+    {
+        $this->authedAdmin();
+        $service = app(ProdukService::class);
+
+        $master = $service->buatProduk(
+            nama: 'LCD iPhone 11 Pro',
+            kategori: 'LCD',
+            brand: 'Apple',
+            model: 'iPhone 11 Pro',
+            kondisi: 'baru',
+            hargaBeli: 200000,
+            hargaJual: 350000,
+            sku: 'LCD-IP11PRO'
+        );
+
+        $tab = Livewire::test(ProdukTab::class);
+
+        // Duplikasi ke-1
+        $tab->call('duplikatProduk', $master->id);
+        $copy1 = Produk::where('nama', 'LCD iPhone 11 Pro (Salinan)')->first();
+        $this->assertNotNull($copy1);
+        $this->assertStringStartsWith('LCD-IP11PRO-COPY-', $copy1->skuVariants->first()->sku);
+
+        // Duplikasi ke-2 dari master asli -> harus jadi (Salinan 2)
+        $tab->call('duplikatProduk', $master->id);
+        $copy2 = Produk::where('nama', 'LCD iPhone 11 Pro (Salinan 2)')->first();
+        $this->assertNotNull($copy2);
+        $this->assertStringStartsWith('LCD-IP11PRO-COPY-', $copy2->skuVariants->first()->sku);
+
+        // Duplikasi ke-3 dari produk salinan (copy2) -> tidak boleh jadi "... (Salinan 2) (Salinan)", melainkan (Salinan 3)
+        $tab->call('duplikatProduk', $copy2->id);
+        $copy3 = Produk::where('nama', 'LCD iPhone 11 Pro (Salinan 3)')->first();
+        $this->assertNotNull($copy3);
+        $this->assertStringStartsWith('LCD-IP11PRO-COPY-', $copy3->skuVariants->first()->sku);
+        $this->assertStringNotContainsString('COPY-COPY', $copy3->skuVariants->first()->sku);
     }
 }

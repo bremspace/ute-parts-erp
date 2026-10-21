@@ -2760,20 +2760,54 @@ class ProdukTab extends Component
 
         try {
             $clone = DB::transaction(function () use ($source) {
-                $baseName = $source->nama.' (Salinan)';
-                $baseSku = ($source->skuVariants->first()?->sku ?: 'SKU-'.strtoupper(Str::random(6))).'-COPY';
+                // Bersihkan suffix salinan lama untuk mencegah penumpukan "... (Salinan) (Salinan)"
+                $cleanBase = trim(preg_replace('/\s*\(Salinan(?:\s+\d+)?\)$/i', '', $source->nama));
+
+                $existingNames = Produk::where('nama', $cleanBase)
+                    ->orWhere('nama', 'like', $cleanBase.' (Salinan%')
+                    ->pluck('nama')
+                    ->all();
+
+                $taken = [];
+                $pattern = '#^'.preg_quote($cleanBase, '#').'\s*\(Salinan(?:\s+(\d+))?\)$#i';
+                foreach ($existingNames as $name) {
+                    if (preg_match($pattern, $name, $matches)) {
+                        $taken[] = isset($matches[1]) ? (int) $matches[1] : 1;
+                    }
+                }
+
+                if (! in_array(1, $taken, true)) {
+                    $uniqueName = $cleanBase.' (Salinan)';
+                } else {
+                    $nextNum = (! empty($taken) ? max($taken) : 1) + 1;
+                    $uniqueName = $cleanBase.' (Salinan '.$nextNum.')';
+                }
+
+                $sourceVariant = $source->skuVariants->first();
+                $cleanSku = $sourceVariant?->sku
+                    ? preg_replace('/-COPY(-\d+)?$/i', '', $sourceVariant->sku)
+                    : 'SKU-'.strtoupper(Str::random(6));
 
                 $newProduk = $source->replicate([
                     'slug',
                     'barcode',
                 ]);
-                $newProduk->nama = $baseName;
+                $newProduk->nama = $uniqueName;
                 $newProduk->save();
+
+                $newSku = $cleanSku.'-COPY-'.$newProduk->id;
+                $counter = 1;
+                while (SkuVariant::where('sku', $newSku)->exists()) {
+                    $newSku = $cleanSku.'-COPY-'.$newProduk->id.'-'.$counter++;
+                }
 
                 SkuVariant::create([
                     'produk_id' => $newProduk->id,
-                    'sku' => $baseSku.'-'.$newProduk->id,
-                    'nama' => 'Default',
+                    'sku' => $newSku,
+                    'nama_varian' => $sourceVariant?->nama_varian ?? 'Default',
+                    'satuan_kode' => $sourceVariant?->satuan_kode ?? ($newProduk->satuan ?: 'pcs'),
+                    'harga_beli' => $newProduk->harga_beli,
+                    'harga_jual_retail' => $newProduk->harga_jual_retail,
                     'is_active' => true,
                 ]);
 
