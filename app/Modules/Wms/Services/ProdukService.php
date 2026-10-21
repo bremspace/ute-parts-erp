@@ -249,9 +249,10 @@ class ProdukService
         ?string $metodeHargaBeli = null,
         ?float $marginPersen = null,
         ?array $multiSatuan = null,
-        ?int $supplierId = null
+        ?int $supplierId = null,
+        ?string $sku = null
     ): Produk {
-        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $multiSatuan, $supplierId) {
+        return DB::transaction(function () use ($produkId, $nama, $kategori, $brand, $model, $kondisi, $hargaBeli, $hargaJual, $brandId, $kualitasId, $satuanKode, $tipeHpIds, $hargaTier, $hargaFleksibel, $sn, $kategoriId, $foto, $deskripsi, $produkKompatibelIds, $abcClass, $reorderPoint, $minStock, $maxStock, $isOndemand, $barcode, $metodeHargaBeli, $marginPersen, $multiSatuan, $supplierId, $sku) {
             $produk = Produk::findOrFail($produkId);
 
             $satuan = $satuanKode ?: ($produk->satuan ?: 'pcs');
@@ -340,11 +341,21 @@ class ProdukService
             // Sync produk kompatibel / substitusi
             $produk->produkKompatibel()->sync(array_values(array_filter($produkKompatibelIds)));
 
-            // Update primary SKU variant harga
+            // Update primary SKU variant harga & sku
             $variant = $produk->skuVariants()->first();
+            $cleanSku = ! empty($sku) ? trim((string) $sku) : null;
+
             if ($variant) {
                 $skuToUpdate = $variant->sku;
-                if (empty($skuToUpdate) && ! empty($cleanBarcode)) {
+                if ($cleanSku !== null && $cleanSku !== '') {
+                    $skuExists = SkuVariant::where('sku', $cleanSku)
+                        ->where('id', '!=', $variant->id)
+                        ->exists();
+                    if ($skuExists) {
+                        throw new \InvalidArgumentException("Kode SKU '{$cleanSku}' sudah digunakan oleh produk lain.");
+                    }
+                    $skuToUpdate = $cleanSku;
+                } elseif (empty($skuToUpdate) && ! empty($cleanBarcode)) {
                     $skuToUpdate = $cleanBarcode;
                 }
 
@@ -354,6 +365,21 @@ class ProdukService
                     'satuan_kode' => $satuanRef?->kode ?? $variant->satuan_kode,
                     'harga_beli' => $hargaBeli,
                     'harga_jual_retail' => $hargaJual,
+                ]);
+
+                if (! empty($hargaTier)) {
+                    $this->simpanHargaTier($produk->id, $variant->id, $hargaTier, $hargaJual);
+                }
+            } else {
+                $finalSku = $cleanSku ?: ($cleanBarcode ?: 'SKU-'.strtoupper(Str::random(6)));
+                $variant = SkuVariant::create([
+                    'produk_id' => $produk->id,
+                    'sku' => $finalSku,
+                    'barcode' => $cleanBarcode,
+                    'satuan_kode' => $satuanRef?->kode ?? $satuan,
+                    'harga_beli' => $hargaBeli,
+                    'harga_jual_retail' => $hargaJual,
+                    'is_active' => true,
                 ]);
 
                 if (! empty($hargaTier)) {

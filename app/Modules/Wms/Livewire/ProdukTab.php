@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -764,6 +765,7 @@ class ProdukTab extends Component
 
         $this->editProdukForm = [
             'nama' => $p->nama,
+            'sku' => $p->skuVariants->first()?->sku ?? '',
             'barcode' => $p->barcode ?? '',
             'kategori' => $p->kategori,
             'kategori_id' => $p->kategori_id,
@@ -941,12 +943,23 @@ class ProdukTab extends Component
             }
         }
 
+        $primaryVariant = SkuVariant::where('produk_id', $this->editProdukId)->first();
+        $primaryVariantId = $primaryVariant?->id;
+
         $this->validate([
             'editProdukForm.nama' => 'required|string|max:255',
+            'editProdukForm.sku' => [
+                'nullable',
+                'string',
+                'max:100',
+                Rule::unique('sku_variants', 'sku')->ignore($primaryVariantId),
+            ],
             'editProdukForm.barcode' => 'nullable|string|max:50|unique:produk,barcode,'.$this->editProdukId,
             'editProdukForm.harga_beli' => 'required|numeric|min:0',
             'editProdukForm.harga_jual_retail' => 'required|numeric|min:0',
             'editFotoUploads.*' => 'nullable|image|max:10240',
+        ], [
+            'editProdukForm.sku.unique' => 'Kode SKU sudah digunakan oleh produk lain.',
         ]);
 
         $imageService = app(ProductImageService::class);
@@ -1013,7 +1026,8 @@ class ProdukTab extends Component
                 metodeHargaBeli: $this->editProdukForm['metode_harga_beli'] ?? 'manual',
                 marginPersen: ! empty($this->editProdukForm['margin_persen']) ? (float) $this->editProdukForm['margin_persen'] : null,
                 multiSatuan: $this->editProdukForm['multi_satuan'] ?? [],
-                supplierId: ! empty($this->editProdukForm['supplier_id']) ? (int) $this->editProdukForm['supplier_id'] : null
+                supplierId: ! empty($this->editProdukForm['supplier_id']) ? (int) $this->editProdukForm['supplier_id'] : null,
+                sku: isset($this->editProdukForm['sku']) ? trim((string) $this->editProdukForm['sku']) : null
             );
 
             // Simpan perubahan lokasi rak stok per gudang

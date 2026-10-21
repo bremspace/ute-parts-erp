@@ -2878,11 +2878,16 @@
                 <div class="space-y-4">
                     <!-- TAB 1: INFO POKOK & HARGA -->
                     <div x-show="tab === 'utama'" class="space-y-3.5">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-1">
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Produk *</label>
                             <input type="text" wire:model="editProdukForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                             @error('editProdukForm.nama') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode SKU (Internal)</label>
+                            <input type="text" wire:model="editProdukForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium" placeholder="Cth: LCD-IP11-ORI" />
+                            @error('editProdukForm.sku') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">

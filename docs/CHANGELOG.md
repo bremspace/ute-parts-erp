@@ -3,6 +3,14 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-22 — Fitur Edit SKU Master Produk & Penanganan Produk Berelasi Transaksi ✅
+
+- **[Fitur Edit Kode SKU]:**
+  - Menambahkan input `Kode SKU (Internal)` pada modal Edit Produk (`ProdukTab`).
+  - Menambahkan dukungan parameter `$sku` pada `ProdukService::updateProduk()`.
+  - Menerapkan validasi keunikan SKU (`Rule::unique('sku_variants', 'sku')->ignore($primaryVariantId)`) sehingga pergantian SKU aman dan tidak bentrok dengan produk lain.
+  - Menambahkan pengujian integrasi `test_edit_produk_sku_berhasil_dan_validasi_keunikan` di `MasterProdukManagementTest`.
+
 ## 2026-10-20 — Hotfix 403 Pasca-Reset Database & Penghapusan Bantuan Akses Cepat Login ✅
 
 - **[Akar Masalah 403 Forbidden Semua Akun]:**

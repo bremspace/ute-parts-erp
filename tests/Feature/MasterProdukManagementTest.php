@@ -209,4 +209,56 @@ class MasterProdukManagementTest extends TestCase
         $this->assertEquals('Galaxy S24 Ultra', $p2->fresh()->model_kompatibel);
         $this->assertTrue($p2->tipeHps->contains('id', $tipeHp->id));
     }
+
+    public function test_edit_produk_sku_berhasil_dan_validasi_keunikan(): void
+    {
+        $this->authedAdmin();
+        $service = app(ProdukService::class);
+
+        $p1 = $service->buatProduk(
+            nama: 'Produk A',
+            kategori: 'Sparepart',
+            brand: 'Apple',
+            model: 'iPhone 11',
+            kondisi: 'baru',
+            hargaBeli: 50000,
+            hargaJual: 75000,
+            sku: 'SKU-AWAL-A'
+        );
+
+        $p2 = $service->buatProduk(
+            nama: 'Produk B',
+            kategori: 'Sparepart',
+            brand: 'Apple',
+            model: 'iPhone 12',
+            kondisi: 'baru',
+            hargaBeli: 60000,
+            hargaJual: 90000,
+            sku: 'SKU-AWAL-B'
+        );
+
+        Livewire::test(ProdukTab::class)
+            ->call('openEditProdukModal', $p1->id)
+            ->assertSet('editProdukForm.sku', 'SKU-AWAL-A')
+            ->set('editProdukForm.sku', 'SKU-BARU-A')
+            ->call('simpanEditProduk')
+            ->assertHasNoErrors();
+
+        $this->assertEquals('SKU-BARU-A', $p1->fresh()->skuVariants()->first()->sku);
+
+        // Edit lagi tanpa mengubah SKU (tidak boleh kena error unique dirinya sendiri)
+        Livewire::test(ProdukTab::class)
+            ->call('openEditProdukModal', $p1->id)
+            ->set('editProdukForm.nama', 'Produk A Diperbarui')
+            ->call('simpanEditProduk')
+            ->assertHasNoErrors();
+
+        $this->assertEquals('Produk A Diperbarui', $p1->fresh()->nama);
+
+        Livewire::test(ProdukTab::class)
+            ->call('openEditProdukModal', $p1->id)
+            ->set('editProdukForm.sku', 'SKU-AWAL-B')
+            ->call('simpanEditProduk')
+            ->assertHasErrors(['editProdukForm.sku']);
+    }
 }
