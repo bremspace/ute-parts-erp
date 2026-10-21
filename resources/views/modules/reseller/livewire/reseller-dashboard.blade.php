@@ -1,53 +1,53 @@
 <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 border-b border-white/5 pb-4">
-        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
-            <button wire:click="$set('activeTab', 'reseller')" class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center gap-2 {{ $activeTab === 'reseller' ? 'bg-up-accent text-white shadow-md shadow-up-accent/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">
+    <!-- ===== HEADER: SUBMENU & TABS NAVIGATION ===== -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-4">
+        <!-- Tab Switcher Utama Mitra & Komisi -->
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/[0.04] border border-white/5 overflow-x-auto scrollbar-none max-w-full flex-nowrap py-1">
+            <button
+                type="button"
+                wire:click="$set('activeTab', 'reseller')"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0 {{ $activeTab === 'reseller' ? 'bg-up-accent text-white shadow-lg shadow-up-accent/25' : 'text-ink-400 hover:text-white hover:bg-white/5' }}"
+            >
                 <span>🤝</span>
                 <span>Mitra Reseller & Agen</span>
-                <span class="tabular-nums px-2 py-0.5 rounded-full text-[10px] {{ $activeTab === 'reseller' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300' }}">
+                <span class="tabular-nums px-2 py-0.5 rounded-full text-[10px] font-mono {{ $activeTab === 'reseller' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300' }}">
                     {{ $statsMitra['total'] ?? count($resellers) }}
                 </span>
             </button>
 
-            <button wire:click="$set('activeTab', 'komisi')" class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center gap-2 {{ $activeTab === 'komisi' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">
+            <button
+                type="button"
+                wire:click="$set('activeTab', 'komisi')"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0 {{ $activeTab === 'komisi' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5' }}"
+            >
                 <span>💰</span>
                 <span>Approval Komisi</span>
-                <span class="tabular-nums px-2 py-0.5 rounded-full text-[10px] {{ $activeTab === 'komisi' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300' }}">
+                <span class="tabular-nums px-2 py-0.5 rounded-full text-[10px] font-mono {{ $activeTab === 'komisi' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300' }}">
                     {{ $komisiList->where('status', 'pending')->count() }}
                 </span>
             </button>
 
-            <button wire:click="$set('activeTab', 'skema')" class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center gap-2 {{ $activeTab === 'skema' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}">
+            <button
+                type="button"
+                wire:click="$set('activeTab', 'skema')"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0 {{ $activeTab === 'skema' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5' }}"
+            >
                 <span>⚙️</span>
                 <span>Skema Komisi</span>
             </button>
         </div>
 
-        <div class="flex items-center gap-2">
-            <a href="/app/crm" class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white text-xs font-semibold flex items-center gap-2 transition active:scale-95 whitespace-nowrap min-h-[44px]" title="Kelola data pelanggan, tier, dan penambahan mitra baru">
+        <!-- Quick Submenu Links (Hubungan Modul Lain) -->
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none flex-nowrap py-0.5 self-start md:self-auto">
+            <a
+                href="/app/crm"
+                class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white text-xs font-semibold transition active:scale-95 whitespace-nowrap min-h-[38px] cursor-pointer"
+                title="Kelola data pelanggan, tier, dan penambahan mitra baru"
+            >
                 <span>👥</span>
                 <span>Kelola di CRM</span>
                 <span class="text-[10px] text-ink-500">&rarr;</span>
             </a>
-
-            @if($activeTab === 'komisi')
-                <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto scrollbar-none py-1 -my-1 w-full xl:w-auto justify-start xl:justify-end">
-                    @can('laporan.cabang')
-                        <button type="button" wire:click="exportLaporan('xlsx')" class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center">Export Excel</button>
-                        <button type="button" wire:click="exportLaporan('csv')" class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center">Export CSV</button>
-                    @endcan
-                    <span class="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-ink-400 font-medium whitespace-nowrap min-h-[44px] flex items-center">
-                        {{ count($selectedKomisiIds) }} terpilih
-                    </span>
-                    <button wire:click="prosesApproval('reject')" class="px-3.5 py-2.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red font-bold text-xs border border-up-red/30 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center">Tolak Terpilih</button>
-                    <button wire:click="prosesApproval('approve')" class="px-3.5 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center">Setujui Terpilih → Jurnal & Utang</button>
-                </div>
-            @elseif($activeTab === 'skema')
-                <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
-                    <button wire:click="openSkemaModal" class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap flex items-center">+ Tambah Skema</button>
-                </div>
-            @endif
         </div>
     </div>
 
@@ -81,13 +81,13 @@
         </div>
 
         <!-- Toolbar Pencarian & Filter Mitra -->
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-            <div class="flex-1 max-w-md">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3 sm:p-3.5 rounded-2xl">
+            <div class="flex-1 min-w-0 sm:max-w-md">
                 <x-prism.barcode-scan-input placeholder="Cari nama mitra, telepon, atau kode agen..." model="search" />
             </div>
 
-            <div class="flex items-center gap-2">
-                <select wire:model.live="filterMitra" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <select wire:model.live="filterMitra" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full sm:w-auto">
                     <option value="" class="bg-ink-900">Semua Tipe Mitra (Reseller & Agen)</option>
                     <option value="agen" class="bg-ink-900">Khusus Agen B2B</option>
                     <option value="reseller" class="bg-ink-900">Khusus Reseller</option>
@@ -183,19 +183,53 @@
 
     <!-- TAB: Komisi -->
     @if($activeTab === 'komisi')
-        <div class="flex items-center gap-2 mb-4 flex-wrap">
-            <select wire:model.live="filterStatus" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium w-full sm:w-48 min-h-[44px]">
-                <option value="" class="bg-ink-900">Semua Status</option>
-                <option value="pending" class="bg-ink-900">Pending</option>
-                <option value="disetujui" class="bg-ink-900">Disetujui</option>
-                <option value="ditolak" class="bg-ink-900">Ditolak</option>
-            </select>
-            <select wire:model.live="filterAktor" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium w-full sm:w-56 min-h-[44px]">
-                <option value="" class="bg-ink-900">Semua Aktor Komisi</option>
-                <option value="reseller" class="bg-ink-900">Reseller (Mitra)</option>
-                <option value="agen" class="bg-ink-900">Agen B2B (Referral)</option>
-                <option value="karyawan" class="bg-ink-900">Karyawan (Internal/Payroll)</option>
-            </select>
+        <!-- Toolbar Komisi: Filter & Bulk Action Buttons -->
+        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3 sm:p-3.5 rounded-2xl mb-4">
+            <!-- Filter Status & Aktor -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full xl:w-auto">
+                <select wire:model.live="filterStatus" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full">
+                    <option value="" class="bg-ink-900">Semua Status Komisi</option>
+                    <option value="pending" class="bg-ink-900">Pending</option>
+                    <option value="disetujui" class="bg-ink-900">Disetujui</option>
+                    <option value="ditolak" class="bg-ink-900">Ditolak</option>
+                </select>
+                <select wire:model.live="filterAktor" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full">
+                    <option value="" class="bg-ink-900">Semua Aktor Komisi</option>
+                    <option value="reseller" class="bg-ink-900">Reseller (Mitra)</option>
+                    <option value="agen" class="bg-ink-900">Agen B2B (Referral)</option>
+                    <option value="karyawan" class="bg-ink-900">Karyawan (Internal/Payroll)</option>
+                </select>
+            </div>
+
+            <!-- Action & Export Buttons -->
+            <div class="flex items-center gap-2 pt-2 xl:pt-0 border-t xl:border-t-0 border-white/5 flex-wrap sm:flex-nowrap justify-stretch sm:justify-end">
+                @can('laporan.cabang')
+                    <div class="flex items-center gap-1.5 w-full sm:w-auto">
+                        <button type="button" wire:click="exportLaporan('xlsx')" class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white font-semibold text-xs whitespace-nowrap cursor-pointer transition active:scale-95 min-h-[44px] flex items-center justify-center gap-1.5" title="Export Laporan Excel">
+                            <span>📊</span>
+                            <span>Excel</span>
+                        </button>
+                        <button type="button" wire:click="exportLaporan('csv')" class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white font-semibold text-xs whitespace-nowrap cursor-pointer transition active:scale-95 min-h-[44px] flex items-center justify-center gap-1.5" title="Export Laporan CSV">
+                            <span>📄</span>
+                            <span>CSV</span>
+                        </button>
+                    </div>
+                @endcan
+
+                <div class="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+                    <span class="px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-xs text-ink-400 font-medium whitespace-nowrap min-h-[44px] flex items-center justify-center flex-1 sm:flex-initial">
+                        {{ count($selectedKomisiIds) }} terpilih
+                    </span>
+                    @if(count($selectedKomisiIds) > 0)
+                        <button wire:click="prosesApproval('reject')" class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red font-bold text-xs border border-up-red/30 transition active:scale-95 min-h-[44px] whitespace-nowrap cursor-pointer flex items-center justify-center">
+                            ✕ Tolak
+                        </button>
+                        <button wire:click="prosesApproval('approve')" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition active:scale-95 min-h-[44px] whitespace-nowrap cursor-pointer flex items-center justify-center">
+                            ✓ Setujui (Jurnal & Utang)
+                        </button>
+                    @endif
+                </div>
+            </div>
         </div>
 
         <x-prism.data-table :headers="['', 'No. Komisi', 'Penerima Komisi', 'Tipe Aktor', 'Referensi', 'Jumlah Dasar', 'Komisi', 'Status', 'Tanggal']">
@@ -236,26 +270,34 @@
 
             <x-slot:mobileCards>
                 @foreach($komisiList as $k)
-                    <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2">
-                        <div class="flex items-center justify-between">
-                            @if($k->status === 'pending')
-                                <input type="checkbox" wire:change="toggleKomisi({{ $k->id }})" {{ in_array($k->id, $selectedKomisiIds, true) ? 'checked' : '' }} class="accent-up-mint w-4 h-4 cursor-pointer" />
-                            @endif
-                            <span class="font-mono font-bold text-white">{{ $k->no_komisi }}</span>
+                    <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                @if($k->status === 'pending')
+                                    <input type="checkbox" wire:change="toggleKomisi({{ $k->id }})" {{ in_array($k->id, $selectedKomisiIds, true) ? 'checked' : '' }} class="accent-up-mint w-4 h-4 cursor-pointer" />
+                                @endif
+                                <span class="font-mono font-bold text-white text-xs">{{ $k->no_komisi }}</span>
+                            </div>
                             <x-prism.status-pill :status="$k->status" />
                         </div>
-                        <div class="flex justify-between text-xs">
-                            <span class="text-ink-300">{{ $k->nama_penerima }}</span>
-                            <span class="font-bold text-up-accent tabular-nums">Rp {{ number_format($k->nominal_komisi, 0, ',', '.') }}</span>
+                        <div class="flex justify-between items-start text-xs gap-2 pt-1">
+                            <div>
+                                <span class="font-semibold text-white block">{{ $k->nama_penerima }}</span>
+                                <span class="text-ink-400 font-mono text-[11px]">{{ $k->referensi_doc }}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="font-bold text-up-accent tabular-nums text-sm block">Rp {{ number_format($k->nominal_komisi, 0, ',', '.') }}</span>
+                                <span class="text-ink-400 text-[10px] tabular-nums">Dasar: Rp {{ number_format($k->jumlah_transaksi, 0, ',', '.') }}</span>
+                            </div>
                         </div>
-                        <div class="flex justify-between items-center text-[11px] pt-1 border-t border-white/5">
-                            <span class="text-ink-400 font-mono">{{ $k->referensi_doc }}</span>
+                        <div class="flex justify-between items-center text-[11px] pt-2 border-t border-white/5">
+                            <span class="text-ink-500">{{ $k->created_at->format('d/m/Y') }}</span>
                             @if($k->aktor_tipe === 'karyawan')
-                                <span class="text-[10px] text-up-primary">Karyawan</span>
+                                <span class="text-[10px] font-semibold text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-full">Karyawan</span>
                             @elseif($k->aktor_tipe === 'agen')
-                                <span class="text-[10px] text-amber-300">Agen B2B</span>
+                                <span class="text-[10px] font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">Agen B2B</span>
                             @else
-                                <span class="text-[10px] text-up-accent">Reseller</span>
+                                <span class="text-[10px] font-semibold text-up-accent bg-up-accent/10 px-2 py-0.5 rounded-full">Reseller</span>
                             @endif
                         </div>
                     </div>
@@ -266,6 +308,24 @@
 
     <!-- TAB: Skema Komisi -->
     @if($activeTab === 'skema')
+        <!-- Header Info & Actions Skema -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3 sm:p-4 rounded-2xl mb-4">
+            <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span>⚙️</span>
+                    <span>Konfigurasi Skema Komisi Mitra & Karyawan</span>
+                </h3>
+                <p class="text-xs text-ink-300 mt-1 max-w-xl">Aturan persentase atau nominal komisi per kategori produk untuk mitra reseller, agen binaan, maupun internal.</p>
+            </div>
+            <button
+                type="button"
+                wire:click="openSkemaModal"
+                class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer transition active:scale-95 min-h-[44px] whitespace-nowrap flex items-center justify-center gap-1.5 shadow-lg shadow-up-primary/20 w-full sm:w-auto"
+            >
+                <span>+ Tambah Skema</span>
+            </button>
+        </div>
+
         <x-prism.data-table :headers="['Nama Skema', 'Kategori Produk', 'Tipe Perhitungan', 'Nilai Komisi', 'Status']">
             @forelse($skemaList as $s)
                 <tr class="hover:bg-white/[0.02] transition-colors">
@@ -295,11 +355,11 @@
 
     <!-- Modal Skema Baru -->
     @if($showSkemaModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Tambah Skema Komisi</h3>
-                    <button wire:click="$set('showSkemaModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-md glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl relative">
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-white/10">
+                    <h3 class="text-base sm:text-lg font-bold text-white">Tambah Skema Komisi</h3>
+                    <button wire:click="$set('showSkemaModal', false)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
                 </div>
 
                 <div class="space-y-4">
