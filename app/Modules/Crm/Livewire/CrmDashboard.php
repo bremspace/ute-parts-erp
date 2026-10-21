@@ -25,6 +25,20 @@ class CrmDashboard extends Component
 
     public bool $filterReseller = false;
 
+    public string $activeTab = 'pelanggan'; // 'pelanggan' | 'tier'
+
+    protected $queryString = [
+        'search' => ['except' => ''],
+        'filterTierId' => ['except' => null],
+        'filterReseller' => ['except' => false],
+        'activeTab' => ['except' => 'pelanggan'],
+    ];
+
+    public function switchTab(string $tab): void
+    {
+        $this->activeTab = in_array($tab, ['pelanggan', 'tier']) ? $tab : 'pelanggan';
+    }
+
     // Detail customer modal
     public ?int $selectedCustomerId = null;
 
@@ -167,7 +181,7 @@ class CrmDashboard extends Component
 
     public function getTiersProperty()
     {
-        return TierMembership::orderBy('urutan')->get();
+        return TierMembership::withCount('pelanggan')->orderBy('urutan')->get();
     }
 
     public function getCustomersProperty()
@@ -380,6 +394,8 @@ class CrmDashboard extends Component
             'tiers' => $this->tiers,
             'customers' => $this->customers,
             'selectedCustomer' => $this->selectedCustomer,
+            'totalPelanggan' => Pelanggan::count(),
+            'activeTab' => $this->activeTab,
         ])->layout('layouts.backoffice', ['header' => 'CRM & Membership']);
     }
 }
