@@ -1203,13 +1203,16 @@ class ProdukTab extends Component
             return;
         }
 
-        // 2. Cek riwayat transaksi/mutasi yang terhubung
-        $hasTransaksi = Schema::hasTable('transaksi_item') && DB::table('transaksi_item')->where('produk_id', $produkId)->exists();
-        $hasPo = Schema::hasTable('purchase_order_item') && DB::table('purchase_order_item')->where('produk_id', $produkId)->exists();
-        $hasServis = (Schema::hasTable('tiket_servis_item') && DB::table('tiket_servis_item')->where('produk_id', $produkId)->exists())
-            || (Schema::hasTable('servis_sparepart') && DB::table('servis_sparepart')->where('produk_id', $produkId)->exists());
-        $hasTransfer = Schema::hasTable('stok_transfer_item') && DB::table('stok_transfer_item')->where('produk_id', $produkId)->exists();
-        $hasOpname = Schema::hasTable('stok_opname_item') && DB::table('stok_opname_item')->where('produk_id', $produkId)->exists();
+        // 2. Cek riwayat transaksi/mutasi yang terhubung (hanya transaksi sah yang terjadi sejak produk dibuat)
+        $prodCreatedAt = $produk->created_at;
+        $validTime = fn ($q) => $prodCreatedAt ? $q->where('created_at', '>=', $prodCreatedAt->copy()->subSeconds(30)) : $q;
+
+        $hasTransaksi = Schema::hasTable('transaksi_item') && DB::table('transaksi_item')->where('produk_id', $produkId)->where($validTime)->exists();
+        $hasPo = Schema::hasTable('purchase_order_item') && DB::table('purchase_order_item')->where('produk_id', $produkId)->where($validTime)->exists();
+        $hasServis = (Schema::hasTable('tiket_servis_item') && DB::table('tiket_servis_item')->where('produk_id', $produkId)->where($validTime)->exists())
+            || (Schema::hasTable('servis_sparepart') && DB::table('servis_sparepart')->where('produk_id', $produkId)->where($validTime)->exists());
+        $hasTransfer = Schema::hasTable('stok_transfer_item') && DB::table('stok_transfer_item')->where('produk_id', $produkId)->where($validTime)->exists();
+        $hasOpname = Schema::hasTable('stok_opname_item') && DB::table('stok_opname_item')->where('produk_id', $produkId)->where($validTime)->exists();
 
         if ($hasTransaksi || $hasPo || $hasServis || $hasTransfer || $hasOpname) {
             $produk->update(['is_active' => false]);
@@ -2439,13 +2442,16 @@ class ProdukTab extends Component
                 continue;
             }
 
-            // 2. Cek riwayat transaksi/mutasi
-            $hasTransaksi = Schema::hasTable('transaksi_item') && DB::table('transaksi_item')->where('produk_id', $produkId)->exists();
-            $hasPo = Schema::hasTable('purchase_order_item') && DB::table('purchase_order_item')->where('produk_id', $produkId)->exists();
-            $hasServis = (Schema::hasTable('tiket_servis_item') && DB::table('tiket_servis_item')->where('produk_id', $produkId)->exists())
-                || (Schema::hasTable('servis_sparepart') && DB::table('servis_sparepart')->where('produk_id', $produkId)->exists());
-            $hasTransfer = Schema::hasTable('stok_transfer_item') && DB::table('stok_transfer_item')->where('produk_id', $produkId)->exists();
-            $hasOpname = Schema::hasTable('stok_opname_item') && DB::table('stok_opname_item')->where('produk_id', $produkId)->exists();
+            // 2. Cek riwayat transaksi/mutasi (hanya transaksi sah yang terjadi sejak produk dibuat)
+            $prodCreatedAt = $produk->created_at;
+            $validTime = fn ($q) => $prodCreatedAt ? $q->where('created_at', '>=', $prodCreatedAt->copy()->subSeconds(30)) : $q;
+
+            $hasTransaksi = Schema::hasTable('transaksi_item') && DB::table('transaksi_item')->where('produk_id', $produkId)->where($validTime)->exists();
+            $hasPo = Schema::hasTable('purchase_order_item') && DB::table('purchase_order_item')->where('produk_id', $produkId)->where($validTime)->exists();
+            $hasServis = (Schema::hasTable('tiket_servis_item') && DB::table('tiket_servis_item')->where('produk_id', $produkId)->where($validTime)->exists())
+                || (Schema::hasTable('servis_sparepart') && DB::table('servis_sparepart')->where('produk_id', $produkId)->where($validTime)->exists());
+            $hasTransfer = Schema::hasTable('stok_transfer_item') && DB::table('stok_transfer_item')->where('produk_id', $produkId)->where($validTime)->exists();
+            $hasOpname = Schema::hasTable('stok_opname_item') && DB::table('stok_opname_item')->where('produk_id', $produkId)->where($validTime)->exists();
 
             if ($hasTransaksi || $hasPo || $hasServis || $hasTransfer || $hasOpname) {
                 $produk->update(['is_active' => false]);
