@@ -115,4 +115,25 @@ class KategoriProduk extends Model
             ->with(['children' => fn ($q) => $q->where('is_active', true)->orderBy('urutan')->orderBy('nama')])
             ->get();
     }
+
+    /**
+     * Dapatkan pohon kategori yang hanya memiliki produk di master produk (atau fallback ke semua jika kosong).
+     */
+    public static function getTreeTersediaDiProduk(): Collection
+    {
+        $usedCatIds = Produk::whereNotNull('kategori_id')->distinct()->pluck('kategori_id')->all();
+        if (empty($usedCatIds)) {
+            return static::getTree();
+        }
+
+        $parentIds = static::whereIn('id', $usedCatIds)->whereNotNull('parent_id')->pluck('parent_id')->all();
+        $allRelevantIds = array_values(array_unique(array_merge($usedCatIds, $parentIds)));
+
+        $tree = static::root()
+            ->whereIn('id', $allRelevantIds)
+            ->with(['children' => fn ($q) => $q->where('is_active', true)->whereIn('id', $allRelevantIds)->orderBy('urutan')->orderBy('nama')])
+            ->get();
+
+        return $tree->isNotEmpty() ? $tree : static::getTree();
+    }
 }

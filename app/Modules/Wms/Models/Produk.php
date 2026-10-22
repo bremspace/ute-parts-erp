@@ -588,6 +588,13 @@ class Produk extends Model
         $bindings[] = '%'.$term.'%';
         $bindings[] = '%'.$term.'%';
 
+        // 7b. Presisi Kombinasi Merk HP & Model HP pada relasi Tipe HP (+110)
+        if (count($words) > 1) {
+            $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM tipe_hp JOIN kompatibilitas_produk_tipe_hp ON kompatibilitas_produk_tipe_hp.tipe_hp_id = tipe_hp.id WHERE kompatibilitas_produk_tipe_hp.produk_id = produk.id AND LOWER(tipe_hp.merk) LIKE LOWER(?) AND LOWER(tipe_hp.model) LIKE LOWER(?)) THEN 110 ELSE 0 END';
+            $bindings[] = '%'.$words[0].'%';
+            $bindings[] = '%'.$words[count($words) - 1].'%';
+        }
+
         // 8. Kecocokan Kata Per Kata (Nama +30 per kata, Model/Brand +15 per kata)
         if (count($words) > 1) {
             foreach ($words as $w) {

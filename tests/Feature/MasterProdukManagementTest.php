@@ -752,4 +752,125 @@ class MasterProdukManagementTest extends TestCase
         $this->assertNull($comp->get('filterKondisi'));
         $this->assertNull($comp->get('filterMinHarga'));
     }
+
+    public function test_filter_merk_hp_dan_tipe_hp_terpisah_presisi_dan_cascading(): void
+    {
+        $this->authedAdmin();
+
+        // Ambil atau buat Tipe HP di master katalog
+        $thApple11 = TipeHp::firstOrCreate(['merk' => 'Apple', 'model' => 'iPhone 11'], ['is_active' => true]);
+        $thApple13 = TipeHp::firstOrCreate(['merk' => 'Apple', 'model' => 'iPhone 13'], ['is_active' => true]);
+        $thSamS21 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy S21'], ['is_active' => true]);
+
+        // Produk 1: LCD iPhone 11 (Apple)
+        $p1 = Produk::create([
+            'nama' => 'LCD iPhone 11 Original',
+            'slug' => 'lcd-iphone-11-orig',
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11',
+            'harga_beli' => 200000,
+            'harga_jual_retail' => 350000,
+            'is_active' => true,
+        ]);
+        $p1->tipeHps()->attach($thApple11->id);
+
+        // Produk 2: Baterai iPhone 13 (Apple)
+        $p2 = Produk::create([
+            'nama' => 'Baterai iPhone 13 High Cap',
+            'slug' => 'baterai-iphone-13-high-cap',
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 13',
+            'harga_beli' => 150000,
+            'harga_jual_retail' => 250000,
+            'is_active' => true,
+        ]);
+        $p2->tipeHps()->attach($thApple13->id);
+
+        // Produk 3: LCD Samsung S21 (Samsung)
+        $p3 = Produk::create([
+            'nama' => 'LCD Samsung Galaxy S21 OLED',
+            'slug' => 'lcd-samsung-galaxy-s21-oled',
+            'brand_kompatibel' => 'Samsung',
+            'model_kompatibel' => 'Galaxy S21',
+            'harga_beli' => 500000,
+            'harga_jual_retail' => 750000,
+            'is_active' => true,
+        ]);
+        $p3->tipeHps()->attach($thSamS21->id);
+
+        $comp = Livewire::test(ProdukTab::class);
+
+        // 1. Cascading model: ketika filterBrandKompatibel dipilih 'Apple', modelKompatibelList hanya memuat model Apple
+        $comp->set('filterBrandKompatibel', 'Apple');
+        $models = $comp->viewData('modelKompatibelList');
+        $this->assertContains('iPhone 11', $models);
+        $this->assertContains('iPhone 13', $models);
+        $this->assertNotContains('Galaxy S21', $models);
+
+        // 2. Filter Tipe HP dipilih 'iPhone 11' -> Hanya P1 yang lolos
+        $comp->set('filterModelKompatibel', 'iPhone 11');
+        $filteredIds = collect($comp->viewData('produks')->items())->pluck('id')->all();
+        $this->assertContains($p1->id, $filteredIds);
+        $this->assertNotContains($p2->id, $filteredIds);
+        $this->assertNotContains($p3->id, $filteredIds);
+
+        // 3. Filter kombinasi beda merk & model (Samsung + iPhone 11) -> Harus 0 hasil (presisi tanpa false positive)
+        $comp->set('filterBrandKompatibel', 'Samsung')
+            ->set('filterModelKompatibel', 'iPhone 11');
+        $this->assertEmpty($comp->viewData('produks')->items());
+
+        // 4. Filter Samsung + Galaxy S21 -> Hanya P3 yang lolos
+        $comp->set('filterBrandKompatibel', 'Samsung')
+            ->set('filterModelKompatibel', 'Galaxy S21');
+        $filteredSamIds = collect($comp->viewData('produks')->items())->pluck('id')->all();
+        $this->assertSame([$p3->id], $filteredSamIds);
+    }
+
+    public function test_opsi_filter_terkalibrasi_ke_master_produk_riil(): void
+    {
+        $this->authedAdmin();
+
+        // Buat Brand sparepart (Crown & Olike)
+        $brandCrown = Brand::create(['nama' => 'Crown Part', 'slug' => 'crown-part', 'is_active' => true]);
+        $brandOlike = Brand::create(['nama' => 'Olike Part', 'slug' => 'olike-part', 'is_active' => true]);
+        $brandUnused = Brand::create(['nama' => 'Merk Tak Terpakai', 'slug' => 'unused-brand', 'is_active' => true]);
+
+        // Buat Kategori (LCD dengan produk, Housing tanpa produk)
+        $katLcd = KategoriProduk::create(['nama' => 'LCD Screen', 'slug' => 'lcd-screen', 'is_active' => true]);
+        $katHousing = KategoriProduk::create(['nama' => 'Housing Frame Kosong', 'slug' => 'housing-kosong', 'is_active' => true]);
+
+        // Buat Produk riil yang hanya memakai brandCrown dan katLcd
+        Produk::create([
+            'nama' => 'LCD Test Kalibrasi',
+            'slug' => 'lcd-test-kalibrasi',
+            'kategori_id' => $katLcd->id,
+            'kategori' => $katLcd->nama,
+            'brand_id' => $brandCrown->id,
+            'brand_kompatibel' => 'Xiaomi',
+            'model_kompatibel' => 'Redmi Note 10',
+            'satuan' => 'pcs',
+            'harga_beli' => 100000,
+            'harga_jual_retail' => 150000,
+            'is_active' => true,
+        ]);
+
+        $comp = Livewire::test(ProdukTab::class);
+
+        // 1. brandKompatibelList HANYA memuat merk smartphone (Xiaomi), TIDAK boleh mencampur brand sparepart (Crown/Olike)
+        $brandKompatibel = $comp->viewData('brandKompatibelList');
+        $this->assertContains('Xiaomi', $brandKompatibel);
+        $this->assertNotContains('Crown Part', $brandKompatibel);
+        $this->assertNotContains('Olike Part', $brandKompatibel);
+
+        // 2. Tree kategori terkalibrasi ke yang ada produknya
+        $kategoriTree = $comp->viewData('kategoriTree');
+        $kategoriTreeIds = $kategoriTree->pluck('id')->all();
+        $this->assertContains($katLcd->id, $kategoriTreeIds);
+        $this->assertNotContains($katHousing->id, $kategoriTreeIds);
+
+        // 3. Brands sparepart dropdown hanya memuat brand yang ada di produk (Crown Part), bukan unused
+        $brands = $comp->viewData('brands')->pluck('id')->all();
+        $this->assertContains($brandCrown->id, $brands);
+        $this->assertNotContains($brandUnused->id, $brands);
+    }
 }

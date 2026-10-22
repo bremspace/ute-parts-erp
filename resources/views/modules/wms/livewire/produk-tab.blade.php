@@ -86,27 +86,18 @@
                             </select>
                         @endif
 
-                        @if($visibleFilters['tipe_hp'] ?? false)
-                            <select wire:model.live="filterTipeHpId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Semua Tipe HP</option>
-                                @foreach($tipeHpList as $th)
-                                    <option value="{{ $th->id }}" class="bg-ink-900">{{ $th->merk }} - {{ $th->model }}</option>
-                                @endforeach
-                            </select>
-                        @endif
-
-                        @if($visibleFilters['brand_kompatibel'] ?? false)
-                            <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Brand Kompatibel</option>
+                        @if(($visibleFilters['brand_kompatibel'] ?? false) || ($visibleFilters['merk_hp'] ?? false))
+                            <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]" title="Filter berdasarkan Merk Smartphone Kompatibel">
+                                <option value="">Semua Merk HP</option>
                                 @foreach($brandKompatibelList as $bk)
                                     <option value="{{ $bk }}" class="bg-ink-900">{{ $bk }}</option>
                                 @endforeach
                             </select>
                         @endif
 
-                        @if($visibleFilters['model_kompatibel'] ?? false)
-                            <select wire:model.live="filterModelKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Model Kompatibel</option>
+                        @if(($visibleFilters['model_kompatibel'] ?? false) || ($visibleFilters['tipe_hp'] ?? false))
+                            <select wire:model.live="filterModelKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]" title="Filter berdasarkan Tipe/Model Smartphone Kompatibel">
+                                <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
                                 @foreach($modelKompatibelList as $mk)
                                     <option value="{{ $mk }}" class="bg-ink-900">{{ $mk }}</option>
                                 @endforeach
@@ -245,16 +236,12 @@
                                 <span>Kualitas</span>
                             </label>
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="pt-chk-tipe_hp-{{ ($visibleFilters['tipe_hp'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('tipe_hp')" @checked($visibleFilters['tipe_hp'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <input type="checkbox" wire:key="pt-chk-brand_kompatibel-{{ (($visibleFilters['brand_kompatibel'] ?? false) || ($visibleFilters['merk_hp'] ?? false)) ? '1' : '0' }}" wire:click="toggleFilter('brand_kompatibel')" @checked(($visibleFilters['brand_kompatibel'] ?? false) || ($visibleFilters['merk_hp'] ?? false)) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Merk HP</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-model_kompatibel-{{ (($visibleFilters['model_kompatibel'] ?? false) || ($visibleFilters['tipe_hp'] ?? false)) ? '1' : '0' }}" wire:click="toggleFilter('model_kompatibel')" @checked(($visibleFilters['model_kompatibel'] ?? false) || ($visibleFilters['tipe_hp'] ?? false)) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Tipe HP</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="pt-chk-brand_kompatibel-{{ ($visibleFilters['brand_kompatibel'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('brand_kompatibel')" @checked($visibleFilters['brand_kompatibel'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
-                                <span>Brand Kompatibel</span>
-                            </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="pt-chk-model_kompatibel-{{ ($visibleFilters['model_kompatibel'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('model_kompatibel')" @checked($visibleFilters['model_kompatibel'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
-                                <span>Model Kompatibel</span>
                             </label>
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
                                 <input type="checkbox" wire:key="pt-chk-kondisi-{{ ($visibleFilters['kondisi'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('kondisi')" @checked($visibleFilters['kondisi'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
@@ -685,14 +672,20 @@
                                                 <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
                                             </div>
                                             <div class="space-y-2">
-                                                <select wire:model.live="filterTipeHpId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Tipe HP Resmi</option>
-                                                    @foreach($tipeHpList as $th) <option value="{{ $th->id }}">{{ $th->merk }} - {{ $th->model }}</option> @endforeach
-                                                </select>
-                                                <select wire:model.live="filterBrandKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Brand Kompatibel</option>
-                                                    @foreach($brandKompatibelList as $bk) <option value="{{ $bk }}">{{ $bk }}</option> @endforeach
-                                                </select>
+                                                <div>
+                                                    <label class="block text-[10px] uppercase font-bold text-ink-400 mb-1">Merk HP</label>
+                                                    <select wire:model.live="filterBrandKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs text-ink-200 bg-ink-900">
+                                                        <option value="">Semua Merk HP</option>
+                                                        @foreach($brandKompatibelList as $bk) <option value="{{ $bk }}">{{ $bk }}</option> @endforeach
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[10px] uppercase font-bold text-ink-400 mb-1">Tipe HP</label>
+                                                    <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs text-ink-200 bg-ink-900">
+                                                        <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
+                                                        @foreach($modelKompatibelList as $mk) <option value="{{ $mk }}">{{ $mk }}</option> @endforeach
+                                                    </select>
+                                                </div>
                                             </div>
                                             <div class="pt-2 border-t border-white/10 flex justify-between">
                                                 <button type="button" wire:click="resetFilterKolom('kompatibilitas')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>

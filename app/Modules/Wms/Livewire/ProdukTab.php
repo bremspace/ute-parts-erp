@@ -406,16 +406,24 @@ class ProdukTab extends Component
 
     public function toggleFilter(string $key): void
     {
-        if (array_key_exists($key, $this->visibleFilters)) {
-            $this->visibleFilters[$key] = ! $this->visibleFilters[$key];
-            if (! $this->visibleFilters[$key]) {
-                match ($key) {
+        $targetKey = match ($key) {
+            'merk_hp' => 'brand_kompatibel',
+            'tipe_hp' => 'model_kompatibel',
+            default => $key,
+        };
+
+        if (array_key_exists($targetKey, $this->visibleFilters)) {
+            $this->visibleFilters[$targetKey] = ! $this->visibleFilters[$targetKey];
+            if (! $this->visibleFilters[$targetKey]) {
+                match ($targetKey) {
                     'kategori' => $this->filterKategoriId = null,
                     'brand' => $this->filterBrandId = null,
                     'kualitas' => $this->filterKualitasId = null,
-                    'tipe_hp' => $this->filterTipeHpId = null,
                     'brand_kompatibel' => $this->filterBrandKompatibel = null,
-                    'model_kompatibel' => $this->filterModelKompatibel = null,
+                    'model_kompatibel' => [
+                        $this->filterModelKompatibel = null,
+                        $this->filterTipeHpId = null,
+                    ],
                     'kondisi' => $this->filterKondisi = null,
                     'satuan' => $this->filterSatuan = null,
                     'abc_class' => $this->filterAbcClass = null,
@@ -2217,13 +2225,13 @@ class ProdukTab extends Component
         if ($this->filterKualitasId) {
             $count++;
         }
-        if ($this->filterTipeHpId) {
-            $count++;
-        }
         if ($this->filterBrandKompatibel) {
             $count++;
         }
         if ($this->filterModelKompatibel) {
+            $count++;
+        }
+        if ($this->filterTipeHpId && ! $this->filterBrandKompatibel && ! $this->filterModelKompatibel) {
             $count++;
         }
         if ($this->filterKondisi) {
@@ -3348,46 +3356,62 @@ class ProdukTab extends Component
         }
 
         if ($this->filterBrandId) {
-            $brandObj = Brand::find($this->filterBrandId);
-            $query->where(function ($q) use ($brandObj) {
-                $q->where('brand_id', $this->filterBrandId);
-                if ($brandObj) {
-                    $q->orWhere('brand_kompatibel', $brandObj->nama);
-                }
-            });
+            $query->where('brand_id', $this->filterBrandId);
         }
 
         if ($this->filterKualitasId) {
             $query->where('kualitas_id', $this->filterKualitasId);
         }
 
-        if ($this->filterTipeHpId) {
+        $merk = trim((string) $this->filterBrandKompatibel);
+        $model = trim((string) $this->filterModelKompatibel);
+
+        if ($merk !== '' && $model !== '') {
+            $query->where(function ($q) use ($merk, $model) {
+                // 1. Kolom langsung produk cocok keduanya secara presisi
+                $q->where(function ($sub) use ($merk, $model) {
+                    $sub->where('brand_kompatibel', $merk)
+                        ->where('model_kompatibel', $model);
+                })
+                // 2. Relasi pivot tipe_hp di mana satu record tipe_hp memenuhi merk & model sekaligus
+                    ->orWhereHas('tipeHps', function ($th) use ($merk, $model) {
+                        $th->where('tipe_hp.merk', $merk)
+                            ->where('tipe_hp.model', $model);
+                    })
+                // 3. JSON kompatibilitas_hp mengandung merk dan model
+                    ->orWhere(function ($sub) use ($merk, $model) {
+                        $sub->where('kompatibilitas_hp', 'like', "%{$merk}%")
+                            ->where('kompatibilitas_hp', 'like', "%{$model}%");
+                    });
+            });
+        } elseif ($merk !== '') {
+            $query->where(function ($q) use ($merk) {
+                $q->where('brand_kompatibel', $merk)
+                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $merk))
+                    ->orWhere('kompatibilitas_hp', 'like', "%{$merk}%");
+            });
+        } elseif ($model !== '') {
+            $query->where(function ($q) use ($model) {
+                $q->where('model_kompatibel', $model)
+                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $model))
+                    ->orWhere('kompatibilitas_hp', 'like', "%{$model}%");
+            });
+        } elseif ($this->filterTipeHpId) {
             $targetTipe = TipeHp::find($this->filterTipeHpId);
-            $query->where(function ($q) use ($targetTipe) {
-                $q->whereHas('tipeHps', fn ($th) => $th->where('tipe_hp.id', $this->filterTipeHpId));
-                if ($targetTipe) {
-                    $q->orWhere(function ($sub) use ($targetTipe) {
-                        $sub->where('brand_kompatibel', $targetTipe->merk)
-                            ->where('model_kompatibel', $targetTipe->model);
-                    })->orWhere('kompatibilitas_hp', 'like', "%{$targetTipe->model}%");
-                }
-            });
-        }
-
-        if ($this->filterBrandKompatibel) {
-            $query->where(function ($q) {
-                $q->where('brand_kompatibel', $this->filterBrandKompatibel)
-                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel))
-                    ->orWhere('kompatibilitas_hp', 'like', "%{$this->filterBrandKompatibel}%");
-            });
-        }
-
-        if ($this->filterModelKompatibel) {
-            $query->where(function ($q) {
-                $q->where('model_kompatibel', $this->filterModelKompatibel)
-                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel))
-                    ->orWhere('kompatibilitas_hp', 'like', "%{$this->filterModelKompatibel}%");
-            });
+            if ($targetTipe) {
+                $tMerk = $targetTipe->merk;
+                $tModel = $targetTipe->model;
+                $query->where(function ($q) use ($targetTipe, $tMerk, $tModel) {
+                    $q->whereHas('tipeHps', fn ($th) => $th->where('tipe_hp.id', $targetTipe->id))
+                        ->orWhere(function ($sub) use ($tMerk, $tModel) {
+                            $sub->where('brand_kompatibel', $tMerk)->where('model_kompatibel', $tModel);
+                        })
+                        ->orWhere(function ($sub) use ($tMerk, $tModel) {
+                            $sub->where('kompatibilitas_hp', 'like', "%{$tMerk}%")
+                                ->where('kompatibilitas_hp', 'like', "%{$tModel}%");
+                        });
+                });
+            }
         }
 
         if ($this->filterKondisi) {
@@ -3530,6 +3554,9 @@ class ProdukTab extends Component
             ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch)->urutkanRelevansi($this->produkSearch))
             ->when(! empty($selectedKategoriIds), fn ($q) => $q->whereIn('kategori_id', $selectedKategoriIds))
             ->when($this->filterBrandId, fn ($q) => $q->where('brand_id', $this->filterBrandId))
+            ->when($this->filterBrandKompatibel && $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('brand_kompatibel', $this->filterBrandKompatibel)->where('model_kompatibel', $this->filterModelKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel)->where('tipe_hp.model', $this->filterModelKompatibel))))
+            ->when($this->filterBrandKompatibel && ! $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('brand_kompatibel', $this->filterBrandKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel))))
+            ->when(! $this->filterBrandKompatibel && $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('model_kompatibel', $this->filterModelKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel))))
             ->where('is_active', true);
 
         return $this->lakukanExportPricelist($query, $format, 'pricelist_'.$this->filterTierHarga);
@@ -3634,7 +3661,7 @@ class ProdukTab extends Component
 
     public function render()
     {
-        $kategoriTree = KategoriProduk::getTree();
+        $kategoriTree = KategoriProduk::getTreeTersediaDiProduk();
 
         $produks = $this->getFilteredProdukQuery()
             ->paginate($this->perPage);
@@ -3722,33 +3749,135 @@ class ProdukTab extends Component
             'label' => $p->nama,
         ])->all();
 
-        $brandKompatibelList = TipeHp::where('is_active', true)
+        // 1. Merk HP Kompatibel (Hanya brand smartphone dari master produk & relasinya)
+        $merekHpDariProduk = Produk::query()
+            ->whereNotNull('brand_kompatibel')
+            ->where('brand_kompatibel', '!=', '')
             ->distinct()
-            ->pluck('merk')
-            ->merge(Brand::where('is_active', true)->pluck('nama'))
-            ->merge(Produk::whereNotNull('brand_kompatibel')->where('brand_kompatibel', '!=', '')->distinct()->pluck('brand_kompatibel'))
+            ->pluck('brand_kompatibel');
+
+        $merekHpDariRelasi = TipeHp::query()
+            ->whereHas('produk')
+            ->distinct()
+            ->pluck('merk');
+
+        $merekHpJson = collect();
+        $kompatJsonList = Produk::query()
+            ->whereNotNull('kompatibilitas_hp')
+            ->pluck('kompatibilitas_hp');
+        foreach ($kompatJsonList as $kJson) {
+            if (is_array($kJson)) {
+                foreach ($kJson as $item) {
+                    if (! empty($item['merk'])) {
+                        $merekHpJson->push(trim((string) $item['merk']));
+                    }
+                }
+            }
+        }
+
+        $brandKompatibelList = $merekHpDariProduk
+            ->merge($merekHpDariRelasi)
+            ->merge($merekHpJson);
+
+        if ($brandKompatibelList->isEmpty()) {
+            $brandKompatibelList = TipeHp::where('is_active', true)->distinct()->pluck('merk');
+        }
+
+        $brandKompatibelList = $brandKompatibelList
             ->filter()
             ->unique()
             ->sort()
             ->values()
             ->all();
 
-        $modelKompatibelList = TipeHp::where('is_active', true)
-            ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
+        // 2. Tipe HP Kompatibel (Model smartphone dari master produk, cascading jika Merk HP dipilih)
+        $selectedMerk = $this->filterBrandKompatibel;
+
+        $modelHpDariProduk = Produk::query()
+            ->whereNotNull('model_kompatibel')
+            ->where('model_kompatibel', '!=', '')
+            ->when($selectedMerk, fn ($q) => $q->where('brand_kompatibel', $selectedMerk))
             ->distinct()
-            ->pluck('model')
-            ->merge(
-                Produk::whereNotNull('model_kompatibel')
-                    ->where('model_kompatibel', '!=', '')
-                    ->when($this->filterBrandKompatibel, fn ($q) => $q->where('brand_kompatibel', $this->filterBrandKompatibel))
-                    ->distinct()
-                    ->pluck('model_kompatibel')
-            )
+            ->pluck('model_kompatibel');
+
+        $modelHpDariRelasi = TipeHp::query()
+            ->whereHas('produk')
+            ->when($selectedMerk, fn ($q) => $q->where('merk', $selectedMerk))
+            ->distinct()
+            ->pluck('model');
+
+        $modelHpJson = collect();
+        foreach ($kompatJsonList as $kJson) {
+            if (is_array($kJson)) {
+                foreach ($kJson as $item) {
+                    if (! empty($item['model'])) {
+                        if (empty($selectedMerk) || strcasecmp(trim((string) ($item['merk'] ?? '')), $selectedMerk) === 0) {
+                            $modelHpJson->push(trim((string) $item['model']));
+                        }
+                    }
+                }
+            }
+        }
+
+        $modelKompatibelList = $modelHpDariProduk
+            ->merge($modelHpDariRelasi)
+            ->merge($modelHpJson);
+
+        if ($modelKompatibelList->isEmpty()) {
+            $modelKompatibelList = TipeHp::where('is_active', true)
+                ->when($selectedMerk, fn ($q) => $q->where('merk', $selectedMerk))
+                ->distinct()
+                ->pluck('model');
+        }
+
+        $modelKompatibelList = $modelKompatibelList
             ->filter()
             ->unique()
             ->sort()
             ->values()
             ->all();
+
+        // 3. Filter data pendukung agar sesuai dengan data riil master produk
+        $brandsMaster = Brand::where('is_active', true)
+            ->when(Produk::whereNotNull('brand_id')->exists(), fn ($q) => $q->whereIn('id', Produk::whereNotNull('brand_id')->distinct()->pluck('brand_id')))
+            ->orderBy('nama')
+            ->get();
+        if ($brandsMaster->isEmpty()) {
+            $brandsMaster = Brand::where('is_active', true)->orderBy('nama')->get();
+        }
+
+        $kualitasMaster = KualitasProduk::where('is_active', true)
+            ->when(Produk::whereNotNull('kualitas_id')->exists(), fn ($q) => $q->whereIn('id', Produk::whereNotNull('kualitas_id')->distinct()->pluck('kualitas_id')))
+            ->orderBy('nama')
+            ->get();
+        if ($kualitasMaster->isEmpty()) {
+            $kualitasMaster = KualitasProduk::where('is_active', true)->orderBy('nama')->get();
+        }
+
+        $suppliersMaster = Supplier::where('is_active', true)
+            ->when(Produk::whereNotNull('supplier_id')->exists(), fn ($q) => $q->whereIn('id', Produk::whereNotNull('supplier_id')->distinct()->pluck('supplier_id')))
+            ->orderBy('nama')
+            ->get();
+        if ($suppliersMaster->isEmpty()) {
+            $suppliersMaster = Supplier::where('is_active', true)->orderBy('nama')->get();
+        }
+
+        $usedSatuan = Produk::distinct()->pluck('satuan')->filter()->all();
+        $satuanUnitsMaster = SatuanUnit::where('is_active', true)
+            ->when(! empty($usedSatuan), fn ($q) => $q->whereIn('kode', $usedSatuan))
+            ->orderBy('kode')
+            ->get();
+        if ($satuanUnitsMaster->isEmpty()) {
+            $satuanUnitsMaster = SatuanUnit::where('is_active', true)->orderBy('kode')->get();
+        }
+
+        $usedKondisi = Produk::distinct()->pluck('kondisi')->filter()->all();
+        $kondisiListMaster = ! empty($usedKondisi)
+            ? collect($kondisiList)->filter(fn ($kd) => in_array($kd['kode'], $usedKondisi))->values()->all()
+            : $kondisiList;
+        if (empty($kondisiListMaster)) {
+            $kondisiListMaster = $kondisiList;
+        }
 
         $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
         $gudangsCabang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->get();
@@ -3787,12 +3916,12 @@ class ProdukTab extends Component
             'filterSupplierId' => $this->filterSupplierId,
             'kategoriTree' => $kategoriTree,
             'tierMemberships' => TierMembership::where('is_active', true)->orderBy('urutan')->get(),
-            // [T-44] master data pendukung
-            'brands' => Brand::where('is_active', true)->orderBy('nama')->get(),
-            'kualitasList' => KualitasProduk::where('is_active', true)->orderBy('nama')->get(),
-            'satuanUnits' => SatuanUnit::where('is_active', true)->orderBy('kode')->get(),
-            'suppliers' => Supplier::where('is_active', true)->orderBy('nama')->get(),
-            'kondisiList' => $kondisiList,
+            // [T-44] master data pendukung terkalibrasi ke master produk
+            'brands' => $brandsMaster,
+            'kualitasList' => $kualitasMaster,
+            'satuanUnits' => $satuanUnitsMaster,
+            'suppliers' => $suppliersMaster,
+            'kondisiList' => $kondisiListMaster,
             'merekHpOptions' => $merekHpOptions,
             'tipeHpCreateOptions' => $tipeHpCreateOptions,
             'tipeHpEditOptions' => $tipeHpEditOptions,
