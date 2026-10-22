@@ -2095,38 +2095,101 @@
                             </div>
                         </div>
 
-                        <!-- Selector 2 Tahap: 1. Merek HP -> 2. Model HP -> 3. Tombol Tambah -->
-                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end p-3 rounded-xl bg-ink-950/40 border border-white/5">
-                            <div class="sm:col-span-5">
-                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">1. Pilih Merek HP</label>
-                                <select wire:model.live="kompatibelMerekHp" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
-                                    <option value="" class="bg-ink-900">— Pilih Merek Smartphone —</option>
-                                    @foreach($merekHpOptions as $merek)
-                                        <option value="{{ $merek }}" class="bg-ink-900">{{ $merek }}</option>
-                                    @endforeach
-                                </select>
+                        <!-- Selector Kompatibilitas: 1. Merek HP -> 2. Pencarian & Multi-Select Tipe HP -->
+                        <div class="p-3.5 rounded-xl bg-ink-950/40 border border-white/5 space-y-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                                <div class="sm:col-span-5">
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1">1. Pilih Merek HP</label>
+                                    <select wire:model.live="kompatibelMerekHp" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                        <option value="" class="bg-ink-900">— Pilih Merek Smartphone —</option>
+                                        @foreach($merekHpOptions as $merek)
+                                            <option value="{{ $merek }}" class="bg-ink-900">{{ $merek }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="sm:col-span-7">
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1">
+                                        2. Cari Model {{ $kompatibelMerekHp ? "({$kompatibelMerekHp})" : '' }}
+                                    </label>
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink-400 text-xs">🔍</span>
+                                        <input type="text"
+                                               wire:model.live.debounce.150ms="searchTipeHpCreate"
+                                               placeholder="{{ empty($kompatibelMerekHp) ? 'Pilih merek smartphone terlebih dahulu...' : 'Cari tipe/model '.$kompatibelMerekHp.' (cth: A11, 13 Pro, Note)...' }}"
+                                               class="w-full pl-8 pr-8 py-2 rounded-xl glass-input text-xs {{ empty($kompatibelMerekHp) ? 'opacity-50 cursor-not-allowed' : '' }}"
+                                               {{ empty($kompatibelMerekHp) ? 'disabled' : '' }} />
+                                        @if(!empty($searchTipeHpCreate))
+                                            <button type="button" wire:click="$set('searchTipeHpCreate', '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-ink-400 hover:text-white text-xs cursor-pointer">✕</button>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="sm:col-span-5">
-                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">2. Pilih Tipe / Model HP</label>
-                                <select wire:model="kompatibelTipeHpId" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium {{ empty($kompatibelMerekHp) ? 'opacity-50 cursor-not-allowed' : '' }}" {{ empty($kompatibelMerekHp) ? 'disabled' : '' }}>
-                                    <option value="" class="bg-ink-900">
-                                        {{ empty($kompatibelMerekHp) ? '— Pilih Merek HP Dulu —' : '— Pilih Model '.$kompatibelMerekHp.' —' }}
-                                    </option>
-                                    @foreach($tipeHpCreateOptions as $opt)
-                                        <option value="{{ $opt->id }}" class="bg-ink-900">{{ $opt->model }} ({{ $opt->merk }})</option>
-                                    @endforeach
-                                </select>
-                            </div>
+                            @if(!empty($kompatibelMerekHp))
+                                <!-- Multi-Select Container -->
+                                <div class="space-y-2 pt-2 border-t border-white/5">
+                                    <div class="flex items-center justify-between text-[11px]">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-medium text-ink-300">Pilih Tipe HP Kompatibel:</span>
+                                            <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary text-[10px] font-semibold font-mono">
+                                                {{ count($kompatibelSelectedTipeHpIds) }} dipilih
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button type="button"
+                                                    wire:click="pilihSemuaTipeHp('create')"
+                                                    class="text-[10px] text-up-primary hover:underline cursor-pointer">
+                                                ✓ Pilih Semua ({{ $tipeHpCreateOptions->count() }})
+                                            </button>
+                                            <span class="text-ink-600">|</span>
+                                            <button type="button"
+                                                    wire:click="batalPilihSemuaTipeHp('create')"
+                                                    class="text-[10px] text-ink-400 hover:text-white cursor-pointer">
+                                                Batal Pilih
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <div class="sm:col-span-2">
-                                <button type="button"
-                                        wire:click="tambahKompatibelKeForm('create')"
-                                        class="w-full py-2 px-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center justify-center gap-1 transition shadow-lg shadow-up-primary/20 cursor-pointer disabled:opacity-50"
-                                        {{ empty($kompatibelMerekHp) ? 'disabled' : '' }}>
-                                    <span>+ Tambah</span>
-                                </button>
-                            </div>
+                                    <!-- Scrollable Multi-Select Grid / Checklist -->
+                                    <div class="max-h-44 overflow-y-auto p-2 rounded-xl bg-ink-950/80 border border-white/10 grid grid-cols-2 sm:grid-cols-3 gap-1.5 custom-scrollbar">
+                                        @forelse($tipeHpCreateOptions as $opt)
+                                            @php
+                                                $sudahTerdaftar = in_array($opt->id, array_map('intval', (array) ($produkForm['tipe_hp_ids'] ?? [])), true);
+                                                $isSelected = in_array($opt->id, array_map('intval', $kompatibelSelectedTipeHpIds), true);
+                                            @endphp
+                                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition select-none {{ $sudahTerdaftar ? 'bg-white/[0.02] border-white/5 opacity-60' : ($isSelected ? 'bg-up-primary/15 border-up-primary/40 text-white font-medium' : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06] text-ink-300') }}">
+                                                <input type="checkbox"
+                                                       value="{{ $opt->id }}"
+                                                       wire:model.live="kompatibelSelectedTipeHpIds"
+                                                       class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30"
+                                                       {{ $sudahTerdaftar ? 'disabled' : '' }}>
+                                                <span class="truncate flex-1">{{ $opt->model }}</span>
+                                                @if($sudahTerdaftar)
+                                                    <span class="text-[9px] text-up-mint font-semibold">✓</span>
+                                                @endif
+                                            </label>
+                                        @empty
+                                            <div class="col-span-full py-4 text-center text-xs text-ink-400">
+                                                Tidak ada model {{ $kompatibelMerekHp }} yang cocok dengan pencarian "{{ $searchTipeHpCreate }}".
+                                                <button type="button" wire:click="openQuickAdd('tipe_hp')" class="text-up-mint hover:underline font-semibold ml-1 cursor-pointer">+ Tambah Model Baru</button>
+                                            </div>
+                                        @endforelse
+                                    </div>
+
+                                    <!-- Tombol Aksi Tambahkan ke Produk -->
+                                    <div class="flex items-center justify-between pt-1">
+                                        <p class="text-[10px] text-ink-400">
+                                            Centang model yang kompatibel, lalu klik tombol di sebelah kanan.
+                                        </p>
+                                        <button type="button"
+                                                wire:click="tambahKompatibelKeForm('create')"
+                                                class="py-1.5 px-4 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-lg shadow-up-primary/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                {{ empty($kompatibelSelectedTipeHpIds) ? 'disabled' : '' }}>
+                                            <span>+ Tambahkan {{ count($kompatibelSelectedTipeHpIds) > 0 ? '('.count($kompatibelSelectedTipeHpIds).')' : '' }} Tipe Terpilih</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
 
                         <!-- Daftar Tipe HP Kompatibel Terpilih (Chips / Tags Anti-Duplikat) -->
@@ -3187,38 +3250,101 @@
                             </div>
                         </div>
 
-                        <!-- Selector 2 Tahap: 1. Merek HP -> 2. Model HP -> 3. Tombol Tambah -->
-                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end p-3 rounded-xl bg-ink-950/40 border border-white/5">
-                            <div class="sm:col-span-5">
-                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">1. Pilih Merek HP</label>
-                                <select wire:model.live="editKompatibelMerekHp" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
-                                    <option value="" class="bg-ink-900">— Pilih Merek Smartphone —</option>
-                                    @foreach($merekHpOptions as $merek)
-                                        <option value="{{ $merek }}" class="bg-ink-900">{{ $merek }}</option>
-                                    @endforeach
-                                </select>
+                        <!-- Selector Kompatibilitas: 1. Merek HP -> 2. Pencarian & Multi-Select Tipe HP -->
+                        <div class="p-3.5 rounded-xl bg-ink-950/40 border border-white/5 space-y-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                                <div class="sm:col-span-5">
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1">1. Pilih Merek HP</label>
+                                    <select wire:model.live="editKompatibelMerekHp" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                        <option value="" class="bg-ink-900">— Pilih Merek Smartphone —</option>
+                                        @foreach($merekHpOptions as $merek)
+                                            <option value="{{ $merek }}" class="bg-ink-900">{{ $merek }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="sm:col-span-7">
+                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1">
+                                        2. Cari Model {{ $editKompatibelMerekHp ? "({$editKompatibelMerekHp})" : '' }}
+                                    </label>
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ink-400 text-xs">🔍</span>
+                                        <input type="text"
+                                               wire:model.live.debounce.150ms="searchTipeHpEdit"
+                                               placeholder="{{ empty($editKompatibelMerekHp) ? 'Pilih merek smartphone terlebih dahulu...' : 'Cari tipe/model '.$editKompatibelMerekHp.' (cth: A11, 13 Pro, Note)...' }}"
+                                               class="w-full pl-8 pr-8 py-2 rounded-xl glass-input text-xs {{ empty($editKompatibelMerekHp) ? 'opacity-50 cursor-not-allowed' : '' }}"
+                                               {{ empty($editKompatibelMerekHp) ? 'disabled' : '' }} />
+                                        @if(!empty($searchTipeHpEdit))
+                                            <button type="button" wire:click="$set('searchTipeHpEdit', '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-ink-400 hover:text-white text-xs cursor-pointer">✕</button>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="sm:col-span-5">
-                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">2. Pilih Tipe / Model HP</label>
-                                <select wire:model="editKompatibelTipeHpId" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium {{ empty($editKompatibelMerekHp) ? 'opacity-50 cursor-not-allowed' : '' }}" {{ empty($editKompatibelMerekHp) ? 'disabled' : '' }}>
-                                    <option value="" class="bg-ink-900">
-                                        {{ empty($editKompatibelMerekHp) ? '— Pilih Merek HP Dulu —' : '— Pilih Model '.$editKompatibelMerekHp.' —' }}
-                                    </option>
-                                    @foreach($tipeHpEditOptions as $opt)
-                                        <option value="{{ $opt->id }}" class="bg-ink-900">{{ $opt->model }} ({{ $opt->merk }})</option>
-                                    @endforeach
-                                </select>
-                            </div>
+                            @if(!empty($editKompatibelMerekHp))
+                                <!-- Multi-Select Container -->
+                                <div class="space-y-2 pt-2 border-t border-white/5">
+                                    <div class="flex items-center justify-between text-[11px]">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-medium text-ink-300">Pilih Tipe HP Kompatibel:</span>
+                                            <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary text-[10px] font-semibold font-mono">
+                                                {{ count($editKompatibelSelectedTipeHpIds) }} dipilih
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button type="button"
+                                                    wire:click="pilihSemuaTipeHp('edit')"
+                                                    class="text-[10px] text-up-primary hover:underline cursor-pointer">
+                                                ✓ Pilih Semua ({{ $tipeHpEditOptions->count() }})
+                                            </button>
+                                            <span class="text-ink-600">|</span>
+                                            <button type="button"
+                                                    wire:click="batalPilihSemuaTipeHp('edit')"
+                                                    class="text-[10px] text-ink-400 hover:text-white cursor-pointer">
+                                                Batal Pilih
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <div class="sm:col-span-2">
-                                <button type="button"
-                                        wire:click="tambahKompatibelKeForm('edit')"
-                                        class="w-full py-2 px-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center justify-center gap-1 transition shadow-lg shadow-up-primary/20 cursor-pointer disabled:opacity-50"
-                                        {{ empty($editKompatibelMerekHp) ? 'disabled' : '' }}>
-                                    <span>+ Tambah</span>
-                                </button>
-                            </div>
+                                    <!-- Scrollable Multi-Select Grid / Checklist -->
+                                    <div class="max-h-44 overflow-y-auto p-2 rounded-xl bg-ink-950/80 border border-white/10 grid grid-cols-2 sm:grid-cols-3 gap-1.5 custom-scrollbar">
+                                        @forelse($tipeHpEditOptions as $opt)
+                                            @php
+                                                $sudahTerdaftar = in_array($opt->id, array_map('intval', (array) ($editProdukForm['tipe_hp_ids'] ?? [])), true);
+                                                $isSelected = in_array($opt->id, array_map('intval', $editKompatibelSelectedTipeHpIds), true);
+                                            @endphp
+                                            <label class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition select-none {{ $sudahTerdaftar ? 'bg-white/[0.02] border-white/5 opacity-60' : ($isSelected ? 'bg-up-primary/15 border-up-primary/40 text-white font-medium' : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06] text-ink-300') }}">
+                                                <input type="checkbox"
+                                                       value="{{ $opt->id }}"
+                                                       wire:model.live="editKompatibelSelectedTipeHpIds"
+                                                       class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30"
+                                                       {{ $sudahTerdaftar ? 'disabled' : '' }}>
+                                                <span class="truncate flex-1">{{ $opt->model }}</span>
+                                                @if($sudahTerdaftar)
+                                                    <span class="text-[9px] text-up-mint font-semibold">✓</span>
+                                                @endif
+                                            </label>
+                                        @empty
+                                            <div class="col-span-full py-4 text-center text-xs text-ink-400">
+                                                Tidak ada model {{ $editKompatibelMerekHp }} yang cocok dengan pencarian "{{ $searchTipeHpEdit }}".
+                                                <button type="button" wire:click="openQuickAdd('tipe_hp')" class="text-up-mint hover:underline font-semibold ml-1 cursor-pointer">+ Tambah Model Baru</button>
+                                            </div>
+                                        @endforelse
+                                    </div>
+
+                                    <!-- Tombol Aksi Tambahkan ke Produk -->
+                                    <div class="flex items-center justify-between pt-1">
+                                        <p class="text-[10px] text-ink-400">
+                                            Centang model yang kompatibel, lalu klik tombol di sebelah kanan.
+                                        </p>
+                                        <button type="button"
+                                                wire:click="tambahKompatibelKeForm('edit')"
+                                                class="py-1.5 px-4 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-lg shadow-up-primary/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                {{ empty($editKompatibelSelectedTipeHpIds) ? 'disabled' : '' }}>
+                                            <span>+ Tambahkan {{ count($editKompatibelSelectedTipeHpIds) > 0 ? '('.count($editKompatibelSelectedTipeHpIds).')' : '' }} Tipe Terpilih</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
 
                         <!-- Daftar Tipe HP Kompatibel Terpilih (Chips / Tags Anti-Duplikat) -->

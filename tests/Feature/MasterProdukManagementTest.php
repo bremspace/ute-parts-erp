@@ -997,4 +997,61 @@ class MasterProdukManagementTest extends TestCase
         $this->assertLessThan($p3Index, $p1Index, 'Produk exact match A11 (P1) harus di atas produk cross-compatible A15 (P3)');
         $this->assertLessThan($p3Index, $p2Index, 'Produk exact match A11 (P2) harus di atas produk cross-compatible A15 (P3)');
     }
+
+    public function test_picker_kompatibel_tipe_hp_multi_select_dan_pencarian_sesuai_merek(): void
+    {
+        $this->authedAdmin();
+
+        $thSamA11 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy A11'], ['is_active' => true]);
+        $thSamA15 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy A15'], ['is_active' => true]);
+        $thSamS22 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy S22'], ['is_active' => true]);
+        $thXioR9 = TipeHp::firstOrCreate(['merk' => 'Xiaomi', 'model' => 'Redmi 9'], ['is_active' => true]);
+        $thApp13 = TipeHp::firstOrCreate(['merk' => 'Apple', 'model' => 'iPhone 13'], ['is_active' => true]);
+
+        $comp = Livewire::test(ProdukTab::class);
+
+        // 1. Sebelum merek dipilih -> tipeHpCreateOptions kosong
+        $this->assertEmpty($comp->viewData('tipeHpCreateOptions'));
+
+        // 2. Pilih merek Samsung -> Hanya model Samsung yang muncul
+        $comp->set('kompatibelMerekHp', 'Samsung');
+        $models = $comp->viewData('tipeHpCreateOptions')->pluck('model')->all();
+        $this->assertContains('Galaxy A11', $models);
+        $this->assertContains('Galaxy A15', $models);
+        $this->assertContains('Galaxy S22', $models);
+        $this->assertNotContains('Redmi 9', $models);
+        $this->assertNotContains('iPhone 13', $models);
+
+        // 3. Pencarian tipe di atasnya -> Cari "A1" -> Hanya Galaxy A11 dan Galaxy A15
+        $comp->set('searchTipeHpCreate', 'A1');
+        $filteredModels = $comp->viewData('tipeHpCreateOptions')->pluck('model')->all();
+        $this->assertContains('Galaxy A11', $filteredModels);
+        $this->assertContains('Galaxy A15', $filteredModels);
+        $this->assertNotContains('Galaxy S22', $filteredModels);
+
+        // 4. Pilih Semua hasil filter -> kompatibelSelectedTipeHpIds terisi A11 & A15
+        $comp->call('pilihSemuaTipeHp', 'create');
+        $selectedIds = $comp->get('kompatibelSelectedTipeHpIds');
+        $this->assertContains($thSamA11->id, $selectedIds);
+        $this->assertContains($thSamA15->id, $selectedIds);
+        $this->assertNotContains($thSamS22->id, $selectedIds);
+
+        // 5. Tambahkan multi-select ke produkForm -> Masuk ke tipe_hp_ids tanpa duplikasi
+        $comp->call('tambahKompatibelKeForm', 'create')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
+
+        $formTipeHpIds = $comp->get('produkForm.tipe_hp_ids');
+        $this->assertContains($thSamA11->id, $formTipeHpIds);
+        $this->assertContains($thSamA15->id, $formTipeHpIds);
+        $this->assertEmpty($comp->get('kompatibelSelectedTipeHpIds'));
+
+        // 6. Ganti merek ke Xiaomi -> Pencarian dan seleksi otomatis di-reset
+        $comp->set('kompatibelMerekHp', 'Xiaomi');
+        $this->assertSame('', $comp->get('searchTipeHpCreate'));
+        $this->assertEmpty($comp->get('kompatibelSelectedTipeHpIds'));
+
+        $xioModels = $comp->viewData('tipeHpCreateOptions')->pluck('model')->all();
+        $this->assertContains('Redmi 9', $xioModels);
+        $this->assertNotContains('Galaxy A11', $xioModels);
+    }
 }
