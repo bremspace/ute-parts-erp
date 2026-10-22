@@ -295,6 +295,24 @@ class ProdukTab extends Component
         'sn' => '',
     ];
 
+    // Initial Stok / Saldo Awal Modal (untuk produk baru belum ada mutasi)
+    public bool $showSaldoAwalModal = false;
+
+    public ?int $saldoAwalProdukId = null;
+
+    public ?string $saldoAwalProdukNama = '';
+
+    public bool $saldoAwalProdukSn = false;
+
+    public array $saldoAwalForm = [
+        'gudang_id' => null,
+        'rak_id' => null,
+        'qty' => 1,
+        'harga_beli' => 0,
+        'sn' => '',
+        'keterangan' => 'Saldo awal inventori produk',
+    ];
+
     // [T-43] Import master produk Excel
     public bool $showImportModal = false;
 
@@ -1650,6 +1668,133 @@ class ProdukTab extends Component
         $this->orderPo($produkId);
     }
 
+    public function openSaldoAwalModal(int $produkId): void
+    {
+        if (! $this->isSuperAdmin()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Input saldo awal produk hanya boleh dilakukan oleh Super Admin / Owner']);
+
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $produk = Produk::withCount('stokLogs')
+            ->withSum([
+                'stokItems as total_stok' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId))),
+            ], 'jumlah')
+            ->findOrFail($produkId);
+
+        if ((int) $produk->stok_logs_count > 0 || (int) $produk->total_stok > 0) {
+            $this->dispatch('alert', [
+                'type' => 'warning',
+                'message' => "Produk '{$produk->nama}' sudah memiliki riwayat mutasi / stok fisik. Penambahan stok berikutnya wajib melalui Purchase Order (PO) atau Opname.",
+            ]);
+
+            return;
+        }
+
+        $gudangsCabang = Gudang::where('cabang_id', $cabangId ?: 1)->where('is_active', true)->get();
+        $defaultGudangId = $gudangsCabang->firstWhere('kode', 'GD-TOKO')?->id ?? $gudangsCabang->first()?->id;
+
+        $this->saldoAwalProdukId = $produk->id;
+        $this->saldoAwalProdukNama = $produk->nama;
+        $this->saldoAwalProdukSn = (bool) $produk->sn;
+        $this->saldoAwalForm = [
+            'gudang_id' => $defaultGudangId,
+            'rak_id' => null,
+            'qty' => 1,
+            'harga_beli' => (float) $produk->harga_beli,
+            'sn' => '',
+            'keterangan' => 'Saldo awal inventori produk',
+        ];
+
+        $this->showSaldoAwalModal = true;
+    }
+
+    public function simpanSaldoAwal(): void
+    {
+        if (! $this->isSuperAdmin()) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin / Owner yang boleh memasukkan saldo awal']);
+
+            return;
+        }
+
+        if (! $this->saldoAwalProdukId) {
+            return;
+        }
+
+        $produk = Produk::withCount('stokLogs')->findOrFail($this->saldoAwalProdukId);
+
+        if ((int) $produk->stok_logs_count > 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Produk ini sudah memiliki mutasi stok. Saldo awal ditolak.']);
+            $this->showSaldoAwalModal = false;
+
+            return;
+        }
+
+        $this->validate([
+            'saldoAwalForm.gudang_id' => 'required|exists:gudang,id',
+            'saldoAwalForm.qty' => 'required|integer|min:1',
+            'saldoAwalForm.harga_beli' => 'required|numeric|min:0',
+        ]);
+
+        $qty = (int) $this->saldoAwalForm['qty'];
+        $snList = null;
+
+        if ($this->saldoAwalProdukSn) {
+            $snRaw = trim((string) ($this->saldoAwalForm['sn'] ?? ''));
+            if ($snRaw === '') {
+                $this->dispatch('alert', ['type' => 'error', 'message' => "Produk SN aktif: wajib menginput {$qty} nomor seri unik (pisahkan per baris/koma)."]);
+
+                return;
+            }
+
+            $snParts = preg_split('/[\r\n,]+/', $snRaw);
+            $snList = array_values(array_filter(array_map('trim', $snParts)));
+
+            if (count($snList) !== $qty) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Jumlah SN ('.count($snList).") tidak sesuai dengan Qty ({$qty})."]);
+
+                return;
+            }
+
+            if (count($snList) !== count(array_unique($snList))) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Terdapat duplikasi nomor seri dalam daftar yang diinput.']);
+
+                return;
+            }
+        }
+
+        try {
+            $variant = $produk->skuVariants()->first();
+            $keterangan = trim($this->saldoAwalForm['keterangan']) ?: "Saldo awal inventori produk: {$produk->nama}";
+
+            app(ProdukService::class)->inisialisasiStokAwal(
+                produkId: $produk->id,
+                variantId: $variant?->id,
+                gudangId: (int) $this->saldoAwalForm['gudang_id'],
+                qty: $qty,
+                hargaBeli: (float) $this->saldoAwalForm['harga_beli'],
+                keterangan: $keterangan,
+                userId: auth()->id(),
+                rakId: ! empty($this->saldoAwalForm['rak_id']) ? (int) $this->saldoAwalForm['rak_id'] : null,
+                snList: $snList
+            );
+
+            // Update harga beli master jika disesuaikan saat input saldo awal
+            if ((float) $this->saldoAwalForm['harga_beli'] > 0 && (float) $this->saldoAwalForm['harga_beli'] !== (float) $produk->harga_beli) {
+                $produk->update(['harga_beli' => (float) $this->saldoAwalForm['harga_beli']]);
+            }
+
+            $this->showSaldoAwalModal = false;
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Saldo awal {$qty} {$produk->satuan} berhasil diinisialisasi + Jurnal Persediaan vs Modal Pemilik berhasil diposting.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal simpan saldo awal: '.$e->getMessage()]);
+        }
+    }
+
     // [T-15] Generate barcode utk produk (api paralel ke WMS-14)
     public function generateBarcodeProduk(int $id)
     {
@@ -1969,6 +2114,51 @@ class ProdukTab extends Component
         $this->resetPage();
     }
 
+    public function updatingFilterSupplierId()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterSku()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterMinHarga()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterMaxHarga()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterMinHargaBeli()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterMaxHargaBeli()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterStokStatus()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterStatusAktif()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterGudangId()
+    {
+        $this->resetPage();
+    }
+
     public function updatingPerPage(): void
     {
         $this->resetPage();
@@ -2060,6 +2250,12 @@ class ProdukTab extends Component
         if ($this->filterMaxHarga !== null && $this->filterMaxHarga !== '') {
             $count++;
         }
+        if ($this->filterMinHargaBeli !== null && $this->filterMinHargaBeli !== '') {
+            $count++;
+        }
+        if ($this->filterMaxHargaBeli !== null && $this->filterMaxHargaBeli !== '') {
+            $count++;
+        }
         if ($this->filterStokStatus !== 'semua') {
             $count++;
         }
@@ -2142,6 +2338,8 @@ class ProdukTab extends Component
         $this->filterSku = null;
         $this->filterMinHarga = null;
         $this->filterMaxHarga = null;
+        $this->filterMinHargaBeli = null;
+        $this->filterMaxHargaBeli = null;
         $this->filterStokStatus = 'semua';
         $this->filterStatusAktif = 'semua';
         $this->filterGudangId = null;
@@ -3113,10 +3311,12 @@ class ProdukTab extends Component
     protected function getFilteredProdukQuery()
     {
         $selectedKategoriIds = [];
+        $kategoriNama = null;
         if ($this->filterKategoriId) {
-            $kat = KategoriProduk::with('children')->find($this->filterKategoriId);
+            $kat = KategoriProduk::find($this->filterKategoriId);
             if ($kat) {
-                $selectedKategoriIds = array_merge([$kat->id], $kat->children->pluck('id')->all());
+                $selectedKategoriIds = $kat->semuaKeturunanIds();
+                $kategoriNama = $kat->nama;
             }
         }
 
@@ -3132,17 +3332,29 @@ class ProdukTab extends Component
             'kategoriRelasi',
             'hargaTier.tierMembership',
         ])
+            ->withCount('stokLogs')
             ->withSum([
                 'stokItems as total_stok' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId))),
             ], 'jumlah')
             ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch));
 
         if (! empty($selectedKategoriIds)) {
-            $query->whereIn('kategori_id', $selectedKategoriIds);
+            $query->where(function ($q) use ($selectedKategoriIds, $kategoriNama) {
+                $q->whereIn('kategori_id', $selectedKategoriIds);
+                if ($kategoriNama) {
+                    $q->orWhere('kategori', $kategoriNama);
+                }
+            });
         }
 
         if ($this->filterBrandId) {
-            $query->where('brand_id', $this->filterBrandId);
+            $brandObj = Brand::find($this->filterBrandId);
+            $query->where(function ($q) use ($brandObj) {
+                $q->where('brand_id', $this->filterBrandId);
+                if ($brandObj) {
+                    $q->orWhere('brand_kompatibel', $brandObj->nama);
+                }
+            });
         }
 
         if ($this->filterKualitasId) {
@@ -3157,7 +3369,7 @@ class ProdukTab extends Component
                     $q->orWhere(function ($sub) use ($targetTipe) {
                         $sub->where('brand_kompatibel', $targetTipe->merk)
                             ->where('model_kompatibel', $targetTipe->model);
-                    });
+                    })->orWhere('kompatibilitas_hp', 'like', "%{$targetTipe->model}%");
                 }
             });
         }
@@ -3165,14 +3377,16 @@ class ProdukTab extends Component
         if ($this->filterBrandKompatibel) {
             $query->where(function ($q) {
                 $q->where('brand_kompatibel', $this->filterBrandKompatibel)
-                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel));
+                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel))
+                    ->orWhere('kompatibilitas_hp', 'like', "%{$this->filterBrandKompatibel}%");
             });
         }
 
         if ($this->filterModelKompatibel) {
             $query->where(function ($q) {
                 $q->where('model_kompatibel', $this->filterModelKompatibel)
-                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel));
+                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel))
+                    ->orWhere('kompatibilitas_hp', 'like', "%{$this->filterModelKompatibel}%");
             });
         }
 
@@ -3198,9 +3412,14 @@ class ProdukTab extends Component
 
         // Filter Kolom Tambahan (Header List Produk)
         if (! empty($this->filterSku)) {
-            $query->where(function ($q) {
-                $q->where('barcode', 'like', "%{$this->filterSku}%")
-                    ->orWhereHas('skuVariants', fn ($sv) => $sv->where('sku', 'like', "%{$this->filterSku}%"));
+            $skuTerm = trim($this->filterSku);
+            $query->where(function ($q) use ($skuTerm) {
+                $q->where('barcode', 'like', "%{$skuTerm}%")
+                    ->orWhereIn('id', SkuVariant::query()
+                        ->where('barcode', 'like', "%{$skuTerm}%")
+                        ->orWhere('sku', 'like', "%{$skuTerm}%")
+                        ->select('produk_id')
+                    );
             });
         }
 
@@ -3223,7 +3442,19 @@ class ProdukTab extends Component
         if ($this->filterStokStatus === 'ready') {
             $query->whereHas('stokItems', fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->where('jumlah', '>', 0));
         } elseif ($this->filterStokStatus === 'menipis') {
-            $query->whereHas('stokItems', fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->whereColumn('jumlah', '<=', 'stok_minimum')->where('jumlah', '>', 0));
+            $query->where(function ($mq) use ($cabangId) {
+                $mq->whereHas('stokItems', function ($q) use ($cabangId) {
+                    $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))
+                        ->where('jumlah', '>', 0)
+                        ->where(function ($subQ) {
+                            $subQ->whereColumn('jumlah', '<=', 'jumlah_minimum')
+                                ->orWhere('jumlah', '<=', 5);
+                        });
+                })->orWhere(function ($oq) {
+                    $oq->whereNotNull('min_stock')
+                        ->whereHas('stokItems', fn ($sq) => $sq->where('jumlah', '>', 0)->whereColumn('jumlah', '<=', 'produk.min_stock'));
+                });
+            });
         } elseif ($this->filterStokStatus === 'habis') {
             $query->whereDoesntHave('stokItems', fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))->where('jumlah', '>', 0));
         }
@@ -3238,7 +3469,13 @@ class ProdukTab extends Component
             $query->whereHas('stokItems', fn ($q) => $q->where('gudang_id', $this->filterGudangId));
         }
 
-        // Apply sorting
+        // Prioritaskan kecocokan tertinggi jika kata kunci pencarian aktif
+        $hasSearch = ! empty(trim((string) $this->produkSearch));
+        if ($hasSearch) {
+            $query->urutkanRelevansi($this->produkSearch);
+        }
+
+        // Apply secondary sorting
         match ($this->sortBy) {
             'sku' => $query->orderBy(
                 SkuVariant::select('sku')->whereColumn('sku_variants.produk_id', 'produk.id')->limit(1),
@@ -3259,7 +3496,7 @@ class ProdukTab extends Component
             'kondisi' => $query->orderBy('kondisi', $this->sortDir),
             'satuan' => $query->orderBy('satuan', $this->sortDir),
             'status', 'is_active' => $query->orderBy('is_active', $this->sortDir),
-            default => $query->orderBy('nama', $this->sortDir),
+            default => $query->orderBy('is_active', 'desc')->orderBy('nama', $this->sortDir),
         };
 
         return $query;
@@ -3283,14 +3520,14 @@ class ProdukTab extends Component
     {
         $selectedKategoriIds = [];
         if ($this->filterKategoriId) {
-            $kat = KategoriProduk::with('children')->find($this->filterKategoriId);
+            $kat = KategoriProduk::find($this->filterKategoriId);
             if ($kat) {
-                $selectedKategoriIds = array_merge([$kat->id], $kat->children->pluck('id')->all());
+                $selectedKategoriIds = $kat->semuaKeturunanIds();
             }
         }
 
         $query = Produk::with(['brand', 'kualitas', 'kategoriRelasi', 'hargaTier.tierMembership', 'skuVariants'])
-            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch))
+            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch)->urutkanRelevansi($this->produkSearch))
             ->when(! empty($selectedKategoriIds), fn ($q) => $q->whereIn('kategori_id', $selectedKategoriIds))
             ->when($this->filterBrandId, fn ($q) => $q->where('brand_id', $this->filterBrandId))
             ->where('is_active', true);

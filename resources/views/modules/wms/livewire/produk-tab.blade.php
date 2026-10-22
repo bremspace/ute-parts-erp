@@ -37,6 +37,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                             </svg>
                             <span class="hidden sm:inline">Filter</span>
+                            @if($this->activeFilterCount > 0)
+                                <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-up-primary text-white font-bold animate-pulse">
+                                    {{ $this->activeFilterCount }}
+                                </span>
+                            @endif
                         </button>
 
                         <!-- Tombol Atur Kolom Master Produk -->
@@ -169,6 +174,16 @@
                                     CSV
                                 </button>
                             </div>
+                        @endif
+
+                        @if($this->activeFilterCount > 0)
+                            <button type="button"
+                                    wire:click="resetSemuaFilter"
+                                    class="px-2.5 py-1.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[40px]"
+                                    title="Reset Semua Filter & Pencarian">
+                                <span>✕</span>
+                                <span class="hidden sm:inline">Reset Filter ({{ $this->activeFilterCount }})</span>
+                            </button>
                         @endif
                     </div>
 
@@ -1533,6 +1548,12 @@
                                              window.addEventListener('resize', closeOnScroll);
                                          }
                                      }">
+                                    @if(isSuperAdminOrOwner() && (int) ($p->total_stok ?? 0) === 0 && (int) ($p->stok_logs_count ?? 0) === 0)
+                                        <button wire:click="openSaldoAwalModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold text-xs cursor-pointer whitespace-nowrap active:scale-95 transition" title="Input Saldo Awal Fisik (Ekuitas Modal Pemilik)">
+                                            📥 + Saldo Awal
+                                        </button>
+                                    @endif
+
                                     <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 text-up-mint border border-up-mint/30 font-bold text-xs cursor-pointer whitespace-nowrap active:scale-95 transition" title="Edit Master Produk">
                                         ✏️ Edit
                                     </button>
@@ -1740,6 +1761,11 @@
                                 <span class="text-[10px]">Pilih</span>
                             </label>
                             <div class="flex items-center gap-1.5">
+                                @if(isSuperAdminOrOwner() && (int) ($p->total_stok ?? 0) === 0 && (int) ($p->stok_logs_count ?? 0) === 0)
+                                    <button wire:click="openSaldoAwalModal({{ $p->id }})" class="px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-[11px] font-bold border border-emerald-500/40 cursor-pointer active:scale-95 transition" title="Input Saldo Awal Fisik">
+                                        📥 + Saldo Awal
+                                    </button>
+                                @endif
                                 <button wire:click="openEditProdukModal({{ $p->id }})" class="px-2.5 py-1 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 text-up-mint text-[11px] font-bold border border-up-mint/20 cursor-pointer active:scale-95 transition">
                                     ✏️ Edit
                                 </button>
@@ -4542,6 +4568,143 @@
 
     {{-- [F1-4] Modal riwayat audit trail per produk --}}
     @include('partials.riwayat-modal')
+
+    <!-- MODAL: INITIAL STOK / SALDO AWAL (MODAL PEMILIK) -->
+    @if($showSaldoAwalModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" x-cloak>
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative border border-white/10 shadow-2xl">
+                <!-- Header Modal -->
+                <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-white/10">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <span>📥 Input Saldo Awal Fisik</span>
+                        </h3>
+                        <p class="text-xs text-ink-400 mt-0.5 truncate max-w-xs sm:max-w-sm">{{ $saldoAwalProdukNama }}</p>
+                    </div>
+                    <button type="button" wire:click="$set('showSaldoAwalModal', false)" class="text-ink-400 hover:text-white transition cursor-pointer p-1">✕</button>
+                </div>
+
+                <!-- Info Jurnal Ekuitas -->
+                <div class="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 space-y-1 mb-4">
+                    <div class="flex items-center gap-1.5 font-bold text-white">
+                        <span>💡 Jurnal Akuntansi Saldo Awal:</span>
+                    </div>
+                    <p class="text-[11px] leading-relaxed text-ink-300">
+                        • <strong>Debit:</strong> Persediaan Barang Dagang (130-01) ➔ <span class="text-emerald-400 font-bold">Aset / Harta Bertambah</span><br>
+                        • <strong>Kredit:</strong> Modal Pemilik (310-01) ➔ <span class="text-emerald-400 font-bold">Ekuitas Modal Pemilik Bertambah</span>
+                    </p>
+                    <p class="text-[10px] text-ink-400 italic pt-0.5">Tidak menimbulkan utang ke supplier dan tidak mengurangi kas operasional toko.</p>
+                </div>
+
+                <!-- Form Fields -->
+                <div class="space-y-3">
+                    <!-- Lokasi Gudang & Rak -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Gudang Penyimpanan *</label>
+                            <select wire:model="saldoAwalForm.gudang_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                @foreach($gudangsCabang as $g)
+                                    <option value="{{ $g->id }}">{{ $g->nama }} ({{ $g->kode }})</option>
+                                @endforeach
+                            </select>
+                            @error('saldoAwalForm.gudang_id') <span class="text-up-red text-[10px]">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Lokasi Rak (Opsional)</label>
+                            <select wire:model="saldoAwalForm.rak_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                <option value="">— Tanpa Rak —</option>
+                                @foreach($raks as $rk)
+                                    <option value="{{ $rk->id }}">{{ $rk->kode }} ({{ $rk->nama }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Qty & Harga Beli/Modal -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Jumlah Qty Fisik *</label>
+                            <input
+                                type="number"
+                                min="1"
+                                wire:model.live="saldoAwalForm.qty"
+                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-white tabular-nums"
+                                placeholder="cth: 10"
+                            />
+                            @error('saldoAwalForm.qty') <span class="text-up-red text-[10px]">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1">Harga Beli / Modal (Rp) *</label>
+                            <input
+                                type="number"
+                                min="0"
+                                wire:model.live="saldoAwalForm.harga_beli"
+                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-bold text-white tabular-nums"
+                                placeholder="Modal per unit..."
+                            />
+                            @error('saldoAwalForm.harga_beli') <span class="text-up-red text-[10px]">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+
+                    <!-- Total Nilai Aset Awal -->
+                    <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between text-xs">
+                        <span class="text-ink-400">Total Nilai Saldo Awal:</span>
+                        <span class="font-mono font-bold text-up-mint text-sm">
+                            Rp {{ number_format((float) ($saldoAwalForm['qty'] ?? 0) * (float) ($saldoAwalForm['harga_beli'] ?? 0), 0, ',', '.') }}
+                        </span>
+                    </div>
+
+                    <!-- Input Serial Number jika produk SN -->
+                    @if($saldoAwalProdukSn)
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-semibold text-up-amber">Daftar Serial Number (Wajib) *</label>
+                                <span class="text-[10px] text-ink-400 font-mono">Wajib {{ (int) ($saldoAwalForm['qty'] ?? 0) }} SN unik</span>
+                            </div>
+                            <textarea
+                                wire:model="saldoAwalForm.sn"
+                                rows="3"
+                                placeholder="Ketik atau scan nomor seri (pisahkan per baris atau tanda koma)..."
+                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono"
+                            ></textarea>
+                            @error('saldoAwalForm.sn') <span class="text-up-red text-[10px]">{{ $message }}</span> @enderror
+                        </div>
+                    @endif
+
+                    <!-- Catatan / Keterangan -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1">Catatan Keterangan</label>
+                        <input
+                            type="text"
+                            wire:model="saldoAwalForm.keterangan"
+                            class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                            placeholder="cth: Saldo awal inventori toko cabang..."
+                        />
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="flex gap-2 pt-4 border-t border-white/5 mt-5">
+                    <button
+                        type="button"
+                        wire:click="$set('showSaldoAwalModal', false)"
+                        class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer hover:bg-white/10"
+                    >Batal</button>
+                    <button
+                        type="button"
+                        wire:click="simpanSaldoAwal"
+                        wire:loading.attr="disabled"
+                        class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-ink-950 font-bold text-xs cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-95 transition"
+                    >
+                        <span wire:loading.remove wire:target="simpanSaldoAwal">Simpan Saldo Awal</span>
+                        <span wire:loading wire:target="simpanSaldoAwal">Memproses Jurnal…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Datalist Autocomplete Brand & Model Kompatibel --}}
     <datalist id="brand-kompatibel-list">

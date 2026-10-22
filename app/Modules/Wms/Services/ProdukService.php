@@ -514,13 +514,14 @@ class ProdukService
         float $hargaBeli,
         string $keterangan,
         ?int $userId = null,
-        ?int $rakId = null
+        ?int $rakId = null,
+        ?array $snList = null
     ): StokItem {
         if ($qty <= 0) {
             throw new \Exception('Kuantitas harus > 0');
         }
 
-        return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId, $rakId) {
+        return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId, $rakId, $snList) {
             $cabangId = Gudang::find($gudangId)?->cabang_id;
 
             $stok = StokItem::firstOrCreate(
@@ -575,6 +576,20 @@ class ProdukService
                     Produk::class,
                     $produkId
                 );
+            }
+
+            // Persist SN jika produk bertipe SN
+            if ($snList !== null && ! empty($snList)) {
+                foreach ($snList as $sn) {
+                    NomorSeri::create([
+                        'cabang_id' => $cabangId,
+                        'produk_id' => $produkId,
+                        'sku_variant_id' => $variantId,
+                        'nomor_seri' => $sn,
+                        'status' => NomorSeri::STATUS_TERSEDIA,
+                        'keterangan' => $keterangan,
+                    ]);
+                }
             }
 
             return $stok;

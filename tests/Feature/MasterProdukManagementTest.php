@@ -11,11 +11,13 @@ use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -554,5 +556,200 @@ class MasterProdukManagementTest extends TestCase
             'merk' => 'Google',
             'model' => 'Pixel 8 Pro',
         ]);
+    }
+
+    public function test_aksi_saldo_awal_hanya_muncul_pada_produk_tanpa_mutasi_dan_menjurnal_ekuitas_modal(): void
+    {
+        $admin = $this->authedAdmin();
+        $gudang = Gudang::firstOrCreate(
+            ['kode' => 'GD-TEST-AWAL'],
+            ['nama' => 'Gudang Test Awal', 'cabang_id' => 1, 'is_active' => true]
+        );
+
+        // Buat produk tanpa stok awal
+        $produk = Produk::create([
+            'nama' => 'IC Power Oppo A5s Original',
+            'slug' => 'ic-power-oppo-a5s-original-'.time(),
+            'kategori' => 'IC & Komponen',
+            'kondisi' => 'baru',
+            'satuan' => 'pcs',
+            'harga_beli' => 45000,
+            'harga_jual_retail' => 75000,
+            'is_active' => true,
+        ]);
+
+        $component = Livewire::test(ProdukTab::class);
+
+        // 1. Verifikasi modal saldo awal bisa dibuka
+        $component->call('openSaldoAwalModal', $produk->id)
+            ->assertSet('showSaldoAwalModal', true)
+            ->assertSet('saldoAwalProdukId', $produk->id)
+            ->assertSet('saldoAwalForm.harga_beli', 45000)
+            ->set('saldoAwalForm.gudang_id', $gudang->id)
+            ->set('saldoAwalForm.qty', 10)
+            ->set('saldoAwalForm.harga_beli', 45000)
+            ->call('simpanSaldoAwal')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success')
+            ->assertSet('showSaldoAwalModal', false);
+
+        // 2. Verifikasi stok fisik dan log tercatat
+        $this->assertDatabaseHas('stok_items', [
+            'produk_id' => $produk->id,
+            'gudang_id' => $gudang->id,
+            'jumlah' => 10,
+        ]);
+
+        $this->assertDatabaseHas('stok_log', [
+            'produk_id' => $produk->id,
+            'jenis' => 'stok_awal',
+            'perubahan' => 10,
+            'jumlah_setelah' => 10,
+        ]);
+
+        // 3. Verifikasi Jurnal Akuntansi: Debit Persediaan (130-01) vs Kredit Modal Pemilik (310-01)
+        // Nilai total: 10 pcs * Rp 45.000 = Rp 450.000
+        $akunPersediaan = DB::table('akun_coa')->where('kode', '130-01')->value('id');
+        $akunModal = DB::table('akun_coa')->where('kode', '310-01')->value('id');
+
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'sumber' => 'stok_awal',
+            'akun_coa_id' => $akunPersediaan,
+            'debit' => 450000,
+            'kredit' => 0,
+        ]);
+
+        $this->assertDatabaseHas('jurnal_akuntansi', [
+            'sumber' => 'stok_awal',
+            'akun_coa_id' => $akunModal,
+            'debit' => 0,
+            'kredit' => 450000,
+        ]);
+
+        // 4. Coba buka lagi untuk produk yang sudah punya stok/mutasi -> WAJIB DITOLAK
+        $component->call('openSaldoAwalModal', $produk->id)
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'warning' && str_contains($params[0]['message'] ?? '', 'sudah memiliki riwayat mutasi'))
+            ->assertSet('showSaldoAwalModal', false);
+    }
+
+    public function test_filter_dan_pencarian_multi_filter_serta_ranking_relevansi_tertinggi(): void
+    {
+        $this->authedAdmin();
+        $gudang = Gudang::firstOrCreate(
+            ['kode' => 'GD-FILTER-TEST'],
+            ['nama' => 'Gudang Filter Test', 'cabang_id' => 1, 'is_active' => true]
+        );
+
+        $katLcd = KategoriProduk::firstOrCreate(['nama' => 'LCD Touchscreen', 'slug' => 'lcd-touchscreen-filter']);
+        $katBaterai = KategoriProduk::firstOrCreate(['nama' => 'Baterai HP', 'slug' => 'baterai-hp-filter']);
+
+        $brandCrown = Brand::firstOrCreate(['nama' => 'Crown Original', 'slug' => 'crown-original']);
+        $brandOlike = Brand::firstOrCreate(['nama' => 'Olike Prime', 'slug' => 'olike-prime']);
+
+        // Buat 4 produk dengan karakteristik berbeda
+        // P1: Exact name "LCD iPhone 11"
+        $p1 = Produk::create([
+            'nama' => 'LCD iPhone 11',
+            'slug' => 'lcd-iphone-11-test',
+            'kategori_id' => $katLcd->id,
+            'kategori' => $katLcd->nama,
+            'brand_id' => $brandCrown->id,
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11',
+            'kondisi' => 'baru',
+            'satuan' => 'pcs',
+            'harga_beli' => 200000,
+            'harga_jual_retail' => 350000,
+            'is_active' => true,
+        ]);
+        StokItem::create(['produk_id' => $p1->id, 'gudang_id' => $gudang->id, 'jumlah' => 10]);
+
+        // P2: Prefix "LCD iPhone 11 Pro Max Incell" (Dimulai dengan LCD iPhone 11)
+        $p2 = Produk::create([
+            'nama' => 'LCD iPhone 11 Pro Max Incell',
+            'slug' => 'lcd-iphone-11-pro-max-incell-test',
+            'kategori_id' => $katLcd->id,
+            'kategori' => $katLcd->nama,
+            'brand_id' => $brandCrown->id,
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11 Pro Max',
+            'kondisi' => 'baru',
+            'satuan' => 'pcs',
+            'harga_beli' => 250000,
+            'harga_jual_retail' => 450000,
+            'is_active' => true,
+        ]);
+        StokItem::create(['produk_id' => $p2->id, 'gudang_id' => $gudang->id, 'jumlah' => 5]);
+
+        // P3: "Baut LCD iPhone 11" (Secara alfabetis 'Baut' lebih awal dari 'LCD', tapi relevansi lebih rendah)
+        $p3 = Produk::create([
+            'nama' => 'Baut LCD iPhone 11',
+            'slug' => 'baut-lcd-iphone-11-test',
+            'kategori_id' => $katLcd->id,
+            'kategori' => $katLcd->nama,
+            'brand_id' => $brandOlike->id,
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11',
+            'kondisi' => 'bekas',
+            'satuan' => 'set',
+            'harga_beli' => 5000,
+            'harga_jual_retail' => 15000,
+            'is_active' => true,
+        ]);
+        StokItem::create(['produk_id' => $p3->id, 'gudang_id' => $gudang->id, 'jumlah' => 20]);
+
+        // P4: Baterai (Bukan LCD)
+        $p4 = Produk::create([
+            'nama' => 'Baterai iPhone 11 Original',
+            'slug' => 'baterai-iphone-11-original-test',
+            'kategori_id' => $katBaterai->id,
+            'kategori' => $katBaterai->nama,
+            'brand_id' => $brandCrown->id,
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11',
+            'kondisi' => 'baru',
+            'satuan' => 'pcs',
+            'harga_beli' => 150000,
+            'harga_jual_retail' => 280000,
+            'is_active' => true,
+        ]);
+        StokItem::create(['produk_id' => $p4->id, 'gudang_id' => $gudang->id, 'jumlah' => 8]);
+
+        // 1. Uji Relevansi Pencarian: "LCD iPhone 11"
+        // P1 (Exact match) harus urutan pertama, P2 kedua, P3 ketiga
+        $comp = Livewire::test(ProdukTab::class)
+            ->set('produkSearch', 'LCD iPhone 11');
+
+        $items = $comp->viewData('produks')->items();
+        $this->assertNotEmpty($items);
+        $this->assertSame($p1->id, $items[0]->id, 'Produk exact match LCD iPhone 11 harus berada di urutan paling atas');
+        $this->assertSame($p2->id, $items[1]->id, 'Produk prefix match LCD iPhone 11 Pro Max harus di urutan kedua');
+        $this->assertSame($p3->id, $items[2]->id, 'Produk Baut LCD iPhone 11 harus di urutan ketiga');
+
+        // 2. Uji Multi-Filter Sekaligus (Kategori LCD + Brand Crown + Kondisi Baru + Min Harga 300.000)
+        $comp->set('produkSearch', '')
+            ->set('filterKategoriId', $katLcd->id)
+            ->set('filterBrandId', $brandCrown->id)
+            ->set('filterKondisi', 'baru')
+            ->set('filterMinHarga', 300000);
+
+        $this->assertSame(4, $comp->get('activeFilterCount'));
+
+        $filteredItems = $comp->viewData('produks')->items();
+        $filteredIds = collect($filteredItems)->pluck('id')->all();
+
+        // P1 & P2 lolos multi-filter, P3 gagal (brand olike & bekas), P4 gagal (kategori baterai)
+        $this->assertContains($p1->id, $filteredIds);
+        $this->assertContains($p2->id, $filteredIds);
+        $this->assertNotContains($p3->id, $filteredIds);
+        $this->assertNotContains($p4->id, $filteredIds);
+
+        // 3. Uji Reset Semua Filter
+        $comp->call('resetSemuaFilter');
+        $this->assertSame(0, $comp->get('activeFilterCount'));
+        $this->assertSame('', $comp->get('produkSearch'));
+        $this->assertNull($comp->get('filterKategoriId'));
+        $this->assertNull($comp->get('filterBrandId'));
+        $this->assertNull($comp->get('filterKondisi'));
+        $this->assertNull($comp->get('filterMinHarga'));
     }
 }
