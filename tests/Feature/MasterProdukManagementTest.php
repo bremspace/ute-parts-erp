@@ -118,6 +118,20 @@ class MasterProdukManagementTest extends TestCase
         $this->assertDatabaseHas('satuan_unit', ['kode' => 'box-set']);
         $this->assertDatabaseHas('tipe_hp', ['merk' => 'Google', 'model' => 'Pixel 8 Pro']);
 
+        $foxconn = Brand::where('nama', 'Foxconn OEM')->first();
+        $this->assertNotNull($foxconn);
+
+        // Kualitas eksklusif brand Foxconn
+        $comp->call('openKualitasModal')
+            ->set('kualitasForm.nama', 'Foxconn Super OLED')
+            ->set('kualitasForm.brand_id', $foxconn->id)
+            ->call('simpanKualitas');
+
+        $this->assertDatabaseHas('kualitas_produk', [
+            'nama' => 'Foxconn Super OLED',
+            'brand_id' => $foxconn->id,
+        ]);
+
         // Check kondisi list in Konfigurasi
         $configList = app(KonfigurasiService::class)->get('master_produk_kondisi_list');
         $kondisi = collect($configList)->firstWhere('nama', 'Copotan Original Like New');

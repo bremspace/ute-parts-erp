@@ -640,7 +640,7 @@ class SettingsRbac extends Component
 
     public bool $showKualitasModal = false;
 
-    public array $kualitasForm = ['id' => null, 'nama' => '', 'keterangan' => '', 'is_active' => true];
+    public array $kualitasForm = ['id' => null, 'brand_id' => null, 'nama' => '', 'keterangan' => '', 'is_active' => true];
 
     public bool $showSatuanModal = false;
 
@@ -1769,12 +1769,13 @@ class SettingsRbac extends Component
             $k = KualitasProduk::findOrFail($id);
             $this->kualitasForm = [
                 'id' => $k->id,
+                'brand_id' => $k->brand_id,
                 'nama' => $k->nama,
                 'keterangan' => $k->keterangan ?? '',
                 'is_active' => (bool) $k->is_active,
             ];
         } else {
-            $this->kualitasForm = ['id' => null, 'nama' => '', 'keterangan' => '', 'is_active' => true];
+            $this->kualitasForm = ['id' => null, 'brand_id' => null, 'nama' => '', 'keterangan' => '', 'is_active' => true];
         }
         $this->showKualitasModal = true;
     }
@@ -1787,20 +1788,20 @@ class SettingsRbac extends Component
 
         $this->validate([
             'kualitasForm.nama' => 'required|string|max:255',
+            'kualitasForm.brand_id' => 'nullable|exists:brands,id',
         ]);
 
+        $data = [
+            'nama' => $this->kualitasForm['nama'],
+            'brand_id' => ! empty($this->kualitasForm['brand_id']) ? (int) $this->kualitasForm['brand_id'] : null,
+            'keterangan' => $this->kualitasForm['keterangan'] ?: null,
+            'is_active' => (bool) $this->kualitasForm['is_active'],
+        ];
+
         if ($this->kualitasForm['id']) {
-            KualitasProduk::findOrFail($this->kualitasForm['id'])->update([
-                'nama' => $this->kualitasForm['nama'],
-                'keterangan' => $this->kualitasForm['keterangan'] ?: null,
-                'is_active' => (bool) $this->kualitasForm['is_active'],
-            ]);
+            KualitasProduk::findOrFail($this->kualitasForm['id'])->update($data);
         } else {
-            KualitasProduk::create([
-                'nama' => $this->kualitasForm['nama'],
-                'keterangan' => $this->kualitasForm['keterangan'] ?: null,
-                'is_active' => (bool) $this->kualitasForm['is_active'],
-            ]);
+            KualitasProduk::create($data);
         }
 
         $this->showKualitasModal = false;
@@ -2340,7 +2341,7 @@ class SettingsRbac extends Component
             'kategoriList' => KategoriProduk::with('parent')->withCount('produk', 'children')->orderBy('urutan')->orderBy('nama')->get(),
             'kategoriTree' => KategoriProduk::getTree(),
             'brandList' => Brand::withCount('produk')->orderBy('nama')->get(),
-            'kualitasList' => KualitasProduk::withCount('produk')->orderBy('nama')->get(),
+            'kualitasList' => KualitasProduk::with('brand')->withCount('produk')->orderByRaw('brand_id IS NULL ASC')->orderBy('nama')->get(),
             'satuanList' => SatuanUnit::orderBy('kode')->get(),
             'kondisiList' => $this->getKondisiList(),
             'tipeHpList' => TipeHp::withCount('produk')->orderBy('merk')->orderBy('model')->get(),

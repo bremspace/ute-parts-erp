@@ -1431,6 +1431,7 @@
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
                                     <th class="py-2.5 px-3">Tingkat Kualitas</th>
+                                    <th class="py-2.5 px-3">Brand Part Induk</th>
                                     <th class="py-2.5 px-3">Keterangan</th>
                                     <th class="py-2.5 px-3 text-center">Jml Produk</th>
                                     <th class="py-2.5 px-3 text-center">Status</th>
@@ -1441,6 +1442,17 @@
                                 @forelse($kualitasList as $k)
                                     <tr class="hover:bg-white/[0.02] transition-colors">
                                         <td class="py-2.5 px-3 font-bold text-white">{{ $k->nama }}</td>
+                                        <td class="py-2.5 px-3">
+                                            @if($k->brand)
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                                                    <span>🏷️</span> {{ $k->brand->nama }}
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-ink-400 border border-white/10">
+                                                    Universal
+                                                </span>
+                                            @endif
+                                        </td>
                                         <td class="py-2.5 px-3 text-ink-400">{{ $k->keterangan ?? '—' }}</td>
                                         <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $k->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
                                             {{ $k->produk_count }}
@@ -1457,7 +1469,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="py-6 text-center text-ink-500">Belum ada data tingkat kualitas.</td>
+                                        <td colspan="6" class="py-6 text-center text-ink-500">Belum ada data tingkat kualitas.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -2167,6 +2179,16 @@
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Tingkat Kualitas *</label>
                         <input type="text" wire:model="kualitasForm.nama" placeholder="cth: Original Pabrik, Grade A+, Disassembled..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                         @error('kualitasForm.nama') <span class="text-up-red text-[10px] mt-1">{{ $message }}</span> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Brand Part Induk (Opsional / Universal)</label>
+                        <select wire:model="kualitasForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium bg-ink-900 text-white">
+                            <option value="">— Universal (Dapat Digunakan Semua Brand Part) —</option>
+                            @foreach($brandList as $b)
+                                <option value="{{ $b->id }}">{{ $b->nama }} (Eksklusif {{ $b->nama }})</option>
+                            @endforeach
+                        </select>
+                        <p class="text-[10px] text-ink-500 mt-1">Pilih brand jika grade ini eksklusif milik brand tertentu (cth: Crown Diamond, OG Pro). Kosongkan jika kualitas berlaku universal.</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Keterangan / Standar Mutu</label>
