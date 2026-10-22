@@ -4,12 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Livewire\ProductSearchModal;
 use App\Modules\Wms\Livewire\ProdukTab;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
@@ -1095,5 +1098,179 @@ class MasterProdukManagementTest extends TestCase
 
         $produk->refresh();
         $this->assertSame($namaUpdate, $produk->nama);
+    }
+
+    public function test_hierarki_hybrid_grade_brand_part_ke_kualitas_produk(): void
+    {
+        $this->authedAdmin();
+
+        $brandCrown = Brand::firstOrCreate(['nama' => 'Crown Part Test'], ['is_active' => true]);
+        $brandOg = Brand::firstOrCreate(['nama' => 'OG Part Test'], ['is_active' => true]);
+
+        // Kualitas universal (tanpa brand)
+        $kualUniversal = KualitasProduk::firstOrCreate(
+            ['nama' => 'Original Copotan Mesin Test', 'brand_id' => null],
+            ['is_active' => true]
+        );
+
+        // Kualitas eksklusif Crown
+        $kualCrown = KualitasProduk::firstOrCreate(
+            ['nama' => 'Crown Diamond Grade Test', 'brand_id' => $brandCrown->id],
+            ['is_active' => true]
+        );
+
+        // Kualitas eksklusif OG
+        $kualOg = KualitasProduk::firstOrCreate(
+            ['nama' => 'OG Ultra Pro Grade Test', 'brand_id' => $brandOg->id],
+            ['is_active' => true]
+        );
+
+        // 1. Verifikasi Relasi
+        $this->assertSame($brandCrown->id, $kualCrown->brand->id);
+        $this->assertSame($brandOg->id, $kualOg->brand->id);
+        $this->assertNull($kualUniversal->brand);
+        $this->assertTrue($brandCrown->kualitas->pluck('id')->contains($kualCrown->id));
+        $this->assertFalse($brandCrown->kualitas->pluck('id')->contains($kualOg->id));
+
+        // 2. Verifikasi Scope forBrand
+        $crownOptions = KualitasProduk::forBrand($brandCrown->id)->pluck('id')->all();
+        $this->assertContains($kualCrown->id, $crownOptions);
+        $this->assertContains($kualUniversal->id, $crownOptions);
+        $this->assertNotContains($kualOg->id, $crownOptions);
+
+        $ogOptions = KualitasProduk::forBrand($brandOg->id)->pluck('id')->all();
+        $this->assertContains($kualOg->id, $ogOptions);
+        $this->assertContains($kualUniversal->id, $ogOptions);
+        $this->assertNotContains($kualCrown->id, $ogOptions);
+
+        // 3. Verifikasi Scope Universal & Exclusive
+        $this->assertTrue(KualitasProduk::universal()->pluck('id')->contains($kualUniversal->id));
+        $this->assertFalse(KualitasProduk::universal()->pluck('id')->contains($kualCrown->id));
+        $this->assertTrue(KualitasProduk::exclusive()->pluck('id')->contains($kualCrown->id));
+        $this->assertFalse(KualitasProduk::exclusive()->pluck('id')->contains($kualUniversal->id));
+    }
+
+    public function test_cascading_dropdown_dan_filter_kualitas_di_wms_produk_tab(): void
+    {
+        $this->authedAdmin();
+
+        $brandCrown = Brand::firstOrCreate(['nama' => 'Crown WMS Test'], ['is_active' => true]);
+        $brandOg = Brand::firstOrCreate(['nama' => 'OG WMS Test'], ['is_active' => true]);
+
+        $kualUniversal = KualitasProduk::firstOrCreate(
+            ['nama' => 'Universal Grade WMS Test', 'brand_id' => null],
+            ['is_active' => true]
+        );
+        $kualCrown = KualitasProduk::firstOrCreate(
+            ['nama' => 'Crown Super WMS Test', 'brand_id' => $brandCrown->id],
+            ['is_active' => true]
+        );
+        $kualOg = KualitasProduk::firstOrCreate(
+            ['nama' => 'OG Master WMS Test', 'brand_id' => $brandOg->id],
+            ['is_active' => true]
+        );
+
+        $comp = Livewire::test(ProdukTab::class);
+
+        // A. Form Create: Pilih Brand Crown -> Opsi kualitas ter-filter
+        $comp->set('produkForm.brand_id', $brandCrown->id);
+        $createOptions = $comp->viewData('kualitasCreateList')->pluck('id')->all();
+        $this->assertContains($kualCrown->id, $createOptions);
+        $this->assertContains($kualUniversal->id, $createOptions);
+        $this->assertNotContains($kualOg->id, $createOptions);
+
+        // Set kualitas ke Crown Super, lalu ganti brand ke OG -> Kualitas otomatis ter-reset
+        $comp->set('produkForm.kualitas_id', $kualCrown->id);
+        $comp->set('produkForm.brand_id', $brandOg->id);
+        $this->assertNull($comp->get('produkForm.kualitas_id'));
+
+        // B. Filter Katalog: Set filter brand Crown -> filter kualitas ter-filter
+        $comp->set('filterBrandId', $brandCrown->id);
+        $filterOptions = $comp->viewData('kualitasList')->pluck('id')->all();
+        $this->assertContains($kualCrown->id, $filterOptions);
+        $this->assertContains($kualUniversal->id, $filterOptions);
+        $this->assertNotContains($kualOg->id, $filterOptions);
+
+        // Set filter kualitas ke Crown, ganti filter brand ke OG -> filter kualitas reset
+        $comp->set('filterKualitasId', $kualCrown->id);
+        $comp->set('filterBrandId', $brandOg->id);
+        $this->assertNull($comp->get('filterKualitasId'));
+
+        // C. Quick Add Modal Kualitas: bisa simpan dengan brand_id
+        $comp->call('openQuickAdd', 'kualitas')
+            ->assertSet('quickAddTipe', 'kualitas')
+            ->set('quickAddForm.nama', 'Crown Platinum Diamond Exclusive')
+            ->set('quickAddForm.brand_id', $brandCrown->id)
+            ->call('simpanQuickAdd')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
+
+        $kualBaru = KualitasProduk::where('nama', 'Crown Platinum Diamond Exclusive')->first();
+        $this->assertNotNull($kualBaru);
+        $this->assertSame($brandCrown->id, $kualBaru->brand_id);
+    }
+
+    public function test_cascading_kualitas_di_pos_kasir(): void
+    {
+        $this->authedAdmin();
+
+        $brandCrown = Brand::firstOrCreate(['nama' => 'Crown POS Test'], ['is_active' => true]);
+        $brandOg = Brand::firstOrCreate(['nama' => 'OG POS Test'], ['is_active' => true]);
+
+        $kualUniversal = KualitasProduk::firstOrCreate(
+            ['nama' => 'Universal Grade POS Test', 'brand_id' => null],
+            ['is_active' => true]
+        );
+        $kualCrown = KualitasProduk::firstOrCreate(
+            ['nama' => 'Crown Super POS Test', 'brand_id' => $brandCrown->id],
+            ['is_active' => true]
+        );
+        $kualOg = KualitasProduk::firstOrCreate(
+            ['nama' => 'OG Master POS Test', 'brand_id' => $brandOg->id],
+            ['is_active' => true]
+        );
+
+        $pos = Livewire::test(PosKasir::class);
+        $pos->set('filterBrandId', $brandCrown->id);
+        $posKualitas = $pos->viewData('kualitasList')->pluck('id')->all();
+        $this->assertContains($kualCrown->id, $posKualitas);
+        $this->assertContains($kualUniversal->id, $posKualitas);
+        $this->assertNotContains($kualOg->id, $posKualitas);
+
+        // Reset otomatis saat brand bertentangan
+        $pos->set('filterKualitasId', $kualCrown->id);
+        $pos->set('filterBrandId', $brandOg->id);
+        $this->assertNull($pos->get('filterKualitasId'));
+    }
+
+    public function test_cascading_kualitas_di_product_search_modal(): void
+    {
+        $this->authedAdmin();
+
+        $brandCrown = Brand::firstOrCreate(['nama' => 'Crown Modal Test'], ['is_active' => true]);
+        $brandOg = Brand::firstOrCreate(['nama' => 'OG Modal Test'], ['is_active' => true]);
+
+        $kualUniversal = KualitasProduk::firstOrCreate(
+            ['nama' => 'Universal Grade Modal Test', 'brand_id' => null],
+            ['is_active' => true]
+        );
+        $kualCrown = KualitasProduk::firstOrCreate(
+            ['nama' => 'Crown Super Modal Test', 'brand_id' => $brandCrown->id],
+            ['is_active' => true]
+        );
+        $kualOg = KualitasProduk::firstOrCreate(
+            ['nama' => 'OG Master Modal Test', 'brand_id' => $brandOg->id],
+            ['is_active' => true]
+        );
+
+        $modal = Livewire::test(ProductSearchModal::class);
+        $modal->set('filterBrandId', $brandCrown->id);
+        $modalKualitas = $modal->viewData('kualitasList')->pluck('id')->all();
+        $this->assertContains($kualCrown->id, $modalKualitas);
+        $this->assertContains($kualUniversal->id, $modalKualitas);
+        $this->assertNotContains($kualOg->id, $modalKualitas);
+
+        $modal->set('filterKualitasId', $kualCrown->id);
+        $modal->set('filterBrandId', $brandOg->id);
+        $this->assertNull($modal->get('filterKualitasId'));
     }
 }

@@ -545,7 +545,7 @@
                     <select wire:model.live="filterKualitasId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
                         <option value="">Semua Kualitas</option>
                         @foreach($kualitasList as $k)
-                            <option value="{{ $k->id }}">{{ $k->nama }}</option>
+                            <option value="{{ $k->id }}">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
                         @endforeach
                     </select>
                 @endif

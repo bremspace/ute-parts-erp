@@ -429,6 +429,12 @@ class PosKasir extends Component
     public function updatedFilterBrandId(): void
     {
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
+        if ($this->filterKualitasId) {
+            $k = KualitasProduk::find($this->filterKualitasId);
+            if ($k && $k->brand_id && $this->filterBrandId && (int) $k->brand_id !== (int) $this->filterBrandId) {
+                $this->filterKualitasId = null;
+            }
+        }
     }
 
     public function updatedFilterKualitasId(): void
@@ -3180,7 +3186,12 @@ class PosKasir extends Component
 
         $kategoriList = KategoriProduk::whereNull('parent_id')->with('children')->where('is_active', true)->get();
         $brandList = Brand::where('is_active', true)->orderBy('nama')->get();
-        $kualitasList = KualitasProduk::where('is_active', true)->orderBy('nama')->get();
+        $kualitasList = KualitasProduk::with('brand')
+            ->where('is_active', true)
+            ->when($this->filterBrandId, fn ($q) => $q->forBrand($this->filterBrandId))
+            ->orderByRaw('brand_id IS NULL ASC')
+            ->orderBy('nama')
+            ->get();
         $tipeHpList = TipeHp::where('is_active', true)
             ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
             ->orderBy('merk')

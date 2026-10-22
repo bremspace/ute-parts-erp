@@ -483,6 +483,37 @@ class ProdukTab extends Component
         }
     }
 
+    public function updatedFilterBrandId($value): void
+    {
+        $this->resetPage();
+        if ($this->filterKualitasId) {
+            $k = KualitasProduk::find($this->filterKualitasId);
+            if ($k && $k->brand_id && $value && (int) $k->brand_id !== (int) $value) {
+                $this->filterKualitasId = null;
+            }
+        }
+    }
+
+    public function updatedProdukFormBrandId($value): void
+    {
+        if (! empty($this->produkForm['kualitas_id'])) {
+            $k = KualitasProduk::find($this->produkForm['kualitas_id']);
+            if ($k && $k->brand_id && $value && (int) $k->brand_id !== (int) $value) {
+                $this->produkForm['kualitas_id'] = null;
+            }
+        }
+    }
+
+    public function updatedEditProdukFormBrandId($value): void
+    {
+        if (! empty($this->editProdukForm['kualitas_id'])) {
+            $k = KualitasProduk::find($this->editProdukForm['kualitas_id']);
+            if ($k && $k->brand_id && $value && (int) $k->brand_id !== (int) $value) {
+                $this->editProdukForm['kualitas_id'] = null;
+            }
+        }
+    }
+
     protected function simpanPreferensi(): void
     {
         $userId = auth()->id();
@@ -1504,6 +1535,7 @@ class ProdukTab extends Component
         $this->quickAddTipe = $tipe;
         $defaultMerk = '';
         $defaultModel = '';
+        $defaultBrandId = null;
         if ($tipe === 'tipe_hp') {
             $defaultMerk = $this->showEditProdukModal
                 ? ($this->editKompatibelMerekHp ?: ($this->editProdukForm['brand_kompatibel'] ?? ''))
@@ -1517,6 +1549,11 @@ class ProdukTab extends Component
         } else {
             $this->quickAddSelectedMerk = '';
             $this->quickAddSelectedModel = '';
+            if ($tipe === 'kualitas') {
+                $defaultBrandId = $this->showEditProdukModal
+                    ? ($this->editProdukForm['brand_id'] ?? null)
+                    : ($this->produkForm['brand_id'] ?? null);
+            }
         }
 
         $this->quickAddForm = [
@@ -1524,6 +1561,7 @@ class ProdukTab extends Component
             'kode' => '',
             'parent_id' => null,
             'keterangan' => '',
+            'brand_id' => $defaultBrandId,
             'merk' => $defaultMerk,
             'model' => $defaultModel,
             'telepon' => '',
@@ -1646,8 +1684,9 @@ class ProdukTab extends Component
                 break;
 
             case 'kualitas':
+                $brandId = ! empty($this->quickAddForm['brand_id']) ? (int) $this->quickAddForm['brand_id'] : null;
                 $kualitas = KualitasProduk::firstOrCreate(
-                    ['nama' => $nama],
+                    ['nama' => $nama, 'brand_id' => $brandId],
                     ['keterangan' => $this->quickAddForm['keterangan'] ?: null, 'is_active' => true]
                 );
                 if ($this->showEditProdukModal) {
@@ -1655,7 +1694,7 @@ class ProdukTab extends Component
                 } else {
                     $this->produkForm['kualitas_id'] = $kualitas->id;
                 }
-                $pesan = "Kualitas '{$nama}' berhasil ditambahkan";
+                $pesan = "Kualitas '{$nama}'".($brandId ? ' untuk Brand terkait' : ' (Universal)').' berhasil ditambahkan';
                 break;
 
             case 'satuan':
@@ -3953,21 +3992,35 @@ class ProdukTab extends Component
             ->all();
 
         // 3. Filter data pendukung agar sesuai dengan data riil master produk
+        $allBrands = Brand::where('is_active', true)->orderBy('nama')->get();
         $brandsMaster = Brand::where('is_active', true)
             ->when(Produk::whereNotNull('brand_id')->exists(), fn ($q) => $q->whereIn('id', Produk::whereNotNull('brand_id')->distinct()->pluck('brand_id')))
             ->orderBy('nama')
             ->get();
         if ($brandsMaster->isEmpty()) {
-            $brandsMaster = Brand::where('is_active', true)->orderBy('nama')->get();
+            $brandsMaster = $allBrands;
         }
 
-        $kualitasMaster = KualitasProduk::where('is_active', true)
-            ->when(Produk::whereNotNull('kualitas_id')->exists(), fn ($q) => $q->whereIn('id', Produk::whereNotNull('kualitas_id')->distinct()->pluck('kualitas_id')))
+        $kualitasFilterOptions = KualitasProduk::with('brand')
+            ->where('is_active', true)
+            ->when($this->filterBrandId, fn ($q) => $q->forBrand($this->filterBrandId))
+            ->orderByRaw('brand_id IS NULL ASC')
             ->orderBy('nama')
             ->get();
-        if ($kualitasMaster->isEmpty()) {
-            $kualitasMaster = KualitasProduk::where('is_active', true)->orderBy('nama')->get();
-        }
+
+        $kualitasCreateOptions = KualitasProduk::with('brand')
+            ->where('is_active', true)
+            ->forBrand(! empty($this->produkForm['brand_id']) ? (int) $this->produkForm['brand_id'] : null)
+            ->orderByRaw('brand_id IS NULL ASC')
+            ->orderBy('nama')
+            ->get();
+
+        $kualitasEditOptions = KualitasProduk::with('brand')
+            ->where('is_active', true)
+            ->forBrand(! empty($this->editProdukForm['brand_id']) ? (int) $this->editProdukForm['brand_id'] : null)
+            ->orderByRaw('brand_id IS NULL ASC')
+            ->orderBy('nama')
+            ->get();
 
         $suppliersMaster = Supplier::where('is_active', true)
             ->when(Produk::whereNotNull('supplier_id')->exists(), fn ($q) => $q->whereIn('id', Produk::whereNotNull('supplier_id')->distinct()->pluck('supplier_id')))
@@ -4033,7 +4086,10 @@ class ProdukTab extends Component
             'tierMemberships' => TierMembership::where('is_active', true)->orderBy('urutan')->get(),
             // [T-44] master data pendukung terkalibrasi ke master produk
             'brands' => $brandsMaster,
-            'kualitasList' => $kualitasMaster,
+            'allBrands' => $allBrands,
+            'kualitasList' => $kualitasFilterOptions,
+            'kualitasCreateList' => $kualitasCreateOptions,
+            'kualitasEditList' => $kualitasEditOptions,
             'satuanUnits' => $satuanUnitsMaster,
             'suppliers' => $suppliersMaster,
             'kondisiList' => $kondisiListMaster,

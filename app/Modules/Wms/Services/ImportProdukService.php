@@ -883,13 +883,25 @@ class ImportProdukService
         $kualitasId = null;
         $kualitasName = $this->normalizeKualitas(trim((string) ($row['kualitas'] ?? '')));
         if ($kualitasName !== '') {
-            if (! isset($this->kualitasCache[$kualitasName])) {
-                $this->kualitasCache[$kualitasName] = KualitasProduk::firstOrCreate(
-                    ['nama' => $kualitasName],
-                    ['is_active' => true]
-                )->id;
+            $cacheKey = "{$brandId}:{$kualitasName}";
+            if (! isset($this->kualitasCache[$cacheKey])) {
+                $kualitasRow = KualitasProduk::where('nama', $kualitasName)
+                    ->where(function ($q) use ($brandId) {
+                        $q->where('brand_id', $brandId)
+                            ->orWhereNull('brand_id');
+                    })
+                    ->orderByRaw('brand_id IS NOT NULL DESC')
+                    ->first();
+
+                if (! $kualitasRow) {
+                    $kualitasRow = KualitasProduk::firstOrCreate(
+                        ['nama' => $kualitasName, 'brand_id' => $brandId],
+                        ['is_active' => true]
+                    );
+                }
+                $this->kualitasCache[$cacheKey] = $kualitasRow->id;
             }
-            $kualitasId = $this->kualitasCache[$kualitasName];
+            $kualitasId = $this->kualitasCache[$cacheKey];
         }
 
         // Kategori & kategori_id: runtime cache & firstOrCreate

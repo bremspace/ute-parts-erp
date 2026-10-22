@@ -81,7 +81,7 @@
                             <select wire:model.live="filterKualitasId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
                                 <option value="">Semua Kualitas</option>
                                 @foreach($kualitasList as $k)
-                                    <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}</option>
+                                    <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
                                 @endforeach
                             </select>
                         @endif
@@ -554,7 +554,7 @@
                                                 <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
                                                     <option value="">Semua Kualitas</option>
                                                     @foreach($kualitasList as $k)
-                                                        <option value="{{ $k->id }}">{{ $k->nama }}</option>
+                                                        <option value="{{ $k->id }}">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -643,7 +643,7 @@
                                                 </select>
                                                 <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
                                                     <option value="">Semua Kualitas</option>
-                                                    @foreach($kualitasList as $k) <option value="{{ $k->id }}">{{ $k->nama }}</option> @endforeach
+                                                    @foreach($kualitasList as $k) <option value="{{ $k->id }}">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option> @endforeach
                                                 </select>
                                             </div>
                                             <div class="pt-2 border-t border-white/10 flex justify-between">
@@ -2026,7 +2026,7 @@
                                 <label class="text-xs font-semibold text-ink-300">Brand Part</label>
                                 <button type="button" wire:click="openQuickAdd('brand')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Baru</button>
                             </div>
-                            <select wire:model="produkForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model.live="produkForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Pilih Brand Part —</option>
                                 @foreach($brands as $b)
                                     <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
@@ -2041,11 +2041,13 @@
                             </div>
                             <select wire:model="produkForm.kualitas_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Pilih kualitas —</option>
-                                @foreach($kualitasList as $k)
-                                    <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}</option>
+                                @foreach($kualitasCreateList as $k)
+                                    <option value="{{ $k->id }}" class="bg-ink-900">
+                                        {{ $k->nama }} {{ $k->brand_id ? '('.($k->brand?->nama ?? 'Brand Khusus').')' : '(Universal)' }}
+                                    </option>
                                 @endforeach
                             </select>
-                            <p class="text-[9px] text-ink-500 mt-1">Original / Grade A / Grade B / Refurbished</p>
+                            <p class="text-[9px] text-ink-500 mt-1">Grade khusus brand atau grade universal</p>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -3184,7 +3186,7 @@
                                 <label class="text-xs font-semibold text-ink-300">Brand Part</label>
                                 <button type="button" wire:click="openQuickAdd('brand')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Baru</button>
                             </div>
-                            <select wire:model="editProdukForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model.live="editProdukForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Pilih Brand Part —</option>
                                 @foreach($brands as $b)
                                     <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
@@ -3199,11 +3201,13 @@
                             </div>
                             <select wire:model="editProdukForm.kualitas_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Pilih kualitas —</option>
-                                @foreach($kualitasList as $k)
-                                    <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}</option>
+                                @foreach($kualitasEditList as $k)
+                                    <option value="{{ $k->id }}" class="bg-ink-900">
+                                        {{ $k->nama }} {{ $k->brand_id ? '('.($k->brand?->nama ?? 'Brand Khusus').')' : '(Universal)' }}
+                                    </option>
                                 @endforeach
                             </select>
-                            <p class="text-[9px] text-ink-500 mt-1">Original / Grade A / Grade B / Refurbished</p>
+                            <p class="text-[9px] text-ink-500 mt-1">Grade khusus brand atau grade universal</p>
                         </div>
                     </div>
 
@@ -4149,6 +4153,19 @@
                                 placeholder="Cth: Harco Mangga Dua Lt. 3"
                                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium"
                             />
+                        </div>
+                    @endif
+
+                    @if($quickAddTipe === 'kualitas')
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Brand Part Induk (Opsional / Universal)</label>
+                            <select wire:model="quickAddForm.brand_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                <option value="" class="bg-ink-900">— Universal (Bisa untuk Semua Brand Part) —</option>
+                                @foreach($allBrands as $b)
+                                    <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }} (Eksklusif {{ $b->nama }})</option>
+                                @endforeach
+                            </select>
+                            <p class="text-[9px] text-ink-500 mt-1">Kosongkan jika kualitas berlaku umum (cth: Original Copotan, OEM, Grade A)</p>
                         </div>
                     @endif
 
