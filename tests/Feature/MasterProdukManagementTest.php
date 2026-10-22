@@ -1287,4 +1287,64 @@ class MasterProdukManagementTest extends TestCase
         $modal->set('filterBrandId', $brandOg->id);
         $this->assertNull($modal->get('filterKualitasId'));
     }
+
+    public function test_quick_add_brand_baru_langsung_tersimpan_dan_tersedia_di_dropdown_serta_sinkron_dengan_kualitas(): void
+    {
+        $this->authedAdmin();
+
+        $comp = Livewire::test(ProdukTab::class);
+
+        // 1. Quick Add Brand Baru
+        $comp->call('openQuickAdd', 'brand')
+            ->assertSet('showQuickAddModal', true)
+            ->assertSet('quickAddTipe', 'brand')
+            ->set('quickAddForm.nama', 'Braderpart Platinum')
+            ->set('quickAddForm.keterangan', 'Brand sparepart lokal kualitas premium')
+            ->call('simpanQuickAdd')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success')
+            ->assertSet('showQuickAddModal', false);
+
+        // Pastikan brand tersimpan di DB
+        $brandBaru = Brand::where('nama', 'Braderpart Platinum')->first();
+        $this->assertNotNull($brandBaru);
+        $this->assertSame('Braderpart Platinum', $brandBaru->nama);
+
+        // Pastikan brand baru langsung terpilih di form produk
+        $this->assertSame($brandBaru->id, $comp->get('produkForm.brand_id'));
+
+        // Pastikan brand baru langsung ada di daftar allBrands view
+        $allBrands = $comp->viewData('allBrands');
+        $this->assertTrue($allBrands->pluck('id')->contains($brandBaru->id));
+
+        // 2. Quick Add Kualitas yang terikat brand baru tersebut
+        $comp->call('openQuickAdd', 'kualitas')
+            ->assertSet('showQuickAddModal', true)
+            ->assertSet('quickAddTipe', 'kualitas')
+            // Nilai default brand_id harus otomatis mewarisi brand yang sedang aktif di form
+            ->assertSet('quickAddForm.brand_id', $brandBaru->id)
+            ->set('quickAddForm.nama', 'Platinum Grade AAA')
+            ->call('simpanQuickAdd')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success')
+            ->assertSet('showQuickAddModal', false);
+
+        // Pastikan kualitas tersimpan dengan relasi brand_id yang benar
+        $kualBaru = KualitasProduk::where('nama', 'Platinum Grade AAA')->first();
+        $this->assertNotNull($kualBaru);
+        $this->assertSame($brandBaru->id, $kualBaru->brand_id);
+
+        // Pastikan kualitas baru langsung terpilih di form produk
+        $this->assertSame($kualBaru->id, $comp->get('produkForm.kualitas_id'));
+
+        // 3. Two-Way Sync: saat user memilih kualitas eksklusif, brand_id otomatis terisi
+        $brandLain = Brand::create(['nama' => 'Kingkong Part', 'is_active' => true]);
+        $kualLain = KualitasProduk::create(['nama' => 'Kingkong Special Edition', 'brand_id' => $brandLain->id, 'is_active' => true]);
+
+        // Reset brand & kualitas di form
+        $comp->set('produkForm.brand_id', null);
+        $comp->set('produkForm.kualitas_id', null);
+
+        // Pilih kualitas milik brand Kingkong -> brand_id otomatis sinkron ke Kingkong
+        $comp->set('produkForm.kualitas_id', $kualLain->id);
+        $this->assertSame($brandLain->id, $comp->get('produkForm.brand_id'));
+    }
 }

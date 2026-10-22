@@ -504,12 +504,32 @@ class ProdukTab extends Component
         }
     }
 
+    public function updatedProdukFormKualitasId($value): void
+    {
+        if ($value) {
+            $k = KualitasProduk::find($value);
+            if ($k && $k->brand_id) {
+                $this->produkForm['brand_id'] = $k->brand_id;
+            }
+        }
+    }
+
     public function updatedEditProdukFormBrandId($value): void
     {
         if (! empty($this->editProdukForm['kualitas_id'])) {
             $k = KualitasProduk::find($this->editProdukForm['kualitas_id']);
             if ($k && $k->brand_id && $value && (int) $k->brand_id !== (int) $value) {
                 $this->editProdukForm['kualitas_id'] = null;
+            }
+        }
+    }
+
+    public function updatedEditProdukFormKualitasId($value): void
+    {
+        if ($value) {
+            $k = KualitasProduk::find($value);
+            if ($k && $k->brand_id) {
+                $this->editProdukForm['brand_id'] = $k->brand_id;
             }
         }
     }
@@ -1691,8 +1711,14 @@ class ProdukTab extends Component
                 );
                 if ($this->showEditProdukModal) {
                     $this->editProdukForm['kualitas_id'] = $kualitas->id;
+                    if ($brandId) {
+                        $this->editProdukForm['brand_id'] = $brandId;
+                    }
                 } else {
                     $this->produkForm['kualitas_id'] = $kualitas->id;
+                    if ($brandId) {
+                        $this->produkForm['brand_id'] = $brandId;
+                    }
                 }
                 $pesan = "Kualitas '{$nama}'".($brandId ? ' untuk Brand terkait' : ' (Universal)').' berhasil ditambahkan';
                 break;
@@ -4022,30 +4048,9 @@ class ProdukTab extends Component
             ->orderBy('nama')
             ->get();
 
-        $suppliersMaster = Supplier::where('is_active', true)
-            ->when(Produk::whereNotNull('supplier_id')->exists(), fn ($q) => $q->whereIn('id', Produk::whereNotNull('supplier_id')->distinct()->pluck('supplier_id')))
-            ->orderBy('nama')
-            ->get();
-        if ($suppliersMaster->isEmpty()) {
-            $suppliersMaster = Supplier::where('is_active', true)->orderBy('nama')->get();
-        }
-
-        $usedSatuan = Produk::distinct()->pluck('satuan')->filter()->all();
-        $satuanUnitsMaster = SatuanUnit::where('is_active', true)
-            ->when(! empty($usedSatuan), fn ($q) => $q->whereIn('kode', $usedSatuan))
-            ->orderBy('kode')
-            ->get();
-        if ($satuanUnitsMaster->isEmpty()) {
-            $satuanUnitsMaster = SatuanUnit::where('is_active', true)->orderBy('kode')->get();
-        }
-
-        $usedKondisi = Produk::distinct()->pluck('kondisi')->filter()->all();
-        $kondisiListMaster = ! empty($usedKondisi)
-            ? collect($kondisiList)->filter(fn ($kd) => in_array($kd['kode'], $usedKondisi))->values()->all()
-            : $kondisiList;
-        if (empty($kondisiListMaster)) {
-            $kondisiListMaster = $kondisiList;
-        }
+        $suppliersMaster = Supplier::where('is_active', true)->orderBy('nama')->get();
+        $satuanUnitsMaster = SatuanUnit::where('is_active', true)->orderBy('kode')->get();
+        $kondisiListMaster = $kondisiList;
 
         $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
         $gudangsCabang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->get();

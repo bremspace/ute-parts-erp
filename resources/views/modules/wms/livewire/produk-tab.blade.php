@@ -2028,7 +2028,7 @@
                             </div>
                             <select wire:model.live="produkForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Pilih Brand Part —</option>
-                                @foreach($brands as $b)
+                                @foreach($allBrands as $b)
                                     <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
                                 @endforeach
                             </select>
@@ -3188,7 +3188,7 @@
                             </div>
                             <select wire:model.live="editProdukForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 <option value="" class="bg-ink-900">— Pilih Brand Part —</option>
-                                @foreach($brands as $b)
+                                @foreach($allBrands as $b)
                                     <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
                                 @endforeach
                             </select>
@@ -4254,7 +4254,7 @@
                             @if($bulkEditFields['brand_id'] ?? false)
                                 <select wire:model="bulkEditForm.brand_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
                                     <option value="">— Pilih Brand Baru —</option>
-                                    @foreach($brands as $b)
+                                    @foreach($allBrands as $b)
                                         <option value="{{ $b->id }}">{{ $b->nama }}</option>
                                     @endforeach
                                 </select>
