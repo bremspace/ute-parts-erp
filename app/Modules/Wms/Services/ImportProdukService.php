@@ -290,10 +290,10 @@ class ImportProdukService
     public function templateColumns(): array
     {
         return [
-            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'tipe_hp', 'brand',
+            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'brand', 'merk_hp', 'tipe_hp',
             'kualitas', 'kondisi', 'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen',
             'min_stock', 'reorder_point', 'sn',
-            'stok_awal', 'gudang_id', 'rak_id', 'kompatibilitas_hp', 'deskripsi', 'foto_url',
+            'stok_awal', 'gudang_id', 'rak_id', 'produk_kompatibel_sku', 'kompatibilitas_hp', 'deskripsi', 'foto_url',
         ];
     }
 
@@ -303,20 +303,24 @@ class ImportProdukService
         return [
             [
                 'sku' => 'LCD-IP13-ORI', 'nama' => 'LCD iPhone 13 Original', 'barcode' => '8991234500001',
-                'satuan' => 'pcs', 'kategori' => 'LCD & Touchscreen', 'tipe_hp' => 'Apple iPhone 13', 'brand' => 'Apple',
+                'satuan' => 'pcs', 'kategori' => 'LCD & Touchscreen', 'brand' => 'Crown',
+                'merk_hp' => 'Apple', 'tipe_hp' => 'iPhone 13',
                 'kualitas' => 'Original', 'kondisi' => 'baru', 'harga_beli' => 850000, 'harga_jual' => 1250000,
                 'harga_reseller' => 1050000, 'harga_agen' => 1000000, 'min_stock' => 5, 'reorder_point' => 10,
                 'sn' => 'tidak', 'stok_awal' => 5, 'gudang_id' => 1, 'rak_id' => 1,
-                'kompatibilitas_hp' => '[{"merk":"Apple","model":"iPhone 13"}]',
+                'produk_kompatibel_sku' => '',
+                'kompatibilitas_hp' => '',
                 'deskripsi' => 'LCD assembly original untuk iPhone 13 warna hitam', 'foto_url' => '',
             ],
             [
                 'sku' => 'BAT-SA54-ODM', 'nama' => 'Baterai Samsung A54 Grade A', 'barcode' => '8991234500002',
-                'satuan' => 'pcs', 'kategori' => 'Baterai', 'tipe_hp' => 'Samsung Galaxy A54', 'brand' => 'Samsung',
+                'satuan' => 'pcs', 'kategori' => 'Baterai', 'brand' => 'OG',
+                'merk_hp' => 'Samsung', 'tipe_hp' => 'Galaxy A54, Galaxy A34',
                 'kualitas' => 'Grade A', 'kondisi' => 'oem', 'harga_beli' => 95000, 'harga_jual' => 175000,
                 'harga_reseller' => 135000, 'harga_agen' => 130000, 'min_stock' => 10, 'reorder_point' => 20,
                 'sn' => 'tidak', 'stok_awal' => 10, 'gudang_id' => 1, 'rak_id' => 2,
-                'kompatibilitas_hp' => '[{"merk":"Samsung","model":"Galaxy A54"}]',
+                'produk_kompatibel_sku' => 'LCD-IP13-ORI',
+                'kompatibilitas_hp' => '',
                 'deskripsi' => 'Baterai lithium ion Grade A kapasitas 5000mAh', 'foto_url' => '',
             ],
         ];
@@ -670,9 +674,10 @@ class ImportProdukService
         $totalPeringatan = 0;
         $detail = [];
         $totalStokNilai = 0.0;
+        $importedSkuToId = [];
 
         foreach (array_chunk($rows, 100) as $indexChunk => $chunk) {
-            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk) {
+            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId) {
                 // Akumulator NILAI per chunk: jurnal di-post dalam transaksi yang
                 // SAMA dengan mutasi stok baris-baris chunk ini.
                 $nilaiChunk = 0.0;
@@ -693,6 +698,9 @@ class ImportProdukService
                         $sukses++;
                         $nilaiChunk += $result['stok_nilai'];
                         $totalStokNilai += $result['stok_nilai'];
+                        if (! empty($result['produk_id']) && ! empty($result['sku'])) {
+                            $importedSkuToId[$result['sku']] = $result['produk_id'];
+                        }
                         if (! empty($warnings)) {
                             $totalPeringatan++;
                         }
@@ -729,6 +737,9 @@ class ImportProdukService
                 }
             });
         }
+
+        // Pass 2: Resolusi kompatibilitas antar produk (substitusi) via SKU
+        $this->resolveProdukKompatibelAntarSku($rows, $importedSkuToId);
 
         // Baris number di detail diisi pasca-transaksi (nomor baris = index + 2)
         foreach ($detail as $d => $item) {
@@ -898,6 +909,17 @@ class ImportProdukService
             $kategoriId = $this->kategoriCache[$kategori];
         }
 
+        // Merk Smartphone & Tipe HP kompatibilitas
+        $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);
+        $daftarTipe = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
+        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null);
+        if (! $daftarTipe && $kompat) {
+            $daftarTipe = $kompat; // derivasi dari JSON legacy
+        }
+
+        $primaryMerk = $merkHp ?: ($daftarTipe[0]['merk'] ?? ($brandName ?: null));
+        $primaryModel = $daftarTipe[0]['model'] ?? null;
+
         $produk = Produk::create([
             'nama' => $nama,
             'slug' => Str::slug($nama).'-'.Str::lower(Str::random(4)),
@@ -907,7 +929,8 @@ class ImportProdukService
             'brand_id' => $brandId,
             'kualitas_id' => $kualitasId,
             'barcode' => $barcode ?: null,
-            'brand_kompatibel' => $brandName ?: null,
+            'brand_kompatibel' => $primaryMerk,
+            'model_kompatibel' => $primaryModel,
             'kondisi' => $kondisi,
             'satuan' => $satuan,
             'harga_beli' => $hargaBeli,
@@ -930,12 +953,6 @@ class ImportProdukService
             'is_active' => true,
         ]);
 
-        // Tipe HP / kompatibilitas
-        $daftarTipe = $this->parseTipeHp($row['tipe_hp'] ?? null);
-        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null);
-        if (! $daftarTipe && $kompat) {
-            $daftarTipe = $kompat; // derivasi dari JSON legacy
-        }
         if ($daftarTipe) {
             $ids = [];
             foreach ($daftarTipe as $t) {
@@ -952,6 +969,8 @@ class ImportProdukService
         }
         if ($kompat) {
             $produk->update(['kompatibilitas_hp' => $kompat]);
+        } elseif ($daftarTipe) {
+            $produk->update(['kompatibilitas_hp' => $daftarTipe]);
         }
 
         // HargaTier default: retail = harga_jual; reseller/agen bila diisi kolom.
@@ -1010,7 +1029,7 @@ class ImportProdukService
             $cabangId = Gudang::find($gudangId)?->cabang_id;
         }
 
-        return ['stok_nilai' => $stokNilai, 'cabang_id' => $cabangId];
+        return ['stok_nilai' => $stokNilai, 'cabang_id' => $cabangId, 'produk_id' => $produk->id, 'sku' => $sku];
     }
 
     /**
@@ -1067,41 +1086,229 @@ class ImportProdukService
     }
 
     /**
-     * Parse kolom tipe_hp: JSON array [{merk, model}] atau teks "Merk Model" dipisah ';'.
+     * Resolusi hubungan kompatibilitas / substitusi antar produk (Pass 2) berdasarkan SKU.
+     * Menautkan produk_kompatibel_ids secara timbal balik (bidirectional).
      */
-    public function parseTipeHp(mixed $value): array
+    protected function resolveProdukKompatibelAntarSku(array $rows, array $importedSkuToId): void
+    {
+        foreach ($rows as $row) {
+            $sku = trim((string) ($row['sku'] ?? ''));
+            $kompatSkuStr = trim((string) ($row['produk_kompatibel_sku'] ?? ''));
+            if ($sku === '' || $kompatSkuStr === '') {
+                continue;
+            }
+
+            $currentProdukId = $importedSkuToId[$sku] ?? SkuVariant::where('sku', $sku)->value('produk_id');
+            if (! $currentProdukId) {
+                continue;
+            }
+
+            $targetSkus = array_filter(array_map('trim', preg_split('/[;,]/', $kompatSkuStr)));
+            $targetProdukIds = [];
+
+            foreach ($targetSkus as $tSku) {
+                if (strcasecmp($tSku, $sku) === 0) {
+                    continue;
+                }
+                $targetId = $importedSkuToId[$tSku] ?? SkuVariant::where('sku', $tSku)->value('produk_id');
+                if ($targetId && $targetId !== $currentProdukId) {
+                    $targetProdukIds[] = $targetId;
+                }
+            }
+
+            if (! empty($targetProdukIds)) {
+                $produk = Produk::find($currentProdukId);
+                if ($produk) {
+                    $produk->produkKompatibel()->syncWithoutDetaching($targetProdukIds);
+                    // Tautkan timbal balik
+                    foreach ($targetProdukIds as $tId) {
+                        $targetProduk = Produk::find($tId);
+                        if ($targetProduk) {
+                            $targetProduk->produkKompatibel()->syncWithoutDetaching([$currentProdukId]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Normalisasi dan koreksi typo nama merk smartphone (fuzzy match ke master TipeHp / kamus).
+     */
+    public function normalizeMerkHp(?string $merkRaw): string
+    {
+        $raw = trim((string) ($merkRaw ?? ''));
+        if ($raw === '') {
+            return '';
+        }
+
+        $lower = strtolower($raw);
+
+        // Kamus singkatan / alias lazim
+        $alias = [
+            'ip' => 'Apple', 'iph' => 'Apple', 'ipon' => 'Apple', 'iphone' => 'Apple', 'aple' => 'Apple', 'appl' => 'Apple',
+            'ss' => 'Samsung', 'sam' => 'Samsung', 'samsng' => 'Samsung', 'samsun' => 'Samsung', 'smasung' => 'Samsung',
+            'xio' => 'Xiaomi', 'xiomi' => 'Xiaomi', 'xomi' => 'Xiaomi', 'redmi' => 'Xiaomi', 'mi' => 'Xiaomi', 'poco' => 'Xiaomi',
+            'op' => 'Oppo', 'opp' => 'Oppo', 'opo' => 'Oppo',
+            'vv' => 'Vivo', 'vvo' => 'Vivo',
+            'inf' => 'Infinix', 'infx' => 'Infinix', 'infinx' => 'Infinix',
+            'real' => 'Realme', 'rlme' => 'Realme', 'relme' => 'Realme',
+            'tc' => 'Tecno', 'tekno' => 'Tecno',
+            'asus' => 'Asus', 'rog' => 'Asus',
+            'hw' => 'Huawei', 'huaw' => 'Huawei', 'huawai' => 'Huawei',
+            'uni' => 'Universal', 'univ' => 'Universal',
+        ];
+
+        if (isset($alias[$lower])) {
+            return $alias[$lower];
+        }
+
+        // Cek existing di database TipeHp (case-insensitive)
+        $dbMerk = TipeHp::where('is_active', true)
+            ->distinct()
+            ->pluck('merk')
+            ->filter()
+            ->all();
+
+        foreach ($dbMerk as $m) {
+            if (strcasecmp($m, $raw) === 0) {
+                return $m;
+            }
+        }
+
+        // Fuzzy match Levenshtein / similar_text (>= 80% kemiripan)
+        $bestMatch = null;
+        $highestPct = 0;
+        foreach ($dbMerk as $m) {
+            similar_text($lower, strtolower($m), $pct);
+            if ($pct > $highestPct && $pct >= 80) {
+                $highestPct = $pct;
+                $bestMatch = $m;
+            }
+        }
+
+        if ($bestMatch) {
+            return $bestMatch;
+        }
+
+        // Bersihkan tanda baca dan rapikan kapital
+        $clean = preg_replace('/[^a-zA-Z0-9\s]/', '', $raw) ?: $raw;
+
+        return ucwords(strtolower($clean));
+    }
+
+    /**
+     * Normalisasi nama model smartphone (hilangkan spasi/strip berlebih).
+     */
+    public function normalizeModelHp(?string $modelRaw): string
+    {
+        $raw = trim((string) ($modelRaw ?? ''));
+        if ($raw === '') {
+            return '';
+        }
+
+        // Rapikan tanda strip yang sering salah diketik jadi model baku (A-11 -> A11, Note-10 -> Note 10)
+        $clean = preg_replace('/\s*-\s*/', ' ', $raw) ?? $raw;
+        $clean = preg_replace('/\s+/', ' ', $clean) ?? $clean;
+
+        // Jika diawali merk (cth 'Apple iPhone 13'), biarkan modelnya rapi
+        return trim($clean);
+    }
+
+    /**
+     * Parse kolom tipe_hp yang mendukung format:
+     * - Model saja dipisah koma (jika $defaultMerk tersedia, cth: "A11, A15, A12" atau "iPhone 13 Pro Max")
+     * - Format lengkap "Merk Model" dipisah ';' atau ',' (cth: "Samsung Galaxy A11; Xiaomi Redmi 9" atau "Apple iPhone 13")
+     * - JSON array legacy
+     *
+     * @return array<int, array{merk: string, model: string}>
+     */
+    public function parseTipeHp(mixed $value, ?string $defaultMerk = null): array
     {
         $value = trim((string) ($value ?? ''));
+        $normDefaultMerk = $this->normalizeMerkHp($defaultMerk);
+
         if (! $value) {
+            if ($normDefaultMerk) {
+                return [['merk' => $normDefaultMerk, 'model' => 'Universal']];
+            }
+
             return [];
         }
+
         if (str_starts_with($value, '[')) {
             $decoded = json_decode($value, true);
             if (is_array($decoded)) {
-                return array_map(function ($d) {
-                    $merk = trim((string) ($d['merk'] ?? ($d['nama'] ?? '')));
-                    $model = trim((string) ($d['model'] ?? ''));
+                return array_map(function ($d) use ($normDefaultMerk) {
+                    $mRaw = trim((string) ($d['merk'] ?? ($d['nama'] ?? '')));
+                    $merk = $this->normalizeMerkHp($mRaw ?: $normDefaultMerk);
+                    $model = $this->normalizeModelHp(trim((string) ($d['model'] ?? '')));
 
                     return ['merk' => $merk, 'model' => $model];
                 }, $decoded);
             }
         }
 
+        $manufacturers = [
+            'apple' => 'Apple',
+            'samsung' => 'Samsung',
+            'xiaomi' => 'Xiaomi',
+            'oppo' => 'Oppo',
+            'vivo' => 'Vivo',
+            'realme' => 'Realme',
+            'infinix' => 'Infinix',
+            'tecno' => 'Tecno',
+            'asus' => 'Asus',
+            'huawei' => 'Huawei',
+            'google' => 'Google',
+            'sony' => 'Sony',
+            'nokia' => 'Nokia',
+            'motorola' => 'Motorola',
+            'lenovo' => 'Lenovo',
+            'oneplus' => 'OnePlus',
+            'universal' => 'Universal',
+        ];
+
         $hasil = [];
-        foreach (preg_split('/[;,]/', $value) as $part) {
+        // Jika terdapat titik koma ';', prioritaskan sebagai pemisah antar entri multi-tipe/multi-brand.
+        // Jika tidak ada ';', pisahkan dengan koma ','
+        $delimiter = str_contains($value, ';') ? ';' : (str_contains($value, "\n") ? "\n" : ',');
+        foreach (explode($delimiter, $value) as $part) {
             $part = trim($part);
             if (! $part) {
                 continue;
             }
+
             $words = preg_split('/\s+/', $part, 2);
-            $merk = $words[0] ?? '';
-            $model = $words[1] ?? '';
-            if ($merk) {
-                $hasil[] = ['merk' => $merk, 'model' => $model];
+            $candidateFirstWord = strtolower($words[0] ?? '');
+            $candidateRest = $words[1] ?? '';
+
+            if (isset($manufacturers[$candidateFirstWord]) && ! empty($candidateRest)) {
+                $hasil[] = [
+                    'merk' => $manufacturers[$candidateFirstWord],
+                    'model' => $this->normalizeModelHp($candidateRest),
+                ];
+            } else {
+                $hasil[] = [
+                    'merk' => $normDefaultMerk ?: 'Universal',
+                    'model' => $this->normalizeModelHp($part),
+                ];
             }
         }
 
-        return $hasil;
+        // Deduplikasi hasil
+        $unique = [];
+        foreach ($hasil as $h) {
+            if (empty($h['merk']) || empty($h['model'])) {
+                continue;
+            }
+            $key = strtolower($h['merk'].'|'.$h['model']);
+            if (! isset($unique[$key])) {
+                $unique[$key] = $h;
+            }
+        }
+
+        return array_values($unique);
     }
 
     /**

@@ -40,8 +40,9 @@ class WmsImportNewColumnsTest extends TestCase
                 'barcode' => '8999990001',
                 'satuan' => 'pcs',
                 'kategori' => 'LCD & Touchscreen',
-                'tipe_hp' => 'Apple iPhone 13 Pro Max',
                 'brand' => 'Crown',
+                'merk_hp' => 'Apple',
+                'tipe_hp' => 'iPhone 13 Pro Max',
                 'kualitas' => 'Grade A',
                 'kondisi' => 'oem',
                 'harga_beli' => 750000,
@@ -54,6 +55,7 @@ class WmsImportNewColumnsTest extends TestCase
                 'stok_awal' => 8,
                 'gudang_id' => $gudang->id,
                 'rak_id' => $rak->id,
+                'produk_kompatibel_sku' => '',
                 'kompatibilitas_hp' => '',
                 'deskripsi' => 'LCD OEM High Brightness untuk iPhone 13 Pro Max',
                 'foto_url' => 'https://example.com/lcd.webp',
@@ -112,6 +114,123 @@ class WmsImportNewColumnsTest extends TestCase
         $this->assertNotNull($stokItem);
         $this->assertSame(8, $stokItem->jumlah);
         $this->assertSame(5, $stokItem->jumlah_minimum);
+
+        @unlink($filePath);
+    }
+
+    public function test_import_produk_multi_tipe_auto_typo_dan_substitusi_sku(): void
+    {
+        $this->seed(AkunCoaSeeder::class);
+
+        $cabang = Cabang::create(['nama' => 'Cabang Pusat 2', 'kode' => 'CBG-02', 'is_active' => true]);
+        $gudang = Gudang::create(['cabang_id' => $cabang->id, 'nama' => 'Gudang Utama 2', 'kode' => 'GDG-02', 'is_active' => true]);
+        $rak = Rak::create(['gudang_id' => $gudang->id, 'kode' => 'RK-02', 'nama' => 'Rak B1', 'is_active' => true]);
+
+        $service = app(ImportProdukService::class);
+        $kolom = $service->templateColumns();
+
+        $baris = [
+            [
+                'sku' => 'LCD-A11-OG',
+                'nama' => 'LCD Samsung A11 OG',
+                'barcode' => '8999990002',
+                'satuan' => 'pcs',
+                'kategori' => 'LCD & Touchscreen',
+                'brand' => 'OG',
+                'merk_hp' => 'samsng', // typo auto-normalized ke Samsung
+                'tipe_hp' => 'Galaxy A11, Galaxy A15, Galaxy M11', // multi-tipe
+                'kualitas' => 'Grade A',
+                'kondisi' => 'baru',
+                'harga_beli' => 150000,
+                'harga_jual' => 250000,
+                'harga_reseller' => 200000,
+                'harga_agen' => 190000,
+                'min_stock' => 5,
+                'reorder_point' => 10,
+                'sn' => 'tidak',
+                'stok_awal' => 5,
+                'gudang_id' => $gudang->id,
+                'rak_id' => $rak->id,
+                'produk_kompatibel_sku' => 'LCD-A11-BRD', // Substitusi ke produk kedua
+                'kompatibilitas_hp' => '',
+                'deskripsi' => 'LCD OG kompatibel multi model',
+                'foto_url' => '',
+            ],
+            [
+                'sku' => 'LCD-A11-BRD',
+                'nama' => 'LCD Samsung A11 Braderpart',
+                'barcode' => '8999990003',
+                'satuan' => 'pcs',
+                'kategori' => 'LCD & Touchscreen',
+                'brand' => 'Braderpart',
+                'merk_hp' => 'Samsung',
+                'tipe_hp' => 'Galaxy A11',
+                'kualitas' => 'Original',
+                'kondisi' => 'baru',
+                'harga_beli' => 180000,
+                'harga_jual' => 290000,
+                'harga_reseller' => 230000,
+                'harga_agen' => 220000,
+                'min_stock' => 3,
+                'reorder_point' => 8,
+                'sn' => 'tidak',
+                'stok_awal' => 3,
+                'gudang_id' => $gudang->id,
+                'rak_id' => $rak->id,
+                'produk_kompatibel_sku' => '',
+                'kompatibilitas_hp' => '',
+                'deskripsi' => 'LCD Braderpart original quality',
+                'foto_url' => '',
+            ],
+        ];
+
+        $export = new class($kolom, $baris) implements FromCollection, WithHeadings
+        {
+            public function __construct(private array $kolom, private array $baris) {}
+
+            public function headings(): array
+            {
+                return $this->kolom;
+            }
+
+            public function collection(): Enumerable
+            {
+                return collect($this->baris);
+            }
+        };
+
+        Excel::store($export, 'import-tmp/test-multi-compat.csv', 'local', \Maatwebsite\Excel\Excel::CSV);
+        $filePath = Storage::disk('local')->path('import-tmp/test-multi-compat.csv');
+
+        $logImp = ImportLog::create([
+            'tipe' => 'produk_excel', 'nama_file' => 'test-multi-compat.csv',
+            'total_baris' => 0, 'sukses' => 0, 'gagal' => 0, 'status' => 'proses',
+        ]);
+
+        $hasil = $service->commit($filePath, $logImp->id, null);
+
+        $this->assertSame(2, $hasil['sukses']);
+        $this->assertSame(0, $hasil['gagal']);
+
+        $p1 = Produk::where('nama', 'LCD Samsung A11 OG')->first();
+        $p2 = Produk::where('nama', 'LCD Samsung A11 Braderpart')->first();
+
+        $this->assertNotNull($p1);
+        $this->assertNotNull($p2);
+
+        // Verifikasi normalisasi merk dari typo "samsng"
+        $this->assertSame('Samsung', $p1->brand_kompatibel);
+
+        // Verifikasi multi-tipe HP tersinkron (Galaxy A11, Galaxy A15, Galaxy M11)
+        $tipeModels = $p1->tipeHps()->pluck('model')->all();
+        $this->assertContains('Galaxy A11', $tipeModels);
+        $this->assertContains('Galaxy A15', $tipeModels);
+        $this->assertContains('Galaxy M11', $tipeModels);
+        $this->assertSame('Samsung', $p1->tipeHps()->first()->merk);
+
+        // Verifikasi relasi timbal-balik substitusi antar produk via SKU (Pass-2)
+        $this->assertTrue($p1->produkKompatibel()->where('kompatibel_produk_id', $p2->id)->exists());
+        $this->assertTrue($p2->produkKompatibel()->where('kompatibel_produk_id', $p1->id)->exists());
 
         @unlink($filePath);
     }

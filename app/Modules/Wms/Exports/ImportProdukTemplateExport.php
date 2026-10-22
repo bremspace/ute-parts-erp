@@ -2,6 +2,11 @@
 
 namespace App\Modules\Wms\Exports;
 
+use App\Modules\Wms\Models\Brand;
+use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
+use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
 use Illuminate\Support\Enumerable;
 use Maatwebsite\Excel\Concerns\Export;
@@ -14,18 +19,20 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 
 /**
- * [T-43] Template Excel import master produk.
- * Sheet 1: header + 2 contoh baris (lengkap dengan dropdown data validation). Sheet 2: petunjuk pengisian.
+ * [T-43] Template Excel import master produk dinamis interaktif.
+ * Sheet 1: Template Produk (Dropdown data validation otomatis).
+ * Sheet 2: Tambah Tipe Baru (Slot fleksibel jika merk/model belum terdaftar).
+ * Sheet 3: Referensi Sistem (Kamus resmi Merk HP, Kategori, Brand part, Satuan, Kualitas).
+ * Sheet 4: Petunjuk Pengisian.
  *
- * [B-04] Wajib implement Export (marker interface) — Excel::download() mengetik
- * argumen #1 sebagai Maatwebsite\Excel\Concerns\Export; WithMultipleSheets saja
- * menyebabkan TypeError → download gagal.
+ * [B-04] Wajib implement Export (marker interface).
  */
 class ImportProdukTemplateExport implements Export, WithMultipleSheets
 {
     public function sheets(): array
     {
         return [
+            // Sheet 1: Template Produk
             new class implements FromCollection, WithEvents, WithHeadings, WithTitle
             {
                 public function title(): string
@@ -49,57 +56,152 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                         AfterSheet::class => function (AfterSheet $event) {
                             $sheet = $event->sheet->getDelegate();
 
-                            // 1. Dropdown Satuan (Kolom D)
+                            // 1. Dropdown Satuan (Kolom D) -> Referensi Sheet 3
                             $valSatuan = $sheet->getCell('D2')->getDataValidation();
                             $valSatuan->setType(DataValidation::TYPE_LIST);
                             $valSatuan->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valSatuan->setAllowBlank(true);
                             $valSatuan->setShowDropDown(true);
-                            $valSatuan->setShowInputMessage(true);
-                            $valSatuan->setPromptTitle('Pilih Satuan');
-                            $valSatuan->setPrompt('Pilih satuan resmi yang terdaftar');
-                            $valSatuan->setFormula1('"pcs,box,unit,set,roll,meter,botol"');
+                            $valSatuan->setFormula1("'Referensi Sistem'!\$D\$2:\$D\$100");
                             $valSatuan->setSqref('D2:D1000');
 
-                            // 2. Dropdown Kualitas (Kolom H)
-                            $valKualitas = $sheet->getCell('H2')->getDataValidation();
+                            // 2. Dropdown Kategori (Kolom E) -> Referensi Sheet 3
+                            $valKat = $sheet->getCell('E2')->getDataValidation();
+                            $valKat->setType(DataValidation::TYPE_LIST);
+                            $valKat->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valKat->setAllowBlank(true);
+                            $valKat->setShowDropDown(true);
+                            $valKat->setFormula1("'Referensi Sistem'!\$B\$2:\$B\$100");
+                            $valKat->setSqref('E2:E1000');
+
+                            // 3. Dropdown Brand Part (Kolom F) -> Referensi Sheet 3
+                            $valBrand = $sheet->getCell('F2')->getDataValidation();
+                            $valBrand->setType(DataValidation::TYPE_LIST);
+                            $valBrand->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valBrand->setAllowBlank(true);
+                            $valBrand->setShowDropDown(true);
+                            $valBrand->setFormula1("'Referensi Sistem'!\$C\$2:\$C\$100");
+                            $valBrand->setSqref('F2:F1000');
+
+                            // 4. Dropdown Merk HP (Kolom G) -> Referensi Sheet 3
+                            $valMerkHp = $sheet->getCell('G2')->getDataValidation();
+                            $valMerkHp->setType(DataValidation::TYPE_LIST);
+                            $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valMerkHp->setAllowBlank(true);
+                            $valMerkHp->setShowDropDown(true);
+                            $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
+                            $valMerkHp->setSqref('G2:G1000');
+
+                            // 5. Dropdown Kualitas (Kolom I)
+                            $valKualitas = $sheet->getCell('I2')->getDataValidation();
                             $valKualitas->setType(DataValidation::TYPE_LIST);
                             $valKualitas->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valKualitas->setAllowBlank(true);
                             $valKualitas->setShowDropDown(true);
-                            $valKualitas->setShowInputMessage(true);
-                            $valKualitas->setPromptTitle('Pilih Kualitas');
-                            $valKualitas->setPrompt('Pilih grade kualitas');
-                            $valKualitas->setFormula1('"Original,Grade A,Grade B,Refurbished,OEM"');
-                            $valKualitas->setSqref('H2:H1000');
+                            $valKualitas->setFormula1("'Referensi Sistem'!\$E\$2:\$E\$50");
+                            $valKualitas->setSqref('I2:I1000');
 
-                            // 3. Dropdown Kondisi (Kolom I)
-                            $valKondisi = $sheet->getCell('I2')->getDataValidation();
+                            // 6. Dropdown Kondisi (Kolom J)
+                            $valKondisi = $sheet->getCell('J2')->getDataValidation();
                             $valKondisi->setType(DataValidation::TYPE_LIST);
                             $valKondisi->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valKondisi->setAllowBlank(true);
                             $valKondisi->setShowDropDown(true);
-                            $valKondisi->setShowInputMessage(true);
-                            $valKondisi->setPromptTitle('Pilih Kondisi');
-                            $valKondisi->setPrompt('baru, oem, atau compatible');
-                            $valKondisi->setFormula1('"baru,oem,compatible"');
-                            $valKondisi->setSqref('I2:I1000');
+                            $valKondisi->setFormula1('"baru,oem,bekas,refurbished"');
+                            $valKondisi->setSqref('J2:J1000');
 
-                            // 4. Dropdown Serial Number (Kolom P)
-                            $valSn = $sheet->getCell('P2')->getDataValidation();
+                            // 7. Dropdown Serial Number (Kolom Q)
+                            $valSn = $sheet->getCell('Q2')->getDataValidation();
                             $valSn->setType(DataValidation::TYPE_LIST);
                             $valSn->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valSn->setAllowBlank(true);
                             $valSn->setShowDropDown(true);
-                            $valSn->setShowInputMessage(true);
-                            $valSn->setPromptTitle('Wajib SN');
-                            $valSn->setPrompt('Pilih ya jika wajib serial number');
                             $valSn->setFormula1('"ya,tidak"');
-                            $valSn->setSqref('P2:P1000');
+                            $valSn->setSqref('Q2:Q1000');
                         },
                     ];
                 }
             },
+
+            // Sheet 2: Tambah Tipe Baru (Tempat mendaftarkan Tipe HP baru secara mandiri)
+            new class implements FromCollection, WithHeadings, WithTitle
+            {
+                public function title(): string
+                {
+                    return 'Tambah Tipe Baru';
+                }
+
+                public function headings(): array
+                {
+                    return ['merk_hp_baru', 'model_hp_baru', 'keterangan'];
+                }
+
+                public function collection(): Enumerable
+                {
+                    return collect([
+                        ['Infinix', 'Hot 40 Pro', 'Contoh model baru yang belum ada di sistem'],
+                        ['Tecno', 'Pova 6 Pro', 'Contoh model baru'],
+                    ]);
+                }
+            },
+
+            // Sheet 3: Referensi Sistem (Kamus resmi terkalibrasi ke database aktif)
+            new class implements FromCollection, WithHeadings, WithTitle
+            {
+                public function title(): string
+                {
+                    return 'Referensi Sistem';
+                }
+
+                public function headings(): array
+                {
+                    return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas'];
+                }
+
+                public function collection(): Enumerable
+                {
+                    $merks = TipeHp::where('is_active', true)->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all();
+                    if (empty($merks)) {
+                        $merks = ['Apple', 'Samsung', 'Xiaomi', 'Oppo', 'Vivo', 'Realme', 'Infinix', 'Tecno', 'Asus', 'Universal'];
+                    }
+
+                    $kategoris = KategoriProduk::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    if (empty($kategoris)) {
+                        $kategoris = ['LCD & Touchscreen', 'Baterai', 'Fleksibel & Board', 'Kamera', 'IC & Chipset', 'Housing & Backdoor'];
+                    }
+
+                    $brands = Brand::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    if (empty($brands)) {
+                        $brands = ['Crown', 'OG', 'Braderpart', 'Olike', 'OEM', 'Original'];
+                    }
+
+                    $satuans = SatuanUnit::where('is_active', true)->orderBy('kode')->pluck('kode')->all();
+                    if (empty($satuans)) {
+                        $satuans = ['pcs', 'box', 'unit', 'set', 'roll', 'meter', 'botol'];
+                    }
+
+                    $kualitas = KualitasProduk::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    if (empty($kualitas)) {
+                        $kualitas = ['Original', 'Grade A', 'Grade B', 'OEM', 'Refurbished'];
+                    }
+
+                    $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas));
+                    $rows = [];
+                    for ($i = 0; $i < $max; $i++) {
+                        $rows[] = [
+                            $merks[$i] ?? '',
+                            $kategoris[$i] ?? '',
+                            $brands[$i] ?? '',
+                            $satuans[$i] ?? '',
+                            $kualitas[$i] ?? '',
+                        ];
+                    }
+
+                    return collect($rows);
+                }
+            },
+
+            // Sheet 4: Petunjuk Pengisian
             new class implements FromCollection, WithTitle
             {
                 public function title(): string
@@ -110,44 +212,29 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                 public function collection(): Enumerable
                 {
                     return collect([
-                        ['PETUNJUK IMPORT MASTER PRODUK — UTE PARTS'],
+                        ['PETUNJUK IMPORT MASTER PRODUK DINAMIS — UTE PARTS'],
                         [''],
-                        ['1. FORMAT & STRUKTUR FILE:'],
-                        ['   - Baris 1 adalah HEADER KOLOM — JANGAN ubah nama atau urutan kolom.'],
-                        ['   - Untuk data sangat banyak (> 5.000 baris), disarankan simpan/upload dalam format CSV agar proses super cepat.'],
-                        ['   - Sistem mendukung hingga 50.000 baris per file dengan pemrosesan otomatis di latar belakang (background queue).'],
+                        ['1. METODE PENGISIAN TINGGAL PILIH (DROPDOWN):'],
+                        ['   - Kolom satuan, kategori, brand part, merk_hp, kualitas, kondisi, dan sn memiliki DROPDOWN pilihan.'],
+                        ['   - Anda cukup klik panah dropdown di masing-masing sel untuk memilih nilai resmi tanpa perlu mengetik manual.'],
                         [''],
-                        ['2. KOLOM WAJIB:'],
-                        ['   - sku: Kode unik produk (cth: LCD-IP13-ORI). Harus unik dan tidak boleh ada di database.'],
-                        ['   - nama: Nama lengkap produk / sparepart (cth: LCD iPhone 13 Original).'],
-                        ['   - satuan: Satuan unit produk, harus terdaftar di sistem (cth: pcs, box, unit, set, roll, meter, botol).'],
-                        ['   - harga_beli: Harga modal / HPP (angka tanpa titik/koma ribuan, cth: 850000).'],
-                        ['   - harga_jual: Harga jual retail untuk konsumen umum (cth: 1250000).'],
+                        ['2. KOMPATIBILITAS TIPE HP (MUDAH & FLEKSIBEL):'],
+                        ['   - merk_hp: Pilih merk smartphone dari dropdown (cth: Samsung, Apple, Xiaomi).'],
+                        ['   - tipe_hp: Tuliskan model handphone. Jika satu sparepart cocok untuk banyak tipe, CUKUP PISAHKAN DENGAN KOMA.'],
+                        ['     Contoh: A11, A15, M11 (Sistem otomatis memasangkannya dengan merk_hp yang dipilih).'],
+                        ['   - Jika sparepart multi-brand (misal IC universal), Anda bisa menuliskan merk lengkap: "Samsung A11; Xiaomi Redmi 9".'],
                         [''],
-                        ['3. KOLOM OPSIONAL & HARGA TIER:'],
-                        ['   - barcode: Kode barcode fisik / scan (unik jika diisi).'],
-                        ['   - kategori: Kategori produk (cth: LCD & Touchscreen, Baterai, IC & Chipset, Aksesoris HP). Dibuat otomatis jika baru.'],
-                        ['   - brand: Brand sparepart / merk produk (cth: Apple, Samsung, OG, Crown). Dibuat otomatis jika baru.'],
-                        ['   - kualitas: Grade kualitas (cth: Original, Grade A, Grade B, Refurbished). Dibuat otomatis jika baru.'],
-                        ['   - kondisi: baru / oem / compatible (default: baru jika dikosongkan).'],
-                        ['   - harga_reseller: Nominal harga khusus pelanggan reseller (opsional).'],
-                        ['   - harga_agen: Nominal harga khusus pelanggan agen/grosir (opsional).'],
+                        ['3. PRODUK SUBSTITUSI / KOMPATIBEL ANTAR PRODUK:'],
+                        ['   - produk_kompatibel_sku: Masukkan SKU produk pengganti jika barang ini kosong.'],
+                        ['     Contoh: Masukkan "LCD-A11-OG, LCD-A11-BRD". Sistem akan otomatis menautkannya secara 2 arah.'],
                         [''],
-                        ['4. PENGADAAN & SERIAL NUMBER:'],
-                        ['   - min_stock: Batas minimum pengaman stok di gudang (pemicu stok menipis).'],
-                        ['   - reorder_point: Titik ROP pengadaan otomatis untuk kelas fast moving.'],
-                        ['   - sn: Isi "ya" atau "1" jika produk wajib scan serial number/SN (kartu garansi anti-fraud). Dikosongkan jika tidak.'],
+                        ['4. JIKA ADA MERK ATAU TIPE HP BARU YANG BELUM ADA DI SISTEM:'],
+                        ['   - Jangan khawatir! Buka Sheet "Tambah Tipe Baru", tuliskan merk dan model baru tersebut di sana.'],
+                        ['   - Saat di-import, sistem otomatis mendaftarkan master Tipe HP baru tersebut tanpa terjadi error!'],
                         [''],
-                        ['5. STOK AWAL & GUDANG (Hanya untuk Inisialisasi Master):'],
-                        ['   - stok_awal: Jumlah saldo awal saat setup produk (default 0).'],
-                        ['   - gudang_id & rak_id: ID gudang dan rak penempatan (wajib diisi bila stok_awal > 0).'],
-                        ['   - Catatan: Stok awal otomatis membuat mutasi saldo awal dan jurnal akuntansi 130-01 / 310-01.'],
-                        ['   - Pembelian barang masuk harian tetap dilakukan melalui menu PO Supplier & GRN.'],
-                        [''],
-                        ['6. KOMPATIBILITAS & MEDIA:'],
-                        ['   - tipe_hp: Tipe handphone yang cocok (cth: "Apple iPhone 13" atau beberapa dipisah titik-koma: "Apple iPhone 13; Apple iPhone 14").'],
-                        ['   - deskripsi: Keterangan / spesifikasi lengkap sparepart.'],
-                        ['   - foto_url: URL foto produk (jika ada).'],
+                        ['5. PENCEGAHAN TYPO OTOMATIS:'],
+                        ['   - Sistem dilengkapi Auto-Fuzzy Matcher: jika terjadi salah ketik kecil (cth: "Samsng" atau "ip 11"),'],
+                        ['     sistem otomatis menormalkan ke data resmi yang tepat tanpa mengotori database master.'],
                     ]);
                 }
             },

@@ -77,8 +77,11 @@ class WmsImportTemplateDownloadTest extends TestCase
         $path = $response->baseResponse->getFile()->getPathname();
 
         $workbook = IOFactory::load($path);
-        $this->assertSame(2, $workbook->getSheetCount());
+        $this->assertSame(4, $workbook->getSheetCount());
         $this->assertSame('Template Produk', $workbook->getSheet(0)->getTitle());
+        $this->assertSame('Tambah Tipe Baru', $workbook->getSheet(1)->getTitle());
+        $this->assertSame('Referensi Sistem', $workbook->getSheet(2)->getTitle());
+        $this->assertSame('Petunjuk', $workbook->getSheet(3)->getTitle());
 
         // Header sheet 1 harus = kolom yang diterima ImportProdukService.
         $header = array_values(array_filter(
