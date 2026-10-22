@@ -367,4 +367,192 @@ class MasterProdukManagementTest extends TestCase
         $this->assertTrue($produksSamsung->pluck('id')->contains($pSamsung->id));
         $this->assertFalse($produksSamsung->pluck('id')->contains($pMulti->id));
     }
+
+    public function test_simpan_dan_edit_produk_otomatis_sinkron_kecocokan_tipe_hp(): void
+    {
+        $this->authedAdmin();
+        $th = TipeHp::create(['merk' => 'Xiaomi', 'model' => 'Redmi Note 10', 'is_active' => true]);
+
+        // Simpan produk baru hanya dengan memilih tipe_hp_ids (tanpa ketik manual brand/model)
+        $tab = Livewire::test(ProdukTab::class)
+            ->set('produkForm.nama', 'Baterai BN59 Redmi Note 10')
+            ->set('produkForm.harga_beli', 45000)
+            ->set('produkForm.harga_jual_retail', 85000)
+            ->set('produkForm.tipe_hp_ids', [$th->id])
+            ->call('simpanProduk')
+            ->assertHasNoErrors();
+
+        $prod = Produk::where('nama', 'Baterai BN59 Redmi Note 10')->first();
+        $this->assertNotNull($prod);
+        $this->assertEquals('Xiaomi', $prod->brand_kompatibel);
+        $this->assertEquals('Redmi Note 10', $prod->model_kompatibel);
+        $this->assertTrue($prod->tipeHps->pluck('id')->contains($th->id));
+
+        // Edit produk: tambahkan tipe HP kedua (Poco M3)
+        $th2 = TipeHp::create(['merk' => 'Poco', 'model' => 'M3', 'is_active' => true]);
+
+        Livewire::test(ProdukTab::class)
+            ->call('openEditProdukModal', $prod->id)
+            ->set('editProdukForm.tipe_hp_ids', [$th->id, $th2->id])
+            ->call('simpanEditProduk')
+            ->assertHasNoErrors();
+
+        $prodFresh = $prod->fresh();
+        $this->assertCount(2, $prodFresh->tipeHps);
+        $this->assertTrue($prodFresh->tipeHps->pluck('id')->contains($th2->id));
+    }
+
+    public function test_pemisahan_merek_dan_tipe_hp_serta_pencegahan_duplikat_kompatibel(): void
+    {
+        $this->authedAdmin();
+
+        $oppo1 = TipeHp::create(['merk' => 'Oppo', 'model' => 'A15', 'is_active' => true]);
+        $oppo2 = TipeHp::create(['merk' => 'Oppo', 'model' => 'A16', 'is_active' => true]);
+        $vivo = TipeHp::create(['merk' => 'Vivo', 'model' => 'Y12', 'is_active' => true]);
+
+        $component = Livewire::test(ProdukTab::class)
+            ->call('openProdukModal')
+            ->set('kompatibelMerekHp', 'Oppo');
+
+        // Pilihan tipe HP hanya menampilkan model Oppo
+        $createOpts = $component->viewData('tipeHpCreateOptions');
+        $this->assertTrue($createOpts->pluck('id')->contains($oppo1->id));
+        $this->assertTrue($createOpts->pluck('id')->contains($oppo2->id));
+        $this->assertFalse($createOpts->pluck('id')->contains($vivo->id));
+
+        // Tambah Oppo A15
+        $component->set('kompatibelTipeHpId', $oppo1->id)
+            ->call('tambahKompatibelKeForm', 'create')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
+
+        $this->assertEquals([$oppo1->id], $component->get('produkForm.tipe_hp_ids'));
+
+        // Coba tambah Oppo A15 lagi (duplikat) -> harus ditolak & tidak boleh dobel
+        $component->set('kompatibelTipeHpId', $oppo1->id)
+            ->call('tambahKompatibelKeForm', 'create')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'warning' && str_contains($params[0]['message'] ?? '', 'sudah ada'));
+
+        $this->assertEquals([$oppo1->id], $component->get('produkForm.tipe_hp_ids'));
+
+        // Tambah tipe kedua: Oppo A16
+        $component->set('kompatibelTipeHpId', $oppo2->id)
+            ->call('tambahKompatibelKeForm', 'create');
+
+        $this->assertEquals([$oppo1->id, $oppo2->id], $component->get('produkForm.tipe_hp_ids'));
+
+        // Hapus salah satu tipe
+        $component->call('hapusKompatibelDariForm', $oppo1->id, 'create');
+        $this->assertEquals([$oppo2->id], $component->get('produkForm.tipe_hp_ids'));
+    }
+
+    public function test_fitur_warna_dan_keterangan_status_kondisi_sid_retail_pro(): void
+    {
+        $this->authedAdmin();
+
+        $component = Livewire::test(ProdukTab::class);
+        $kondisiList = collect($component->viewData('kondisiList'));
+
+        $baru = $kondisiList->firstWhere('kode', 'baru');
+        $this->assertNotNull($baru);
+        $this->assertEquals('emerald', $baru['warna']);
+        $this->assertStringContainsString('Segel Pabrik', $baru['keterangan']);
+
+        $oem = $kondisiList->firstWhere('kode', 'oem');
+        $this->assertNotNull($oem);
+        $this->assertEquals('blue', $oem['warna']);
+        $this->assertStringContainsString('Original Equipment Manufacturer', $oem['keterangan']);
+
+        $bekas = $kondisiList->firstWhere('kode', 'bekas');
+        $this->assertNotNull($bekas);
+        $this->assertEquals('amber', $bekas['warna']);
+        $this->assertStringContainsString('Copotan', $bekas['keterangan']);
+    }
+
+    public function test_quick_add_tipe_hp_dengan_dropdown_merk_dan_model_tersedia_atau_isi_baru(): void
+    {
+        $this->authedAdmin();
+
+        TipeHp::create(['merk' => 'Infinix', 'model' => 'Hot 10', 'is_active' => true]);
+
+        $component = Livewire::test(ProdukTab::class)
+            ->call('openProdukModal')
+            ->call('openQuickAdd', 'tipe_hp')
+            ->assertSet('showQuickAddModal', true)
+            ->assertSet('quickAddTipe', 'tipe_hp')
+            // 1. Pilih merk yang sudah ada dari dropdown
+            ->set('quickAddSelectedMerk', 'Infinix');
+
+        $models = $component->viewData('quickAddExistingModels');
+        $this->assertContains('Hot 10', $models);
+
+        // 2. Isi model baru yang belum ada di list
+        $component->set('quickAddForm.model', 'Hot 20 5G')
+            ->call('simpanQuickAdd')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success')
+            ->assertSet('showQuickAddModal', false);
+
+        $newTipe = TipeHp::where('merk', 'Infinix')->where('model', 'Hot 20 5G')->first();
+        $this->assertNotNull($newTipe);
+
+        // Otomatis terpasang ke produkForm.tipe_hp_ids
+        $this->assertContains($newTipe->id, $component->get('produkForm.tipe_hp_ids'));
+    }
+
+    public function test_menu_pengaturan_sinkronisasi_brand_part_kondisi_sid_retail_pro_dan_tipe_hp(): void
+    {
+        $this->authedAdmin();
+
+        TipeHp::firstOrCreate(['merk' => 'Google', 'model' => 'Pixel 7'], ['is_active' => true]);
+
+        $comp = Livewire::test(SettingsRbac::class, ['activeTab' => 'master_produk'])
+            ->set('masterProdukSubTab', 'brand')
+            ->assertSee('Brand Part')
+            // Test CRUD Brand Part
+            ->call('openBrandModal')
+            ->assertSet('showBrandModal', true)
+            ->set('brandForm.nama', 'Olike Indonesia')
+            ->set('brandForm.keterangan', 'Distributor aksesoris & sparepart')
+            ->call('simpanBrand')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success')
+            ->assertSet('showBrandModal', false);
+
+        $this->assertDatabaseHas('brands', ['nama' => 'Olike Indonesia']);
+
+        // Test Kondisi Produk gaya SID Retail Pro
+        $comp->set('masterProdukSubTab', 'kondisi')
+            ->call('openKondisiModal')
+            ->assertSet('showKondisiModal', true)
+            ->set('kondisiForm.nama', 'Refurbished Grade A')
+            ->set('kondisiForm.warna', 'rose')
+            ->set('kondisiForm.keterangan', 'Unit rekondisi pabrik bergaransi')
+            ->call('simpanKondisi')
+            ->assertSet('showKondisiModal', false);
+
+        $kondisiList = $comp->viewData('kondisiList');
+        $refurb = collect($kondisiList)->firstWhere('nama', 'Refurbished Grade A');
+        $this->assertNotNull($refurb);
+        $this->assertEquals('rose', $refurb['warna']);
+        $this->assertEquals('#ef4444', $refurb['hex']);
+
+        // Test Modal Tipe HP Cascading di Pengaturan
+        $comp->set('masterProdukSubTab', 'tipe_hp')
+            ->call('openTipeHpModal')
+            ->assertSet('showTipeHpModal', true)
+            // Pilih merk Google yang ada
+            ->set('tipeHpSelectedMerk', 'Google');
+
+        $models = $comp->viewData('existingModelsForSelectedMerk');
+        $this->assertContains('Pixel 7', $models);
+
+        // Isi model Pixel 8 Pro
+        $comp->set('tipeHpForm.model', 'Pixel 8 Pro')
+            ->call('simpanTipeHp')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success')
+            ->assertSet('showTipeHpModal', false);
+
+        $this->assertDatabaseHas('tipe_hp', [
+            'merk' => 'Google',
+            'model' => 'Pixel 8 Pro',
+        ]);
+    }
 }

@@ -648,9 +648,13 @@ class SettingsRbac extends Component
 
     public bool $showKondisiModal = false;
 
-    public array $kondisiForm = ['kode' => '', 'nama' => '', 'is_active' => true, 'is_edit' => false];
+    public array $kondisiForm = ['kode' => '', 'nama' => '', 'warna' => 'emerald', 'hex' => '#10b981', 'keterangan' => '', 'is_active' => true, 'is_edit' => false];
 
     public bool $showTipeHpModal = false;
+
+    public ?string $tipeHpSelectedMerk = '';
+
+    public ?string $tipeHpSelectedModel = '';
 
     public array $tipeHpForm = ['id' => null, 'merk' => '', 'model' => '', 'nama' => '', 'is_active' => true];
 
@@ -1935,6 +1939,9 @@ class SettingsRbac extends Component
                 $this->kondisiForm = [
                     'kode' => $item['kode'],
                     'nama' => $item['nama'],
+                    'warna' => $item['warna'] ?? 'emerald',
+                    'hex' => $item['hex'] ?? '#10b981',
+                    'keterangan' => $item['keterangan'] ?? '',
                     'is_active' => (bool) ($item['is_active'] ?? true),
                     'is_edit' => true,
                 ];
@@ -1943,6 +1950,9 @@ class SettingsRbac extends Component
             $this->kondisiForm = [
                 'kode' => '',
                 'nama' => '',
+                'warna' => 'emerald',
+                'hex' => '#10b981',
+                'keterangan' => '',
                 'is_active' => true,
                 'is_edit' => false,
             ];
@@ -1960,6 +1970,19 @@ class SettingsRbac extends Component
             'kondisiForm.nama' => 'required|string|max:100',
         ]);
 
+        $warnaMap = [
+            'emerald' => '#10b981',
+            'blue' => '#3b82f6',
+            'cyan' => '#06b6d4',
+            'amber' => '#f59e0b',
+            'rose' => '#ef4444',
+            'purple' => '#a855f7',
+            'slate' => '#64748b',
+        ];
+        $warna = $this->kondisiForm['warna'] ?? 'emerald';
+        $hex = $warnaMap[$warna] ?? ($this->kondisiForm['hex'] ?? '#10b981');
+        $keterangan = trim($this->kondisiForm['keterangan'] ?? '');
+
         $list = $this->getKondisiList();
         $nama = trim($this->kondisiForm['nama']);
         $kode = $this->kondisiForm['is_edit']
@@ -1970,6 +1993,9 @@ class SettingsRbac extends Component
         foreach ($list as &$item) {
             if ($item['kode'] === $kode) {
                 $item['nama'] = $nama;
+                $item['warna'] = $warna;
+                $item['hex'] = $hex;
+                $item['keterangan'] = $keterangan;
                 $item['is_active'] = (bool) $this->kondisiForm['is_active'];
                 $ada = true;
                 break;
@@ -1979,6 +2005,9 @@ class SettingsRbac extends Component
             $list[] = [
                 'kode' => $kode,
                 'nama' => $nama,
+                'warna' => $warna,
+                'hex' => $hex,
+                'keterangan' => $keterangan,
                 'is_active' => (bool) $this->kondisiForm['is_active'],
             ];
         }
@@ -1994,7 +2023,7 @@ class SettingsRbac extends Component
             null,
             "Kondisi produk '{$kode}' ({$nama}) disimpan",
             null,
-            ['kode' => $kode, 'nama' => $nama, 'is_active' => (bool) $this->kondisiForm['is_active']]
+            ['kode' => $kode, 'nama' => $nama, 'warna' => $warna, 'keterangan' => $keterangan, 'is_active' => (bool) $this->kondisiForm['is_active']]
         );
 
         $this->showKondisiModal = false;
@@ -2088,14 +2117,30 @@ class SettingsRbac extends Component
         $config = app(KonfigurasiService::class);
         $saved = $config->get('master_produk_kondisi_list');
 
+        $defaultKondisi = [
+            ['kode' => 'baru', 'nama' => 'Baru', 'warna' => 'emerald', 'hex' => '#10b981', 'keterangan' => 'Baru (Segel Pabrik / Fresh Stock)', 'is_active' => true],
+            ['kode' => 'oem', 'nama' => 'OEM', 'warna' => 'blue', 'hex' => '#3b82f6', 'keterangan' => 'OEM (Original Equipment Manufacturer)', 'is_active' => true],
+            ['kode' => 'compatible', 'nama' => 'Compatible', 'warna' => 'cyan', 'hex' => '#06b6d4', 'keterangan' => 'Compatible (Part Pihak Ketiga Berkualitas)', 'is_active' => true],
+            ['kode' => 'bekas', 'nama' => 'Bekas / Copotan', 'warna' => 'amber', 'hex' => '#f59e0b', 'keterangan' => 'Bekas / Copotan Unit Mesin Normal', 'is_active' => true],
+            ['kode' => 'rusak', 'nama' => 'Rusak / Kanibal', 'warna' => 'rose', 'hex' => '#ef4444', 'keterangan' => 'Rusak / Bahan Kanibal Part Teknisi', 'is_active' => true],
+        ];
+
+        $defMap = collect($defaultKondisi)->keyBy('kode');
+
         return (is_array($saved) && ! empty($saved))
-            ? $saved
-            : [
-                ['kode' => 'baru', 'nama' => 'Baru', 'is_active' => true],
-                ['kode' => 'oem', 'nama' => 'OEM', 'is_active' => true],
-                ['kode' => 'compatible', 'nama' => 'Compatible', 'is_active' => true],
-                ['kode' => 'bekas', 'nama' => 'Bekas / Copotan', 'is_active' => true],
-            ];
+            ? array_values(array_map(function ($k) use ($defMap) {
+                $def = $defMap->get($k['kode'] ?? '');
+
+                return [
+                    'kode' => $k['kode'] ?? 'baru',
+                    'nama' => $k['nama'] ?? 'Baru',
+                    'warna' => $k['warna'] ?? ($def['warna'] ?? 'emerald'),
+                    'hex' => $k['hex'] ?? ($def['hex'] ?? '#10b981'),
+                    'keterangan' => $k['keterangan'] ?? ($def['keterangan'] ?? 'Kondisi Suku Cadang'),
+                    'is_active' => (bool) ($k['is_active'] ?? true),
+                ];
+            }, $saved))
+            : $defaultKondisi;
     }
 
     // 6. Tipe HP
@@ -2114,16 +2159,47 @@ class SettingsRbac extends Component
                 'nama' => $t->nama ?? '',
                 'is_active' => (bool) $t->is_active,
             ];
+            $this->tipeHpSelectedMerk = $t->merk;
+            $this->tipeHpSelectedModel = $t->model;
         } else {
             $this->tipeHpForm = ['id' => null, 'merk' => '', 'model' => '', 'nama' => '', 'is_active' => true];
+            $this->tipeHpSelectedMerk = '';
+            $this->tipeHpSelectedModel = '';
         }
         $this->showTipeHpModal = true;
+    }
+
+    public function updatedTipeHpSelectedMerk($value): void
+    {
+        if ($value && $value !== '__custom__') {
+            $this->tipeHpForm['merk'] = $value;
+        } elseif ($value === '__custom__') {
+            $this->tipeHpForm['merk'] = '';
+        }
+        $this->tipeHpSelectedModel = '';
+        $this->tipeHpForm['model'] = '';
+    }
+
+    public function updatedTipeHpSelectedModel($value): void
+    {
+        if ($value && $value !== '__custom__') {
+            $this->tipeHpForm['model'] = $value;
+        } elseif ($value === '__custom__') {
+            $this->tipeHpForm['model'] = '';
+        }
     }
 
     public function simpanTipeHp(): void
     {
         if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola tipe HP.')) {
             return;
+        }
+
+        if (! empty($this->tipeHpSelectedMerk) && $this->tipeHpSelectedMerk !== '__custom__' && empty($this->tipeHpForm['merk'])) {
+            $this->tipeHpForm['merk'] = $this->tipeHpSelectedMerk;
+        }
+        if (! empty($this->tipeHpSelectedModel) && $this->tipeHpSelectedModel !== '__custom__' && empty($this->tipeHpForm['model'])) {
+            $this->tipeHpForm['model'] = $this->tipeHpSelectedModel;
         }
 
         $this->validate([
@@ -2268,6 +2344,17 @@ class SettingsRbac extends Component
             'satuanList' => SatuanUnit::orderBy('kode')->get(),
             'kondisiList' => $this->getKondisiList(),
             'tipeHpList' => TipeHp::withCount('produk')->orderBy('merk')->orderBy('model')->get(),
+            'merekHpOptions' => TipeHp::where('is_active', true)->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all(),
+            'existingModelsForSelectedMerk' => (! empty($this->tipeHpForm['merk']) && $this->tipeHpForm['merk'] !== '__custom__')
+                ? TipeHp::where('is_active', true)
+                    ->where('merk', $this->tipeHpForm['merk'])
+                    ->distinct()
+                    ->orderBy('model')
+                    ->pluck('model')
+                    ->filter()
+                    ->values()
+                    ->all()
+                : [],
         ])->layout('layouts.backoffice', ['header' => 'Pengaturan & RBAC']);
     }
 }

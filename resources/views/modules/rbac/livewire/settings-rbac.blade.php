@@ -9,7 +9,7 @@
             { id: 'cabang', label: 'Cabang, Gudang & Rak Part', subModul: 'akses', tab: 'cabang', subTab: null, icon: '🏬', group: 'Akses & Organisasi', desc: 'Lokasi cabang toko fisik, mapping gudang dan kode nomor rak', keywords: 'cabang toko gudang warehouse rak lokasi penyimpanan bin' },
 
             { id: 'kategori', label: 'Kategori Produk Hierarkis', subModul: 'katalog', tab: 'master_produk', subTab: 'kategori', icon: '🗂️', group: 'Katalog & Master Produk', desc: 'Struktur pohon kategori induk dan sub-kategori sparepart', keywords: 'kategori subkategori grup kelompok jenis produk part' },
-            { id: 'brand', label: 'Brand & Merek Sparepart', subModul: 'katalog', tab: 'master_produk', subTab: 'brand', icon: '🏷️', group: 'Katalog & Master Produk', desc: 'Daftar pabrikan dan merek sparepart HP', keywords: 'brand merk merek pabrikan vendor produsen' },
+            { id: 'brand', label: 'Brand Part Sparepart', subModul: 'katalog', tab: 'master_produk', subTab: 'brand', icon: '🏷️', group: 'Katalog & Master Produk', desc: 'Daftar pabrikan dan produsen sparepart suku cadang (Brand Part)', keywords: 'brand part merek pabrikan vendor produsen sparepart' },
             { id: 'kualitas', label: 'Tingkat Kualitas (Grade)', subModul: 'katalog', tab: 'master_produk', subTab: 'kualitas', icon: '⭐', group: 'Katalog & Master Produk', desc: 'Grade kualitas: Original, OEM, High Copy, Copotan', keywords: 'kualitas grade ori original oem grade copy kw kualitas' },
             { id: 'satuan', label: 'Satuan Unit Produk', subModul: 'katalog', tab: 'master_produk', subTab: 'satuan', icon: '📏', group: 'Katalog & Master Produk', desc: 'Pcs, Set, Rol, Box, Lembar, Strip', keywords: 'satuan unit pcs pieces pack dus box meter' },
             { id: 'kondisi', label: 'Kondisi Fisik Barang', subModul: 'katalog', tab: 'master_produk', subTab: 'kondisi', icon: '🔄', group: 'Katalog & Master Produk', desc: 'Kondisi Baru, Refurbished, Bekas / Copotan normal', keywords: 'kondisi baru bekas second copotan refurbished reject' },
@@ -362,20 +362,20 @@
             </div>
 
             <!-- Tab Action Button: Responsive placement, never overlaps -->
-            <div class="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-end">
+            <div class="flex flex-wrap items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-start sm:justify-end">
                 @if($activeTab === 'users')
                     <button wire:click="openUserModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ User Baru</button>
                 @elseif($activeTab === 'role')
                     <button wire:click="openRoleModal" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Role Baru</button>
                 @elseif($activeTab === 'cabang')
-                    <button wire:click="openCabangModal()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Cabang</button>
-                    <button wire:click="openGudangModal()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Gudang</button>
-                    <button wire:click="openRakModal()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/10 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Rak</button>
+                    <button wire:click="openCabangModal()" class="flex-1 sm:flex-initial min-w-[90px] px-3.5 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Cabang</button>
+                    <button wire:click="openGudangModal()" class="flex-1 sm:flex-initial min-w-[90px] px-3.5 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Gudang</button>
+                    <button wire:click="openRakModal()" class="flex-1 sm:flex-initial min-w-[80px] px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/10 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Rak</button>
                 @elseif($activeTab === 'master_produk')
                     @if($masterProdukSubTab === 'kategori')
                         <button wire:click="openKategoriModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kategori Baru</button>
                     @elseif($masterProdukSubTab === 'brand')
-                        <button wire:click="openBrandModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Brand Baru</button>
+                        <button wire:click="openBrandModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Brand Part Baru</button>
                     @elseif($masterProdukSubTab === 'kualitas')
                         <button wire:click="openKualitasModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kualitas Baru</button>
                     @elseif($masterProdukSubTab === 'satuan')
@@ -1300,7 +1300,7 @@
             <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-2 border-b border-black/10 dark:border-white/5 scrollbar-none scroll-smooth touch-pan-x flex-nowrap">
                 @foreach([
                     'kategori' => ['icon' => '🗂️', 'label' => 'Kategori Hierarkis', 'count' => count($kategoriList)],
-                    'brand' => ['icon' => '🏷️', 'label' => 'Brand Produk', 'count' => count($brandList)],
+                    'brand' => ['icon' => '🏷️', 'label' => 'Brand Part', 'count' => count($brandList)],
                     'kualitas' => ['icon' => '⭐', 'label' => 'Tingkat Kualitas', 'count' => count($kualitasList)],
                     'satuan' => ['icon' => '📏', 'label' => 'Satuan Unit', 'count' => count($satuanList)],
                     'kondisi' => ['icon' => '🔄', 'label' => 'Kondisi Produk', 'count' => count($kondisiList)],
@@ -1381,14 +1381,14 @@
                     </x-prism.dual-scroll>
                 </x-prism.glass-card>
 
-            <!-- SUB-TAB 2: BRAND -->
+            <!-- SUB-TAB 2: BRAND PART -->
             @elseif($masterProdukSubTab === 'brand')
-                <x-prism.glass-card title="Master Brand Produk" subtitle="Kelola merek produk suku cadang dan aksesoris">
+                <x-prism.glass-card title="Master Brand Part (Pabrikan Sparepart)" subtitle="Kelola merk pabrikan suku cadang (Brand Part) seperti Olike, Hippo, Shinetsu, Vizz, dll">
                     <x-prism.dual-scroll>
                         <table class="w-full text-left text-xs text-ink-200">
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
-                                    <th class="py-2.5 px-3">Nama Brand</th>
+                                    <th class="py-2.5 px-3">Nama Brand Part</th>
                                     <th class="py-2.5 px-3">Keterangan</th>
                                     <th class="py-2.5 px-3 text-center">Jml Produk</th>
                                     <th class="py-2.5 px-3 text-center">Status</th>
@@ -1410,12 +1410,12 @@
                                         </td>
                                         <td class="py-2.5 px-3 text-right space-x-2">
                                             <button wire:click="openBrandModal({{ $b->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                            <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan brand ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                            <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan brand part ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="py-6 text-center text-ink-500">Belum ada data brand produk.</td>
+                                        <td colspan="5" class="py-6 text-center text-ink-500">Belum ada data brand part.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -1505,22 +1505,49 @@
 
             <!-- SUB-TAB 5: KONDISI -->
             @elseif($masterProdukSubTab === 'kondisi')
-                <x-prism.glass-card title="Master Opsi Kondisi Produk" subtitle="Opsi kondisi barang yang muncul pada form registrasi dan katalog">
+                <x-prism.glass-card title="Master Opsi Kondisi Produk (Gaya SID Retail Pro)" subtitle="Klasifikasi kondisi fisik suku cadang berindikator warna visual untuk kemudahan kasir & gudang">
                     <x-prism.dual-scroll>
                         <table class="w-full text-left text-xs text-ink-200">
                             <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                 <tr>
-                                    <th class="py-2.5 px-3">Kode Internal</th>
+                                    <th class="py-2.5 px-3">Kode</th>
                                     <th class="py-2.5 px-3">Nama Label Kondisi</th>
+                                    <th class="py-2.5 px-3">Indikator Warna</th>
+                                    <th class="py-2.5 px-3">Keterangan / Karakteristik</th>
                                     <th class="py-2.5 px-3 text-center">Status</th>
                                     <th class="py-2.5 px-3 text-right">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5">
                                 @forelse($kondisiList as $c)
+                                    @php
+                                        $warna = $c['warna'] ?? 'emerald';
+                                        $hex = $c['hex'] ?? '#10b981';
+                                        $badgeClasses = match($warna) {
+                                            'emerald' => 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                                            'blue' => 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+                                            'cyan' => 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+                                            'amber' => 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                                            'rose' => 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+                                            'purple' => 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+                                            default => 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+                                        };
+                                    @endphp
                                     <tr class="hover:bg-white/[0.02] transition-colors">
                                         <td class="py-2.5 px-3 font-mono text-ink-400">{{ $c['kode'] }}</td>
-                                        <td class="py-2.5 px-3 font-bold text-white">{{ $c['nama'] }}</td>
+                                        <td class="py-2.5 px-3 font-bold text-white">
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border {{ $badgeClasses }}">
+                                                <span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: {{ $hex }}"></span>
+                                                <span>{{ $c['nama'] }}</span>
+                                            </span>
+                                        </td>
+                                        <td class="py-2.5 px-3">
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm" style="background-color: {{ $hex }}"></span>
+                                                <span class="font-mono text-[11px] text-ink-300">{{ ucfirst($warna) }} ({{ $hex }})</span>
+                                            </div>
+                                        </td>
+                                        <td class="py-2.5 px-3 text-ink-300 text-[11px] max-w-xs">{{ $c['keterangan'] ?? '—' }}</td>
                                         <td class="py-2.5 px-3 text-center">
                                             <button wire:click="toggleKondisiStatus('{{ $c['kode'] }}')" class="cursor-pointer">
                                                 <x-prism.status-pill :status="($c['is_active'] ?? true) ? 'active' : 'inactive'" :label="($c['is_active'] ?? true) ? 'Aktif' : 'Nonaktif'" />
@@ -1533,7 +1560,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="py-6 text-center text-ink-500">Belum ada opsi kondisi.</td>
+                                        <td colspan="6" class="py-6 text-center text-ink-500">Belum ada opsi kondisi.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -2094,33 +2121,34 @@
         </div>
     @endif
 
-    <!-- MODAL: BRAND PRODUK -->
+    <!-- MODAL: BRAND PART -->
     @if($showBrandModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-base font-bold text-white">{{ $brandForm['id'] ? 'Edit Brand' : 'Brand Baru' }}</h3>
+                    <h3 class="text-base font-bold text-white">{{ $brandForm['id'] ? 'Edit Brand Part' : 'Brand Part Baru' }}</h3>
                     <button wire:click="$set('showBrandModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Brand *</label>
-                        <input type="text" wire:model="brandForm.nama" placeholder="cth: Apple, Samsung, Xiaomi..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Brand Part *</label>
+                        <input type="text" wire:model="brandForm.nama" placeholder="cth: Olike, Hippo, Vizz, Shinetsu, Original Equipment..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                         @error('brandForm.nama') <span class="text-up-red text-[10px] mt-1">{{ $message }}</span> @enderror
+                        <p class="text-[10px] text-ink-400 mt-1">Merek pabrikan suku cadang/sparepart. Untuk merek HP (Apple, Samsung, dll) dikelola di tab Tipe HP.</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Keterangan (Opsional)</label>
-                        <textarea wire:model="brandForm.keterangan" rows="2" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
+                        <textarea wire:model="brandForm.keterangan" rows="2" placeholder="cth: Distributor resmi baterai & kabel garansi 6 bulan" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs"></textarea>
                     </div>
                     <div>
                         <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer pt-1">
-                            <input type="checkbox" wire:model="brandForm.is_active" class="accent-up-mint w-4 h-4" /> Brand Aktif
+                            <input type="checkbox" wire:model="brandForm.is_active" class="accent-up-mint w-4 h-4" /> Brand Part Aktif
                         </label>
                     </div>
                 </div>
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
                     <button wire:click="$set('showBrandModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
-                    <button wire:click="simpanBrand" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan Brand</button>
+                    <button wire:click="simpanBrand" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan Brand Part</button>
                 </div>
             </div>
         </div>
@@ -2198,26 +2226,88 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-base font-bold text-white">{{ $kondisiForm['is_edit'] ? 'Edit Kondisi Produk' : 'Kondisi Produk Baru' }}</h3>
+                    <h3 class="text-base font-bold text-white">{{ $kondisiForm['is_edit'] ? 'Edit Kondisi Produk' : 'Kondisi Produk Baru (Gaya SID Retail Pro)' }}</h3>
                     <button wire:click="$set('showKondisiModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
-                <div class="space-y-3">
+                <div class="space-y-3.5">
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Label Kondisi *</label>
-                        <input type="text" wire:model="kondisiForm.nama" placeholder="cth: Baru, OEM, Copotan Original..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <input type="text" wire:model.live="kondisiForm.nama" placeholder="cth: Baru, OEM, Copotan Original, Rusak Kanibal..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                         @error('kondisiForm.nama') <span class="text-up-red text-[10px] mt-1">{{ $message }}</span> @enderror
                     </div>
+
+                    <!-- Indikator Warna Visual Gaya SID Retail Pro -->
+                    <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+                        <label class="block text-xs font-semibold text-white">Warna Indikator Visual (SID Retail Pro)</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            @foreach([
+                                'emerald' => ['nama' => 'Hijau', 'hex' => '#10b981'],
+                                'blue' => ['nama' => 'Biru', 'hex' => '#3b82f6'],
+                                'cyan' => ['nama' => 'Cyan', 'hex' => '#06b6d4'],
+                                'amber' => ['nama' => 'Amber', 'hex' => '#f59e0b'],
+                                'rose' => ['nama' => 'Merah', 'hex' => '#ef4444'],
+                                'purple' => ['nama' => 'Ungu', 'hex' => '#a855f7'],
+                                'slate' => ['nama' => 'Abu-abu', 'hex' => '#64748b'],
+                            ] as $wKey => $wVal)
+                                <button
+                                    type="button"
+                                    wire:click="$set('kondisiForm.warna', '{{ $wKey }}')"
+                                    class="p-1.5 rounded-xl border flex flex-col items-center gap-1 transition cursor-pointer {{ ($kondisiForm['warna'] ?? 'emerald') === $wKey ? 'bg-white/15 border-white ring-2 ring-white/30' : 'bg-white/5 border-white/10 hover:bg-white/10' }}"
+                                >
+                                    <span class="w-4 h-4 rounded-full shadow-sm" style="background-color: {{ $wVal['hex'] }}"></span>
+                                    <span class="text-[10px] font-medium text-ink-300">{{ $wVal['nama'] }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+
+                        <!-- Live Preview Badge -->
+                        <div class="pt-2 border-t border-white/5 flex items-center justify-between">
+                            <span class="text-[11px] text-ink-400">Preview Tampilan Badge:</span>
+                            @php
+                                $prevWarna = $kondisiForm['warna'] ?? 'emerald';
+                                $prevHex = match($prevWarna) {
+                                    'emerald' => '#10b981',
+                                    'blue' => '#3b82f6',
+                                    'cyan' => '#06b6d4',
+                                    'amber' => '#f59e0b',
+                                    'rose' => '#ef4444',
+                                    'purple' => '#a855f7',
+                                    default => '#64748b',
+                                };
+                                $prevClasses = match($prevWarna) {
+                                    'emerald' => 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                                    'blue' => 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+                                    'cyan' => 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+                                    'amber' => 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                                    'rose' => 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+                                    'purple' => 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+                                    default => 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+                                };
+                            @endphp
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border {{ $prevClasses }}">
+                                <span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: {{ $prevHex }}"></span>
+                                <span>{{ $kondisiForm['nama'] ?: 'Label Kondisi' }}</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Deskripsi / Keterangan Kondisi</label>
+                        <input type="text" wire:model="kondisiForm.keterangan" placeholder="cth: Segel Pabrik / Fresh Stock, Part Pihak Ketiga Berkualitas..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                    </div>
+
                     @if(!$kondisiForm['is_edit'])
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Unik (Opsional, auto slug)</label>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Internal (Opsional, auto slug)</label>
                             <input type="text" wire:model="kondisiForm.kode" placeholder="cth: bekas_grade_a" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" />
                         </div>
                     @else
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Unik</label>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Internal</label>
                             <input type="text" value="{{ $kondisiForm['kode'] }}" disabled class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono opacity-50 cursor-not-allowed" />
                         </div>
                     @endif
+
                     <div>
                         <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer pt-1">
                             <input type="checkbox" wire:model="kondisiForm.is_active" class="accent-up-mint w-4 h-4" /> Kondisi Aktif
@@ -2237,26 +2327,106 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-base font-bold text-white">{{ $tipeHpForm['id'] ? 'Edit Tipe HP' : 'Tipe HP Baru' }}</h3>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <span>📱</span>
+                        <span>{{ $tipeHpForm['id'] ? 'Edit Tipe HP' : 'Tipe HP Baru' }}</span>
+                    </h3>
                     <button wire:click="$set('showTipeHpModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
-                <div class="space-y-3">
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Merek *</label>
-                            <input type="text" wire:model="tipeHpForm.merk" list="settings-brand-datalist" placeholder="Apple, Samsung, Oppo..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
-                            @error('tipeHpForm.merk') <span class="text-up-red text-[10px] mt-1">{{ $message }}</span> @enderror
+                <div class="space-y-3.5">
+                    <!-- 1. Merek Smartphone: Dropdown list yang ada + input baru jika belum ada -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-semibold text-white">1. Merek Smartphone *</label>
+                            <span class="text-[10px] text-ink-400">Pilih dari list atau ketik baru</span>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Model *</label>
-                            <input type="text" wire:model="tipeHpForm.model" placeholder="iPhone 13, A54 5G..." class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
-                            @error('tipeHpForm.model') <span class="text-up-red text-[10px] mt-1">{{ $message }}</span> @enderror
+                            <select wire:model.live="tipeHpSelectedMerk" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                <option value="" class="bg-ink-900">— Pilih Merek yang Sudah Ada ({{ count($merekHpOptions) }} merek) —</option>
+                                @foreach($merekHpOptions as $m)
+                                    <option value="{{ $m }}" class="bg-ink-900">{{ $m }}</option>
+                                @endforeach
+                                <option value="__custom__" class="bg-ink-900 text-up-mint font-semibold">+ Merek Baru Lainnya (Ketik Baru)...</option>
+                            </select>
                         </div>
+
+                        <!-- Kolom Ketik Merek Baru jika belum ada -->
+                        @if($tipeHpSelectedMerk === '__custom__' || empty($tipeHpSelectedMerk))
+                            <div class="mt-1.5 pt-2 border-t border-white/5 space-y-1">
+                                <label class="block text-[11px] text-ink-300">
+                                    {{ empty($tipeHpSelectedMerk) ? 'Atau ketik Merek HP baru jika belum ada di atas:' : 'Ketik Merek HP Baru *:' }}
+                                </label>
+                                <input
+                                    type="text"
+                                    wire:model="tipeHpForm.merk"
+                                    placeholder="cth: Infinix, Tecno, Google Pixel..."
+                                    class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"
+                                />
+                            </div>
+                        @else
+                            <div class="flex items-center justify-between text-[11px] text-ink-300 px-1 pt-0.5">
+                                <span>Merek aktif: <strong class="text-white">{{ $tipeHpForm['merk'] }}</strong></span>
+                                <button type="button" wire:click="$set('tipeHpSelectedMerk', '__custom__')" class="text-up-mint hover:underline text-[10px] cursor-pointer">+ Ketik Merek Baru</button>
+                            </div>
+                        @endif
+                        @error('tipeHpForm.merk') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                     </div>
+
+                    <!-- 2. Tipe / Model HP: Dropdown list yang ada + input baru jika belum ada -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-semibold text-white">2. Model / Seri HP *</label>
+                            @if(!empty($existingModelsForSelectedMerk))
+                                <span class="text-[10px] text-ink-400">{{ count($existingModelsForSelectedMerk) }} model terdaftar</span>
+                            @endif
+                        </div>
+
+                        <!-- Dropdown Model yang Sudah Ada untuk Merek ini -->
+                        @if(!empty($existingModelsForSelectedMerk))
+                            <div>
+                                <select wire:model.live="tipeHpSelectedModel" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                                    <option value="" class="bg-ink-900">— Pilih Model {{ $tipeHpForm['merk'] ?? '' }} yang Sudah Ada —</option>
+                                    @foreach($existingModelsForSelectedMerk as $mod)
+                                        <option value="{{ $mod }}" class="bg-ink-900">{{ $mod }}</option>
+                                    @endforeach
+                                    <option value="__custom__" class="bg-ink-900 text-up-mint font-semibold">+ Model Baru Lainnya (Ketik Baru)...</option>
+                                </select>
+                            </div>
+                        @endif
+
+                        <!-- Kolom Ketik Model Baru jika belum ada di list -->
+                        @if(empty($existingModelsForSelectedMerk) || $tipeHpSelectedModel === '__custom__' || empty($tipeHpSelectedModel))
+                            <div class="{{ !empty($existingModelsForSelectedMerk) ? 'mt-1.5 pt-2 border-t border-white/5 space-y-1' : 'space-y-1' }}">
+                                @if(!empty($existingModelsForSelectedMerk))
+                                    <label class="block text-[11px] text-ink-300">
+                                        {{ empty($tipeHpSelectedModel) ? 'Atau ketik Model HP baru jika belum ada di atas:' : 'Ketik Model / Seri HP Baru *:' }}
+                                    </label>
+                                @else
+                                    <label class="block text-[11px] text-ink-300">Ketik Model / Seri HP Baru *:</label>
+                                @endif
+                                <input
+                                    type="text"
+                                    wire:model="tipeHpForm.model"
+                                    placeholder="cth: iPhone 13 Pro, Redmi Note 11, A15s..."
+                                    class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"
+                                />
+                            </div>
+                        @else
+                            <div class="flex items-center justify-between text-[11px] text-ink-300 px-1 pt-0.5">
+                                <span>Model aktif: <strong class="text-white">{{ $tipeHpForm['model'] }}</strong></span>
+                                <button type="button" wire:click="$set('tipeHpSelectedModel', '__custom__')" class="text-up-mint hover:underline text-[10px] cursor-pointer">+ Ketik Model Baru</button>
+                            </div>
+                        @endif
+                        @error('tipeHpForm.model') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    <!-- 3. Nama Lengkap (Opsional) -->
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Lengkap (Opsional)</label>
-                        <input type="text" wire:model="tipeHpForm.nama" placeholder="Otomatis gabungan Merek + Model jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Lengkap Tampilan (Opsional)</label>
+                        <input type="text" wire:model="tipeHpForm.nama" placeholder="Otomatis diisi: [Merk] [Model] jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        <p class="text-[10px] text-ink-500 mt-1">Otomatis gabungan: "{{ trim(($tipeHpForm['merk'] ?? '') . ' ' . ($tipeHpForm['model'] ?? '')) }}" jika dikosongkan.</p>
                     </div>
+
                     <div>
                         <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer pt-1">
                             <input type="checkbox" wire:model="tipeHpForm.is_active" class="accent-up-mint w-4 h-4" /> Tipe HP Aktif
@@ -2269,11 +2439,5 @@
                 </div>
             </div>
         </div>
-
-        <datalist id="settings-brand-datalist">
-            @foreach($brandList as $b)
-                <option value="{{ $b->nama }}"></option>
-            @endforeach
-        </datalist>
     @endif
 </div>

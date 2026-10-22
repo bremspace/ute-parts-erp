@@ -478,7 +478,7 @@
                     </label>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" wire:key="pos-chk-brand-{{ $visibleFilters['brand'] ? '1' : '0' }}" wire:click="toggleFilter('brand')" @checked($visibleFilters['brand']) class="rounded border-ink-300 text-up-primary">
-                        <span>Brand</span>
+                        <span>Brand Part</span>
                     </label>
                     <label class="inline-flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" wire:key="pos-chk-kualitas-{{ $visibleFilters['kualitas'] ? '1' : '0' }}" wire:click="toggleFilter('kualitas')" @checked($visibleFilters['kualitas']) class="rounded border-ink-300 text-up-primary">
@@ -535,7 +535,7 @@
                 @endif
                 @if($visibleFilters['brand'])
                     <select wire:model.live="filterBrandId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
-                        <option value="">Semua Brand</option>
+                        <option value="">Semua Brand Part</option>
                         @foreach($brandList as $b)
                             <option value="{{ $b->id }}">{{ $b->nama }}</option>
                         @endforeach

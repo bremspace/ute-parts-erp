@@ -1,3 +1,13 @@
+@php
+    $kondisiMeta = [
+        'baru' => ['bg' => 'bg-emerald-500/15', 'border' => 'border-emerald-500/30', 'text' => 'text-emerald-400', 'dot' => 'bg-emerald-400', 'desc' => 'Baru (Segel Pabrik / Fresh Stock)'],
+        'oem' => ['bg' => 'bg-blue-500/15', 'border' => 'border-blue-500/30', 'text' => 'text-blue-400', 'dot' => 'bg-blue-400', 'desc' => 'OEM (Original Equipment Manufacturer)'],
+        'compatible' => ['bg' => 'bg-cyan-500/15', 'border' => 'border-cyan-500/30', 'text' => 'text-cyan-400', 'dot' => 'bg-cyan-400', 'desc' => 'Compatible (Part Pihak Ketiga Berkualitas)'],
+        'bekas' => ['bg' => 'bg-amber-500/15', 'border' => 'border-amber-500/30', 'text' => 'text-amber-400', 'dot' => 'bg-amber-400', 'desc' => 'Bekas / Copotan Unit Mesin Normal'],
+        'rusak' => ['bg' => 'bg-rose-500/15', 'border' => 'border-rose-500/30', 'text' => 'text-rose-400', 'dot' => 'bg-rose-400', 'desc' => 'Rusak / Bahan Kanibal Part Teknisi'],
+    ];
+@endphp
+
 <div x-data="{
         wmsViewMode: localStorage.getItem('ute-wms-view-mode') || 'table',
         setWmsView(mode) {
@@ -55,7 +65,7 @@
 
                         @if($visibleFilters['brand'] ?? true)
                             <select wire:model.live="filterBrandId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Semua Brand</option>
+                                <option value="">Semua Brand Part</option>
                                 @foreach($brands as $b)
                                     <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
                                 @endforeach
@@ -213,7 +223,7 @@
                             </label>
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
                                 <input type="checkbox" wire:key="pt-chk-brand-{{ ($visibleFilters['brand'] ?? true) ? '1' : '0' }}" wire:click="toggleFilter('brand')" @checked($visibleFilters['brand'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
-                                <span>Brand</span>
+                                <span>Brand Part</span>
                             </label>
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
                                 <input type="checkbox" wire:key="pt-chk-kualitas-{{ ($visibleFilters['kualitas'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('kualitas')" @checked($visibleFilters['kualitas'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
@@ -528,9 +538,9 @@
                                             </div>
 
                                             <div>
-                                                <label class="block text-[11px] text-ink-300 mb-1">Brand</label>
+                                                <label class="block text-[11px] text-ink-300 mb-1">Brand Part</label>
                                                 <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Semua Brand</option>
+                                                    <option value="">Semua Brand Part</option>
                                                     @foreach($brands as $b)
                                                         <option value="{{ $b->id }}">{{ $b->nama }}</option>
                                                     @endforeach
@@ -621,12 +631,12 @@
                                         </button>
                                         <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
                                             <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter Brand & Kualitas</span>
+                                                <span class="text-xs font-bold text-white">Filter Brand Part & Kualitas</span>
                                                 <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
                                             </div>
                                             <div class="space-y-2">
                                                 <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Semua Brand</option>
+                                                    <option value="">Semua Brand Part</option>
                                                     @foreach($brands as $b) <option value="{{ $b->id }}">{{ $b->nama }}</option> @endforeach
                                                 </select>
                                                 <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
@@ -1439,8 +1449,23 @@
 
                         @if($visibleColumns['spesifikasi'] ?? false)
                             <td class="py-2.5 px-3 text-xs whitespace-nowrap">
-                                <div class="flex flex-col gap-0.5">
-                                    <span class="text-ink-200 capitalize font-medium">{{ $p->kondisi ?? 'Baru' }}</span>
+                                <div class="flex flex-col gap-1">
+                                    @php
+                                        $kd = strtolower($p->kondisi ?? 'baru');
+                                        $meta = $kondisiMeta[$kd] ?? [
+                                            'bg' => 'bg-emerald-500/15',
+                                            'border' => 'border-emerald-500/30',
+                                            'text' => 'text-emerald-400',
+                                            'dot' => 'bg-emerald-400',
+                                            'desc' => 'Baru (Segel Pabrik / Fresh Stock)'
+                                        ];
+                                        $kdNama = collect($kondisiList)->firstWhere('kode', $kd)['nama'] ?? ucfirst($kd);
+                                        $kdDesc = collect($kondisiList)->firstWhere('kode', $kd)['keterangan'] ?? $meta['desc'];
+                                    @endphp
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $meta['bg'] }} {{ $meta['text'] }} border {{ $meta['border'] }} w-fit" title="{{ $kdDesc }}">
+                                        <span class="w-1.5 h-1.5 rounded-full {{ $meta['dot'] }}"></span>
+                                        <span>{{ $kdNama }}</span>
+                                    </span>
                                     <span class="text-[10px] text-ink-400 uppercase font-mono">{{ $p->satuan ?? 'pcs' }}</span>
                                 </div>
                             </td>
@@ -1608,11 +1633,23 @@
                                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
                                             {{ $p->kualitas->nama }}
                                         </span>
-                                    @elseif(!empty($p->kondisi))
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/10 text-ink-300">
-                                            {{ ucfirst($p->kondisi) }}
-                                        </span>
                                     @endif
+                                    @php
+                                        $cardKd = strtolower($p->kondisi ?? 'baru');
+                                        $cardMeta = $kondisiMeta[$cardKd] ?? [
+                                            'bg' => 'bg-emerald-500/15',
+                                            'border' => 'border-emerald-500/30',
+                                            'text' => 'text-emerald-400',
+                                            'dot' => 'bg-emerald-400',
+                                            'desc' => 'Baru (Segel Pabrik / Fresh Stock)'
+                                        ];
+                                        $cardKdNama = collect($kondisiList)->firstWhere('kode', $cardKd)['nama'] ?? ucfirst($cardKd);
+                                        $cardKdDesc = collect($kondisiList)->firstWhere('kode', $cardKd)['keterangan'] ?? $cardMeta['desc'];
+                                    @endphp
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $cardMeta['bg'] }} {{ $cardMeta['text'] }} border {{ $cardMeta['border'] }}" title="{{ $cardKdDesc }}">
+                                        <span class="w-1.5 h-1.5 rounded-full {{ $cardMeta['dot'] }}"></span>
+                                        <span>{{ $cardKdNama }}</span>
+                                    </span>
 
                                     @if($p->brand)
                                         <span class="px-1.5 py-0.5 rounded text-[10px] bg-white/5 text-ink-400">
@@ -1925,28 +1962,48 @@
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
-                                <label class="text-xs font-semibold text-ink-300">Kondisi</label>
+                                <label class="text-xs font-semibold text-ink-300">Kondisi Produk *</label>
                                 <button type="button" wire:click="openQuickAdd('kondisi')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Baru</button>
                             </div>
-                            <select wire:model="produkForm.kondisi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model.live="produkForm.kondisi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 @foreach($kondisiList as $knd)
-                                    <option value="{{ $knd['kode'] }}" class="bg-ink-900">{{ $knd['nama'] }}</option>
+                                    <option value="{{ $knd['kode'] }}" class="bg-ink-900">
+                                        ● {{ $knd['nama'] }} — {{ $knd['keterangan'] ?? '' }}
+                                    </option>
                                 @endforeach
                             </select>
+                            @php
+                                $cKondisi = strtolower($produkForm['kondisi'] ?? 'baru');
+                                $cMeta = $kondisiMeta[$cKondisi] ?? [
+                                    'bg' => 'bg-emerald-500/15',
+                                    'border' => 'border-emerald-500/30',
+                                    'text' => 'text-emerald-400',
+                                    'dot' => 'bg-emerald-400',
+                                    'desc' => 'Baru (Segel Pabrik / Fresh Stock)'
+                                ];
+                                $cLabel = collect($kondisiList)->firstWhere('kode', $cKondisi)['nama'] ?? ucfirst($cKondisi);
+                                $cDesc = collect($kondisiList)->firstWhere('kode', $cKondisi)['keterangan'] ?? $cMeta['desc'];
+                            @endphp
+                            <div class="mt-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg {{ $cMeta['bg'] }} border {{ $cMeta['border'] }}">
+                                <span class="w-2 h-2 rounded-full {{ $cMeta['dot'] }} animate-pulse"></span>
+                                <span class="text-[11px] font-bold {{ $cMeta['text'] }}">{{ $cLabel }}</span>
+                                <span class="text-[10px] text-ink-300 truncate">— {{ $cDesc }}</span>
+                            </div>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
-                                <label class="text-xs font-semibold text-ink-300">Brand Sparepart / Merk</label>
+                                <label class="text-xs font-semibold text-ink-300">Brand Part</label>
                                 <button type="button" wire:click="openQuickAdd('brand')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Baru</button>
                             </div>
                             <select wire:model="produkForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                                <option value="" class="bg-ink-900">— Pilih brand —</option>
+                                <option value="" class="bg-ink-900">— Pilih Brand Part —</option>
                                 @foreach($brands as $b)
                                     <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
                                 @endforeach
                             </select>
+                            <p class="text-[9px] text-ink-500 mt-1">Merk suku cadang (cth: Crown, OGS, BPT, Apple Ori)</p>
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
@@ -1992,6 +2049,84 @@
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode SKU (opsional)</label>
                         <input type="text" wire:model="produkForm.sku" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono" placeholder="Otomatis ikuti Barcode jika kosong" />
+                    </div>
+
+                    <!-- Kecocokan Smartphone (Multi-Kompatibilitas Tipe HP — Merek & Model Terpisah) -->
+                    <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label class="block text-xs font-bold text-white">📱 Kecocokan Smartphone (Kompatibilitas Tipe HP)</label>
+                                <p class="text-[10px] text-ink-400">Pilih Merek HP dan Model HP target. Satu produk bisa cocok untuk banyak tipe HP tanpa duplikat.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-up-primary/10 border border-up-primary/20 text-up-primary font-mono font-semibold">
+                                    {{ count($produkForm['tipe_hp_ids'] ?? []) }} Tipe Terpilih
+                                </span>
+                                <button type="button" wire:click="openQuickAdd('tipe_hp')" class="text-[11px] text-up-mint hover:underline font-semibold cursor-pointer">+ Tambah Tipe HP Baru</button>
+                            </div>
+                        </div>
+
+                        <!-- Selector 2 Tahap: 1. Merek HP -> 2. Model HP -> 3. Tombol Tambah -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end p-3 rounded-xl bg-ink-950/40 border border-white/5">
+                            <div class="sm:col-span-5">
+                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">1. Pilih Merek HP</label>
+                                <select wire:model.live="kompatibelMerekHp" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                    <option value="" class="bg-ink-900">— Pilih Merek Smartphone —</option>
+                                    @foreach($merekHpOptions as $merek)
+                                        <option value="{{ $merek }}" class="bg-ink-900">{{ $merek }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-5">
+                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">2. Pilih Tipe / Model HP</label>
+                                <select wire:model="kompatibelTipeHpId" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium {{ empty($kompatibelMerekHp) ? 'opacity-50 cursor-not-allowed' : '' }}" {{ empty($kompatibelMerekHp) ? 'disabled' : '' }}>
+                                    <option value="" class="bg-ink-900">
+                                        {{ empty($kompatibelMerekHp) ? '— Pilih Merek HP Dulu —' : '— Pilih Model '.$kompatibelMerekHp.' —' }}
+                                    </option>
+                                    @foreach($tipeHpCreateOptions as $opt)
+                                        <option value="{{ $opt->id }}" class="bg-ink-900">{{ $opt->model }} ({{ $opt->merk }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <button type="button"
+                                        wire:click="tambahKompatibelKeForm('create')"
+                                        class="w-full py-2 px-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center justify-center gap-1 transition shadow-lg shadow-up-primary/20 cursor-pointer disabled:opacity-50"
+                                        {{ empty($kompatibelMerekHp) ? 'disabled' : '' }}>
+                                    <span>+ Tambah</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Daftar Tipe HP Kompatibel Terpilih (Chips / Tags Anti-Duplikat) -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between text-[11px] text-ink-400">
+                                <span class="font-medium">Daftar Kompatibilitas Terdaftar:</span>
+                                <span class="text-[10px] text-up-mint">✓ Anti-Duplikat Aktif</span>
+                            </div>
+
+                            @if(!empty($selectedCreateTipeHps) && $selectedCreateTipeHps->isNotEmpty())
+                                <div class="flex flex-wrap gap-2 p-2.5 rounded-xl bg-ink-950/60 border border-white/5 min-h-[44px] items-center">
+                                    @foreach($selectedCreateTipeHps as $th)
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-up-primary/15 text-up-primary border border-up-primary/30 transition hover:bg-up-primary/25">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
+                                            <strong class="font-bold">{{ $th->merk }}</strong> {{ $th->model }}
+                                            <button type="button"
+                                                    wire:click="hapusKompatibelDariForm({{ $th->id }}, 'create')"
+                                                    class="ml-1 text-ink-400 hover:text-up-red transition cursor-pointer"
+                                                    title="Hapus {{ $th->merk }} {{ $th->model }} dari daftar">✕</button>
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="p-3 rounded-xl bg-ink-950/30 border border-dashed border-white/10 text-center">
+                                    <p class="text-xs text-ink-400">Belum ada tipe HP kompatibel yang ditambahkan.</p>
+                                    <p class="text-[10px] text-ink-500 mt-0.5">Pilih Merek dan Model HP di atas, lalu klik <strong>+ Tambah</strong>.</p>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     <!-- Skema Harga Beli Dinamis & Harga Jual Margin -->
@@ -2359,19 +2494,12 @@
 
                 <!-- TAB 3: DETAIL & LANJUTAN -->
                 <div x-show="tab === 'lanjutan'" class="space-y-3.5">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <div class="flex items-center justify-between mb-1.5">
-                                <label class="block text-xs font-semibold text-ink-300">Tipe HP (Kompatibilitas)</label>
-                                <button type="button" wire:click="openQuickAdd('tipe_hp')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Tambah Tipe</button>
-                            </div>
-                            <x-prism.searchable-multi-select model="produkForm.tipe_hp_ids" :options="$tipeHpOptions" placeholder="Cari tipe HP..." />
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold text-ink-300">🔄 Kompatibel Antar Produk (Substitusi / Part Pengganti)</label>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kompatibel Antar Produk (Substitusi)</label>
-                            <x-prism.searchable-multi-select model="produkForm.produk_kompatibel_ids" :options="$allProdukOptions" placeholder="Cari produk substitusi / pengganti..." />
-                            <p class="text-[9px] text-ink-500 mt-1">Produk lain yang bisa saling menggantikan (part substitution)</p>
-                        </div>
+                        <x-prism.searchable-multi-select model="produkForm.produk_kompatibel_ids" :options="$allProdukOptions" placeholder="Cari produk substitusi / pengganti jika stok barang ini kosong..." />
+                        <p class="text-[9px] text-ink-500 mt-1">Produk lain yang fungsinya sama dan bisa saling menggantikan saat kasir atau teknisi servis kehabisan stok.</p>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2928,29 +3056,49 @@
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
-                                <label class="text-xs font-semibold text-ink-300">Kondisi</label>
+                                <label class="text-xs font-semibold text-ink-300">Kondisi Produk *</label>
                                 <button type="button" wire:click="openQuickAdd('kondisi')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Baru</button>
                             </div>
-                            <select wire:model="editProdukForm.kondisi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <select wire:model.live="editProdukForm.kondisi" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                                 @foreach($kondisiList as $knd)
-                                    <option value="{{ $knd['kode'] }}" class="bg-ink-900">{{ $knd['nama'] }}</option>
+                                    <option value="{{ $knd['kode'] }}" class="bg-ink-900">
+                                        ● {{ $knd['nama'] }} — {{ $knd['keterangan'] ?? '' }}
+                                    </option>
                                 @endforeach
                             </select>
+                            @php
+                                $eKondisi = strtolower($editProdukForm['kondisi'] ?? 'baru');
+                                $eMeta = $kondisiMeta[$eKondisi] ?? [
+                                    'bg' => 'bg-emerald-500/15',
+                                    'border' => 'border-emerald-500/30',
+                                    'text' => 'text-emerald-400',
+                                    'dot' => 'bg-emerald-400',
+                                    'desc' => 'Baru (Segel Pabrik / Fresh Stock)'
+                                ];
+                                $eLabel = collect($kondisiList)->firstWhere('kode', $eKondisi)['nama'] ?? ucfirst($eKondisi);
+                                $eDesc = collect($kondisiList)->firstWhere('kode', $eKondisi)['keterangan'] ?? $eMeta['desc'];
+                            @endphp
+                            <div class="mt-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg {{ $eMeta['bg'] }} border {{ $eMeta['border'] }}">
+                                <span class="w-2 h-2 rounded-full {{ $eMeta['dot'] }} animate-pulse"></span>
+                                <span class="text-[11px] font-bold {{ $eMeta['text'] }}">{{ $eLabel }}</span>
+                                <span class="text-[10px] text-ink-300 truncate">— {{ $eDesc }}</span>
+                            </div>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
-                                <label class="text-xs font-semibold text-ink-300">Brand Sparepart / Merk</label>
+                                <label class="text-xs font-semibold text-ink-300">Brand Part</label>
                                 <button type="button" wire:click="openQuickAdd('brand')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Baru</button>
                             </div>
                             <select wire:model="editProdukForm.brand_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                                <option value="" class="bg-ink-900">— Pilih brand —</option>
+                                <option value="" class="bg-ink-900">— Pilih Brand Part —</option>
                                 @foreach($brands as $b)
                                     <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
                                 @endforeach
                             </select>
+                            <p class="text-[9px] text-ink-500 mt-1">Merk suku cadang (cth: Crown, OGS, BPT, Apple Ori)</p>
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
@@ -2963,6 +3111,7 @@
                                     <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}</option>
                                 @endforeach
                             </select>
+                            <p class="text-[9px] text-ink-500 mt-1">Original / Grade A / Grade B / Refurbished</p>
                         </div>
                     </div>
 
@@ -2994,14 +3143,81 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Brand Kompatibel</label>
-                            <input type="text" wire:model="editProdukForm.brand_kompatibel" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Cth: Samsung, iPhone" />
+                    <!-- Kecocokan Smartphone (Multi-Kompatibilitas Tipe HP — Merek & Model Terpisah) -->
+                    <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label class="block text-xs font-bold text-white">📱 Kecocokan Smartphone (Kompatibilitas Tipe HP)</label>
+                                <p class="text-[10px] text-ink-400">Pilih Merek HP dan Model HP target. Satu produk bisa cocok untuk banyak tipe HP tanpa duplikat.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-up-primary/10 border border-up-primary/20 text-up-primary font-mono font-semibold">
+                                    {{ count($editProdukForm['tipe_hp_ids'] ?? []) }} Tipe Terpilih
+                                </span>
+                                <button type="button" wire:click="openQuickAdd('tipe_hp')" class="text-[11px] text-up-mint hover:underline font-semibold cursor-pointer">+ Tambah Tipe HP Baru</button>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Model Kompatibel</label>
-                            <input type="text" wire:model="editProdukForm.model_kompatibel" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Cth: A52, Note 10" />
+
+                        <!-- Selector 2 Tahap: 1. Merek HP -> 2. Model HP -> 3. Tombol Tambah -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end p-3 rounded-xl bg-ink-950/40 border border-white/5">
+                            <div class="sm:col-span-5">
+                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">1. Pilih Merek HP</label>
+                                <select wire:model.live="editKompatibelMerekHp" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                    <option value="" class="bg-ink-900">— Pilih Merek Smartphone —</option>
+                                    @foreach($merekHpOptions as $merek)
+                                        <option value="{{ $merek }}" class="bg-ink-900">{{ $merek }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-5">
+                                <label class="block text-[11px] font-semibold text-ink-300 mb-1">2. Pilih Tipe / Model HP</label>
+                                <select wire:model="editKompatibelTipeHpId" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium {{ empty($editKompatibelMerekHp) ? 'opacity-50 cursor-not-allowed' : '' }}" {{ empty($editKompatibelMerekHp) ? 'disabled' : '' }}>
+                                    <option value="" class="bg-ink-900">
+                                        {{ empty($editKompatibelMerekHp) ? '— Pilih Merek HP Dulu —' : '— Pilih Model '.$editKompatibelMerekHp.' —' }}
+                                    </option>
+                                    @foreach($tipeHpEditOptions as $opt)
+                                        <option value="{{ $opt->id }}" class="bg-ink-900">{{ $opt->model }} ({{ $opt->merk }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <button type="button"
+                                        wire:click="tambahKompatibelKeForm('edit')"
+                                        class="w-full py-2 px-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-semibold flex items-center justify-center gap-1 transition shadow-lg shadow-up-primary/20 cursor-pointer disabled:opacity-50"
+                                        {{ empty($editKompatibelMerekHp) ? 'disabled' : '' }}>
+                                    <span>+ Tambah</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Daftar Tipe HP Kompatibel Terpilih (Chips / Tags Anti-Duplikat) -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between text-[11px] text-ink-400">
+                                <span class="font-medium">Daftar Kompatibilitas Terdaftar:</span>
+                                <span class="text-[10px] text-up-mint">✓ Anti-Duplikat Aktif</span>
+                            </div>
+
+                            @if(!empty($selectedEditTipeHps) && $selectedEditTipeHps->isNotEmpty())
+                                <div class="flex flex-wrap gap-2 p-2.5 rounded-xl bg-ink-950/60 border border-white/5 min-h-[44px] items-center">
+                                    @foreach($selectedEditTipeHps as $th)
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-up-primary/15 text-up-primary border border-up-primary/30 transition hover:bg-up-primary/25">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-up-primary"></span>
+                                            <strong class="font-bold">{{ $th->merk }}</strong> {{ $th->model }}
+                                            <button type="button"
+                                                    wire:click="hapusKompatibelDariForm({{ $th->id }}, 'edit')"
+                                                    class="ml-1 text-ink-400 hover:text-up-red transition cursor-pointer"
+                                                    title="Hapus {{ $th->merk }} {{ $th->model }} dari daftar">✕</button>
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="p-3 rounded-xl bg-ink-950/30 border border-dashed border-white/10 text-center">
+                                    <p class="text-xs text-ink-400">Belum ada tipe HP kompatibel yang ditambahkan.</p>
+                                    <p class="text-[10px] text-ink-500 mt-0.5">Pilih Merek dan Model HP di atas, lalu klik <strong>+ Tambah</strong>.</p>
+                                </div>
+                            @endif
                         </div>
                     </div>
 
@@ -3370,19 +3586,12 @@
 
                 <!-- TAB 3: DETAIL & LANJUTAN (Edit) -->
                 <div x-show="tab === 'lanjutan'" class="space-y-3.5">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <div class="flex items-center justify-between mb-1.5">
-                                <label class="block text-xs font-semibold text-ink-300">Tipe HP (Kompatibilitas)</label>
-                                <button type="button" wire:click="openQuickAdd('tipe_hp')" class="text-[10px] text-up-mint hover:underline font-semibold cursor-pointer">+ Tambah Tipe</button>
-                            </div>
-                            <x-prism.searchable-multi-select model="editProdukForm.tipe_hp_ids" :options="$tipeHpOptions" placeholder="Cari tipe HP..." />
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold text-ink-300">🔄 Kompatibel Antar Produk (Substitusi / Part Pengganti)</label>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kompatibel Antar Produk (Substitusi)</label>
-                            <x-prism.searchable-multi-select model="editProdukForm.produk_kompatibel_ids" :options="collect($allProdukOptions)->reject(fn($o) => $o['id'] === $editProdukId)->values()->all()" placeholder="Cari produk substitusi / pengganti..." />
-                            <p class="text-[9px] text-ink-500 mt-1">Produk lain yang bisa saling menggantikan</p>
-                        </div>
+                        <x-prism.searchable-multi-select model="editProdukForm.produk_kompatibel_ids" :options="collect($allProdukOptions)->reject(fn($o) => $o['id'] === $editProdukId)->values()->all()" placeholder="Cari produk substitusi / pengganti jika stok barang ini habis..." />
+                        <p class="text-[9px] text-ink-500 mt-1">Produk lain yang fungsinya sama dan bisa saling menggantikan saat kasir atau teknisi servis kehabisan stok.</p>
                     </div>
 
                     <!-- Harga Fleksibel & SN -->
@@ -3603,48 +3812,120 @@
     <!-- MODAL: QUICK ADD MASTER DATA INLINE -->
     @if($showQuickAddModal)
         <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
+            <div class="w-full {{ $quickAddTipe === 'tipe_hp' ? 'max-w-md' : 'max-w-sm' }} glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
-                    <h3 class="text-sm font-bold text-white">
-                        + Tambah {{ ucfirst($quickAddTipe) }} Baru
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        @if($quickAddTipe === 'tipe_hp')
+                            <span>📱 + Tambah Tipe HP Baru</span>
+                        @else
+                            <span>+ Tambah {{ ucfirst($quickAddTipe) }} Baru</span>
+                        @endif
                     </h3>
-                    <button wire:click="$set('showQuickAddModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button wire:click="$set('showQuickAddModal', false)" class="text-ink-400 hover:text-white transition cursor-pointer">✕</button>
                 </div>
 
                 <div class="space-y-3">
                     @if($quickAddTipe === 'tipe_hp')
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Merk / Brand HP *</label>
-                            <input
-                                type="text"
-                                wire:model="quickAddForm.merk"
-                                list="brand-kompatibel-list"
-                                placeholder="cth: Apple, Samsung, Xiaomi..."
-                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium focus:ring-2 focus:ring-up-mint/30"
-                                autofocus
-                            />
-                            @error('quickAddForm.merk') <span class="text-up-red text-[10px] mt-1">{{ $message }}</span> @enderror
+                        <!-- 1. MERK HP: Dropdown List yang Ada + Opsi Isi Baru jika belum ada -->
+                        <div class="space-y-2 p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-semibold text-white">1. Merek Smartphone *</label>
+                                <span class="text-[10px] text-ink-400">Pilih dari list atau isi baru</span>
+                            </div>
+
+                            <!-- Dropdown Merek yang Sudah Ada -->
+                            <div>
+                                <select wire:model.live="quickAddSelectedMerk" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                    <option value="" class="bg-ink-900">— Pilih Merek yang Sudah Ada ({{ count($merekHpOptions) }} merek) —</option>
+                                    @foreach($merekHpOptions as $m)
+                                        <option value="{{ $m }}" class="bg-ink-900">{{ $m }}</option>
+                                    @endforeach
+                                    <option value="__custom__" class="bg-ink-900 text-up-mint font-semibold">+ Merek Baru Lainnya (Ketik Baru)...</option>
+                                </select>
+                            </div>
+
+                            <!-- Kolom Ketik Merek Baru jika belum ada di list -->
+                            @if($quickAddSelectedMerk === '__custom__' || empty($quickAddSelectedMerk))
+                                <div class="mt-1.5 pt-2 border-t border-white/5 space-y-1">
+                                    <label class="block text-[11px] text-ink-300">
+                                        {{ empty($quickAddSelectedMerk) ? 'Atau ketik Merek HP baru jika belum ada di atas:' : 'Ketik Merek HP Baru *:' }}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        wire:model="quickAddForm.merk"
+                                        placeholder="cth: Infinix, Tecno, Google Pixel..."
+                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium focus:ring-2 focus:ring-up-mint/30"
+                                        autofocus
+                                    />
+                                </div>
+                            @else
+                                <div class="flex items-center justify-between text-[11px] text-ink-300 px-1 pt-0.5">
+                                    <span>Merek aktif: <strong class="text-white">{{ $quickAddForm['merk'] }}</strong></span>
+                                    <button type="button" wire:click="$set('quickAddSelectedMerk', '__custom__')" class="text-up-mint hover:underline text-[10px] cursor-pointer">+ Ketik Merek Baru</button>
+                                </div>
+                            @endif
+                            @error('quickAddForm.merk') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Model / Seri HP *</label>
-                            <input
-                                type="text"
-                                wire:model="quickAddForm.model"
-                                list="model-kompatibel-list"
-                                placeholder="cth: iPhone 13 Pro, Redmi Note 11..."
-                                class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium focus:ring-2 focus:ring-up-mint/30"
-                            />
-                            @error('quickAddForm.model') <span class="text-up-red text-[10px] mt-1">{{ $message }}</span> @enderror
+
+                        <!-- 2. MODEL / TIPE HP: Dropdown List yang Ada + Opsi Isi Baru jika belum ada -->
+                        <div class="space-y-2 p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-semibold text-white">2. Tipe / Model HP *</label>
+                                @if(!empty($quickAddExistingModels))
+                                    <span class="text-[10px] text-ink-400">{{ count($quickAddExistingModels) }} model terdaftar</span>
+                                @endif
+                            </div>
+
+                            <!-- Dropdown Model yang Sudah Ada untuk Merek ini (jika ada) -->
+                            @if(!empty($quickAddExistingModels))
+                                <div>
+                                    <select wire:model.live="quickAddSelectedModel" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                        <option value="" class="bg-ink-900">— Pilih Model {{ $quickAddForm['merk'] ?? '' }} yang Sudah Ada —</option>
+                                        @foreach($quickAddExistingModels as $mod)
+                                            <option value="{{ $mod }}" class="bg-ink-900">{{ $mod }}</option>
+                                        @endforeach
+                                        <option value="__custom__" class="bg-ink-900 text-up-mint font-semibold">+ Model Baru Lainnya (Ketik Baru)...</option>
+                                    </select>
+                                </div>
+                            @endif
+
+                            <!-- Kolom Ketik Model Baru jika belum ada di list atau ingin buat baru -->
+                            @if(empty($quickAddExistingModels) || $quickAddSelectedModel === '__custom__' || empty($quickAddSelectedModel))
+                                <div class="{{ !empty($quickAddExistingModels) ? 'mt-1.5 pt-2 border-t border-white/5 space-y-1' : 'space-y-1' }}">
+                                    @if(!empty($quickAddExistingModels))
+                                        <label class="block text-[11px] text-ink-300">
+                                            {{ empty($quickAddSelectedModel) ? 'Atau ketik Model HP baru jika belum ada di atas:' : 'Ketik Model / Seri HP Baru *:' }}
+                                        </label>
+                                    @else
+                                        <label class="block text-[11px] text-ink-300">Ketik Model / Seri HP Baru *:</label>
+                                    @endif
+                                    <input
+                                        type="text"
+                                        wire:model="quickAddForm.model"
+                                        placeholder="cth: A15s, Redmi Note 12, iPhone 15 Pro..."
+                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium focus:ring-2 focus:ring-up-mint/30"
+                                    />
+                                </div>
+                            @else
+                                <div class="flex items-center justify-between text-[11px] text-ink-300 px-1 pt-0.5">
+                                    <span>Model aktif: <strong class="text-white">{{ $quickAddForm['model'] }}</strong></span>
+                                    <button type="button" wire:click="$set('quickAddSelectedModel', '__custom__')" class="text-up-mint hover:underline text-[10px] cursor-pointer">+ Ketik Model Baru</button>
+                                </div>
+                            @endif
+                            @error('quickAddForm.model') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
+
+                        <!-- 3. NAMA LENGKAP TAMPILAN (OPSIONAL) -->
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Lengkap (Opsional)</label>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Lengkap Tampilan (Opsional)</label>
                             <input
                                 type="text"
                                 wire:model="quickAddForm.nama"
                                 wire:keydown.enter="simpanQuickAdd"
-                                placeholder="Kosongkan jika sama dengan Merk + Model..."
+                                placeholder="Kosongkan jika otomatis: [Merk] [Model]..."
                                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium focus:ring-2 focus:ring-up-mint/30"
                             />
+                            <p class="text-[10px] text-ink-500 mt-1">Otomatis diisi: "{{ trim(($quickAddForm['merk'] ?? '') . ' ' . ($quickAddForm['model'] ?? '')) }}" jika kosong</p>
                         </div>
                     @else
                         <div>

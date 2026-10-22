@@ -254,10 +254,23 @@ class ProdukTab extends Component
 
     public $editFotoKameraUpload = null;
 
+    // Kompatibilitas Smartphone Picker (Merek HP & Tipe HP Terpisah)
+    public ?string $kompatibelMerekHp = null;
+
+    public ?int $kompatibelTipeHpId = null;
+
+    public ?string $editKompatibelMerekHp = null;
+
+    public ?int $editKompatibelTipeHpId = null;
+
     // Quick Add Modal (Kategori, Brand, Kualitas, Satuan, Kondisi, Tipe HP)
     public bool $showQuickAddModal = false;
 
     public string $quickAddTipe = 'kategori';
+
+    public ?string $quickAddSelectedMerk = '';
+
+    public ?string $quickAddSelectedModel = '';
 
     public array $quickAddForm = [
         'nama' => '',
@@ -487,7 +500,81 @@ class ProdukTab extends Component
         ];
         $this->fotoUploads = [];
         $this->fotoKameraUpload = null;
+        $this->kompatibelMerekHp = null;
+        $this->kompatibelTipeHpId = null;
         $this->showProdukModal = true;
+    }
+
+    public function updatedKompatibelMerekHp(): void
+    {
+        $this->kompatibelTipeHpId = null;
+    }
+
+    public function updatedEditKompatibelMerekHp(): void
+    {
+        $this->editKompatibelTipeHpId = null;
+    }
+
+    public function tambahKompatibelKeForm(string $target = 'create'): void
+    {
+        $tipeHpId = $target === 'edit' ? $this->editKompatibelTipeHpId : $this->kompatibelTipeHpId;
+
+        if (! $tipeHpId) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Pilih Merek dan Tipe HP terlebih dahulu.']);
+
+            return;
+        }
+
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        $current = array_map('intval', (array) ($this->{$formKey}['tipe_hp_ids'] ?? []));
+
+        // Pastikan tidak ada duplikat dalam satu produk
+        if (in_array((int) $tipeHpId, $current, true)) {
+            $th = TipeHp::find($tipeHpId);
+            $label = $th ? "{$th->merk} {$th->model}" : 'Tipe HP';
+            $this->dispatch('alert', ['type' => 'warning', 'message' => "{$label} sudah ada di daftar kompatibilitas produk ini."]);
+
+            return;
+        }
+
+        $current[] = (int) $tipeHpId;
+        $this->{$formKey}['tipe_hp_ids'] = array_values(array_unique($current));
+
+        // Sinkronkan brand_kompatibel dan model_kompatibel ringkasan dari tipe pertama
+        if (empty($this->{$formKey}['brand_kompatibel'])) {
+            $th = TipeHp::find($tipeHpId);
+            if ($th) {
+                $this->{$formKey}['brand_kompatibel'] = $th->merk;
+                $this->{$formKey}['model_kompatibel'] = $th->model;
+            }
+        }
+
+        if ($target === 'edit') {
+            $this->editKompatibelTipeHpId = null;
+        } else {
+            $this->kompatibelTipeHpId = null;
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Tipe HP berhasil ditambahkan ke daftar kompatibilitas.']);
+    }
+
+    public function hapusKompatibelDariForm(int $tipeHpId, string $target = 'create'): void
+    {
+        $formKey = $target === 'edit' ? 'editProdukForm' : 'produkForm';
+        $current = array_map('intval', (array) ($this->{$formKey}['tipe_hp_ids'] ?? []));
+        $filtered = array_values(array_filter($current, fn ($id) => (int) $id !== (int) $tipeHpId));
+        $this->{$formKey}['tipe_hp_ids'] = $filtered;
+
+        if (! empty($filtered)) {
+            $first = TipeHp::find($filtered[0]);
+            if ($first) {
+                $this->{$formKey}['brand_kompatibel'] = $first->merk;
+                $this->{$formKey}['model_kompatibel'] = $first->model;
+            }
+        } else {
+            $this->{$formKey}['brand_kompatibel'] = null;
+            $this->{$formKey}['model_kompatibel'] = null;
+        }
     }
 
     public function produkHargaJualBerubah()
@@ -671,12 +758,16 @@ class ProdukTab extends Component
         $this->produkForm['harga_tier']['retail']['nominal_tetap'] = (float) $this->produkForm['harga_jual_retail'];
 
         // Pastikan brand & model kompatibel sinkron dari Tipe HP bila ada
-        if (! empty($this->produkForm['tipe_hp_ids']) && (empty($this->produkForm['brand_kompatibel']) || empty($this->produkForm['model_kompatibel']))) {
+        $this->produkForm['tipe_hp_ids'] = array_values(array_unique(array_map('intval', (array) ($this->produkForm['tipe_hp_ids'] ?? []))));
+        if (! empty($this->produkForm['tipe_hp_ids'])) {
             $firstT = TipeHp::find($this->produkForm['tipe_hp_ids'][0]);
             if ($firstT) {
-                $this->produkForm['brand_kompatibel'] = $this->produkForm['brand_kompatibel'] ?: $firstT->merk;
-                $this->produkForm['model_kompatibel'] = $this->produkForm['model_kompatibel'] ?: $firstT->model;
+                $this->produkForm['brand_kompatibel'] = $firstT->merk;
+                $this->produkForm['model_kompatibel'] = $firstT->model;
             }
+        } else {
+            $this->produkForm['brand_kompatibel'] = null;
+            $this->produkForm['model_kompatibel'] = null;
         }
 
         $minStokVal = ! empty($this->produkForm['min_stock']) ? (int) $this->produkForm['min_stock'] : (int) $this->produkForm['stok_minimum'];
@@ -763,6 +854,17 @@ class ProdukTab extends Component
 
         $existingCodes = SatuanUnit::pluck('kode')->map(fn ($k) => strtolower($k))->all();
 
+        $tipeHpIds = $p->tipeHps->pluck('id')->all();
+        if (empty($tipeHpIds) && ! empty($p->brand_kompatibel) && ! empty($p->model_kompatibel)) {
+            $matched = TipeHp::where('merk', $p->brand_kompatibel)->where('model', $p->model_kompatibel)->first();
+            if ($matched) {
+                $tipeHpIds = [$matched->id];
+            }
+        }
+        $tipeHpIds = array_values(array_unique(array_map('intval', $tipeHpIds)));
+        $this->editKompatibelMerekHp = null;
+        $this->editKompatibelTipeHpId = null;
+
         $this->editProdukForm = [
             'nama' => $p->nama,
             'sku' => $p->skuVariants->first()?->sku ?? '',
@@ -778,7 +880,7 @@ class ProdukTab extends Component
             'brand_id' => $p->brand_id,
             'kualitas_id' => $p->kualitas_id,
             'supplier_id' => $p->supplier_id,
-            'tipe_hp_ids' => $p->tipeHps->pluck('id')->all(),
+            'tipe_hp_ids' => $tipeHpIds,
             'produk_kompatibel_ids' => $p->produkKompatibel->pluck('id')->all(),
             'harga_tier' => $tierMap,
             'harga_fleksibel' => (bool) $p->harga_fleksibel,
@@ -977,12 +1079,16 @@ class ProdukTab extends Component
         $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = (float) $this->editProdukForm['harga_jual_retail'];
 
         // Pastikan brand & model kompatibel sinkron dari Tipe HP bila ada
-        if (! empty($this->editProdukForm['tipe_hp_ids']) && (empty($this->editProdukForm['brand_kompatibel']) || empty($this->editProdukForm['model_kompatibel']))) {
+        $this->editProdukForm['tipe_hp_ids'] = array_values(array_unique(array_map('intval', (array) ($this->editProdukForm['tipe_hp_ids'] ?? []))));
+        if (! empty($this->editProdukForm['tipe_hp_ids'])) {
             $firstT = TipeHp::find($this->editProdukForm['tipe_hp_ids'][0]);
             if ($firstT) {
-                $this->editProdukForm['brand_kompatibel'] = $this->editProdukForm['brand_kompatibel'] ?: $firstT->merk;
-                $this->editProdukForm['model_kompatibel'] = $this->editProdukForm['model_kompatibel'] ?: $firstT->model;
+                $this->editProdukForm['brand_kompatibel'] = $firstT->merk;
+                $this->editProdukForm['model_kompatibel'] = $firstT->model;
             }
+        } else {
+            $this->editProdukForm['brand_kompatibel'] = null;
+            $this->editProdukForm['model_kompatibel'] = null;
         }
 
         if (! empty($this->editProdukForm['multi_satuan'])) {
@@ -1307,11 +1413,17 @@ class ProdukTab extends Component
         $defaultModel = '';
         if ($tipe === 'tipe_hp') {
             $defaultMerk = $this->showEditProdukModal
-                ? ($this->editProdukForm['brand_kompatibel'] ?? '')
-                : ($this->produkForm['brand_kompatibel'] ?? '');
+                ? ($this->editKompatibelMerekHp ?: ($this->editProdukForm['brand_kompatibel'] ?? ''))
+                : ($this->kompatibelMerekHp ?: ($this->produkForm['brand_kompatibel'] ?? ''));
             $defaultModel = $this->showEditProdukModal
                 ? ($this->editProdukForm['model_kompatibel'] ?? '')
                 : ($this->produkForm['model_kompatibel'] ?? '');
+
+            $this->quickAddSelectedMerk = $defaultMerk;
+            $this->quickAddSelectedModel = $defaultModel;
+        } else {
+            $this->quickAddSelectedMerk = '';
+            $this->quickAddSelectedModel = '';
         }
 
         $this->quickAddForm = [
@@ -1328,9 +1440,36 @@ class ProdukTab extends Component
         $this->showQuickAddModal = true;
     }
 
+    public function updatedQuickAddSelectedMerk($value): void
+    {
+        if ($value && $value !== '__custom__') {
+            $this->quickAddForm['merk'] = $value;
+        } elseif ($value === '__custom__') {
+            $this->quickAddForm['merk'] = '';
+        }
+        $this->quickAddSelectedModel = '';
+        $this->quickAddForm['model'] = '';
+    }
+
+    public function updatedQuickAddSelectedModel($value): void
+    {
+        if ($value && $value !== '__custom__') {
+            $this->quickAddForm['model'] = $value;
+        } elseif ($value === '__custom__') {
+            $this->quickAddForm['model'] = '';
+        }
+    }
+
     public function simpanQuickAdd(): void
     {
         if ($this->quickAddTipe === 'tipe_hp') {
+            if (! empty($this->quickAddSelectedMerk) && $this->quickAddSelectedMerk !== '__custom__' && empty($this->quickAddForm['merk'])) {
+                $this->quickAddForm['merk'] = $this->quickAddSelectedMerk;
+            }
+            if (! empty($this->quickAddSelectedModel) && $this->quickAddSelectedModel !== '__custom__' && empty($this->quickAddForm['model'])) {
+                $this->quickAddForm['model'] = $this->quickAddSelectedModel;
+            }
+
             $this->validate([
                 'quickAddForm.merk' => 'required|string|max:100',
                 'quickAddForm.model' => 'required|string|max:100',
@@ -1355,11 +1494,13 @@ class ProdukTab extends Component
                 );
 
                 if ($this->showEditProdukModal) {
-                    $cur = $this->editProdukForm['tipe_hp_ids'] ?? [];
-                    if (! in_array($tipe->id, $cur)) {
+                    $cur = array_map('intval', (array) ($this->editProdukForm['tipe_hp_ids'] ?? []));
+                    if (! in_array($tipe->id, $cur, true)) {
                         $cur[] = $tipe->id;
                     }
-                    $this->editProdukForm['tipe_hp_ids'] = array_values($cur);
+                    $this->editProdukForm['tipe_hp_ids'] = array_values(array_unique($cur));
+                    $this->editKompatibelMerekHp = $tipe->merk;
+                    $this->editKompatibelTipeHpId = $tipe->id;
                     if (empty($this->editProdukForm['brand_kompatibel'])) {
                         $this->editProdukForm['brand_kompatibel'] = $tipe->merk;
                     }
@@ -1367,11 +1508,13 @@ class ProdukTab extends Component
                         $this->editProdukForm['model_kompatibel'] = $tipe->model;
                     }
                 } else {
-                    $cur = $this->produkForm['tipe_hp_ids'] ?? [];
-                    if (! in_array($tipe->id, $cur)) {
+                    $cur = array_map('intval', (array) ($this->produkForm['tipe_hp_ids'] ?? []));
+                    if (! in_array($tipe->id, $cur, true)) {
                         $cur[] = $tipe->id;
                     }
-                    $this->produkForm['tipe_hp_ids'] = array_values($cur);
+                    $this->produkForm['tipe_hp_ids'] = array_values(array_unique($cur));
+                    $this->kompatibelMerekHp = $tipe->merk;
+                    $this->kompatibelTipeHpId = $tipe->id;
                     if (empty($this->produkForm['brand_kompatibel'])) {
                         $this->produkForm['brand_kompatibel'] = $tipe->merk;
                     }
@@ -3263,14 +3406,53 @@ class ProdukTab extends Component
 
         $config = app(KonfigurasiService::class);
         $savedKondisi = $config->get('master_produk_kondisi_list');
+        $defaultKondisi = [
+            ['kode' => 'baru', 'nama' => 'Baru', 'warna' => 'emerald', 'hex' => '#10b981', 'keterangan' => 'Baru (Segel Pabrik / Fresh Stock)'],
+            ['kode' => 'oem', 'nama' => 'OEM', 'warna' => 'blue', 'hex' => '#3b82f6', 'keterangan' => 'OEM (Original Equipment Manufacturer)'],
+            ['kode' => 'compatible', 'nama' => 'Compatible', 'warna' => 'cyan', 'hex' => '#06b6d4', 'keterangan' => 'Compatible (Part Pihak Ketiga Berkualitas)'],
+            ['kode' => 'bekas', 'nama' => 'Bekas / Copotan', 'warna' => 'amber', 'hex' => '#f59e0b', 'keterangan' => 'Bekas / Copotan Unit Mesin Normal'],
+            ['kode' => 'rusak', 'nama' => 'Rusak / Kanibal', 'warna' => 'rose', 'hex' => '#ef4444', 'keterangan' => 'Rusak / Bahan Kanibal Part Teknisi'],
+        ];
+
+        $defMap = collect($defaultKondisi)->keyBy('kode');
         $kondisiList = (is_array($savedKondisi) && ! empty($savedKondisi))
-            ? array_values(array_filter($savedKondisi, fn ($k) => ($k['is_active'] ?? true)))
-            : [
-                ['kode' => 'baru', 'nama' => 'Baru'],
-                ['kode' => 'oem', 'nama' => 'OEM'],
-                ['kode' => 'compatible', 'nama' => 'Compatible'],
-                ['kode' => 'bekas', 'nama' => 'Bekas / Copotan'],
-            ];
+            ? array_values(array_map(function ($k) use ($defMap) {
+                $def = $defMap->get($k['kode'] ?? '');
+
+                return [
+                    'kode' => $k['kode'] ?? 'baru',
+                    'nama' => $k['nama'] ?? 'Baru',
+                    'warna' => $k['warna'] ?? ($def['warna'] ?? 'emerald'),
+                    'hex' => $k['hex'] ?? ($def['hex'] ?? '#10b981'),
+                    'keterangan' => $k['keterangan'] ?? ($def['keterangan'] ?? 'Kondisi Suku Cadang'),
+                    'is_active' => $k['is_active'] ?? true,
+                ];
+            }, array_filter($savedKondisi, fn ($k) => ($k['is_active'] ?? true))))
+            : $defaultKondisi;
+
+        $merekHpOptions = TipeHp::where('is_active', true)
+            ->distinct()
+            ->orderBy('merk')
+            ->pluck('merk')
+            ->filter()
+            ->values()
+            ->all();
+
+        $tipeHpCreateOptions = ! empty($this->kompatibelMerekHp)
+            ? TipeHp::where('is_active', true)->where('merk', $this->kompatibelMerekHp)->orderBy('model')->get()
+            : collect();
+
+        $tipeHpEditOptions = ! empty($this->editKompatibelMerekHp)
+            ? TipeHp::where('is_active', true)->where('merk', $this->editKompatibelMerekHp)->orderBy('model')->get()
+            : collect();
+
+        $selectedCreateTipeHps = ! empty($this->produkForm['tipe_hp_ids'])
+            ? TipeHp::whereIn('id', (array) $this->produkForm['tipe_hp_ids'])->orderBy('merk')->orderBy('model')->get()
+            : collect();
+
+        $selectedEditTipeHps = ! empty($this->editProdukForm['tipe_hp_ids'])
+            ? TipeHp::whereIn('id', (array) $this->editProdukForm['tipe_hp_ids'])->orderBy('merk')->orderBy('model')->get()
+            : collect();
 
         $tipeHpList = TipeHp::where('is_active', true)
             ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
@@ -3334,6 +3516,18 @@ class ProdukTab extends Component
         $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
         $gudangsCabang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->get();
 
+        $quickAddMerk = trim($this->quickAddForm['merk'] ?? $this->quickAddSelectedMerk ?? '');
+        $quickAddExistingModels = (! empty($quickAddMerk) && $quickAddMerk !== '__custom__')
+            ? TipeHp::where('is_active', true)
+                ->where('merk', $quickAddMerk)
+                ->distinct()
+                ->orderBy('model')
+                ->pluck('model')
+                ->filter()
+                ->values()
+                ->all()
+            : [];
+
         return view('modules.wms.livewire.produk-tab', [
             'gudangs' => $gudangs,
             'gudangsCabang' => $gudangsCabang,
@@ -3362,12 +3556,18 @@ class ProdukTab extends Component
             'satuanUnits' => SatuanUnit::where('is_active', true)->orderBy('kode')->get(),
             'suppliers' => Supplier::where('is_active', true)->orderBy('nama')->get(),
             'kondisiList' => $kondisiList,
+            'merekHpOptions' => $merekHpOptions,
+            'tipeHpCreateOptions' => $tipeHpCreateOptions,
+            'tipeHpEditOptions' => $tipeHpEditOptions,
+            'selectedCreateTipeHps' => $selectedCreateTipeHps,
+            'selectedEditTipeHps' => $selectedEditTipeHps,
             'tipeHpList' => $tipeHpList,
             'tipeHpOptions' => $tipeHpOptions,
             'allProdukList' => $allProdukList,
             'allProdukOptions' => $allProdukOptions,
             'brandKompatibelList' => $brandKompatibelList,
             'modelKompatibelList' => $modelKompatibelList,
+            'quickAddExistingModels' => $quickAddExistingModels,
         ]);
     }
 }
