@@ -3382,6 +3382,21 @@ class ProdukTab extends Component
                     ->orWhere(function ($sub) use ($merk, $model) {
                         $sub->where('kompatibilitas_hp', 'like', "%{$merk}%")
                             ->where('kompatibilitas_hp', 'like', "%{$model}%");
+                    })
+                // 4. Kompatibilitas silang antar produk (substitusi langsung)
+                    ->orWhereHas('produkKompatibel', function ($sub) use ($merk, $model) {
+                        $sub->where(function ($sq) use ($merk, $model) {
+                            $sq->where('brand_kompatibel', $merk)->where('model_kompatibel', $model)
+                                ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $merk)->where('tipe_hp.model', $model))
+                                ->orWhere(fn ($jq) => $jq->where('kompatibilitas_hp', 'like', "%{$merk}%")->where('kompatibilitas_hp', 'like', "%{$model}%"));
+                        });
+                    })
+                    ->orWhereHas('disubstitusiOleh', function ($sub) use ($merk, $model) {
+                        $sub->where(function ($sq) use ($merk, $model) {
+                            $sq->where('brand_kompatibel', $merk)->where('model_kompatibel', $model)
+                                ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $merk)->where('tipe_hp.model', $model))
+                                ->orWhere(fn ($jq) => $jq->where('kompatibilitas_hp', 'like', "%{$merk}%")->where('kompatibilitas_hp', 'like', "%{$model}%"));
+                        });
                     });
             });
         } elseif ($merk !== '') {
@@ -3394,7 +3409,17 @@ class ProdukTab extends Component
             $query->where(function ($q) use ($model) {
                 $q->where('model_kompatibel', $model)
                     ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $model))
-                    ->orWhere('kompatibilitas_hp', 'like', "%{$model}%");
+                    ->orWhere('kompatibilitas_hp', 'like', "%{$model}%")
+                    ->orWhereHas('produkKompatibel', function ($sub) use ($model) {
+                        $sub->where('model_kompatibel', $model)
+                            ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $model))
+                            ->orWhere('kompatibilitas_hp', 'like', "%{$model}%");
+                    })
+                    ->orWhereHas('disubstitusiOleh', function ($sub) use ($model) {
+                        $sub->where('model_kompatibel', $model)
+                            ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $model))
+                            ->orWhere('kompatibilitas_hp', 'like', "%{$model}%");
+                    });
             });
         } elseif ($this->filterTipeHpId) {
             $targetTipe = TipeHp::find($this->filterTipeHpId);
@@ -3409,6 +3434,14 @@ class ProdukTab extends Component
                         ->orWhere(function ($sub) use ($tMerk, $tModel) {
                             $sub->where('kompatibilitas_hp', 'like', "%{$tMerk}%")
                                 ->where('kompatibilitas_hp', 'like', "%{$tModel}%");
+                        })
+                        ->orWhereHas('produkKompatibel', function ($sub) use ($tMerk, $tModel) {
+                            $sub->where('brand_kompatibel', $tMerk)->where('model_kompatibel', $tModel)
+                                ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $tMerk)->where('tipe_hp.model', $tModel));
+                        })
+                        ->orWhereHas('disubstitusiOleh', function ($sub) use ($tMerk, $tModel) {
+                            $sub->where('brand_kompatibel', $tMerk)->where('model_kompatibel', $tModel)
+                                ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $tMerk)->where('tipe_hp.model', $tModel));
                         });
                 });
             }
@@ -3497,6 +3530,13 @@ class ProdukTab extends Component
         $hasSearch = ! empty(trim((string) $this->produkSearch));
         if ($hasSearch) {
             $query->urutkanRelevansi($this->produkSearch);
+        } elseif ($model !== '' || $this->filterTipeHpId) {
+            // [T-44b] Hierarki kompatibilitas murni filter: Primary target A11 teratas, cross-compatible A15 dibawahnya
+            $targetSortingModel = $model !== '' ? $model : (TipeHp::find($this->filterTipeHpId)?->model ?? '');
+            $targetSortingMerk = $merk !== '' ? $merk : (TipeHp::find($this->filterTipeHpId)?->merk ?? null);
+            if ($targetSortingModel !== '') {
+                $query->urutkanKompatibilitas($targetSortingModel, $targetSortingMerk);
+            }
         }
 
         // Apply secondary sorting

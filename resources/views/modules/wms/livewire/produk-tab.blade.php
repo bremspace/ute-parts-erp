@@ -1286,7 +1286,12 @@
                                     <span class="block text-[10px] text-ink-400 mt-0.5 truncate">
                                         <strong class="text-ink-700 dark:text-ink-200">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</strong> · {{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}
                                     </span>
-                                    <span class="flex gap-1 mt-1 flex-wrap">
+                                    <span class="flex gap-1 mt-1 flex-wrap items-center">
+                                        @if(!empty($filterModelKompatibel) && strcasecmp((string)$p->model_kompatibel, (string)$filterModelKompatibel) !== 0)
+                                            <span class="px-1.5 py-0.2 rounded bg-up-primary/20 border border-up-primary/40 text-[9px] font-bold text-up-primary" title="Produk ini kompatibel silang / substitusi untuk {{ $filterModelKompatibel }}">
+                                                Kompatibel {{ $filterModelKompatibel }}
+                                            </span>
+                                        @endif
                                         @if($p->brand)
                                             <span class="px-1.5 py-0.2 rounded bg-up-primary/15 border border-up-primary/25 text-[9px] font-bold text-up-primary">{{ $p->brand->nama }}</span>
                                         @endif
@@ -1338,6 +1343,11 @@
                         @if($visibleColumns['kompatibilitas'] ?? false)
                             <td class="py-2.5 px-3 text-xs min-w-[140px]">
                                 <span class="font-medium text-ink-200 block truncate">{{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}</span>
+                                @if(!empty($filterModelKompatibel) && strcasecmp((string)$p->model_kompatibel, (string)$filterModelKompatibel) !== 0)
+                                    <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-up-primary/20 border border-up-primary/40 text-[9px] font-bold text-up-primary">
+                                        Kompatibel {{ $filterModelKompatibel }}
+                                    </span>
+                                @endif
                                 @if($p->tipeHps && $p->tipeHps->isNotEmpty())
                                     <span class="text-[10px] text-ink-400 block line-clamp-1" title="{{ $p->tipeHps->map(fn($t) => $t->merk.' '.$t->model)->join(', ') }}">
                                         {{ $p->tipeHps->count() }} Tipe HP: {{ $p->tipeHps->first()?->model }}

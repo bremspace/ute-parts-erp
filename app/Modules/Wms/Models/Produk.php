@@ -616,6 +616,59 @@ class Produk extends Model
     }
 
     /**
+     * Urutkan hasil berdasarkan prioritas kompatibilitas saat filter Tipe HP aktif tanpa search input:
+     * 1. Exact primary model (model_kompatibel cocok persis) -> paling atas (misal semua LCD A11 dari brand OG, Braderpart, Crown)
+     * 2. Nama memuat model kompatibel -> urutan kedua
+     * 3. Kompatibel silang / multi-kompatibel (lewat relasi tipeHps, kompatibilitas_antar_produk, atau JSON) -> tepat di bawahnya (misal LCD A15 yang kompatibel A11)
+     */
+    public function scopeUrutkanKompatibilitas($query, string $model, ?string $merk = null)
+    {
+        $targetModel = trim($model);
+        if ($targetModel === '') {
+            return $query;
+        }
+
+        $targetMerk = $merk ? trim($merk) : null;
+        $cases = [];
+        $bindings = [];
+
+        // 1. Model Utama Cocok Persis (+200)
+        $cases[] = 'CASE WHEN LOWER(produk.model_kompatibel) = LOWER(?) THEN 200 ELSE 0 END';
+        $bindings[] = $targetModel;
+
+        // 2. Nama Produk Mengandung Model (+100)
+        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 100 ELSE 0 END';
+        $bindings[] = '%'.$targetModel.'%';
+
+        // 3. Relasi Tipe HP Cocok (+50)
+        if ($targetMerk) {
+            $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM tipe_hp JOIN kompatibilitas_produk_tipe_hp ON kompatibilitas_produk_tipe_hp.tipe_hp_id = tipe_hp.id WHERE kompatibilitas_produk_tipe_hp.produk_id = produk.id AND LOWER(tipe_hp.merk) = LOWER(?) AND LOWER(tipe_hp.model) = LOWER(?)) THEN 50 ELSE 0 END';
+            $bindings[] = $targetMerk;
+            $bindings[] = $targetModel;
+        } else {
+            $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM tipe_hp JOIN kompatibilitas_produk_tipe_hp ON kompatibilitas_produk_tipe_hp.tipe_hp_id = tipe_hp.id WHERE kompatibilitas_produk_tipe_hp.produk_id = produk.id AND LOWER(tipe_hp.model) = LOWER(?)) THEN 50 ELSE 0 END';
+            $bindings[] = $targetModel;
+        }
+
+        // 4. Kompatibilitas Antar Produk / Substitusi Silang (+40)
+        $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM kompatibilitas_antar_produk kap JOIN produk p_sub ON kap.kompatibel_produk_id = p_sub.id WHERE kap.produk_id = produk.id AND (LOWER(p_sub.model_kompatibel) = LOWER(?) OR LOWER(p_sub.nama) LIKE LOWER(?))) THEN 40 ELSE 0 END';
+        $bindings[] = $targetModel;
+        $bindings[] = '%'.$targetModel.'%';
+
+        $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM kompatibilitas_antar_produk kap JOIN produk p_sub ON kap.produk_id = p_sub.id WHERE kap.kompatibel_produk_id = produk.id AND (LOWER(p_sub.model_kompatibel) = LOWER(?) OR LOWER(p_sub.nama) LIKE LOWER(?))) THEN 40 ELSE 0 END';
+        $bindings[] = $targetModel;
+        $bindings[] = '%'.$targetModel.'%';
+
+        // 5. JSON Kompatibilitas HP (+30)
+        $cases[] = 'CASE WHEN LOWER(produk.kompatibilitas_hp) LIKE LOWER(?) THEN 30 ELSE 0 END';
+        $bindings[] = '%'.$targetModel.'%';
+
+        $sql = '('.implode(' + ', $cases).')';
+
+        return $query->orderByRaw($sql.' DESC', $bindings);
+    }
+
+    /**
      * Urutkan produk berdasarkan ketersediaan stok (tersedia > habis) dan terlaris (total terjual terbanyak).
      * Memudahkan kasir menemukan fast-moving item yang ready stock dan membantu pelanggan toko online.
      */

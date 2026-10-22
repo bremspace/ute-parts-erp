@@ -873,4 +873,128 @@ class MasterProdukManagementTest extends TestCase
         $this->assertContains($brandCrown->id, $brands);
         $this->assertNotContains($brandUnused->id, $brands);
     }
+
+    public function test_pencarian_murni_filter_kategori_dan_tipe_hp_urutkan_exact_dan_cross_kompatibel(): void
+    {
+        $this->authedAdmin();
+
+        // Master Kategori & Tipe HP
+        $katLcd = KategoriProduk::create(['nama' => 'LCD Touchscreen', 'slug' => 'lcd-touchscreen-test', 'is_active' => true]);
+        $katBaterai = KategoriProduk::create(['nama' => 'Baterai HP', 'slug' => 'baterai-hp-test', 'is_active' => true]);
+
+        $thSamA11 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'A11'], ['is_active' => true]);
+        $thSamA15 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'A15'], ['is_active' => true]);
+
+        // Brand suku cadang berbeda
+        $brandOg = Brand::create(['nama' => 'OG Original Quality', 'slug' => 'og-original-quality', 'is_active' => true]);
+        $brandBrader = Brand::create(['nama' => 'Braderpart Indonesia', 'slug' => 'braderpart-indonesia', 'is_active' => true]);
+        $brandCrown = Brand::create(['nama' => 'Crown Super', 'slug' => 'crown-super', 'is_active' => true]);
+
+        // P1: LCD A11 dari brand OG (Exact primary match A11)
+        $p1 = Produk::create([
+            'nama' => 'LCD Samsung A11 OG Diamond',
+            'slug' => 'lcd-samsung-a11-og-diamond',
+            'kategori_id' => $katLcd->id,
+            'kategori' => $katLcd->nama,
+            'brand_id' => $brandOg->id,
+            'brand_kompatibel' => 'Samsung',
+            'model_kompatibel' => 'A11',
+            'harga_beli' => 120000,
+            'harga_jual_retail' => 180000,
+            'is_active' => true,
+        ]);
+        $p1->tipeHps()->attach($thSamA11->id);
+
+        // P2: LCD A11 dari brand Braderpart (Exact primary match A11)
+        $p2 = Produk::create([
+            'nama' => 'LCD Samsung A11 Braderpart Crown Gold',
+            'slug' => 'lcd-samsung-a11-braderpart-crown-gold',
+            'kategori_id' => $katLcd->id,
+            'kategori' => $katLcd->nama,
+            'brand_id' => $brandBrader->id,
+            'brand_kompatibel' => 'Samsung',
+            'model_kompatibel' => 'A11',
+            'harga_beli' => 125000,
+            'harga_jual_retail' => 185000,
+            'is_active' => true,
+        ]);
+        $p2->tipeHps()->attach($thSamA11->id);
+
+        // P3: LCD A15 dari brand Crown (Primary model A15, tapi KOMPATIBEL SILANG / substitusi dengan A11)
+        $p3 = Produk::create([
+            'nama' => 'LCD Samsung A15 Crown Super OLED',
+            'slug' => 'lcd-samsung-a15-crown-super-oled',
+            'kategori_id' => $katLcd->id,
+            'kategori' => $katLcd->nama,
+            'brand_id' => $brandCrown->id,
+            'brand_kompatibel' => 'Samsung',
+            'model_kompatibel' => 'A15',
+            'harga_beli' => 140000,
+            'harga_jual_retail' => 210000,
+            'is_active' => true,
+        ]);
+        // Tautkan A11 sebagai kompatibilitas silang
+        $p3->tipeHps()->attach($thSamA15->id);
+        $p3->tipeHps()->attach($thSamA11->id);
+        $p3->produkKompatibel()->attach($p1->id);
+
+        // P4: Baterai Samsung A11 (Kategori bukan LCD)
+        $p4 = Produk::create([
+            'nama' => 'Baterai Samsung A11 Original',
+            'slug' => 'baterai-samsung-a11-original',
+            'kategori_id' => $katBaterai->id,
+            'kategori' => $katBaterai->nama,
+            'brand_id' => $brandOg->id,
+            'brand_kompatibel' => 'Samsung',
+            'model_kompatibel' => 'A11',
+            'harga_beli' => 70000,
+            'harga_jual_retail' => 110000,
+            'is_active' => true,
+        ]);
+        $p4->tipeHps()->attach($thSamA11->id);
+
+        // P5: LCD Xiaomi Redmi Note 10 (Kategori LCD tapi bukan A11)
+        $p5 = Produk::create([
+            'nama' => 'LCD Xiaomi Redmi Note 10 OG',
+            'slug' => 'lcd-xiaomi-redmi-note-10-og',
+            'kategori_id' => $katLcd->id,
+            'kategori' => $katLcd->nama,
+            'brand_id' => $brandOg->id,
+            'brand_kompatibel' => 'Xiaomi',
+            'model_kompatibel' => 'Redmi Note 10',
+            'harga_beli' => 130000,
+            'harga_jual_retail' => 190000,
+            'is_active' => true,
+        ]);
+
+        // Eksekusi Livewire: Filter MURNI Kategori LCD + Tipe HP A11 (search input teks = '')
+        $comp = Livewire::test(ProdukTab::class)
+            ->set('produkSearch', '')
+            ->set('filterKategoriId', $katLcd->id)
+            ->set('filterBrandKompatibel', 'Samsung')
+            ->set('filterModelKompatibel', 'A11');
+
+        $items = $comp->viewData('produks')->items();
+        $itemIds = collect($items)->pluck('id')->all();
+
+        // 1. Verifikasi lolos filter:
+        // P1 & P2 (LCD A11 dari brand OG & Braderpart) dan P3 (LCD A15 cross-compatible A11 dari brand Crown) HARUS muncul
+        $this->assertContains($p1->id, $itemIds, 'LCD A11 OG harus muncul');
+        $this->assertContains($p2->id, $itemIds, 'LCD A11 Braderpart harus muncul');
+        $this->assertContains($p3->id, $itemIds, 'LCD A15 Crown (kompatibel silang A11) harus muncul');
+
+        // P4 (Baterai) dan P5 (Xiaomi) TIDAK boleh muncul
+        $this->assertNotContains($p4->id, $itemIds, 'Baterai harus terfilter karena filter kategori LCD aktif');
+        $this->assertNotContains($p5->id, $itemIds, 'Xiaomi harus terfilter karena filter tipe HP Samsung A11 aktif');
+
+        // 2. Verifikasi Hierarki Urutan (Ranking Kompatibilitas):
+        // P1 dan P2 (Exact primary match model A11) HARUS muncul di urutan atas (posisi 0 dan 1)
+        // P3 (LCD A15 - cross compatible) HARUS muncul di bawahnya (posisi 2)
+        $p1Index = array_search($p1->id, $itemIds, true);
+        $p2Index = array_search($p2->id, $itemIds, true);
+        $p3Index = array_search($p3->id, $itemIds, true);
+
+        $this->assertLessThan($p3Index, $p1Index, 'Produk exact match A11 (P1) harus di atas produk cross-compatible A15 (P3)');
+        $this->assertLessThan($p3Index, $p2Index, 'Produk exact match A11 (P2) harus di atas produk cross-compatible A15 (P3)');
+    }
 }
