@@ -922,7 +922,7 @@ class ImportProdukService
 
         $produk = Produk::create([
             'nama' => $nama,
-            'slug' => Str::slug($nama).'-'.Str::lower(Str::random(4)),
+            'slug' => (Str::limit(Str::slug($nama), 180, '') ?: 'produk').'-'.Str::lower(Str::random(4)),
             'deskripsi' => $deskripsi,
             'kategori' => $kategori,
             'kategori_id' => $kategoriId,

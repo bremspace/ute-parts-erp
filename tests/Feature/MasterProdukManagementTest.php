@@ -1054,4 +1054,46 @@ class MasterProdukManagementTest extends TestCase
         $this->assertContains('Redmi 9', $xioModels);
         $this->assertNotContains('Galaxy A11', $xioModels);
     }
+
+    public function test_nama_produk_bisa_lebih_dari_255_karakter_tanpa_dibatasi(): void
+    {
+        $this->authedAdmin();
+
+        $kat = KategoriProduk::firstOrCreate(['nama' => 'LCD Touchscreen', 'slug' => 'lcd-touchscreen-panjang'], ['is_active' => true]);
+
+        // Nama produk panjang (> 300 karakter)
+        $namaPanjang = 'LCD Touchscreen Assembly Fullset Samsung Galaxy A11 SM-A115F SM-A115M Original Equipment Manufacturer Grade A Plus Frame Bezel Housing Hitam Presisi Tinggi Touch Responsif Garansi Tes 7 Hari Toko Ute Parts Official Sparepart HP Indonesia Terlengkap Termurah dan Terpercaya Garansi Resmi Distributor Utama';
+        $this->assertGreaterThan(255, mb_strlen($namaPanjang));
+
+        $comp = Livewire::test(ProdukTab::class);
+
+        $comp->set('produkForm.nama', $namaPanjang)
+            ->set('produkForm.kategori_id', $kat->id)
+            ->set('produkForm.satuan_kode', 'pcs')
+            ->set('produkForm.harga_beli', 125000)
+            ->set('produkForm.harga_jual_retail', 225000)
+            ->set('produkForm.harga_tier.retail.nominal_tetap', 225000)
+            ->call('simpanProduk')
+            ->assertHasNoErrors(['produkForm.nama'])
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
+
+        $produk = Produk::where('nama', $namaPanjang)->first();
+        $this->assertNotNull($produk);
+        $this->assertSame($namaPanjang, $produk->nama);
+        $this->assertLessThanOrEqual(255, strlen($produk->slug));
+
+        // Test update dengan nama produk lebih panjang lagi (> 350 karakter)
+        $namaUpdate = $namaPanjang.' - Versi Revisi Tambahan Informasi Spesifikasi Fleksibel Edisi Khusus Teknisi';
+        $this->assertGreaterThan(300, mb_strlen($namaUpdate));
+
+        $comp->call('openEditProdukModal', $produk->id)
+            ->assertSet('editProdukForm.nama', $namaPanjang)
+            ->set('editProdukForm.nama', $namaUpdate)
+            ->call('simpanEditProduk')
+            ->assertHasNoErrors(['editProdukForm.nama'])
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
+
+        $produk->refresh();
+        $this->assertSame($namaUpdate, $produk->nama);
+    }
 }

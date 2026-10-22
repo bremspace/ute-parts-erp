@@ -41,7 +41,7 @@ class Produk extends Model
     {
         static::creating(function (self $model) {
             if (empty($model->slug) && ! empty($model->nama)) {
-                $base = Str::slug($model->nama);
+                $base = Str::limit(Str::slug($model->nama), 180, '') ?: 'produk';
                 $slug = $base;
                 $counter = 1;
                 while (static::where('slug', $slug)->exists()) {

@@ -139,7 +139,7 @@ class ProdukService
 
             $produk = Produk::create([
                 'nama' => $nama,
-                'slug' => Str::slug($nama).'-'.Str::lower(Str::random(4)),
+                'slug' => (Str::limit(Str::slug($nama), 180, '') ?: 'produk').'-'.Str::lower(Str::random(4)),
                 'barcode' => $cleanBarcode,
                 'deskripsi' => $deskripsi,
                 'kategori' => $finalKategoriStr,

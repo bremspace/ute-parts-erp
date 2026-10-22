@@ -790,7 +790,7 @@ class ProdukTab extends Component
         }
 
         $this->validate([
-            'produkForm.nama' => 'required|string|max:255',
+            'produkForm.nama' => 'required|string',
             'produkForm.barcode' => 'nullable|string|max:50|unique:produk,barcode',
             'produkForm.satuan_kode' => 'required|exists:satuan_unit,kode',
             'produkForm.harga_beli' => 'required|numeric|min:0',
@@ -1142,7 +1142,7 @@ class ProdukTab extends Component
         $primaryVariantId = $primaryVariant?->id;
 
         $this->validate([
-            'editProdukForm.nama' => 'required|string|max:255',
+            'editProdukForm.nama' => 'required|string',
             'editProdukForm.sku' => [
                 'nullable',
                 'string',
