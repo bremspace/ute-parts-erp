@@ -3820,6 +3820,134 @@ class ProdukTab extends Component
         return response()->download($fullPath, 'pricelist-'.$slug.'-'.now()->format('Ymd-His').'.'.$fmt);
     }
 
+    /**
+     * [EXPORT MASTER PRODUK] Ekspor master produk lengkap (xlsx / csv) — semua kolom master:
+     * identitas, kategori berjenjang, brand, kualitas, supplier, kompatibilitas HP,
+     * harga internal + tier (retail/reseller/agen), konfigurasi stok (ABC/ROP/min/max).
+     * Berbeda dari pricelist: dokumen internal, termasuk produk nonaktif & harga_beli.
+     * Ikut mematuhi filter aktif (search, kategori berjenjang, brand, kompatibilitas).
+     */
+    public function exportMaster(string $format = 'xlsx')
+    {
+        if (! $this->boleh('wms.view', 'Anda tidak memiliki hak akses untuk ekspor master produk.')) {
+            return null;
+        }
+
+        $selectedKategoriIds = [];
+        if ($this->filterKategoriId) {
+            $kat = KategoriProduk::find($this->filterKategoriId);
+            if ($kat) {
+                $selectedKategoriIds = $kat->semuaKeturunanIds();
+            }
+        }
+
+        $cabangId = session('cabang_id');
+
+        $query = Produk::with([
+            'brand',
+            'kualitas',
+            'supplier',
+            'kategoriRelasi.parent',
+            'hargaTier',
+            'skuVariants',
+            'tipeHps',
+        ])
+            ->withSum([
+                'stokItems as total_stok' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId))),
+            ], 'jumlah')
+            ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch)->urutkanRelevansi($this->produkSearch))
+            ->when(! empty($selectedKategoriIds), fn ($q) => $q->whereIn('kategori_id', $selectedKategoriIds))
+            ->when($this->filterBrandId, fn ($q) => $q->where('brand_id', $this->filterBrandId))
+            ->when($this->filterBrandKompatibel && $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('brand_kompatibel', $this->filterBrandKompatibel)->where('model_kompatibel', $this->filterModelKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel)->where('tipe_hp.model', $this->filterModelKompatibel))))
+            ->when($this->filterBrandKompatibel && ! $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('brand_kompatibel', $this->filterBrandKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel))))
+            ->when(! $this->filterBrandKompatibel && $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('model_kompatibel', $this->filterModelKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel))))
+            ->orderBy('nama')
+            ->get();
+
+        $rows = [];
+        foreach ($query as $p) {
+            // Daftar tipe HP kompatibel: gabung tipeHps relasi + legacy brand/model, dedup.
+            $namaTipeHp = [];
+            if (! empty($p->brand_kompatibel) || ! empty($p->model_kompatibel)) {
+                $namaTipeHp[] = trim((string) $p->brand_kompatibel.' '.(string) $p->model_kompatibel);
+            }
+            foreach ($p->tipeHps as $th) {
+                $namaTipeHp[] = trim((string) $th->merk.' '.(string) $th->model);
+            }
+
+            $rows[] = [
+                'Kode / SKU' => $p->kode ?: ($p->skuVariants->first()?->sku ?? '-'),
+                'Barcode' => $p->barcode ?: '-',
+                'Nama Produk' => $p->nama,
+                'Kategori Lengkap' => $p->kategoriRelasi?->nama_lengkap ?? $p->kategori ?? '-',
+                'Brand' => $p->brand?->nama ?? $p->brand_kompatibel ?? '-',
+                'Kualitas' => $p->kualitas?->nama ?? '-',
+                'Supplier' => $p->supplier?->nama ?? '-',
+                'Tipe HP Kompatibel' => collect($namaTipeHp)->filter()->unique()->implode(', ') ?: '-',
+                'Kondisi' => $p->kondisi ?: '-',
+                'Satuan' => $p->satuan ?: 'pcs',
+                'Status' => $p->is_active ? 'Aktif' : 'Nonaktif',
+                'Harga Beli (Rp)' => number_format((float) $p->harga_beli, 0, ',', '.'),
+                'Harga Retail (Rp)' => number_format((float) $p->harga_jual_retail, 0, ',', '.'),
+                'Harga Tier Retail (Rp)' => number_format(max(0, (float) $this->resolveHargaTierProduk($p, 'retail')['harga']), 0, ',', '.'),
+                'Harga Tier Reseller (Rp)' => number_format(max(0, (float) $this->resolveHargaTierProduk($p, 'reseller')['harga']), 0, ',', '.'),
+                'Harga Tier Agen (Rp)' => number_format(max(0, (float) $this->resolveHargaTierProduk($p, 'agen')['harga']), 0, ',', '.'),
+                'Harga Fleksibel' => $p->harga_fleksibel ? 'Ya' : 'Tidak',
+                'Wajib SN' => $p->sn ? 'Ya' : 'Tidak',
+                'Stok Total' => (int) ($p->total_stok ?? 0),
+                'ABC Class' => $p->abc_class ?: '-',
+                'Reorder Point' => (int) $p->reorder_point,
+                'Stok Minimum' => (int) $p->min_stock,
+                'Stok Maksimum' => (int) $p->max_stock,
+                'Deskripsi' => $p->deskripsi ?: '-',
+            ];
+        }
+
+        $fmt = $format === 'csv' ? 'csv' : 'xlsx';
+        $userId = auth()->id() ?? 0;
+        $slug = 'master-produk';
+        $filename = $userId.'_'.$slug.'_'.now()->format('Ymd-His').'.'.$fmt;
+        $path = 'exports/'.$filename;
+
+        if ($fmt === 'csv') {
+            $out = fopen('php://memory', 'r+');
+            if (! empty($rows)) {
+                fputcsv($out, array_keys($rows[0]));
+                foreach ($rows as $row) {
+                    fputcsv($out, array_values($row));
+                }
+            }
+            rewind($out);
+            $csv = stream_get_contents($out);
+            fclose($out);
+            Storage::disk('local')->put($path, $csv);
+        } else {
+            Excel::store(new class($rows) implements FromArray, WithHeadings
+            {
+                public function __construct(private array $rows) {}
+
+                public function headings(): array
+                {
+                    return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
+                }
+
+                public function array(): array
+                {
+                    return array_map(fn ($r) => array_values((array) $r), $this->rows);
+                }
+            }, $path, 'local');
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Ekspor master produk berhasil — unduhan dimulai.',
+        ]);
+
+        $fullPath = Storage::disk('local')->path($path);
+
+        return response()->download($fullPath, 'master-produk-'.now()->format('Ymd-His').'.'.$fmt);
+    }
+
     protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
     {
         if (auth()->user()?->can($permission)) {
