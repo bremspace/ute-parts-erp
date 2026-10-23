@@ -144,7 +144,7 @@
                         <div class="flex items-center gap-1.5">
                             <button
                                 type="button"
-                                wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ count($transferItems) - 1 >= 0 ? count($transferItems) - 1 : 0 }}, context: 'transfer' })"
+                                @click="$dispatch('buka-pencarian-produk', { targetIndex: {{ count($transferItems) - 1 >= 0 ? count($transferItems) - 1 : 0 }}, context: 'transfer' })"
                                 class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 text-xs font-semibold flex items-center gap-1 cursor-pointer transition active:scale-95"
                             >
                                 <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -213,7 +213,7 @@
                                     <div class="flex-1 relative">
                                         <input type="text"
                                                wire:model="transferItems.{{ $index }}.produk_nama"
-                                               wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $index }}, context: 'transfer' })"
+                                               @click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $index }}, context: 'transfer' })"
                                                class="w-full px-3 py-2 rounded-xl glass-input text-xs min-h-[44px] cursor-pointer"
                                                placeholder="Klik untuk cari produk..."
                                                readonly>
@@ -229,7 +229,7 @@
                                     </div>
                                     <button
                                         type="button"
-                                        wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $index }}, context: 'transfer' })"
+                                        @click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $index }}, context: 'transfer' })"
                                         class="px-2.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 text-xs min-h-[44px] flex items-center justify-center cursor-pointer shrink-0 transition"
                                         title="Cari Produk Lengkap"
                                     >

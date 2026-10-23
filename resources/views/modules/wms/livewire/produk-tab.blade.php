@@ -1401,22 +1401,7 @@
 
                         @if($visibleColumns['harga_jual'] ?? true)
                             <td class="py-2.5 px-3 tabular-nums text-xs whitespace-nowrap">
-                                @if(!($visibleColumns['harga_beli'] ?? false))
-                                    @if(canSeeField('harga_beli'))
-                                        <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="text-ink-500 dark:text-ink-400">Beli</span>
-                                            <span class="text-ink-900 dark:text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
-                                            @if(($p->metode_harga_beli ?? 'manual') === 'average')
-                                                <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-bold border border-up-mint/30" title="Metode: Moving Average Otomatis dari PO">Avg</span>
-                                            @endif
-                                        </div>
-                                    @else
-                                        <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="text-ink-500 dark:text-ink-400">Beli</span> <span class="text-ink-900 dark:text-white font-semibold">—</span>
-                                        </div>
-                                    @endif
-                                @endif
-                                <div class="flex items-center gap-1.5 flex-wrap {{ !($visibleColumns['harga_beli'] ?? false) ? 'mt-0.5' : '' }}">
+                                <div class="flex items-center gap-1.5 flex-wrap">
                                     <span class="text-ink-400">{{ $filterTierHarga === 'retail' ? 'Jual' : $labelTierAktif }}</span>
                                     <span class="text-up-mint font-semibold">Rp {{ number_format($tierInfo['harga'], 0, ',', '.') }}</span>
                                     @if($filterTierHarga !== 'retail')

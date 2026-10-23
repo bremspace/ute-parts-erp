@@ -64,7 +64,7 @@
                         @endcanany
                         @can('wms.create')
                         <button
-                            wire:click="$dispatch('wms-import-modal')"
+                            @click="$dispatch('wms-import-modal')"
                             class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer"
                             title="Import master produk dari Excel (inisialisasi — bukan stok masuk harian)"
                         >
@@ -72,7 +72,7 @@
                             <span>Import Excel</span>
                         </button>
                         <button
-                            wire:click="$dispatch('wms-produk-modal')"
+                            @click="$dispatch('wms-produk-modal')"
                             class="px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                         >
                             <span>+ Tambah Produk</span>
@@ -82,7 +82,7 @@
                 @elseif($activeTab === 'transfer')
                     @can('wms.transfer')
                     <button
-                        wire:click="$dispatch('wms-transfer-baru')"
+                        @click="$dispatch('wms-transfer-baru')"
                         class="px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs shadow-md shadow-up-accent/25 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
                     >
                         <span>+ Buat Transfer Baru</span>
@@ -91,7 +91,7 @@
                 @elseif($activeTab === 'opname')
                     @can('wms.opname')
                     <button
-                        wire:click="$dispatch('wms-opname-baru')"
+                        @click="$dispatch('wms-opname-baru')"
                         class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
                     >
                         <span>+ Mulai Stock Opname</span>
@@ -129,8 +129,7 @@
                     @can('wms.create')
                     <button
                         type="button"
-                        wire:click="$dispatch('wms-auto-abc')"
-                        wire:confirm="Jalankan klasifikasi otomatis kelas WMS (ABC Pareto) dan parameter ROP / Min-Max untuk seluruh master produk aktif berdasarkan pergerakan 90 hari terakhir?"
+                        @click="if (confirm('Jalankan klasifikasi otomatis kelas WMS (ABC Pareto) dan parameter ROP / Min-Max untuk seluruh master produk aktif berdasarkan pergerakan 90 hari terakhir?')) $dispatch('wms-auto-abc')"
                         class="px-3 sm:px-3.5 py-2 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 text-up-primary border border-up-primary/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[44px]"
                         title="Kalkulasi otomatis kelas ABC dan parameter restock seluruh produk"
                     >
@@ -198,7 +197,7 @@
                         @endcanany
                         @can('wms.create')
                         <button
-                            wire:click="$dispatch('wms-import-modal')"
+                            @click="$dispatch('wms-import-modal')"
                             class="flex-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer"
                             title="Import master produk dari Excel"
                         >
@@ -206,7 +205,7 @@
                             <span>Import</span>
                         </button>
                         <button
-                            wire:click="$dispatch('wms-produk-modal')"
+                            @click="$dispatch('wms-produk-modal')"
                             class="flex-1 px-3 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                         >
                             <span>+ Produk</span>
@@ -216,7 +215,7 @@
                 @elseif($activeTab === 'transfer')
                     @can('wms.transfer')
                     <button
-                        wire:click="$dispatch('wms-transfer-baru')"
+                        @click="$dispatch('wms-transfer-baru')"
                         class="w-full px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs shadow-md shadow-up-accent/25 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
                     >
                         <span>+ Buat Transfer Baru</span>
@@ -225,7 +224,7 @@
                 @elseif($activeTab === 'opname')
                     @can('wms.opname')
                     <button
-                        wire:click="$dispatch('wms-opname-baru')"
+                        @click="$dispatch('wms-opname-baru')"
                         class="w-full px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
                     >
                         <span>+ Mulai Stock Opname</span>
@@ -234,7 +233,7 @@
                 @elseif($activeTab === 'po')
                     @can('wms.create')
                     <div class="flex items-center gap-2 w-full flex-wrap sm:flex-nowrap">
-                        <button wire:click="$dispatch('wms-procurement-modal')" class="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap" title="Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, JIT)">
+                        <button @click="$dispatch('wms-procurement-modal')" class="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap" title="Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, JIT)">
                             <span>📊</span>
                             <span>Rekomendasi</span>
                         </button>

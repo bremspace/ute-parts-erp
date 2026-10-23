@@ -1286,7 +1286,13 @@ class SettingsRbac extends Component
         $cabangIds = array_map('intval', $this->userForm['cabang_ids'] ?? []);
         $defaultId = ! empty($this->userForm['cabang_default_id']) ? (int) $this->userForm['cabang_default_id'] : null;
 
-        if (! in_array($defaultId, $cabangIds, true) && ! empty($cabangIds)) {
+        if (empty($cabangIds)) {
+            $firstCabang = Cabang::where('is_active', true)->first();
+            if ($firstCabang) {
+                $cabangIds = [(int) $firstCabang->id];
+                $defaultId = (int) $firstCabang->id;
+            }
+        } elseif (! in_array($defaultId, $cabangIds, true)) {
             $defaultId = $cabangIds[0];
         }
 

@@ -321,15 +321,30 @@ Route::post('/login-pelanggan', function (Request $request) {
 
 Route::get('/daftar-pelanggan', fn () => view('auth.customer-register'))->name('customer.register');
 Route::post('/daftar-pelanggan', function (Request $request) {
+    // Normalisasi nomor telepon: hapus karakter non-angka dan standardisasi format 62 -> 08
+    $rawTelepon = (string) $request->input('telepon', '');
+    $teleponBersih = preg_replace('/[^0-9]/', '', $rawTelepon);
+    if (str_starts_with($teleponBersih, '628')) {
+        $teleponBersih = '08'.substr($teleponBersih, 3);
+    }
+    $request->merge(['telepon' => $teleponBersih]);
+
     $request->validate([
         'nama' => 'required|string|max:255',
-        'telepon' => 'required|string|max:20|unique:pelanggan,telepon',
+        'telepon' => 'required|string|min:9|max:20|unique:pelanggan,telepon',
         'password' => 'required|string|min:6',
+    ], [
+        'nama.required' => 'Nama lengkap wajib diisi.',
+        'telepon.required' => 'Nomor HP / WhatsApp wajib diisi.',
+        'telepon.unique' => 'Nomor HP / WhatsApp sudah terdaftar. Silakan login ke akun Anda.',
+        'telepon.min' => 'Nomor HP tidak valid (minimal 9 digit).',
+        'password.required' => 'Kata sandi wajib diisi.',
+        'password.min' => 'Kata sandi minimal 6 karakter.',
     ]);
 
     $pelanggan = Pelanggan::create([
-        'nama' => $request->nama,
-        'telepon' => $request->telepon,
+        'nama' => trim($request->nama),
+        'telepon' => $teleponBersih,
         'password' => $request->password,
         'is_reseller' => false,
         'status' => 'pending',
@@ -348,7 +363,7 @@ Route::post('/daftar-pelanggan', function (Request $request) {
         $pemohon = $systemUser->id;
     }
 
-    $approvalService->ajukan(
+    $approvalRequest = $approvalService->ajukan(
         'member',
         $pelanggan->id,
         null,
@@ -360,6 +375,17 @@ Route::post('/daftar-pelanggan', function (Request $request) {
         ],
         $pemohon
     );
+
+    if (! $approvalRequest) {
+        // Fallback: bila tidak ada approval rule aktif, aktifkan akun member langsung
+        $pelanggan->update([
+            'status' => 'aktif',
+            'approved_at' => now(),
+            'approved_by' => $pemohon,
+        ]);
+
+        return redirect()->route('customer.login')->with('info', 'Pendaftaran berhasil! Akun member Anda sudah aktif dan siap digunakan.');
+    }
 
     return redirect()->route('customer.login')->with('info', 'Pendaftaran berhasil dikirim. Akun member Anda sedang menunggu persetujuan (approval) dari owner sebelum dapat digunakan.');
 })->middleware('throttle:10,1')->name('customer.register.post');

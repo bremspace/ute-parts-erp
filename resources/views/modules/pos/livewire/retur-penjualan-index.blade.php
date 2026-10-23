@@ -405,22 +405,22 @@
                                             class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
                                         />
 
-                                        @if(!empty($this->hasilCariTukarProduk))
-                                            <div class="absolute left-0 right-0 top-full mt-1.5 z-20 bg-ink-900 border border-white/10 rounded-2xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-white/5">
+                                        @if(!empty($this->hasilCariTukarProduk) && count($this->hasilCariTukarProduk) > 0)
+                                            <div class="relative mt-2 z-20 bg-ink-900 border border-white/10 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-white/5">
                                                 @foreach($this->hasilCariTukarProduk as $pCari)
                                                     @php $stokTersedia = (int) ($pCari->stokItems->first()?->jumlah ?? 0); @endphp
                                                     <button
                                                         type="button"
                                                         wire:click="tambahTukarItem({{ $pCari->id }})"
-                                                        class="w-full p-2.5 text-left hover:bg-white/5 flex items-center justify-between gap-2 cursor-pointer transition"
+                                                        class="w-full p-2.5 sm:p-3 text-left hover:bg-white/5 flex items-center justify-between gap-2.5 cursor-pointer transition active:scale-[0.99]"
                                                     >
-                                                        <div>
-                                                            <div class="font-bold text-xs text-white">{{ $pCari->nama }}</div>
-                                                            <div class="text-[10px] text-ink-400">Stok: {{ $stokTersedia }} · SKU: {{ $pCari->kode }}</div>
+                                                        <div class="min-w-0 flex-1">
+                                                            <div class="font-bold text-xs sm:text-sm text-white break-words">{{ $pCari->nama }}</div>
+                                                            <div class="text-[10px] text-ink-400 mt-0.5">Stok: <strong class="{{ $stokTersedia > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ $stokTersedia }}</strong> · SKU: {{ $pCari->kode }}</div>
                                                         </div>
-                                                        <div class="text-right">
-                                                            <div class="font-bold text-xs text-up-mint">Rp {{ number_format($pCari->harga_jual, 0, ',', '.') }}</div>
-                                                            <span class="text-[10px] text-up-primary font-bold">+ Pilih</span>
+                                                        <div class="text-right shrink-0">
+                                                            <div class="font-bold text-xs text-up-mint tabular-nums">Rp {{ number_format($pCari->harga_jual, 0, ',', '.') }}</div>
+                                                            <span class="text-[10px] text-up-primary font-bold px-2 py-0.5 rounded-md bg-up-primary/10 border border-up-primary/20 mt-1 inline-block">+ Pilih</span>
                                                         </div>
                                                     </button>
                                                 @endforeach

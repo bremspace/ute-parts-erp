@@ -109,13 +109,13 @@
                             @endphp
                             <div class="text-[11px] leading-tight">
                                 <div class="flex items-start justify-between gap-1 font-semibold text-gray-900">
-                                    <div class="flex items-center gap-1 flex-1 min-w-0">
+                                    <div class="flex items-start gap-1 flex-1 min-w-0">
                                         @if($isJasa)
-                                            <span class="no-print inline-block px-1 py-0.2 rounded text-[8px] font-bold bg-up-mint/10 text-up-mint border border-up-mint/20">JASA</span>
+                                            <span class="no-print inline-block px-1 py-0.2 rounded text-[8px] font-bold bg-up-mint/10 text-up-mint border border-up-mint/20 shrink-0">JASA</span>
                                         @elseif($isPart)
-                                            <span class="no-print inline-block px-1 py-0.2 rounded text-[8px] font-bold bg-up-primary/10 text-up-primary border border-up-primary/20">PART</span>
+                                            <span class="no-print inline-block px-1 py-0.2 rounded text-[8px] font-bold bg-up-primary/10 text-up-primary border border-up-primary/20 shrink-0">PART</span>
                                         @endif
-                                        <span class="truncate">{{ $it['nama'] }}</span>
+                                        <span class="break-words whitespace-normal text-left">{{ $it['nama'] }}</span>
                                     </div>
                                 </div>
                                 <div class="receipt-row flex justify-between text-[10px] text-gray-600 mt-0.5">

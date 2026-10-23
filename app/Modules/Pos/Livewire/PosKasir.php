@@ -944,6 +944,7 @@ class PosKasir extends Component
                 'harga_beli' => (float) ($produk->harga_beli * $faktorKonversi),
                 'qty' => 1,
                 'diskon' => (float) ($pricing['diskon_nominal'] ?? 0.0) * $faktorKonversi,
+                'tier_nama' => $pricing['tier'] ?? null,
                 'subtotal' => $harga,
                 'stok_max' => $stokMaxSatuan,
                 'flex' => (bool) $produk->harga_fleksibel,

@@ -141,6 +141,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // jurnal existing) jadi aman dijalankan dobel.
         // withoutOverlapping(): cegah 2 invocation tumpang tindih di server 1GB.
         $schedule->job(DepresiasiAsetJob::class)
+            ->name(DepresiasiAsetJob::class)
             ->monthlyOn(1, '01:30')
             ->withoutOverlapping();
 

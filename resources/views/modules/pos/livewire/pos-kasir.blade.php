@@ -132,10 +132,27 @@
 
                                     <!-- Price & Stock Badge -->
                                     <div class="text-right flex-shrink-0 flex flex-col items-end gap-1">
+                                        @if(($pricing['diskon_nominal'] ?? 0) > 0)
+                                            <div class="flex items-center gap-1">
+                                                <span class="text-[10px] text-ink-400 line-through tabular-nums">
+                                                    Rp {{ number_format($pricing['harga_dasar'], 0, ',', '.') }}
+                                                </span>
+                                                @if(!empty($pricing['tier']))
+                                                    <span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-up-primary/10 text-up-primary border border-up-primary/20">
+                                                        {{ $pricing['tier'] }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        @endif
                                         <span class="text-xs sm:text-sm font-black text-up-mint tabular-nums">
                                             Rp {{ number_format($baseHarga, 0, ',', '.') }}
                                             <span class="text-[10px] font-normal text-ink-400">/{{ $satuanDasar }}</span>
                                         </span>
+                                        @if(($pricing['diskon_nominal'] ?? 0) > 0)
+                                            <span class="text-[9px] font-semibold text-emerald-500 tabular-nums">
+                                                Hemat Rp {{ number_format($pricing['diskon_nominal'], 0, ',', '.') }}
+                                            </span>
+                                        @endif
 
                                         @if($stokKosong)
                                             <x-prism.status-pill status="batal">
@@ -827,9 +844,26 @@
                             @else
                                 <div class="flex flex-col">
                                     <span class="text-[10px] text-ink-400">Harga Satuan</span>
+                                    @if(($item['diskon'] ?? 0) > 0)
+                                        <div class="flex items-center gap-1">
+                                            <span class="text-[10px] text-ink-400 line-through tabular-nums">
+                                                Rp {{ number_format($item['harga_dasar'], 0, ',', '.') }}
+                                            </span>
+                                            @if(!empty($item['tier_nama']))
+                                                <span class="px-1.5 py-0.2 rounded-full text-[8px] font-bold bg-up-primary/10 text-up-primary border border-up-primary/20">
+                                                    {{ $item['tier_nama'] }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @endif
                                     <span class="tabular-nums font-semibold text-xs text-ink-700 dark:text-ink-300">
                                         Rp {{ number_format($item['harga'], 0, ',', '.') }}
                                     </span>
+                                    @if(($item['diskon'] ?? 0) > 0)
+                                        <span class="text-[9px] text-emerald-500 font-medium tabular-nums">
+                                            Hemat Rp {{ number_format($item['diskon'], 0, ',', '.') }}
+                                        </span>
+                                    @endif
                                 </div>
                             @endif
                         </div>
@@ -970,9 +1004,23 @@
                                     @endif
                                 </div>
                             @else
-                                <span class="text-[11px] tabular-nums font-medium text-ink-500 dark:text-ink-400">
-                                    @ Rp {{ number_format($item['harga'], 0, ',', '.') }}
-                                </span>
+                                <div class="flex flex-col">
+                                    @if(($item['diskon'] ?? 0) > 0)
+                                        <div class="flex items-center gap-1">
+                                            <span class="text-[9px] text-ink-400 line-through tabular-nums">
+                                                Rp {{ number_format($item['harga_dasar'], 0, ',', '.') }}
+                                            </span>
+                                            @if(!empty($item['tier_nama']))
+                                                <span class="px-1 py-0.2 rounded text-[8px] font-bold bg-up-primary/10 text-up-primary">
+                                                    {{ $item['tier_nama'] }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @endif
+                                    <span class="text-[11px] tabular-nums font-medium text-ink-700 dark:text-ink-300">
+                                        @ Rp {{ number_format($item['harga'], 0, ',', '.') }}
+                                    </span>
+                                </div>
                             @endif
                         </div>
 
@@ -1157,9 +1205,26 @@
                                     </div>
                                 @else
                                     <div class="flex flex-col items-end">
+                                        @if(($item['diskon'] ?? 0) > 0)
+                                            <div class="flex items-center gap-1">
+                                                <span class="text-[10px] text-ink-400 line-through tabular-nums">
+                                                    Rp {{ number_format($item['harga_dasar'], 0, ',', '.') }}
+                                                </span>
+                                                @if(!empty($item['tier_nama']))
+                                                    <span class="px-1.5 py-0.2 rounded-full text-[8px] font-bold bg-up-primary/10 text-up-primary border border-up-primary/20">
+                                                        {{ $item['tier_nama'] }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        @endif
                                         <span class="font-semibold tabular-nums text-xs text-ink-700 dark:text-ink-300">
                                             Rp {{ number_format($item['harga'], 0, ',', '.') }}
                                         </span>
+                                        @if(($item['diskon'] ?? 0) > 0)
+                                            <span class="text-[9px] text-emerald-500 font-medium tabular-nums">
+                                                Hemat Rp {{ number_format($item['diskon'], 0, ',', '.') }}
+                                            </span>
+                                        @endif
                                         @if(($item['konversi'] ?? 1) > 1)
                                             <span class="text-[9px] text-ink-400 tabular-nums">
                                                 isi {{ (float)$item['konversi'] }} unit

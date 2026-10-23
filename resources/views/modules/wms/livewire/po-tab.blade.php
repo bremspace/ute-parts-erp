@@ -212,7 +212,7 @@
                                             <div class="flex-1 relative">
                                                 <input type="text"
                                                        wire:model="poForm.items.{{ $idx }}.produk_nama"
-                                                       wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po', supplierId: {{ !empty($poForm['supplier_id']) ? (int)$poForm['supplier_id'] : 'null' }} })"
+                                                       @click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po', supplierId: {{ !empty($poForm['supplier_id']) ? (int)$poForm['supplier_id'] : 'null' }} })"
                                                        class="w-full pl-3 pr-8 py-2 rounded-xl glass-input text-xs min-h-[44px] cursor-pointer font-medium"
                                                        placeholder="Klik untuk cari produk..."
                                                        readonly>
@@ -227,7 +227,7 @@
                                             </div>
                                             <button
                                                 type="button"
-                                                wire:click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po', supplierId: {{ !empty($poForm['supplier_id']) ? (int)$poForm['supplier_id'] : 'null' }} })"
+                                                @click="$dispatch('buka-pencarian-produk', { targetIndex: {{ $idx }}, context: 'po', supplierId: {{ !empty($poForm['supplier_id']) ? (int)$poForm['supplier_id'] : 'null' }} })"
                                                 class="px-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white border border-white/10 text-xs min-h-[44px] flex items-center justify-center cursor-pointer shrink-0 transition"
                                                 title="Cari Produk">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

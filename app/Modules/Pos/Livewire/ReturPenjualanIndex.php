@@ -64,12 +64,14 @@ class ReturPenjualanIndex extends Component
     public function mount(): void
     {
         if (request()->has('transaksi_id')) {
-            $this->kwitansiInput = (string) request()->query('transaksi_id');
+            $input = (string) request()->query('transaksi_id');
             $this->bukaModalTambah();
+            $this->kwitansiInput = $input;
             $this->cariKwitansi();
         } elseif (request()->has('no_faktur')) {
-            $this->kwitansiInput = (string) request()->query('no_faktur');
+            $input = (string) request()->query('no_faktur');
             $this->bukaModalTambah();
+            $this->kwitansiInput = $input;
             $this->cariKwitansi();
         }
     }

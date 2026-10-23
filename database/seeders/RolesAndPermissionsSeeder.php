@@ -60,6 +60,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'lihat-audit-log',
             // KEAMANAN & SESI (F3-4)
             'kelola-sesi',
+            // HARGA FLEKSIBEL
+            'atur-harga-fleksibel',
             // [F3-1] Field-level security permissions — baru untuk menghide harga_beli/margin dari role kasir/staff
             'lihat.harga_beli',
             'lihat.margin',

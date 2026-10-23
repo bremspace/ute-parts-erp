@@ -23,6 +23,18 @@
                 <strong>Catatan:</strong> Pendaftaran member baru memerlukan verifikasi dan persetujuan (approval) owner sebelum akun aktif.
             </div>
 
+            @if(session('info'))
+                <div class="mb-4 p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-700 text-xs font-medium">
+                    {{ session('info') }}
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="mb-4 p-3.5 rounded-xl bg-up-red/10 border border-up-red/20 text-up-red text-xs font-medium">
+                    {{ session('error') }}
+                </div>
+            @endif
+
             @if($errors->any())
                 <div class="mb-5 p-3.5 rounded-xl bg-up-red/10 border border-up-red/20 text-up-red text-xs font-medium">
                     @foreach($errors->all() as $e)
@@ -35,14 +47,14 @@
                 @csrf
                 <div>
                     <label for="nama" class="block text-xs font-semibold text-ink-700 mb-1.5">Nama Lengkap</label>
-                    <input type="text" id="nama" name="nama" required autofocus placeholder="Nama Anda"
+                    <input type="text" id="nama" name="nama" value="{{ old('nama') }}" required autofocus placeholder="Nama Anda"
                         class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
                 </div>
                 <div>
-                    <label for="telepon" class="block text-xs font-semibold text-ink-700 mb-1.5">Nomor HP</label>
-                    <input type="text" id="telepon" name="telepon" required placeholder="08xx-xxxx-xxxx"
+                    <label for="telepon" class="block text-xs font-semibold text-ink-700 mb-1.5">Nomor HP / WhatsApp</label>
+                    <input type="text" id="telepon" name="telepon" value="{{ old('telepon') }}" required placeholder="08xx-xxxx-xxxx"
                         class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
-                    <p class="text-[11px] text-ink-400 mt-1">Nomor ini dipakai untuk login & verifikasi OTP (menyusul).</p>
+                    <p class="text-[11px] text-ink-400 mt-1">Nomor ini dipakai untuk login & verifikasi akun member.</p>
                 </div>
                 <div>
                     <label for="password" class="block text-xs font-semibold text-ink-700 mb-1.5">Kata Sandi</label>

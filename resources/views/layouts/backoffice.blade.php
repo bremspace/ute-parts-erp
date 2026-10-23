@@ -544,7 +544,42 @@
                                   d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
-                    <h2 class="text-sm sm:text-base lg:text-xl font-bold text-ink-900 dark:text-white tracking-tight truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none">{{ $header ?? 'Ute Parts ERP' }}</h2>
+                    @php
+                        $resolvedHeader = $header ?? null;
+                        if (! $resolvedHeader || $resolvedHeader === 'Ute Parts ERP') {
+                            $resolvedHeader = match (true) {
+                                request()->is('app/dashboard*') => 'Dashboard',
+                                request()->is('app/pos/riwayat*') => 'Riwayat Transaksi',
+                                request()->is('app/pos/pesanan-online*') => 'Pesanan Online',
+                                request()->is('app/pos/retur*') => 'Retur Konsumen',
+                                request()->is('app/pos*') => 'Kasir Point of Sale (POS)',
+                                request()->is('app/servis*') => 'Servis HP (Kanban)',
+                                request()->is('app/wms/cycle-count*') => 'Cycle Count Otomatis',
+                                request()->is('app/wms*') => 'Gudang & Manajemen Stok (WMS)',
+                                request()->is('app/crm/leads*') => 'Lead Pipeline',
+                                request()->is('app/crm*') => 'CRM & Membership',
+                                request()->is('app/reseller*') => 'Reseller & Komisi',
+                                request()->is('app/akunting/aset*') => 'Aset Tetap & Depresiasi',
+                                request()->is('app/akunting*') => 'Akunting & Keuangan',
+                                request()->is('app/laporan-pajak*') => 'Laporan Pajak Bulanan',
+                                request()->is('app/laporan/nomor-seri*') => 'Laporan Histori Nomor Seri',
+                                request()->is('app/laporan*') => 'Laporan & Analitik',
+                                request()->is('app/hr/absensi*') => 'Absensi, Shift & KPI',
+                                request()->is('app/hr/payroll*') => 'Payroll Karyawan',
+                                request()->is('app/hr/saya*') => 'Portal Karyawan',
+                                request()->is('app/hr/komisi-skema*') => 'Skema Komisi Multi-Aktor',
+                                request()->is('app/hr*') => 'HR & Payroll',
+                                request()->is('app/omnichannel*') => 'Omnichannel Command Center',
+                                request()->is('app/approvals*') => 'Approval Inbox',
+                                request()->is('app/keamanan/dua-faktor*') => 'Keamanan Akun & 2FA',
+                                request()->is('app/keamanan/sesi*') => 'Sesi Perangkat',
+                                request()->is('app/audit-log*') => 'Audit Trail & Log',
+                                request()->is('app/pengaturan*') => 'Pengaturan & Sistem',
+                                default => 'Ute Parts ERP',
+                            };
+                        }
+                    @endphp
+                    <h2 class="text-sm sm:text-base lg:text-xl font-bold text-ink-900 dark:text-white tracking-tight truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none">{{ $resolvedHeader }}</h2>
                 </div>
 
                 <!-- Shortcuts, Install Button & Status Indicator -->
@@ -804,6 +839,7 @@
                 sidebarOpen: false,
                 sidebarCollapsed: false,
                 isMobile: window.innerWidth < 768,
+                defaultDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : ''))))))) }}',
                 activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : ''))))))) }}',
 
                 init() {
@@ -815,6 +851,15 @@
                     } catch (e) {
                         this.sidebarCollapsed = true;
                     }
+
+                    try {
+                        const savedDropdown = localStorage.getItem('ute-sidebar-active-dropdown');
+                        if (savedDropdown !== null) {
+                            this.activeDropdown = savedDropdown || null;
+                        } else if (this.defaultDropdown) {
+                            this.activeDropdown = this.defaultDropdown;
+                        }
+                    } catch (e) {}
                     
                     // Handle resize: close drawer on mobile when resizing to tablet/desktop
                     window.addEventListener('resize', () => {
@@ -843,9 +888,15 @@
                             localStorage.setItem('ute-sidebar-md-collapsed', '0');
                         } catch (e) {}
                         this.activeDropdown = name;
+                        try {
+                            localStorage.setItem('ute-sidebar-active-dropdown', name || '');
+                        } catch (e) {}
                         return;
                     }
                     this.activeDropdown = this.activeDropdown === name ? null : name;
+                    try {
+                        localStorage.setItem('ute-sidebar-active-dropdown', this.activeDropdown || '');
+                    } catch (e) {}
                 },
 
                 isDropdownOpen(name) {
