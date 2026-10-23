@@ -3851,6 +3851,8 @@ class ProdukTab extends Component
             'hargaTier',
             'skuVariants',
             'tipeHps',
+            'stokItems',
+            'produkKompatibel',
         ])
             ->withSum([
                 'stokItems as total_stok' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId))),
@@ -3866,40 +3868,70 @@ class ProdukTab extends Component
 
         $rows = [];
         foreach ($query as $p) {
-            // Daftar tipe HP kompatibel: gabung tipeHps relasi + legacy brand/model, dedup.
-            $namaTipeHp = [];
-            if (! empty($p->brand_kompatibel) || ! empty($p->model_kompatibel)) {
-                $namaTipeHp[] = trim((string) $p->brand_kompatibel.' '.(string) $p->model_kompatibel);
-            }
-            foreach ($p->tipeHps as $th) {
-                $namaTipeHp[] = trim((string) $th->merk.' '.(string) $th->model);
+            // Ambil merk_hp dan tipe_hp dari relasi tipeHps (ambil yang pertama sebagai utama)
+            $merkHp = '';
+            $tipeHp = '';
+            if ($p->tipeHps->isNotEmpty()) {
+                $firstTipe = $p->tipeHps->first();
+                $merkHp = $firstTipe->merk ?? '';
+                $tipeHp = $firstTipe->model ?? '';
+            } elseif (! empty($p->brand_kompatibel) || ! empty($p->model_kompatibel)) {
+                $merkHp = $p->brand_kompatibel ?? '';
+                $tipeHp = $p->model_kompatibel ?? '';
             }
 
+            // Untuk kompatibilitas_hp: gabung semua tipeHps sebagai JSON string (merk:model)
+            $kompatibilitasHp = $p->tipeHps->map(fn ($th) => trim((string) $th->merk.':'.(string) $th->model))->filter()->unique()->implode(';');
+
+            // Stok awal untuk import: gunakan stok total saat ini (bisa dikosongkan user nanti)
+            $stokAwal = (int) ($p->total_stok ?? 0);
+
+            // Gudang/Rak default: ambil dari stokItems pertama yang ada
+            $gudangId = '-';
+            $rakId = '-';
+            if ($p->stokItems->isNotEmpty()) {
+                $firstStok = $p->stokItems->first();
+                $gudangId = $firstStok->gudang_id ?? '-';
+                $rakId = $firstStok->rak_id ?? '-';
+            }
+
+            // Produk kompatibel SKU: ambil dari relasi produk_kompatibel
+            $produkKompatibelSku = $p->produkKompatibel->pluck('kode')->filter()->implode(',');
+
+            // Foto URL: ambil dari kolom foto/gambar
+            $fotoUrl = $p->foto ?? $p->gambar ?? '';
+
+            // Kategori untuk import: gunakan nama kategori sederhana (bukan berjenjang)
+            $kategoriImport = $p->kategoriRelasi?->nama ?? $p->kategori ?? '-';
+
+            // Brand untuk import: gunakan brand relasi
+            $brandImport = $p->brand?->nama ?? $p->brand_kompatibel ?? '-';
+
             $rows[] = [
-                'Kode / SKU' => $p->kode ?: ($p->skuVariants->first()?->sku ?? '-'),
-                'Barcode' => $p->barcode ?: '-',
-                'Nama Produk' => $p->nama,
-                'Kategori Lengkap' => $p->kategoriRelasi?->nama_lengkap ?? $p->kategori ?? '-',
-                'Brand' => $p->brand?->nama ?? $p->brand_kompatibel ?? '-',
-                'Kualitas' => $p->kualitas?->nama ?? '-',
-                'Supplier' => $p->supplier?->nama ?? '-',
-                'Tipe HP Kompatibel' => collect($namaTipeHp)->filter()->unique()->implode(', ') ?: '-',
-                'Kondisi' => $p->kondisi ?: '-',
-                'Satuan' => $p->satuan ?: 'pcs',
-                'Status' => $p->is_active ? 'Aktif' : 'Nonaktif',
-                'Harga Beli (Rp)' => number_format((float) $p->harga_beli, 0, ',', '.'),
-                'Harga Retail (Rp)' => number_format((float) $p->harga_jual_retail, 0, ',', '.'),
-                'Harga Tier Retail (Rp)' => number_format(max(0, (float) $this->resolveHargaTierProduk($p, 'retail')['harga']), 0, ',', '.'),
-                'Harga Tier Reseller (Rp)' => number_format(max(0, (float) $this->resolveHargaTierProduk($p, 'reseller')['harga']), 0, ',', '.'),
-                'Harga Tier Agen (Rp)' => number_format(max(0, (float) $this->resolveHargaTierProduk($p, 'agen')['harga']), 0, ',', '.'),
-                'Harga Fleksibel' => $p->harga_fleksibel ? 'Ya' : 'Tidak',
-                'Wajib SN' => $p->sn ? 'Ya' : 'Tidak',
-                'Stok Total' => (int) ($p->total_stok ?? 0),
-                'ABC Class' => $p->abc_class ?: '-',
-                'Reorder Point' => (int) $p->reorder_point,
-                'Stok Minimum' => (int) $p->min_stock,
-                'Stok Maksimum' => (int) $p->max_stock,
-                'Deskripsi' => $p->deskripsi ?: '-',
+                'sku' => $p->kode ?: ($p->skuVariants->first()?->sku ?? '-'),
+                'nama' => $p->nama,
+                'barcode' => $p->barcode ?: '-',
+                'satuan' => $p->satuan ?: 'pcs',
+                'kategori' => $kategoriImport,
+                'brand' => $brandImport,
+                'merk_hp' => $merkHp,
+                'tipe_hp' => $tipeHp,
+                'kualitas' => $p->kualitas?->nama ?? '-',
+                'kondisi' => $p->kondisi ?: 'baru',
+                'harga_beli' => (float) $p->harga_beli,
+                'harga_jual' => (float) $p->harga_jual_retail,
+                'harga_reseller' => (float) $this->resolveHargaTierProduk($p, 'reseller')['harga'],
+                'harga_agen' => (float) $this->resolveHargaTierProduk($p, 'agen')['harga'],
+                'min_stock' => (int) $p->min_stock,
+                'reorder_point' => (int) $p->reorder_point,
+                'sn' => $p->sn ? 'ya' : 'tidak',
+                'stok_awal' => $stokAwal,
+                'gudang_id' => $gudangId,
+                'rak_id' => $rakId,
+                'produk_kompatibel_sku' => $produkKompatibelSku ?: '',
+                'kompatibilitas_hp' => $kompatibilitasHp ?: '',
+                'deskripsi' => $p->deskripsi ?: '',
+                'foto_url' => $fotoUrl,
             ];
         }
 

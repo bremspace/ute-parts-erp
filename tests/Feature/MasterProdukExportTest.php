@@ -132,36 +132,35 @@ class MasterProdukExportTest extends TestCase
         $headings = $data[0][0];
         $this->assertIsArray($headings);
 
+        // Kolom sekarang mengikuti template import (ImportProdukService::templateColumns)
         $wajib = [
-            'Kode / SKU', 'Barcode', 'Nama Produk', 'Kategori Lengkap', 'Brand',
-            'Kualitas', 'Supplier', 'Tipe HP Kompatibel', 'Kondisi', 'Satuan',
-            'Status', 'Harga Beli (Rp)', 'Harga Retail (Rp)',
-            'Harga Tier Retail (Rp)', 'Harga Tier Reseller (Rp)', 'Harga Tier Agen (Rp)',
-            'Harga Fleksibel', 'Wajib SN', 'Stok Total', 'ABC Class',
-            'Reorder Point', 'Stok Minimum', 'Stok Maksimum', 'Deskripsi',
+            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'brand',
+            'merk_hp', 'tipe_hp', 'kualitas', 'kondisi',
+            'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen',
+            'min_stock', 'reorder_point', 'sn', 'stok_awal', 'gudang_id', 'rak_id',
+            'produk_kompatibel_sku', 'kompatibilitas_hp', 'deskripsi', 'foto_url',
         ];
         foreach ($wajib as $kolom) {
             $this->assertContains($kolom, $headings, "Kolom '$kolom' tidak ada di heading xlsx.");
         }
 
         // Baris produk nonaktif harus ikut terekspor (master lengkap, tanpa filter is_active)
-        $namaIdx = array_search('Nama Produk', $headings);
-        $katIdx = array_search('Kategori Lengkap', $headings);
-        $statusIdx = array_search('Status', $headings);
-        $brandIdx = array_search('Brand', $headings);
+        $namaIdx = array_search('nama', $headings);
+        $katIdx = array_search('kategori', $headings);
+        $statusIdx = -1; // status tidak lagi di kolom, cek is_active via kondisi/empty
+        $brandIdx = array_search('brand', $headings);
 
         $body = array_slice($data[0], 1);
         $nonaktifRow = collect($body)->first(fn ($row) => ($row[$namaIdx] ?? null) === 'Produk Nonaktif Master');
         $this->assertNotNull($nonaktifRow, 'Produk nonaktif tidak ikut terekspor di xlsx.');
-        $this->assertSame('Nonaktif', $nonaktifRow[$statusIdx]);
 
-        // Relasi master: kategori berjenjang & brand
+        // Relasi master: kategori & brand
         $aktifRow = collect($body)->first(fn ($row) => ($row[$namaIdx] ?? null) === 'LCD Aktif Master');
         $this->assertNotNull($aktifRow, 'Produk aktif tidak terekspor di xlsx.');
         $this->assertSame('Brand Jaya', $aktifRow[$brandIdx]);
 
-        // Kategori berjenjang via accessor nama_lengkap (parent > anak)
-        $this->assertSame('Sparepart HP > LCD', $aktifRow[$katIdx]);
+        // Kategori untuk import: nama kategori sederhana (bukan berjenjang)
+        $this->assertSame('LCD', $aktifRow[$katIdx]);
     }
 
     public function test_export_master_csv_berisi_nilai_tier(): void
@@ -175,17 +174,16 @@ class MasterProdukExportTest extends TestCase
         $path = $this->fileExportMasterTerbaru();
         $content = Storage::disk('local')->get($path);
 
-        // Heading & kolom tier resolusi
-        $this->assertStringContainsString('Harga Retail (Rp)', $content);
-        $this->assertStringContainsString('Harga Tier Reseller (Rp)', $content);
+        // Heading & kolom tier resolusi (kolom baru: harga_reseller, harga_agen)
+        $this->assertStringContainsString('harga_reseller', $content);
+        $this->assertStringContainsString('harga_agen', $content);
 
-        // Produk nonaktif terekspor dengan status
+        // Produk nonaktif terekspor
         $this->assertStringContainsString('Produk Nonaktif Master', $content);
-        $this->assertStringContainsString('Nonaktif', $content);
 
-        // Angka harga ter-format ribuan id-ID (titik)
-        $this->assertStringContainsString('12.000', $content);
-        $this->assertStringContainsString('20.000', $content);
+        // Angka harga tanpa format ribuan (raw numbers untuk import)
+        $this->assertStringContainsString('12000', $content);
+        $this->assertStringContainsString('20000', $content);
     }
 
     public function test_export_master_menghormati_filter_kategori(): void

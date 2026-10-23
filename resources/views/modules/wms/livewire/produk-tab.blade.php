@@ -181,7 +181,6 @@
                             </button>
 
                             <div x-show="open" x-cloak
-                                 @click="open = false"
                                  x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
                                  x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                                  class="absolute left-0 z-50 mt-2 w-64 rounded-xl glass-card bg-ink-900 border border-white/10 shadow-2xl py-2 origin-top-left"
