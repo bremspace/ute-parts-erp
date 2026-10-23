@@ -5,6 +5,7 @@ namespace App\Modules\Marketplace\Livewire;
 use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,6 +45,12 @@ class ShopPage extends Component
 
     public string $filterHpModel = ''; // [T-11] filter dari kompatibilitas_hp JSON
 
+    public string $filterKualitas = '';
+
+    public string $filterStok = ''; // '', 'tersedia', 'habis'
+
+    public string $sort = ''; // '', 'terbaru', 'terlaris', 'termurah', 'termahal', 'relevansi'
+
     public ?int $hargaMax = null;
 
     // Detail: pilihan varian & qty
@@ -76,6 +83,17 @@ class ShopPage extends Component
     public function updatingSearch()
     {
         $this->resetPage();
+    }
+
+    public function getKualitasListProperty()
+    {
+        return Cache::remember('shop.kualitas-list.v1', self::HP_LIST_CACHE_TTL, function (): array {
+            return KualitasProduk::where('is_active', true)
+                ->orderBy('nama')
+                ->get(['id', 'nama'])
+                ->map(fn ($k) => ['id' => (string) $k->id, 'nama' => (string) $k->nama])
+                ->all();
+        });
     }
 
     public function getCategoriesProperty(): array
@@ -241,7 +259,38 @@ class ShopPage extends Component
             $query->where('harga_jual_retail', '<=', $this->hargaMax);
         }
 
-        return $query->paginate(18);
+        // Filter kualitas (grade part, mis. OEM vs compatible)
+        if ($this->filterKualitas) {
+            if (is_numeric($this->filterKualitas)) {
+                $query->where('kualitas_id', (int) $this->filterKualitas);
+            } else {
+                $query->whereHas('kualitas', fn ($kq) => $kq->where('nama', $this->filterKualitas));
+            }
+        }
+
+        // Filter ketersediaan stok mengikuti stok_items live (tersinkron dgn POS/backoffice)
+        if ($this->filterStok === 'tersedia') {
+            $query->has('stokItems');
+        } elseif ($this->filterStok === 'habis') {
+            $query->doesntHave('stokItems');
+        }
+
+        // Urutan: dropdown user > kompatibilitas gaid (semester filterHpModel) > relevansi dgn keyword > default (ready-stok "& terlaris)
+        if ($this->sort === 'termurah') {
+            $query->orderBy('harga_jual_retail', 'asc');
+        } elseif ($this->sort === 'termahal') {
+            $query->orderBy('harga_jual_retail', 'desc');
+        } elseif ($this->sort === 'terbaru') {
+            $query->latest('produk.id');
+        } elseif ($this->sort === 'terlaris') {
+            $query->orderByDesc('total_terjual')->orderByDesc('stok_katalog');
+        } elseif ($this->sort === 'relevansi' && $this->search) {
+            $query->urutkanRelevansi($this->search);
+        } elseif (! $this->sort && ! $this->search && $this->filterHpModel) {
+            $query->urutkanKompatibilitas($this->filterHpModel, $this->filterHpMerk ?: null);
+        }
+
+        return $query->paginate(24);
     }
 
     public function getProductDetailProperty(): ?Produk
@@ -376,6 +425,7 @@ class ShopPage extends Component
                 $this->selectedVariantId,
                 max(1, $this->qty)
             );
+            $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
             $this->dispatch('alert', ['type' => 'success', 'message' => "{$produk->nama} masuk keranjang"]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
@@ -399,6 +449,7 @@ class ShopPage extends Component
             'brands' => $this->brands,
             'hpMerkList' => $this->hpMerkList,
             'hpModelList' => $this->hpModelList,
+            'kualitasList' => $this->kualitasList,
             'products' => $this->products,
         ])->layout('layouts.marketplace', ['title' => 'Katalog Sparepart']);
     }

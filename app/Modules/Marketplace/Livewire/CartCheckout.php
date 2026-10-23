@@ -69,11 +69,13 @@ class CartCheckout extends Component
     public function updateQty(string $key, int $qty)
     {
         app(CartService::class)->updateQty($key, $qty);
+        $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
     }
 
     public function hapus(string $key)
     {
         app(CartService::class)->hapus($key);
+        $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
     }
 
     public function lanjutCheckout()
@@ -100,12 +102,17 @@ class CartCheckout extends Component
             return;
         }
 
-        $this->validate([
+        $rules = [
             'selectedCabangId' => 'required|exists:cabang,id',
             'metodeAmbil' => 'required|in:ambil_ke_toko,pengiriman',
             'namaPenerima' => 'nullable|string|max:100',
             'teleponPenerima' => 'nullable|string|max:20',
-            'alamatPengiriman' => 'nullable|string',
+            'alamatPengiriman' => $this->metodeAmbil === 'pengiriman' ? 'required|string|min:5' : 'nullable|string',
+        ];
+
+        $this->validate($rules, [
+            'alamatPengiriman.required' => 'Alamat pengiriman wajib diisi untuk pengiriman kurir.',
+            'alamatPengiriman.min' => 'Alamat pengiriman minimal 5 karakter.',
         ]);
 
         $items = [];
@@ -134,6 +141,7 @@ class CartCheckout extends Component
             );
 
             app(CartService::class)->kosongkan();
+            $this->dispatch('cart-updated', count: 0);
 
             $this->orderNo = $order->no_transaksi;
             $this->orderTotal = (float) $order->total_akhir;

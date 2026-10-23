@@ -31,7 +31,7 @@
                 $galeri = $produk->galeri_foto;
                 $fotoUtama = $produk->foto_utama ?: $produk->gambar;
             @endphp
-            <div class="lg:col-span-6 space-y-4 lg:sticky lg:top-24" x-data="{ activeFoto: '{{ $fotoUtama }}' }">
+            <div class="lg:col-span-6 space-y-4 lg:sticky lg:top-24" x-data="{ activeFoto: @js($fotoUtama) }">
                 <!-- Main Stage Canvas -->
                 <div class="aspect-square bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/90 dark:border-white/[0.08] flex items-center justify-center overflow-hidden relative shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
                     <template x-if="activeFoto">
@@ -54,8 +54,8 @@
                         @foreach($galeri as $item)
                             <button
                                 type="button"
-                                x-on:click="activeFoto = '{{ $item['url'] }}'"
-                                :class="activeFoto === '{{ $item['url'] }}' ? 'ring-2 ring-up-primary dark:ring-white scale-100 opacity-100' : 'opacity-60 hover:opacity-100 scale-95'"
+                                x-on:click="activeFoto = @js($item['url'])"
+                                :class="activeFoto === @js($item['url']) ? 'ring-2 ring-up-primary dark:ring-white scale-100 opacity-100' : 'opacity-60 hover:opacity-100 scale-95'"
                                 class="w-14 sm:w-18 h-14 sm:h-18 rounded-2xl overflow-hidden border border-ink-200/80 dark:border-white/10 flex-shrink-0 transition-[opacity,transform] duration-140 cursor-pointer bg-white dark:bg-ink-900"
                             >
                                 <img src="{{ $item['thumb'] ?? $item['url'] }}" alt="Thumbnail" class="w-full h-full object-cover">

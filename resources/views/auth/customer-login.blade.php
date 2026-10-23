@@ -33,7 +33,7 @@
                 @csrf
                 <div>
                     <label for="telepon" class="block text-xs font-semibold text-ink-700 mb-1.5">Nomor Telepon</label>
-                    <input type="text" id="telepon" name="telepon" required autofocus placeholder="08xx-xxxx-xxxx"
+                    <input type="text" id="telepon" name="telepon" value="{{ old('telepon') }}" required autofocus placeholder="08xx-xxxx-xxxx"
                         class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
                 </div>
                 <div>

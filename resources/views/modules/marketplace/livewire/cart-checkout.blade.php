@@ -109,15 +109,18 @@
                                         <div>
                                             <label class="block text-[11px] font-bold text-ink-600 dark:text-ink-400 mb-1">Nama Penerima</label>
                                             <input type="text" wire:model="namaPenerima" placeholder="Nama lengkap penerima" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-semibold text-ink-900 dark:text-white outline-none focus:border-up-primary" />
+                                            @error('namaPenerima') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                                         </div>
                                         <div>
                                             <label class="block text-[11px] font-bold text-ink-600 dark:text-ink-400 mb-1">Nomor WhatsApp / HP</label>
                                             <input type="text" wire:model="teleponPenerima" placeholder="08xxxxxxxxxx" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs font-semibold text-ink-900 dark:text-white outline-none focus:border-up-primary font-mono" />
+                                            @error('teleponPenerima') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                                         </div>
                                     </div>
                                     <div>
-                                        <label class="block text-[11px] font-bold text-ink-600 dark:text-ink-400 mb-1">Alamat Lengkap</label>
+                                        <label class="block text-[11px] font-bold text-ink-600 dark:text-ink-400 mb-1">Alamat Lengkap <span class="text-up-red">*</span></label>
                                         <textarea wire:model="alamatPengiriman" rows="2" placeholder="Jalan, nomor rumah, RT/RW, kelurahan, kecamatan, kota, kode pos" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-ink-950 border border-ink-200 dark:border-white/10 text-xs text-ink-900 dark:text-white outline-none focus:border-up-primary"></textarea>
+                                        @error('alamatPengiriman') <span class="text-[10px] text-up-red font-semibold mt-1 block">{{ $message }}</span> @enderror
                                     </div>
                                 </div>
                             @endif

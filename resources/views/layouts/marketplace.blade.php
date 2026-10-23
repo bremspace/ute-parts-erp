@@ -68,40 +68,46 @@
 
             <!-- Nav -->
             <nav class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                <!-- Katalog (desktop only, mobile di bottom dock) -->
                 <a href="{{ route('shop') }}"
-                   class="min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] inline-flex items-center gap-1.5 {{ request()->is('shop') || request()->is('shop/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
+                   class="hidden md:inline-flex min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->is('shop') || request()->is('shop/*') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
                     <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
-                    <span class="hidden sm:inline">Katalog</span>
+                    <span>Katalog</span>
                 </a>
+
+                <!-- Booking (desktop only, mobile di bottom dock) -->
                 <a href="{{ route('servis.booking') }}"
-                   class="min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] inline-flex items-center gap-1.5 {{ request()->routeIs('servis.booking') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
+                   class="hidden md:inline-flex min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-1.5 {{ request()->routeIs('servis.booking') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}">
                     <svg class="w-4 h-4 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                    <span class="hidden sm:inline">Booking</span>
+                    <span>Booking</span>
                 </a>
 
-                <!-- Cart -->
+                <!-- Cart (desktop only, mobile di bottom dock) -->
                 <a href="{{ route('cart') }}"
-                   class="relative min-h-[44px] px-2.5 sm:px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] flex items-center gap-2 {{ request()->is('cart') || request()->is('checkout') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}"
+                   class="hidden md:inline-flex relative min-h-[44px] px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.97] items-center gap-2 {{ request()->is('cart') || request()->is('checkout') ? 'bg-ink-900 text-white dark:bg-white dark:text-ink-950 shadow-sm' : 'text-ink-600 hover:text-ink-950 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5' }}"
                    aria-label="Keranjang belanja">
                     <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
-                    <span class="hidden sm:inline">Keranjang</span>
-                    @if(session('shop.cart') && array_sum(array_column(session('shop.cart'), 'qty')) > 0)
-                        <span class="px-1.5 py-0.2 min-w-[20px] h-5 rounded-full bg-up-primary text-white text-[10px] font-bold tabular-nums inline-flex items-center justify-center shadow-sm shadow-up-primary/30 animate-scale-in">
-                            {{ array_sum(array_column(session('shop.cart'), 'qty')) }}
-                        </span>
-                    @endif
+                    <span>Keranjang</span>
+                    <span x-data="{ count: {{ session('shop.cart') ? array_sum(array_column(session('shop.cart'), 'qty')) : 0 }} }"
+                          @cart-updated.window="count = $event.detail.count"
+                          x-show="count > 0"
+                          x-cloak
+                          class="px-1.5 py-0.2 min-w-[20px] h-5 rounded-full bg-up-primary text-white text-[10px] font-bold tabular-nums inline-flex items-center justify-center shadow-sm shadow-up-primary/30 animate-scale-in"
+                          x-text="count">
+                        {{ session('shop.cart') ? array_sum(array_column(session('shop.cart'), 'qty')) : 0 }}
+                    </span>
                 </a>
 
-                <div class="h-5 w-px bg-ink-200/60 dark:bg-white/10 mx-0.5 hidden sm:block"></div>
+                <div class="h-5 w-px bg-ink-200/60 dark:bg-white/10 mx-0.5 hidden md:block"></div>
 
-                <!-- [2026] Font Size Switcher -->
-                <div class="relative" x-data="fontSizeManager()" @click.outside="open = false">
+                <!-- [2026] Font Size Switcher (desktop only) -->
+                <div class="relative hidden md:block" x-data="fontSizeManager()" @click.outside="open = false">
                     <button type="button" @click="open = !open"
                             title="Ukuran font tampilan" aria-label="Ukuran font tampilan"
                             class="min-h-[44px] min-w-[44px] p-2 rounded-full text-ink-500 hover:text-ink-900 hover:bg-ink-100 dark:text-ink-400 dark:hover:text-white dark:hover:bg-white/5 transition-[background-color,color,transform] duration-140 active:scale-[0.95] cursor-pointer flex items-center justify-center flex-shrink-0 gap-0.5">
@@ -148,37 +154,186 @@
                     </svg>
                 </button>
 
-                <!-- Customer / Login -->
-                @auth('customer')
-                    <a href="{{ route('customer.account') }}"
-                       class="min-h-[44px] px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-300 hover:bg-ink-100/60 dark:hover:bg-white/5 transition-[background-color,color,transform] duration-140 active:scale-[0.97] flex items-center gap-1.5 sm:gap-2 flex-shrink-0"
-                       aria-label="Akun saya">
-                        <span class="w-7 h-7 rounded-full bg-gradient-to-tr from-up-primary to-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-sm flex-shrink-0">
-                            {{ substr(auth('customer')->user()->nama, 0, 1) }}
-                        </span>
-                        <span class="hidden sm:inline max-w-[100px] truncate">{{ auth('customer')->user()->nama }}</span>
-                    </a>
-                    <form action="{{ route('customer.logout') }}" method="POST" class="flex-shrink-0">
-                        @csrf
-                        <button type="submit"
-                                class="min-h-[44px] px-2.5 sm:px-3 py-2 rounded-full text-xs font-semibold text-ink-400 hover:text-up-red hover:bg-up-red/10 transition-[background-color,color,transform] duration-140 active:scale-[0.97] cursor-pointer inline-flex items-center gap-1"
-                                aria-label="Keluar">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                <!-- Floating Expandable Profile Menu (Mobile & Desktop) -->
+                <div class="relative flex-shrink-0"
+                     x-data="{ profileOpen: false }"
+                     @click.outside="profileOpen = false"
+                     @keydown.escape.window="profileOpen = false"
+                     @open-profile-menu.window="profileOpen = true">
+                    @auth('customer')
+                        @php
+                            $pelanggan = auth('customer')->user();
+                        @endphp
+                        <button type="button"
+                                @click="profileOpen = !profileOpen"
+                                class="min-h-[44px] pl-1.5 pr-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 hover:bg-ink-100/80 dark:hover:bg-white/10 border border-slate-200/80 dark:border-white/10 transition-[background-color,color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 cursor-pointer shadow-sm"
+                                :class="profileOpen ? 'ring-2 ring-up-primary/40 bg-ink-100/80 dark:bg-white/10' : ''"
+                                aria-label="Menu Akun">
+                            <span class="w-7 h-7 rounded-full bg-gradient-to-tr from-up-primary to-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-sm flex-shrink-0">
+                                {{ substr($pelanggan->nama, 0, 1) }}
+                            </span>
+                            <span class="hidden sm:inline max-w-[100px] truncate font-medium">{{ $pelanggan->nama }}</span>
+                            <svg class="w-3.5 h-3.5 text-ink-400 transition-transform duration-150" :class="profileOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                             </svg>
-                            <span class="hidden sm:inline">Keluar</span>
                         </button>
-                    </form>
-                @else
-                    <a href="{{ route('customer.login') }}"
-                       class="min-h-[44px] px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white dark:bg-white/10 dark:text-white dark:hover:bg-white dark:hover:text-ink-950 transition-[background-color,color,transform] duration-140 active:scale-[0.97] inline-flex items-center gap-1 sm:gap-1.5 shadow-sm flex-shrink-0"
-                       aria-label="Masuk">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
-                        </svg>
-                        <span class="text-xs sm:text-sm">Masuk</span>
-                    </a>
-                @endauth
+
+                        <!-- Expandable Floating Card (Logged in) -->
+                        <div x-show="profileOpen"
+                             x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                             x-transition:leave-end="opacity-0 translate-y-2 scale-95"
+                             class="absolute right-0 mt-2 w-72 sm:w-80 rounded-3xl bg-white/95 dark:bg-[#0D1526]/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.6)] p-3.5 z-50">
+                            <!-- User Summary -->
+                            <div class="p-3 rounded-2xl bg-slate-50 dark:bg-white/[0.04] border border-slate-100 dark:border-white/5 mb-2">
+                                <div class="flex items-center gap-3">
+                                    <span class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-up-primary to-indigo-500 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-up-primary/20 flex-shrink-0">
+                                        {{ substr($pelanggan->nama, 0, 1) }}
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <h4 class="text-sm font-bold text-ink-900 dark:text-white truncate leading-tight">{{ $pelanggan->nama }}</h4>
+                                        <p class="text-[11px] text-ink-500 dark:text-ink-400 font-mono truncate">{{ $pelanggan->telepon }}</p>
+                                    </div>
+                                </div>
+                                <div class="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-white/5 flex items-center justify-between text-[11px]">
+                                    <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold text-[10px] uppercase tracking-wider">
+                                        {{ $pelanggan->tierMembership?->nama ?? 'Retail' }}
+                                    </span>
+                                    <span class="text-ink-600 dark:text-ink-300 font-semibold tabular-nums">
+                                        <span class="text-up-amber font-bold">{{ number_format($pelanggan->poin_loyalty ?? 0) }}</span> Poin
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Menu Links -->
+                            <div class="space-y-0.5">
+                                <a href="{{ route('customer.account') }}"
+                                   @click="profileOpen = false"
+                                   class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-ink-700 dark:text-ink-200 hover:text-up-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                                    <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>Profil & Akun Saya</span>
+                                </a>
+
+                                <a href="{{ route('customer.account', ['tab' => 'orders']) }}"
+                                   @click="profileOpen = false"
+                                   class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-ink-700 dark:text-ink-200 hover:text-up-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                                    <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    <span>Pesanan Saya</span>
+                                </a>
+
+                                <a href="{{ route('customer.account', ['tab' => 'servis']) }}"
+                                   @click="profileOpen = false"
+                                   class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-ink-700 dark:text-ink-200 hover:text-up-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                                    <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <span>Riwayat Servis</span>
+                                </a>
+
+                                <a href="{{ route('customer.account', ['tab' => 'notifikasi']) }}"
+                                   @click="profileOpen = false"
+                                   class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-ink-700 dark:text-ink-200 hover:text-up-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                                    <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                    </svg>
+                                    <span>Notifikasi</span>
+                                </a>
+
+                                <a href="{{ route('customer.account', ['tab' => 'komisi']) }}"
+                                   @click="profileOpen = false"
+                                   class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-ink-700 dark:text-ink-200 hover:text-up-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                                    <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Komisi & Afiliasi</span>
+                                </a>
+                            </div>
+
+                            <div class="my-2 border-t border-slate-200/60 dark:border-white/10"></div>
+
+                            <!-- Logout Form -->
+                            <form action="{{ route('customer.logout') }}" method="POST">
+                                @csrf
+                                <button type="submit"
+                                        class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-up-red hover:bg-up-red/10 transition-colors cursor-pointer min-h-[44px]">
+                                    <svg class="w-4 h-4 text-up-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                    </svg>
+                                    <span>Keluar dari Akun</span>
+                                </button>
+                            </form>
+                        </div>
+                    @else
+                        <!-- Guest trigger -->
+                        <button type="button"
+                                @click="profileOpen = !profileOpen"
+                                class="min-h-[44px] px-3 sm:px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-up-primary/10 text-up-primary hover:bg-up-primary hover:text-white dark:bg-white/10 dark:text-white dark:hover:bg-white dark:hover:text-ink-950 transition-[background-color,color,transform] duration-140 active:scale-[0.97] inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                                :class="profileOpen ? 'ring-2 ring-up-primary/40' : ''"
+                                aria-label="Menu Pengguna">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <span>Masuk</span>
+                            <svg class="w-3 h-3 text-current opacity-60 transition-transform duration-150" :class="profileOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        <!-- Expandable Floating Card (Guest) -->
+                        <div x-show="profileOpen"
+                             x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+                             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                             x-transition:leave-end="opacity-0 translate-y-2 scale-95"
+                             class="absolute right-0 mt-2 w-72 sm:w-80 rounded-3xl bg-white/95 dark:bg-[#0D1526]/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.6)] p-3.5 z-50">
+                            <div class="p-3 text-center mb-2">
+                                <div class="w-11 h-11 mx-auto rounded-2xl bg-up-primary/10 text-up-primary flex items-center justify-center mb-2">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                </div>
+                                <h4 class="text-sm font-bold text-ink-900 dark:text-white">Selamat Datang</h4>
+                                <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">Masuk untuk melihat pesanan, servis, dan harga member.</p>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <a href="{{ route('customer.login') }}"
+                                   class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 text-white font-bold text-xs text-center shadow-sm shadow-up-primary/20 hover:brightness-105 active:scale-[0.98] transition-all min-h-[44px] flex items-center justify-center">
+                                    Masuk
+                                </a>
+                                <a href="{{ route('customer.register') }}"
+                                   class="py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-ink-800 dark:text-white font-bold text-xs text-center active:scale-[0.98] transition-all min-h-[44px] flex items-center justify-center border border-slate-200/60 dark:border-white/5">
+                                    Daftar
+                                </a>
+                            </div>
+
+                            <div class="my-2 border-t border-slate-200/60 dark:border-white/10"></div>
+
+                            <div class="space-y-0.5">
+                                <a href="{{ route('servis.tracking.search') }}"
+                                   @click="profileOpen = false"
+                                   class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-ink-700 dark:text-ink-200 hover:text-up-primary hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                                    <svg class="w-4 h-4 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <span>Lacak Status Servis</span>
+                                </a>
+                            </div>
+                        </div>
+                    @endauth
+                </div>
             </nav>
         </div>
     </header>
@@ -218,11 +373,14 @@
                     <svg class="w-5 h-5 transition-transform duration-140 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    @if(session('shop.cart') && array_sum(array_column(session('shop.cart'), 'qty')) > 0)
-                        <span class="absolute -top-1 -right-2 px-1 min-w-[16px] h-4 rounded-full bg-up-accent text-white text-[9px] font-bold flex items-center justify-center shadow">
-                            {{ array_sum(array_column(session('shop.cart'), 'qty')) }}
-                        </span>
-                    @endif
+                    <span x-data="{ count: {{ session('shop.cart') ? array_sum(array_column(session('shop.cart'), 'qty')) : 0 }} }"
+                          @cart-updated.window="count = $event.detail.count"
+                          x-show="count > 0"
+                          x-cloak
+                          class="absolute -top-1 -right-2 px-1 min-w-[16px] h-4 rounded-full bg-up-accent text-white text-[9px] font-bold flex items-center justify-center shadow"
+                          x-text="count">
+                        {{ session('shop.cart') ? array_sum(array_column(session('shop.cart'), 'qty')) : 0 }}
+                    </span>
                 </div>
                 <span class="mt-0.5 tracking-tight text-[10px] sm:text-[11px] truncate">Keranjang</span>
             </a>

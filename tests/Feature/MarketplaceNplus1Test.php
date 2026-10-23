@@ -317,7 +317,7 @@ class MarketplaceNplus1Test extends TestCase
         $this->seedFixture();
 
         $products = (new ShopPage)->getProductsProperty();
-        $this->assertCount(18, $products, 'Fixture 20 produk → halaman pertama berisi 18');
+        $this->assertCount(20, $products, 'Fixture 20 produk → halaman pertama berisi 20 (perPage 24, semua masuk)');
 
         foreach ($products as $p) {
             $lama = (int) StokItem::where('produk_id', $p->id)->sum('jumlah'); // blade versi lama

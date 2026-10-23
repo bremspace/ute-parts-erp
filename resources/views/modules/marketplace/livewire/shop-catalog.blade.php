@@ -156,7 +156,7 @@
         </div>
 
         <!-- Filter Selectors Matrix -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5">
             <!-- Kategori -->
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="filterKategori"
@@ -271,6 +271,54 @@
                     </svg>
                 </div>
             </div>
+
+            <!-- Kualitas / Grade Part -->
+            <div class="relative min-w-0 w-full">
+                <select wire:model.live="filterKualitas"
+                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
+                    <option value="">Semua Kualitas</option>
+                    @foreach($kualitasList as $k)
+                        <option value="{{ $k['id'] }}">{{ $k['nama'] }}</option>
+                    @endforeach
+                </select>
+                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Ketersediaan Stok (sinkron live dengan stok_items backoffice) -->
+            <div class="relative min-w-0 w-full">
+                <select wire:model.live="filterStok"
+                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
+                    <option value="">Semua Stok</option>
+                    <option value="tersedia">Ready Stock</option>
+                    <option value="habis">Stok Habis</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Sortasi -->
+            <div class="relative min-w-0 w-full">
+                <select wire:model.live="sort"
+                        class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
+                    <option value="">Paling Relevan</option>
+                    <option value="terlaris">Terlaris</option>
+                    <option value="terbaru">Terbaru</option>
+                    <option value="termurah">Harga Termurah</option>
+                    <option value="termahal">Harga Termahal</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -283,9 +331,9 @@
             </div>
 
             <div class="flex items-center gap-3">
-                @if($search || $filterKategori || $filterKondisi || $filterHpMerk || $filterHpModel || $filterBrand || $hargaMax)
+                @if($search || $filterKategori || $filterKondisi || $filterHpMerk || $filterHpModel || $filterBrand || $hargaMax || $filterKualitas || $filterStok || $sort)
                     <button
-                        wire:click="$set('search', ''); $set('filterKategori', ''); $set('filterKondisi', ''); $set('filterHpMerk', ''); $set('filterHpModel', ''); $set('filterBrand', ''); $set('hargaMax', '');"
+                        wire:click="$set('search', ''); $set('filterKategori', ''); $set('filterKondisi', ''); $set('filterHpMerk', ''); $set('filterHpModel', ''); $set('filterBrand', ''); $set('hargaMax', ''); $set('filterKualitas', ''); $set('filterStok', ''); $set('sort', '');"
                         class="text-xs font-semibold text-up-primary hover:underline cursor-pointer flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

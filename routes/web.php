@@ -293,6 +293,13 @@ Route::post('/webhook/channel/{channelId}', [OmnichannelController::class, 'webh
 // Auth + akun pelanggan
 Route::get('/login-pelanggan', fn () => view('auth.customer-login'))->name('customer.login');
 Route::post('/login-pelanggan', function (Request $request) {
+    $rawTelepon = (string) $request->input('telepon', '');
+    $teleponBersih = preg_replace('/[^0-9]/', '', $rawTelepon);
+    if (str_starts_with($teleponBersih, '628')) {
+        $teleponBersih = '08'.substr($teleponBersih, 3);
+    }
+    $request->merge(['telepon' => $teleponBersih]);
+
     $credentials = $request->validate([
         'telepon' => 'required|string',
         'password' => 'required|string',
@@ -303,20 +310,23 @@ Route::post('/login-pelanggan', function (Request $request) {
         if (($user->status ?? 'aktif') === 'pending') {
             Auth::guard('customer')->logout();
 
-            return back()->withErrors(['telepon' => 'Pendaftaran Anda sedang menunggu persetujuan (approval) dari owner. Silakan tunggu konfirmasi.']);
+            return back()->withInput($request->only('telepon'))->withErrors(['telepon' => 'Pendaftaran Anda sedang menunggu persetujuan (approval) dari owner. Silakan tunggu konfirmasi.']);
         }
 
         if (($user->status ?? 'aktif') === 'ditolak') {
             $catatan = $user->catatan_approval ? " Alasan: {$user->catatan_approval}" : '';
             Auth::guard('customer')->logout();
 
-            return back()->withErrors(['telepon' => 'Pendaftaran akun Anda ditolak oleh owner.'.$catatan]);
+            return back()->withInput($request->only('telepon'))->withErrors(['telepon' => 'Pendaftaran akun Anda ditolak oleh owner.'.$catatan]);
         }
 
-        return redirect()->intended('/checkout');
+        $cart = session()->get('shop.cart', []);
+        $fallback = ! empty($cart) ? '/checkout' : '/shop';
+
+        return redirect()->intended($fallback);
     }
 
-    return back()->withErrors(['telepon' => 'Telepon atau password salah']);
+    return back()->withInput($request->only('telepon'))->withErrors(['telepon' => 'Telepon atau password salah']);
 })->middleware('throttle:10,1')->name('customer.login.post');
 
 Route::get('/daftar-pelanggan', fn () => view('auth.customer-register'))->name('customer.register');
