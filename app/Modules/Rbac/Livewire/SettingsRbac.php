@@ -2793,6 +2793,23 @@ class SettingsRbac extends Component
 
     public function render()
     {
+        $kategoriAll = KategoriProduk::with('parent')
+            ->withCount('produk', 'children')
+            ->orderBy('urutan')
+            ->orderBy('nama')
+            ->get();
+        $kategoriByParent = $kategoriAll->groupBy(fn ($kategori) => $kategori->parent_id ?? 0);
+        $kategoriList = collect();
+        foreach ($kategoriByParent->get(0, collect()) as $root) {
+            $kategoriList->push($root);
+            foreach ($kategoriByParent->get($root->id, collect()) as $child) {
+                $kategoriList->push($child);
+            }
+        }
+        // Preserve orphaned rows instead of silently dropping them.
+        $handledIds = $kategoriList->pluck('id');
+        $kategoriList = $kategoriList->concat($kategoriAll->whereNotIn('id', $handledIds));
+
         return view('modules.rbac.livewire.settings-rbac', [
             'roles' => $this->roles,
             'rolesFull' => $this->rolesFull,
@@ -2805,7 +2822,8 @@ class SettingsRbac extends Component
             'jenisServis' => $this->jenisServis,
             'coaList' => $this->coaList,
             // Master Produk & Katalog
-            'kategoriList' => KategoriProduk::with('parent')->withCount('produk', 'children')->orderBy('urutan')->orderBy('nama')->get(),
+            'kategoriList' => $kategoriList,
+            'kategoriParentOptions' => $kategoriAll->whereNull('parent_id'),
             'kategoriTree' => KategoriProduk::getTree(),
             'brandList' => Brand::withCount('produk')->orderBy('nama')->get(),
             'kualitasList' => KualitasProduk::with('brand')->withCount('produk')->orderByRaw('brand_id IS NULL ASC')->orderBy('nama')->get(),

@@ -2823,7 +2823,7 @@
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kategori Induk (Parent)</label>
                         <select wire:model="kategoriForm.parent_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                             <option value="" class="bg-ink-900">— Jadikan Kategori Utama (Tanpa Induk) —</option>
-                            @foreach($kategoriTree as $p)
+                            @foreach($kategoriParentOptions as $p)
                                 @if(!$kategoriForm['id'] || $p->id != $kategoriForm['id'])
                                     <option value="{{ $p->id }}" class="bg-ink-900 font-bold text-white">{{ $p->nama }}</option>
                                 @endif
