@@ -598,6 +598,16 @@ class ImportProdukService
         // menandai baris itu sendiri → semua baris dianggap duplikat).
         $konteks = ['skuDalamFile' => [], 'barcodeDalamFile' => [], 'namaDalamFile' => []];
 
+        // Collect unique reference values for smart preview
+        $refValues = [
+            'kategori' => [],
+            'brand' => [],
+            'merk_hp' => [],
+            'tipe_hp' => [], // array of ['merk' => ..., 'model' => ...]
+            'kualitas' => [],
+            'satuan' => [],
+        ];
+
         $hasil = [];
         $valid = 0;
         $invalid = 0;
@@ -623,7 +633,40 @@ class ImportProdukService
                 'errors' => $errors,
                 'warnings' => $warnings,
             ];
+
+            // Collect reference values
+            $kat = trim((string) ($row['kategori'] ?? 'Umum'));
+            if ($kat !== '' && $kat !== 'Umum') {
+                $refValues['kategori'][$kat] = true;
+            }
+            $brand = trim((string) ($row['brand'] ?? ''));
+            if ($brand !== '') {
+                $refValues['brand'][$brand] = true;
+            }
+            $merkHp = trim((string) ($row['merk_hp'] ?? ''));
+            $tipeHpRaw = trim((string) ($row['tipe_hp'] ?? ''));
+            if ($merkHp !== '' && $tipeHpRaw !== '') {
+                $refValues['merk_hp'][$merkHp] = true;
+                // Parse tipe_hp (comma separated models)
+                foreach (explode(',', $tipeHpRaw) as $model) {
+                    $model = trim($model);
+                    if ($model !== '') {
+                        $refValues['tipe_hp'][] = ['merk' => $merkHp, 'model' => $model];
+                    }
+                }
+            }
+            $kualitas = trim((string) ($row['kualitas'] ?? ''));
+            if ($kualitas !== '') {
+                $refValues['kualitas'][$kualitas] = true;
+            }
+            $satuan = $this->normalizeSatuan(trim((string) ($row['satuan'] ?? 'pcs')));
+            if ($satuan !== '') {
+                $refValues['satuan'][$satuan] = true;
+            }
         }
+
+        // Build referensi_summary: check DB for each unique value
+        $referensiSummary = $this->buildReferensiSummary($refValues);
 
         $statusPreview = $invalid === 0
             ? ($totalPeringatan > 0 ? 'perlu_perhatian' : 'sempurna')
@@ -646,7 +689,63 @@ class ImportProdukService
             'sampel' => array_slice($hasil, 0, 5),
             'error_rows' => array_values(array_filter($hasil, fn ($h) => ! $h['valid'])),
             'warning_rows' => array_values(array_filter($hasil, fn ($h) => ! empty($h['warnings']))),
+            'referensi_summary' => $referensiSummary,
         ];
+    }
+
+    /**
+     * Build referensi summary for smart import preview.
+     * Returns existing/new split for each reference type.
+     */
+    public function buildReferensiSummary(array $refValues): array
+    {
+        $summary = [
+            'kategori' => ['existing' => [], 'new' => []],
+            'brand' => ['existing' => [], 'new' => []],
+            'merk_hp' => ['existing' => [], 'new' => []],
+            'tipe_hp' => ['existing' => [], 'new' => []],
+            'kualitas' => ['existing' => [], 'new' => []],
+            'satuan' => ['existing' => [], 'new' => []],
+        ];
+
+        // Kategori: check by nama or slug
+        foreach (array_keys($refValues['kategori']) as $kat) {
+            $exists = KategoriProduk::where('nama', $kat)->orWhere('slug', Str::slug($kat))->exists();
+            $summary['kategori'][$exists ? 'existing' : 'new'][] = $kat;
+        }
+
+        // Brand: check by nama
+        foreach (array_keys($refValues['brand']) as $brand) {
+            $exists = Brand::where('nama', $brand)->exists();
+            $summary['brand'][$exists ? 'existing' : 'new'][] = $brand;
+        }
+
+        // Merk HP: check TipeHp distinct merk
+        foreach (array_keys($refValues['merk_hp']) as $merk) {
+            $exists = TipeHp::where('merk', $merk)->where('is_active', true)->exists();
+            $summary['merk_hp'][$exists ? 'existing' : 'new'][] = $merk;
+        }
+
+        // Tipe HP: check merk+model pairs
+        foreach ($refValues['tipe_hp'] as $pair) {
+            $exists = TipeHp::where('merk', $pair['merk'])->where('model', $pair['model'])->where('is_active', true)->exists();
+            $key = $pair['merk'].':'.$pair['model'];
+            $summary['tipe_hp'][$exists ? 'existing' : 'new'][] = $key;
+        }
+
+        // Kualitas: check by nama (global)
+        foreach (array_keys($refValues['kualitas']) as $kual) {
+            $exists = KualitasProduk::where('nama', $kual)->exists();
+            $summary['kualitas'][$exists ? 'existing' : 'new'][] = $kual;
+        }
+
+        // Satuan: check by kode
+        foreach (array_keys($refValues['satuan']) as $sat) {
+            $exists = SatuanUnit::where('kode', $sat)->exists();
+            $summary['satuan'][$exists ? 'existing' : 'new'][] = $sat;
+        }
+
+        return $summary;
     }
 
     /**

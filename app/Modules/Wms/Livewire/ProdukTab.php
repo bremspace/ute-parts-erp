@@ -35,9 +35,15 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 
 /**
  * [F1-8 / S-01] Tab "Master Produk" — dipecah dari WmsDashboard (paritas perilaku).
@@ -3944,9 +3950,16 @@ class ProdukTab extends Component
         if ($fmt === 'csv') {
             $out = fopen('php://memory', 'r+');
             if (! empty($rows)) {
-                fputcsv($out, array_keys($rows[0]));
+                fputcsv($out, array_keys($rows[0]), ',', '"', '');
                 foreach ($rows as $row) {
-                    fputcsv($out, array_values($row));
+                    $sanitized = array_map(function ($v) {
+                        if (is_array($v) || is_object($v)) {
+                            return json_encode($v, JSON_UNESCAPED_UNICODE);
+                        }
+
+                        return (string) $v;
+                    }, array_values($row));
+                    fputcsv($out, $sanitized, ',', '"', '');
                 }
             }
             rewind($out);
@@ -3954,18 +3967,174 @@ class ProdukTab extends Component
             fclose($out);
             Storage::disk('local')->put($path, $csv);
         } else {
-            Excel::store(new class($rows) implements FromArray, WithHeadings
+            // Multi-sheet XLSX matching import template (Data Produk + Referensi Sistem + Petunjuk + Tambah Tipe Baru)
+            $referensiRows = $this->buatReferensiSistem();
+            $petunjukRows = $this->buatPetunjukImport();
+            $tambahTipeRows = $this->buatContohTambahTipeBaru();
+
+            Excel::store(new class($rows, $referensiRows, $petunjukRows, $tambahTipeRows) implements Export, WithMultipleSheets
             {
-                public function __construct(private array $rows) {}
+                public function __construct(
+                    private array $dataRows,
+                    private array $referensiRows,
+                    private array $petunjukRows,
+                    private array $tambahTipeRows
+                ) {}
 
-                public function headings(): array
+                public function sheets(): array
                 {
-                    return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
-                }
+                    return [
+                        // Sheet 1: Data Produk
+                        new class($this->dataRows) implements FromArray, WithEvents, WithHeadings, WithTitle
+                        {
+                            public function __construct(private array $rows) {}
 
-                public function array(): array
-                {
-                    return array_map(fn ($r) => array_values((array) $r), $this->rows);
+                            public function title(): string
+                            {
+                                return 'Data Produk';
+                            }
+
+                            public function headings(): array
+                            {
+                                return ! empty($this->rows) ? array_keys($this->rows[0]) : [];
+                            }
+
+                            public function array(): array
+                            {
+                                return array_map(fn ($r) => array_values((array) $r), $this->rows);
+                            }
+
+                            public function registerEvents(): array
+                            {
+                                return [
+                                    AfterSheet::class => function (AfterSheet $event) {
+                                        $sheet = $event->sheet->getDelegate();
+
+                                        // Dropdown Satuan (Kolom D) -> Referensi Sheet 2 (kolom D)
+                                        $valSatuan = $sheet->getCell('D2')->getDataValidation();
+                                        $valSatuan->setType(DataValidation::TYPE_LIST);
+                                        $valSatuan->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valSatuan->setAllowBlank(true);
+                                        $valSatuan->setShowDropDown(true);
+                                        $valSatuan->setFormula1("'Referensi Sistem'!\$D\$2:\$D\$100");
+                                        $valSatuan->setSqref('D2:D5000');
+
+                                        // Dropdown Kategori (Kolom E) -> Referensi Sheet 2 (kolom B)
+                                        $valKat = $sheet->getCell('E2')->getDataValidation();
+                                        $valKat->setType(DataValidation::TYPE_LIST);
+                                        $valKat->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valKat->setAllowBlank(true);
+                                        $valKat->setShowDropDown(true);
+                                        $valKat->setFormula1("'Referensi Sistem'!\$B\$2:\$B\$100");
+                                        $valKat->setSqref('E2:E5000');
+
+                                        // Dropdown Brand (Kolom F) -> Referensi Sheet 2 (kolom C)
+                                        $valBrand = $sheet->getCell('F2')->getDataValidation();
+                                        $valBrand->setType(DataValidation::TYPE_LIST);
+                                        $valBrand->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valBrand->setAllowBlank(true);
+                                        $valBrand->setShowDropDown(true);
+                                        $valBrand->setFormula1("'Referensi Sistem'!\$C\$2:\$C\$100");
+                                        $valBrand->setSqref('F2:F5000');
+
+                                        // Dropdown Merk HP (Kolom G) -> Referensi Sheet 2 (kolom A)
+                                        $valMerkHp = $sheet->getCell('G2')->getDataValidation();
+                                        $valMerkHp->setType(DataValidation::TYPE_LIST);
+                                        $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valMerkHp->setAllowBlank(true);
+                                        $valMerkHp->setShowDropDown(true);
+                                        $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
+                                        $valMerkHp->setSqref('G2:G5000');
+
+                                        // Dropdown Kualitas (Kolom I) -> Referensi Sheet 2 (kolom E)
+                                        $valKualitas = $sheet->getCell('I2')->getDataValidation();
+                                        $valKualitas->setType(DataValidation::TYPE_LIST);
+                                        $valKualitas->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valKualitas->setAllowBlank(true);
+                                        $valKualitas->setShowDropDown(true);
+                                        $valKualitas->setFormula1("'Referensi Sistem'!\$E\$2:\$E\$100");
+                                        $valKualitas->setSqref('I2:I5000');
+
+                                        // Dropdown Kondisi (Kolom J) - fixed list
+                                        $valKondisi = $sheet->getCell('J2')->getDataValidation();
+                                        $valKondisi->setType(DataValidation::TYPE_LIST);
+                                        $valKondisi->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valKondisi->setAllowBlank(true);
+                                        $valKondisi->setShowDropDown(true);
+                                        $valKondisi->setFormula1('"baru,oem,bekas,refurbished"');
+                                        $valKondisi->setSqref('J2:J5000');
+
+                                        // Dropdown SN (Kolom Q)
+                                        $valSn = $sheet->getCell('Q2')->getDataValidation();
+                                        $valSn->setType(DataValidation::TYPE_LIST);
+                                        $valSn->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valSn->setAllowBlank(true);
+                                        $valSn->setShowDropDown(true);
+                                        $valSn->setFormula1('"ya,tidak"');
+                                        $valSn->setSqref('Q2:Q5000');
+                                    },
+                                ];
+                            }
+                        },
+
+                        // Sheet 2: Referensi Sistem
+                        new class($this->referensiRows) implements FromArray, WithHeadings, WithTitle
+                        {
+                            public function __construct(private array $rows) {}
+
+                            public function title(): string
+                            {
+                                return 'Referensi Sistem';
+                            }
+
+                            public function headings(): array
+                            {
+                                return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas'];
+                            }
+
+                            public function array(): array
+                            {
+                                return $this->rows;
+                            }
+                        },
+
+                        // Sheet 3: Petunjuk
+                        new class($this->petunjukRows) implements FromArray, WithTitle
+                        {
+                            public function __construct(private array $rows) {}
+
+                            public function title(): string
+                            {
+                                return 'Petunjuk';
+                            }
+
+                            public function array(): array
+                            {
+                                return $this->rows;
+                            }
+                        },
+
+                        // Sheet 4: Tambah Tipe Baru
+                        new class($this->tambahTipeRows) implements FromArray, WithHeadings, WithTitle
+                        {
+                            public function __construct(private array $rows) {}
+
+                            public function title(): string
+                            {
+                                return 'Tambah Tipe Baru';
+                            }
+
+                            public function headings(): array
+                            {
+                                return ['merk_hp_baru', 'model_hp_baru', 'keterangan'];
+                            }
+
+                            public function array(): array
+                            {
+                                return $this->rows;
+                            }
+                        },
+                    ];
                 }
             }, $path, 'local');
         }
@@ -3978,6 +4147,96 @@ class ProdukTab extends Component
         $fullPath = Storage::disk('local')->path($path);
 
         return response()->download($fullPath, 'master-produk-'.now()->format('Ymd-His').'.'.$fmt);
+    }
+
+    /**
+     * Build reference data for Sheet 2 "Referensi Sistem" (same as import template).
+     * Returns array of rows with 5 columns: Merk HP, Kategori Produk, Brand Sparepart, Satuan, Kualitas.
+     */
+    protected function buatReferensiSistem(): array
+    {
+        $merks = TipeHp::where('is_active', true)->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all();
+        if (empty($merks)) {
+            $merks = ['Apple', 'Samsung', 'Xiaomi', 'Oppo', 'Vivo', 'Realme', 'Infinix', 'Tecno', 'Asus', 'Universal'];
+        }
+
+        $kategoris = KategoriProduk::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+        if (empty($kategoris)) {
+            $kategoris = ['LCD & Touchscreen', 'Baterai', 'Fleksibel & Board', 'Kamera', 'IC & Chipset', 'Housing & Backdoor'];
+        }
+
+        $brands = Brand::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+        if (empty($brands)) {
+            $brands = ['Crown', 'OG', 'Braderpart', 'Olike', 'OEM', 'Original'];
+        }
+
+        $satuans = SatuanUnit::where('is_active', true)->orderBy('kode')->pluck('kode')->all();
+        if (empty($satuans)) {
+            $satuans = ['pcs', 'box', 'unit', 'set', 'roll', 'meter', 'botol'];
+        }
+
+        $kualitas = KualitasProduk::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+        if (empty($kualitas)) {
+            $kualitas = ['Original', 'Grade A', 'Grade B', 'OEM', 'Refurbished'];
+        }
+
+        $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas));
+        $rows = [];
+        for ($i = 0; $i < $max; $i++) {
+            $rows[] = [
+                $merks[$i] ?? '',
+                $kategoris[$i] ?? '',
+                $brands[$i] ?? '',
+                $satuans[$i] ?? '',
+                $kualitas[$i] ?? '',
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Build instructions for Sheet 3 "Petunjuk" (same as import template).
+     */
+    protected function buatPetunjukImport(): array
+    {
+        return [
+            ['PETUNJUK IMPORT MASTER PRODUK DINAMIS — UTE PARTS'],
+            [''],
+            ['1. METODE PENGISIAN TINGGAL PILIH (DROPDOWN):'],
+            ['   - Kolom satuan, kategori, brand part, merk_hp, kualitas, kondisi, dan sn memiliki DROPDOWN pilihan.'],
+            ['   - Anda cukup klik panah dropdown di masing-masing sel untuk memilih nilai resmi tanpa perlu mengetik manual.'],
+            [''],
+            ['2. KOMPATIBILITAS TIPE HP (MUDAH & FLEKSIBEL):'],
+            ['   - merk_hp: Pilih merk smartphone dari dropdown (cth: Samsung, Apple, Xiaomi).'],
+            ['   - tipe_hp: Tuliskan model handphone. Jika satu sparepart cocok untuk banyak tipe, CUKUP PISAHKAN DENGAN KOMA.'],
+            ['     Contoh: A11, A15, M11 (Sistem otomatis memasangkannya dengan merk_hp yang dipilih).'],
+            ['   - Jika sparepart multi-brand (misal IC universal), Anda bisa menuliskan merk lengkap: "Samsung A11; Xiaomi Redmi 9".'],
+            [''],
+            ['3. PRODUK SUBSTITUSI / KOMPATIBEL ANTAR PRODUK:'],
+            ['   - produk_kompatibel_sku: Masukkan SKU produk pengganti jika barang ini kosong.'],
+            ['     Contoh: Masukkan "LCD-A11-OG, LCD-A11-BRD". Sistem akan otomatis menautkannya secara 2 arah.'],
+            [''],
+            ['4. JIKA ADA MERK ATAU TIPE HP BARU YANG BELUM ADA DI SISTEM:'],
+            ['   - Jangan khawatir! Buka Sheet "Tambah Tipe Baru", tuliskan merk dan model baru tersebut di sana.'],
+            ['   - Saat di-import, sistem otomatis mendaftarkan master Tipe HP baru tersebut tanpa terjadi error!'],
+            [''],
+            ['5. PENCEGAHAN TYPO OTOMATIS:'],
+            ['   - Sistem dilengkapi Auto-Fuzzy Matcher: jika terjadi salah ketik kecil (cth: "Samsng" atau "ip 11"),'],
+            ['     sistem otomatis menormalkan ke data resmi yang tepat tanpa mengotori database master.'],
+        ];
+    }
+
+    /**
+     * Build example rows for Sheet 4 "Tambah Tipe Baru" (same as import template).
+     */
+    protected function buatContohTambahTipeBaru(): array
+    {
+        return [
+            ['merk_hp_baru', 'model_hp_baru', 'keterangan'],
+            ['Infinix', 'Hot 40 Pro', 'Contoh model baru yang belum ada di sistem'],
+            ['Tecno', 'Pova 6 Pro', 'Contoh model baru'],
+        ];
     }
 
     protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool

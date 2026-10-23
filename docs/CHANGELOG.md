@@ -3,11 +3,18 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
-## 2026-10-23 — Menu Export Master Produk (WMS) ✅
+## 2026-10-23 — Unified Export/Import Master Produk (WMS) ✅
 
-- **[Method `exportMaster()` di ProdukTab]** — ekspor master produk lengkap (xlsx/csv), 24 kolom **kompatibel template import** (`ImportProdukService::templateColumns`): sku, nama, barcode, satuan, kategori, brand, merk_hp, tipe_hp, kualitas, kondisi, harga_beli, harga_jual, harga_reseller, harga_agen, min_stock, reorder_point, sn, stok_awal, gudang_id, rak_id, produk_kompatibel_sku, kompatibilitas_hp, deskripsi, foto_url. Termasuk produk nonaktif, patuh filter aktif, guard `wms.view`.
-- **[Menu "⬇ Export" di toolbar]** — dropdown Alpine (click-away + escape + transition, glass dark): grup 📊 Pricelist Excel/CSV, 📦 Master Produk Excel/CSV, 🖨 Terpilih Excel/CSV (disabled bila belum ada produk terpilih, `wire:loading` disable saat proses). Tombol cepat Excel/CSV pricelist lama dipertahankan. **Fix**: hapus `@click="open = false"` pada panel dropdown agar `wire:click` item menu tidak dibatalkan.
-- **[Pengujian]** `MasterProdukExportTest` (3 test / 43 assertions): file xlsx dengan 24 heading import-compatible + produk nonaktif ikut + kategori sederhana; csv berisi nilai tier raw + status; filter kategori (inkl. keturunan) mengecualikan produk di luar kategori. Regresi `MasterProdukUiDanBatchTest` pass (12 test / 80 assertions); Pint, `npm run build`, `php artisan view:cache` pass.
+- **[Export Master XLSX multi-sheet]** `exportMaster('xlsx')` menghasilkan 4 sheet identik template import:
+  - Sheet 1 **Data Produk** — 24 kolom templateColumns (sku, nama, barcode, satuan, kategori, brand, merk_hp, tipe_hp, kualitas, kondisi, harga_beli, harga_jual, harga_reseller, harga_agen, min_stock, reorder_point, sn, stok_awal, gudang_id, rak_id, produk_kompatibel_sku, kompatibilitas_hp, deskripsi, foto_url) + dropdown data validation menunjuk Sheet 2.
+  - Sheet 2 **Referensi Sistem** — 5 kolom (Merk HP, Kategori Produk, Brand Sparepart, Satuan, Kualitas) diambil dari DB aktif (TipeHp, KategoriProduk, Brand, SatuanUnit, KualitasProduk), padding baris sama.
+  - Sheet 3 **Petunjuk** — panduan lengkap import (dropdown, kompatibilitas HP, produk substitusi, tipe baru, fuzzy matcher).
+  - Sheet 4 **Tambah Tipe Baru** — slot merk/model baru yang otomatis didaftarkan saat import.
+- **[Export CSV fixed]** fputcsv dengan escape param eksplisit + sanitasi array→string, tanpa warning deprecation.
+- **[Import Preview pintar]** `ImportProdukService::preview()` mengembalikan `referensi_summary` — split existing/new untuk kategori, brand, merk_hp, tipe_hp (merk:model), kualitas, satuan. User melihat "⚠️ 3 kategori baru akan dibuat: X, Y, Z" sebelum commit.
+- **[Auto-create references]** Import commit tetap gunakan `firstOrCreate` (Brand, Kualitas, Kategori, TipeHp) — baru ditambahkan otomatis tanpa error.
+- **[Round-trip export→import]** File export bisa langsung di-import: preview valid 100%, referensi semua existing.
+- **[Pengujian]** `ExportImportUnifiedTest` (3 test / 64 assertions): multi-sheet XLSX, referensi_summary, round-trip; `MasterProdukExportTest` (3 test / 43 assertions) regression pass; `MasterProdukUiDanBatchTest` (12 test / 80 assertions) pass; Pint, `npm run build` pass.
 
 ## 2026-10-23 — Perbaikan Koneksi Kategori & Master Produk (WMS) ✅
 
