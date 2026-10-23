@@ -2,6 +2,8 @@
 
 namespace App\Modules\Workflow\Livewire;
 
+use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Support\Facades\Cache;
@@ -21,6 +23,20 @@ class ApprovalInbox extends Component
 
     public $showRejectModal = false;
 
+    public $showApproveMemberModal = false;
+
+    public $memberApprovalForm = [
+        'request_id' => null,
+        'pelanggan_id' => null,
+        'nama' => '',
+        'telepon' => '',
+        'tipe_konsumen' => 'retail',
+        'tier_membership_id' => '',
+        'kode_agen' => '',
+        'referral_kode' => '',
+        'catatan' => '',
+    ];
+
     public $processing = false;
 
     protected $rules = [
@@ -34,6 +50,13 @@ class ApprovalInbox extends Component
 
     public function approveRequest($requestId)
     {
+        $request = ApprovalRequest::find($requestId);
+        if ($request && $request->entity_type === 'member') {
+            $this->openApproveMemberModal($requestId);
+
+            return;
+        }
+
         $this->validate(['catatan' => 'nullable|string|max:255']);
         $this->processing = true;
 
@@ -43,6 +66,78 @@ class ApprovalInbox extends Component
             Cache::forget('backoffice-approval-badge-all');
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Permintaan disetujui']);
             $this->reset(['selectedRequest', 'catatan', 'showRejectModal']);
+        } catch (ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+            $this->dispatch('alert', ['type' => 'error', 'message' => $msg]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        } finally {
+            $this->processing = false;
+        }
+    }
+
+    public function openApproveMemberModal($requestId)
+    {
+        $request = ApprovalRequest::findOrFail($requestId);
+        $pelanggan = Pelanggan::find($request->entity_id);
+        $defaultTier = TierMembership::where('is_active', true)->orderBy('urutan')->first();
+
+        $this->memberApprovalForm = [
+            'request_id' => $request->id,
+            'pelanggan_id' => $pelanggan?->id,
+            'nama' => $pelanggan?->nama ?? ($request->payload_json['nama'] ?? '-'),
+            'telepon' => $pelanggan?->telepon ?? ($request->payload_json['telepon'] ?? '-'),
+            'tipe_konsumen' => $pelanggan?->tipe_konsumen ?: 'retail',
+            'tier_membership_id' => $pelanggan?->tier_membership_id ?: ($defaultTier?->id ?? ''),
+            'kode_agen' => $pelanggan?->kode_agen ?? '',
+            'referral_kode' => $pelanggan?->referral_kode ?? '',
+            'catatan' => '',
+        ];
+        $this->showApproveMemberModal = true;
+    }
+
+    public function closeApproveMemberModal()
+    {
+        $this->showApproveMemberModal = false;
+        $this->reset('memberApprovalForm');
+    }
+
+    public function confirmApproveMember()
+    {
+        $this->validate([
+            'memberApprovalForm.tipe_konsumen' => 'required|in:retail,reseller,agen',
+            'memberApprovalForm.tier_membership_id' => 'nullable|exists:tier_memberships,id',
+            'memberApprovalForm.kode_agen' => 'nullable|string|max:40',
+            'memberApprovalForm.referral_kode' => 'nullable|string|max:40',
+            'memberApprovalForm.catatan' => 'nullable|string|max:255',
+        ]);
+
+        $this->processing = true;
+
+        try {
+            app(ApprovalService::class)->proses(
+                $this->memberApprovalForm['request_id'],
+                'disetujui',
+                auth()->id(),
+                $this->memberApprovalForm['catatan'] ?: null,
+                $this->memberApprovalForm
+            );
+
+            Cache::forget('backoffice-approval-badge-'.(session('cabang_id') ?? 'all'));
+            Cache::forget('backoffice-approval-badge-all');
+
+            $label = match ($this->memberApprovalForm['tipe_konsumen']) {
+                'agen' => 'Agen / Mitra B2B',
+                'reseller' => 'Reseller',
+                default => 'Member Biasa (Retail)',
+            };
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Pendaftaran member '{$this->memberApprovalForm['nama']}' disetujui sebagai {$label}",
+            ]);
+
+            $this->closeApproveMemberModal();
         } catch (ValidationException $e) {
             $msg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
             $this->dispatch('alert', ['type' => 'error', 'message' => $msg]);
@@ -112,6 +207,7 @@ class ApprovalInbox extends Component
 
         return view('modules.workflow.livewire.approval-inbox', [
             'requests' => $requests,
+            'tiers' => TierMembership::where('is_active', true)->orderBy('urutan')->get(),
         ])->layout('layouts.backoffice', ['header' => 'Approval Inbox']);
     }
 }

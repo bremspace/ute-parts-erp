@@ -539,7 +539,17 @@
                         <span class="text-lg">🔍</span>
                         <h3 class="text-base sm:text-lg font-bold text-white">Profil Pelanggan 360°</h3>
                     </div>
-                    <button wire:click="$set('selectedCustomerId', null)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
+                    <div class="flex items-center gap-2">
+                        @if(!empty($selectedCustomer['pelanggan']))
+                            <button wire:click="openEditPelangganModal({{ $selectedCustomer['pelanggan']->id }})" 
+                                    type="button"
+                                    class="px-2.5 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+                                <span>✏️</span>
+                                <span>Ubah Kategori / Status</span>
+                            </button>
+                        @endif
+                        <button wire:click="$set('selectedCustomerId', null)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
+                    </div>
                 </div>
 
                 <div class="overflow-y-auto pr-1 flex-1 space-y-4">
@@ -855,11 +865,26 @@
                         <input type="date" wire:model="editPelangganForm.tanggal_lahir" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
                     </div>
 
-                    <div>
-                        <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer select-none">
-                            <input type="checkbox" wire:model="editPelangganForm.is_reseller" class="accent-up-accent w-4 h-4 rounded cursor-pointer" />
-                            <span>Status Mitra Reseller Aktif</span>
-                        </label>
+                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-ink-400 font-semibold text-[11px] uppercase">Benefit & Status:</span>
+                            @if(($editPelangganForm['tipe_konsumen'] ?? '') === 'agen')
+                                <span class="text-[10px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/35 px-2 py-0.5 rounded-full">AGEN B2B</span>
+                            @elseif(($editPelangganForm['tipe_konsumen'] ?? '') === 'reseller')
+                                <span class="text-[10px] font-bold text-up-accent bg-up-accent/10 border border-up-accent/30 px-2 py-0.5 rounded-full">MITRA RESELLER</span>
+                            @else
+                                <span class="text-[10px] font-bold text-up-primary bg-up-primary/10 border border-up-primary/30 px-2 py-0.5 rounded-full">MEMBER BIASA (RETAIL)</span>
+                            @endif
+                        </div>
+                        <p class="text-[11px] text-ink-300 leading-relaxed">
+                            @if(($editPelangganForm['tipe_konsumen'] ?? '') === 'agen')
+                                Berhak mendapatkan tingkat harga Agen B2B, kepemilikan kode agen unik, serta potensi komisi referral downline.
+                            @elseif(($editPelangganForm['tipe_konsumen'] ?? '') === 'reseller')
+                                Berhak mendapatkan tingkat harga Reseller pada kasir POS, pesanan online, dan suku cadang servis.
+                            @else
+                                Konsumen umum. Mengumpulkan poin loyalitas dan berhak atas diskon kasir sesuai Tier Membership yang aktif.
+                            @endif
+                        </p>
                     </div>
                 </div>
 

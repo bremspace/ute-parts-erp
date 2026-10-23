@@ -125,11 +125,20 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     @if($request->status === 'pending')
                                         <div class="flex items-center space-x-2">
-                                            <button wire:click="approveRequest({{ $request->id }})" 
-                                                    class="px-3.5 py-1.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer"
-                                                    :disabled="$processing">
-                                                Setujui
-                                            </button>
+                                            @if($request->entity_type === 'member')
+                                                <button wire:click="openApproveMemberModal({{ $request->id }})" 
+                                                        class="px-3.5 py-1.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer flex items-center gap-1.5"
+                                                        :disabled="$processing">
+                                                    <span>✓</span>
+                                                    <span>Setujui & Kategori</span>
+                                                </button>
+                                            @else
+                                                <button wire:click="approveRequest({{ $request->id }})" 
+                                                        class="px-3.5 py-1.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer"
+                                                        :disabled="$processing">
+                                                    Setujui
+                                                </button>
+                                            @endif
                                             <button wire:click="openRejectModal({{ $request->id }})"
                                                     class="px-3.5 py-1.5 bg-up-red/15 hover:bg-up-red/25 border border-up-red/30 text-up-red text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer"
                                                     :disabled="$processing">
@@ -188,6 +197,170 @@
                             Tolak Permintaan
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Approve Member Modal -->
+    @if($showApproveMemberModal)
+        <div class="fixed inset-0 bg-black/75 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-3 sm:p-4">
+            <div class="relative mx-auto p-5 sm:p-6 border border-gray-200 dark:border-white/10 w-full max-w-lg shadow-2xl rounded-2xl sm:rounded-3xl bg-white dark:bg-gray-800 text-left max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
+                    <div>
+                        <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span>👤</span>
+                            <span>Persetujuan Pendaftaran Member</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Tetapkan kategori dan tier untuk menentukan benefit & hak istimewa harga
+                        </p>
+                    </div>
+                    <button wire:click="closeApproveMemberModal" 
+                            type="button" 
+                            class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition cursor-pointer text-sm">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="overflow-y-auto pr-1 flex-1 space-y-4">
+                    <!-- Ringkasan Calon Member -->
+                    <div class="p-3.5 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/5">
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400 block text-[10px] uppercase font-semibold">Nama Lengkap</span>
+                                <span class="font-bold text-gray-900 dark:text-white text-sm">{{ $memberApprovalForm['nama'] }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400 block text-[10px] uppercase font-semibold">No. HP / WhatsApp</span>
+                                <span class="font-bold font-mono text-gray-900 dark:text-white text-sm">{{ $memberApprovalForm['telepon'] }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kategori Member (Benefit & Privilege) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            Kategori & Hak Istimewa Member *
+                        </label>
+                        <div class="grid grid-cols-1 gap-2.5">
+                            <!-- Retail -->
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $memberApprovalForm['tipe_konsumen'] === 'retail' ? 'border-up-primary bg-up-primary/10 dark:bg-up-primary/15' : 'border-gray-200 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 bg-white dark:bg-white/[0.02]' }}">
+                                <input type="radio" wire:model.live="memberApprovalForm.tipe_konsumen" value="retail" class="mt-0.5 accent-up-primary cursor-pointer" />
+                                <div class="text-xs">
+                                    <div class="font-bold text-gray-900 dark:text-white">Member Biasa (Retail / Konsumen)</div>
+                                    <div class="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-relaxed">
+                                        Pelanggan ritel umum. Berhak atas akumulasi belanja 12 bulan, perolehan poin loyalitas, serta diskon belanja sesuai Tier Membership.
+                                    </div>
+                                </div>
+                            </label>
+
+                            <!-- Reseller -->
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $memberApprovalForm['tipe_konsumen'] === 'reseller' ? 'border-up-accent bg-up-accent/10 dark:bg-up-accent/15' : 'border-gray-200 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 bg-white dark:bg-white/[0.02]' }}">
+                                <input type="radio" wire:model.live="memberApprovalForm.tipe_konsumen" value="reseller" class="mt-0.5 accent-up-accent cursor-pointer" />
+                                <div class="text-xs">
+                                    <div class="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                        <span>Mitra Reseller</span>
+                                        <span class="text-[9px] font-bold text-up-accent bg-up-accent/10 border border-up-accent/30 px-1.5 py-0.5 rounded-full">HARGA RESELLER</span>
+                                    </div>
+                                    <div class="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-relaxed">
+                                        Mitra penjualan toko/bengkel rekanan. Otomatis mendapatkan tarif harga khusus Reseller pada katalog POS, web toko, dan suku cadang servis.
+                                    </div>
+                                </div>
+                            </label>
+
+                            <!-- Agen B2B -->
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $memberApprovalForm['tipe_konsumen'] === 'agen' ? 'border-amber-400 bg-amber-400/10 dark:bg-amber-400/15' : 'border-gray-200 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 bg-white dark:bg-white/[0.02]' }}">
+                                <input type="radio" wire:model.live="memberApprovalForm.tipe_konsumen" value="agen" class="mt-0.5 accent-amber-400 cursor-pointer" />
+                                <div class="text-xs">
+                                    <div class="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                        <span>Agen / Mitra B2B</span>
+                                        <span class="text-[9px] font-bold text-amber-400 bg-amber-400/15 border border-amber-400/35 px-1.5 py-0.5 rounded-full">HARGA AGEN + DOWNLINE</span>
+                                    </div>
+                                    <div class="text-gray-500 dark:text-gray-400 text-[11px] mt-0.5 leading-relaxed">
+                                        Tingkat kemitraan B2B tertinggi. Mendapatkan harga khusus Agen, kode agen unik untuk merekrut downline, serta hak komisi penjualan jaringan.
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Tier Membership -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Tier Membership (Level Diskon & Poin)
+                        </label>
+                        <select wire:model="memberApprovalForm.tier_membership_id" 
+                                class="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 text-xs font-medium">
+                            <option value="">Tanpa Tier Khusus / Tier Dasar</option>
+                            @foreach($tiers as $t)
+                                <option value="{{ $t->id }}">
+                                    {{ $t->nama }} (Diskon POS: {{ number_format($t->diskon_persen, 1) }}%, Poin: {{ number_format($t->poin_multiplier, 1) }}x)
+                                </option>
+                            @endforeach
+                        </select>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                            Diskon tier diterapkan pada kasir POS sesuai strategi loyalitas.
+                        </p>
+                    </div>
+
+                    <!-- Khusus Agen: Kode Unik & Referral Upline -->
+                    @if($memberApprovalForm['tipe_konsumen'] === 'agen')
+                        <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-3">
+                            <div class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                                <span>🏢</span>
+                                <span>Konfigurasi Keagenan</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                        Kode Agen Unik (Opsional)
+                                    </label>
+                                    <input type="text" 
+                                           wire:model="memberApprovalForm.kode_agen" 
+                                           placeholder="Otomatis jika kosong" 
+                                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-xs uppercase" />
+                                    @error('memberApprovalForm.kode_agen') <span class="text-red-500 text-[10px] block mt-0.5">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                        Kode Referral Upline (Opsional)
+                                    </label>
+                                    <input type="text" 
+                                           wire:model="memberApprovalForm.referral_kode" 
+                                           placeholder="Misal: AGN-XXXXXX" 
+                                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-xs uppercase" />
+                                    @error('memberApprovalForm.referral_kode') <span class="text-red-500 text-[10px] block mt-0.5">{{ $message }}</span> @enderror
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- Catatan Approval -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Catatan Persetujuan (Opsional)
+                        </label>
+                        <textarea wire:model="memberApprovalForm.catatan" 
+                                  rows="2" 
+                                  placeholder="Contoh: Disetujui sebagai agen perwakilan area..."
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 text-xs"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-4 border-t border-gray-200 dark:border-white/10 mt-4 flex-shrink-0">
+                    <button wire:click="closeApproveMemberModal"
+                            type="button"
+                            class="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 text-xs font-semibold rounded-xl cursor-pointer">
+                        Batal
+                    </button>
+                    <button wire:click="confirmApproveMember"
+                            type="button"
+                            :disabled="$processing"
+                            class="px-5 py-2.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5">
+                        <span>✓</span>
+                        <span>Setujui & Aktifkan Member</span>
+                    </button>
                 </div>
             </div>
         </div>

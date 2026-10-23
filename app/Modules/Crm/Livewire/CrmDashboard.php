@@ -146,6 +146,14 @@ class CrmDashboard extends Component
         $this->showEditPelangganModal = true;
     }
 
+    public function updatedEditPelangganFormTipeKonsumen($value): void
+    {
+        $this->editPelangganForm['is_reseller'] = in_array($value, ['reseller', 'agen'], true);
+        if ($value !== 'agen') {
+            $this->editPelangganForm['kode_agen'] = '';
+        }
+    }
+
     public function simpanEditPelanggan(): void
     {
         $user = auth()->user();
@@ -153,6 +161,16 @@ class CrmDashboard extends Component
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, Admin Toko, atau Marketing yang berhak mengedit data pelanggan.']);
 
             return;
+        }
+
+        if ($this->editPelangganForm['tipe_konsumen'] === 'retail') {
+            $this->editPelangganForm['is_reseller'] = false;
+            $this->editPelangganForm['kode_agen'] = null;
+        } elseif ($this->editPelangganForm['tipe_konsumen'] === 'reseller') {
+            $this->editPelangganForm['is_reseller'] = true;
+            $this->editPelangganForm['kode_agen'] = null;
+        } elseif ($this->editPelangganForm['tipe_konsumen'] === 'agen') {
+            $this->editPelangganForm['is_reseller'] = true;
         }
 
         $this->validate([

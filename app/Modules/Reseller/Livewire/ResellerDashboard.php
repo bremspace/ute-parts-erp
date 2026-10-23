@@ -49,9 +49,14 @@ class ResellerDashboard extends Component
     {
         $query = Pelanggan::with(['tierMembership', 'komisi', 'downlines'])
             ->where(function ($q) {
-                $q->where('is_reseller', true)
-                    ->orWhere('tipe_konsumen', 'agen')
-                    ->orWhereNotNull('kode_agen');
+                $q->where(function ($sub) {
+                    $sub->where('is_reseller', true)
+                        ->orWhere('tipe_konsumen', 'agen')
+                        ->orWhereNotNull('kode_agen');
+                })->where(function ($sub) {
+                    $sub->where('tipe_konsumen', '!=', 'retail')
+                        ->orWhereNull('tipe_konsumen');
+                });
             });
 
         if ($this->filterMitra === 'agen') {
@@ -223,9 +228,14 @@ class ResellerDashboard extends Component
     public function render()
     {
         $semuaMitra = Pelanggan::where(function ($q) {
-            $q->where('is_reseller', true)
-                ->orWhere('tipe_konsumen', 'agen')
-                ->orWhereNotNull('kode_agen');
+            $q->where(function ($sub) {
+                $sub->where('is_reseller', true)
+                    ->orWhere('tipe_konsumen', 'agen')
+                    ->orWhereNotNull('kode_agen');
+            })->where(function ($sub) {
+                $sub->where('tipe_konsumen', '!=', 'retail')
+                    ->orWhereNull('tipe_konsumen');
+            });
         })->get();
 
         $totalMitra = $semuaMitra->count();

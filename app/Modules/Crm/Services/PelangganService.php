@@ -140,23 +140,28 @@ class PelangganService
             $updateData['referral_kode'] = $validated['referral_kode'] ? strtoupper(trim($validated['referral_kode'])) : null;
         }
 
-        if (array_key_exists('is_reseller', $validated)) {
-            $isReseller = (bool) $validated['is_reseller'];
-            $updateData['is_reseller'] = $isReseller;
-            $tipeKonsumen = $validated['tipe_konsumen'] ?? ($isReseller ? 'reseller' : 'retail');
-            if ($isReseller && $tipeKonsumen === 'retail') {
-                $tipeKonsumen = 'reseller';
-            } elseif (! $isReseller && $tipeKonsumen === 'reseller') {
-                $tipeKonsumen = 'retail';
-            }
-            $updateData['tipe_konsumen'] = $tipeKonsumen;
-        } elseif (array_key_exists('tipe_konsumen', $validated)) {
+        if (array_key_exists('tipe_konsumen', $validated)) {
             $tipe = $validated['tipe_konsumen'] ?: 'retail';
             $updateData['tipe_konsumen'] = $tipe;
-            if ($tipe === 'reseller' || $tipe === 'agen') {
-                $updateData['is_reseller'] = true;
-            } elseif ($tipe === 'retail') {
-                $updateData['is_reseller'] = false;
+            $updateData['is_reseller'] = in_array($tipe, ['reseller', 'agen'], true);
+
+            if ($tipe === 'agen') {
+                if (empty($pelanggan->kode_agen) && empty($updateData['kode_agen'])) {
+                    $updateData['kode_agen'] = $this->generateUniqueKodeAgen();
+                }
+            } else {
+                // Bila diturunkan ke retail/reseller (bukan agen), kosongkan kode agen bila tidak spesifik diinput
+                if (! array_key_exists('kode_agen', $validated) || empty($validated['kode_agen'])) {
+                    $updateData['kode_agen'] = null;
+                }
+            }
+        } elseif (array_key_exists('is_reseller', $validated)) {
+            $isReseller = (bool) $validated['is_reseller'];
+            $updateData['is_reseller'] = $isReseller;
+            $updateData['tipe_konsumen'] = $isReseller ? 'reseller' : 'retail';
+
+            if (! $isReseller && (! array_key_exists('kode_agen', $validated) || empty($validated['kode_agen']))) {
+                $updateData['kode_agen'] = null;
             }
         }
 

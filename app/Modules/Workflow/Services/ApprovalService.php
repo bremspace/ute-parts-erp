@@ -4,6 +4,7 @@ namespace App\Modules\Workflow\Services;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Services\KasSesiState;
@@ -94,7 +95,7 @@ class ApprovalService
         });
     }
 
-    public function proses(int $requestId, string $action, int $actionedBy, ?string $catatan = null): ApprovalRequest
+    public function proses(int $requestId, string $action, int $actionedBy, ?string $catatan = null, array $options = []): ApprovalRequest
     {
         $request = ApprovalRequest::with('rule')->findOrFail($requestId);
 
@@ -126,7 +127,7 @@ class ApprovalService
 
         $status = self::normalisasiStatus($action);
 
-        return DB::transaction(function () use ($request, $status, $actionedBy, $catatan) {
+        return DB::transaction(function () use ($request, $status, $actionedBy, $catatan, $options) {
             $request->update([
                 'status' => $status,
                 'actioned_by' => $actionedBy,
@@ -142,7 +143,7 @@ class ApprovalService
 
             // Rantai selesai (semua level disetujui / ditolak) → efek entitas + kabari pemohon via queue
             if (! $lanjut) {
-                $this->selesaikanEntity($request, $status, $actionedBy, $catatan);
+                $this->selesaikanEntity($request, $status, $actionedBy, $catatan, $options);
 
                 $this->notifikasiUser(
                     $request->requested_by,
@@ -167,7 +168,7 @@ class ApprovalService
      * [F3-7] Cycle Count MAJOR: disetujui → CycleCountService koreksi stok; ditolak → task ditolak.
      * Idempoten di sisi service (hanya transisi dari status draft / menunggu_approval).
      */
-    protected function selesaikanEntity(ApprovalRequest $request, string $status, int $actionedBy, ?string $catatan): void
+    protected function selesaikanEntity(ApprovalRequest $request, string $status, int $actionedBy, ?string $catatan, array $options = []): void
     {
         if ($request->entity_type === 'grn') {
             $grnService = app(GrnService::class);
@@ -234,13 +235,41 @@ class ApprovalService
             return;
         }
 
-        // [MEMBER APPROVAL] Pendaftaran member: disetujui → aktif; ditolak → status ditolak
+        // [MEMBER APPROVAL] Pendaftaran member: disetujui → aktif (dengan penetapan kategori/tier); ditolak → status ditolak
         if ($request->entity_type === 'member') {
             $pelanggan = Pelanggan::find($request->entity_id);
             if ($pelanggan) {
                 if ($status === 'disetujui') {
+                    $tipeKonsumen = $options['tipe_konsumen'] ?? ($pelanggan->tipe_konsumen ?: 'retail');
+                    if (! in_array($tipeKonsumen, ['retail', 'reseller', 'agen'], true)) {
+                        $tipeKonsumen = 'retail';
+                    }
+                    $isReseller = in_array($tipeKonsumen, ['reseller', 'agen'], true);
+
+                    $tierId = ! empty($options['tier_membership_id'])
+                        ? (int) $options['tier_membership_id']
+                        : $pelanggan->tier_membership_id;
+
+                    $kodeAgen = ! empty($options['kode_agen']) ? strtoupper(trim($options['kode_agen'])) : null;
+                    if ($tipeKonsumen === 'agen') {
+                        if (empty($kodeAgen)) {
+                            $kodeAgen = $pelanggan->kode_agen ?: app(PelangganService::class)->generateUniqueKodeAgen();
+                        }
+                    } else {
+                        $kodeAgen = null;
+                    }
+
+                    $referralKode = ! empty($options['referral_kode'])
+                        ? strtoupper(trim($options['referral_kode']))
+                        : $pelanggan->referral_kode;
+
                     $pelanggan->update([
                         'status' => 'aktif',
+                        'tipe_konsumen' => $tipeKonsumen,
+                        'is_reseller' => $isReseller,
+                        'tier_membership_id' => $tierId,
+                        'kode_agen' => $kodeAgen,
+                        'referral_kode' => $referralKode,
                         'catatan_approval' => $catatan,
                         'approved_at' => now(),
                         'approved_by' => $actionedBy,
