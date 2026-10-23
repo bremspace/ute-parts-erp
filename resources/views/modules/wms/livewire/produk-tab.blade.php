@@ -174,14 +174,14 @@
                         <div class="hidden sm:block w-px h-8 bg-white/10 mx-1.5"></div>
                         <div class="sm:hidden w-full h-px bg-white/10 my-1.5"></div>
 
-                        <!-- MASTER PRODUK: Internal / Untuk manajemen & update data -->
-                        @php $hasSelected = ! empty($selectedProdukIds); @endphp
+                        <!-- MASTER PRODUK: Internal / Untuk manajemen & update data (sejajar Import) -->
+                        @php $hasSelected = ! empty($selectedProdukIds); $selectedCount = count($selectedProdukIds); @endphp
                         <div class="relative text-left w-full sm:w-auto" x-data="{ open: false }" @click.away="open = false" @keydown.escape.window="open = false">
                             <button type="button"
                                     @click="open = !open"
                                     aria-haspopup="true" :aria-expanded="open"
                                     class="w-full sm:w-auto px-3 py-2 rounded-xl bg-ink-900/60 hover:bg-black/40 border border-white/10 text-ink-200 font-semibold text-xs flex items-center justify-center sm:justify-start gap-1.5 transition-[transform,background-color] active:scale-95 cursor-pointer whitespace-nowrap min-h-[44px]"
-                                    title="Export Master Produk (Internal: lengkap, untuk import update)">
+                                    title="Export Master Produk (Internal: untuk import update / backup)">
                                 <span>📦</span>
                                 <span class="hidden sm:inline">Master Produk</span>
                                 <span class="text-[9px] ml-auto sm:ml-0" :class="open ? 'rotate-180' : ''" style="transition: transform 150ms">▼</span>
@@ -190,23 +190,26 @@
                             <div x-show="open" x-cloak
                                  x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
                                  x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                                 class="absolute left-0 right-0 sm:right-auto z-50 mt-2 w-full sm:w-56 rounded-xl glass-card bg-ink-900 border border-white/10 shadow-2xl py-2 origin-top-left"
+                                 class="absolute left-0 right-0 sm:right-auto z-50 mt-2 w-full sm:w-60 rounded-xl glass-card bg-ink-900 border border-white/10 shadow-2xl py-2 origin-top-left"
                                  style="display: none;">
-                                <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-ink-400 font-bold">📦 Master Produk (Internal)</div>
-                                <button type="button" wire:click="exportMaster('xlsx')" class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px]" title="Export Master Produk Excel (lengkap, untuk import update)">
+                                <!-- Section: Semua (Sesuai Filter) -->
+                                <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-up-mint font-bold">📤 Semua (Sesuai Filter)</div>
+                                <button type="button" wire:click="exportMaster('xlsx')" class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px]" title="Export SEMUA produk yang terlihat (mengikuti filter aktif) — Excel">
                                     <span>📊</span><span>Excel (xlsx)</span>
                                 </button>
-                                <button type="button" wire:click="exportMaster('csv')" class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px]" title="Export Master Produk CSV (lengkap, untuk import update)">
+                                <button type="button" wire:click="exportMaster('csv')" class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px]" title="Export SEMUA produk yang terlihat (mengikuti filter aktif) — CSV">
                                     <span>📊</span><span>CSV</span>
                                 </button>
 
                                 <div class="my-1.5 border-t border-white/10"></div>
-                                <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-ink-400 font-bold">🖨 Produk Terpilih</div>
-                                <button type="button" wire:click="exportTerpilih('xlsx')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang produk di tabel)" @endif
+
+                                <!-- Section: Terpilih -->
+                                <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-up-amber font-bold">🖨 Terpilih ({{ $selectedCount }} item)</div>
+                                <button type="button" wire:click="exportTerpilih('xlsx')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang checkbox di tabel)" @endif
                                         class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px] @if(! $hasSelected) opacity-50 pointer-events-none @endif">
                                     <span>🖨</span><span>Excel (xlsx)</span>
                                 </button>
-                                <button type="button" wire:click="exportTerpilih('csv')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang produk di tabel)" @endif
+                                <button type="button" wire:click="exportTerpilih('csv')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang checkbox di tabel)" @endif
                                         class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px] @if(! $hasSelected) opacity-50 pointer-events-none @endif">
                                     <span>🖨</span><span>CSV</span>
                                 </button>
