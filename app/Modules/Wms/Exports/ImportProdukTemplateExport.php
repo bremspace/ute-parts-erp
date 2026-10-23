@@ -6,6 +6,7 @@ use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
 use Illuminate\Support\Enumerable;
@@ -83,41 +84,50 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                             $valBrand->setFormula1("'Referensi Sistem'!\$C\$2:\$C\$100");
                             $valBrand->setSqref('F2:F1000');
 
-                            // 4. Dropdown Merk HP (Kolom G) -> Referensi Sheet 3
-                            $valMerkHp = $sheet->getCell('G2')->getDataValidation();
+                            // 4. Dropdown Supplier (Kolom G) -> Referensi Sheet 3
+                            $valSupplier = $sheet->getCell('G2')->getDataValidation();
+                            $valSupplier->setType(DataValidation::TYPE_LIST);
+                            $valSupplier->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valSupplier->setAllowBlank(true);
+                            $valSupplier->setShowDropDown(true);
+                            $valSupplier->setFormula1("'Referensi Sistem'!\$F\$2:\$F\$100");
+                            $valSupplier->setSqref('G2:G1000');
+
+                            // 5. Dropdown Merk HP (Kolom H) -> Referensi Sheet 3
+                            $valMerkHp = $sheet->getCell('H2')->getDataValidation();
                             $valMerkHp->setType(DataValidation::TYPE_LIST);
                             $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valMerkHp->setAllowBlank(true);
                             $valMerkHp->setShowDropDown(true);
                             $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
-                            $valMerkHp->setSqref('G2:G1000');
+                            $valMerkHp->setSqref('H2:H1000');
 
-                            // 5. Dropdown Kualitas (Kolom I)
-                            $valKualitas = $sheet->getCell('I2')->getDataValidation();
+                            // 6. Dropdown Kualitas (Kolom J)
+                            $valKualitas = $sheet->getCell('J2')->getDataValidation();
                             $valKualitas->setType(DataValidation::TYPE_LIST);
                             $valKualitas->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valKualitas->setAllowBlank(true);
                             $valKualitas->setShowDropDown(true);
                             $valKualitas->setFormula1("'Referensi Sistem'!\$E\$2:\$E\$50");
-                            $valKualitas->setSqref('I2:I1000');
+                            $valKualitas->setSqref('J2:J1000');
 
-                            // 6. Dropdown Kondisi (Kolom J)
-                            $valKondisi = $sheet->getCell('J2')->getDataValidation();
+                            // 7. Dropdown Kondisi (Kolom K)
+                            $valKondisi = $sheet->getCell('K2')->getDataValidation();
                             $valKondisi->setType(DataValidation::TYPE_LIST);
                             $valKondisi->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valKondisi->setAllowBlank(true);
                             $valKondisi->setShowDropDown(true);
                             $valKondisi->setFormula1('"baru,oem,bekas,refurbished"');
-                            $valKondisi->setSqref('J2:J1000');
+                            $valKondisi->setSqref('K2:K1000');
 
-                            // 7. Dropdown Serial Number (Kolom Q)
-                            $valSn = $sheet->getCell('Q2')->getDataValidation();
+                            // 8. Dropdown Serial Number (Kolom R)
+                            $valSn = $sheet->getCell('R2')->getDataValidation();
                             $valSn->setType(DataValidation::TYPE_LIST);
                             $valSn->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valSn->setAllowBlank(true);
                             $valSn->setShowDropDown(true);
                             $valSn->setFormula1('"ya,tidak"');
-                            $valSn->setSqref('Q2:Q1000');
+                            $valSn->setSqref('R2:R1000');
                         },
                     ];
                 }
@@ -155,7 +165,7 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
 
                 public function headings(): array
                 {
-                    return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas'];
+                    return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier'];
                 }
 
                 public function collection(): Enumerable
@@ -185,7 +195,12 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                         $kualitas = ['Original', 'Grade A', 'Grade B', 'OEM', 'Refurbished'];
                     }
 
-                    $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas));
+                    $suppliers = Supplier::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    if (empty($suppliers)) {
+                        $suppliers = ['PT Supplier Jaya', 'Supplier Umum', 'Sumber Makmur'];
+                    }
+
+                    $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers));
                     $rows = [];
                     for ($i = 0; $i < $max; $i++) {
                         $rows[] = [
@@ -194,6 +209,7 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                             $brands[$i] ?? '',
                             $satuans[$i] ?? '',
                             $kualitas[$i] ?? '',
+                            $suppliers[$i] ?? '',
                         ];
                     }
 

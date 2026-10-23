@@ -124,11 +124,13 @@ class ProdukTab extends Component
         'sn' => false,
         'penyesuaian_harga' => false,
         'rak_id' => false,
+        'supplier_id' => false,
     ];
 
     public array $bulkEditForm = [
         'kategori_id' => null,
         'brand_id' => null,
+        'supplier_id' => null,
         'kualitas_id' => null,
         'kondisi' => 'baru',
         'satuan' => 'pcs',
@@ -1077,7 +1079,18 @@ class ProdukTab extends Component
         $this->editFotoUploads = [];
         $this->editFotoKameraUpload = null;
 
-        // Load lokasi rak & stok per gudang untuk produk ini
+        // Load lokasi rak & stok per gudang untuk produk ini (pastikan ada slot gudang cabang agar rak selalu bisa diatur/dikosongkan)
+        $cabangId = session('cabang_id');
+        $gudangsCabang = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->where('is_active', true)->get();
+        if ($gudangsCabang->isNotEmpty()) {
+            foreach ($gudangsCabang as $gc) {
+                StokItem::firstOrCreate(
+                    ['produk_id' => $p->id, 'sku_variant_id' => null, 'gudang_id' => $gc->id],
+                    ['jumlah' => 0, 'jumlah_minimum' => $p->min_stock ?? 0, 'rak_id' => null]
+                );
+            }
+        }
+
         $stokList = StokItem::with(['gudang', 'rak'])
             ->where('produk_id', $p->id)
             ->get();
@@ -1113,8 +1126,20 @@ class ProdukTab extends Component
     {
         $stok = StokItem::find($stokItemId);
         if ($stok) {
-            $val = $rakId ?? ($this->editStokRaks[$stokItemId] ?? null);
-            $stok->update(['rak_id' => $val ?: null]);
+            $val = $rakId !== null ? $rakId : ($this->editStokRaks[$stokItemId] ?? null);
+            $finalRakId = (! empty($val) && (int) $val > 0) ? (int) $val : null;
+            $stok->update(['rak_id' => $finalRakId]);
+            $this->editStokRaks[$stokItemId] = $finalRakId;
+
+            foreach ($this->editStokItems as &$si) {
+                if ($si['id'] === $stokItemId) {
+                    $si['rak_id'] = $finalRakId;
+                    $rak = $finalRakId ? Rak::find($finalRakId) : null;
+                    $si['rak_nama'] = $rak ? $rak->nama.' ('.$rak->kode.')' : '— Belum diset';
+                }
+            }
+            unset($si);
+
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Lokasi rak produk berhasil diperbarui']);
         }
     }
@@ -1289,7 +1314,8 @@ class ProdukTab extends Component
             // Simpan perubahan lokasi rak stok per gudang
             if (! empty($this->editStokRaks)) {
                 foreach ($this->editStokRaks as $stokId => $rId) {
-                    StokItem::where('id', $stokId)->update(['rak_id' => $rId ?: null]);
+                    $finalRId = (! empty($rId) && (int) $rId > 0) ? (int) $rId : null;
+                    StokItem::where('id', $stokId)->update(['rak_id' => $finalRId]);
                 }
             }
 
@@ -3206,6 +3232,10 @@ class ProdukTab extends Component
                     $updates['kualitas_id'] = $this->bulkEditForm['kualitas_id'] ?: null;
                 }
 
+                if (! empty($activeFields['supplier_id'])) {
+                    $updates['supplier_id'] = $this->bulkEditForm['supplier_id'] ?: null;
+                }
+
                 if (! empty($activeFields['kondisi'])) {
                     $updates['kondisi'] = $this->bulkEditForm['kondisi'];
                 }
@@ -3928,13 +3958,13 @@ class ProdukTab extends Component
             // Stok awal untuk import: gunakan stok total saat ini (bisa dikosongkan user nanti)
             $stokAwal = (int) ($p->total_stok ?? 0);
 
-            // Gudang/Rak default: ambil dari stokItems pertama yang ada
-            $gudangId = '-';
-            $rakId = '-';
+            // Gudang/Rak default: ambil dari stokItems pertama yang ada (gunakan string kosong bila belum diset agar re-import aman)
+            $gudangId = '';
+            $rakId = '';
             if ($p->stokItems->isNotEmpty()) {
                 $firstStok = $p->stokItems->first();
-                $gudangId = $firstStok->gudang_id ?? '-';
-                $rakId = $firstStok->rak_id ?? '-';
+                $gudangId = $firstStok->gudang_id ? (string) $firstStok->gudang_id : '';
+                $rakId = $firstStok->rak_id ? (string) $firstStok->rak_id : '';
             }
 
             // Produk kompatibel SKU: ambil dari relasi produk_kompatibel
@@ -3944,21 +3974,22 @@ class ProdukTab extends Component
             $fotoUrl = $p->foto ?? $p->gambar ?? '';
 
             // Kategori untuk import: gunakan nama kategori sederhana (bukan berjenjang)
-            $kategoriImport = $p->kategoriRelasi?->nama ?? $p->kategori ?? '-';
+            $kategoriImport = $p->kategoriRelasi?->nama ?? $p->kategori ?? '';
 
             // Brand untuk import: gunakan brand relasi
-            $brandImport = $p->brand?->nama ?? $p->brand_kompatibel ?? '-';
+            $brandImport = $p->brand?->nama ?? $p->brand_kompatibel ?? '';
 
             $rows[] = [
                 'sku' => $p->kode ?: ($p->skuVariants->first()?->sku ?? '-'),
                 'nama' => $p->nama,
-                'barcode' => $p->barcode ?: '-',
+                'barcode' => $p->barcode ?: '',
                 'satuan' => $p->satuan ?: 'pcs',
                 'kategori' => $kategoriImport,
                 'brand' => $brandImport,
+                'supplier' => $p->supplier?->nama ?? '',
                 'merk_hp' => $merkHp,
                 'tipe_hp' => $tipeHp,
-                'kualitas' => $p->kualitas?->nama ?? '-',
+                'kualitas' => $p->kualitas?->nama ?? '',
                 'kondisi' => $p->kondisi ?: 'baru',
                 'harga_beli' => (float) $p->harga_beli,
                 'harga_jual' => (float) $p->harga_jual_retail,
@@ -4073,41 +4104,50 @@ class ProdukTab extends Component
                                         $valBrand->setFormula1("'Referensi Sistem'!\$C\$2:\$C\$100");
                                         $valBrand->setSqref('F2:F5000');
 
-                                        // Dropdown Merk HP (Kolom G) -> Referensi Sheet 2 (kolom A)
-                                        $valMerkHp = $sheet->getCell('G2')->getDataValidation();
+                                        // Dropdown Supplier (Kolom G) -> Referensi Sheet 2 (kolom F)
+                                        $valSupplier = $sheet->getCell('G2')->getDataValidation();
+                                        $valSupplier->setType(DataValidation::TYPE_LIST);
+                                        $valSupplier->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valSupplier->setAllowBlank(true);
+                                        $valSupplier->setShowDropDown(true);
+                                        $valSupplier->setFormula1("'Referensi Sistem'!\$F\$2:\$F\$100");
+                                        $valSupplier->setSqref('G2:G5000');
+
+                                        // Dropdown Merk HP (Kolom H) -> Referensi Sheet 2 (kolom A)
+                                        $valMerkHp = $sheet->getCell('H2')->getDataValidation();
                                         $valMerkHp->setType(DataValidation::TYPE_LIST);
                                         $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valMerkHp->setAllowBlank(true);
                                         $valMerkHp->setShowDropDown(true);
                                         $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
-                                        $valMerkHp->setSqref('G2:G5000');
+                                        $valMerkHp->setSqref('H2:H5000');
 
-                                        // Dropdown Kualitas (Kolom I) -> Referensi Sheet 2 (kolom E)
-                                        $valKualitas = $sheet->getCell('I2')->getDataValidation();
+                                        // Dropdown Kualitas (Kolom J) -> Referensi Sheet 2 (kolom E)
+                                        $valKualitas = $sheet->getCell('J2')->getDataValidation();
                                         $valKualitas->setType(DataValidation::TYPE_LIST);
                                         $valKualitas->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valKualitas->setAllowBlank(true);
                                         $valKualitas->setShowDropDown(true);
                                         $valKualitas->setFormula1("'Referensi Sistem'!\$E\$2:\$E\$100");
-                                        $valKualitas->setSqref('I2:I5000');
+                                        $valKualitas->setSqref('J2:J5000');
 
-                                        // Dropdown Kondisi (Kolom J) - fixed list
-                                        $valKondisi = $sheet->getCell('J2')->getDataValidation();
+                                        // Dropdown Kondisi (Kolom K) - fixed list
+                                        $valKondisi = $sheet->getCell('K2')->getDataValidation();
                                         $valKondisi->setType(DataValidation::TYPE_LIST);
                                         $valKondisi->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valKondisi->setAllowBlank(true);
                                         $valKondisi->setShowDropDown(true);
                                         $valKondisi->setFormula1('"baru,oem,bekas,refurbished"');
-                                        $valKondisi->setSqref('J2:J5000');
+                                        $valKondisi->setSqref('K2:K5000');
 
-                                        // Dropdown SN (Kolom Q)
-                                        $valSn = $sheet->getCell('Q2')->getDataValidation();
+                                        // Dropdown SN (Kolom R)
+                                        $valSn = $sheet->getCell('R2')->getDataValidation();
                                         $valSn->setType(DataValidation::TYPE_LIST);
                                         $valSn->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valSn->setAllowBlank(true);
                                         $valSn->setShowDropDown(true);
                                         $valSn->setFormula1('"ya,tidak"');
-                                        $valSn->setSqref('Q2:Q5000');
+                                        $valSn->setSqref('R2:R5000');
                                     },
                                 ];
                             }
@@ -4125,7 +4165,7 @@ class ProdukTab extends Component
 
                             public function headings(): array
                             {
-                                return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas'];
+                                return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier'];
                             }
 
                             public function array(): array
@@ -4187,7 +4227,7 @@ class ProdukTab extends Component
 
     /**
      * Build reference data for Sheet 2 "Referensi Sistem" (same as import template).
-     * Returns array of rows with 5 columns: Merk HP, Kategori Produk, Brand Sparepart, Satuan, Kualitas.
+     * Returns array of rows with 6 columns: Merk HP, Kategori Produk, Brand Sparepart, Satuan, Kualitas, Supplier.
      */
     protected function buatReferensiSistem(): array
     {
@@ -4216,7 +4256,12 @@ class ProdukTab extends Component
             $kualitas = ['Original', 'Grade A', 'Grade B', 'OEM', 'Refurbished'];
         }
 
-        $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas));
+        $suppliers = Supplier::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+        if (empty($suppliers)) {
+            $suppliers = ['PT Supplier Jaya', 'Supplier Umum', 'Sumber Makmur'];
+        }
+
+        $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers));
         $rows = [];
         for ($i = 0; $i < $max; $i++) {
             $rows[] = [
@@ -4225,6 +4270,7 @@ class ProdukTab extends Component
                 $brands[$i] ?? '',
                 $satuans[$i] ?? '',
                 $kualitas[$i] ?? '',
+                $suppliers[$i] ?? '',
             ];
         }
 

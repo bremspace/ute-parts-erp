@@ -195,6 +195,23 @@ class MasterProdukUiDanBatchTest extends TestCase
             'produk_id' => $p2->id,
             'rak_id' => $rak->id,
         ]);
+
+        // Verifikasi pengosongan lokasi rak secara masal (rak_id null)
+        Livewire::test(ProdukTab::class)
+            ->set('selectedProdukIds', [$p1->id, $p2->id])
+            ->call('openBulkEditModal')
+            ->set('bulkEditFields.rak_id', true)
+            ->set('bulkEditForm.rak_id', '')
+            ->call('simpanBulkEdit');
+
+        $this->assertDatabaseHas('stok_items', [
+            'produk_id' => $p1->id,
+            'rak_id' => null,
+        ]);
+        $this->assertDatabaseHas('stok_items', [
+            'produk_id' => $p2->id,
+            'rak_id' => null,
+        ]);
     }
 
     public function test_kustomisasi_salin_data_produk(): void

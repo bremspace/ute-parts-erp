@@ -4312,6 +4312,22 @@
                         </div>
                     </div>
 
+                    <!-- Supplier -->
+                    <div class="p-3 rounded-2xl bg-white/[0.02] border {{ ($bulkEditFields['supplier_id'] ?? false) ? 'border-up-primary/40 bg-up-primary/5' : 'border-white/5' }} space-y-2">
+                        <label class="flex items-center justify-between cursor-pointer select-none">
+                            <span class="text-xs font-semibold text-ink-200">Ubah Supplier</span>
+                            <input type="checkbox" wire:model.live="bulkEditFields.supplier_id" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-0">
+                        </label>
+                        @if($bulkEditFields['supplier_id'] ?? false)
+                            <select wire:model="bulkEditForm.supplier_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium text-white bg-ink-900">
+                                <option value="">— Kosongkan Supplier (Tanpa Supplier) —</option>
+                                @foreach($suppliers as $s)
+                                    <option value="{{ $s->id }}">{{ $s->nama }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+
                     <!-- Kondisi & Satuan (Grid) -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <!-- Kondisi -->

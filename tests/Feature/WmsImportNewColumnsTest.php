@@ -41,6 +41,7 @@ class WmsImportNewColumnsTest extends TestCase
                 'satuan' => 'pcs',
                 'kategori' => 'LCD & Touchscreen',
                 'brand' => 'Crown',
+                'supplier' => 'PT Supplier Utama',
                 'merk_hp' => 'Apple',
                 'tipe_hp' => 'iPhone 13 Pro Max',
                 'kualitas' => 'Grade A',
@@ -104,6 +105,7 @@ class WmsImportNewColumnsTest extends TestCase
         $this->assertSame('LCD OEM High Brightness untuk iPhone 13 Pro Max', $produk->deskripsi);
         $this->assertNotNull($produk->kategori_id);
         $this->assertSame('Crown', $produk->brand?->nama);
+        $this->assertSame('PT Supplier Utama', $produk->supplier?->nama);
         $this->assertSame('Grade A', $produk->kualitas?->nama);
 
         // Tipe HP pivot
@@ -137,6 +139,7 @@ class WmsImportNewColumnsTest extends TestCase
                 'satuan' => 'pcs',
                 'kategori' => 'LCD & Touchscreen',
                 'brand' => 'OG',
+                'supplier' => 'Supplier Korea',
                 'merk_hp' => 'samsng', // typo auto-normalized ke Samsung
                 'tipe_hp' => 'Galaxy A11, Galaxy A15, Galaxy M11', // multi-tipe
                 'kualitas' => 'Grade A',
@@ -163,6 +166,7 @@ class WmsImportNewColumnsTest extends TestCase
                 'satuan' => 'pcs',
                 'kategori' => 'LCD & Touchscreen',
                 'brand' => 'Braderpart',
+                'supplier' => 'Supplier Korea',
                 'merk_hp' => 'Samsung',
                 'tipe_hp' => 'Galaxy A11',
                 'kualitas' => 'Original',
@@ -231,6 +235,87 @@ class WmsImportNewColumnsTest extends TestCase
         // Verifikasi relasi timbal-balik substitusi antar produk via SKU (Pass-2)
         $this->assertTrue($p1->produkKompatibel()->where('kompatibel_produk_id', $p2->id)->exists());
         $this->assertTrue($p2->produkKompatibel()->where('kompatibel_produk_id', $p1->id)->exists());
+
+        @unlink($filePath);
+    }
+
+    public function test_import_produk_rak_dapat_dikosongkan_dan_relaksasi_validasi(): void
+    {
+        $this->seed(AkunCoaSeeder::class);
+
+        $cabang = Cabang::create(['nama' => 'Cabang Relaksasi', 'kode' => 'CBG-RLX', 'is_active' => true]);
+        $gudang = Gudang::create(['cabang_id' => $cabang->id, 'nama' => 'Gudang Relaksasi', 'kode' => 'GDG-RLX', 'is_active' => true]);
+
+        $service = app(ImportProdukService::class);
+        $kolom = $service->templateColumns();
+
+        $baris = [
+            [
+                'sku' => 'SKU-RAK-KOSONG',
+                'nama' => 'Baterai Tanpa Rak',
+                'barcode' => '',
+                'satuan' => '', // kosong -> default pcs
+                'kategori' => '',
+                'brand' => '',
+                'supplier' => '-', // strip -> null
+                'merk_hp' => 'Universal',
+                'tipe_hp' => '',
+                'kualitas' => '',
+                'kondisi' => 'baru',
+                'harga_beli' => 50000,
+                'harga_jual' => 80000,
+                'harga_reseller' => 70000,
+                'harga_agen' => 65000,
+                'min_stock' => 2,
+                'reorder_point' => 5,
+                'sn' => 'tidak',
+                'stok_awal' => 4,
+                'gudang_id' => $gudang->id,
+                'rak_id' => '-', // strip -> lokasi rak null
+                'produk_kompatibel_sku' => '',
+                'kompatibilitas_hp' => '',
+                'deskripsi' => '',
+                'foto_url' => '',
+            ],
+        ];
+
+        $export = new class($kolom, $baris) implements FromCollection, WithHeadings
+        {
+            public function __construct(private array $kolom, private array $baris) {}
+
+            public function headings(): array
+            {
+                return $this->kolom;
+            }
+
+            public function collection(): Enumerable
+            {
+                return collect($this->baris);
+            }
+        };
+
+        Excel::store($export, 'import-tmp/test-rak-kosong.csv', 'local', \Maatwebsite\Excel\Excel::CSV);
+        $filePath = Storage::disk('local')->path('import-tmp/test-rak-kosong.csv');
+
+        $logImp = ImportLog::create([
+            'tipe' => 'produk_excel', 'nama_file' => 'test-rak-kosong.csv',
+            'total_baris' => 0, 'sukses' => 0, 'gagal' => 0, 'status' => 'proses',
+        ]);
+
+        $hasil = $service->commit($filePath, $logImp->id, null);
+
+        $this->assertSame(1, $hasil['sukses']);
+        $this->assertSame(0, $hasil['gagal']);
+
+        $p = Produk::where('nama', 'Baterai Tanpa Rak')->first();
+        $this->assertNotNull($p);
+        $this->assertNull($p->supplier_id);
+        $this->assertSame('pcs', $p->satuan);
+
+        $stok = StokItem::where('produk_id', $p->id)->first();
+        $this->assertNotNull($stok);
+        $this->assertSame(4, $stok->jumlah);
+        $this->assertNull($stok->rak_id);
 
         @unlink($filePath);
     }

@@ -134,7 +134,7 @@ class MasterProdukExportTest extends TestCase
 
         // Kolom sekarang mengikuti template import (ImportProdukService::templateColumns)
         $wajib = [
-            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'brand',
+            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'brand', 'supplier',
             'merk_hp', 'tipe_hp', 'kualitas', 'kondisi',
             'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen',
             'min_stock', 'reorder_point', 'sn', 'stok_awal', 'gudang_id', 'rak_id',
@@ -154,10 +154,14 @@ class MasterProdukExportTest extends TestCase
         $nonaktifRow = collect($body)->first(fn ($row) => ($row[$namaIdx] ?? null) === 'Produk Nonaktif Master');
         $this->assertNotNull($nonaktifRow, 'Produk nonaktif tidak ikut terekspor di xlsx.');
 
-        // Relasi master: kategori & brand
+        // Relasi master: kategori, brand, supplier
         $aktifRow = collect($body)->first(fn ($row) => ($row[$namaIdx] ?? null) === 'LCD Aktif Master');
         $this->assertNotNull($aktifRow, 'Produk aktif tidak terekspor di xlsx.');
         $this->assertSame('Brand Jaya', $aktifRow[$brandIdx]);
+
+        $supplierIdx = array_search('supplier', $headings);
+        $this->assertNotFalse($supplierIdx);
+        $this->assertSame('PT Supplier Jaya', $aktifRow[$supplierIdx]);
 
         // Kategori untuk import: nama kategori sederhana (bukan berjenjang)
         $this->assertSame('LCD', $aktifRow[$katIdx]);
