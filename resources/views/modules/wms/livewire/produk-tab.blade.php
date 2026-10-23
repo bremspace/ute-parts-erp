@@ -167,6 +167,16 @@
                             </div>
                         @endif
 
+                        <!-- Export Master Produk - tombol langsung (fallback) -->
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" wire:click="exportMaster('xlsx')" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary/80 text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Master Produk Excel">
+                                <span>📦</span><span class="hidden sm:inline"> Master Excel</span>
+                            </button>
+                            <button type="button" wire:click="exportMaster('csv')" class="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Master Produk CSV">
+                                <span>📦</span><span class="hidden sm:inline"> Master CSV</span>
+                            </button>
+                        </div>
+
                         <!-- Menu Export Lengkap (Pricelist / Master Produk / Terpilih) -->
                         @php $hasSelected = ! empty($selectedProdukIds); @endphp
                         <div class="relative text-left" x-data="{ open: false }" @click.away="open = false" @keydown.escape.window="open = false">
