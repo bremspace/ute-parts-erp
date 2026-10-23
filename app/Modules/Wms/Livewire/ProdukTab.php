@@ -3973,8 +3973,10 @@ class ProdukTab extends Component
             // Foto URL: ambil dari kolom foto/gambar
             $fotoUrl = $p->foto ?? $p->gambar ?? '';
 
-            // Kategori untuk import: gunakan nama kategori sederhana (bukan berjenjang)
+            // Kategori untuk import: pertahankan parent-child hierarchy.
             $kategoriImport = $p->kategoriRelasi?->nama ?? $p->kategori ?? '';
+            $kategoriUtamaImport = $p->kategoriRelasi?->parent?->nama ?? ($p->kategoriRelasi?->parent_id ? '' : $kategoriImport);
+            $subKategoriImport = $p->kategoriRelasi?->parent_id ? $kategoriImport : '';
 
             // Brand untuk import: gunakan brand relasi
             $brandImport = $p->brand?->nama ?? $p->brand_kompatibel ?? '';
@@ -3985,6 +3987,8 @@ class ProdukTab extends Component
                 'barcode' => $p->barcode ?: '',
                 'satuan' => $p->satuan ?: 'pcs',
                 'kategori' => $kategoriImport,
+                'kategori_utama' => $kategoriUtamaImport,
+                'sub_kategori' => $subKategoriImport,
                 'brand' => $brandImport,
                 'supplier' => $p->supplier?->nama ?? '',
                 'merk_hp' => $merkHp,
@@ -4165,7 +4169,7 @@ class ProdukTab extends Component
 
                             public function headings(): array
                             {
-                                return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier'];
+                                return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand'];
                             }
 
                             public function array(): array
@@ -4227,7 +4231,7 @@ class ProdukTab extends Component
 
     /**
      * Build reference data for Sheet 2 "Referensi Sistem" (same as import template).
-     * Returns array of rows with 6 columns: Merk HP, Kategori Produk, Brand Sparepart, Satuan, Kualitas, Supplier.
+     * Returns rows aligned with the 12 reference headings used by the import template.
      */
     protected function buatReferensiSistem(): array
     {
@@ -4236,9 +4240,13 @@ class ProdukTab extends Component
             $merks = ['Apple', 'Samsung', 'Xiaomi', 'Oppo', 'Vivo', 'Realme', 'Infinix', 'Tecno', 'Asus', 'Universal'];
         }
 
+        $kategoriUtama = KategoriProduk::where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('parent_id')->orWhere('parent_id', 0))
+            ->orderBy('nama')->pluck('nama')->all();
         $kategoris = KategoriProduk::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
         if (empty($kategoris)) {
             $kategoris = ['LCD & Touchscreen', 'Baterai', 'Fleksibel & Board', 'Kamera', 'IC & Chipset', 'Housing & Backdoor'];
+            $kategoriUtama = $kategoris;
         }
 
         $brands = Brand::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
@@ -4261,9 +4269,27 @@ class ProdukTab extends Component
             $suppliers = ['PT Supplier Jaya', 'Supplier Umum', 'Sumber Makmur'];
         }
 
-        $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers));
+        $subKategoris = KategoriProduk::with('parent')
+            ->where('is_active', true)
+            ->where('parent_id', '>', 0)
+            ->orderBy('nama')
+            ->get();
+        $tipeHp = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get();
+        $kualitasBrand = KualitasProduk::with('brand')
+            ->where('is_active', true)
+            ->whereNotNull('brand_id')
+            ->orderBy('nama')
+            ->get();
+
+        $max = max(
+            count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers),
+            $subKategoris->count(), $tipeHp->count(), $kualitasBrand->count()
+        );
         $rows = [];
         for ($i = 0; $i < $max; $i++) {
+            $subKategori = $subKategoris->get($i);
+            $tipe = $tipeHp->get($i);
+            $kualitasBrandItem = $kualitasBrand->get($i);
             $rows[] = [
                 $merks[$i] ?? '',
                 $kategoris[$i] ?? '',
@@ -4271,6 +4297,12 @@ class ProdukTab extends Component
                 $satuans[$i] ?? '',
                 $kualitas[$i] ?? '',
                 $suppliers[$i] ?? '',
+                $kategoriUtama[$i] ?? '',
+                $subKategori?->nama_lengkap ?? '',
+                $tipe?->merk ?? '',
+                $tipe?->model ?? '',
+                $kualitasBrandItem?->brand?->nama ?? '',
+                $kualitasBrandItem?->nama ?? '',
             ];
         }
 

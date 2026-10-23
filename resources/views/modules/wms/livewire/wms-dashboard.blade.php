@@ -69,7 +69,7 @@
                             title="Import master produk dari Excel (inisialisasi — bukan stok masuk harian)"
                         >
                             <span>📥</span>
-                            <span>Import Excel</span>
+                            <span>Template Import Master</span>
                         </button>
                         <button
                             @click="$dispatch('wms-export-master')"

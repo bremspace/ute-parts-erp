@@ -181,7 +181,7 @@
                                     @click="open = !open"
                                     aria-haspopup="true" :aria-expanded="open"
                                     class="w-full sm:w-auto px-3 py-2 rounded-xl bg-ink-900/60 hover:bg-black/40 border border-white/10 text-ink-200 font-semibold text-xs flex items-center justify-center sm:justify-start gap-1.5 transition-[transform,background-color] active:scale-95 cursor-pointer whitespace-nowrap min-h-[44px]"
-                                    title="Export Master Produk (Internal: untuk import update / backup)">
+                                     title="Export Master Produk (internal; lengkap, untuk import update / backup)">
                                 <span>📦</span>
                                 <span class="hidden sm:inline">Master Produk</span>
                                 <span class="text-[9px] ml-auto sm:ml-0" :class="open ? 'rotate-180' : ''" style="transition: transform 150ms">▼</span>
@@ -207,11 +207,11 @@
                                 <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-up-amber font-bold">🖨 Terpilih ({{ $selectedCount }} item)</div>
                                 <button type="button" wire:click="exportTerpilih('xlsx')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang checkbox di tabel)" @endif
                                         class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px] @if(! $hasSelected) opacity-50 pointer-events-none @endif">
-                                    <span>🖨</span><span>Excel (xlsx)</span>
+                                     <span>🖨</span><span>Export Pricelist Terpilih (xlsx)</span>
                                 </button>
                                 <button type="button" wire:click="exportTerpilih('csv')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang checkbox di tabel)" @endif
                                         class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px] @if(! $hasSelected) opacity-50 pointer-events-none @endif">
-                                    <span>🖨</span><span>CSV</span>
+                                     <span>🖨</span><span>Export Pricelist Terpilih (CSV)</span>
                                 </button>
                             </div>
                         </div>
@@ -2885,7 +2885,7 @@
                             </div>
                             <a href="{{ url('/api/wms/produk/import/template') }}" target="_blank"
                                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer">
-                                ⬇️ Download Template (.xlsx)
+                                ⬇️ Template Import Master (.xlsx)
                             </a>
                         @endif
 
