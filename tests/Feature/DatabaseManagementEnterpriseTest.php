@@ -168,6 +168,11 @@ class DatabaseManagementEnterpriseTest extends TestCase
         $this->assertDatabaseHas('users', ['email' => 'superadmin@uteparts.id']);
         $this->assertDatabaseHas('users', ['email' => 'owner@uteparts.id']);
 
+        // Verifikasi tier membership bawaan sistem tetap ada dan kembali ke setting default
+        $this->assertDatabaseHas('tier_memberships', ['kode' => 'silver', 'diskon_persen' => 3]);
+        $this->assertDatabaseHas('tier_memberships', ['kode' => 'gold', 'diskon_persen' => 5]);
+        $this->assertDatabaseHas('tier_memberships', ['kode' => 'platinum', 'diskon_persen' => 10]);
+
         $service = app(DatabaseManagementService::class);
         foreach ($service->listBackups() as $b) {
             $service->deleteBackup($b['filename']);

@@ -321,6 +321,16 @@
                 >
                     <span>⟳ Rekalkulasi Tier</span>
                 </button>
+
+                <button
+                    type="button"
+                    wire:click="resetTierKeDefault"
+                    wire:confirm="Kembalikan konfigurasi tier membership bawaan sistem (Silver, Gold, Platinum) ke standar default?"
+                    class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[44px] whitespace-nowrap"
+                    title="Pulihkan standar setting bawaan Silver, Gold, Platinum"
+                >
+                    <span>↺ Reset Tier Default</span>
+                </button>
                 @endcan
             </div>
         </div>

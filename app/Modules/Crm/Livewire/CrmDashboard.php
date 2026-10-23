@@ -11,6 +11,7 @@ use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Traits\ParsesNominal;
+use Database\Seeders\TierMembershipSeeder;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -407,6 +408,16 @@ class CrmDashboard extends Component
 
         $updated = app(TierService::class)->recalcSemua();
         $this->dispatch('alert', ['type' => 'success', 'message' => "Rekalkulasi tier: {$updated} pelanggan diperbarui"]);
+    }
+
+    public function resetTierKeDefault()
+    {
+        if (! $this->boleh('tier.manage', 'Anda tidak memiliki izin mereset tier membership.')) {
+            return;
+        }
+
+        (new TierMembershipSeeder)->run();
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Setelan tier membership berhasil dikembalikan ke standar default sistem (Silver, Gold, Platinum)']);
     }
 
     // ===== BROADCAST =====

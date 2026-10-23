@@ -326,7 +326,6 @@ class DatabaseManagementService
             'kondisi',
             'tipe_hp',
             'harga_tier',
-            'tier_memberships',
             'riwayat_perubahan_harga',
             'supplier_scores',
             'channel_product_mapping',
@@ -362,7 +361,7 @@ class DatabaseManagementService
                 $label = 'Reset Transaksi + Katalog & Pelanggan';
                 $clearedCount = $this->truncateTables(array_merge($transactionTables, $masterTables));
 
-                // Pastikan tier membership CRM tetap terdefinisi
+                // Pastikan tier membership CRM tetap ada dan setelan default-nya dipulihkan
                 try {
                     (new TierMembershipSeeder)->run();
                 } catch (Throwable $e) {
@@ -378,6 +377,12 @@ class DatabaseManagementService
                 $label = 'Factory Reset (Setelan Pabrik Awal)';
                 $clearedCount = $this->truncateTables(array_merge($transactionTables, $masterTables, $orgTables));
                 $defaultPassword = 'Password123!';
+
+                // Pulihkan setelan default tier membership
+                try {
+                    (new TierMembershipSeeder)->run();
+                } catch (Throwable $e) {
+                }
 
                 // Bersihkan user tambahan selain akun resmi bawaan & reset 2FA
                 $defaultEmails = [
