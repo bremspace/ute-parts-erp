@@ -1999,6 +1999,13 @@ class ProdukTab extends Component
         $this->showImportModal = true;
     }
 
+    // Quick action header "Export Master Produk" (dari shell WmsDashboard via $dispatch)
+    #[On('wms-export-master')]
+    public function openExportMasterModal(string $format = 'xlsx')
+    {
+        return $this->exportMaster($format);
+    }
+
     public function tutupImportModal()
     {
         $this->showImportModal = false;

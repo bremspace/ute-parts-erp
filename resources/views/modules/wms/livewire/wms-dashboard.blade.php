@@ -72,6 +72,14 @@
                             <span>Import Excel</span>
                         </button>
                         <button
+                            @click="$dispatch('wms-export-master')"
+                            class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint border border-up-mint/30 font-bold text-xs transition-[transform,background-color,opacity] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            title="Export Master Produk (internal: lengkap, untuk import update / backup)"
+                        >
+                            <span>📤</span>
+                            <span class="hidden sm:inline">Export</span>
+                        </button>
+                        <button
                             @click="$dispatch('wms-produk-modal')"
                             class="px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                         >
@@ -203,6 +211,14 @@
                         >
                             <span>📥</span>
                             <span>Import</span>
+                        </button>
+                        <button
+                            @click="$dispatch('wms-export-master')"
+                            class="flex-1 px-3 py-2.5 rounded-xl bg-up-mint/15 hover:bg-up-mint/25 text-up-mint border border-up-mint/30 font-bold text-xs transition-[transform,background-color,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            title="Export Master Produk (internal: lengkap, untuk import update / backup)"
+                        >
+                            <span>📤</span>
+                            <span class="hidden xs:inline">Export</span>
                         </button>
                         <button
                             @click="$dispatch('wms-produk-modal')"
