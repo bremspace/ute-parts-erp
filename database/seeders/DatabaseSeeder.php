@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             CabangSeeder::class,
             TierMembershipSeeder::class,
+            KategoriProdukSeeder::class,
             AdminUserSeeder::class,
             RoleUserSeeder::class,
             ProdukDanStokSeeder::class,

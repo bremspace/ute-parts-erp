@@ -3,6 +3,14 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-23 — Perbaikan Koneksi Kategori & Master Produk (WMS) ✅
+
+- **[Dropdown form produk = pohon kategori penuh]** `ProdukTab::render()` kini memakai `KategoriProduk::getTree()` (penuh, aktif) alih-alih `getTreeTersediaDiProduk()` yang hanya memuat kategori yang sudah direferensikan produk — root cause kategori master yang baru dibuat tidak muncul di dropdown form create/edit produk, quick-add induk kategori, maupun filter tabel.
+- **[Auto-create kategori saat create produk]** `ProdukService::buatProduk()`: bila `kategori_id` null dan string kategori non-empty (≠ 'Umum'), kategori dicari by nama-or-slug; bila belum ada → dibuat (`is_active = true`, slug via hook model) dan langsung terhubung ke produk (`kategori_id` + string).
+- **[Command backfill dua arah]** `wms:kategori-sinkron {--dry-run}` — Pass 1: produk legacy (`kategori_id` NULL + string kategori) di-tautkan via firstOrCreate; Pass 2 reverse: string `kategori` disinkronkan dari nama relasi. Run aktual staging: 7 produk tertaut, 3 kategori baru dibuat.
+- **[Seeder default pohon kategori]** `KategoriProdukSeeder` (idempotent by slug): Sparepart HP (8 anak), Tools & Servis (4), Aksesoris HP (3) — terdaftar di `DatabaseSeeder` dan kedua jalur reset `master_and_transaksi` + `factory_reset` di `DatabaseManagementService` (konsisten dengan TierMembershipSeeder); tidak menghapus kategori milik user.
+- **[Pengujian]** `KategoriKoneksiTest` (4 test / 27 assertions): kategori belum terpakai tampil di form, create produk auto-create + menghubungkan kategori, backfill command legacy (existing & kategori baru) + idempotensi, seeder idempotent. Regresi: `MasterProdukUiDanBatchTest` + `DatabaseManagementEnterpriseTest` pass (21 test / 102 assertions); Pint & `npm run build` pass.
+
 ## 2026-10-22 — Optimasi Multi-Kompatibilitas & Interlinked Filter Produk (WMS & POS) ✅
 
 - **[Interlinked & Cascading Filter Kompatibilitas]:**

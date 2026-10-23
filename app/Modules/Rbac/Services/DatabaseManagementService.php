@@ -9,6 +9,7 @@ use Database\Seeders\AdminUserSeeder;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\CabangSeeder;
 use Database\Seeders\JenisServisSeeder;
+use Database\Seeders\KategoriProdukSeeder;
 use Database\Seeders\KomisiSkemaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\RoleUserSeeder;
@@ -364,6 +365,7 @@ class DatabaseManagementService
                 // Pastikan tier membership CRM tetap ada dan setelan default-nya dipulihkan
                 try {
                     (new TierMembershipSeeder)->run();
+                    (new KategoriProdukSeeder)->run();
                 } catch (Throwable $e) {
                 }
 
@@ -410,6 +412,7 @@ class DatabaseManagementService
                     RolesAndPermissionsSeeder::class,
                     CabangSeeder::class,
                     TierMembershipSeeder::class,
+                    KategoriProdukSeeder::class,
                     AdminUserSeeder::class,
                     RoleUserSeeder::class,
                     AkunCoaSeeder::class,

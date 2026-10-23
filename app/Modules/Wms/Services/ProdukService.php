@@ -91,11 +91,14 @@ class ProdukService
                 if ($katRow) {
                     $finalKategoriStr = $katRow->nama;
                 }
-            } elseif (! empty($kategori)) {
+            } elseif (! empty($kategori) && $kategori !== 'Umum') {
                 $katRow = KategoriProduk::where('nama', $kategori)->orWhere('slug', Str::slug($kategori))->first();
-                if ($katRow) {
-                    $finalKategoriId = $katRow->id;
+                if (! $katRow) {
+                    // Buat baru (slug di-generate otomatis oleh hook creating di model)
+                    $katRow = KategoriProduk::create(['nama' => $kategori, 'is_active' => true]);
                 }
+                $finalKategoriId = $katRow->id;
+                $finalKategoriStr = $katRow->nama;
             }
 
             // Normalisasi foto utama ke kolom gambar

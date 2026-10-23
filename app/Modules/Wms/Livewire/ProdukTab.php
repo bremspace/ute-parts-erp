@@ -3833,7 +3833,7 @@ class ProdukTab extends Component
 
     public function render()
     {
-        $kategoriTree = KategoriProduk::getTreeTersediaDiProduk();
+        $kategoriTree = KategoriProduk::getTree();
 
         $produks = $this->getFilteredProdukQuery()
             ->paginate($this->perPage);
