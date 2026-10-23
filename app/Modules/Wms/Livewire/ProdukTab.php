@@ -1645,10 +1645,13 @@ class ProdukTab extends Component
                 $model = trim($this->quickAddForm['model']);
                 $namaLengkap = $nama ?: "{$merk} {$model}";
 
-                $tipe = TipeHp::firstOrCreate(
-                    ['merk' => $merk, 'model' => $model],
-                    ['nama' => $namaLengkap, 'is_active' => true]
-                );
+                $existingTipe = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($model)])->first();
+                $tipe = $existingTipe ?? TipeHp::create([
+                    'merk' => $merk,
+                    'model' => $model,
+                    'nama' => $namaLengkap,
+                    'is_active' => true,
+                ]);
 
                 if ($this->showEditProdukModal) {
                     $cur = array_map('intval', (array) ($this->editProdukForm['tipe_hp_ids'] ?? []));
@@ -1682,10 +1685,21 @@ class ProdukTab extends Component
                 $pesan = "Tipe HP '{$tipe->nama}' berhasil ditambahkan";
                 break;
             case 'kategori':
-                $kat = KategoriProduk::firstOrCreate(
-                    ['nama' => $nama],
-                    ['parent_id' => $this->quickAddForm['parent_id'] ?: null, 'is_active' => true]
-                );
+                $parentId = $this->quickAddForm['parent_id'] ? (int) $this->quickAddForm['parent_id'] : null;
+                $existingKat = KategoriProduk::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($nama)])
+                    ->where(function ($q) use ($parentId) {
+                        if ($parentId === null) {
+                            $q->whereNull('parent_id');
+                        } else {
+                            $q->where('parent_id', $parentId);
+                        }
+                    })
+                    ->first();
+                $kat = $existingKat ?? KategoriProduk::create([
+                    'nama' => $nama,
+                    'parent_id' => $parentId,
+                    'is_active' => true,
+                ]);
                 if ($this->showEditProdukModal) {
                     $this->editProdukForm['kategori_id'] = $kat->id;
                     $this->editProdukForm['kategori'] = $kat->nama;
@@ -1697,10 +1711,12 @@ class ProdukTab extends Component
                 break;
 
             case 'brand':
-                $brand = Brand::firstOrCreate(
-                    ['nama' => $nama],
-                    ['keterangan' => $this->quickAddForm['keterangan'] ?: null, 'is_active' => true]
-                );
+                $existingBrand = Brand::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($nama)])->first();
+                $brand = $existingBrand ?? Brand::create([
+                    'nama' => $nama,
+                    'keterangan' => $this->quickAddForm['keterangan'] ?: null,
+                    'is_active' => true,
+                ]);
                 if ($this->showEditProdukModal) {
                     $this->editProdukForm['brand_id'] = $brand->id;
                 } else {
@@ -1711,10 +1727,21 @@ class ProdukTab extends Component
 
             case 'kualitas':
                 $brandId = ! empty($this->quickAddForm['brand_id']) ? (int) $this->quickAddForm['brand_id'] : null;
-                $kualitas = KualitasProduk::firstOrCreate(
-                    ['nama' => $nama, 'brand_id' => $brandId],
-                    ['keterangan' => $this->quickAddForm['keterangan'] ?: null, 'is_active' => true]
-                );
+                $existingKualitas = KualitasProduk::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($nama)])
+                    ->where(function ($q) use ($brandId) {
+                        if ($brandId === null) {
+                            $q->whereNull('brand_id');
+                        } else {
+                            $q->where('brand_id', $brandId);
+                        }
+                    })
+                    ->first();
+                $kualitas = $existingKualitas ?? KualitasProduk::create([
+                    'nama' => $nama,
+                    'brand_id' => $brandId,
+                    'keterangan' => $this->quickAddForm['keterangan'] ?: null,
+                    'is_active' => true,
+                ]);
                 if ($this->showEditProdukModal) {
                     $this->editProdukForm['kualitas_id'] = $kualitas->id;
                     if ($brandId) {
@@ -1731,10 +1758,12 @@ class ProdukTab extends Component
 
             case 'satuan':
                 $kode = strtolower(trim($this->quickAddForm['kode'] ?: $nama));
-                $satuan = SatuanUnit::firstOrCreate(
-                    ['kode' => $kode],
-                    ['nama' => $nama, 'is_active' => true]
-                );
+                $existingSatuan = SatuanUnit::whereRaw('LOWER(TRIM(kode)) = ? OR LOWER(TRIM(nama)) = ?', [$kode, strtolower($nama)])->first();
+                $satuan = $existingSatuan ?? SatuanUnit::create([
+                    'kode' => $kode,
+                    'nama' => $nama,
+                    'is_active' => true,
+                ]);
                 if ($this->showEditProdukModal) {
                     $this->editProdukForm['satuan_kode'] = $satuan->kode;
                 } else {

@@ -1296,8 +1296,8 @@
     <!-- TAB: MASTER PRODUK & KATALOG -->
     @if($activeTab === 'master_produk')
         <div class="space-y-4">
-            <!-- Sub-tab Bar: Smooth horizontal scrolling, touch-pan-x, active:scale-[0.97] -->
-            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-2 border-b border-black/10 dark:border-white/5 scrollbar-none scroll-smooth touch-pan-x flex-nowrap">
+            <!-- Sub-tab Bar: Modern horizontal pill scrollbar with tactile active feedback -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-black/10 dark:border-white/5 scrollbar-none scroll-smooth touch-pan-x flex-nowrap -mx-1 px-1 sm:mx-0 sm:px-0">
                 @foreach([
                     'kategori' => ['icon' => '🗂️', 'label' => 'Kategori Hierarkis', 'count' => count($kategoriList)],
                     'brand' => ['icon' => '🏷️', 'label' => 'Brand Part', 'count' => count($brandList)],
@@ -1308,141 +1308,431 @@
                 ] as $subKey => $subData)
                     <button
                         wire:click="$set('masterProdukSubTab', '{{ $subKey }}')"
-                        class="px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-[transform,background-color] active:scale-[0.97] min-h-[40px] cursor-pointer whitespace-nowrap {{ $masterProdukSubTab === $subKey ? 'bg-up-primary/20 text-white border border-up-primary/40 font-bold shadow-sm shadow-up-primary/10' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="flex-shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 min-h-[40px] cursor-pointer {{ $masterProdukSubTab === $subKey ? 'bg-up-primary/20 text-white border border-up-primary/40 font-bold shadow-sm shadow-up-primary/10' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10 border border-transparent' }}"
                     >
-                        <span>{{ $subData['icon'] }}</span>
+                        <span class="text-sm leading-none">{{ $subData['icon'] }}</span>
                         <span>{{ $subData['label'] }}</span>
-                        <span class="text-[10px] px-1.5 py-0.5 rounded-full {{ $masterProdukSubTab === $subKey ? 'bg-up-primary text-white' : 'bg-black/10 dark:bg-white/10 text-ink-400' }}">{{ $subData['count'] }}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full font-mono tabular-nums leading-none {{ $masterProdukSubTab === $subKey ? 'bg-up-primary text-white font-bold' : 'bg-black/10 dark:bg-white/10 text-ink-400' }}">{{ $subData['count'] }}</span>
                     </button>
                 @endforeach
             </div>
 
             <!-- SUB-TAB 1: KATEGORI -->
             @if($masterProdukSubTab === 'kategori')
+                @if(count($selectedKategoriIds) > 0)
+                    <div class="mb-3 p-3 bg-up-primary/15 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
+                        <div class="flex items-center gap-2.5">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-up-primary text-white font-bold text-xs shadow-sm tabular-nums">
+                                {{ count($selectedKategoriIds) }}
+                            </span>
+                            <span class="text-xs font-bold text-white">Kategori Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto justify-end">
+                            <button type="button" wire:click="openBatchEditModal" class="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm min-h-[36px]">
+                                <span>✏️ Edit ({{ count($selectedKategoriIds) }})</span>
+                            </button>
+                            <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                                <button type="button" wire:click="batchSetStatus(true)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-up-mint hover:bg-up-mint/15 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Aktif
+                                </button>
+                                <button type="button" wire:click="batchSetStatus(false)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-ink-300 hover:bg-white/10 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Nonaktif
+                                </button>
+                            </div>
+                            <button type="button" wire:click="batchHapus" wire:confirm="Yakin ingin menghapus / menonaktifkan {{ count($selectedKategoriIds) }} kategori terpilih?" class="px-3 py-1.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[36px]">
+                                <span>🗑️ Hapus</span>
+                            </button>
+                            <button type="button" wire:click="clearSelection" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-semibold transition cursor-pointer min-h-[36px] flex items-center">
+                                ✕ Batal
+                            </button>
+                        </div>
+                    </div>
+                @endif
                 <x-prism.glass-card title="Katalog Kategori Berjenjang" subtitle="Kelola kategori utama dan sub-kategori untuk pengelompokan produk">
-                    <x-prism.dual-scroll>
-                        <table class="w-full text-left text-xs text-ink-200">
-                            <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
-                                <tr>
-                                    <th class="py-2.5 px-3">Urutan</th>
-                                    <th class="py-2.5 px-3">Nama Kategori</th>
-                                    <th class="py-2.5 px-3">Slug / Path</th>
-                                    <th class="py-2.5 px-3">Tipe / Induk</th>
-                                    <th class="py-2.5 px-3 text-center">Jml Produk</th>
-                                    <th class="py-2.5 px-3 text-center">Status</th>
-                                    <th class="py-2.5 px-3 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                @forelse($kategoriList as $k)
-                                    <tr class="hover:bg-white/[0.02] transition-colors">
-                                        <td class="py-2.5 px-3 font-mono text-ink-400">{{ $k->urutan }}</td>
-                                        <td class="py-2.5 px-3">
-                                            @if($k->parent_id)
-                                                <div class="flex items-center gap-1.5 pl-5">
-                                                    <span class="text-ink-500">↳</span>
-                                                    <span class="font-medium text-white">{{ $k->nama }}</span>
-                                                </div>
-                                            @else
-                                                <div class="flex items-center gap-2 font-bold text-white">
-                                                    <span>{{ $k->icon ?? '📁' }}</span>
-                                                    <span>{{ $k->nama }}</span>
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td class="py-2.5 px-3 font-mono text-[11px] text-ink-400">{{ $k->slug }}</td>
-                                        <td class="py-2.5 px-3">
+                    <!-- Mobile Card View (< md) -->
+                    <div class="block md:hidden space-y-2.5">
+                        <div class="flex items-center justify-between px-1 py-1 text-xs text-ink-400">
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/5">
+                                    <input type="checkbox"
+                                           wire:click="toggleSelectAll('kategori', @js($kategoriList->pluck('id')->all()))"
+                                           @checked(count($selectedKategoriIds) > 0 && count($selectedKategoriIds) === count($kategoriList))
+                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                </span>
+                                <span class="font-semibold text-white">Pilih Semua ({{ count($kategoriList) }})</span>
+                            </label>
+                            <span class="text-[11px] font-mono tabular-nums text-ink-400">{{ count($selectedKategoriIds) }} dipilih</span>
+                        </div>
+
+                        @forelse($kategoriList as $k)
+                            @php $isKategoriSelected = in_array($k->id, $selectedKategoriIds, true); @endphp
+                            <div class="p-3.5 rounded-2xl border transition-all {{ $isKategoriSelected ? 'bg-up-primary/10 border-up-primary/40 shadow-sm shadow-up-primary/10' : 'bg-white/[0.02] border-white/5 hover:border-white/10' }}">
+                                <div class="flex items-start gap-3">
+                                    <label class="inline-flex items-center justify-center w-9 h-9 -m-1 rounded-xl hover:bg-white/5 cursor-pointer flex-shrink-0">
+                                        <input type="checkbox"
+                                               wire:model.live="selectedKategoriIds"
+                                               value="{{ $k->id }}"
+                                               class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                    </label>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <div class="flex items-center gap-1.5 truncate">
+                                                @if($k->parent_id)
+                                                    <span class="text-ink-500 text-xs">↳</span>
+                                                    <span class="font-bold text-white text-xs truncate">{{ $k->nama }}</span>
+                                                @else
+                                                    <span class="text-sm">{{ $k->icon ?? '📁' }}</span>
+                                                    <span class="font-bold text-white text-xs truncate">{{ $k->nama }}</span>
+                                                @endif
+                                            </div>
+                                            <button wire:click="toggleKategoriStatus({{ $k->id }})" class="cursor-pointer flex-shrink-0">
+                                                <x-prism.status-pill :status="$k->is_active ? 'active' : 'inactive'" :label="$k->is_active ? 'Aktif' : 'Nonaktif'" size="xs" />
+                                            </button>
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                                             @if($k->parent)
                                                 <span class="px-2 py-0.5 rounded bg-white/5 text-[10px] text-ink-300">Sub dari {{ $k->parent->nama }}</span>
                                             @else
                                                 <span class="px-2 py-0.5 rounded bg-up-primary/15 text-[10px] text-up-primary font-semibold">Kategori Utama</span>
                                             @endif
-                                        </td>
-                                        <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $k->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
-                                            {{ $k->produk_count }}
-                                        </td>
-                                        <td class="py-2.5 px-3 text-center">
-                                            <button wire:click="toggleKategoriStatus({{ $k->id }})" class="cursor-pointer">
-                                                <x-prism.status-pill :status="$k->is_active ? 'active' : 'inactive'" :label="$k->is_active ? 'Aktif' : 'Nonaktif'" />
-                                            </button>
-                                        </td>
-                                        <td class="py-2.5 px-3 text-right space-x-2">
-                                            <button wire:click="openKategoriModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                            <button wire:click="hapusKategori({{ $k->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan kategori ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
-                                        </td>
-                                    </tr>
-                                @empty
+                                            <span class="font-mono text-[10px] text-ink-400">#{{ $k->urutan }}</span>
+                                            <span class="font-mono text-[10px] text-ink-500 truncate max-w-[120px]">{{ $k->slug }}</span>
+                                        </div>
+
+                                        <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-white/5">
+                                            <span class="text-[11px] text-ink-400 font-medium">
+                                                Produk: <span class="font-bold tabular-nums {{ $k->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">{{ $k->produk_count }}</span>
+                                            </span>
+                                            <div class="flex items-center gap-3">
+                                                <button wire:click="openKategoriModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
+                                                <button wire:click="hapusKategori({{ $k->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan kategori ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-ink-500 text-xs">Belum ada kategori produk. Klik "+ Kategori Baru" untuk menambahkan.</div>
+                        @endforelse
+                    </div>
+
+                    <!-- Desktop Dual-Scroll Table (>= md) -->
+                    <div class="hidden md:block">
+                        <x-prism.dual-scroll>
+                            <table class="w-full text-left text-xs text-ink-200 min-w-[760px] whitespace-nowrap">
+                                <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                     <tr>
-                                        <td colspan="7" class="py-6 text-center text-ink-500">Belum ada kategori produk. Klik "+ Kategori Baru" untuk menambahkan.</td>
+                                        <th class="py-2.5 px-3 w-10 text-center">
+                                            <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                <input type="checkbox"
+                                                       wire:click="toggleSelectAll('kategori', @js($kategoriList->pluck('id')->all()))"
+                                                       @checked(count($selectedKategoriIds) > 0 && count($selectedKategoriIds) === count($kategoriList))
+                                                       class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                            </label>
+                                        </th>
+                                        <th class="py-2.5 px-3">Urutan</th>
+                                        <th class="py-2.5 px-3">Nama Kategori</th>
+                                        <th class="py-2.5 px-3">Slug / Path</th>
+                                        <th class="py-2.5 px-3">Tipe / Induk</th>
+                                        <th class="py-2.5 px-3 text-center">Jml Produk</th>
+                                        <th class="py-2.5 px-3 text-center">Status</th>
+                                        <th class="py-2.5 px-3 text-right">
+                                            @if(count($selectedKategoriIds) > 0)
+                                                <div class="inline-flex items-center gap-1.5">
+                                                    <button type="button" wire:click="openBatchEditModal" class="text-up-primary font-bold hover:underline" title="Batch Edit">✏️ Edit ({{ count($selectedKategoriIds) }})</button>
+                                                    <span class="text-ink-600">|</span>
+                                                    <button type="button" wire:click="batchHapus" wire:confirm="Hapus {{ count($selectedKategoriIds) }} item terpilih?" class="text-up-red font-bold hover:underline" title="Batch Hapus">🗑️ Hapus</button>
+                                                </div>
+                                            @else
+                                                Aksi
+                                            @endif
+                                        </th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </x-prism.dual-scroll>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @forelse($kategoriList as $k)
+                                        <tr class="hover:bg-white/[0.02] transition-colors {{ in_array($k->id, $selectedKategoriIds, true) ? 'bg-up-primary/10' : '' }}">
+                                            <td class="py-2.5 px-3 text-center">
+                                                <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                    <input type="checkbox"
+                                                           wire:model.live="selectedKategoriIds"
+                                                           value="{{ $k->id }}"
+                                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                                </label>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-mono text-ink-400">{{ $k->urutan }}</td>
+                                            <td class="py-2.5 px-3">
+                                                @if($k->parent_id)
+                                                    <div class="flex items-center gap-1.5 pl-5">
+                                                        <span class="text-ink-500">↳</span>
+                                                        <span class="font-medium text-white">{{ $k->nama }}</span>
+                                                    </div>
+                                                @else
+                                                    <div class="flex items-center gap-2 font-bold text-white">
+                                                        <span>{{ $k->icon ?? '📁' }}</span>
+                                                        <span>{{ $k->nama }}</span>
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3 font-mono text-[11px] text-ink-400">{{ $k->slug }}</td>
+                                            <td class="py-2.5 px-3">
+                                                @if($k->parent)
+                                                    <span class="px-2 py-0.5 rounded bg-white/5 text-[10px] text-ink-300">Sub dari {{ $k->parent->nama }}</span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded bg-up-primary/15 text-[10px] text-up-primary font-semibold">Kategori Utama</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $k->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
+                                                {{ $k->produk_count }}
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                <button wire:click="toggleKategoriStatus({{ $k->id }})" class="cursor-pointer">
+                                                    <x-prism.status-pill :status="$k->is_active ? 'active' : 'inactive'" :label="$k->is_active ? 'Aktif' : 'Nonaktif'" />
+                                                </button>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-right space-x-2">
+                                                <button wire:click="openKategoriModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
+                                                <button wire:click="hapusKategori({{ $k->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan kategori ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="8" class="py-6 text-center text-ink-500">Belum ada kategori produk. Klik "+ Kategori Baru" untuk menambahkan.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </x-prism.dual-scroll>
+                    </div>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 2: BRAND PART -->
             @elseif($masterProdukSubTab === 'brand')
+                @if(count($selectedBrandIds) > 0)
+                    <div class="mb-3 p-3 bg-up-primary/15 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
+                        <div class="flex items-center gap-2.5">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-up-primary text-white font-bold text-xs shadow-sm tabular-nums">
+                                {{ count($selectedBrandIds) }}
+                            </span>
+                            <span class="text-xs font-bold text-white">Brand Part Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto justify-end">
+                            <button type="button" wire:click="openBatchEditModal" class="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm min-h-[36px]">
+                                <span>✏️ Edit ({{ count($selectedBrandIds) }})</span>
+                            </button>
+                            <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                                <button type="button" wire:click="batchSetStatus(true)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-up-mint hover:bg-up-mint/15 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Aktif
+                                </button>
+                                <button type="button" wire:click="batchSetStatus(false)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-ink-300 hover:bg-white/10 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Nonaktif
+                                </button>
+                            </div>
+                            <button type="button" wire:click="batchHapus" wire:confirm="Yakin ingin menghapus / menonaktifkan {{ count($selectedBrandIds) }} brand part terpilih?" class="px-3 py-1.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[36px]">
+                                <span>🗑️ Hapus</span>
+                            </button>
+                            <button type="button" wire:click="clearSelection" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-semibold transition cursor-pointer min-h-[36px] flex items-center">
+                                ✕ Batal
+                            </button>
+                        </div>
+                    </div>
+                @endif
                 <x-prism.glass-card title="Master Brand Part (Pabrikan Sparepart)" subtitle="Kelola merk pabrikan suku cadang (Brand Part) seperti Olike, Hippo, Shinetsu, Vizz, dll">
-                    <x-prism.dual-scroll>
-                        <table class="w-full text-left text-xs text-ink-200">
-                            <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
-                                <tr>
-                                    <th class="py-2.5 px-3">Nama Brand Part</th>
-                                    <th class="py-2.5 px-3">Keterangan</th>
-                                    <th class="py-2.5 px-3 text-center">Jml Produk</th>
-                                    <th class="py-2.5 px-3 text-center">Status</th>
-                                    <th class="py-2.5 px-3 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                @forelse($brandList as $b)
-                                    <tr class="hover:bg-white/[0.02] transition-colors">
-                                        <td class="py-2.5 px-3 font-bold text-white">{{ $b->nama }}</td>
-                                        <td class="py-2.5 px-3 text-ink-400">{{ $b->keterangan ?? '—' }}</td>
-                                        <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $b->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
-                                            {{ $b->produk_count }}
-                                        </td>
-                                        <td class="py-2.5 px-3 text-center">
-                                            <button wire:click="toggleBrandStatus({{ $b->id }})" class="cursor-pointer">
-                                                <x-prism.status-pill :status="$b->is_active ? 'active' : 'inactive'" :label="$b->is_active ? 'Aktif' : 'Nonaktif'" />
+                    <!-- Mobile Card View (< md) -->
+                    <div class="block md:hidden space-y-2.5">
+                        <div class="flex items-center justify-between px-1 py-1 text-xs text-ink-400">
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/5">
+                                    <input type="checkbox"
+                                           wire:click="toggleSelectAll('brand', @js($brandList->pluck('id')->all()))"
+                                           @checked(count($selectedBrandIds) > 0 && count($selectedBrandIds) === count($brandList))
+                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                </span>
+                                <span class="font-semibold text-white">Pilih Semua ({{ count($brandList) }})</span>
+                            </label>
+                            <span class="text-[11px] font-mono tabular-nums text-ink-400">{{ count($selectedBrandIds) }} dipilih</span>
+                        </div>
+
+                        @forelse($brandList as $b)
+                            @php $isBrandSelected = in_array($b->id, $selectedBrandIds, true); @endphp
+                            <div class="p-3.5 rounded-2xl border transition-all {{ $isBrandSelected ? 'bg-up-primary/10 border-up-primary/40 shadow-sm shadow-up-primary/10' : 'bg-white/[0.02] border-white/5 hover:border-white/10' }}">
+                                <div class="flex items-start gap-3">
+                                    <label class="inline-flex items-center justify-center w-9 h-9 -m-1 rounded-xl hover:bg-white/5 cursor-pointer flex-shrink-0">
+                                        <input type="checkbox"
+                                               wire:model.live="selectedBrandIds"
+                                               value="{{ $b->id }}"
+                                               class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                    </label>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <div class="flex items-center gap-1.5 truncate">
+                                                <span class="text-sm">🏷️</span>
+                                                <span class="font-bold text-white text-xs truncate">{{ $b->nama }}</span>
+                                            </div>
+                                            <button wire:click="toggleBrandStatus({{ $b->id }})" class="cursor-pointer flex-shrink-0">
+                                                <x-prism.status-pill :status="$b->is_active ? 'active' : 'inactive'" :label="$b->is_active ? 'Aktif' : 'Nonaktif'" size="xs" />
                                             </button>
-                                        </td>
-                                        <td class="py-2.5 px-3 text-right space-x-2">
-                                            <button wire:click="openBrandModal({{ $b->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                            <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan brand part ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
-                                        </td>
-                                    </tr>
-                                @empty
+                                        </div>
+
+                                        @if($b->keterangan)
+                                            <p class="text-[11px] text-ink-400 mt-1 line-clamp-2 leading-relaxed">{{ $b->keterangan }}</p>
+                                        @endif
+
+                                        <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-white/5">
+                                            <span class="text-[11px] text-ink-400 font-medium">
+                                                Produk: <span class="font-bold tabular-nums {{ $b->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">{{ $b->produk_count }}</span>
+                                            </span>
+                                            <div class="flex items-center gap-3">
+                                                <button wire:click="openBrandModal({{ $b->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
+                                                <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan brand part ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-ink-500 text-xs">Belum ada data brand part.</div>
+                        @endforelse
+                    </div>
+
+                    <!-- Desktop Dual-Scroll Table (>= md) -->
+                    <div class="hidden md:block">
+                        <x-prism.dual-scroll>
+                            <table class="w-full text-left text-xs text-ink-200 min-w-[760px] whitespace-nowrap">
+                                <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                     <tr>
-                                        <td colspan="5" class="py-6 text-center text-ink-500">Belum ada data brand part.</td>
+                                        <th class="py-2.5 px-3 w-10 text-center">
+                                            <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                <input type="checkbox"
+                                                       wire:click="toggleSelectAll('brand', @js($brandList->pluck('id')->all()))"
+                                                       @checked(count($selectedBrandIds) > 0 && count($selectedBrandIds) === count($brandList))
+                                                       class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                            </label>
+                                        </th>
+                                        <th class="py-2.5 px-3">Nama Brand Part</th>
+                                        <th class="py-2.5 px-3">Keterangan</th>
+                                        <th class="py-2.5 px-3 text-center">Jml Produk</th>
+                                        <th class="py-2.5 px-3 text-center">Status</th>
+                                        <th class="py-2.5 px-3 text-right">
+                                            @if(count($selectedBrandIds) > 0)
+                                                <div class="inline-flex items-center gap-1.5">
+                                                    <button type="button" wire:click="openBatchEditModal" class="text-up-primary font-bold hover:underline" title="Batch Edit">✏️ Edit ({{ count($selectedBrandIds) }})</button>
+                                                    <span class="text-ink-600">|</span>
+                                                    <button type="button" wire:click="batchHapus" wire:confirm="Hapus {{ count($selectedBrandIds) }} brand terpilih?" class="text-up-red font-bold hover:underline" title="Batch Hapus">🗑️ Hapus</button>
+                                                </div>
+                                            @else
+                                                Aksi
+                                            @endif
+                                        </th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </x-prism.dual-scroll>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @forelse($brandList as $b)
+                                        <tr class="hover:bg-white/[0.02] transition-colors {{ in_array($b->id, $selectedBrandIds, true) ? 'bg-up-primary/10' : '' }}">
+                                            <td class="py-2.5 px-3 text-center">
+                                                <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                    <input type="checkbox"
+                                                           wire:model.live="selectedBrandIds"
+                                                           value="{{ $b->id }}"
+                                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                                </label>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-bold text-white">{{ $b->nama }}</td>
+                                            <td class="py-2.5 px-3 text-ink-400">{{ $b->keterangan ?? '—' }}</td>
+                                            <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $b->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
+                                                {{ $b->produk_count }}
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                <button wire:click="toggleBrandStatus({{ $b->id }})" class="cursor-pointer">
+                                                    <x-prism.status-pill :status="$b->is_active ? 'active' : 'inactive'" :label="$b->is_active ? 'Aktif' : 'Nonaktif'" />
+                                                </button>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-right space-x-2">
+                                                <button wire:click="openBrandModal({{ $b->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
+                                                <button wire:click="hapusBrand({{ $b->id }})" wire:confirm="Yakin ingin menghapus/menonaktifkan brand part ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="py-6 text-center text-ink-500">Belum ada data brand part.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </x-prism.dual-scroll>
+                    </div>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 3: KUALITAS -->
             @elseif($masterProdukSubTab === 'kualitas')
+                @if(count($selectedKualitasIds) > 0)
+                    <div class="mb-3 p-3 bg-up-primary/15 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
+                        <div class="flex items-center gap-2.5">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-up-primary text-white font-bold text-xs shadow-sm tabular-nums">
+                                {{ count($selectedKualitasIds) }}
+                            </span>
+                            <span class="text-xs font-bold text-white">Tingkat Kualitas Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto justify-end">
+                            <button type="button" wire:click="openBatchEditModal" class="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm min-h-[36px]">
+                                <span>✏️ Edit ({{ count($selectedKualitasIds) }})</span>
+                            </button>
+                            <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                                <button type="button" wire:click="batchSetStatus(true)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-up-mint hover:bg-up-mint/15 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Aktif
+                                </button>
+                                <button type="button" wire:click="batchSetStatus(false)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-ink-300 hover:bg-white/10 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Nonaktif
+                                </button>
+                            </div>
+                            <button type="button" wire:click="batchHapus" wire:confirm="Yakin ingin menghapus / menonaktifkan {{ count($selectedKualitasIds) }} tingkat kualitas terpilih?" class="px-3 py-1.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[36px]">
+                                <span>🗑️ Hapus</span>
+                            </button>
+                            <button type="button" wire:click="clearSelection" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-semibold transition cursor-pointer min-h-[36px] flex items-center">
+                                ✕ Batal
+                            </button>
+                        </div>
+                    </div>
+                @endif
                 <x-prism.glass-card title="Master Tingkat Kualitas" subtitle="Klasifikasi kualitas suku cadang (Original, Grade A, OEM, dll)">
-                    <x-prism.dual-scroll>
-                        <table class="w-full text-left text-xs text-ink-200">
-                            <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
-                                <tr>
-                                    <th class="py-2.5 px-3">Tingkat Kualitas</th>
-                                    <th class="py-2.5 px-3">Brand Part Induk</th>
-                                    <th class="py-2.5 px-3">Keterangan</th>
-                                    <th class="py-2.5 px-3 text-center">Jml Produk</th>
-                                    <th class="py-2.5 px-3 text-center">Status</th>
-                                    <th class="py-2.5 px-3 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                @forelse($kualitasList as $k)
-                                    <tr class="hover:bg-white/[0.02] transition-colors">
-                                        <td class="py-2.5 px-3 font-bold text-white">{{ $k->nama }}</td>
-                                        <td class="py-2.5 px-3">
+                    <!-- Mobile Card View (< md) -->
+                    <div class="block md:hidden space-y-2.5">
+                        <div class="flex items-center justify-between px-1 py-1 text-xs text-ink-400">
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/5">
+                                    <input type="checkbox"
+                                           wire:click="toggleSelectAll('kualitas', @js($kualitasList->pluck('id')->all()))"
+                                           @checked(count($selectedKualitasIds) > 0 && count($selectedKualitasIds) === count($kualitasList))
+                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                </span>
+                                <span class="font-semibold text-white">Pilih Semua ({{ count($kualitasList) }})</span>
+                            </label>
+                            <span class="text-[11px] font-mono tabular-nums text-ink-400">{{ count($selectedKualitasIds) }} dipilih</span>
+                        </div>
+
+                        @forelse($kualitasList as $k)
+                            @php $isKualitasSelected = in_array($k->id, $selectedKualitasIds, true); @endphp
+                            <div class="p-3.5 rounded-2xl border transition-all {{ $isKualitasSelected ? 'bg-up-primary/10 border-up-primary/40 shadow-sm shadow-up-primary/10' : 'bg-white/[0.02] border-white/5 hover:border-white/10' }}">
+                                <div class="flex items-start gap-3">
+                                    <label class="inline-flex items-center justify-center w-9 h-9 -m-1 rounded-xl hover:bg-white/5 cursor-pointer flex-shrink-0">
+                                        <input type="checkbox"
+                                               wire:model.live="selectedKualitasIds"
+                                               value="{{ $k->id }}"
+                                               class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                    </label>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <div class="flex items-center gap-1.5 truncate">
+                                                <span class="text-sm">⭐</span>
+                                                <span class="font-bold text-white text-xs truncate">{{ $k->nama }}</span>
+                                            </div>
+                                            <button wire:click="toggleKualitasStatus({{ $k->id }})" class="cursor-pointer flex-shrink-0">
+                                                <x-prism.status-pill :status="$k->is_active ? 'active' : 'inactive'" :label="$k->is_active ? 'Aktif' : 'Nonaktif'" size="xs" />
+                                            </button>
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                                             @if($k->brand)
                                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-primary/20 text-up-primary border border-up-primary/30">
                                                     <span>🏷️</span> {{ $k->brand->nama }}
@@ -1452,176 +1742,608 @@
                                                     Universal
                                                 </span>
                                             @endif
-                                        </td>
-                                        <td class="py-2.5 px-3 text-ink-400">{{ $k->keterangan ?? '—' }}</td>
-                                        <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $k->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
-                                            {{ $k->produk_count }}
-                                        </td>
-                                        <td class="py-2.5 px-3 text-center">
-                                            <button wire:click="toggleKualitasStatus({{ $k->id }})" class="cursor-pointer">
-                                                <x-prism.status-pill :status="$k->is_active ? 'active' : 'inactive'" :label="$k->is_active ? 'Aktif' : 'Nonaktif'" />
-                                            </button>
-                                        </td>
-                                        <td class="py-2.5 px-3 text-right space-x-2">
-                                            <button wire:click="openKualitasModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                            <button wire:click="hapusKualitas({{ $k->id }})" wire:confirm="Yakin ingin menghapus kualitas ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
-                                        </td>
-                                    </tr>
-                                @empty
+                                        </div>
+
+                                        @if($k->keterangan)
+                                            <p class="text-[11px] text-ink-400 mt-1 line-clamp-2 leading-relaxed">{{ $k->keterangan }}</p>
+                                        @endif
+
+                                        <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-white/5">
+                                            <span class="text-[11px] text-ink-400 font-medium">
+                                                Produk: <span class="font-bold tabular-nums {{ $k->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">{{ $k->produk_count }}</span>
+                                            </span>
+                                            <div class="flex items-center gap-3">
+                                                <button wire:click="openKualitasModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
+                                                <button wire:click="hapusKualitas({{ $k->id }})" wire:confirm="Yakin ingin menghapus kualitas ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-ink-500 text-xs">Belum ada data tingkat kualitas.</div>
+                        @endforelse
+                    </div>
+
+                    <!-- Desktop Dual-Scroll Table (>= md) -->
+                    <div class="hidden md:block">
+                        <x-prism.dual-scroll>
+                            <table class="w-full text-left text-xs text-ink-200 min-w-[760px] whitespace-nowrap">
+                                <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                     <tr>
-                                        <td colspan="6" class="py-6 text-center text-ink-500">Belum ada data tingkat kualitas.</td>
+                                        <th class="py-2.5 px-3 w-10 text-center">
+                                            <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                <input type="checkbox"
+                                                       wire:click="toggleSelectAll('kualitas', @js($kualitasList->pluck('id')->all()))"
+                                                       @checked(count($selectedKualitasIds) > 0 && count($selectedKualitasIds) === count($kualitasList))
+                                                       class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                            </label>
+                                        </th>
+                                        <th class="py-2.5 px-3">Tingkat Kualitas</th>
+                                        <th class="py-2.5 px-3">Brand Part Induk</th>
+                                        <th class="py-2.5 px-3">Keterangan</th>
+                                        <th class="py-2.5 px-3 text-center">Jml Produk</th>
+                                        <th class="py-2.5 px-3 text-center">Status</th>
+                                        <th class="py-2.5 px-3 text-right">
+                                            @if(count($selectedKualitasIds) > 0)
+                                                <div class="inline-flex items-center gap-1.5">
+                                                    <button type="button" wire:click="openBatchEditModal" class="text-up-primary font-bold hover:underline" title="Batch Edit">✏️ Edit ({{ count($selectedKualitasIds) }})</button>
+                                                    <span class="text-ink-600">|</span>
+                                                    <button type="button" wire:click="batchHapus" wire:confirm="Hapus {{ count($selectedKualitasIds) }} kualitas terpilih?" class="text-up-red font-bold hover:underline" title="Batch Hapus">🗑️ Hapus</button>
+                                                </div>
+                                            @else
+                                                Aksi
+                                            @endif
+                                        </th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </x-prism.dual-scroll>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @forelse($kualitasList as $k)
+                                        <tr class="hover:bg-white/[0.02] transition-colors {{ in_array($k->id, $selectedKualitasIds, true) ? 'bg-up-primary/10' : '' }}">
+                                            <td class="py-2.5 px-3 text-center">
+                                                <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                    <input type="checkbox"
+                                                           wire:model.live="selectedKualitasIds"
+                                                           value="{{ $k->id }}"
+                                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                                </label>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-bold text-white">{{ $k->nama }}</td>
+                                            <td class="py-2.5 px-3">
+                                                @if($k->brand)
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-up-primary/20 text-up-primary border border-up-primary/30">
+                                                        <span>🏷️</span> {{ $k->brand->nama }}
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-ink-400 border border-white/10">
+                                                        Universal
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3 text-ink-400">{{ $k->keterangan ?? '—' }}</td>
+                                            <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $k->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
+                                                {{ $k->produk_count }}
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                <button wire:click="toggleKualitasStatus({{ $k->id }})" class="cursor-pointer">
+                                                    <x-prism.status-pill :status="$k->is_active ? 'active' : 'inactive'" :label="$k->is_active ? 'Aktif' : 'Nonaktif'" />
+                                                </button>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-right space-x-2">
+                                                <button wire:click="openKualitasModal({{ $k->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
+                                                <button wire:click="hapusKualitas({{ $k->id }})" wire:confirm="Yakin ingin menghapus kualitas ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="7" class="py-6 text-center text-ink-500">Belum ada data tingkat kualitas.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </x-prism.dual-scroll>
+                    </div>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 4: SATUAN -->
             @elseif($masterProdukSubTab === 'satuan')
+                @if(count($selectedSatuanIds) > 0)
+                    <div class="mb-3 p-3 bg-up-primary/15 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
+                        <div class="flex items-center gap-2.5">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-up-primary text-white font-bold text-xs shadow-sm tabular-nums">
+                                {{ count($selectedSatuanIds) }}
+                            </span>
+                            <span class="text-xs font-bold text-white">Satuan Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto justify-end">
+                            <button type="button" wire:click="openBatchEditModal" class="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm min-h-[36px]">
+                                <span>✏️ Edit ({{ count($selectedSatuanIds) }})</span>
+                            </button>
+                            <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                                <button type="button" wire:click="batchSetStatus(true)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-up-mint hover:bg-up-mint/15 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Aktif
+                                </button>
+                                <button type="button" wire:click="batchSetStatus(false)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-ink-300 hover:bg-white/10 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Nonaktif
+                                </button>
+                            </div>
+                            <button type="button" wire:click="batchHapus" wire:confirm="Yakin ingin menghapus / menonaktifkan {{ count($selectedSatuanIds) }} satuan unit terpilih?" class="px-3 py-1.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[36px]">
+                                <span>🗑️ Hapus</span>
+                            </button>
+                            <button type="button" wire:click="clearSelection" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-semibold transition cursor-pointer min-h-[36px] flex items-center">
+                                ✕ Batal
+                            </button>
+                        </div>
+                    </div>
+                @endif
                 <x-prism.glass-card title="Master Satuan Unit (UOM)" subtitle="Daftar satuan kuantitas barang inventaris (pcs, unit, box, set, dll)">
-                    <x-prism.dual-scroll>
-                        <table class="w-full text-left text-xs text-ink-200">
-                            <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
-                                <tr>
-                                    <th class="py-2.5 px-3">Kode Satuan</th>
-                                    <th class="py-2.5 px-3">Nama Satuan</th>
-                                    <th class="py-2.5 px-3 text-center">Status</th>
-                                    <th class="py-2.5 px-3 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                @forelse($satuanList as $s)
-                                    <tr class="hover:bg-white/[0.02] transition-colors">
-                                        <td class="py-2.5 px-3 font-mono font-bold text-up-primary">{{ $s->kode }}</td>
-                                        <td class="py-2.5 px-3 text-white font-medium">{{ $s->nama }}</td>
-                                        <td class="py-2.5 px-3 text-center">
-                                            <button wire:click="toggleSatuanStatus({{ $s->id }})" class="cursor-pointer">
-                                                <x-prism.status-pill :status="$s->is_active ? 'active' : 'inactive'" :label="$s->is_active ? 'Aktif' : 'Nonaktif'" />
+                    <!-- Mobile Card View (< md) -->
+                    <div class="block md:hidden space-y-2.5">
+                        <div class="flex items-center justify-between px-1 py-1 text-xs text-ink-400">
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/5">
+                                    <input type="checkbox"
+                                           wire:click="toggleSelectAll('satuan', @js($satuanList->pluck('id')->all()))"
+                                           @checked(count($selectedSatuanIds) > 0 && count($selectedSatuanIds) === count($satuanList))
+                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                </span>
+                                <span class="font-semibold text-white">Pilih Semua ({{ count($satuanList) }})</span>
+                            </label>
+                            <span class="text-[11px] font-mono tabular-nums text-ink-400">{{ count($selectedSatuanIds) }} dipilih</span>
+                        </div>
+
+                        @forelse($satuanList as $s)
+                            @php $isSatuanSelected = in_array($s->id, $selectedSatuanIds, true); @endphp
+                            <div class="p-3.5 rounded-2xl border transition-all {{ $isSatuanSelected ? 'bg-up-primary/10 border-up-primary/40 shadow-sm shadow-up-primary/10' : 'bg-white/[0.02] border-white/5 hover:border-white/10' }}">
+                                <div class="flex items-start gap-3">
+                                    <label class="inline-flex items-center justify-center w-9 h-9 -m-1 rounded-xl hover:bg-white/5 cursor-pointer flex-shrink-0">
+                                        <input type="checkbox"
+                                               wire:model.live="selectedSatuanIds"
+                                               value="{{ $s->id }}"
+                                               class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                    </label>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <div class="flex items-center gap-2 truncate">
+                                                <span class="px-2 py-0.5 rounded bg-up-primary/15 font-mono font-bold text-up-primary text-xs">{{ $s->kode }}</span>
+                                                <span class="font-bold text-white text-xs truncate">{{ $s->nama }}</span>
+                                            </div>
+                                            <button wire:click="toggleSatuanStatus({{ $s->id }})" class="cursor-pointer flex-shrink-0">
+                                                <x-prism.status-pill :status="$s->is_active ? 'active' : 'inactive'" :label="$s->is_active ? 'Aktif' : 'Nonaktif'" size="xs" />
                                             </button>
-                                        </td>
-                                        <td class="py-2.5 px-3 text-right space-x-2">
-                                            <button wire:click="openSatuanModal({{ $s->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                            <button wire:click="hapusSatuan({{ $s->id }})" wire:confirm="Hapus satuan ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
-                                        </td>
-                                    </tr>
-                                @empty
+                                        </div>
+
+                                        <div class="flex items-center justify-end gap-3 pt-2.5 mt-2.5 border-t border-white/5">
+                                            <button wire:click="openSatuanModal({{ $s->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
+                                            <button wire:click="hapusSatuan({{ $s->id }})" wire:confirm="Hapus satuan ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-ink-500 text-xs">Belum ada data satuan unit.</div>
+                        @endforelse
+                    </div>
+
+                    <!-- Desktop Dual-Scroll Table (>= md) -->
+                    <div class="hidden md:block">
+                        <x-prism.dual-scroll>
+                            <table class="w-full text-left text-xs text-ink-200 min-w-[760px] whitespace-nowrap">
+                                <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                     <tr>
-                                        <td colspan="4" class="py-6 text-center text-ink-500">Belum ada data satuan unit.</td>
+                                        <th class="py-2.5 px-3 w-10 text-center">
+                                            <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                <input type="checkbox"
+                                                       wire:click="toggleSelectAll('satuan', @js($satuanList->pluck('id')->all()))"
+                                                       @checked(count($selectedSatuanIds) > 0 && count($selectedSatuanIds) === count($satuanList))
+                                                       class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                            </label>
+                                        </th>
+                                        <th class="py-2.5 px-3">Kode Satuan</th>
+                                        <th class="py-2.5 px-3">Nama Satuan</th>
+                                        <th class="py-2.5 px-3 text-center">Status</th>
+                                        <th class="py-2.5 px-3 text-right">
+                                            @if(count($selectedSatuanIds) > 0)
+                                                <div class="inline-flex items-center gap-1.5">
+                                                    <button type="button" wire:click="openBatchEditModal" class="text-up-primary font-bold hover:underline" title="Batch Edit">✏️ Edit ({{ count($selectedSatuanIds) }})</button>
+                                                    <span class="text-ink-600">|</span>
+                                                    <button type="button" wire:click="batchHapus" wire:confirm="Hapus {{ count($selectedSatuanIds) }} satuan terpilih?" class="text-up-red font-bold hover:underline" title="Batch Hapus">🗑️ Hapus</button>
+                                                </div>
+                                            @else
+                                                Aksi
+                                            @endif
+                                        </th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </x-prism.dual-scroll>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @forelse($satuanList as $s)
+                                        <tr class="hover:bg-white/[0.02] transition-colors {{ in_array($s->id, $selectedSatuanIds, true) ? 'bg-up-primary/10' : '' }}">
+                                            <td class="py-2.5 px-3 text-center">
+                                                <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                    <input type="checkbox"
+                                                           wire:model.live="selectedSatuanIds"
+                                                           value="{{ $s->id }}"
+                                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                                </label>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-mono font-bold text-up-primary">{{ $s->kode }}</td>
+                                            <td class="py-2.5 px-3 text-white font-medium">{{ $s->nama }}</td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                <button wire:click="toggleSatuanStatus({{ $s->id }})" class="cursor-pointer">
+                                                    <x-prism.status-pill :status="$s->is_active ? 'active' : 'inactive'" :label="$s->is_active ? 'Aktif' : 'Nonaktif'" />
+                                                </button>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-right space-x-2">
+                                                <button wire:click="openSatuanModal({{ $s->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
+                                                <button wire:click="hapusSatuan({{ $s->id }})" wire:confirm="Hapus satuan ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="py-6 text-center text-ink-500">Belum ada data satuan unit.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </x-prism.dual-scroll>
+                    </div>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 5: KONDISI -->
             @elseif($masterProdukSubTab === 'kondisi')
+                @if(count($selectedKondisiKodes) > 0)
+                    <div class="mb-3 p-3 bg-up-primary/15 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
+                        <div class="flex items-center gap-2.5">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-up-primary text-white font-bold text-xs shadow-sm tabular-nums">
+                                {{ count($selectedKondisiKodes) }}
+                            </span>
+                            <span class="text-xs font-bold text-white">Kondisi Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto justify-end">
+                            <button type="button" wire:click="openBatchEditModal" class="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm min-h-[36px]">
+                                <span>✏️ Edit ({{ count($selectedKondisiKodes) }})</span>
+                            </button>
+                            <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                                <button type="button" wire:click="batchSetStatus(true)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-up-mint hover:bg-up-mint/15 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Aktif
+                                </button>
+                                <button type="button" wire:click="batchSetStatus(false)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-ink-300 hover:bg-white/10 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Nonaktif
+                                </button>
+                            </div>
+                            <button type="button" wire:click="batchHapus" wire:confirm="Yakin ingin menghapus / menonaktifkan {{ count($selectedKondisiKodes) }} kondisi terpilih?" class="px-3 py-1.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[36px]">
+                                <span>🗑️ Hapus</span>
+                            </button>
+                            <button type="button" wire:click="clearSelection" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-semibold transition cursor-pointer min-h-[36px] flex items-center">
+                                ✕ Batal
+                            </button>
+                        </div>
+                    </div>
+                @endif
                 <x-prism.glass-card title="Master Opsi Kondisi Produk (Gaya SID Retail Pro)" subtitle="Klasifikasi kondisi fisik suku cadang berindikator warna visual untuk kemudahan kasir & gudang">
-                    <x-prism.dual-scroll>
-                        <table class="w-full text-left text-xs text-ink-200">
-                            <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
-                                <tr>
-                                    <th class="py-2.5 px-3">Kode</th>
-                                    <th class="py-2.5 px-3">Nama Label Kondisi</th>
-                                    <th class="py-2.5 px-3">Indikator Warna</th>
-                                    <th class="py-2.5 px-3">Keterangan / Karakteristik</th>
-                                    <th class="py-2.5 px-3 text-center">Status</th>
-                                    <th class="py-2.5 px-3 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                @forelse($kondisiList as $c)
-                                    @php
-                                        $warna = $c['warna'] ?? 'emerald';
-                                        $hex = $c['hex'] ?? '#10b981';
-                                        $badgeClasses = match($warna) {
-                                            'emerald' => 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-                                            'blue' => 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-                                            'cyan' => 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-                                            'amber' => 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-                                            'rose' => 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-                                            'purple' => 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-                                            default => 'bg-slate-500/15 text-slate-300 border-slate-500/30',
-                                        };
-                                    @endphp
-                                    <tr class="hover:bg-white/[0.02] transition-colors">
-                                        <td class="py-2.5 px-3 font-mono text-ink-400">{{ $c['kode'] }}</td>
-                                        <td class="py-2.5 px-3 font-bold text-white">
-                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border {{ $badgeClasses }}">
-                                                <span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: {{ $hex }}"></span>
-                                                <span>{{ $c['nama'] }}</span>
-                                            </span>
-                                        </td>
-                                        <td class="py-2.5 px-3">
-                                            <div class="flex items-center gap-2">
-                                                <span class="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm" style="background-color: {{ $hex }}"></span>
-                                                <span class="font-mono text-[11px] text-ink-300">{{ ucfirst($warna) }} ({{ $hex }})</span>
+                    <!-- Mobile Card View (< md) -->
+                    <div class="block md:hidden space-y-2.5">
+                        <div class="flex items-center justify-between px-1 py-1 text-xs text-ink-400">
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/5">
+                                    <input type="checkbox"
+                                           wire:click="toggleSelectAll('kondisi', @js(collect($kondisiList)->pluck('kode')->all()))"
+                                           @checked(count($selectedKondisiKodes) > 0 && count($selectedKondisiKodes) === count($kondisiList))
+                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                </span>
+                                <span class="font-semibold text-white">Pilih Semua ({{ count($kondisiList) }})</span>
+                            </label>
+                            <span class="text-[11px] font-mono tabular-nums text-ink-400">{{ count($selectedKondisiKodes) }} dipilih</span>
+                        </div>
+
+                        @forelse($kondisiList as $c)
+                            @php
+                                $warna = $c['warna'] ?? 'emerald';
+                                $hex = $c['hex'] ?? '#10b981';
+                                $badgeClasses = match($warna) {
+                                    'emerald' => 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                                    'blue' => 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+                                    'cyan' => 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+                                    'amber' => 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                                    'rose' => 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+                                    'purple' => 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+                                    default => 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+                                };
+                                $isKondisiSelected = in_array($c['kode'], $selectedKondisiKodes, true);
+                            @endphp
+                            <div class="p-3.5 rounded-2xl border transition-all {{ $isKondisiSelected ? 'bg-up-primary/10 border-up-primary/40 shadow-sm shadow-up-primary/10' : 'bg-white/[0.02] border-white/5 hover:border-white/10' }}">
+                                <div class="flex items-start gap-3">
+                                    <label class="inline-flex items-center justify-center w-9 h-9 -m-1 rounded-xl hover:bg-white/5 cursor-pointer flex-shrink-0">
+                                        <input type="checkbox"
+                                               wire:model.live="selectedKondisiKodes"
+                                               value="{{ $c['kode'] }}"
+                                               class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                    </label>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <div class="flex items-center gap-2 truncate">
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border {{ $badgeClasses }}">
+                                                    <span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: {{ $hex }}"></span>
+                                                    <span>{{ $c['nama'] }}</span>
+                                                </span>
+                                                <span class="font-mono text-[10px] text-ink-400">{{ $c['kode'] }}</span>
                                             </div>
-                                        </td>
-                                        <td class="py-2.5 px-3 text-ink-300 text-[11px] max-w-xs">{{ $c['keterangan'] ?? '—' }}</td>
-                                        <td class="py-2.5 px-3 text-center">
-                                            <button wire:click="toggleKondisiStatus('{{ $c['kode'] }}')" class="cursor-pointer">
-                                                <x-prism.status-pill :status="($c['is_active'] ?? true) ? 'active' : 'inactive'" :label="($c['is_active'] ?? true) ? 'Aktif' : 'Nonaktif'" />
+                                            <button wire:click="toggleKondisiStatus('{{ $c['kode'] }}')" class="cursor-pointer flex-shrink-0">
+                                                <x-prism.status-pill :status="($c['is_active'] ?? true) ? 'active' : 'inactive'" :label="($c['is_active'] ?? true) ? 'Aktif' : 'Nonaktif'" size="xs" />
                                             </button>
-                                        </td>
-                                        <td class="py-2.5 px-3 text-right space-x-2">
-                                            <button wire:click="openKondisiModal('{{ $c['kode'] }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                            <button wire:click="hapusKondisi('{{ $c['kode'] }}')" wire:confirm="Hapus kondisi ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
-                                        </td>
-                                    </tr>
-                                @empty
+                                        </div>
+
+                                        @if($c['keterangan'] ?? false)
+                                            <p class="text-[11px] text-ink-300 mt-1.5 line-clamp-2 leading-relaxed">{{ $c['keterangan'] }}</p>
+                                        @endif
+
+                                        <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-white/5">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="w-3 h-3 rounded-full border border-white/20 shadow-sm" style="background-color: {{ $hex }}"></span>
+                                                <span class="font-mono text-[10px] text-ink-400">{{ ucfirst($warna) }}</span>
+                                            </div>
+                                            <div class="flex items-center gap-3">
+                                                <button wire:click="openKondisiModal('{{ $c['kode'] }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
+                                                <button wire:click="hapusKondisi('{{ $c['kode'] }}')" wire:confirm="Hapus kondisi ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-ink-500 text-xs">Belum ada opsi kondisi.</div>
+                        @endforelse
+                    </div>
+
+                    <!-- Desktop Dual-Scroll Table (>= md) -->
+                    <div class="hidden md:block">
+                        <x-prism.dual-scroll>
+                            <table class="w-full text-left text-xs text-ink-200 min-w-[760px] whitespace-nowrap">
+                                <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                     <tr>
-                                        <td colspan="6" class="py-6 text-center text-ink-500">Belum ada opsi kondisi.</td>
+                                        <th class="py-2.5 px-3 w-10 text-center">
+                                            <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                <input type="checkbox"
+                                                       wire:click="toggleSelectAll('kondisi', @js(collect($kondisiList)->pluck('kode')->all()))"
+                                                       @checked(count($selectedKondisiKodes) > 0 && count($selectedKondisiKodes) === count($kondisiList))
+                                                       class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                            </label>
+                                        </th>
+                                        <th class="py-2.5 px-3">Kode</th>
+                                        <th class="py-2.5 px-3">Nama Label Kondisi</th>
+                                        <th class="py-2.5 px-3">Indikator Warna</th>
+                                        <th class="py-2.5 px-3">Keterangan / Karakteristik</th>
+                                        <th class="py-2.5 px-3 text-center">Status</th>
+                                        <th class="py-2.5 px-3 text-right">
+                                            @if(count($selectedKondisiKodes) > 0)
+                                                <div class="inline-flex items-center gap-1.5">
+                                                    <button type="button" wire:click="openBatchEditModal" class="text-up-primary font-bold hover:underline" title="Batch Edit">✏️ Edit ({{ count($selectedKondisiKodes) }})</button>
+                                                    <span class="text-ink-600">|</span>
+                                                    <button type="button" wire:click="batchHapus" wire:confirm="Hapus {{ count($selectedKondisiKodes) }} kondisi terpilih?" class="text-up-red font-bold hover:underline" title="Batch Hapus">🗑️ Hapus</button>
+                                                </div>
+                                            @else
+                                                Aksi
+                                            @endif
+                                        </th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </x-prism.dual-scroll>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @forelse($kondisiList as $c)
+                                        @php
+                                            $warna = $c['warna'] ?? 'emerald';
+                                            $hex = $c['hex'] ?? '#10b981';
+                                            $badgeClasses = match($warna) {
+                                                'emerald' => 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                                                'blue' => 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+                                                'cyan' => 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+                                                'amber' => 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                                                'rose' => 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+                                                'purple' => 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+                                                default => 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+                                            };
+                                        @endphp
+                                        <tr class="hover:bg-white/[0.02] transition-colors {{ in_array($c['kode'], $selectedKondisiKodes, true) ? 'bg-up-primary/10' : '' }}">
+                                            <td class="py-2.5 px-3 text-center">
+                                                <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                    <input type="checkbox"
+                                                           wire:model.live="selectedKondisiKodes"
+                                                           value="{{ $c['kode'] }}"
+                                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                                </label>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-mono text-ink-400">{{ $c['kode'] }}</td>
+                                            <td class="py-2.5 px-3 font-bold text-white">
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border {{ $badgeClasses }}">
+                                                    <span class="w-2 h-2 rounded-full inline-block shadow-sm" style="background-color: {{ $hex }}"></span>
+                                                    <span>{{ $c['nama'] }}</span>
+                                                </span>
+                                            </td>
+                                            <td class="py-2.5 px-3">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm" style="background-color: {{ $hex }}"></span>
+                                                    <span class="font-mono text-[11px] text-ink-300">{{ ucfirst($warna) }} ({{ $hex }})</span>
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-ink-300 text-[11px] max-w-xs">{{ $c['keterangan'] ?? '—' }}</td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                <button wire:click="toggleKondisiStatus('{{ $c['kode'] }}')" class="cursor-pointer">
+                                                    <x-prism.status-pill :status="($c['is_active'] ?? true) ? 'active' : 'inactive'" :label="($c['is_active'] ?? true) ? 'Aktif' : 'Nonaktif'" />
+                                                </button>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-right space-x-2">
+                                                <button wire:click="openKondisiModal('{{ $c['kode'] }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
+                                                <button wire:click="hapusKondisi('{{ $c['kode'] }}')" wire:confirm="Hapus kondisi ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="7" class="py-6 text-center text-ink-500">Belum ada opsi kondisi.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </x-prism.dual-scroll>
+                    </div>
                 </x-prism.glass-card>
 
             <!-- SUB-TAB 6: TIPE HP -->
             @elseif($masterProdukSubTab === 'tipe_hp')
+                @if(count($selectedTipeHpIds) > 0)
+                    <div class="mb-3 p-3 bg-up-primary/15 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
+                        <div class="flex items-center gap-2.5">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-up-primary text-white font-bold text-xs shadow-sm tabular-nums">
+                                {{ count($selectedTipeHpIds) }}
+                            </span>
+                            <span class="text-xs font-bold text-white">Tipe HP Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto justify-end">
+                            <button type="button" wire:click="openBatchEditModal" class="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm min-h-[36px]">
+                                <span>✏️ Edit ({{ count($selectedTipeHpIds) }})</span>
+                            </button>
+                            <div class="inline-flex rounded-xl bg-white/5 border border-white/10 p-0.5">
+                                <button type="button" wire:click="batchSetStatus(true)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-up-mint hover:bg-up-mint/15 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Aktif
+                                </button>
+                                <button type="button" wire:click="batchSetStatus(false)" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-ink-300 hover:bg-white/10 transition cursor-pointer min-h-[32px] flex items-center">
+                                    Set Nonaktif
+                                </button>
+                            </div>
+                            <button type="button" wire:click="batchHapus" wire:confirm="Yakin ingin menghapus / menonaktifkan {{ count($selectedTipeHpIds) }} tipe HP terpilih?" class="px-3 py-1.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer min-h-[36px]">
+                                <span>🗑️ Hapus</span>
+                            </button>
+                            <button type="button" wire:click="clearSelection" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-semibold transition cursor-pointer min-h-[36px] flex items-center">
+                                ✕ Batal
+                            </button>
+                        </div>
+                    </div>
+                @endif
                 <x-prism.glass-card title="Master Tipe HP / Perangkat Kompatibel" subtitle="Database tipe perangkat untuk pemetaan kompatibilitas sparepart">
-                    <x-prism.dual-scroll>
-                        <table class="w-full text-left text-xs text-ink-200">
-                            <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
-                                <tr>
-                                    <th class="py-2.5 px-3">Merek Perangkat</th>
-                                    <th class="py-2.5 px-3">Model</th>
-                                    <th class="py-2.5 px-3">Nama Lengkap</th>
-                                    <th class="py-2.5 px-3 text-center">Jml Part Terkait</th>
-                                    <th class="py-2.5 px-3 text-center">Status</th>
-                                    <th class="py-2.5 px-3 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                @forelse($tipeHpList as $t)
-                                    <tr class="hover:bg-white/[0.02] transition-colors">
-                                        <td class="py-2.5 px-3 font-semibold text-white">{{ $t->merk }}</td>
-                                        <td class="py-2.5 px-3 font-mono text-ink-300">{{ $t->model }}</td>
-                                        <td class="py-2.5 px-3 text-white">{{ $t->nama }}</td>
-                                        <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $t->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
-                                            {{ $t->produk_count }}
-                                        </td>
-                                        <td class="py-2.5 px-3 text-center">
-                                            <button wire:click="toggleTipeHpStatus({{ $t->id }})" class="cursor-pointer">
-                                                <x-prism.status-pill :status="$t->is_active ? 'active' : 'inactive'" :label="$t->is_active ? 'Aktif' : 'Nonaktif'" />
+                    <!-- Mobile Card View (< md) -->
+                    <div class="block md:hidden space-y-2.5">
+                        <div class="flex items-center justify-between px-1 py-1 text-xs text-ink-400">
+                            <label class="flex items-center gap-2 cursor-pointer select-none">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/5">
+                                    <input type="checkbox"
+                                           wire:click="toggleSelectAll('tipe_hp', @js($tipeHpList->pluck('id')->all()))"
+                                           @checked(count($selectedTipeHpIds) > 0 && count($selectedTipeHpIds) === count($tipeHpList))
+                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                </span>
+                                <span class="font-semibold text-white">Pilih Semua ({{ count($tipeHpList) }})</span>
+                            </label>
+                            <span class="text-[11px] font-mono tabular-nums text-ink-400">{{ count($selectedTipeHpIds) }} dipilih</span>
+                        </div>
+
+                        @forelse($tipeHpList as $t)
+                            @php $isTipeHpSelected = in_array($t->id, $selectedTipeHpIds, true); @endphp
+                            <div class="p-3.5 rounded-2xl border transition-all {{ $isTipeHpSelected ? 'bg-up-primary/10 border-up-primary/40 shadow-sm shadow-up-primary/10' : 'bg-white/[0.02] border-white/5 hover:border-white/10' }}">
+                                <div class="flex items-start gap-3">
+                                    <label class="inline-flex items-center justify-center w-9 h-9 -m-1 rounded-xl hover:bg-white/5 cursor-pointer flex-shrink-0">
+                                        <input type="checkbox"
+                                               wire:model.live="selectedTipeHpIds"
+                                               value="{{ $t->id }}"
+                                               class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                    </label>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <div class="flex items-center gap-1.5 truncate">
+                                                <span class="text-sm">📱</span>
+                                                <span class="font-bold text-white text-xs truncate">{{ $t->nama }}</span>
+                                            </div>
+                                            <button wire:click="toggleTipeHpStatus({{ $t->id }})" class="cursor-pointer flex-shrink-0">
+                                                <x-prism.status-pill :status="$t->is_active ? 'active' : 'inactive'" :label="$t->is_active ? 'Aktif' : 'Nonaktif'" size="xs" />
                                             </button>
-                                        </td>
-                                        <td class="py-2.5 px-3 text-right space-x-2">
-                                            <button wire:click="openTipeHpModal({{ $t->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
-                                            <button wire:click="hapusTipeHp({{ $t->id }})" wire:confirm="Hapus tipe HP ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
-                                        </td>
-                                    </tr>
-                                @empty
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                            <span class="px-2 py-0.5 rounded bg-up-primary/15 text-[10px] text-up-primary font-semibold">{{ $t->merk }}</span>
+                                            <span class="font-mono text-[10px] text-ink-300">{{ $t->model }}</span>
+                                        </div>
+
+                                        <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-white/5">
+                                            <span class="text-[11px] text-ink-400 font-medium">
+                                                Part Terkait: <span class="font-bold tabular-nums {{ $t->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">{{ $t->produk_count }}</span>
+                                            </span>
+                                            <div class="flex items-center gap-3">
+                                                <button wire:click="openTipeHpModal({{ $t->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Edit</button>
+                                                <button wire:click="hapusTipeHp({{ $t->id }})" wire:confirm="Hapus tipe HP ini?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-ink-500 text-xs">Belum ada data tipe HP.</div>
+                        @endforelse
+                    </div>
+
+                    <!-- Desktop Dual-Scroll Table (>= md) -->
+                    <div class="hidden md:block">
+                        <x-prism.dual-scroll>
+                            <table class="w-full text-left text-xs text-ink-200 min-w-[760px] whitespace-nowrap">
+                                <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
                                     <tr>
-                                        <td colspan="6" class="py-6 text-center text-ink-500">Belum ada data tipe HP.</td>
+                                        <th class="py-2.5 px-3 w-10 text-center">
+                                            <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                <input type="checkbox"
+                                                       wire:click="toggleSelectAll('tipe_hp', @js($tipeHpList->pluck('id')->all()))"
+                                                       @checked(count($selectedTipeHpIds) > 0 && count($selectedTipeHpIds) === count($tipeHpList))
+                                                       class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                            </label>
+                                        </th>
+                                        <th class="py-2.5 px-3">Merek Perangkat</th>
+                                        <th class="py-2.5 px-3">Model</th>
+                                        <th class="py-2.5 px-3">Nama Lengkap</th>
+                                        <th class="py-2.5 px-3 text-center">Jml Part Terkait</th>
+                                        <th class="py-2.5 px-3 text-center">Status</th>
+                                        <th class="py-2.5 px-3 text-right">
+                                            @if(count($selectedTipeHpIds) > 0)
+                                                <div class="inline-flex items-center gap-1.5">
+                                                    <button type="button" wire:click="openBatchEditModal" class="text-up-primary font-bold hover:underline" title="Batch Edit">✏️ Edit ({{ count($selectedTipeHpIds) }})</button>
+                                                    <span class="text-ink-600">|</span>
+                                                    <button type="button" wire:click="batchHapus" wire:confirm="Hapus {{ count($selectedTipeHpIds) }} tipe HP terpilih?" class="text-up-red font-bold hover:underline" title="Batch Hapus">🗑️ Hapus</button>
+                                                </div>
+                                            @else
+                                                Aksi
+                                            @endif
+                                        </th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </x-prism.dual-scroll>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @forelse($tipeHpList as $t)
+                                        <tr class="hover:bg-white/[0.02] transition-colors {{ in_array($t->id, $selectedTipeHpIds, true) ? 'bg-up-primary/10' : '' }}">
+                                            <td class="py-2.5 px-3 text-center">
+                                                <label class="inline-flex items-center justify-center w-8 h-8 rounded hover:bg-white/5 cursor-pointer">
+                                                    <input type="checkbox"
+                                                           wire:model.live="selectedTipeHpIds"
+                                                           value="{{ $t->id }}"
+                                                           class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90">
+                                                </label>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-semibold text-white">{{ $t->merk }}</td>
+                                            <td class="py-2.5 px-3 font-mono text-ink-300">{{ $t->model }}</td>
+                                            <td class="py-2.5 px-3 text-white">{{ $t->nama }}</td>
+                                            <td class="py-2.5 px-3 text-center font-bold tabular-nums {{ $t->produk_count > 0 ? 'text-up-mint' : 'text-ink-500' }}">
+                                                {{ $t->produk_count }}
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                <button wire:click="toggleTipeHpStatus({{ $t->id }})" class="cursor-pointer">
+                                                    <x-prism.status-pill :status="$t->is_active ? 'active' : 'inactive'" :label="$t->is_active ? 'Aktif' : 'Nonaktif'" />
+                                                </button>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-right space-x-2">
+                                                <button wire:click="openTipeHpModal({{ $t->id }})" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Edit</button>
+                                                <button wire:click="hapusTipeHp({{ $t->id }})" wire:confirm="Hapus tipe HP ini?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="7" class="py-6 text-center text-ink-500">Belum ada data tipe HP.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </x-prism.dual-scroll>
+                    </div>
                 </x-prism.glass-card>
             @endif
         </div>
@@ -2458,6 +3180,115 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
                     <button wire:click="$set('showTipeHpModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
                     <button wire:click="simpanTipeHp" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan Tipe HP</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: BATCH EDIT MASTER ATRIBUT -->
+    @if($showBatchEditModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-md max-h-[90vh] flex flex-col glass-panel p-4 sm:p-6 rounded-3xl relative overflow-hidden">
+                <div class="flex items-center justify-between pb-3 mb-3 sm:pb-4 sm:mb-4 border-b border-white/10 flex-shrink-0">
+                    <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                        <span>✏️</span>
+                        <span>Batch Edit Master Atribut ({{ strtoupper($masterProdukSubTab) }})</span>
+                    </h3>
+                    <button wire:click="$set('showBatchEditModal', false)" class="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white cursor-pointer transition">✕</button>
+                </div>
+
+                <div class="space-y-4 overflow-y-auto pr-1 flex-1">
+                    <p class="text-xs text-ink-300">
+                        Pilih opsi perubahan yang ingin diterapkan ke semua item terpilih secara massal:
+                    </p>
+
+                    <!-- 1. Ubah Status Aktif/Nonaktif -->
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5">
+                        <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="batchEditForm.ubah_status" class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90" />
+                            <span>Ubah Status Aktif / Nonaktif</span>
+                        </label>
+                        @if($batchEditForm['ubah_status'])
+                            <div class="pl-6 pt-1 flex items-center gap-4">
+                                <label class="flex items-center gap-2 text-xs text-ink-200 cursor-pointer select-none">
+                                    <input type="radio" wire:model="batchEditForm.status" value="1" class="w-4 h-4 accent-up-mint cursor-pointer" />
+                                    <span class="text-up-mint font-semibold">Aktif</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-ink-200 cursor-pointer select-none">
+                                    <input type="radio" wire:model="batchEditForm.status" value="0" class="w-4 h-4 accent-up-red cursor-pointer" />
+                                    <span class="text-ink-400 font-semibold">Nonaktif</span>
+                                </label>
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- 2. Kategori: Ubah Kategori Induk -->
+                    @if($masterProdukSubTab === 'kategori')
+                        <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5">
+                            <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
+                                <input type="checkbox" wire:model.live="batchEditForm.ubah_parent" class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90" />
+                                <span>Pindahkan Kategori Induk</span>
+                            </label>
+                            @if($batchEditForm['ubah_parent'])
+                                <div class="pl-6 pt-1">
+                                    <select wire:model="batchEditForm.parent_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                        <option value="" class="bg-ink-900">— Jadikan Kategori Utama (Tanpa Induk) —</option>
+                                        @foreach($kategoriList as $kp)
+                                            @if(!$kp->parent_id)
+                                                <option value="{{ $kp->id }}" class="bg-ink-900">{{ $kp->nama }}</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <!-- 3. Kualitas: Ubah Brand Part Induk -->
+                    @if($masterProdukSubTab === 'kualitas')
+                        <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5">
+                            <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
+                                <input type="checkbox" wire:model.live="batchEditForm.ubah_brand" class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90" />
+                                <span>Ubah Brand Part Induk</span>
+                            </label>
+                            @if($batchEditForm['ubah_brand'])
+                                <div class="pl-6 pt-1">
+                                    <select wire:model="batchEditForm.brand_id" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                        <option value="" class="bg-ink-900">— Universal (Semua Brand) —</option>
+                                        @foreach($brandList as $bp)
+                                            <option value="{{ $bp->id }}" class="bg-ink-900">{{ $bp->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <!-- 4. Tipe HP: Ubah Merek HP -->
+                    @if($masterProdukSubTab === 'tipe_hp')
+                        <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5">
+                            <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
+                                <input type="checkbox" wire:model.live="batchEditForm.ubah_merk" class="w-4.5 h-4.5 rounded border border-white/20 bg-ink-900 text-up-primary accent-up-primary focus:ring-up-primary/40 cursor-pointer inline-block align-middle transition-transform active:scale-90" />
+                                <span>Ubah Merek Perangkat Smartphone</span>
+                            </label>
+                            @if($batchEditForm['ubah_merk'])
+                                <div class="pl-6 pt-1 space-y-2">
+                                    <select wire:model="batchEditForm.merk" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium">
+                                        <option value="" class="bg-ink-900">— Pilih Merek —</option>
+                                        @foreach($merekHpOptions as $m)
+                                            <option value="{{ $m }}" class="bg-ink-900">{{ $m }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input type="text" wire:model="batchEditForm.merk" placeholder="Atau ketik merek baru..." class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium" />
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+
+                <div class="flex gap-2.5 sm:gap-3 pt-3 sm:pt-4 border-t border-white/5 mt-4 sm:mt-5 flex-shrink-0">
+                    <button wire:click="$set('showBatchEditModal', false)" class="flex-1 py-2.5 sm:py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer transition active:scale-95">Batal</button>
+                    <button wire:click="simpanBatchEdit" class="flex-1 py-2.5 sm:py-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer transition active:scale-95 shadow-md shadow-up-primary/20">Terapkan Perubahan</button>
                 </div>
             </div>
         </div>

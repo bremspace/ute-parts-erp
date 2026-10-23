@@ -630,6 +630,33 @@ class SettingsRbac extends Component
     // Master Produk & Katalog Sub-Tab & Modals
     public string $masterProdukSubTab = 'kategori'; // kategori, brand, kualitas, satuan, kondisi, tipe_hp
 
+    // Batch Selection untuk Master Atribut Produk & Part
+    public array $selectedKategoriIds = [];
+
+    public array $selectedBrandIds = [];
+
+    public array $selectedKualitasIds = [];
+
+    public array $selectedSatuanIds = [];
+
+    public array $selectedKondisiKodes = [];
+
+    public array $selectedTipeHpIds = [];
+
+    // Modal Batch Edit Master Atribut
+    public bool $showBatchEditModal = false;
+
+    public array $batchEditForm = [
+        'ubah_status' => false,
+        'status' => true,
+        'ubah_parent' => false,
+        'parent_id' => null,
+        'ubah_brand' => false,
+        'brand_id' => null,
+        'ubah_merk' => false,
+        'merk' => '',
+    ];
+
     public bool $showKategoriModal = false;
 
     public array $kategoriForm = ['id' => null, 'nama' => '', 'parent_id' => null, 'icon' => null, 'urutan' => 0, 'is_active' => true];
@@ -1627,6 +1654,28 @@ class SettingsRbac extends Component
             return;
         }
 
+        $nama = trim($this->kategoriForm['nama']);
+        $parentId = $this->kategoriForm['parent_id'] ? (int) $this->kategoriForm['parent_id'] : null;
+        $id = $this->kategoriForm['id'] ? (int) $this->kategoriForm['id'] : null;
+
+        $duplikat = KategoriProduk::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($nama)])
+            ->where(function ($q) use ($parentId) {
+                if ($parentId === null) {
+                    $q->whereNull('parent_id');
+                } else {
+                    $q->where('parent_id', $parentId);
+                }
+            })
+            ->when($id, fn ($q) => $q->where('id', '!=', $id))
+            ->exists();
+
+        if ($duplikat) {
+            $this->addError('kategoriForm.nama', "Kategori '{$nama}' sudah ada pada jenjang ini.");
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Kategori '{$nama}' sudah ada pada jenjang ini"]);
+
+            return;
+        }
+
         if ($this->kategoriForm['id']) {
             $kat = KategoriProduk::findOrFail($this->kategoriForm['id']);
             $kat->update([
@@ -1714,6 +1763,20 @@ class SettingsRbac extends Component
             'brandForm.nama' => 'required|string|max:255',
         ]);
 
+        $nama = trim($this->brandForm['nama']);
+        $id = $this->brandForm['id'] ? (int) $this->brandForm['id'] : null;
+
+        $duplikat = Brand::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($nama)])
+            ->when($id, fn ($q) => $q->where('id', '!=', $id))
+            ->exists();
+
+        if ($duplikat) {
+            $this->addError('brandForm.nama', "Brand part '{$nama}' sudah terdaftar.");
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Brand part '{$nama}' sudah terdaftar"]);
+
+            return;
+        }
+
         if ($this->brandForm['id']) {
             Brand::findOrFail($this->brandForm['id'])->update([
                 'nama' => $this->brandForm['nama'],
@@ -1797,9 +1860,34 @@ class SettingsRbac extends Component
             'kualitasForm.brand_id' => 'nullable|exists:brands,id',
         ]);
 
+        $nama = trim($this->kualitasForm['nama']);
+        $brandId = ! empty($this->kualitasForm['brand_id']) ? (int) $this->kualitasForm['brand_id'] : null;
+        $id = $this->kualitasForm['id'] ? (int) $this->kualitasForm['id'] : null;
+
+        $duplikat = KualitasProduk::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($nama)])
+            ->where(function ($q) use ($brandId) {
+                if ($brandId === null) {
+                    $q->whereNull('brand_id');
+                } else {
+                    $q->where('brand_id', $brandId);
+                }
+            })
+            ->when($id, fn ($q) => $q->where('id', '!=', $id))
+            ->exists();
+
+        if ($duplikat) {
+            $msg = $brandId
+                ? "Tingkat kualitas '{$nama}' untuk brand ini sudah terdaftar."
+                : "Tingkat kualitas '{$nama}' (Universal) sudah terdaftar.";
+            $this->addError('kualitasForm.nama', $msg);
+            $this->dispatch('alert', ['type' => 'error', 'message' => $msg]);
+
+            return;
+        }
+
         $data = [
             'nama' => $this->kualitasForm['nama'],
-            'brand_id' => ! empty($this->kualitasForm['brand_id']) ? (int) $this->kualitasForm['brand_id'] : null,
+            'brand_id' => $brandId,
             'keterangan' => $this->kualitasForm['keterangan'] ?: null,
             'is_active' => (bool) $this->kualitasForm['is_active'],
         ];
@@ -1873,13 +1961,34 @@ class SettingsRbac extends Component
             return;
         }
 
-        $id = $this->satuanForm['id'] ?? 'NULL';
+        $id = $this->satuanForm['id'] ? (int) $this->satuanForm['id'] : null;
         $this->validate([
-            'satuanForm.kode' => "required|string|max:20|unique:satuan_unit,kode,{$id}",
+            'satuanForm.kode' => 'required|string|max:20',
             'satuanForm.nama' => 'required|string|max:100',
         ]);
 
         $kode = strtolower(trim($this->satuanForm['kode']));
+        $nama = trim($this->satuanForm['nama']);
+
+        $duplikatKode = SatuanUnit::whereRaw('LOWER(TRIM(kode)) = ?', [$kode])
+            ->when($id, fn ($q) => $q->where('id', '!=', $id))
+            ->exists();
+        if ($duplikatKode) {
+            $this->addError('satuanForm.kode', "Kode satuan '{$kode}' sudah digunakan.");
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Kode satuan '{$kode}' sudah digunakan"]);
+
+            return;
+        }
+
+        $duplikatNama = SatuanUnit::whereRaw('LOWER(TRIM(nama)) = ?', [strtolower($nama)])
+            ->when($id, fn ($q) => $q->where('id', '!=', $id))
+            ->exists();
+        if ($duplikatNama) {
+            $this->addError('satuanForm.nama', "Nama satuan '{$nama}' sudah terdaftar.");
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Nama satuan '{$nama}' sudah terdaftar"]);
+
+            return;
+        }
 
         if ($this->satuanForm['id']) {
             SatuanUnit::findOrFail($this->satuanForm['id'])->update([
@@ -1992,9 +2101,25 @@ class SettingsRbac extends Component
 
         $list = $this->getKondisiList();
         $nama = trim($this->kondisiForm['nama']);
-        $kode = $this->kondisiForm['is_edit']
+        $isEdit = (bool) ($this->kondisiForm['is_edit'] ?? false);
+        $kode = $isEdit
             ? $this->kondisiForm['kode']
             : (Str::slug($this->kondisiForm['kode'] ?: $nama, '_') ?: 'k_'.time());
+
+        foreach ($list as $item) {
+            if (! $isEdit && strtolower($item['kode']) === strtolower($kode)) {
+                $this->addError('kondisiForm.kode', "Kode kondisi '{$kode}' sudah ada.");
+                $this->dispatch('alert', ['type' => 'error', 'message' => "Kode kondisi '{$kode}' sudah ada"]);
+
+                return;
+            }
+            if ((! $isEdit || $item['kode'] !== $kode) && strtolower(trim($item['nama'])) === strtolower($nama)) {
+                $this->addError('kondisiForm.nama', "Kondisi dengan nama '{$nama}' sudah ada.");
+                $this->dispatch('alert', ['type' => 'error', 'message' => "Kondisi dengan nama '{$nama}' sudah ada"]);
+
+                return;
+            }
+        }
 
         $ada = false;
         foreach ($list as &$item) {
@@ -2214,7 +2339,22 @@ class SettingsRbac extends Component
             'tipeHpForm.model' => 'required|string|max:100',
         ]);
 
-        $nama = trim($this->tipeHpForm['nama']) ?: "{$this->tipeHpForm['merk']} {$this->tipeHpForm['model']}";
+        $merk = trim($this->tipeHpForm['merk']);
+        $model = trim($this->tipeHpForm['model']);
+        $id = $this->tipeHpForm['id'] ? (int) $this->tipeHpForm['id'] : null;
+
+        $duplikat = TipeHp::whereRaw('LOWER(TRIM(merk)) = ? AND LOWER(TRIM(model)) = ?', [strtolower($merk), strtolower($model)])
+            ->when($id, fn ($q) => $q->where('id', '!=', $id))
+            ->exists();
+
+        if ($duplikat) {
+            $this->addError('tipeHpForm.model', "Tipe HP '{$merk} {$model}' sudah terdaftar.");
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Tipe HP '{$merk} {$model}' sudah terdaftar"]);
+
+            return;
+        }
+
+        $nama = trim($this->tipeHpForm['nama']) ?: "{$merk} {$model}";
 
         if ($this->tipeHpForm['id']) {
             TipeHp::findOrFail($this->tipeHpForm['id'])->update([
@@ -2266,6 +2406,327 @@ class SettingsRbac extends Component
 
         $t->delete();
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Tipe HP berhasil dihapus']);
+    }
+
+    // -------------------------------------------------------------
+    // Batch Aksi Master Atribut Produk & Part (T-Batch)
+    // -------------------------------------------------------------
+
+    public function toggleSelectAll(string $subTab, array $allKeys): void
+    {
+        switch ($subTab) {
+            case 'kategori':
+                $allInt = array_values(array_map('intval', $allKeys));
+                $this->selectedKategoriIds = count($this->selectedKategoriIds) === count($allInt) ? [] : $allInt;
+                break;
+            case 'brand':
+                $allInt = array_values(array_map('intval', $allKeys));
+                $this->selectedBrandIds = count($this->selectedBrandIds) === count($allInt) ? [] : $allInt;
+                break;
+            case 'kualitas':
+                $allInt = array_values(array_map('intval', $allKeys));
+                $this->selectedKualitasIds = count($this->selectedKualitasIds) === count($allInt) ? [] : $allInt;
+                break;
+            case 'satuan':
+                $allInt = array_values(array_map('intval', $allKeys));
+                $this->selectedSatuanIds = count($this->selectedSatuanIds) === count($allInt) ? [] : $allInt;
+                break;
+            case 'kondisi':
+                $allStr = array_values(array_map('strval', $allKeys));
+                $this->selectedKondisiKodes = count($this->selectedKondisiKodes) === count($allStr) ? [] : $allStr;
+                break;
+            case 'tipe_hp':
+                $allInt = array_values(array_map('intval', $allKeys));
+                $this->selectedTipeHpIds = count($this->selectedTipeHpIds) === count($allInt) ? [] : $allInt;
+                break;
+        }
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selectedKategoriIds = [];
+        $this->selectedBrandIds = [];
+        $this->selectedKualitasIds = [];
+        $this->selectedSatuanIds = [];
+        $this->selectedKondisiKodes = [];
+        $this->selectedTipeHpIds = [];
+    }
+
+    public function batchSetStatus(bool $status): void
+    {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengubah status atribut.')) {
+            return;
+        }
+
+        $sub = $this->masterProdukSubTab;
+        $count = 0;
+
+        switch ($sub) {
+            case 'kategori':
+                $count = KategoriProduk::whereIn('id', $this->selectedKategoriIds)->update(['is_active' => $status]);
+                $this->selectedKategoriIds = [];
+                break;
+            case 'brand':
+                $count = Brand::whereIn('id', $this->selectedBrandIds)->update(['is_active' => $status]);
+                $this->selectedBrandIds = [];
+                break;
+            case 'kualitas':
+                $count = KualitasProduk::whereIn('id', $this->selectedKualitasIds)->update(['is_active' => $status]);
+                $this->selectedKualitasIds = [];
+                break;
+            case 'satuan':
+                $count = SatuanUnit::whereIn('id', $this->selectedSatuanIds)->update(['is_active' => $status]);
+                $this->selectedSatuanIds = [];
+                break;
+            case 'kondisi':
+                $list = $this->getKondisiList();
+                foreach ($list as &$item) {
+                    if (in_array($item['kode'], $this->selectedKondisiKodes, true)) {
+                        $item['is_active'] = $status;
+                        $count++;
+                    }
+                }
+                app(KonfigurasiService::class)->set('master_produk_kondisi_list', array_values($list));
+                $this->selectedKondisiKodes = [];
+                break;
+            case 'tipe_hp':
+                $count = TipeHp::whereIn('id', $this->selectedTipeHpIds)->update(['is_active' => $status]);
+                $this->selectedTipeHpIds = [];
+                break;
+        }
+
+        $label = $status ? 'Aktif' : 'Nonaktif';
+        $this->dispatch('alert', ['type' => 'success', 'message' => "{$count} item berhasil diset {$label}"]);
+    }
+
+    public function batchHapus(): void
+    {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin menghapus master atribut.')) {
+            return;
+        }
+
+        $sub = $this->masterProdukSubTab;
+        $deleted = 0;
+        $deactivated = 0;
+
+        switch ($sub) {
+            case 'kategori':
+                $kats = KategoriProduk::withCount(['produk', 'children'])->whereIn('id', $this->selectedKategoriIds)->get();
+                foreach ($kats as $kat) {
+                    if ($kat->produk_count > 0 || $kat->children_count > 0) {
+                        $kat->update(['is_active' => false]);
+                        $deactivated++;
+                    } else {
+                        $kat->delete();
+                        $deleted++;
+                    }
+                }
+                $this->selectedKategoriIds = [];
+                break;
+
+            case 'brand':
+                $brands = Brand::withCount('produk')->whereIn('id', $this->selectedBrandIds)->get();
+                foreach ($brands as $brand) {
+                    if ($brand->produk_count > 0) {
+                        $brand->update(['is_active' => false]);
+                        $deactivated++;
+                    } else {
+                        $brand->delete();
+                        $deleted++;
+                    }
+                }
+                $this->selectedBrandIds = [];
+                break;
+
+            case 'kualitas':
+                $listK = KualitasProduk::withCount('produk')->whereIn('id', $this->selectedKualitasIds)->get();
+                foreach ($listK as $k) {
+                    if ($k->produk_count > 0) {
+                        $k->update(['is_active' => false]);
+                        $deactivated++;
+                    } else {
+                        $k->delete();
+                        $deleted++;
+                    }
+                }
+                $this->selectedKualitasIds = [];
+                break;
+
+            case 'satuan':
+                $satuans = SatuanUnit::whereIn('id', $this->selectedSatuanIds)->get();
+                foreach ($satuans as $s) {
+                    $terpakai = Produk::where('satuan_kode', $s->kode)->count();
+                    if ($terpakai > 0) {
+                        $s->update(['is_active' => false]);
+                        $deactivated++;
+                    } else {
+                        $s->delete();
+                        $deleted++;
+                    }
+                }
+                $this->selectedSatuanIds = [];
+                break;
+
+            case 'kondisi':
+                $list = $this->getKondisiList();
+                $newList = [];
+                foreach ($list as $item) {
+                    if (in_array($item['kode'], $this->selectedKondisiKodes, true)) {
+                        $terpakai = Produk::where('kondisi', $item['kode'])->count();
+                        if ($terpakai > 0) {
+                            $item['is_active'] = false;
+                            $newList[] = $item;
+                            $deactivated++;
+                        } else {
+                            $deleted++;
+                        }
+                    } else {
+                        $newList[] = $item;
+                    }
+                }
+                app(KonfigurasiService::class)->set('master_produk_kondisi_list', array_values($newList));
+                $this->selectedKondisiKodes = [];
+                break;
+
+            case 'tipe_hp':
+                $tipes = TipeHp::withCount('produk')->whereIn('id', $this->selectedTipeHpIds)->get();
+                foreach ($tipes as $t) {
+                    if ($t->produk_count > 0) {
+                        $t->update(['is_active' => false]);
+                        $deactivated++;
+                    } else {
+                        $t->delete();
+                        $deleted++;
+                    }
+                }
+                $this->selectedTipeHpIds = [];
+                break;
+        }
+
+        $pesan = "Batch hapus selesai: {$deleted} item dihapus permanen";
+        if ($deactivated > 0) {
+            $pesan .= ", {$deactivated} dinonaktifkan (karena terkait data produk)";
+        }
+        $this->dispatch('alert', ['type' => $deleted > 0 ? 'success' : 'warning', 'message' => $pesan]);
+    }
+
+    public function openBatchEditModal(): void
+    {
+        $this->batchEditForm = [
+            'ubah_status' => false,
+            'status' => true,
+            'ubah_parent' => false,
+            'parent_id' => null,
+            'ubah_brand' => false,
+            'brand_id' => null,
+            'ubah_merk' => false,
+            'merk' => '',
+        ];
+        $this->showBatchEditModal = true;
+    }
+
+    public function simpanBatchEdit(): void
+    {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengedit master atribut.')) {
+            return;
+        }
+
+        $sub = $this->masterProdukSubTab;
+        $updated = 0;
+
+        switch ($sub) {
+            case 'kategori':
+                $kats = KategoriProduk::whereIn('id', $this->selectedKategoriIds)->get();
+                foreach ($kats as $kat) {
+                    $updates = [];
+                    if (! empty($this->batchEditForm['ubah_status'])) {
+                        $updates['is_active'] = (bool) $this->batchEditForm['status'];
+                    }
+                    if (! empty($this->batchEditForm['ubah_parent'])) {
+                        $parentId = $this->batchEditForm['parent_id'] ? (int) $this->batchEditForm['parent_id'] : null;
+                        if ($parentId !== (int) $kat->id) {
+                            $updates['parent_id'] = $parentId;
+                        }
+                    }
+                    if (! empty($updates)) {
+                        $kat->update($updates);
+                        $updated++;
+                    }
+                }
+                $this->selectedKategoriIds = [];
+                break;
+
+            case 'brand':
+                if (! empty($this->batchEditForm['ubah_status'])) {
+                    $updated = Brand::whereIn('id', $this->selectedBrandIds)
+                        ->update(['is_active' => (bool) $this->batchEditForm['status']]);
+                }
+                $this->selectedBrandIds = [];
+                break;
+
+            case 'kualitas':
+                $listK = KualitasProduk::whereIn('id', $this->selectedKualitasIds)->get();
+                foreach ($listK as $k) {
+                    $updates = [];
+                    if (! empty($this->batchEditForm['ubah_status'])) {
+                        $updates['is_active'] = (bool) $this->batchEditForm['status'];
+                    }
+                    if (! empty($this->batchEditForm['ubah_brand'])) {
+                        $updates['brand_id'] = $this->batchEditForm['brand_id'] ? (int) $this->batchEditForm['brand_id'] : null;
+                    }
+                    if (! empty($updates)) {
+                        $k->update($updates);
+                        $updated++;
+                    }
+                }
+                $this->selectedKualitasIds = [];
+                break;
+
+            case 'satuan':
+                if (! empty($this->batchEditForm['ubah_status'])) {
+                    $updated = SatuanUnit::whereIn('id', $this->selectedSatuanIds)
+                        ->update(['is_active' => (bool) $this->batchEditForm['status']]);
+                }
+                $this->selectedSatuanIds = [];
+                break;
+
+            case 'kondisi':
+                $list = $this->getKondisiList();
+                foreach ($list as &$item) {
+                    if (in_array($item['kode'], $this->selectedKondisiKodes, true)) {
+                        if (! empty($this->batchEditForm['ubah_status'])) {
+                            $item['is_active'] = (bool) $this->batchEditForm['status'];
+                            $updated++;
+                        }
+                    }
+                }
+                app(KonfigurasiService::class)->set('master_produk_kondisi_list', array_values($list));
+                $this->selectedKondisiKodes = [];
+                break;
+
+            case 'tipe_hp':
+                $tipes = TipeHp::whereIn('id', $this->selectedTipeHpIds)->get();
+                foreach ($tipes as $t) {
+                    $updates = [];
+                    if (! empty($this->batchEditForm['ubah_status'])) {
+                        $updates['is_active'] = (bool) $this->batchEditForm['status'];
+                    }
+                    if (! empty($this->batchEditForm['ubah_merk']) && ! empty(trim($this->batchEditForm['merk']))) {
+                        $merkBaru = trim($this->batchEditForm['merk']);
+                        $updates['merk'] = $merkBaru;
+                        $updates['nama'] = "{$merkBaru} {$t->model}";
+                    }
+                    if (! empty($updates)) {
+                        $t->update($updates);
+                        $updated++;
+                    }
+                }
+                $this->selectedTipeHpIds = [];
+                break;
+        }
+
+        $this->showBatchEditModal = false;
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Batch edit berhasil: {$updated} item diperbarui"]);
     }
 
     protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
