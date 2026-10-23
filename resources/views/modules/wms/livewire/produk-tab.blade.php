@@ -148,9 +148,10 @@
                         @endif
 
                         @if($visibleFilters['tier'] ?? true)
-                            <!-- Filter Tier Harga Pricelist + Export Pricelist -->
-                            <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 p-1 rounded-xl">
-                                <select wire:model.live="filterTierHarga" class="px-2.5 py-1.5 rounded-lg bg-black/40 border-0 text-xs font-medium text-white min-h-[36px] outline-none cursor-pointer" title="Pilih tier harga untuk ekspor pricelist">
+                            <!-- PRICELIST: Eksternal / Customer-facing (sesuai tier) -->
+                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 bg-up-primary/10 border border-up-primary/20 p-1.5 rounded-xl min-w-[200px] sm:min-w-0 flex-1 sm:flex-none" title="Pricelist untuk konsumen (harga sesuai tier)">
+                                <span class="px-2 py-1 text-[10px] uppercase tracking-wider text-up-primary font-bold hidden sm:flex items-center">📊 Pricelist</span>
+                                <select wire:model.live="filterTierHarga" class="px-3 py-2 rounded-lg bg-black/40 border-0 text-xs font-medium text-white min-h-[44px] outline-none cursor-pointer w-full sm:w-auto" title="Pilih tier harga untuk ekspor pricelist">
                                     <option value="retail" class="bg-ink-900 text-white">Tier: Retail Standar</option>
                                     <option value="reseller" class="bg-ink-900 text-white">Tier: Reseller</option>
                                     <option value="agen" class="bg-ink-900 text-white">Tier: Agen</option>
@@ -158,49 +159,55 @@
                                         <option value="tier_{{ $tm->id }}" class="bg-ink-900 text-white">Tier CRM: {{ $tm->nama }}</option>
                                     @endforeach
                                 </select>
-                                <button type="button" wire:click="exportPricelist('xlsx')" class="px-2.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary/80 text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist format Excel">
-                                    <span class="hidden sm:inline">Excel</span>
-                                </button>
-                                <button type="button" wire:click="exportPricelist('csv')" class="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist format CSV">
-                                    <span class="hidden sm:inline">CSV</span>
-                                </button>
+                                <div class="flex items-center gap-1.5 w-full sm:w-auto">
+                                    <button type="button" wire:click="exportPricelist('xlsx')" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-up-primary hover:bg-up-primary/80 text-white font-semibold text-xs min-h-[44px] cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist Excel (untuk konsumen)">
+                                        <span class="hidden xs:inline">📊 </span><span>Excel</span>
+                                    </button>
+                                    <button type="button" wire:click="exportPricelist('csv')" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-ink-200 font-semibold text-xs min-h-[44px] cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist CSV (untuk konsumen)">
+                                        <span class="hidden xs:inline">📄 </span><span>CSV</span>
+                                    </button>
+                                </div>
                             </div>
                         @endif
 
-                        <!-- Export Dropdown: Master Produk & Terpilih -->
+                        <!-- Divider visual pemisah -->
+                        <div class="hidden sm:block w-px h-8 bg-white/10 mx-1.5"></div>
+                        <div class="sm:hidden w-full h-px bg-white/10 my-1.5"></div>
+
+                        <!-- MASTER PRODUK: Internal / Untuk manajemen & update data -->
                         @php $hasSelected = ! empty($selectedProdukIds); @endphp
-                        <div class="relative text-left" x-data="{ open: false }" @click.away="open = false" @keydown.escape.window="open = false">
+                        <div class="relative text-left w-full sm:w-auto" x-data="{ open: false }" @click.away="open = false" @keydown.escape.window="open = false">
                             <button type="button"
                                     @click="open = !open"
                                     aria-haspopup="true" :aria-expanded="open"
-                                    class="px-3 py-1.5 rounded-xl bg-ink-900/60 hover:bg-black/40 border border-white/10 text-ink-200 font-semibold text-xs flex items-center gap-1.5 transition-[transform,background-color] active:scale-95 cursor-pointer whitespace-nowrap min-h-[40px]"
-                                    title="Export Master Produk / Produk Terpilih">
-                                <span>📤</span>
-                                <span class="hidden sm:inline">Export</span>
-                                <span class="text-[9px]" :class="open ? 'rotate-180' : ''" style="transition: transform 150ms">▼</span>
+                                    class="w-full sm:w-auto px-3 py-2 rounded-xl bg-ink-900/60 hover:bg-black/40 border border-white/10 text-ink-200 font-semibold text-xs flex items-center justify-center sm:justify-start gap-1.5 transition-[transform,background-color] active:scale-95 cursor-pointer whitespace-nowrap min-h-[44px]"
+                                    title="Export Master Produk (Internal: lengkap, untuk import update)">
+                                <span>📦</span>
+                                <span class="hidden sm:inline">Master Produk</span>
+                                <span class="text-[9px] ml-auto sm:ml-0" :class="open ? 'rotate-180' : ''" style="transition: transform 150ms">▼</span>
                             </button>
 
                             <div x-show="open" x-cloak
                                  x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
                                  x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                                 class="absolute left-0 z-50 mt-2 w-56 rounded-xl glass-card bg-ink-900 border border-white/10 shadow-2xl py-2 origin-top-left"
+                                 class="absolute left-0 right-0 sm:right-auto z-50 mt-2 w-full sm:w-56 rounded-xl glass-card bg-ink-900 border border-white/10 shadow-2xl py-2 origin-top-left"
                                  style="display: none;">
-                                <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-ink-400 font-bold">📦 Master Produk (Lengkap)</div>
-                                <button type="button" wire:click="exportMaster('xlsx')" class="w-full text-left px-3 py-2 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer" title="Semua kolom master, ikut filter aktif, termasuk produk nonaktif">
+                                <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-ink-400 font-bold">📦 Master Produk (Internal)</div>
+                                <button type="button" wire:click="exportMaster('xlsx')" class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px]" title="Export Master Produk Excel (lengkap, untuk import update)">
                                     <span>📊</span><span>Excel (xlsx)</span>
                                 </button>
-                                <button type="button" wire:click="exportMaster('csv')" class="w-full text-left px-3 py-2 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer" title="Semua kolom master, ikut filter aktif, termasuk produk nonaktif">
+                                <button type="button" wire:click="exportMaster('csv')" class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px]" title="Export Master Produk CSV (lengkap, untuk import update)">
                                     <span>📊</span><span>CSV</span>
                                 </button>
 
                                 <div class="my-1.5 border-t border-white/10"></div>
                                 <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-ink-400 font-bold">🖨 Produk Terpilih</div>
                                 <button type="button" wire:click="exportTerpilih('xlsx')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang produk di tabel)" @endif
-                                        class="w-full text-left px-3 py-2 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer @if(! $hasSelected) opacity-50 pointer-events-none @endif">
+                                        class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px] @if(! $hasSelected) opacity-50 pointer-events-none @endif">
                                     <span>🖨</span><span>Excel (xlsx)</span>
                                 </button>
                                 <button type="button" wire:click="exportTerpilih('csv')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang produk di tabel)" @endif
-                                        class="w-full text-left px-3 py-2 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer @if(! $hasSelected) opacity-50 pointer-events-none @endif">
+                                        class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px] @if(! $hasSelected) opacity-50 pointer-events-none @endif">
                                     <span>🖨</span><span>CSV</span>
                                 </button>
                             </div>
