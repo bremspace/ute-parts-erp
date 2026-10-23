@@ -138,6 +138,18 @@ class ImportProdukService
         return $aliasMap[$alphanumeric] ?? $clean;
     }
 
+    protected function normalizeImportHeading(string $heading): string
+    {
+        $heading = strtolower(trim($heading));
+
+        return match ($heading) {
+            'kategori utama', 'kategori_utama' => 'kategori_utama',
+            'sub kategori', 'sub_kategori' => 'sub_kategori',
+            'brand part', 'brand_part' => 'brand_part',
+            default => $heading,
+        };
+    }
+
     /**
      * Normalisasi kondisi: baru, oem, compatible.
      */
@@ -403,7 +415,7 @@ class ImportProdukService
     public function templateColumns(): array
     {
         return [
-            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'brand', 'supplier', 'merk_hp', 'tipe_hp',
+            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'kategori_utama', 'sub_kategori', 'brand', 'brand_part', 'supplier', 'merk_hp', 'tipe_hp',
             'kualitas', 'kondisi', 'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen',
             'min_stock', 'reorder_point', 'sn',
             'stok_awal', 'gudang_id', 'rak_id', 'produk_kompatibel_sku', 'kompatibilitas_hp', 'deskripsi', 'foto_url',
@@ -416,7 +428,7 @@ class ImportProdukService
         return [
             [
                 'sku' => 'LCD-IP13-ORI', 'nama' => 'LCD iPhone 13 Original', 'barcode' => '8991234500001',
-                'satuan' => 'pcs', 'kategori' => 'LCD & Touchscreen', 'brand' => 'Crown', 'supplier' => 'PT Supplier Jaya',
+                'satuan' => 'pcs', 'kategori' => 'LCD & Touchscreen', 'kategori_utama' => '', 'sub_kategori' => '', 'brand' => 'Crown', 'brand_part' => '', 'supplier' => 'PT Supplier Jaya',
                 'merk_hp' => 'Apple', 'tipe_hp' => 'iPhone 13',
                 'kualitas' => 'Original', 'kondisi' => 'baru', 'harga_beli' => 850000, 'harga_jual' => 1250000,
                 'harga_reseller' => 1050000, 'harga_agen' => 1000000, 'min_stock' => 5, 'reorder_point' => 10,
@@ -427,7 +439,7 @@ class ImportProdukService
             ],
             [
                 'sku' => 'BAT-SA54-ODM', 'nama' => 'Baterai Samsung A54 Grade A', 'barcode' => '8991234500002',
-                'satuan' => 'pcs', 'kategori' => 'Baterai', 'brand' => 'OG', 'supplier' => 'Supplier Umum',
+                'satuan' => 'pcs', 'kategori' => 'Baterai', 'kategori_utama' => '', 'sub_kategori' => '', 'brand' => 'OG', 'brand_part' => '', 'supplier' => 'Supplier Umum',
                 'merk_hp' => 'Samsung', 'tipe_hp' => 'Galaxy A54, Galaxy A34',
                 'kualitas' => 'Grade A', 'kondisi' => 'oem', 'harga_beli' => 95000, 'harga_jual' => 175000,
                 'harga_reseller' => 135000, 'harga_agen' => 130000, 'min_stock' => 10, 'reorder_point' => 20,
@@ -498,7 +510,7 @@ class ImportProdukService
         if ($rowPertama) {
             $arr = is_array($rowPertama) ? $rowPertama : (method_exists($rowPertama, 'toArray') ? $rowPertama->toArray() : (array) $rowPertama);
             foreach ($arr as $value) {
-                $headings[] = strtolower(trim((string) $value));
+                $headings[] = $this->normalizeImportHeading((string) $value);
             }
         }
 
@@ -586,7 +598,7 @@ class ImportProdukService
                 if (isset($data[0])) {
                     $data[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $data[0]) ?? $data[0];
                 }
-                $headings = array_map(fn ($h) => strtolower(trim((string) $h)), $data);
+                $headings = array_map(fn ($h) => $this->normalizeImportHeading((string) $h), $data);
                 $isHeading = false;
 
                 $wajib = ['sku', 'nama', 'harga_jual'];
@@ -630,6 +642,7 @@ class ImportProdukService
     public function validateRow(array $row, array $konteks): array
     {
         $errors = [];
+        $this->resolveHierarchyInputs($row, $errors);
         $sku = trim((string) ($row['sku'] ?? ''));
         $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
         $nama = trim((string) ($row['nama'] ?? ''));
@@ -698,6 +711,31 @@ class ImportProdukService
         // Rak id bersifat opsional dan fleksibel: kosong, strip (-), 0, atau tidak ditemukan tidak menggagalkan baris (warning dicatat di checkRowWarnings).
 
         return $errors;
+    }
+
+    protected function resolveHierarchyInputs(array &$row, array &$errors): void
+    {
+        $utama = trim((string) ($row['kategori_utama'] ?? ''));
+        $sub = trim((string) ($row['sub_kategori'] ?? ''));
+        if ($sub !== '') {
+            if ($utama === '') {
+                $errors[] = 'Kategori utama wajib diisi untuk sub-kategori';
+            } else {
+                $parent = KategoriProduk::whereRaw('LOWER(nama) = ?', [mb_strtolower($utama)])->first();
+                if (! $parent) {
+                    $errors[] = "Kategori utama '{$utama}' tidak ditemukan";
+                } else {
+                    $child = KategoriProduk::where('parent_id', $parent->id)
+                        ->whereRaw('LOWER(nama) = ?', [mb_strtolower($sub)])->first();
+                    $row['kategori'] = $sub;
+                }
+            }
+        } elseif ($utama !== '') {
+            $row['kategori'] = $utama;
+        }
+        if (! empty($row['brand_part']) && empty($row['brand'])) {
+            $row['brand'] = $row['brand_part'];
+        }
     }
 
     /**
@@ -1160,18 +1198,24 @@ class ImportProdukService
         // Kategori & kategori_id: runtime cache & firstOrCreate
         $kategoriId = null;
         if (! empty($kategori) && $kategori !== 'Umum') {
-            if (! isset($this->kategoriCache[$kategori])) {
-                $katRow = KategoriProduk::where('nama', $kategori)->orWhere('slug', Str::slug($kategori))->first();
+            $parentName = trim((string) ($row['kategori_utama'] ?? ''));
+            $cacheKey = $parentName.'|'.$kategori;
+            if (! isset($this->kategoriCache[$cacheKey])) {
+                $parent = $parentName !== '' ? KategoriProduk::whereRaw('LOWER(nama) = ?', [mb_strtolower($parentName)])->first() : null;
+                $katRow = $parent
+                    ? KategoriProduk::where('parent_id', $parent->id)->whereRaw('LOWER(nama) = ?', [mb_strtolower($kategori)])->first()
+                    : KategoriProduk::where('nama', $kategori)->orWhere('slug', Str::slug($kategori))->first();
                 if (! $katRow) {
                     $katRow = KategoriProduk::create([
                         'nama' => $kategori,
                         'slug' => Str::slug($kategori),
+                        'parent_id' => $parent?->id,
                         'is_active' => true,
                     ]);
                 }
-                $this->kategoriCache[$kategori] = $katRow->id;
+                $this->kategoriCache[$cacheKey] = $katRow->id;
             }
-            $kategoriId = $this->kategoriCache[$kategori];
+            $kategoriId = $this->kategoriCache[$cacheKey];
         }
 
         // Merk Smartphone & Tipe HP kompatibilitas

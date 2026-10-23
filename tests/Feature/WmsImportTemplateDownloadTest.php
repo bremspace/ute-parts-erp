@@ -85,7 +85,7 @@ class WmsImportTemplateDownloadTest extends TestCase
 
         // Header sheet 1 harus = kolom yang diterima ImportProdukService.
         $header = array_values(array_filter(
-            $workbook->getSheet(0)->rangeToArray('A1:Z1', null, false, false, false)[0],
+            $workbook->getSheet(0)->rangeToArray('A1:ZZ1', null, false, false, false)[0],
             static fn ($v) => $v !== null && $v !== ''
         ));
         $expected = app(ImportProdukService::class)->templateColumns();
@@ -94,7 +94,7 @@ class WmsImportTemplateDownloadTest extends TestCase
         // Baris contoh harus sejajar dengan header (key + urutan sama).
         // Nilai dinormalkan ke string: barcode/harga ditulis PhpSpreadsheet sebagai
         // cell numerik sehingga saat dibaca balik tipenya int/float (bukan string).
-        $rows = $workbook->getSheet(0)->rangeToArray('A2:Z3', null, false, false, false);
+        $rows = $workbook->getSheet(0)->rangeToArray('A2:ZZ3', null, false, false, false);
         $nonEmpty = static fn ($v) => $v !== null && $v !== '';
         $str = static fn ($v) => array_map(static fn ($x) => (string) $x, $v);
 

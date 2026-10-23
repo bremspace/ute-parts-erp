@@ -165,7 +165,7 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
 
                 public function headings(): array
                 {
-                    return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier'];
+                    return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand'];
                 }
 
                 public function collection(): Enumerable
@@ -175,7 +175,7 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                         $merks = ['Apple', 'Samsung', 'Xiaomi', 'Oppo', 'Vivo', 'Realme', 'Infinix', 'Tecno', 'Asus', 'Universal'];
                     }
 
-                    $kategoris = KategoriProduk::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    $kategoris = KategoriProduk::where('is_active', true)->whereNull('parent_id')->orderBy('nama')->pluck('nama')->all();
                     if (empty($kategoris)) {
                         $kategoris = ['LCD & Touchscreen', 'Baterai', 'Fleksibel & Board', 'Kamera', 'IC & Chipset', 'Housing & Backdoor'];
                     }
@@ -200,7 +200,10 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                         $suppliers = ['PT Supplier Jaya', 'Supplier Umum', 'Sumber Makmur'];
                     }
 
-                    $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers));
+                    $subKategoris = KategoriProduk::with('parent')->where('is_active', true)->whereNotNull('parent_id')->orderBy('nama')->get();
+                    $tipeHp = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get();
+                    $kualitasBrand = KualitasProduk::with('brand')->where('is_active', true)->whereNotNull('brand_id')->orderBy('nama')->get();
+                    $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers), count($subKategoris), count($tipeHp), count($kualitasBrand));
                     $rows = [];
                     for ($i = 0; $i < $max; $i++) {
                         $rows[] = [
@@ -209,7 +212,8 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                             $brands[$i] ?? '',
                             $satuans[$i] ?? '',
                             $kualitas[$i] ?? '',
-                            $suppliers[$i] ?? '',
+                            $suppliers[$i] ?? '', $kategoris[$i] ?? '', $subKategoris[$i]?->nama ?? '',
+                            $tipeHp[$i]?->merk ?? '', $tipeHp[$i]?->model ?? '', $kualitasBrand[$i]?->brand?->nama ?? '', $kualitasBrand[$i]?->nama ?? '',
                         ];
                     }
 

@@ -2923,6 +2923,15 @@
                             </div>
                         </div>
 
+                        @if(! empty($importPreview['referensi_summary']))
+                            <div class="p-3 rounded-xl bg-white/5 border border-white/10 text-[10px]">
+                                <strong class="text-white">Ringkasan master:</strong>
+                                @foreach($importPreview['referensi_summary'] as $jenis => $items)
+                                    <span class="mr-3 text-ink-300">{{ $jenis }}: {{ count($items['existing'] ?? []) }} ada, {{ count($items['new'] ?? []) }} baru</span>
+                                @endforeach
+                            </div>
+                        @endif
+
                         <!-- Banner Status Preview -->
                         <div class="p-3 rounded-xl {{ ($importPreview['invalid'] ?? 0) > 0 ? 'bg-up-amber/10 border border-up-amber/30 text-up-amber' : 'bg-up-mint/10 border border-up-mint/30 text-up-mint' }} text-[11px] flex items-center justify-between">
                             <span class="font-bold">{{ $importPreview['label_status'] ?? 'Hasil Pemeriksaan File' }}</span>
