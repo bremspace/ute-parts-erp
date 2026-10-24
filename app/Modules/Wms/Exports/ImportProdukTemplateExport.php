@@ -66,16 +66,25 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                             $valSatuan->setFormula1("'Referensi Sistem'!\$D\$2:\$D\$100");
                             $valSatuan->setSqref('D2:D1000');
 
-                            // 2. Dropdown Kategori (Kolom E) -> Referensi Sheet 3
-                            $valKat = $sheet->getCell('E2')->getDataValidation();
+                            // 2. Dropdown Kategori Utama (Kolom F) -> Referensi Sheet 3 (Kolom B)
+                            $valKat = $sheet->getCell('F2')->getDataValidation();
                             $valKat->setType(DataValidation::TYPE_LIST);
                             $valKat->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valKat->setAllowBlank(true);
                             $valKat->setShowDropDown(true);
                             $valKat->setFormula1("'Referensi Sistem'!\$B\$2:\$B\$100");
-                            $valKat->setSqref('E2:E1000');
+                            $valKat->setSqref('F2:F1000');
 
-                            // 3. Dropdown Brand Part (Kolom H) -> Referensi Sheet 3
+                            // 3. Dropdown Sub Kategori (Kolom G) -> Referensi Sheet 3 (Kolom H)
+                            $valSubKat = $sheet->getCell('G2')->getDataValidation();
+                            $valSubKat->setType(DataValidation::TYPE_LIST);
+                            $valSubKat->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valSubKat->setAllowBlank(true);
+                            $valSubKat->setShowDropDown(true);
+                            $valSubKat->setFormula1("'Referensi Sistem'!\$H\$2:\$H\$100");
+                            $valSubKat->setSqref('G2:G1000');
+
+                            // 4. Dropdown Brand Part (Kolom H) -> Referensi Sheet 3 (Kolom C)
                             $valBrand = $sheet->getCell('H2')->getDataValidation();
                             $valBrand->setType(DataValidation::TYPE_LIST);
                             $valBrand->setErrorStyle(DataValidation::STYLE_INFORMATION);
@@ -83,52 +92,51 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                             $valBrand->setShowDropDown(true);
                             $valBrand->setFormula1("'Referensi Sistem'!\$C\$2:\$C\$100");
                             $valBrand->setSqref('H2:H1000');
-                            $valBrand->setFormula1("'Referensi Sistem'!\$C\$2:\$C\$100");
 
-                            // 4. Dropdown Supplier (Kolom J) -> Referensi Sheet 3
-                            $valSupplier = $sheet->getCell('J2')->getDataValidation();
-                            $valSupplier->setType(DataValidation::TYPE_LIST);
-                            $valSupplier->setErrorStyle(DataValidation::STYLE_INFORMATION);
-                            $valSupplier->setAllowBlank(true);
-                            $valSupplier->setShowDropDown(true);
-                            $valSupplier->setFormula1("'Referensi Sistem'!\$F\$2:\$F\$100");
-                            $valSupplier->setSqref('J2:J1000');
-
-                            // 5. Dropdown Merk HP (Kolom K) -> Referensi Sheet 3
-                            $valMerkHp = $sheet->getCell('K2')->getDataValidation();
-                            $valMerkHp->setType(DataValidation::TYPE_LIST);
-                            $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
-                            $valMerkHp->setAllowBlank(true);
-                            $valMerkHp->setShowDropDown(true);
-                            $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
-                            $valMerkHp->setSqref('K2:K1000');
-
-                            // 6. Dropdown Kualitas (Kolom M)
-                            $valKualitas = $sheet->getCell('M2')->getDataValidation();
+                            // 5. Dropdown Kualitas (Kolom I) -> Referensi Sheet 3 (Kolom E)
+                            $valKualitas = $sheet->getCell('I2')->getDataValidation();
                             $valKualitas->setType(DataValidation::TYPE_LIST);
                             $valKualitas->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valKualitas->setAllowBlank(true);
                             $valKualitas->setShowDropDown(true);
                             $valKualitas->setFormula1("'Referensi Sistem'!\$E\$2:\$E\$50");
-                            $valKualitas->setSqref('M2:M1000');
+                            $valKualitas->setSqref('I2:I1000');
 
-                            // 7. Dropdown Kondisi (Kolom N)
-                            $valKondisi = $sheet->getCell('N2')->getDataValidation();
+                            // 6. Dropdown Kondisi (Kolom J)
+                            $valKondisi = $sheet->getCell('J2')->getDataValidation();
                             $valKondisi->setType(DataValidation::TYPE_LIST);
                             $valKondisi->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valKondisi->setAllowBlank(true);
                             $valKondisi->setShowDropDown(true);
                             $valKondisi->setFormula1('"baru,oem,bekas,refurbished"');
-                            $valKondisi->setSqref('N2:N1000');
+                            $valKondisi->setSqref('J2:J1000');
 
-                            // 8. Dropdown Serial Number (Kolom U)
-                            $valSn = $sheet->getCell('U2')->getDataValidation();
+                            // 7. Dropdown Supplier (Kolom K) -> Referensi Sheet 3 (Kolom F)
+                            $valSupplier = $sheet->getCell('K2')->getDataValidation();
+                            $valSupplier->setType(DataValidation::TYPE_LIST);
+                            $valSupplier->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valSupplier->setAllowBlank(true);
+                            $valSupplier->setShowDropDown(true);
+                            $valSupplier->setFormula1("'Referensi Sistem'!\$F\$2:\$F\$100");
+                            $valSupplier->setSqref('K2:K1000');
+
+                            // 8. Dropdown Merk HP (Kolom L) -> Referensi Sheet 3 (Kolom A)
+                            $valMerkHp = $sheet->getCell('L2')->getDataValidation();
+                            $valMerkHp->setType(DataValidation::TYPE_LIST);
+                            $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valMerkHp->setAllowBlank(true);
+                            $valMerkHp->setShowDropDown(true);
+                            $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
+                            $valMerkHp->setSqref('L2:L1000');
+
+                            // 9. Dropdown Serial Number (Kolom T)
+                            $valSn = $sheet->getCell('T2')->getDataValidation();
                             $valSn->setType(DataValidation::TYPE_LIST);
                             $valSn->setErrorStyle(DataValidation::STYLE_INFORMATION);
                             $valSn->setAllowBlank(true);
                             $valSn->setShowDropDown(true);
                             $valSn->setFormula1('"ya,tidak"');
-                            $valSn->setSqref('U2:U1000');
+                            $valSn->setSqref('T2:T1000');
                         },
                     ];
                 }

@@ -39,13 +39,15 @@ class WmsImportNewColumnsTest extends TestCase
                 'nama' => 'LCD iPhone 13 Pro Max OEM',
                 'barcode' => '8999990001',
                 'satuan' => 'pcs',
+                'konversi_satuan' => 'box:10:12000000;pack:5:6200000',
                 'kategori' => 'LCD & Touchscreen',
+                'sub_kategori' => 'LCD Assembly',
                 'brand' => 'Crown',
+                'kualitas' => 'Grade A',
+                'kondisi' => 'oem',
                 'supplier' => 'PT Supplier Utama',
                 'merk_hp' => 'Apple',
                 'tipe_hp' => 'iPhone 13 Pro Max',
-                'kualitas' => 'Grade A',
-                'kondisi' => 'oem',
                 'harga_beli' => 750000,
                 'harga_jual' => 1100000,
                 'harga_reseller' => 950000,
@@ -54,8 +56,8 @@ class WmsImportNewColumnsTest extends TestCase
                 'reorder_point' => 12,
                 'sn' => 'ya',
                 'stok_awal' => 8,
-                'gudang_id' => $gudang->id,
-                'rak_id' => $rak->id,
+                'gudang' => $gudang->nama,
+                'rak' => $rak->nama,
                 'produk_kompatibel_sku' => '',
                 'kompatibilitas_hp' => '',
                 'deskripsi' => 'LCD OEM High Brightness untuk iPhone 13 Pro Max',
@@ -92,6 +94,9 @@ class WmsImportNewColumnsTest extends TestCase
         ]);
 
         $hasil = $service->commit($filePath, $logImp->id, null);
+        if ($hasil['gagal'] > 0) {
+            dump($hasil['detail']);
+        }
 
         $this->assertSame(1, $hasil['sukses']);
         $this->assertSame(0, $hasil['gagal']);
@@ -117,6 +122,13 @@ class WmsImportNewColumnsTest extends TestCase
         $this->assertSame(8, $stokItem->jumlah);
         $this->assertSame(5, $stokItem->jumlah_minimum);
 
+        // Multi-satuan konversi terdaftar
+        $this->assertCount(2, $produk->satuanKonversi);
+        $boxKonv = $produk->satuanKonversi()->where('satuan_kode', 'box')->first();
+        $this->assertNotNull($boxKonv);
+        $this->assertEquals(10, (float) $boxKonv->pengali);
+        $this->assertEquals(12000000, (float) $boxKonv->harga_jual);
+
         @unlink($filePath);
     }
 
@@ -137,13 +149,15 @@ class WmsImportNewColumnsTest extends TestCase
                 'nama' => 'LCD Samsung A11 OG',
                 'barcode' => '8999990002',
                 'satuan' => 'pcs',
+                'konversi_satuan' => '',
                 'kategori' => 'LCD & Touchscreen',
+                'sub_kategori' => 'LCD Touchscreen',
                 'brand' => 'OG',
+                'kualitas' => 'Grade A',
+                'kondisi' => 'baru',
                 'supplier' => 'Supplier Korea',
                 'merk_hp' => 'samsng', // typo auto-normalized ke Samsung
                 'tipe_hp' => 'Galaxy A11, Galaxy A15, Galaxy M11', // multi-tipe
-                'kualitas' => 'Grade A',
-                'kondisi' => 'baru',
                 'harga_beli' => 150000,
                 'harga_jual' => 250000,
                 'harga_reseller' => 200000,
@@ -152,8 +166,8 @@ class WmsImportNewColumnsTest extends TestCase
                 'reorder_point' => 10,
                 'sn' => 'tidak',
                 'stok_awal' => 5,
-                'gudang_id' => $gudang->id,
-                'rak_id' => $rak->id,
+                'gudang' => $gudang->nama,
+                'rak' => $rak->nama,
                 'produk_kompatibel_sku' => 'LCD-A11-BRD', // Substitusi ke produk kedua
                 'kompatibilitas_hp' => '',
                 'deskripsi' => 'LCD OG kompatibel multi model',
@@ -164,13 +178,15 @@ class WmsImportNewColumnsTest extends TestCase
                 'nama' => 'LCD Samsung A11 Braderpart',
                 'barcode' => '8999990003',
                 'satuan' => 'pcs',
+                'konversi_satuan' => '',
                 'kategori' => 'LCD & Touchscreen',
+                'sub_kategori' => 'LCD Touchscreen',
                 'brand' => 'Braderpart',
+                'kualitas' => 'Original',
+                'kondisi' => 'baru',
                 'supplier' => 'Supplier Korea',
                 'merk_hp' => 'Samsung',
                 'tipe_hp' => 'Galaxy A11',
-                'kualitas' => 'Original',
-                'kondisi' => 'baru',
                 'harga_beli' => 180000,
                 'harga_jual' => 290000,
                 'harga_reseller' => 230000,
@@ -179,8 +195,8 @@ class WmsImportNewColumnsTest extends TestCase
                 'reorder_point' => 8,
                 'sn' => 'tidak',
                 'stok_awal' => 3,
-                'gudang_id' => $gudang->id,
-                'rak_id' => $rak->id,
+                'gudang' => $gudang->nama,
+                'rak' => $rak->nama,
                 'produk_kompatibel_sku' => '',
                 'kompatibilitas_hp' => '',
                 'deskripsi' => 'LCD Braderpart original quality',
@@ -255,13 +271,15 @@ class WmsImportNewColumnsTest extends TestCase
                 'nama' => 'Baterai Tanpa Rak',
                 'barcode' => '',
                 'satuan' => '', // kosong -> default pcs
+                'konversi_satuan' => '',
                 'kategori' => '',
+                'sub_kategori' => '',
                 'brand' => '',
+                'kualitas' => '',
+                'kondisi' => 'baru',
                 'supplier' => '-', // strip -> null
                 'merk_hp' => 'Universal',
                 'tipe_hp' => '',
-                'kualitas' => '',
-                'kondisi' => 'baru',
                 'harga_beli' => 50000,
                 'harga_jual' => 80000,
                 'harga_reseller' => 70000,
@@ -270,8 +288,8 @@ class WmsImportNewColumnsTest extends TestCase
                 'reorder_point' => 5,
                 'sn' => 'tidak',
                 'stok_awal' => 4,
-                'gudang_id' => $gudang->id,
-                'rak_id' => '-', // strip -> lokasi rak null
+                'gudang' => $gudang->nama,
+                'rak' => '-', // strip -> lokasi rak null
                 'produk_kompatibel_sku' => '',
                 'kompatibilitas_hp' => '',
                 'deskripsi' => '',

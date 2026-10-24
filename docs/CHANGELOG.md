@@ -3,6 +3,27 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-24 — Restrukturisasi Hierarki Parent-Child & Multi-Satuan Template Produk (WMS) ✅
+
+- **[27 Kolom Baku Import/Export]** Struktur kolom tersusun dengan hierarki lengkap:
+  `sku, nama, barcode, satuan, konversi_satuan, kategori, sub_kategori, brand, kualitas, kondisi, supplier, merk_hp, tipe_hp, harga_beli, harga_jual, harga_reseller, harga_agen, min_stock, reorder_point, sn, stok_awal, gudang, rak, produk_kompatibel_sku, kompatibilitas_hp, deskripsi, foto_url`.
+- **[Hierarki Parent-Child]**:
+  - Kategori: `kategori` (Parent) -> `sub_kategori` (Child).
+  - Brand: `brand` (Parent) -> `kualitas` (Child berelasi `brand_id`) -> `kondisi` (Status fisik).
+  - Device: `merk_hp` (Parent) -> `tipe_hp` (Child model).
+  - Lokasi: `gudang` (Parent) -> `rak` (Child berelasi `gudang_id`).
+- **[Multi-Satuan `konversi_satuan`]**:
+  - Format `satuan:pengali[:harga_jual[:barcode]]` dipisah `;`.
+  - Otomatis tersimpan ke `produk_satuan_konversi` via `simpanKonversiSatuan()`.
+  - Satuan baru otomatis terdaftar di `satuan_units`.
+  - Normalizer memisahkan `box`, `pack`, `karton`, dan `paket`.
+- **[Dropdown Validation & Export]**:
+  - Penyelarasan kolom validation: D (Satuan), F (Kategori Utama), G (Sub Kategori), H (Brand), I (Kualitas), J (Kondisi), K (Supplier), L (Merk HP), T (SN).
+  - `exportMaster` memetakan relasi `satuanKonversi` dan memecah relasi kategori parent-child.
+- **[Pengujian]**:
+  - `php artisan test --filter="WmsImport|MasterProduk|ExportImport"`: 57 test, 588 assertions passing 100%.
+  - Pint PSR-12 clean, Vite asset build sukses.
+
 ## 2026-10-23 — Unified Export/Import Master Produk (WMS) ✅
 
 - **[Export Master XLSX multi-sheet]** `exportMaster('xlsx')` menghasilkan 4 sheet identik template import:

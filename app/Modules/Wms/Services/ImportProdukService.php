@@ -11,6 +11,7 @@ use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\ProdukSatuanKonversi;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
@@ -106,9 +107,11 @@ class ImportProdukService
             'box' => 'box',
             'dus' => 'box',
             'kotak' => 'box',
-            'pack' => 'box',
-            'paket' => 'box',
-            'karton' => 'box',
+            'pack' => 'pack',
+            'pck' => 'pack',
+            'paket' => 'paket',
+            'karton' => 'karton',
+            'ctn' => 'karton',
 
             'set' => 'set',
             'pasang' => 'set',
@@ -143,9 +146,12 @@ class ImportProdukService
         $heading = strtolower(trim($heading));
 
         return match ($heading) {
-            'kategori utama', 'kategori_utama' => 'kategori_utama',
+            'gudang_id', 'gudang id' => 'gudang',
+            'rak_id', 'rak id' => 'rak',
+            'multi_satuan', 'konversi satuan', 'satuan_konversi', 'konversi_satuan' => 'konversi_satuan',
+            'kategori utama', 'kategori_utama' => 'kategori',
             'sub kategori', 'sub_kategori' => 'sub_kategori',
-            'brand part', 'brand_part' => 'brand_part',
+            'brand part', 'brand_part' => 'brand',
             default => $heading,
         };
     }
@@ -299,16 +305,16 @@ class ImportProdukService
         }
 
         // 3. Peringatan non-esensial: lokasi rak & gudang (agar fleksibel/longgar tanpa menggagalkan import)
-        $rakRaw = trim((string) ($row['rak_id'] ?? ''));
+        $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
         if ($rakRaw !== '' && ! in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true)) {
-            $gudangId = $this->resolveGudangId(trim((string) ($row['gudang_id'] ?? '')));
+            $gudangId = $this->resolveGudangId(trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? '')));
             if (! $this->resolveRakId($rakRaw, $gudangId)) {
                 $warnings[] = "Lokasi rak '{$rakRaw}' tidak ditemukan di sistem. Produk akan tetap diimport tanpa penempatan rak (kosong).";
             }
         }
 
         $stokAwal = (float) ($row['stok_awal'] ?? 0);
-        $gudangRaw = trim((string) ($row['gudang_id'] ?? ''));
+        $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         if ($stokAwal > 0 && ($gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true))) {
             $warnings[] = 'Stok awal diisi tanpa gudang tujuan; stok akan ditempatkan di gudang default aktif.';
         }
@@ -415,10 +421,12 @@ class ImportProdukService
     public function templateColumns(): array
     {
         return [
-            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'kategori_utama', 'sub_kategori', 'brand', 'brand_part', 'supplier', 'merk_hp', 'tipe_hp',
-            'kualitas', 'kondisi', 'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen',
+            'sku', 'nama', 'barcode', 'satuan', 'konversi_satuan', 'kategori', 'sub_kategori', 'brand', 'kualitas', 'kondisi', 'supplier',
+            'merk_hp', 'tipe_hp',
+            'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen',
             'min_stock', 'reorder_point', 'sn',
-            'stok_awal', 'gudang_id', 'rak_id', 'produk_kompatibel_sku', 'kompatibilitas_hp', 'deskripsi', 'foto_url',
+            'stok_awal', 'gudang', 'rak',
+            'produk_kompatibel_sku', 'kompatibilitas_hp', 'deskripsi', 'foto_url',
         ];
     }
 
@@ -428,22 +436,24 @@ class ImportProdukService
         return [
             [
                 'sku' => 'LCD-IP13-ORI', 'nama' => 'LCD iPhone 13 Original', 'barcode' => '8991234500001',
-                'satuan' => 'pcs', 'kategori' => 'LCD & Touchscreen', 'kategori_utama' => '', 'sub_kategori' => '', 'brand' => 'Crown', 'brand_part' => '', 'supplier' => 'PT Supplier Jaya',
+                'satuan' => 'pcs', 'konversi_satuan' => 'box:10:12000000;pack:5:6200000', 'kategori' => 'LCD & Touchscreen', 'sub_kategori' => 'Fullset Assembly', 'brand' => 'Crown',
+                'kualitas' => 'Original', 'kondisi' => 'baru', 'supplier' => 'PT Supplier Jaya',
                 'merk_hp' => 'Apple', 'tipe_hp' => 'iPhone 13',
-                'kualitas' => 'Original', 'kondisi' => 'baru', 'harga_beli' => 850000, 'harga_jual' => 1250000,
+                'harga_beli' => 850000, 'harga_jual' => 1250000,
                 'harga_reseller' => 1050000, 'harga_agen' => 1000000, 'min_stock' => 5, 'reorder_point' => 10,
-                'sn' => 'tidak', 'stok_awal' => 5, 'gudang_id' => 1, 'rak_id' => 1,
+                'sn' => 'tidak', 'stok_awal' => 5, 'gudang' => 'Gudang Utama', 'rak' => 'Rak A1',
                 'produk_kompatibel_sku' => '',
                 'kompatibilitas_hp' => '',
                 'deskripsi' => 'LCD assembly original untuk iPhone 13 warna hitam', 'foto_url' => '',
             ],
             [
                 'sku' => 'BAT-SA54-ODM', 'nama' => 'Baterai Samsung A54 Grade A', 'barcode' => '8991234500002',
-                'satuan' => 'pcs', 'kategori' => 'Baterai', 'kategori_utama' => '', 'sub_kategori' => '', 'brand' => 'OG', 'brand_part' => '', 'supplier' => 'Supplier Umum',
+                'satuan' => 'pcs', 'konversi_satuan' => 'box:20:3200000', 'kategori' => 'Baterai', 'sub_kategori' => 'Baterai Tanam', 'brand' => 'OG',
+                'kualitas' => 'Grade A', 'kondisi' => 'oem', 'supplier' => 'Supplier Umum',
                 'merk_hp' => 'Samsung', 'tipe_hp' => 'Galaxy A54, Galaxy A34',
-                'kualitas' => 'Grade A', 'kondisi' => 'oem', 'harga_beli' => 95000, 'harga_jual' => 175000,
+                'harga_beli' => 95000, 'harga_jual' => 175000,
                 'harga_reseller' => 135000, 'harga_agen' => 130000, 'min_stock' => 10, 'reorder_point' => 20,
-                'sn' => 'tidak', 'stok_awal' => 10, 'gudang_id' => 1, 'rak_id' => 2,
+                'sn' => 'tidak', 'stok_awal' => 10, 'gudang' => 'Gudang Utama', 'rak' => 'Rak A2',
                 'produk_kompatibel_sku' => 'LCD-IP13-ORI',
                 'kompatibilitas_hp' => '',
                 'deskripsi' => 'Baterai lithium ion Grade A kapasitas 5000mAh', 'foto_url' => '',
@@ -642,7 +652,6 @@ class ImportProdukService
     public function validateRow(array $row, array $konteks): array
     {
         $errors = [];
-        $this->resolveHierarchyInputs($row, $errors);
         $sku = trim((string) ($row['sku'] ?? ''));
         $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
         $nama = trim((string) ($row['nama'] ?? ''));
@@ -700,7 +709,7 @@ class ImportProdukService
             $errors[] = 'Stok awal tidak boleh negatif';
         }
 
-        $gudangRaw = trim((string) ($row['gudang_id'] ?? ''));
+        $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
         if (! $gudangKosong && ! $this->resolveGudangId($gudangRaw)) {
             $errors[] = "Gudang '{$gudangRaw}' tidak ditemukan";
@@ -711,31 +720,6 @@ class ImportProdukService
         // Rak id bersifat opsional dan fleksibel: kosong, strip (-), 0, atau tidak ditemukan tidak menggagalkan baris (warning dicatat di checkRowWarnings).
 
         return $errors;
-    }
-
-    protected function resolveHierarchyInputs(array &$row, array &$errors): void
-    {
-        $utama = trim((string) ($row['kategori_utama'] ?? ''));
-        $sub = trim((string) ($row['sub_kategori'] ?? ''));
-        if ($sub !== '') {
-            if ($utama === '') {
-                $errors[] = 'Kategori utama wajib diisi untuk sub-kategori';
-            } else {
-                $parent = KategoriProduk::whereRaw('LOWER(nama) = ?', [mb_strtolower($utama)])->first();
-                if (! $parent) {
-                    $errors[] = "Kategori utama '{$utama}' tidak ditemukan";
-                } else {
-                    $child = KategoriProduk::where('parent_id', $parent->id)
-                        ->whereRaw('LOWER(nama) = ?', [mb_strtolower($sub)])->first();
-                    $row['kategori'] = $sub;
-                }
-            }
-        } elseif ($utama !== '') {
-            $row['kategori'] = $utama;
-        }
-        if (! empty($row['brand_part']) && empty($row['brand'])) {
-            $row['brand'] = $row['brand_part'];
-        }
     }
 
     /**
@@ -756,12 +740,15 @@ class ImportProdukService
         // Collect unique reference values for smart preview
         $refValues = [
             'kategori' => [],
+            'sub_kategori' => [],
             'brand' => [],
             'supplier' => [],
             'merk_hp' => [],
             'tipe_hp' => [], // array of ['merk' => ..., 'model' => ...]
             'kualitas' => [],
             'satuan' => [],
+            'gudang' => [],
+            'rak' => [],
         ];
 
         $hasil = [];
@@ -795,6 +782,10 @@ class ImportProdukService
             if ($kat !== '' && $kat !== 'Umum') {
                 $refValues['kategori'][$kat] = true;
             }
+            $subKat = trim((string) ($row['sub_kategori'] ?? ''));
+            if ($subKat !== '') {
+                $refValues['sub_kategori'][$subKat] = true;
+            }
             $brand = trim((string) ($row['brand'] ?? ''));
             if ($brand !== '') {
                 $refValues['brand'][$brand] = true;
@@ -823,10 +814,51 @@ class ImportProdukService
             if ($satuan !== '') {
                 $refValues['satuan'][$satuan] = true;
             }
+            $gudangVal = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
+            if ($gudangVal !== '' && ! in_array(strtolower($gudangVal), ['-', '0', 'none', 'null', 'kosong'], true)) {
+                $refValues['gudang'][$gudangVal] = true;
+            }
+            $rakVal = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
+            if ($rakVal !== '' && ! in_array(strtolower($rakVal), ['-', '0', 'none', 'null', 'kosong'], true)) {
+                $refValues['rak'][$rakVal] = true;
+            }
         }
 
         // Build referensi_summary: check DB for each unique value
         $referensiSummary = $this->buildReferensiSummary($refValues);
+
+        $konfirmasi = [];
+        foreach (['brand', 'supplier', 'kategori', 'sub_kategori', 'kualitas', 'satuan'] as $tipe) {
+            foreach ($referensiSummary[$tipe]['new'] ?? [] as $nilai) {
+                $label = match ($tipe) {
+                    'sub_kategori' => 'Sub Kategori',
+                    'kategori' => 'Kategori Utama',
+                    default => ucfirst($tipe),
+                };
+                $konfirmasi[] = [
+                    'tipe' => $tipe,
+                    'nilai' => $nilai,
+                    'aksi' => 'auto_create',
+                    'keterangan' => "{$label} '{$nilai}' belum ada di sistem — akan dibuat otomatis saat import.",
+                ];
+            }
+        }
+        foreach ($referensiSummary['rak']['new'] ?? [] as $nilai) {
+            $konfirmasi[] = [
+                'tipe' => 'rak',
+                'nilai' => $nilai,
+                'aksi' => 'auto_create',
+                'keterangan' => "Rak '{$nilai}' belum ada di sistem — akan didaftarkan otomatis ke gudang terkait.",
+            ];
+        }
+        foreach ($referensiSummary['gudang']['new'] ?? [] as $nilai) {
+            $konfirmasi[] = [
+                'tipe' => 'gudang',
+                'nilai' => $nilai,
+                'aksi' => 'tidak_ditemukan',
+                'keterangan' => "Gudang '{$nilai}' tidak ditemukan — baris terkait akan menggunakan gudang default.",
+            ];
+        }
 
         $statusPreview = $invalid === 0
             ? ($totalPeringatan > 0 ? 'perlu_perhatian' : 'sempurna')
@@ -850,6 +882,7 @@ class ImportProdukService
             'error_rows' => array_values(array_filter($hasil, fn ($h) => ! $h['valid'])),
             'warning_rows' => array_values(array_filter($hasil, fn ($h) => ! empty($h['warnings']))),
             'referensi_summary' => $referensiSummary,
+            'konfirmasi' => $konfirmasi,
         ];
     }
 
@@ -861,18 +894,29 @@ class ImportProdukService
     {
         $summary = [
             'kategori' => ['existing' => [], 'new' => []],
+            'sub_kategori' => ['existing' => [], 'new' => []],
             'brand' => ['existing' => [], 'new' => []],
             'supplier' => ['existing' => [], 'new' => []],
             'merk_hp' => ['existing' => [], 'new' => []],
             'tipe_hp' => ['existing' => [], 'new' => []],
             'kualitas' => ['existing' => [], 'new' => []],
             'satuan' => ['existing' => [], 'new' => []],
+            'gudang' => ['existing' => [], 'new' => []],
+            'rak' => ['existing' => [], 'new' => []],
         ];
 
-        // Kategori: check by nama or slug
+        // Kategori: check by nama or slug (parent)
         foreach (array_keys($refValues['kategori']) as $kat) {
             $exists = KategoriProduk::where('nama', $kat)->orWhere('slug', Str::slug($kat))->exists();
             $summary['kategori'][$exists ? 'existing' : 'new'][] = $kat;
+        }
+
+        // Sub Kategori: check by nama or slug
+        if (! empty($refValues['sub_kategori'])) {
+            foreach (array_keys($refValues['sub_kategori']) as $sub) {
+                $exists = KategoriProduk::where('nama', $sub)->orWhere('slug', Str::slug($sub))->exists();
+                $summary['sub_kategori'][$exists ? 'existing' : 'new'][] = $sub;
+            }
         }
 
         // Brand: check by nama
@@ -912,6 +956,24 @@ class ImportProdukService
         foreach (array_keys($refValues['satuan']) as $sat) {
             $exists = SatuanUnit::where('kode', $sat)->exists();
             $summary['satuan'][$exists ? 'existing' : 'new'][] = $sat;
+        }
+
+        // Gudang: check by nama or kode
+        if (! empty($refValues['gudang'])) {
+            foreach (array_keys($refValues['gudang']) as $g) {
+                $exists = Gudang::where('nama', $g)->orWhere('kode', $g)->exists()
+                    || (is_numeric($g) && Gudang::find((int) $g));
+                $summary['gudang'][$exists ? 'existing' : 'new'][] = $g;
+            }
+        }
+
+        // Rak: check by nama or kode
+        if (! empty($refValues['rak'])) {
+            foreach (array_keys($refValues['rak']) as $r) {
+                $exists = Rak::where('nama', $r)->orWhere('kode', $r)->exists()
+                    || (is_numeric($r) && Rak::find((int) $r));
+                $summary['rak'][$exists ? 'existing' : 'new'][] = $r;
+            }
         }
 
         return $summary;
@@ -1049,9 +1111,12 @@ class ImportProdukService
     {
         $gudangIds = [];
         foreach ($rows as $row) {
-            $g = trim((string) ($row['gudang_id'] ?? ''));
-            if ($g !== '') {
-                $gudangIds[(int) $g] = true;
+            $gRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
+            if ($gRaw !== '' && ! in_array(strtolower($gRaw), ['-', '0', 'none', 'null', 'kosong'], true)) {
+                $resolvedId = $this->resolveGudangId($gRaw);
+                if ($resolvedId) {
+                    $gudangIds[$resolvedId] = true;
+                }
             }
         }
 
@@ -1132,12 +1197,13 @@ class ImportProdukService
             SatuanUnit::create(['kode' => $satuan, 'nama' => ucfirst($satuan), 'is_active' => true]);
         }
 
-        $kategori = trim((string) ($row['kategori'] ?? 'Umum')) ?: 'Umum';
+        $kategoriUtamaInput = trim((string) ($row['kategori'] ?? $row['kategori_utama'] ?? '')) ?: 'Umum';
+        $subKategoriInput = trim((string) ($row['sub_kategori'] ?? ''));
         $hargaBeli = round((float) ($row['harga_beli'] ?? 0), 2);
         $hargaJual = round((float) ($row['harga_jual'] ?? 0), 2);
         $stokAwal = (int) ($row['stok_awal'] ?? 0);
 
-        $gudangRaw = trim((string) ($row['gudang_id'] ?? ''));
+        $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangId = $this->resolveGudangId($gudangRaw);
         if (! $gudangId && $stokAwal > 0) {
             $cabangIdSession = session('cabang_id');
@@ -1146,8 +1212,17 @@ class ImportProdukService
                 ->value('id') ?? Gudang::where('is_active', true)->value('id');
         }
 
-        $rakRaw = trim((string) ($row['rak_id'] ?? ''));
+        $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
         $rakId = $this->resolveRakId($rakRaw, $gudangId);
+        if (! $rakId && $rakRaw !== '' && ! in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true) && $gudangId) {
+            $rakBaru = Rak::create([
+                'gudang_id' => $gudangId,
+                'nama' => $rakRaw,
+                'kode' => Str::upper(Str::slug($rakRaw)) ?: 'RAK-'.strtoupper(Str::random(4)),
+                'is_active' => true,
+            ]);
+            $rakId = $rakBaru->id;
+        }
 
         $supplierRaw = trim((string) ($row['supplier'] ?? ''));
         $supplierId = $this->resolveSupplierId($supplierRaw);
@@ -1195,27 +1270,63 @@ class ImportProdukService
             $kualitasId = $this->kualitasCache[$cacheKey];
         }
 
-        // Kategori & kategori_id: runtime cache & firstOrCreate
+        // Kategori & sub-kategori: runtime cache & firstOrCreate
         $kategoriId = null;
-        if (! empty($kategori) && $kategori !== 'Umum') {
-            $parentName = trim((string) ($row['kategori_utama'] ?? ''));
-            $cacheKey = $parentName.'|'.$kategori;
+        $kategoriSimpan = $kategoriUtamaInput;
+        if (! empty($kategoriUtamaInput) && $kategoriUtamaInput !== 'Umum') {
+            $cacheKey = $kategoriUtamaInput.'|'.$subKategoriInput;
             if (! isset($this->kategoriCache[$cacheKey])) {
-                $parent = $parentName !== '' ? KategoriProduk::whereRaw('LOWER(nama) = ?', [mb_strtolower($parentName)])->first() : null;
-                $katRow = $parent
-                    ? KategoriProduk::where('parent_id', $parent->id)->whereRaw('LOWER(nama) = ?', [mb_strtolower($kategori)])->first()
-                    : KategoriProduk::where('nama', $kategori)->orWhere('slug', Str::slug($kategori))->first();
-                if (! $katRow) {
-                    $katRow = KategoriProduk::create([
-                        'nama' => $kategori,
-                        'slug' => Str::slug($kategori),
-                        'parent_id' => $parent?->id,
+                $parent = KategoriProduk::where('nama', $kategoriUtamaInput)
+                    ->orWhere('slug', Str::slug($kategoriUtamaInput))
+                    ->first();
+
+                if (! $parent) {
+                    $parent = KategoriProduk::create([
+                        'nama' => $kategoriUtamaInput,
+                        'slug' => Str::slug($kategoriUtamaInput),
+                        'parent_id' => null,
                         'is_active' => true,
                     ]);
                 }
-                $this->kategoriCache[$cacheKey] = $katRow->id;
+
+                if ($subKategoriInput !== '') {
+                    $child = KategoriProduk::where('parent_id', $parent->id)
+                        ->where(function ($q) use ($subKategoriInput) {
+                            $q->where('nama', $subKategoriInput)
+                                ->orWhere('slug', Str::slug($subKategoriInput));
+                        })->first();
+
+                    if (! $child) {
+                        $existing = KategoriProduk::where('nama', $subKategoriInput)
+                            ->orWhere('slug', Str::slug($subKategoriInput))
+                            ->first();
+
+                        if ($existing && (empty($existing->parent_id) || (int) $existing->parent_id === 0)) {
+                            $existing->update(['parent_id' => $parent->id]);
+                            $child = $existing;
+                        } else {
+                            $child = KategoriProduk::create([
+                                'nama' => $subKategoriInput,
+                                'parent_id' => $parent->id,
+                                'is_active' => true,
+                            ]);
+                        }
+                    }
+                    $kategoriId = $child->id;
+                    $kategoriSimpan = $subKategoriInput;
+                } else {
+                    $kategoriId = $parent->id;
+                    $kategoriSimpan = $kategoriUtamaInput;
+                }
+
+                $this->kategoriCache[$cacheKey] = [
+                    'id' => $kategoriId,
+                    'nama' => $kategoriSimpan,
+                ];
             }
-            $kategoriId = $this->kategoriCache[$cacheKey];
+
+            $kategoriId = $this->kategoriCache[$cacheKey]['id'];
+            $kategoriSimpan = $this->kategoriCache[$cacheKey]['nama'];
         }
 
         // Merk Smartphone & Tipe HP kompatibilitas
@@ -1229,11 +1340,15 @@ class ImportProdukService
         $primaryMerk = $merkHp ?: ($daftarTipe[0]['merk'] ?? ($brandName ?: null));
         $primaryModel = $daftarTipe[0]['model'] ?? null;
 
+        $marginPersen = ($hargaBeli > 0 && $hargaJual > 0)
+            ? round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2)
+            : null;
+
         $produk = Produk::create([
             'nama' => $nama,
             'slug' => (Str::limit(Str::slug($nama), 180, '') ?: 'produk').'-'.Str::lower(Str::random(4)),
             'deskripsi' => $deskripsi,
-            'kategori' => $kategori,
+            'kategori' => $kategoriSimpan,
             'kategori_id' => $kategoriId,
             'brand_id' => $brandId,
             'kualitas_id' => $kualitasId,
@@ -1245,6 +1360,7 @@ class ImportProdukService
             'satuan' => $satuan,
             'harga_beli' => $hargaBeli,
             'harga_jual_retail' => $hargaJual,
+            'margin_persen' => $marginPersen,
             'gambar' => trim((string) ($row['foto_url'] ?? '')) ?: null,
             'is_active' => true,
             'sn' => $sn,
@@ -1343,6 +1459,12 @@ class ImportProdukService
             }
 
             $cabangId = Gudang::find($gudangId)?->cabang_id;
+        }
+
+        // Multi-satuan konversi (opsional)
+        $rawKonversi = trim((string) ($row['konversi_satuan'] ?? $row['multi_satuan'] ?? ''));
+        if ($rawKonversi !== '' && ! in_array(strtolower($rawKonversi), ['-', 'none', 'null', '0'], true)) {
+            $this->simpanKonversiSatuan($produk, $rawKonversi, $satuan);
         }
 
         return ['stok_nilai' => $stokNilai, 'cabang_id' => $cabangId, 'produk_id' => $produk->id, 'sku' => $sku];
@@ -1653,5 +1775,55 @@ class ImportProdukService
 
             return ['merk' => $merk, 'model' => $model];
         }, $decoded)));
+    }
+
+    /**
+     * Simpan definisi multi-satuan ke tabel produk_satuan_konversi.
+     * Format: satuan:pengali[:harga_jual[:barcode]] dipisah ';'
+     * Contoh: box:10:1200000:8990001;pack:5:620000
+     */
+    public function simpanKonversiSatuan(Produk $produk, string $rawKonversi, string $satuanDasar): void
+    {
+        $items = array_filter(array_map('trim', explode(';', $rawKonversi)));
+        $urutan = 1;
+
+        foreach ($items as $item) {
+            $parts = array_map('trim', explode(':', $item));
+            if (count($parts) < 2) {
+                continue;
+            }
+
+            $satuanKode = $this->normalizeSatuan($parts[0]);
+            $pengali = (float) $parts[1];
+
+            if ($satuanKode === '' || $pengali <= 0) {
+                continue;
+            }
+
+            // Pastikan satuan tujuan terdaftar di master satuan_unit
+            if (! SatuanUnit::where('kode', $satuanKode)->exists()) {
+                SatuanUnit::create(['kode' => $satuanKode, 'nama' => ucfirst($satuanKode), 'is_active' => true]);
+            }
+
+            $hargaJual = isset($parts[2]) && is_numeric($parts[2]) ? round((float) $parts[2], 2) : null;
+            $barcode = isset($parts[3]) && trim($parts[3]) !== '' ? trim($parts[3]) : null;
+
+            ProdukSatuanKonversi::updateOrCreate(
+                [
+                    'produk_id' => $produk->id,
+                    'satuan_kode' => $satuanKode,
+                ],
+                [
+                    'satuan_asal' => $satuanDasar,
+                    'pengali' => $pengali,
+                    'faktor_konversi' => $pengali,
+                    'harga_jual' => $hargaJual,
+                    'barcode' => $barcode,
+                    'is_satuan_beli' => true,
+                    'is_satuan_jual' => true,
+                    'urutan' => $urutan++,
+                ]
+            );
+        }
     }
 }

@@ -98,7 +98,7 @@ class ExportImportUnifiedTest extends TestCase
         $sheet1 = $sheets[0];
         $this->assertNotEmpty($sheet1);
         $headings1 = $sheet1[0];
-        $wajib = ['sku', 'nama', 'barcode', 'satuan', 'kategori', 'brand', 'merk_hp', 'tipe_hp', 'kualitas', 'kondisi', 'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen', 'min_stock', 'reorder_point', 'sn', 'stok_awal', 'gudang_id', 'rak_id', 'produk_kompatibel_sku', 'kompatibilitas_hp', 'deskripsi', 'foto_url'];
+        $wajib = app(ImportProdukService::class)->templateColumns();
         foreach ($wajib as $kolom) {
             $this->assertContains($kolom, $headings1, "Kolom '$kolom' tidak ada di Sheet 1 Data Produk");
         }

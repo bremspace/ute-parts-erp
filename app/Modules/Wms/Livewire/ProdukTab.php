@@ -3923,8 +3923,11 @@ class ProdukTab extends Component
             'hargaTier',
             'skuVariants',
             'tipeHps',
+            'satuanKonversi',
             'stokItems',
             'produkKompatibel',
+            'stokItems.gudang',
+            'stokItems.rak',
         ])
             ->withSum([
                 'stokItems as total_stok' => fn ($q) => $q->when($cabangId, fn ($sub) => $sub->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId))),
@@ -3958,13 +3961,13 @@ class ProdukTab extends Component
             // Stok awal untuk import: gunakan stok total saat ini (bisa dikosongkan user nanti)
             $stokAwal = (int) ($p->total_stok ?? 0);
 
-            // Gudang/Rak default: ambil dari stokItems pertama yang ada (gunakan string kosong bila belum diset agar re-import aman)
-            $gudangId = '';
-            $rakId = '';
+            // Gudang/Rak default: ambil dari stokItems pertama yang ada (isi NAMA gudang dan rak)
+            $gudangNama = '';
+            $rakNama = '';
             if ($p->stokItems->isNotEmpty()) {
                 $firstStok = $p->stokItems->first();
-                $gudangId = $firstStok->gudang_id ? (string) $firstStok->gudang_id : '';
-                $rakId = $firstStok->rak_id ? (string) $firstStok->rak_id : '';
+                $gudangNama = $firstStok->gudang?->nama ?? ($firstStok->gudang_id ? (string) $firstStok->gudang_id : '');
+                $rakNama = $firstStok->rak?->nama ?? ($firstStok->rak_id ? (string) $firstStok->rak_id : '');
             }
 
             // Produk kompatibel SKU: ambil dari relasi produk_kompatibel
@@ -3973,10 +3976,36 @@ class ProdukTab extends Component
             // Foto URL: ambil dari kolom foto/gambar
             $fotoUrl = $p->foto ?? $p->gambar ?? '';
 
-            // Kategori untuk import: pertahankan parent-child hierarchy.
-            $kategoriImport = $p->kategoriRelasi?->nama ?? $p->kategori ?? '';
-            $kategoriUtamaImport = $p->kategoriRelasi?->parent?->nama ?? ($p->kategoriRelasi?->parent_id ? '' : $kategoriImport);
-            $subKategoriImport = $p->kategoriRelasi?->parent_id ? $kategoriImport : '';
+            // Kategori untuk import: dukung relasi parent (kategori) dan child (sub_kategori)
+            $kategoriImport = '';
+            $subKategoriImport = '';
+            if ($p->kategoriRelasi) {
+                if ($p->kategoriRelasi->parent_id) {
+                    $kategoriImport = $p->kategoriRelasi->parent?->nama ?? '';
+                    $subKategoriImport = $p->kategoriRelasi->nama ?? '';
+                } else {
+                    $kategoriImport = $p->kategoriRelasi->nama ?? '';
+                    $subKategoriImport = '';
+                }
+            } else {
+                $kategoriImport = $p->kategori ?? '';
+                $subKategoriImport = '';
+            }
+
+            // Konversi satuan multi-tier: format string satuan:pengali[:harga_jual[:barcode]] dipisah ';'
+            $konversiSatuan = $p->satuanKonversi->map(function ($sk) {
+                $str = $sk->satuan_kode.':'.((float) $sk->pengali + 0);
+                if ($sk->harga_jual !== null) {
+                    $str .= ':'.((float) $sk->harga_jual + 0);
+                    if ($sk->barcode !== null && $sk->barcode !== '') {
+                        $str .= ':'.$sk->barcode;
+                    }
+                } elseif ($sk->barcode !== null && $sk->barcode !== '') {
+                    $str .= '::'.$sk->barcode;
+                }
+
+                return $str;
+            })->implode(';');
 
             // Brand untuk import: gunakan brand relasi
             $brandImport = $p->brand?->nama ?? $p->brand_kompatibel ?? '';
@@ -3986,15 +4015,15 @@ class ProdukTab extends Component
                 'nama' => $p->nama,
                 'barcode' => $p->barcode ?: '',
                 'satuan' => $p->satuan ?: 'pcs',
+                'konversi_satuan' => $konversiSatuan,
                 'kategori' => $kategoriImport,
-                'kategori_utama' => $kategoriUtamaImport,
                 'sub_kategori' => $subKategoriImport,
                 'brand' => $brandImport,
+                'kualitas' => $p->kualitas?->nama ?? '',
+                'kondisi' => $p->kondisi ?: 'baru',
                 'supplier' => $p->supplier?->nama ?? '',
                 'merk_hp' => $merkHp,
                 'tipe_hp' => $tipeHp,
-                'kualitas' => $p->kualitas?->nama ?? '',
-                'kondisi' => $p->kondisi ?: 'baru',
                 'harga_beli' => (float) $p->harga_beli,
                 'harga_jual' => (float) $p->harga_jual_retail,
                 'harga_reseller' => (float) $this->resolveHargaTierProduk($p, 'reseller')['harga'],
@@ -4003,8 +4032,8 @@ class ProdukTab extends Component
                 'reorder_point' => (int) $p->reorder_point,
                 'sn' => $p->sn ? 'ya' : 'tidak',
                 'stok_awal' => $stokAwal,
-                'gudang_id' => $gudangId,
-                'rak_id' => $rakId,
+                'gudang' => $gudangNama,
+                'rak' => $rakNama,
                 'produk_kompatibel_sku' => $produkKompatibelSku ?: '',
                 'kompatibilitas_hp' => $kompatibilitasHp ?: '',
                 'deskripsi' => $p->deskripsi ?: '',
@@ -4090,68 +4119,77 @@ class ProdukTab extends Component
                                         $valSatuan->setFormula1("'Referensi Sistem'!\$D\$2:\$D\$100");
                                         $valSatuan->setSqref('D2:D5000');
 
-                                        // Dropdown Kategori (Kolom E) -> Referensi Sheet 2 (kolom B)
-                                        $valKat = $sheet->getCell('E2')->getDataValidation();
+                                        // Dropdown Kategori (Kolom F) -> Referensi Sheet 2 (kolom B)
+                                        $valKat = $sheet->getCell('F2')->getDataValidation();
                                         $valKat->setType(DataValidation::TYPE_LIST);
                                         $valKat->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valKat->setAllowBlank(true);
                                         $valKat->setShowDropDown(true);
                                         $valKat->setFormula1("'Referensi Sistem'!\$B\$2:\$B\$100");
-                                        $valKat->setSqref('E2:E5000');
+                                        $valKat->setSqref('F2:F5000');
 
-                                        // Dropdown Brand (Kolom F) -> Referensi Sheet 2 (kolom C)
-                                        $valBrand = $sheet->getCell('F2')->getDataValidation();
+                                        // Dropdown Sub Kategori (Kolom G) -> Referensi Sheet 2 (kolom H)
+                                        $valSubKat = $sheet->getCell('G2')->getDataValidation();
+                                        $valSubKat->setType(DataValidation::TYPE_LIST);
+                                        $valSubKat->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valSubKat->setAllowBlank(true);
+                                        $valSubKat->setShowDropDown(true);
+                                        $valSubKat->setFormula1("'Referensi Sistem'!\$H\$2:\$H\$100");
+                                        $valSubKat->setSqref('G2:G5000');
+
+                                        // Dropdown Brand (Kolom H) -> Referensi Sheet 2 (kolom C)
+                                        $valBrand = $sheet->getCell('H2')->getDataValidation();
                                         $valBrand->setType(DataValidation::TYPE_LIST);
                                         $valBrand->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valBrand->setAllowBlank(true);
                                         $valBrand->setShowDropDown(true);
                                         $valBrand->setFormula1("'Referensi Sistem'!\$C\$2:\$C\$100");
-                                        $valBrand->setSqref('F2:F5000');
+                                        $valBrand->setSqref('H2:H5000');
 
-                                        // Dropdown Supplier (Kolom G) -> Referensi Sheet 2 (kolom F)
-                                        $valSupplier = $sheet->getCell('G2')->getDataValidation();
-                                        $valSupplier->setType(DataValidation::TYPE_LIST);
-                                        $valSupplier->setErrorStyle(DataValidation::STYLE_INFORMATION);
-                                        $valSupplier->setAllowBlank(true);
-                                        $valSupplier->setShowDropDown(true);
-                                        $valSupplier->setFormula1("'Referensi Sistem'!\$F\$2:\$F\$100");
-                                        $valSupplier->setSqref('G2:G5000');
-
-                                        // Dropdown Merk HP (Kolom H) -> Referensi Sheet 2 (kolom A)
-                                        $valMerkHp = $sheet->getCell('H2')->getDataValidation();
-                                        $valMerkHp->setType(DataValidation::TYPE_LIST);
-                                        $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
-                                        $valMerkHp->setAllowBlank(true);
-                                        $valMerkHp->setShowDropDown(true);
-                                        $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
-                                        $valMerkHp->setSqref('H2:H5000');
-
-                                        // Dropdown Kualitas (Kolom J) -> Referensi Sheet 2 (kolom E)
-                                        $valKualitas = $sheet->getCell('J2')->getDataValidation();
+                                        // Dropdown Kualitas (Kolom I) -> Referensi Sheet 2 (kolom E)
+                                        $valKualitas = $sheet->getCell('I2')->getDataValidation();
                                         $valKualitas->setType(DataValidation::TYPE_LIST);
                                         $valKualitas->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valKualitas->setAllowBlank(true);
                                         $valKualitas->setShowDropDown(true);
                                         $valKualitas->setFormula1("'Referensi Sistem'!\$E\$2:\$E\$100");
-                                        $valKualitas->setSqref('J2:J5000');
+                                        $valKualitas->setSqref('I2:I5000');
 
-                                        // Dropdown Kondisi (Kolom K) - fixed list
-                                        $valKondisi = $sheet->getCell('K2')->getDataValidation();
+                                        // Dropdown Kondisi (Kolom J) - fixed list
+                                        $valKondisi = $sheet->getCell('J2')->getDataValidation();
                                         $valKondisi->setType(DataValidation::TYPE_LIST);
                                         $valKondisi->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valKondisi->setAllowBlank(true);
                                         $valKondisi->setShowDropDown(true);
                                         $valKondisi->setFormula1('"baru,oem,bekas,refurbished"');
-                                        $valKondisi->setSqref('K2:K5000');
+                                        $valKondisi->setSqref('J2:J5000');
 
-                                        // Dropdown SN (Kolom R)
-                                        $valSn = $sheet->getCell('R2')->getDataValidation();
+                                        // Dropdown Supplier (Kolom K) -> Referensi Sheet 2 (kolom F)
+                                        $valSupplier = $sheet->getCell('K2')->getDataValidation();
+                                        $valSupplier->setType(DataValidation::TYPE_LIST);
+                                        $valSupplier->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valSupplier->setAllowBlank(true);
+                                        $valSupplier->setShowDropDown(true);
+                                        $valSupplier->setFormula1("'Referensi Sistem'!\$F\$2:\$F\$100");
+                                        $valSupplier->setSqref('K2:K5000');
+
+                                        // Dropdown Merk HP (Kolom L) -> Referensi Sheet 2 (kolom A)
+                                        $valMerkHp = $sheet->getCell('L2')->getDataValidation();
+                                        $valMerkHp->setType(DataValidation::TYPE_LIST);
+                                        $valMerkHp->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                                        $valMerkHp->setAllowBlank(true);
+                                        $valMerkHp->setShowDropDown(true);
+                                        $valMerkHp->setFormula1("'Referensi Sistem'!\$A\$2:\$A\$100");
+                                        $valMerkHp->setSqref('L2:L5000');
+
+                                        // Dropdown SN (Kolom T)
+                                        $valSn = $sheet->getCell('T2')->getDataValidation();
                                         $valSn->setType(DataValidation::TYPE_LIST);
                                         $valSn->setErrorStyle(DataValidation::STYLE_INFORMATION);
                                         $valSn->setAllowBlank(true);
                                         $valSn->setShowDropDown(true);
                                         $valSn->setFormula1('"ya,tidak"');
-                                        $valSn->setSqref('R2:R5000');
+                                        $valSn->setSqref('T2:T5000');
                                     },
                                 ];
                             }
@@ -4366,7 +4404,7 @@ class ProdukTab extends Component
 
     public function render()
     {
-        $kategoriTree = KategoriProduk::getTree();
+        $kategoriTree = KategoriProduk::getTreeTersediaDiProduk();
 
         $produks = $this->getFilteredProdukQuery()
             ->paginate($this->perPage);

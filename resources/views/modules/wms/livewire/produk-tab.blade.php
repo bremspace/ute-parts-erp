@@ -2932,6 +2932,30 @@
                             </div>
                         @endif
 
+                        @if(! empty($importPreview['konfirmasi']))
+                            <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/30 text-[11px] space-y-1.5 max-h-44 overflow-y-auto">
+                                <p class="font-bold text-up-primary flex items-center gap-1.5 text-xs">
+                                    <span>ℹ️</span> Konfirmasi Penambahan Data Master Baru:
+                                </p>
+                                <p class="text-[10px] text-ink-300">
+                                    Sistem mendeteksi data master baru di dalam file Excel. Data ini akan didaftarkan otomatis secara cerdas saat Anda melanjutkan import:
+                                </p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1">
+                                    @foreach($importPreview['konfirmasi'] as $k)
+                                        <div class="p-2 rounded-lg bg-black/25 border border-white/5 flex items-start gap-2">
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider {{ $k['aksi'] === 'tidak_ditemukan' ? 'bg-up-amber/20 text-up-amber' : 'bg-up-primary/20 text-up-primary' }}">
+                                                {{ $k['tipe'] }}
+                                            </span>
+                                            <div class="text-[10px] text-ink-200">
+                                                <div class="font-semibold text-white">{{ $k['nilai'] }}</div>
+                                                <div class="text-[9px] text-ink-400 mt-0.5">{{ $k['keterangan'] }}</div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
                         <!-- Banner Status Preview -->
                         <div class="p-3 rounded-xl {{ ($importPreview['invalid'] ?? 0) > 0 ? 'bg-up-amber/10 border border-up-amber/30 text-up-amber' : 'bg-up-mint/10 border border-up-mint/30 text-up-mint' }} text-[11px] flex items-center justify-between">
                             <span class="font-bold">{{ $importPreview['label_status'] ?? 'Hasil Pemeriksaan File' }}</span>

@@ -12,6 +12,7 @@ use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Services\ImportProdukService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -133,13 +134,7 @@ class MasterProdukExportTest extends TestCase
         $this->assertIsArray($headings);
 
         // Kolom sekarang mengikuti template import (ImportProdukService::templateColumns)
-        $wajib = [
-            'sku', 'nama', 'barcode', 'satuan', 'kategori', 'brand', 'supplier',
-            'merk_hp', 'tipe_hp', 'kualitas', 'kondisi',
-            'harga_beli', 'harga_jual', 'harga_reseller', 'harga_agen',
-            'min_stock', 'reorder_point', 'sn', 'stok_awal', 'gudang_id', 'rak_id',
-            'produk_kompatibel_sku', 'kompatibilitas_hp', 'deskripsi', 'foto_url',
-        ];
+        $wajib = app(ImportProdukService::class)->templateColumns();
         foreach ($wajib as $kolom) {
             $this->assertContains($kolom, $headings, "Kolom '$kolom' tidak ada di heading xlsx.");
         }
@@ -163,8 +158,11 @@ class MasterProdukExportTest extends TestCase
         $this->assertNotFalse($supplierIdx);
         $this->assertSame('PT Supplier Jaya', $aktifRow[$supplierIdx]);
 
-        // Kategori untuk import: nama kategori sederhana (bukan berjenjang)
-        $this->assertSame('LCD', $aktifRow[$katIdx]);
+        // Kategori & Sub Kategori untuk import: parent & child terpisah jelas
+        $subKatIdx = array_search('sub_kategori', $headings);
+        $this->assertNotFalse($subKatIdx);
+        $this->assertSame('Sparepart HP', $aktifRow[$katIdx]);
+        $this->assertSame('LCD', $aktifRow[$subKatIdx]);
     }
 
     public function test_export_master_csv_berisi_nilai_tier(): void
