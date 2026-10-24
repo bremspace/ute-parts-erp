@@ -107,7 +107,7 @@ class ExportImportUnifiedTest extends TestCase
         $sheet2 = $sheets[1];
         $this->assertNotEmpty($sheet2);
         $headings2 = $sheet2[0];
-        $this->assertSame(['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand'], $headings2);
+        $this->assertSame(['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand', 'Gudang', 'Rak'], $headings2);
         // Check existing data appears
         $flat2 = collect($sheet2)->flatten()->filter()->all();
         $this->assertContains('Samsung', $flat2);
@@ -225,7 +225,7 @@ class ExportImportUnifiedTest extends TestCase
         // Sheet 2: Referensi Sistem - should have our reference data
         $sheet2 = $sheets[1];
         $headings2 = $sheet2[0];
-        $this->assertSame(['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand'], $headings2);
+        $this->assertSame(['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand', 'Gudang', 'Rak'], $headings2);
 
         // Verify exported references include our test data
         $flat2 = collect($sheet2)->flatten()->filter()->all();

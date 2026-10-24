@@ -100,8 +100,8 @@ class WmsImportStatusAndNormalizerTest extends TestCase
     {
         $csvContent = implode("\n", [
             'sku;nama;satuan;harga_beli;harga_jual;brand;tipe_hp;kualitas;kondisi;min_stock;reorder_point;sn;deskripsi',
-            'LCD-IP11;LCD iPhone 11 Original;buah;250000;450000;Apple;iPhone 11;Original;baru;5;10;ya;LCD Original',
-            'LCD-IP11P;LCD iPhone 11 Pro Original;pieces;300000;550000;Apple;iPhone 11 Pro;Original;baru;5;10;ya;LCD Original',
+            'LCD-IP11;LCD iPhone 11 Pro Max Original;buah;250000;450000;Apple;iPhone 11 Pro Max;Original;baru;5;10;ya;LCD Original',
+            'LCD-IP11P;LCD iPhone 11 Pro Max Original;pieces;300000;550000;Apple;iPhone 11 Pro Max;Original;baru;5;10;ya;LCD Original',
         ]);
 
         $filePath = sys_get_temp_dir().'/test_import_preview_compat.csv';

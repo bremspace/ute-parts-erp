@@ -18,6 +18,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Services\StockReservationService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -242,7 +243,7 @@ class PosController extends Controller
                     $lineSubtotal = max(0, ($hargaSatuan * $qty) - $diskonItem);
                     $subtotal += $lineSubtotal;
 
-                    // Cek ketersediaan stok di gudang jika gudang ditentukan
+                    // Cek ketersediaan stok di gudang jika gudang ditentukan (memperhitungkan reservasi aktif)
                     if ($gudangId) {
                         $stokItem = StokItem::firstOrCreate(
                             [
@@ -253,13 +254,20 @@ class PosController extends Controller
                             ['jumlah' => 0, 'jumlah_minimum' => 0]
                         );
 
-                        if ($stokItem->jumlah < $qty) {
+                        $reserved = app(StockReservationService::class)->getActiveReservation(
+                            $cabangId,
+                            $produk->id,
+                            $item['sku_variant_id'] ?? null
+                        );
+                        $stokBisaJual = max(0, (int) $stokItem->jumlah - $reserved);
+
+                        if ($stokBisaJual < $qty) {
                             // [B-02 revisi] Exception domain → controller mengembalikan 422
                             // + pesan Indonesia (bukan 500 lewat \Exception generik).
                             throw new StokTidakCukupException(
-                                "Stok tidak mencukupi untuk {$produk->nama}. Tersedia: {$stokItem->jumlah}, diminta: {$qty}",
+                                "Stok tidak mencukupi untuk {$produk->nama}. Tersedia: {$stokBisaJual}, diminta: {$qty}",
                                 (int) $produk->id,
-                                (int) $stokItem->jumlah,
+                                (int) $stokBisaJual,
                                 (int) $qty,
                             );
                         }

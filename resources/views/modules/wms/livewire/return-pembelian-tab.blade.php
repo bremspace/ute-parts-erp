@@ -1,20 +1,22 @@
 <div class="space-y-5">
     {{-- Sub Navigation: Riwayat Retur vs Pool Karantina Supplier --}}
-    <div class="flex items-center justify-between gap-3 border-b border-white/10 pb-3 flex-wrap">
-        <div class="inline-flex items-center p-1 rounded-2xl bg-white/5 border border-white/10">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 p-1 rounded-2xl bg-white/5 border border-white/10 w-full sm:w-auto">
             <button
                 type="button"
                 wire:click="$set('subTab', 'riwayat')"
-                class="px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 {{ $subTab === 'riwayat' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white' }}"
+                class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 {{ $subTab === 'riwayat' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-white' }} min-h-[40px]"
             >
-                <span>📦 Riwayat Retur Pembelian</span>
+                <span>📦</span>
+                <span>Riwayat Retur Pembelian</span>
             </button>
             <button
                 type="button"
                 wire:click="$set('subTab', 'karantina')"
-                class="px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 {{ $subTab === 'karantina' ? 'bg-up-red text-white shadow-md shadow-up-red/25' : 'text-ink-400 hover:text-white' }}"
+                class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 {{ $subTab === 'karantina' ? 'bg-up-red text-white shadow-md shadow-up-red/25' : 'text-ink-400 hover:text-white' }} min-h-[40px]"
             >
-                <span>⚠️ Pool Karantina Retur ({{ $karantinaItems->count() }} item)</span>
+                <span>⚠️</span>
+                <span>Pool Karantina ({{ $karantinaItems->count() }} item)</span>
             </button>
         </div>
 
@@ -22,7 +24,7 @@
             @can('wms.create')
                 <button
                     wire:click="bukaModalTambah"
-                    class="px-4 py-2.5 rounded-xl bg-up-red/90 hover:bg-up-red text-white font-bold text-xs shadow-md shadow-up-red/20 transition active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                    class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-red/90 hover:bg-up-red text-white font-bold text-xs shadow-md shadow-up-red/20 transition active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                 >
                     <span>+ Buat Retur Pembelian (PO)</span>
                 </button>
@@ -59,7 +61,7 @@
                         <td class="py-3.5 px-4 tabular-nums font-bold text-up-red">Rp {{ number_format($retur->jumlah, 0, ',', '.') }}</td>
                         <td class="py-3.5 px-4"><x-prism.status-pill :status="str_replace('_','-',$retur->status)" /></td>
                         <td class="py-3.5 px-4">
-                            <div class="flex items-center gap-1.5 flex-nowrap">
+                            <div class="flex items-center gap-1.5 flex-wrap min-w-[90px]">
                                 <button
                                     wire:click="bukaDetail({{ $retur->id }})"
                                     class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]"
@@ -415,8 +417,8 @@
                 </div>
 
                 <div class="pt-4 border-t border-black/10 dark:border-white/10 mt-4 flex items-center gap-2">
-                    @if($detailRetur->status === 'menunggu')
-                        @canany(['wms.approve', 'wms.update'])
+                    @if(in_array($detailRetur->status, ['draft', 'menunggu']))
+                        @canany(['approve-workflow', 'wms.create', 'wms.approve', 'wms.update'])
                             <button
                                 type="button"
                                 wire:click="setujuiRetur({{ $detailRetur->id }})"
@@ -438,7 +440,7 @@
                     <button
                         type="button"
                         wire:click="tutupDetail"
-                        class="{{ $detailRetur->status === 'menunggu' ? 'px-4' : 'w-full' }} py-2.5 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-700 dark:text-white font-bold text-xs cursor-pointer"
+                        class="{{ in_array($detailRetur->status, ['draft', 'menunggu']) ? 'px-4' : 'w-full' }} py-2.5 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-700 dark:text-white font-bold text-xs cursor-pointer"
                     >
                         Tutup
                     </button>

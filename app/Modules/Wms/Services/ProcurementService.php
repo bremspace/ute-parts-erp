@@ -382,11 +382,24 @@ class ProcurementService
         $weightedAvg = $totalQty > 0 ? round($totalNilai / $totalQty, 2) : $hargaTerakhir;
 
         return [
-            'items' => $rows->map(function ($r) {
+            'items' => $rows->values()->map(function ($r, $idx) use ($rows) {
+                $prev = $rows->get($idx + 1);
+                $selisih = 0.0;
+                $persentase = 0.0;
+                $trend = 'awal';
+
+                if ($prev) {
+                    $prevHarga = (float) $prev->harga_beli;
+                    $selisih = round((float) $r->harga_beli - $prevHarga, 2);
+                    $persentase = $prevHarga > 0 ? round(($selisih / $prevHarga) * 100, 2) : 0.0;
+                    $trend = $selisih > 0 ? 'naik' : ($selisih < 0 ? 'turun' : 'tetap');
+                }
+
                 return [
                     'po_id' => $r->po_id,
                     'no_po' => $r->no_po,
                     'tanggal' => $r->created_at ? date('d/m/Y H:i', strtotime($r->created_at)) : '-',
+                    'created_at' => $r->created_at,
                     'status' => $r->status,
                     'metode_bayar' => $r->metode_bayar,
                     'supplier_id' => $r->supplier_id,
@@ -395,6 +408,9 @@ class ProcurementService
                     'harga_beli' => (float) $r->harga_beli,
                     'jumlah' => (int) $r->jumlah,
                     'subtotal' => (float) $r->subtotal,
+                    'selisih' => $selisih,
+                    'persentase' => $persentase,
+                    'trend' => $trend,
                 ];
             })->all(),
             'statistik' => [

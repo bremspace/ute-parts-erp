@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('servis:cek-batas-waktu')->everyTenMinutes();
+Schedule::command('duitku:rekon')->everyTenMinutes();

@@ -41,12 +41,21 @@ class DuitkuRekonCommand extends Command
 
         $expiryMinutes = (int) config('duitku.expiry_period', 1440);
         $cutoff = now()->subMinutes($expiryMinutes);
+        $now = now();
 
         // Global lintas cabang: tiap order diproses dgn cabang_id-nya sendiri
         // di dalam processor (aman untuk scheduler tanpa konteks session).
         $transaksis = Transaksi::query()
             ->where('status', 'menunggu_pembayaran')
-            ->where('updated_at', '<', $cutoff)
+            ->where(function ($q) use ($now, $cutoff) {
+                $q->where(function ($sub) use ($now) {
+                    $sub->whereNotNull('expires_at')
+                        ->where('expires_at', '<=', $now);
+                })->orWhere(function ($sub) use ($cutoff) {
+                    $sub->whereNull('expires_at')
+                        ->where('updated_at', '<', $cutoff);
+                });
+            })
             ->orderBy('updated_at')
             ->limit(max(1, (int) $this->option('limit')))
             ->get();

@@ -68,7 +68,7 @@ class WmsImportVerifyTest extends TestCase
         // sepanjang $kolom supaya tiap nilai jatuh di kolom heading yang benar.
         $pad = fn (array $over): array => array_merge(array_fill_keys($this->kolom, ''), $over);
         $rows[] = $pad(['sku' => 'VER-1-SKU', 'nama' => 'Duplikat SKU', 'barcode' => 'X1', 'satuan' => 'pcs', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 0, 'gudang_id' => $gudangId]);
-        $rows[] = $pad(['sku' => 'VER-BAD-SATUAN', 'nama' => 'Satuan Salah', 'barcode' => 'X2', 'satuan' => 'galon-xyz', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 0]);
+        $rows[] = $pad(['sku' => 'VER-NO-NAME', 'nama' => '', 'barcode' => 'X2', 'satuan' => 'pcs', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 0]);
         $rows[] = $pad(['sku' => 'VER-NEGATIF', 'nama' => 'Harga Negatif', 'barcode' => 'X3', 'satuan' => 'pcs', 'harga_beli' => -50, 'harga_jual' => 200, 'stok_awal' => 0]);
         $rows[] = $pad(['sku' => 'VER-TANPA-GUDANG', 'nama' => 'Stok Tanpa Gudang', 'barcode' => 'X4', 'satuan' => 'pcs', 'harga_beli' => 100, 'harga_jual' => 200, 'stok_awal' => 5]);
 
@@ -148,7 +148,7 @@ class WmsImportVerifyTest extends TestCase
         $this->assertSame(4, $preview['invalid']);
         $pesanSemua = collect($preview['error_rows'])->pluck('errors')->flatten()->implode(' ');
         $this->assertStringContainsString('duplikat', $pesanSemua);
-        $this->assertStringContainsString('tidak terdaftar di satuan_unit', $pesanSemua);
+        $this->assertStringContainsString('Nama produk wajib diisi', $pesanSemua);
         $this->assertStringContainsString('tidak boleh negatif', $pesanSemua);
         $this->assertStringContainsString('gudang_id wajib diisi', $pesanSemua);
 

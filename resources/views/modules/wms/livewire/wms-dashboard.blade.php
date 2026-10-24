@@ -8,7 +8,7 @@
                 $wire.set('activeTab', 'produk');
             } else if (modul === 'operasional' && !['transfer', 'opname'].includes(currentTab)) {
                 $wire.set('activeTab', 'transfer');
-            } else if (modul === 'pengadaan' && !['po', 'grn', 'retur'].includes(currentTab)) {
+            } else if (modul === 'pengadaan' && !['po', 'grn', 'retur', 'histori_po'].includes(currentTab)) {
                 $wire.set('activeTab', 'po');
             }
         }
@@ -16,7 +16,7 @@
     x-init="$watch('$wire.activeTab', value => {
         if (['stok', 'produk'].includes(value)) subModul = 'inventori';
         else if (['transfer', 'opname'].includes(value)) subModul = 'operasional';
-        else if (['po', 'grn', 'retur'].includes(value)) subModul = 'pengadaan';
+        else if (['po', 'grn', 'retur', 'histori_po'].includes(value)) subModul = 'pengadaan';
     })"
 >
     <!-- Header with 2-Tier Sub-Modul Tabs and Actions (No Overlapping on Mobile/Desktop) -->
@@ -64,14 +64,15 @@
                         </a>
                         @endcanany
                         @can('wms.create')
-                        <button
-                            @click="$dispatch('wms-import-modal')"
-                            class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer"
-                            title="Import master produk dari Excel (inisialisasi — bukan stok masuk harian)"
+                        <a
+                            href="/app/wms/import-export"
+                            wire:navigate
+                            class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            title="Import & Penyesuaian Master Produk dari Excel"
                         >
                             <span>📥</span>
                             <span>Import Excel</span>
-                        </button>
+                        </a>
                         <!-- Dropdown Export (Semua atau Terpilih) -->
                         <div class="relative" x-data="{ openExport: false }" @click.outside="openExport = false">
                             <button
@@ -222,6 +223,12 @@
                     >
                         Retur Pembelian
                     </button>
+                    <button
+                        wire:click="$set('activeTab', 'histori_po')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'histori_po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        Histori Pengadaan
+                    </button>
                 </div>
             </div>
 
@@ -236,14 +243,15 @@
                         </a>
                         @endcanany
                         @can('wms.create')
-                        <button
-                            @click="$dispatch('wms-import-modal')"
-                            class="flex-1 px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer"
-                            title="Import master produk dari Excel"
+                        <a
+                            href="/app/wms/import-export"
+                            wire:navigate
+                            class="flex-1 px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            title="Import & Penyesuaian Master Produk dari Excel"
                         >
                             <span>📥</span>
                             <span>Import</span>
-                        </button>
+                        </a>
                         <!-- Mobile Dropdown Export -->
                         <div class="flex-1 relative" x-data="{ openExportM: false }" @click.outside="openExportM = false">
                             <button
@@ -306,13 +314,28 @@
                     @endcan
                 @elseif($activeTab === 'po')
                     @can('wms.create')
-                    <div class="flex items-center gap-2 w-full flex-wrap sm:flex-nowrap">
-                        <button @click="$dispatch('wms-procurement-modal')" class="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap" title="Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, JIT)">
+                    <div class="grid grid-cols-3 gap-1.5 w-full sm:flex sm:items-center sm:gap-2">
+                        <button @click="$dispatch('wms-procurement-modal')" class="px-2.5 sm:px-3 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap" title="Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, JIT)">
                             <span>📊</span>
-                            <span>Rekomendasi</span>
+                            <span class="truncate">Saran PO</span>
                         </button>
-                        <button @click="$dispatch('wms-supplier-baru')" class="flex-1 px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 border border-black/10 dark:border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ Supplier</button>
-                        <button @click="$dispatch('wms-po-baru')" class="flex-1 px-3 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap">+ PO</button>
+                        <button @click="$dispatch('wms-supplier-baru')" class="px-2.5 sm:px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 border border-black/10 dark:border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap truncate">+ Supplier</button>
+                        <button @click="$dispatch('wms-po-baru')" class="px-2.5 sm:px-3 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap shadow-sm shadow-up-accent/20 truncate">+ PO</button>
+                    </div>
+                    @endcan
+                @elseif($activeTab === 'grn')
+                    <div class="flex items-center gap-2 w-full">
+                        <button @click="$dispatch('wms-search-modal')" class="w-full px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 font-bold text-xs min-h-[44px] flex items-center justify-center gap-2 cursor-pointer transition active:scale-[0.97]">
+                            <span>🔍</span>
+                            <span>Cari Dokumen &amp; Scan Barcode</span>
+                        </button>
+                    </div>
+                @elseif($activeTab === 'retur')
+                    @can('wms.create')
+                    <div class="flex items-center gap-2 w-full">
+                        <button @click="$wire.set('activeTab', 'retur'); $nextTick(() => { const btn = document.querySelector('[wire\\:click=\'bukaModalTambah\']'); if (btn) btn.click(); })" class="w-full px-4 py-2.5 rounded-xl bg-up-red hover:bg-up-red/90 text-white font-bold text-xs shadow-md shadow-up-red/25 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap">
+                            <span>+ Buat Retur Pembelian</span>
+                        </button>
                     </div>
                     @endcan
                 @endif
@@ -358,6 +381,10 @@
     @elseif($activeTab === 'retur')
         <div key="tab-retur">
             @livewire(\App\Modules\Wms\Livewire\ReturnPembelianTab::class)
+        </div>
+    @elseif($activeTab === 'histori_po')
+        <div key="tab-histori-po">
+            @livewire(\App\Modules\Wms\Livewire\HistoriPengadaanTab::class)
         </div>
     @endif
 

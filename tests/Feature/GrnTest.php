@@ -6,20 +6,27 @@ use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Utang;
+use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Livewire\GrnTab;
+use App\Modules\Wms\Livewire\HistoriPengadaanTab;
 use App\Modules\Wms\Livewire\PoTab;
+use App\Modules\Wms\Livewire\ReturnPembelianTab;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
+use App\Modules\Wms\Models\ReturnPembelian;
+use App\Modules\Wms\Models\RiwayatPerubahanHarga;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\GrnService;
+use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\PurchaseOrderService;
+use App\Modules\Wms\Services\ReturnPembelianService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -722,5 +729,306 @@ class GrnTest extends TestCase
         );
         $this->assertSame(1, StockMutationLog::where('referensi_tipe', Grn::class)->count());
         $this->assertSame(1, StokLog::where('jenis', 'GRN')->count());
+    }
+
+    public function test_grn_item_qty_received_menyimpan_produk_nama(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(5, 50000);
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 5], $this->user->id);
+
+        $this->assertNotEmpty($grn->item_qty_received);
+        $this->assertEquals($this->produk->nama, $grn->item_qty_received[0]['produk_nama']);
+    }
+
+    public function test_procurement_service_histori_pembelian_mencatat_selisih_dan_indikasi_perubahan_harga(): void
+    {
+        $po1 = PurchaseOrder::create([
+            'no_po' => 'PO-HIST-1',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'status' => 'diterima',
+            'metode_bayar' => 'kredit',
+            'total' => 100000,
+            'created_at' => now()->subDays(5),
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po1->id,
+            'produk_id' => $this->produk->id,
+            'harga_beli' => 10000,
+            'jumlah' => 10,
+            'subtotal' => 100000,
+        ]);
+
+        $po2 = PurchaseOrder::create([
+            'no_po' => 'PO-HIST-2',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'status' => 'diterima',
+            'metode_bayar' => 'kredit',
+            'total' => 120000,
+            'created_at' => now()->subDays(1),
+        ]);
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po2->id,
+            'produk_id' => $this->produk->id,
+            'harga_beli' => 12000,
+            'jumlah' => 10,
+            'subtotal' => 120000,
+        ]);
+
+        $histori = app(ProcurementService::class)->getHistoriPembelian($this->produk->id);
+
+        $this->assertCount(2, $histori['items']);
+        // Item 0 is latest (po2), compared to po1
+        $this->assertEquals('PO-HIST-2', $histori['items'][0]['no_po']);
+        $this->assertEquals(2000.0, $histori['items'][0]['selisih']);
+        $this->assertEquals(20.0, $histori['items'][0]['persentase']);
+        $this->assertEquals('naik', $histori['items'][0]['trend']);
+        $this->assertNotNull($histori['items'][0]['created_at']);
+
+        // Item 1 is oldest (po1), trend awal
+        $this->assertEquals('PO-HIST-1', $histori['items'][1]['no_po']);
+        $this->assertEquals(0.0, $histori['items'][1]['selisih']);
+        $this->assertEquals('awal', $histori['items'][1]['trend']);
+    }
+
+    public function test_grn_perubahan_harga_mencatat_riwayat_perubahan_harga(): void
+    {
+        Queue::fake();
+        // Master produk harga beli = 40000
+        $this->produk->update(['harga_beli' => 40000]);
+
+        // PO dengan harga 50000 (berbeda dari master produk)
+        $po = $this->buatPoDikirim(5, 50000);
+        $this->service()->inputGudang($po, [$this->produk->id => 5], $this->user->id);
+
+        $riwayat = RiwayatPerubahanHarga::where('produk_id', $this->produk->id)->first();
+        $this->assertNotNull($riwayat);
+        $this->assertEquals('grn', $riwayat->sumber);
+        $this->assertEquals(50000, (float) $riwayat->harga_baru);
+        $this->assertEquals(40000, (float) $riwayat->harga_lama);
+        $this->assertEquals(10000, (float) $riwayat->selisih);
+    }
+
+    public function test_return_pembelian_tab_bisa_menyetujui_status_draft(): void
+    {
+        Queue::fake();
+        $po = PurchaseOrder::create([
+            'no_po' => 'PO-RETUR-1',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'status' => 'diterima',
+            'metode_bayar' => 'kredit',
+            'total' => 200000,
+        ]);
+        $poItem = PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'produk_id' => $this->produk->id,
+            'harga_beli' => 20000,
+            'jumlah' => 10,
+            'subtotal' => 200000,
+        ]);
+        StokItem::updateOrCreate(
+            ['produk_id' => $this->produk->id, 'gudang_id' => $this->gudang->id],
+            ['jumlah' => 10, 'cabang_id' => $this->cabang->id]
+        );
+
+        $retur = ReturnPembelian::create([
+            'no_return' => 'RET-BELI-001',
+            'purchase_order_id' => $po->id,
+            'supplier_id' => $this->supplier->id,
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'status' => 'draft',
+            'tanggal' => now(),
+            'metode_pengembalian' => 'saldo',
+            'jumlah' => 40000,
+            'user_id' => $this->user->id,
+        ]);
+        $retur->items()->create([
+            'produk_id' => $this->produk->id,
+            'jumlah' => 2,
+            'harga_beli' => 20000,
+            'subtotal' => 40000,
+        ]);
+
+        session(['cabang_id' => $this->cabang->id]);
+        $approver = $this->approver();
+        $this->actingAs($approver);
+
+        Livewire::test(ReturnPembelianTab::class)
+            ->call('setujuiRetur', $retur->id)
+            ->assertDispatched('alert', function ($event, $params) {
+                return ($params[0]['type'] ?? $params['type'] ?? null) === 'success';
+            });
+
+        $this->assertEquals('selesai', $retur->fresh()->status);
+        $this->assertEquals(8, (int) StokItem::where('produk_id', $this->produk->id)->where('gudang_id', $this->gudang->id)->value('jumlah'));
+    }
+
+    public function test_grn_penerimaan_barang_dengan_produk_bermargin_dan_harga_tier(): void
+    {
+        Queue::fake();
+
+        // Setup produk dengan margin dan harga tier retail
+        $this->produk->update([
+            'harga_beli' => 10000,
+            'margin_persen' => 20,
+            'harga_jual_retail' => 12000,
+        ]);
+
+        HargaTier::create([
+            'produk_id' => $this->produk->id,
+            'tipe_konsumen' => 'retail',
+            'nominal_tetap' => 12000,
+            'harga' => 12000,
+        ]);
+
+        // PO dengan harga baru 15.000
+        $po = $this->buatPoDikirim(10, 15000);
+
+        // Penerimaan barang GRN yang mentrigger sesuaikanHargaBeliAverage
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 10], $this->user->id);
+
+        $this->assertEquals('terima', $grn->status);
+        $this->assertEquals(15000, (float) $this->produk->fresh()->harga_beli);
+        // Harga jual retail = 15.000 * 1.20 = 18.000
+        $this->assertEquals(18000, (float) $this->produk->fresh()->harga_jual_retail);
+
+        $tier = HargaTier::where('produk_id', $this->produk->id)->where('tipe_konsumen', 'retail')->first();
+        $this->assertNotNull($tier);
+        $this->assertEquals(18000, (float) $tier->nominal_tetap);
+    }
+
+    public function test_buka_dan_konfirmasi_tolak_grn_via_modal_dialog(): void
+    {
+        Queue::fake();
+        $po = $this->buatPoDikirim(10, 50000);
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 5], $this->user->id);
+
+        $this->actingAs($this->approver(), 'web');
+        $this->withSession(['cabang_id' => $this->cabang->id]);
+
+        Livewire::test(GrnTab::class)
+            ->call('bukaKonfirmasiTolak', $grn->id)
+            ->assertSet('showTolakDialog', true)
+            ->assertSet('tolakGrnId', $grn->id)
+            ->set('alasanTolak', 'Barang rusak kemasan pecah total')
+            ->call('konfirmasiTolakGrn')
+            ->assertSet('showTolakDialog', false);
+
+        $this->assertEquals('ditolak', $grn->fresh()->status);
+        $this->assertStringContainsString('Barang rusak kemasan pecah total', (string) $grn->fresh()->catatan);
+        $this->assertSame(0, Utang::count(), 'GRN ditolak tidak boleh membuat baris Utang');
+        $this->assertSame(0, (int) StokItem::where('produk_id', $this->produk->id)->sum('jumlah'));
+    }
+
+    public function test_alur_end_to_end_po_grn_dan_retur_pembelian_lengkap(): void
+    {
+        Queue::fake();
+
+        // 1. PO dibuat dan dikirim
+        $po = $this->buatPoDikirim(10, 50000);
+        $poItem = $po->items->first();
+
+        // 2. Penerimaan GRN (10 unit lengkap)
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 10], $this->user->id);
+        $this->assertEquals('terima', $grn->status);
+        $this->assertEquals('diterima', $po->fresh()->status);
+
+        // Verifikasi Stok bertambah 10
+        $stokAwal = (int) StokItem::where('produk_id', $this->produk->id)->where('gudang_id', $this->gudang->id)->value('jumlah');
+        $this->assertEquals(10, $stokAwal);
+
+        // Verifikasi Jurnal AP: Debit Persediaan 130-01 (500.000), Kredit Utang 210-01 (500.000)
+        $debitPersediaan = JurnalAkuntansi::where('no_jurnal', $grn->no_grn)
+            ->whereHas('akun', fn ($q) => $q->where('kode', '130-01'))
+            ->value('debit');
+        $this->assertEquals(500000, (float) $debitPersediaan);
+
+        $kreditUtang = JurnalAkuntansi::where('no_jurnal', $grn->no_grn)
+            ->whereHas('akun', fn ($q) => $q->where('kode', '210-01'))
+            ->value('kredit');
+        $this->assertEquals(500000, (float) $kreditUtang);
+
+        // Verifikasi Subledger Utang AP
+        $utangPo = Utang::where('referensi_tipe', PurchaseOrder::class)->where('referensi_id', $po->id)->first();
+        $this->assertNotNull($utangPo);
+        $this->assertEquals(500000, (float) $utangPo->jumlah);
+
+        // 3. Retur Pembelian: 3 unit dikembalikan ke supplier karena cacat
+        $returService = app(ReturnPembelianService::class);
+        $retur = $returService->buatRetur(
+            $po->fresh(),
+            [
+                [
+                    'purchase_order_item_id' => $poItem->id,
+                    'jumlah' => 3,
+                ],
+            ],
+            'Barang cacat pabrik 3 unit',
+            'utang',
+            $this->user->id
+        );
+
+        $this->assertEquals('selesai', $retur->fresh()->status);
+
+        // Verifikasi Stok berkurang 3 (10 - 3 = 7)
+        $stokAkhir = (int) StokItem::where('produk_id', $this->produk->id)->where('gudang_id', $this->gudang->id)->value('jumlah');
+        $this->assertEquals(7, $stokAkhir);
+
+        // Verifikasi Jurnal Retur: Debit Utang 210-01 (150.000), Kredit Persediaan 130-01 (150.000)
+        $debitUtangRetur = JurnalAkuntansi::where('no_jurnal', $retur->no_return)
+            ->whereHas('akun', fn ($q) => $q->where('kode', '210-01'))
+            ->value('debit');
+        $this->assertEquals(150000, (float) $debitUtangRetur);
+
+        $kreditPersediaanRetur = JurnalAkuntansi::where('no_jurnal', $retur->no_return)
+            ->whereHas('akun', fn ($q) => $q->where('kode', '130-01'))
+            ->value('kredit');
+        $this->assertEquals(150000, (float) $kreditPersediaanRetur);
+
+        // Verifikasi Saldo Utang Terpotong (500.000 - 150.000 = 350.000)
+        $this->assertEquals(350000, (float) $utangPo->fresh()->jumlah);
+        // Verifikasi Total PO berkurang sesuai retur utang
+        $this->assertEquals(350000, (float) $po->fresh()->total);
+    }
+
+    public function test_histori_pengadaan_tab_menampilkan_data_dan_bisa_export_csv(): void
+    {
+        session(['cabang_id' => $this->cabang->id]);
+        $this->actingAs($this->user);
+
+        $po = $this->buatPoDikirim(5, 25000);
+
+        Livewire::test(HistoriPengadaanTab::class)
+            ->assertSee($po->no_po)
+            ->assertSee($this->produk->nama)
+            ->set('search', $po->no_po)
+            ->assertSee($po->no_po)
+            ->call('bukaDetailProduk', $this->produk->id)
+            ->assertSet('showProdukModal', true)
+            ->call('tutupDetailProduk')
+            ->assertSet('showProdukModal', false)
+            ->call('exportCsv')
+            ->assertFileDownloaded();
+    }
+
+    public function test_generate_no_grn_mencegah_duplicate_key_saat_penerimaan_berulang(): void
+    {
+        Queue::fake();
+
+        $po1 = $this->buatPoDikirim(5, 20000);
+        $po2 = $this->buatPoDikirim(8, 12000);
+
+        $grn1 = $this->service()->inputGudang($po1, [$this->produk->id => 5], $this->user->id);
+        $grn2 = $this->service()->inputGudang($po2, [$this->produk->id => 8], $this->user->id);
+
+        $this->assertNotEmpty($grn1->no_grn);
+        $this->assertNotEmpty($grn2->no_grn);
+        $this->assertNotEquals($grn1->no_grn, $grn2->no_grn);
+        $this->assertDatabaseHas('grn', ['id' => $grn1->id, 'no_grn' => $grn1->no_grn]);
+        $this->assertDatabaseHas('grn', ['id' => $grn2->id, 'no_grn' => $grn2->no_grn]);
     }
 }

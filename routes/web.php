@@ -40,9 +40,11 @@ use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Livewire\CycleCountPage;
+use App\Modules\Wms\Livewire\ImportExportPage;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
 use App\Modules\Wms\Livewire\WmsDashboard;
 use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Workflow\Livewire\ApprovalInbox;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -610,6 +612,24 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
     Route::get('/wms', WmsDashboard::class)
         ->name('wms')
         ->middleware('permission:wms.view');
+
+    // WMS Export & Import Master Produk Screen
+    Route::get('/wms/import-export', ImportExportPage::class)
+        ->name('wms.import-export')
+        ->middleware('permission:wms.view');
+
+    // Cetak Dokumen PO Fisik & Dokumen Penolakan PO (Print A4 & WhatsApp)
+    Route::get('/wms/po/{id}/print', function ($id) {
+        $po = PurchaseOrder::with(['supplier', 'gudangTujuan.cabang', 'items.produk', 'items.skuVariant'])->findOrFail($id);
+
+        return view('wms.po-print', ['po' => $po]);
+    })->name('wms.po.print')->middleware('permission:wms.view');
+
+    Route::get('/wms/po/{id}/print-penolakan', function ($id) {
+        $po = PurchaseOrder::with(['supplier', 'gudangTujuan.cabang', 'items.produk', 'items.skuVariant'])->findOrFail($id);
+
+        return view('wms.po-print-penolakan', ['po' => $po]);
+    })->name('wms.po.print-penolakan')->middleware('permission:wms.view');
 
     // [F3-7] Cycle Count Otomatis (G-18) — jadwal CRUD + daftar task count
     // RBAC: permission wms.view utk lihat; mutasi (jadwal/count) di-gate wms.opname di komponen

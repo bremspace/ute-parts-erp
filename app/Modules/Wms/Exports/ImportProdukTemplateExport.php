@@ -3,8 +3,10 @@
 namespace App\Modules\Wms\Exports;
 
 use App\Modules\Wms\Models\Brand;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
@@ -137,6 +139,15 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                             $valSn->setShowDropDown(true);
                             $valSn->setFormula1('"ya,tidak"');
                             $valSn->setSqref('T2:T1000');
+
+                            // 10. Dropdown Gudang Penyimpanan (Kolom V) -> Referensi Sheet 3 (Kolom M)
+                            $valGudang = $sheet->getCell('V2')->getDataValidation();
+                            $valGudang->setType(DataValidation::TYPE_LIST);
+                            $valGudang->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valGudang->setAllowBlank(true);
+                            $valGudang->setShowDropDown(true);
+                            $valGudang->setFormula1("'Referensi Sistem'!\$M\$2:\$M\$100");
+                            $valGudang->setSqref('V2:V1000');
                         },
                     ];
                 }
@@ -174,7 +185,7 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
 
                 public function headings(): array
                 {
-                    return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand'];
+                    return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand', 'Gudang', 'Rak'];
                 }
 
                 public function collection(): Enumerable
@@ -209,10 +220,20 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                         $suppliers = ['PT Supplier Jaya', 'Supplier Umum', 'Sumber Makmur'];
                     }
 
+                    $gudangs = Gudang::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    if (empty($gudangs)) {
+                        $gudangs = ['Gudang Utama'];
+                    }
+
+                    $raks = Rak::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    if (empty($raks)) {
+                        $raks = ['Rak A1', 'Rak A2', 'Rak B1'];
+                    }
+
                     $subKategoris = KategoriProduk::with('parent')->where('is_active', true)->whereNotNull('parent_id')->orderBy('nama')->get();
                     $tipeHp = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->get();
                     $kualitasBrand = KualitasProduk::with('brand')->where('is_active', true)->whereNotNull('brand_id')->orderBy('nama')->get();
-                    $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers), count($subKategoris), count($tipeHp), count($kualitasBrand));
+                    $max = max(count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers), count($gudangs), count($raks), count($subKategoris), count($tipeHp), count($kualitasBrand));
                     $rows = [];
                     for ($i = 0; $i < $max; $i++) {
                         $rows[] = [
@@ -223,6 +244,7 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                             $kualitas[$i] ?? '',
                             $suppliers[$i] ?? '', $kategoris[$i] ?? '', $subKategoris[$i]?->nama ?? '',
                             $tipeHp[$i]?->merk ?? '', $tipeHp[$i]?->model ?? '', $kualitasBrand[$i]?->brand?->nama ?? '', $kualitasBrand[$i]?->nama ?? '',
+                            $gudangs[$i] ?? '', $raks[$i] ?? '',
                         ];
                     }
 
@@ -264,6 +286,10 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                         ['5. PENCEGAHAN TYPO OTOMATIS:'],
                         ['   - Sistem dilengkapi Auto-Fuzzy Matcher: jika terjadi salah ketik kecil (cth: "Samsng" atau "ip 11"),'],
                         ['     sistem otomatis menormalkan ke data resmi yang tepat tanpa mengotori database master.'],
+                        [''],
+                        ['6. GUDANG & PENEMPATAN LOKASI RAK FISIK:'],
+                        ['   - gudang: Pilih nama gudang penyimpanan (default: "Gudang Utama"). Jika dikosongkan, sistem otomatis memasukkannya ke Gudang Utama default cabang.'],
+                        ['   - rak: Tuliskan kode atau nama rak (cth: "Rak A1", "Rak Z-01"). Jika rak atau satuan belum ada di sistem, sistem otomatis mendaftarkannya tanpa menggagalkan import.'],
                     ]);
                 }
             },

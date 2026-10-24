@@ -670,6 +670,38 @@ class PoTab extends Component
         ]);
     }
 
+    public function batalkanPo(int $id, ?string $alasan = null): void
+    {
+        $po = PurchaseOrder::with('gudangTujuan')->find($id);
+        if (! $po) {
+            return;
+        }
+
+        $this->tolakJikaBukanCabang($po->gudangTujuan?->cabang_id, 'PO bukan milik cabang aktif');
+
+        if (! in_array($po->status, ['draft', 'dikirim'], true)) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "PO {$po->no_po} tidak dapat dibatalkan karena berstatus {$po->status}.",
+            ]);
+
+            return;
+        }
+
+        $alasanFinal = trim((string) $alasan) ?: 'Dibatalkan oleh purchasing/gudang';
+        $catatanLama = $po->catatan ? $po->catatan.' | ' : '';
+
+        $po->update([
+            'status' => 'dibatalkan',
+            'catatan' => $catatanLama.'[Dibatalkan: '.$alasanFinal.']',
+        ]);
+
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => "PO {$po->no_po} berhasil dibatalkan: {$alasanFinal}",
+        ]);
+    }
+
     public function bukaDetailPo(int $id): void
     {
         $this->detailPoId = $id;

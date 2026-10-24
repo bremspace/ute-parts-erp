@@ -3,6 +3,106 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-24 — WMS: Threshold Kemiripan 99%, Resolusi Duplikat SKU Interaktif & Workspace Terpisah ✅
+
+- **Pengaturan Manual Threshold Kemiripan di UI**: Menambahkan slider dan input angka threshold (50%–100%, default 99%, preset 90%/95%/98%/99%/100%) baik pada formulir upload maupun langsung di panel pratinjau. Menggeser slider pada layar pratinjau langsung mengevaluasi ulang deteksi kemiripan secara real-time tanpa perlu mengunggah ulang file.
+- **Threshold Kemiripan Dinamis Backend**: Parameter `$threshold` diteruskan dinamis ke `ImportProdukService::preview()`, `checkRowWarnings()`, `detectKemiripanRow()`, `commit()`, dan `ImportProdukExcelJob`.
+- **Resolusi Duplikat SKU/Barcode Interaktif**: Menambahkan helper `detectDuplikatRow()`, `generateUniqueSkuSuffix()`, dan `prosesTimpaUpdateBaris()` pada `ImportProdukService`. User kini dapat mengedit SKU pengganti langsung, memilih opsi timpa/update produk eksisting, atau melewatinya (skip). Parameter `$resolusiDuplikat` diteruskan secara konsisten melalui `ImportProdukExcelJob`.
+- **Halaman Workspace Dedicated**: Membuat rute `/app/wms/import-export` (`name: 'wms.import-export'`) dan komponen Livewire `ImportExportPage` terpisah untuk mengisolasi beban memori dan render DOM saat pemrosesan preview, penyesuaian SKU, dan log import.
+- **Pembersihan Modal ProdukTab**: Merampingkan lebih dari 400 baris DOM modal import dari `resources/views/modules/wms/livewire/produk-tab.blade.php`, mengarahkan tombol import di dashboard dan event `wms-import-modal` langsung ke workspace via `wire:navigate`.
+- **Rincian Error Lengkap**: Seluruh baris error kini dipaparkan satu per satu tanpa pemotongan sehingga pengguna dapat memperbaiki data secara tuntas.
+- **Verifikasi**: Test suite WMS import (`WmsImportRakDanSatuanTest`, `WmsImportStatusAndNormalizerTest`, dll) lulus (21 tests, 226 assertions). Format kode diselaraskan dengan Laravel Pint.
+
+
+## 2026-10-24 — Sistem Reservasi Stok Marketplace & POS Anti-Oversell ✅
+
+- Menambahkan migrasi kolom `expires_at` pada tabel `transaksi` beserta index dan casting model `Transaksi`.
+- Menambahkan konfigurasi `marketplace.reservation_minutes` (default 60 menit) di `config/marketplace.php`.
+- Membuat `StockReservationService` untuk sentralisasi kalkulasi reservasi stok marketplace aktif (`menunggu_pembayaran` dan belum lewat `expires_at`) serta stok tersedia bersih per cabang.
+- Memperbarui `OrderService::buatOrder` untuk mengunci baris stok per cabang (`lockForUpdate`), mengurangkan pending transfer lock dan reservasi online aktif, mengisi `expires_at`, serta menolak oversell.
+- Memperbarui guard ketersediaan dan deduksi stok POS (`PosKasir::hitungStokTersedia`, `PosController::store`, dan `StokDeductionService::kurangi`) agar reservasi online aktif mengurangi sellable stock kasir, sekaligus mengecualikan reservasi milik transaksi online itu sendiri saat konfirmasi/pembayaran dilakukan.
+- Memastikan pembatalan (`batal`), kegagalan (`gagal`), atau ekspirasi (`kadaluarsa`) secara alami membebaskan kuantitas reservasi tanpa mutasi fisik balik.
+- Memperbarui `DuitkuRekonCommand` untuk memeriksa ekspirasi order berbasis `expires_at <= now()` atau fallback cutoff lama, serta mendaftarkan `duitku:rekon` berjalan `everyTenMinutes()` di `routes/console.php`.
+- Menambahkan feature test `StockReservationSystemTest` (6 test suite, 20 assertions) mencakup reservasi memblokir pesanan kedua, memblokir POS saat stok kurang, rilis saat pembatalan/ekspirasi, dan pembayaran sukses.
+
+## 2026-10-24 — Sinkronisasi Stok POS dan Online ✅
+
+- `stok_items.jumlah` tetap menjadi source of truth; pembayaran POS dan online memakai `StokDeductionService`.
+- Pembayaran Duitku kini menghormati `konversi` satuan dasar.
+- Alokasi multi-gudang mengabaikan saldo yang terkunci transfer pending.
+- Bayar pickup mengunci transaksi dan menolak pemrosesan ganda.
+- Verifikasi: 25 test lulus, 130 assertions.
+
+## 2026-10-24 — Validasi Stok Marketplace per Cabang ✅
+
+- Checkout marketplace kini memeriksa stok pada gudang cabang yang dipilih, bukan agregat lintas cabang.
+- Order gagal sebelum dibuat jika stok cabang tidak mencukupi; mencegah pembayaran gagal karena mismatch cabang.
+- Regression test ditambahkan pada `MarketplacePpnTest`.
+
+## 2026-10-24 — Perbaikan Import Master Produk (Auto-Create Rak, Satuan, Gudang Default & Fix GRN Duplicate Key) ✅
+
+- **[Auto-Create Gudang Default, Satuan & Rak saat Import Produk]**:
+  - Menghapus blocking error `"Satuan tidak terdaftar di satuan_unit"` pada `ImportProdukService::validateRow`.
+  - Mengimplementasikan `resolveOrCreateSatuan`: normalisasi alias satuan, pengecekan runtime cache `$satuanCache`, dan pendaftaran otomatis ke master `satuan_unit` (`firstOrCreate`).
+  - Mengimplementasikan `resolveOrCreateGudangDefault`: jika sistem belum memiliki gudang secara global atau rak tidak memiliki parent gudang, sistem secara otomatis membuatkan `Gudang Utama` default (`is_default = true`) di cabang aktif sehingga constraint foreign key rak selalu terpenuhi.
+  - Mengimplementasikan `resolveOrCreateRak`: resolusi rak per gudang, fallback gudang default, pencegahan bentrok constraint `rak.kode_unique` melalui generator kode slug unik berbasis counter (`$kodeUnik`), serta cache memori `$rakCache`.
+  - Menerapkan penanganan fallback gudang dan rak unik serupa pada `ImportSidRetailService`.
+  - Menyajikan notifikasi transparan di modal preview import (`konfirmasi`) yang menginformasikan bahwa satuan, rak, maupun gudang default baru akan dibuat secara otomatis oleh sistem saat import dieksekusi.
+- **[Fix Error Livewire Payload Too Large (2228KB)]**:
+  - Menerbitkan `config/livewire.php` dan menaikkan batas `payload.max_size` dari 1MB (1024KB) menjadi 10MB (10240KB).
+  - Membatasi ukuran payload array preview pada `ImportProdukService::preview`: memotong `warning_rows` dan `error_rows` hanya maksimal 10 baris sampel pertama (disertai `total_warning_rows` dan `total_error_rows`), serta membatasi referensi `konfirmasi` maksimal 20 item.
+  - Membatasi array `items` pada `ImportSidRetailService::preview` maksimal 10 baris sampel.
+  - Mengosongkan properti `$importPreview = []` saat beralih ke langkah `selesai` pada `ProdukTab::commitImport` sehingga Livewire tidak lagi menserialisasi megabytes data bolak-balik pada request AJAX berikutnya.
+- **[Fix Error SQL Duplicate Entry 'JRL-GRN-...' pada Penerimaan GRN Pengadaan]**:
+  - Masalah: `GrnService` sebelumnya memanggil `JurnalService::generateNoJurnal('grn', $cabangId)` yang hanya memeriksa tabel `jurnal_headers`. Karena GRN baru tersimpan dalam status `draft` (belum posting jurnal), counter menghasilkan nomor berulang yang sama sehingga menabrak kunci unik `grn.grn_no_grn_unique`.
+  - Solusi: Menyediakan method dedicated `generateNoGrn(?int $cabangId)` di `GrnService.php` yang membaca counter langsung dari tabel `grn` (dengan `lockForUpdate`), tabel `jurnal_headers`, serta loop pengaman `do { ... } while (Grn::where('no_grn', $candidate)->exists())`.
+- **[Automated Testing & Verifikasi]**:
+  - Menambahkan test feature `tests/Feature/WmsImportRakDanSatuanTest.php` untuk memverifikasi auto-create satuan, rak, gudang default jika sistem kosong, dan efisiensi ukuran payload JSON preview (< 100KB).
+  - Menambahkan test `test_generate_no_grn_mencegah_duplicate_key_saat_penerimaan_berulang` pada `tests/Feature/GrnTest.php`.
+  - Seluruh 45 test pengadaan, GRN, dan import produk lulus (329 assertions).
+
+## 2026-10-24 — Perbaikan Alur Pengadaan (PO, GRN & Retur Pembelian) End-to-End ✅
+
+- **[Dokumen PO Fisik, Berita Acara Penolakan, Tombol Tolak PO & Integrasi WhatsApp Supplier]**:
+  - Menyediakan tombol **Tolak PO** pada daftar *PO Siap Diterima* di `grn-tab.blade.php` beserta modal konfirmasi alasan pembatalan di pintu gudang (`showTolakPoDialog`, `bukaKonfirmasiTolakPo`, `konfirmasiTolakPo`).
+  - PO yang ditolak diubah statusnya menjadi `dibatalkan` disertai catatan audit, tanpa menambah stok atau memposting jurnal AP.
+  - Menyediakan fitur cetak Surat Purchase Order Resmi print-ready A4 (`/wms/po/{id}/print`) dan Berita Acara Penolakan Barang / Kontra Bon Penolakan (`/wms/po/{id}/print-penolakan`).
+  - Menambahkan generator URL WhatsApp langsung ke supplier pada model `PurchaseOrder` (`generateWaPesananUrl` & `generateWaPenolakanUrl`) untuk mengirimkan ringkasan pesanan atau notifikasi penolakan kiriman.
+  - Memasang tombol cetak dokumen, share WhatsApp, dan pembatalan PO di tabel Purchase Order (`po-tab.blade.php`) dan tabel penerimaan GRN (`grn-tab.blade.php`).
+- **[UI/UX Mobile Polish Tombol Menu Pengadaan]**:
+  - Memperbaiki layout tombol pada sub-nav pengadaan (`wms-dashboard.blade.php`), toolbar header PO (`po-tab.blade.php`), dan sub-tab Retur Pembelian (`return-pembelian-tab.blade.php`) menggunakan `grid`/`flex-wrap` dan responsive touch target min 40-44px agar tidak over-layout / horizontal overflow di layar mobile (360px-420px).
+  - Merapikan sel aksi tombol di tabel PO, GRN, dan Retur dari `flex-nowrap` menjadi `flex-wrap min-w-[100px]-min-w-[130px]` sehingga kolom tabel tidak melar tak terkontrol di viewport kecil.
+- **[Integrasi Tab Progres Step & Alur Tolak GRN]**:
+  - Menyediakan visual workflow stepper interaktif 4 tahap di `grn-tab.blade.php`:
+    1. **Step 1: Fisik Tiba (PO Siap Terima)** — counter badge PO siap input fisik dan penataan lokasi rak.
+    2. **Step 2: Verifikasi & QC (Menunggu Approval)** — counter badge GRN draft untuk review supervisor.
+    3. **Step 3: Selesai (Diterima)** — counter badge barang resmi masuk stok & jurnal AP terposting.
+    4. **Step 4: Kendala (Ditolak)** — counter badge GRN ditolak beserta catatan penyebab kendala.
+  - Mengganti raw browser `prompt()` pada penolakan GRN dengan dialog modal penolakan resmi (`bukaKonfirmasiTolak` & `showTolakDialog`) di `GrnTab.php` dan `grn-tab.blade.php`.
+  - Dilengkapi penjelasan transparan konsekuensi penolakan (stok tidak masuk, jurnal utang tidak terbentuk, PO tetap aman untuk ditindaklanjuti) dan quick template alasan penolakan.
+- **[Audit Integrasi PO -> GRN -> Retur End-to-End]**:
+  - Memverifikasi konsistensi stok fisik (`stok_items`), mutasi keluar-masuk (`stock_mutation_logs` & `stok_log`), Moving Average harga beli master produk (`ProdukService::sesuaikanHargaBeliAverage`), penyesuaian harga tier retail, jurnaling AP (Debit 130-01 Persediaan, Kredit 210-01 Utang Usaha/Kas), dan jurnaling Retur (Debit 210-01 Utang Usaha, Kredit 130-01 Persediaan) serta pemotongan saldo utang supplier.
+- **[Fix Error SQL GRN Penerimaan Barang]**:
+  - Memperbaiki query update pada `ProdukService::sesuaikanHargaBeliAverage`: mengganti `where('tipe', 'retail')` menjadi `where('tipe_konsumen', 'retail')` sesuai skema tabel `harga_tier`, menyelesaikan error `Unknown column 'tipe' in 'where clause'`.
+- **[Halaman / Sub-Tab Khusus: Histori Pengadaan]**:
+  - Menambahkan sub-tab baru **Histori Pengadaan** (`HistoriPengadaanTab`) di bawah kelompok menu Pengadaan pada WMS Dashboard.
+  - Ringkasan KPI belanja: Total PO, Total Unit Dipesan, Total Belanja Pengadaan (Rp), dan Rata-rata Belanja per PO.
+  - Toolbar tracking manual lengkap: pencarian part/SKU/PO/supplier, filter supplier, filter status PO, rentang tanggal (Mulai - Selesai), dan opsi sorting.
+  - Tabel komprehensif ber-timestamp jam detik (`d/m/Y H:i:s`), indikator tren selisih harga (▲ Naik / ▼ Turun / ▬ Stabil), konversi satuan, subtotal, status PO, dan nomor referensi GRN.
+  - Modal audit histori part individual (moving average & fluktuasi harga antar-transaksi), modal detail PO lengkap, dan fitur **Export CSV** riwayat pengadaan.
+- **[GRN UI & Blade Parsing Fix]**:
+  - Memperbaiki ketidakseimbangan tag penutup div ganda (`</div></div>`) pada modal Input GRN (`grn-tab.blade.php`) yang memicu kerusakan DOM morphing Livewire saat modal dibuka.
+  - Memperbaiki event handler barcode scanner dari identifier JS mentah `prosesBarcode(barcodeInput)` menjadi method Livewire `prosesBarcode`.
+- **[Metadata Produk pada GRN]**:
+  - Menyimpan atribut `produk_nama` pada array payload JSON `item_qty_received` di `GrnService::inputGudang` agar detail GRN selalu menampilkan nama produk secara konsisten tanpa fallback ke `#ID`.
+- **[Histori Pemesanan PO & Deteksi Perubahan Harga]**:
+  - Memperkaya `ProcurementService::getHistoriPembelian` dengan penghitungan selisih harga sekuensial (`selisih`), persentase perubahan (`persentase`), status tren (`naik`/`turun`/`tetap`/`awal`), dan raw timestamp `created_at`.
+  - Menampilkan badge indikator perubahan harga (kenaikan bertanda merah `▲`, penurunan bertanda hijau `▼`) pada modal histori PO (`po-tab.blade.php`).
+- **[Approval & Eksekusi Retur Pembelian]**:
+  - Menyelaraskan status handling di `ReturnPembelianTab.php` dan `return-pembelian-tab.blade.php` untuk mendukung status `draft` bersama `menunggu`, serta mengizinkan role dengan permission `approve-workflow` atau `wms.create` menyetujui dan mengeksekusi retur ke supplier.
+- **[Testing & Verifikasi]**:
+  - Menambahkan test feature di `GrnTest.php` untuk verifikasi histori pembelian ber-timestamp, deteksi selisih harga, pencatatan `RiwayatPerubahanHarga` pada GRN, dan eksekusi retur pembelian status `draft`. Seluruh 43 test suite pengadaan lulus tanpa error.
+
 ## 2026-10-24 — WMS Frontend, Workflow & Contrast Comprehensive Polish (13 Poin User) ✅
 
 - **[T-01 & T-04: Toolbar Filter & Popover Kolom Master Produk]**:
@@ -2209,4 +2309,3 @@ EOF
   - **Stok Log (17.176)**: `sid_retail_raw_arus_stok` (19.286) → `stok_items` + `stok_log` + `stock_mutation_log` (sumber `sid_migration`), lookup gudang via `lokasi_stok` map, referensi transaksi via `no_transaksi` di `sid_import_map`. ~2k di-skip (delta=0 atau barang tidak termap).
   - **Servis (332)**: `sid_retail_raw_servis` → `tiket_servis` (status map: SEDANG DI SERVIS→dalam_pengerjaan, SUDAH DI AMBIL→diambil, DIBATALKAN→dibatalkan, MENUNGGU APPROVAL→menunggu_approval) + `teknisi` seed ke `users`.
 - **Verifikasi aktual (db_staging)**: Produk 6.368 (3.235 existing + 3.133 SID), SkuVariant 6.368, HargaTier 19.104 (3×), Pelanggan 291 (284 SID + 4 member + 3 existing), Supplier 12 (10 SID + 2 existing), Transaksi 18.786 (12.524 existing + 6.262 SID), TransaksiItem 28.491 (18.994 existing + 9.497 SID), StokItem 3.044, StokLog 120.167 (68.712 existing + 51.455 SID re-run with refs), TiketServis 342 (10 existing + 332 SID), Piutang 0, Utang 0, SidImportMap 13.251 entries. Idempoten: re-run → 0 insert baru (guard unique `kode_sumber+tabel_sumber`). Semua test suite PASS (kecuali `WmsImportVerifyTest` temporary test memori).
-

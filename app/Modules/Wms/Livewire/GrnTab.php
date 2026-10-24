@@ -64,6 +64,24 @@ class GrnTab extends Component
 
     public ?int $confirmActionedBy = null;
 
+    public bool $showTolakDialog = false;
+
+    public ?int $tolakGrnId = null;
+
+    public ?string $tolakGrnNo = null;
+
+    public string $alasanTolak = '';
+
+    public bool $showTolakPoDialog = false;
+
+    public ?int $tolakPoId = null;
+
+    public ?string $tolakPoNo = null;
+
+    public ?string $tolakPoSupplier = null;
+
+    public string $alasanTolakPo = '';
+
     public string $filterStatus = 'all';
 
     public ?int $detailGrnId = null;
@@ -558,6 +576,99 @@ class GrnTab extends Component
         $this->confirmGrnId = null;
     }
 
+    public function bukaKonfirmasiTolak(int $grnId): void
+    {
+        abort_unless(auth()->user()?->can('approve-workflow'), 403);
+
+        $grn = $this->grnCabangAktif($grnId);
+
+        $this->tolakGrnId = $grn->id;
+        $this->tolakGrnNo = $grn->no_grn;
+        $this->alasanTolak = '';
+        $this->resetErrorBag('alasanTolak');
+        $this->showTolakDialog = true;
+    }
+
+    public function tutupKonfirmasiTolak(): void
+    {
+        $this->showTolakDialog = false;
+        $this->tolakGrnId = null;
+        $this->tolakGrnNo = null;
+        $this->alasanTolak = '';
+        $this->resetErrorBag('alasanTolak');
+    }
+
+    public function konfirmasiTolakGrn(): void
+    {
+        if (! $this->tolakGrnId) {
+            return;
+        }
+
+        $alasan = trim($this->alasanTolak);
+        if ($alasan === '') {
+            $this->addError('alasanTolak', 'Alasan penolakan GRN wajib diisi agar tercatat di audit trail');
+
+            return;
+        }
+
+        $grnId = $this->tolakGrnId;
+        $this->tutupKonfirmasiTolak();
+        $this->tolakGrn($grnId, $alasan);
+    }
+
+    public function bukaKonfirmasiTolakPo(int $poId): void
+    {
+        $po = PurchaseOrder::with(['supplier', 'gudangTujuan'])->findOrFail($poId);
+        $this->tolakJikaBukanCabang($po->gudangTujuan?->cabang_id, 'PO bukan milik cabang aktif');
+
+        $this->tolakPoId = $po->id;
+        $this->tolakPoNo = $po->no_po;
+        $this->tolakPoSupplier = $po->supplier?->nama;
+        $this->alasanTolakPo = '';
+        $this->resetErrorBag('alasanTolakPo');
+        $this->showTolakPoDialog = true;
+    }
+
+    public function tutupKonfirmasiTolakPo(): void
+    {
+        $this->showTolakPoDialog = false;
+        $this->tolakPoId = null;
+        $this->tolakPoNo = null;
+        $this->tolakPoSupplier = null;
+        $this->alasanTolakPo = '';
+        $this->resetErrorBag('alasanTolakPo');
+    }
+
+    public function konfirmasiTolakPo(): void
+    {
+        if (! $this->tolakPoId) {
+            return;
+        }
+
+        $alasan = trim($this->alasanTolakPo);
+        if ($alasan === '') {
+            $this->addError('alasanTolakPo', 'Alasan penolakan PO wajib diisi agar tercatat di audit trail');
+
+            return;
+        }
+
+        $po = PurchaseOrder::with('gudangTujuan')->findOrFail($this->tolakPoId);
+        $this->tolakJikaBukanCabang($po->gudangTujuan?->cabang_id, 'PO bukan milik cabang aktif');
+
+        $catatanLama = $po->catatan ? $po->catatan.' | ' : '';
+        $po->update([
+            'status' => 'dibatalkan',
+            'catatan' => $catatanLama.'[Ditolak di Pintu Gudang: '.$alasan.']',
+        ]);
+
+        $this->dispatch('alert', [
+            'type' => 'warning',
+            'message' => "PO {$po->no_po} ditolak & dibatalkan: {$alasan}",
+        ]);
+
+        $this->tutupKonfirmasiTolakPo();
+    }
+
     /** [P1-1] Load GRN dgn scope cabang session — id asing → 403. */
     private function grnCabangAktif(int $grnId): Grn
     {
@@ -617,8 +728,15 @@ class GrnTab extends Component
         }
 
         // [P1-1] GRN dibatasi cabang aktif session
-        $grnList = Grn::with(['purchaseOrder.supplier', 'gudang', 'user'])
-            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+        $baseGrnQuery = Grn::query()->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId));
+        $countDraft = (clone $baseGrnQuery)->where('status', 'draft')->count();
+        $countTerima = (clone $baseGrnQuery)->where('status', 'terima')->count();
+        $countDitolak = (clone $baseGrnQuery)->where('status', 'ditolak')->count();
+        $countTotal = (clone $baseGrnQuery)->count();
+        $countPoSiapTerima = $poList->count();
+
+        $grnList = (clone $baseGrnQuery)
+            ->with(['purchaseOrder.supplier', 'gudang', 'user'])
             ->when($this->filterStatus !== 'all', fn ($q) => $q->where('status', $this->filterStatus))
             ->latest()
             ->paginate(15, pageName: 'grn');
@@ -634,6 +752,11 @@ class GrnTab extends Component
             'grnList' => $grnList,
             'detailGrn' => $detailGrn,
             'filterStatus' => $this->filterStatus,
+            'countDraft' => $countDraft,
+            'countTerima' => $countTerima,
+            'countDitolak' => $countDitolak,
+            'countTotal' => $countTotal,
+            'countPoSiapTerima' => $countPoSiapTerima,
         ]);
     }
 }

@@ -103,6 +103,29 @@ class MarketplacePpnTest extends TestCase
         );
     }
 
+    public function test_order_menolak_stok_di_cabang_lain(): void
+    {
+        $cabangKosong = Cabang::create([
+            'kode' => 'CBG-EMPTY-'.Str::random(3),
+            'nama' => 'Cabang Kosong',
+            'is_active' => true,
+        ]);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('tidak mencukupi di cabang yang dipilih');
+
+        try {
+            app(OrderService::class)->buatOrder(
+                $this->pelanggan,
+                [['produk_id' => StokItem::query()->value('produk_id'), 'jumlah' => 1]],
+                $cabangKosong->id,
+                'ambil_ke_toko'
+            );
+        } finally {
+            $this->assertDatabaseCount('transaksi', 0);
+        }
+    }
+
     private function webhookLunas(Transaksi $transaksi)
     {
         $amount = (int) round((float) $transaksi->total_akhir);

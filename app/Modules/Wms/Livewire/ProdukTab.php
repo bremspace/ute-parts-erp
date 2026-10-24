@@ -344,6 +344,8 @@ class ProdukTab extends Component
 
     public array $importPreview = [];
 
+    public array $aksiKemiripan = [];
+
     public string $importFilePath = '';
 
     public int $importLogId = 0;
@@ -2033,25 +2035,7 @@ class ProdukTab extends Component
     #[On('wms-import-modal')]
     public function openImportModal()
     {
-        $this->importStep = 'upload';
-        $this->importFile = null;
-        $this->importPreview = [];
-        $this->importFilePath = '';
-        $this->activeImportLog = null;
-        $this->importFormat = 'standar';
-
-        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? 1;
-        $gudangsCabang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->get();
-        $this->gudangTokoId = $gudangsCabang->firstWhere('kode', 'GD-TOKO')?->id
-            ?? $gudangsCabang->first(fn ($g) => str_contains(strtolower($g->nama), 'toko'))?->id
-            ?? $gudangsCabang->first()?->id;
-
-        $this->gudangPusatId = $gudangsCabang->firstWhere('kode', 'GD-PUSAT')?->id
-            ?? $gudangsCabang->first(fn ($g) => str_contains(strtolower($g->nama), 'pusat') || str_contains(strtolower($g->nama), 'gudang'))?->id
-            ?? $gudangsCabang->skip(1)->first()?->id
-            ?? $this->gudangTokoId;
-
-        $this->showImportModal = true;
+        return $this->redirect(route('wms.import-export'), navigate: true);
     }
 
     // Quick action header "Export Master Produk" (dari shell WmsDashboard via $dispatch)
@@ -2081,8 +2065,14 @@ class ProdukTab extends Component
         }
         $this->importFile = null;
         $this->importPreview = [];
+        $this->aksiKemiripan = [];
         $this->importFilePath = '';
         $this->activeImportLog = null;
+    }
+
+    public function setAksiKemiripan(int $baris, string $aksi): void
+    {
+        $this->aksiKemiripan[$baris] = $aksi;
     }
 
     /**
@@ -2114,6 +2104,12 @@ class ProdukTab extends Component
             $this->importFilePath = $path;
             $this->importPreview = $hasil;
             $this->importStep = 'preview';
+            $this->aksiKemiripan = [];
+            if (! empty($hasil['kemiripan_rows'])) {
+                foreach ($hasil['kemiripan_rows'] as $kr) {
+                    $this->aksiKemiripan[$kr['baris']] = $kr['default_aksi'] ?? 'gabung';
+                }
+            }
 
             if ($hasil['invalid'] > 0) {
                 $this->dispatch('alert', [
@@ -2199,12 +2195,13 @@ class ProdukTab extends Component
 
                 // Jika <= 100 baris, proses langsung secara sinkron agar hasil instan dan tidak stuck di antrian
                 if ($totalBaris <= 100) {
-                    ImportProdukExcelJob::dispatchSync($log->id, $filePath, auth()->id());
+                    ImportProdukExcelJob::dispatchSync($log->id, $filePath, auth()->id(), 'standar', null, null, null, $this->aksiKemiripan);
                 } else {
-                    ImportProdukExcelJob::dispatch($log->id, $filePath, auth()->id());
+                    ImportProdukExcelJob::dispatch($log->id, $filePath, auth()->id(), 'standar', null, null, null, $this->aksiKemiripan);
                 }
             }
 
+            $this->importPreview = [];
             $this->importStep = 'selesai';
             $this->cekStatusImport();
             $this->dispatch('alert', [
@@ -3979,6 +3976,11 @@ class ProdukTab extends Component
                 $gudangNama = $firstStok->gudang?->nama ?? ($firstStok->gudang_id ? (string) $firstStok->gudang_id : '');
                 $rakNama = $firstStok->rak?->nama ?? ($firstStok->rak_id ? (string) $firstStok->rak_id : '');
             }
+            if ($gudangNama === '') {
+                $gudangNama = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->where('is_active', true)->value('nama')
+                    ?? Gudang::where('is_active', true)->value('nama')
+                    ?? 'Gudang Utama';
+            }
 
             // Produk kompatibel SKU: ambil dari relasi produk_kompatibel
             $produkKompatibelSku = $p->produkKompatibel->pluck('kode')->filter()->implode(',');
@@ -4217,7 +4219,7 @@ class ProdukTab extends Component
 
                             public function headings(): array
                             {
-                                return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand'];
+                                return ['Merk HP', 'Kategori Produk', 'Brand Sparepart', 'Satuan', 'Kualitas', 'Supplier', 'Kategori Utama', 'Sub Kategori', 'Merk HP', 'Tipe HP', 'Brand Part', 'Kualitas Brand', 'Gudang', 'Rak'];
                             }
 
                             public function array(): array
@@ -4317,6 +4319,16 @@ class ProdukTab extends Component
             $suppliers = ['PT Supplier Jaya', 'Supplier Umum', 'Sumber Makmur'];
         }
 
+        $gudangs = Gudang::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+        if (empty($gudangs)) {
+            $gudangs = ['Gudang Utama'];
+        }
+
+        $raks = Rak::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+        if (empty($raks)) {
+            $raks = ['Rak A1', 'Rak A2', 'Rak B1'];
+        }
+
         $subKategoris = KategoriProduk::with('parent')
             ->where('is_active', true)
             ->where('parent_id', '>', 0)
@@ -4331,7 +4343,7 @@ class ProdukTab extends Component
 
         $max = max(
             count($merks), count($kategoris), count($brands), count($satuans), count($kualitas), count($suppliers),
-            $subKategoris->count(), $tipeHp->count(), $kualitasBrand->count()
+            count($gudangs), count($raks), $subKategoris->count(), $tipeHp->count(), $kualitasBrand->count()
         );
         $rows = [];
         for ($i = 0; $i < $max; $i++) {
@@ -4351,6 +4363,8 @@ class ProdukTab extends Component
                 $tipe?->model ?? '',
                 $kualitasBrandItem?->brand?->nama ?? '',
                 $kualitasBrandItem?->nama ?? '',
+                $gudangs[$i] ?? '',
+                $raks[$i] ?? '',
             ];
         }
 
@@ -4386,6 +4400,10 @@ class ProdukTab extends Component
             ['5. PENCEGAHAN TYPO OTOMATIS:'],
             ['   - Sistem dilengkapi Auto-Fuzzy Matcher: jika terjadi salah ketik kecil (cth: "Samsng" atau "ip 11"),'],
             ['     sistem otomatis menormalkan ke data resmi yang tepat tanpa mengotori database master.'],
+            [''],
+            ['6. GUDANG & PENEMPATAN LOKASI RAK FISIK:'],
+            ['   - gudang: Pilih nama gudang penyimpanan (default: "Gudang Utama"). Jika dikosongkan, sistem otomatis memasukkannya ke Gudang Utama default cabang.'],
+            ['   - rak: Tuliskan kode atau nama rak (cth: "Rak A1", "Rak Z-01"). Jika rak atau satuan belum ada di sistem, sistem otomatis mendaftarkannya tanpa menggagalkan import.'],
         ];
     }
 

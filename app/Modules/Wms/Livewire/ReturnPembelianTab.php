@@ -111,14 +111,14 @@ class ReturnPembelianTab extends Component
     public function setujuiRetur(int $id): void
     {
         abort_unless(
-            auth()->user()?->can('wms.approve') || auth()->user()?->can('wms.update'),
+            auth()->user()?->can('approve-workflow') || auth()->user()?->can('wms.create') || auth()->user()?->can('wms.approve') || auth()->user()?->can('wms.update'),
             403,
             'Anda tidak memiliki izin menyetujui retur pembelian.'
         );
 
         $retur = ReturnPembelian::findOrFail($id);
-        if ($retur->status !== 'menunggu') {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya retur berstatus menunggu yang dapat disetujui.']);
+        if (! in_array($retur->status, ['draft', 'menunggu'])) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya retur berstatus draft atau menunggu yang dapat disetujui.']);
 
             return;
         }
@@ -138,14 +138,14 @@ class ReturnPembelianTab extends Component
     public function tolakRetur(int $id, string $alasan = 'Ditolak oleh admin'): void
     {
         abort_unless(
-            auth()->user()?->can('wms.approve') || auth()->user()?->can('wms.update'),
+            auth()->user()?->can('approve-workflow') || auth()->user()?->can('wms.create') || auth()->user()?->can('wms.approve') || auth()->user()?->can('wms.update'),
             403,
             'Anda tidak memiliki izin menolak retur pembelian.'
         );
 
         $retur = ReturnPembelian::findOrFail($id);
-        if ($retur->status !== 'menunggu') {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya retur berstatus menunggu yang dapat ditolak.']);
+        if (! in_array($retur->status, ['draft', 'menunggu'])) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya retur berstatus draft atau menunggu yang dapat ditolak.']);
 
             return;
         }

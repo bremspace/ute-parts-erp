@@ -4,6 +4,7 @@ namespace App\Modules\Wms\Services;
 
 use App\Modules\Omnichannel\Models\ChannelOrder;
 use App\Modules\Omnichannel\Services\ChannelSyncService;
+use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
@@ -89,6 +90,37 @@ class StokDeductionService
             throw new \Exception(
                 "Stok tidak mencukupi karena {$locked} unit sedang terkunci transfer pending (produk ID {$produkId}, tersedia bebas: ".max(0, $stok->jumlah - $locked).')'
             );
+        }
+
+        // Guard reservasi marketplace aktif: jika deduksi berasal dari penjualan POS biasa
+        // (bukan pembayaran pesanan online/marketplace itu sendiri), kurangi stok sellable dengan reservasi aktif.
+        $excludeTransaksiId = null;
+        $isMarketplacePayment = false;
+        if (str_contains($referensiTipe, 'Transaksi') && $referensiId) {
+            $transaksiRef = Transaksi::find($referensiId);
+            if ($transaksiRef && $transaksiRef->sumber === 'marketplace') {
+                $isMarketplacePayment = true;
+                $excludeTransaksiId = $transaksiRef->id;
+            }
+        }
+
+        // Jika ini penjualan POS kasir biasa (bukan pembayaran marketplace order), stok tidak boleh menabrak reservasi online aktif.
+        if (! $izinkanNegatif && ! $isMarketplacePayment && str_contains($jenis, 'penjualan')) {
+            $gudang = Gudang::find($gudangId);
+            if ($gudang) {
+                $reserved = app(StockReservationService::class)->getActiveReservation(
+                    $gudang->cabang_id,
+                    $produkId,
+                    $stok->sku_variant_id,
+                    $excludeTransaksiId
+                );
+                $stokBebasReservasi = max(0, $stok->jumlah - $locked - $reserved);
+                if ($stokBebasReservasi < $qty) {
+                    throw new \Exception(
+                        "Stok tidak mencukupi karena {$reserved} unit sedang direservasi pesanan online (produk ID {$produkId}, tersedia bebas: {$stokBebasReservasi})"
+                    );
+                }
+            }
         }
 
         $sebelum = $stok->jumlah;
@@ -310,15 +342,21 @@ class StokDeductionService
             // [B-03/P1-3] Praseleksi PAKAI kriteria identik dgn eksekusi (cariBarisStok/
             // barisKanonik): per gudang hanya 1 baris kanonik — dulu praseleksi mengabaikan
             // varian lalu eksekusi memakai varian eksak → "Stok tidak mencukupi" palsu.
-            // Prioritaskan gudang dengan stok cukup paling besar terlebih dahulu.
+            // Alokasikan saldo bebas; stok yang terkunci transfer tidak boleh dipakai.
             $stoks = StokItem::where('produk_id', $produkId)
                 ->whereIn('gudang_id', $gudangIds)
                 ->get()
                 ->groupBy('gudang_id')
                 ->map(fn ($rows) => $this->barisKanonik($rows, $skuVariantId))
                 ->filter()
-                ->filter(fn (StokItem $stok) => (int) $stok->jumlah > 0)
-                ->sortByDesc('jumlah')
+                ->map(function (StokItem $stok) {
+                    $bebas = max(0, (int) $stok->jumlah - StokTransfer::pendingLockedFor($stok));
+                    $stok->alokasi_bebas = $bebas;
+
+                    return $stok;
+                })
+                ->filter(fn (StokItem $stok) => $stok->alokasi_bebas > 0)
+                ->sortByDesc('alokasi_bebas')
                 ->values();
 
             foreach ($stoks as $stok) {
@@ -326,7 +364,7 @@ class StokDeductionService
                     break;
                 }
 
-                $ambil = min($stok->jumlah, $tersisa);
+                $ambil = min($stok->alokasi_bebas, $tersisa);
                 $log = $this->kurangi(
                     $produkId,
                     $stok->sku_variant_id,

@@ -33,7 +33,10 @@ class ImportProdukExcelJob implements ShouldQueue
         public string $format = 'standar',
         public ?int $cabangId = null,
         public ?int $gudangTokoId = null,
-        public ?int $gudangPusatId = null
+        public ?int $gudangPusatId = null,
+        public array $aksiKemiripan = [],
+        public array $resolusiDuplikat = [],
+        public int $thresholdKemiripan = 99
     ) {}
 
     public function handle(
@@ -71,7 +74,7 @@ class ImportProdukExcelJob implements ShouldQueue
                     $this->userId
                 );
             } else {
-                $hasil = $service->commit($filePath, $this->importLogId, $this->userId);
+                $hasil = $service->commit($filePath, $this->importLogId, $this->userId, $this->aksiKemiripan, $this->resolusiDuplikat, $this->thresholdKemiripan);
             }
 
             $label = $hasil['label_status'] ?? ($hasil['gagal'] > 0 ? 'Diterima Sebagian' : 'Diterima Sempurna');

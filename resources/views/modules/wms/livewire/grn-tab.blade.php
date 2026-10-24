@@ -1,36 +1,187 @@
 <div class="space-y-5">
-    {{-- Filter status [F2-2] --}}
-    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
-        @foreach (['all' => 'Semua', 'draft' => 'Menunggu Approval', 'terima' => 'Diterima', 'ditolak' => 'Ditolak'] as $val => $label)
+    {{-- Stepper Progress Alur Penerimaan Barang & Filter Terintegrasi --}}
+    <div class="p-3.5 sm:p-4 rounded-2xl glass-panel bg-white/70 dark:bg-ink-950/70 border border-black/10 dark:border-white/10 shadow-sm space-y-3">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-extrabold text-ink-900 dark:text-white">Alur Progres Penerimaan (GRN)</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-mono font-semibold">Step-by-Step</span>
+            </div>
+            <span class="text-[11px] text-ink-500 dark:text-ink-400">PO Dikirim ➔ Input Fisik &amp; QC ➔ Approval ➔ Stok Masuk &amp; Jurnal AP</span>
+        </div>
+
+        {{-- Visual Stepper Buttons --}}
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <!-- Step 1: PO Siap Diterima -->
             <button
-                wire:click="$set('filterStatus', '{{ $val }}')"
-                class="px-3.5 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] cursor-pointer active:scale-[0.97] whitespace-nowrap min-h-[44px] flex items-center {{ $filterStatus === $val ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/5 text-ink-300 hover:bg-white/10' }}"
+                type="button"
+                @click="document.getElementById('section-po-siap-terima')?.scrollIntoView({ behavior: 'smooth' })"
+                class="p-2.5 rounded-xl border text-left transition active:scale-[0.98] cursor-pointer bg-white/50 dark:bg-white/5 hover:border-up-primary/40 {{ $countPoSiapTerima > 0 ? 'border-up-amber/40 bg-up-amber/5' : 'border-black/10 dark:border-white/10' }}"
             >
-                {{ $label }}
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-ink-400 uppercase">Step 1: Fisik Tiba</span>
+                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums {{ $countPoSiapTerima > 0 ? 'bg-up-amber/20 text-up-amber' : 'bg-black/5 dark:bg-white/5 text-ink-400' }}">
+                        {{ $countPoSiapTerima }}
+                    </span>
+                </div>
+                <div class="text-xs font-bold text-ink-900 dark:text-white">PO Siap Terima</div>
+                <div class="text-[9px] text-ink-500 dark:text-ink-400 mt-0.5">Input kuantitas &amp; rak</div>
             </button>
-        @endforeach
+
+            <!-- Step 2: Menunggu Approval (Draft) -->
+            <button
+                type="button"
+                wire:click="$set('filterStatus', 'draft')"
+                class="p-2.5 rounded-xl border text-left transition active:scale-[0.98] cursor-pointer {{ $filterStatus === 'draft' ? 'bg-up-primary/15 border-up-primary text-white shadow-sm' : 'bg-white/50 dark:bg-white/5 hover:border-up-primary/40 border-black/10 dark:border-white/10' }}"
+            >
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-ink-400 uppercase">Step 2: Verifikasi</span>
+                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums {{ $countDraft > 0 ? 'bg-up-amber/20 text-up-amber' : 'bg-black/5 dark:bg-white/5 text-ink-400' }}">
+                        {{ $countDraft }}
+                    </span>
+                </div>
+                <div class="text-xs font-bold text-ink-900 dark:text-white">Menunggu Approval</div>
+                <div class="text-[9px] text-ink-500 dark:text-ink-400 mt-0.5">Review QC &amp; nilai HPP</div>
+            </button>
+
+            <!-- Step 3: Diterima & Masuk Stok -->
+            <button
+                type="button"
+                wire:click="$set('filterStatus', 'terima')"
+                class="p-2.5 rounded-xl border text-left transition active:scale-[0.98] cursor-pointer {{ $filterStatus === 'terima' ? 'bg-up-mint/15 border-up-mint text-white shadow-sm' : 'bg-white/50 dark:bg-white/5 hover:border-up-mint/40 border-black/10 dark:border-white/10' }}"
+            >
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-ink-400 uppercase">Step 3: Selesai</span>
+                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums bg-up-mint/20 text-up-mint">
+                        {{ $countTerima }}
+                    </span>
+                </div>
+                <div class="text-xs font-bold text-ink-900 dark:text-white">Diterima (Stok Masuk)</div>
+                <div class="text-[9px] text-ink-500 dark:text-ink-400 mt-0.5">Jurnal AP &amp; moving avg</div>
+            </button>
+
+            <!-- Step 4: Ditolak -->
+            <button
+                type="button"
+                wire:click="$set('filterStatus', 'ditolak')"
+                class="p-2.5 rounded-xl border text-left transition active:scale-[0.98] cursor-pointer {{ $filterStatus === 'ditolak' ? 'bg-up-red/15 border-up-red text-white shadow-sm' : 'bg-white/50 dark:bg-white/5 hover:border-up-red/40 border-black/10 dark:border-white/10' }}"
+            >
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-ink-400 uppercase">Kendala</span>
+                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums {{ $countDitolak > 0 ? 'bg-up-red/20 text-up-red' : 'bg-black/5 dark:bg-white/5 text-ink-400' }}">
+                        {{ $countDitolak }}
+                    </span>
+                </div>
+                <div class="text-xs font-bold text-ink-900 dark:text-white">GRN Ditolak</div>
+                <div class="text-[9px] text-ink-500 dark:text-ink-400 mt-0.5">Stok &amp; utang batal</div>
+            </button>
+        </div>
+
+        {{-- Filter tabs tambahan & tombol reset filter --}}
+        <div class="flex items-center justify-between gap-2 pt-2 border-t border-black/5 dark:border-white/5 flex-wrap">
+            <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 flex-nowrap sm:flex-wrap">
+                <button
+                    wire:click="$set('filterStatus', 'all')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer {{ $filterStatus === 'all' ? 'bg-up-primary text-white' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    Semua Dokumen ({{ $countTotal }})
+                </button>
+                <button
+                    wire:click="$set('filterStatus', 'draft')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer {{ $filterStatus === 'draft' ? 'bg-up-primary text-white' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    Menunggu Approval ({{ $countDraft }})
+                </button>
+                <button
+                    wire:click="$set('filterStatus', 'terima')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer {{ $filterStatus === 'terima' ? 'bg-up-primary text-white' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    Diterima ({{ $countTerima }})
+                </button>
+                <button
+                    wire:click="$set('filterStatus', 'ditolak')"
+                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer {{ $filterStatus === 'ditolak' ? 'bg-up-primary text-white' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    Ditolak ({{ $countDitolak }})
+                </button>
+            </div>
+
+            @if($filterStatus !== 'all')
+                <button
+                    wire:click="$set('filterStatus', 'all')"
+                    class="text-[11px] text-ink-400 hover:text-ink-200 underline cursor-pointer"
+                >
+                    Reset Filter
+                </button>
+            @endif
+        </div>
     </div>
 
     {{-- PO siap diterima — input GRN wajib sebelum stok masuk --}}
-    <div class="rounded-2xl glass-panel p-4">
+    <div id="section-po-siap-terima" class="rounded-2xl glass-panel p-4">
         <div class="flex items-center justify-between mb-3 gap-3 flex-wrap">
-            <h3 class="text-sm font-bold text-white">PO Siap Diterima</h3>
-            <span class="text-[10px] text-ink-400">Flow: PO dikirim → input GRN → stok & jurnal AP</span>
+            <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+                    <span>📦</span>
+                    <span>PO Siap Diterima</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-accent/20 text-up-accent font-mono">
+                        {{ $countPoSiapTerima }} PO
+                    </span>
+                </h3>
+                <p class="text-[11px] text-ink-400 mt-0.5">PO berstatus dikirim. Lakukan input penerimaan fisik gudang agar stok dan jurnal AP tercatat.</p>
+            </div>
         </div>
-        <x-prism.data-table :headers="['No. PO', 'Supplier', 'Gudang Tujuan', 'Total', 'Aksi']">
+        <x-prism.data-table :headers="['No. PO', 'Supplier', 'Gudang Tujuan', 'Total', 'Dokumen / Aksi']">
             @forelse($poList as $po)
                 <tr class="hover:bg-white/[0.02] transition-colors text-xs">
                     <td class="py-3 px-4 font-mono font-bold text-white">{{ $po->no_po }}</td>
-                    <td class="py-3 px-4 text-ink-200">{{ $po->supplier?->nama }}</td>
-                    <td class="py-3 px-4 text-ink-300">{{ $po->gudangTujuan?->nama }}</td>
+                    <td class="py-3 px-4 text-ink-200">
+                        <div class="font-medium text-white">{{ $po->supplier?->nama ?? '-' }}</div>
+                        @if($po->supplier?->telepon)
+                            <div class="text-[10px] text-ink-400 font-mono">{{ $po->supplier->telepon }}</div>
+                        @endif
+                    </td>
+                    <td class="py-3 px-4 text-ink-300">{{ $po->gudangTujuan?->nama ?? '-' }}</td>
                     <td class="py-3 px-4 tabular-nums font-bold text-white">Rp {{ number_format($po->total, 0, ',', '.') }}</td>
                     <td class="py-3 px-4">
-                        <button
-                            wire:click="openGrnModal({{ $po->id }})"
-                            class="px-2.5 py-1 rounded-lg bg-up-accent hover:opacity-90 text-white font-bold text-[10px] cursor-pointer"
-                        >
-                            Input GRN
-                        </button>
+                        <div class="flex items-center gap-1.5 flex-wrap min-w-[200px]">
+                            <button
+                                wire:click="openGrnModal({{ $po->id }})"
+                                class="px-2.5 py-1.5 rounded-lg bg-up-accent hover:opacity-90 text-white font-bold text-[11px] cursor-pointer min-h-[32px] flex items-center gap-1 active:scale-95 transition whitespace-nowrap shadow-sm shadow-up-accent/20"
+                                title="Input GRN Penerimaan Fisik"
+                            >
+                                <span>📥</span>
+                                <span>Terima</span>
+                            </button>
+
+                            <button
+                                wire:click="bukaKonfirmasiTolakPo({{ $po->id }})"
+                                class="px-2.5 py-1.5 rounded-lg bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-[11px] cursor-pointer min-h-[32px] flex items-center gap-1 active:scale-95 transition whitespace-nowrap"
+                                title="Tolak PO &amp; Batalkan Pesanan di Pintu Gudang"
+                            >
+                                <span>🚫</span>
+                                <span>Tolak PO</span>
+                            </button>
+
+                            <a
+                                href="{{ route('wms.po.print', $po->id) }}"
+                                target="_blank"
+                                class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white text-[11px] font-bold flex items-center justify-center min-w-[32px] min-h-[32px] border border-white/5"
+                                title="Cetak Dokumen Purchase Order Resmi (A4)"
+                            >
+                                🖨️
+                            </a>
+
+                            @if($po->supplier?->telepon)
+                                <a
+                                    href="{{ $po->generateWaPesananUrl() }}"
+                                    target="_blank"
+                                    class="p-1.5 rounded-lg bg-up-mint/15 hover:bg-up-mint/25 text-up-mint text-[11px] font-bold flex items-center justify-center min-w-[32px] min-h-[32px] border border-up-mint/30"
+                                    title="Kirim Ringkasan Pesanan ke WA Supplier"
+                                >
+                                    💬
+                                </a>
+                            @endif
+                        </div>
                     </td>
                 </tr>
             @empty
@@ -43,7 +194,13 @@
 
     {{-- Daftar GRN --}}
     <div>
-        <h3 class="text-sm font-bold text-white mb-3">Daftar GRN</h3>
+        <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+                <span>📑</span>
+                <span>Daftar Dokumen GRN</span>
+                <span class="text-xs text-ink-400 font-normal">({{ $filterStatus === 'all' ? 'Semua Status' : 'Filter: '.strtoupper($filterStatus) }})</span>
+            </h3>
+        </div>
         <x-prism.data-table :headers="['No. GRN', 'PO', 'Supplier', 'Gudang', 'Total HPP', 'Status', 'Aksi']">
             @forelse($grnList as $grn)
                 <tr class="hover:bg-white/[0.02] transition-colors text-xs">
@@ -54,29 +211,30 @@
                     <td class="py-3.5 px-4 tabular-nums font-bold text-white">Rp {{ number_format((float) $grn->total_hpp, 0, ',', '.') }}</td>
                     <td class="py-3.5 px-4">
                         @if($grn->status === 'draft')
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/10 text-up-amber">Menunggu Approval</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/10 text-up-amber border border-up-amber/20">Menunggu Approval</span>
                         @elseif($grn->status === 'terima')
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/10 text-up-mint">Diterima</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/10 text-up-mint border border-up-mint/20">Diterima</span>
                         @elseif($grn->status === 'ditolak')
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-red/10 text-up-red">Ditolak</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-red/10 text-up-red border border-up-red/20">Ditolak</span>
                         @else
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-ink-300">{{ $grn->status }}</span>
                         @endif
                     </td>
                     <td class="py-3.5 px-4">
-                        <div class="flex gap-1.5 flex-wrap">
+                        <div class="flex gap-1.5 flex-wrap min-w-[130px]">
                             @if($grn->status === 'draft')
                                 @can('approve-workflow')
                                     <button
                                         wire:click="bukaKonfirmasiSetuju({{ $grn->id }})"
-                                        class="px-2.5 py-1 rounded-lg bg-up-mint/90 hover:opacity-90 text-ink-950 font-bold text-[10px] cursor-pointer"
+                                        class="px-2.5 py-1.5 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-[10px] cursor-pointer active:scale-95 transition"
+                                        title="Setujui GRN (Posting Jurnal &amp; Stok Masuk)"
                                     >
                                         Setujui
                                     </button>
                                     <button
-                                        x-data
-                                        x-on:click="const alasan = prompt('Alasan penolakan GRN:'); if (alasan) { @this.call('tolakGrn', {{ $grn->id }}, alasan); }"
-                                        class="px-2.5 py-1 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red font-bold text-[10px] cursor-pointer"
+                                        wire:click="bukaKonfirmasiTolak({{ $grn->id }})"
+                                        class="px-2.5 py-1.5 rounded-lg bg-up-red/15 hover:bg-up-red/25 text-up-red font-bold text-[10px] border border-up-red/30 cursor-pointer active:scale-95 transition"
+                                        title="Tolak GRN dengan alasan audit"
                                     >
                                         Tolak
                                     </button>
@@ -84,13 +242,13 @@
                             @endif
                             <button
                                 wire:click="bukaDetailGrn({{ $grn->id }})"
-                                class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] cursor-pointer"
+                                class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] cursor-pointer active:scale-95 transition"
                             >
                                 Detail
                             </button>
                             <button
                                 wire:click="bukaRiwayat('grn', {{ $grn->id }})"
-                                class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer"
+                                class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer active:scale-95 transition"
                             >
                                 Riwayat
                             </button>
@@ -99,7 +257,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="py-6 text-center text-ink-400 text-xs">Belum ada GRN.</td>
+                    <td colspan="7" class="py-6 text-center text-ink-400 text-xs">Belum ada dokumen GRN untuk status ini.</td>
                 </tr>
             @endforelse
         </x-prism.data-table>
@@ -168,7 +326,7 @@
                                     type="text"
                                     x-ref="grnSearchInput"
                                     wire:model.live.debounce.250ms="barcodeInput"
-                                    wire:keydown.enter.prevent="prosesBarcode(barcodeInput)"
+                                    wire:keydown.enter.prevent="prosesBarcode"
                                     placeholder="Scan barcode fisik atau ketik nama part / SKU PO..."
                                     class="w-full pl-9 pr-10 py-2.5 rounded-xl glass-input text-xs sm:text-sm text-ink-900 dark:text-white bg-white/90 dark:bg-ink-900/90 border border-black/10 dark:border-white/10 placeholder-ink-400 min-h-[44px] focus:ring-1 focus:ring-up-primary"
                                     autofocus
@@ -186,7 +344,7 @@
 
                             <button
                                 type="button"
-                                wire:click="prosesBarcode(barcodeInput)"
+                                wire:click="prosesBarcode"
                                 class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white text-xs font-bold min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer transition active:scale-95 shrink-0 shadow-lg shadow-up-primary/20"
                             >
                                 <span>Pilih / Hitung</span>
@@ -472,8 +630,6 @@
                 </div>
             </div>
         </div>
-            </div>
-        </div>
     @endif
 
     {{-- MODAL: DETAIL GRN --}}
@@ -604,6 +760,187 @@
                 <div class="flex gap-3">
                     <button wire:click="tutupKonfirmasi" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button wire:click="setujuiGrn({{ $confirmGrnId }})" class="flex-1 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">Ya, Setujui</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL: DIALOG TOLAK GRN --}}
+    @if($showTolakDialog)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+            <div class="w-full max-w-md glass-panel p-5 sm:p-6 rounded-3xl relative my-auto border border-up-red/30 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">🚫</span>
+                        <h3 class="text-base font-bold text-white">Tolak GRN: {{ $tolakGrnNo }}</h3>
+                    </div>
+                    <button wire:click="tutupKonfirmasiTolak" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+
+                {{-- Penjelasan Alur Penolakan --}}
+                <div class="p-3 rounded-2xl bg-up-red/10 border border-up-red/20 text-xs text-ink-200 space-y-1.5 leading-relaxed">
+                    <div class="font-bold text-up-red flex items-center gap-1.5">
+                        <span>⚠️</span>
+                        <span>Alur &amp; Konsekuensi Penolakan:</span>
+                    </div>
+                    <ul class="list-disc pl-4 space-y-1 text-[11px] text-ink-300">
+                        <li>Dokumen GRN akan berstatus <strong>Ditolak</strong> dan permintaan approval diselesaikan.</li>
+                        <li>Stok fisik <strong>TIDAK akan masuk</strong> ke inventori gudang.</li>
+                        <li>Jurnal Akuntansi Utang Usaha (AP) <strong>TIDAK akan diposting</strong>.</li>
+                        <li>PO terkait tetap tercatat dan dapat diproses ulang atau ditindaklanjuti retur/pembatalan.</li>
+                    </ul>
+                </div>
+
+                {{-- Input Alasan --}}
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-ink-200">
+                        Alasan Penolakan <span class="text-up-red">*</span>
+                    </label>
+                    
+                    {{-- Quick template reasons --}}
+                    <div class="flex flex-wrap gap-1 mb-1.5">
+                        <button
+                            type="button"
+                            wire:click="$set('alasanTolak', 'Barang rusak / pecah fisik saat tiba di gudang')"
+                            class="px-2 py-0.5 rounded text-[10px] bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 cursor-pointer"
+                        >
+                            + Barang rusak/pecah
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="$set('alasanTolak', 'Kuantitas fisik tidak sesuai surat jalan supplier')"
+                            class="px-2 py-0.5 rounded text-[10px] bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 cursor-pointer"
+                        >
+                            + Qty selisih
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="$set('alasanTolak', 'Spesifikasi part salah / tidak sesuai PO')"
+                            class="px-2 py-0.5 rounded text-[10px] bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 cursor-pointer"
+                        >
+                            + Salah part
+                        </button>
+                    </div>
+
+                    <textarea
+                        wire:model="alasanTolak"
+                        rows="3"
+                        class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-ink-400 border border-white/10 focus:ring-1 focus:ring-up-red"
+                        placeholder="Tuliskan catatan rinci alasan penolakan untuk audit trail..."
+                    ></textarea>
+                    @error('alasanTolak')
+                        <span class="text-[11px] text-up-red font-medium block">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                {{-- Actions --}}
+                <div class="flex gap-3 pt-2 border-t border-white/10">
+                    <button
+                        type="button"
+                        wire:click="tutupKonfirmasiTolak"
+                        class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.98]"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="konfirmasiTolakGrn"
+                        class="flex-1 py-2.5 rounded-xl bg-up-red hover:bg-up-red/90 text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-red/25 transition active:scale-[0.98] flex items-center justify-center gap-1.5"
+                    >
+                        <span>🚫</span>
+                        <span>Konfirmasi Tolak</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL: DIALOG TOLAK PO DI PINTU GUDANG --}}
+    @if($showTolakPoDialog)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+            <div class="w-full max-w-md glass-panel p-5 sm:p-6 rounded-3xl relative my-auto border border-up-red/30 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">🚫</span>
+                        <h3 class="text-base font-bold text-white">Tolak PO: {{ $tolakPoNo }}</h3>
+                    </div>
+                    <button wire:click="tutupKonfirmasiTolakPo" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+
+                {{-- Penjelasan Alur Penolakan PO --}}
+                <div class="p-3 rounded-2xl bg-up-red/10 border border-up-red/20 text-xs text-ink-200 space-y-1.5 leading-relaxed">
+                    <div class="font-bold text-up-red flex items-center gap-1.5">
+                        <span>⚠️</span>
+                        <span>Konsekuensi Penolakan di Pintu Gudang:</span>
+                    </div>
+                    <ul class="list-disc pl-4 space-y-1 text-[11px] text-ink-300">
+                        <li>Supplier: <strong>{{ $tolakPoSupplier ?? '-' }}</strong>.</li>
+                        <li>Status PO diubah menjadi <strong>Dibatalkan</strong>.</li>
+                        <li>Barang tidak di-input ke GRN &amp; stok fisik <strong>TIDAK bertambah</strong>.</li>
+                        <li>Tidak ada Utang Usaha (AP) yang diakui di pembukuan.</li>
+                        <li>Setelah ditolak, Berita Acara Penolakan / Kontra Bon Penolakan dapat dicetak atau dikirim via WhatsApp ke supplier.</li>
+                    </ul>
+                </div>
+
+                {{-- Input Alasan --}}
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-ink-200">
+                        Alasan Penolakan PO <span class="text-up-red">*</span>
+                    </label>
+
+                    {{-- Quick template reasons --}}
+                    <div class="flex flex-wrap gap-1 mb-1.5">
+                        <button
+                            type="button"
+                            wire:click="$set('alasanTolakPo', 'Fisik barang hancur / cacat pabrik di pintu gudang')"
+                            class="px-2 py-0.5 rounded text-[10px] bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 cursor-pointer"
+                        >
+                            + Barang cacat/rusak
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="$set('alasanTolakPo', 'Barang yang tiba tidak sesuai tipe/pesanan PO')"
+                            class="px-2 py-0.5 rounded text-[10px] bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 cursor-pointer"
+                        >
+                            + Salah kirim tipe
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="$set('alasanTolakPo', 'Pengiriman melewati batas toleransi jatuh tempo supplier')"
+                            class="px-2 py-0.5 rounded text-[10px] bg-white/5 hover:bg-white/10 text-ink-300 border border-white/10 cursor-pointer"
+                        >
+                            + Terlambat / dibatalkan
+                        </button>
+                    </div>
+
+                    <textarea
+                        wire:model="alasanTolakPo"
+                        rows="3"
+                        class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder-ink-400 border border-white/10 focus:ring-1 focus:ring-up-red"
+                        placeholder="Tuliskan catatan rinci mengapa barang ditolak di pintu gudang..."
+                    ></textarea>
+                    @error('alasanTolakPo')
+                        <span class="text-[11px] text-up-red font-medium block">{{ $message }}</span>
+                    @enderror
+                </div>
+
+                {{-- Actions --}}
+                <div class="flex gap-3 pt-2 border-t border-white/10">
+                    <button
+                        type="button"
+                        wire:click="tutupKonfirmasiTolakPo"
+                        class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.98]"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="konfirmasiTolakPo"
+                        class="flex-1 py-2.5 rounded-xl bg-up-red hover:bg-up-red/90 text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-red/25 transition active:scale-[0.98] flex items-center justify-center gap-1.5"
+                    >
+                        <span>🚫</span>
+                        <span>Tolak &amp; Batalkan PO</span>
+                    </button>
                 </div>
             </div>
         </div>

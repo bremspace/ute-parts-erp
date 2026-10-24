@@ -113,6 +113,10 @@ class PembayaranPesananOnlineService
         }
 
         return DB::transaction(function () use ($transaksi, $metode, $diterima, $total) {
+            $transaksi = Transaksi::with('items')->lockForUpdate()->findOrFail($transaksi->id);
+            if ($transaksi->status !== 'menunggu_pembayaran') {
+                throw new \RuntimeException("Pesanan {$transaksi->no_transaksi} sudah diproses atau tidak dapat dibayar.");
+            }
             $cabangId = $transaksi->cabang_id ?: Cabang::firstOrFail()->id;
             $kembalian = max(0.0, $diterima - $total);
 

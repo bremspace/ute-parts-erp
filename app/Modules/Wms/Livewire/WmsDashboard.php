@@ -12,13 +12,13 @@ use Livewire\Component;
  */
 class WmsDashboard extends Component
 {
-    public string $activeTab = 'produk'; // produk, transfer, opname, po, grn, retur, stok
+    public string $activeTab = 'produk'; // produk, transfer, opname, po, grn, retur, stok, histori_po
 
     public function mount(): void
     {
         // [FIX] Dukung deep-link ke tab via query param ?tab=...
         // Default langsung ke 'produk' (Master Produk & Stok terpadu)
-        $allowed = ['produk', 'stok', 'transfer', 'opname', 'po', 'grn', 'retur'];
+        $allowed = ['produk', 'stok', 'transfer', 'opname', 'po', 'grn', 'retur', 'histori_po'];
         $tab = (string) request('tab', 'produk');
 
         $this->activeTab = in_array($tab, $allowed, true) ? $tab : 'produk';

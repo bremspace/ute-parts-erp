@@ -32,6 +32,7 @@ use Spatie\Activitylog\Support\LogOptions;
     // tetap `transaksi.paid_at` (tidak ada duplikasi ke tabel lain).
     'payment_reference', 'payment_url', 'paid_at',
     'void_by_id', 'void_at', 'void_alasan',
+    'expires_at',
 ])]
 class Transaksi extends Model
 {
@@ -58,6 +59,7 @@ class Transaksi extends Model
         'split_detail' => 'array',
         // [B-10f] paid_at kini benar-benar tersimpan (sebelumnya dibuang fillable)
         'paid_at' => 'datetime',
+        'expires_at' => 'datetime',
         'garansi_berakhir_pada' => 'date',
     ];
 

@@ -5,6 +5,7 @@ namespace App\Modules\Wms\Services;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Pos\Models\HargaTier;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
@@ -48,6 +49,8 @@ class ImportProdukService
 {
     public const MAKS_BARIS = 50000;
 
+    public const THRESHOLD_PENCOCOKAN = 99;
+
     protected array $brandCache = [];
 
     protected array $kualitasCache = [];
@@ -57,6 +60,10 @@ class ImportProdukService
     protected array $tipeHpCache = [];
 
     protected array $supplierCache = [];
+
+    protected array $rakCache = [];
+
+    protected array $satuanCache = [];
 
     protected ?array $existingProductCache = null;
 
@@ -243,7 +250,7 @@ class ImportProdukService
     /**
      * Deteksi produk eksisting yang memiliki kemiripan tinggi.
      */
-    protected function findSimilarExistingProduct(string $nama, string $skuCurrent): ?object
+    protected function findSimilarExistingProduct(string $nama, string $skuCurrent, int $threshold = self::THRESHOLD_PENCOCOKAN): ?object
     {
         $cache = $this->getExistingProductCache();
         $namaLower = strtolower($nama);
@@ -257,7 +264,7 @@ class ImportProdukService
                 continue;
             }
             similar_text($namaLower, $item['nama_lower'], $pct);
-            if ($pct >= 85) {
+            if ($pct >= $threshold) {
                 return (object) array_merge($item, ['kemiripan' => round($pct)]);
             }
         }
@@ -268,7 +275,7 @@ class ImportProdukService
     /**
      * Deteksi peringatan duplikasi & rekomendasi kompatibilitas cerdas.
      */
-    public function checkRowWarnings(array $row, int $nomorBaris, array $konteks): array
+    public function checkRowWarnings(array $row, int $nomorBaris, array $konteks, int $threshold = self::THRESHOLD_PENCOCOKAN): array
     {
         $warnings = [];
         $nama = trim((string) ($row['nama'] ?? ''));
@@ -290,7 +297,7 @@ class ImportProdukService
                     continue;
                 }
                 similar_text(strtolower($nama), strtolower($prev['nama']), $pct);
-                if ($pct >= 85) {
+                if ($pct >= $threshold) {
                     $pctBulat = round($pct);
                     $warnings[] = "Perhatian Kompatibilitas ({$pctBulat}% mirip dengan Baris {$prev['baris']} [{$prev['sku']}] '{$prev['nama']}'): Jika fisik sparepart identik, satukan menjadi 1 SKU dengan kolom tipe_hp multi-tipe (cth: '{$prev['tipe_hp']}; {$tipeHp}') daripada membuat master data ganda.";
                     break;
@@ -299,27 +306,79 @@ class ImportProdukService
         }
 
         // 2. Cek potensi kemiripan dengan master data yang sudah ada di database
-        $existing = $this->findSimilarExistingProduct($nama, $sku);
+        $existing = $this->findSimilarExistingProduct($nama, $sku, $threshold);
         if ($existing) {
             $warnings[] = "Perhatian Master Ganda: Mirip ({$existing->kemiripan}%) dengan produk eksisting [{$existing->sku}] '{$existing->nama}'. Pertimbangkan menambahkan tipe HP ke produk tersebut daripada membuat master produk baru.";
         }
 
-        // 3. Peringatan non-esensial: lokasi rak & gudang (agar fleksibel/longgar tanpa menggagalkan import)
-        $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
-        if ($rakRaw !== '' && ! in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true)) {
-            $gudangId = $this->resolveGudangId(trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? '')));
-            if (! $this->resolveRakId($rakRaw, $gudangId)) {
-                $warnings[] = "Lokasi rak '{$rakRaw}' tidak ditemukan di sistem. Produk akan tetap diimport tanpa penempatan rak (kosong).";
+        return $warnings;
+    }
+
+    /**
+     * Deteksi kemiripan terstruktur untuk pencocokan manual oleh pengguna.
+     */
+    public function detectKemiripanRow(array $row, int $nomorBaris, array $konteks, int $threshold = self::THRESHOLD_PENCOCOKAN): ?array
+    {
+        $nama = trim((string) ($row['nama'] ?? ''));
+        $sku = trim((string) ($row['sku'] ?? ''));
+        $tipeHp = trim((string) ($row['tipe_hp'] ?? ''));
+
+        if ($nama === '') {
+            return null;
+        }
+
+        // 1. Cek intra-file
+        if (! empty($konteks['namaDalamFile'])) {
+            foreach ($konteks['namaDalamFile'] as $prev) {
+                if (strcasecmp($prev['sku'], $sku) === 0) {
+                    continue;
+                }
+                $lenDiff = abs(strlen($nama) - strlen($prev['nama']));
+                if ($lenDiff > 12) {
+                    continue;
+                }
+                similar_text(strtolower($nama), strtolower($prev['nama']), $pct);
+                if ($pct >= $threshold) {
+                    $pctBulat = (int) round($pct);
+
+                    return [
+                        'baris' => $nomorBaris,
+                        'sku' => $sku ?: 'Auto-generate',
+                        'nama' => $nama,
+                        'tipe_hp' => $tipeHp,
+                        'tipe_kemiripan' => 'intra_file',
+                        'persentase' => $pctBulat,
+                        'target_id' => null,
+                        'target_sku' => $prev['sku'],
+                        'target_nama' => $prev['nama'],
+                        'target_baris' => $prev['baris'],
+                        'default_aksi' => 'gabung',
+                        'keterangan' => "Mirip {$pctBulat}% dengan Baris {$prev['baris']} [{$prev['sku']}] '{$prev['nama']}' di file ini.",
+                    ];
+                }
             }
         }
 
-        $stokAwal = (float) ($row['stok_awal'] ?? 0);
-        $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
-        if ($stokAwal > 0 && ($gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true))) {
-            $warnings[] = 'Stok awal diisi tanpa gudang tujuan; stok akan ditempatkan di gudang default aktif.';
+        // 2. Cek database
+        $existing = $this->findSimilarExistingProduct($nama, $sku, $threshold);
+        if ($existing) {
+            return [
+                'baris' => $nomorBaris,
+                'sku' => $sku ?: 'Auto-generate',
+                'nama' => $nama,
+                'tipe_hp' => $tipeHp,
+                'tipe_kemiripan' => 'database',
+                'persentase' => (int) $existing->kemiripan,
+                'target_id' => $existing->id,
+                'target_sku' => $existing->sku,
+                'target_nama' => $existing->nama,
+                'target_baris' => null,
+                'default_aksi' => 'gabung',
+                'keterangan' => "Mirip {$existing->kemiripan}% dengan master produk [{$existing->sku}] '{$existing->nama}'.",
+            ];
         }
 
-        return $warnings;
+        return null;
     }
 
     /**
@@ -373,9 +432,32 @@ class ImportProdukService
             }
         }
 
-        $g = Gudang::where('kode', $raw)->orWhere('nama', $raw)->first();
+        $g = Gudang::whereRaw('LOWER(kode) = ?', [strtolower($raw)])
+            ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)])
+            ->first();
 
-        return $g?->id;
+        if ($g) {
+            return $g->id;
+        }
+
+        // Jika menyebut "Gudang Utama", "Gudang Pusat", atau variasi nama utama
+        if (strcasecmp($raw, 'Gudang Utama') === 0 || strcasecmp($raw, 'Gudang Pusat') === 0) {
+            $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+            $gDefault = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+                ->where('is_active', true)
+                ->where(fn ($q) => $q->where('nama', 'like', '%Utama%')->orWhere('nama', 'like', '%Pusat%')->orWhere('kode', 'like', '%UTAMA%'))
+                ->first()
+                ?? Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))->where('is_active', true)->first()
+                ?? Gudang::where('is_active', true)->first();
+
+            if ($gDefault) {
+                return $gDefault->id;
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     /**
@@ -404,7 +486,8 @@ class ImportProdukService
         }
 
         $query = Rak::where(function ($q) use ($raw) {
-            $q->where('kode', $raw)->orWhere('nama', $raw);
+            $q->whereRaw('LOWER(kode) = ?', [strtolower($raw)])
+                ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)]);
         });
 
         if ($gudangId) {
@@ -415,6 +498,232 @@ class ImportProdukService
         }
 
         return $query->value('id');
+    }
+
+    /**
+     * Resolusi satuan dan daftarkan otomatis ke master satuan_unit bila belum ada.
+     */
+    public function resolveOrCreateSatuan(?string $satuanRaw): string
+    {
+        $raw = trim((string) $satuanRaw);
+        if ($raw === '' || in_array(strtolower($raw), ['-', 'none', 'null', 'kosong'], true)) {
+            $satuan = 'pcs';
+        } else {
+            $satuan = $this->normalizeSatuan($raw);
+            if ($satuan === '') {
+                $satuan = 'pcs';
+            }
+        }
+
+        if (! isset($this->satuanCache[$satuan])) {
+            $su = SatuanUnit::whereRaw('LOWER(kode) = ?', [$satuan])
+                ->orWhereRaw('LOWER(nama) = ?', [$satuan])
+                ->first();
+
+            if (! $su) {
+                $su = SatuanUnit::create([
+                    'kode' => $satuan,
+                    'nama' => ucfirst($satuan),
+                    'is_active' => true,
+                ]);
+            }
+
+            $this->satuanCache[$satuan] = $su->kode;
+        }
+
+        return $this->satuanCache[$satuan];
+    }
+
+    /**
+     * Resolusi gudang dari input import (ID numerik, kode, atau nama) atau buat baru jika belum ada.
+     */
+    public function resolveOrCreateGudang(?string $gudangRaw, ?int $cabangId = null): int
+    {
+        $raw = trim((string) $gudangRaw);
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+
+        if ($raw === '' || in_array(strtolower($raw), ['-', '0', 'none', 'null', 'kosong'], true)) {
+            return $this->resolveOrCreateGudangDefault($cabangId);
+        }
+
+        if (is_numeric($raw)) {
+            $g = Gudang::find((int) $raw);
+            if ($g) {
+                return $g->id;
+            }
+        }
+
+        $g = Gudang::whereRaw('LOWER(kode) = ?', [strtolower($raw)])
+            ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)])
+            ->first();
+
+        if ($g) {
+            return $g->id;
+        }
+
+        if (strcasecmp($raw, 'Gudang Utama') === 0 || strcasecmp($raw, 'Gudang Pusat') === 0) {
+            return $this->resolveOrCreateGudangDefault($cabangId);
+        }
+
+        // Buat gudang baru jika belum terdaftar
+        $cabang = Cabang::find($cabangId) ?? Cabang::first();
+        if (! $cabang) {
+            $cabang = Cabang::create([
+                'nama' => 'Cabang Utama',
+                'kode' => 'CBG-01',
+                'is_pusat' => true,
+                'is_active' => true,
+            ]);
+        }
+
+        $baseKode = Str::upper(Str::slug($raw));
+        if ($baseKode === '') {
+            $baseKode = 'GDG';
+        }
+        $kodeUnik = $baseKode;
+        $counter = 1;
+        while (Gudang::where('kode', $kodeUnik)->exists()) {
+            $kodeUnik = "{$baseKode}-{$counter}";
+            $counter++;
+        }
+
+        $newGudang = Gudang::create([
+            'cabang_id' => $cabang->id,
+            'nama' => $raw,
+            'kode' => $kodeUnik,
+            'is_active' => true,
+        ]);
+
+        return $newGudang->id;
+    }
+
+    /**
+     * Resolusi gudang default atau buat baru jika sistem belum memiliki gudang (sebagai parent rak).
+     */
+    public function resolveOrCreateGudangDefault(?int $cabangId = null): int
+    {
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+
+        $gudang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)
+            ->where(fn ($q) => $q->where('nama', 'like', '%Utama%')->orWhere('nama', 'like', '%Pusat%')->orWhere('kode', 'like', '%UTAMA%'))
+            ->first()
+            ?? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first()
+            ?? Gudang::where('is_active', true)->first()
+            ?? Gudang::first();
+
+        if (! $gudang) {
+            $cabang = Cabang::find($cabangId) ?? Cabang::first();
+            if (! $cabang) {
+                $cabang = Cabang::create([
+                    'nama' => 'Cabang Utama',
+                    'kode' => 'CBG-01',
+                    'is_pusat' => true,
+                    'is_active' => true,
+                ]);
+            }
+
+            $gudang = Gudang::create([
+                'cabang_id' => $cabang->id,
+                'nama' => 'Gudang Utama',
+                'kode' => 'GDG-UTAMA',
+                'is_active' => true,
+            ]);
+        }
+
+        return $gudang->id;
+    }
+
+    /**
+     * Resolusi rak default bawaan sistem untuk gudang tertentu.
+     */
+    public function resolveOrCreateRakDefault(int $gudangId): int
+    {
+        $cacheKey = "{$gudangId}|__default__";
+        if (isset($this->rakCache[$cacheKey])) {
+            return $this->rakCache[$cacheKey];
+        }
+
+        $rak = Rak::where('gudang_id', $gudangId)
+            ->where(function ($q) {
+                $q->where('nama', 'Rak Default')
+                    ->orWhere('kode', 'like', 'RAK-DEF%')
+                    ->orWhere('nama', 'Default');
+            })->first();
+
+        if (! $rak) {
+            $kodeUnik = "RAK-DEF-G{$gudangId}";
+            $counter = 1;
+            while (Rak::where('kode', $kodeUnik)->exists()) {
+                $kodeUnik = "RAK-DEF-G{$gudangId}-{$counter}";
+                $counter++;
+            }
+
+            $rak = Rak::create([
+                'gudang_id' => $gudangId,
+                'nama' => 'Rak Default',
+                'kode' => $kodeUnik,
+                'is_active' => true,
+            ]);
+        }
+
+        return $this->rakCache[$cacheKey] = $rak->id;
+    }
+
+    /**
+     * Resolusi lokasi rak atau buat baru secara aman tanpa bentrok unique constraint kode.
+     * Jika nilai rak dikosongkan, otomatis dimasukkan ke rak default bawaan sistem.
+     */
+    public function resolveOrCreateRak(?string $rakRaw, ?int $gudangId = null): int
+    {
+        if (! $gudangId) {
+            $cabangIdSession = session('cabang_id');
+            $gudangId = $this->resolveOrCreateGudangDefault($cabangIdSession);
+        }
+
+        $raw = trim((string) $rakRaw);
+        if ($raw === '' || in_array(strtolower($raw), ['-', '0', 'none', 'null', 'kosong'], true)) {
+            return $this->resolveOrCreateRakDefault($gudangId);
+        }
+
+        $cacheKey = "{$gudangId}|{$raw}";
+        if (isset($this->rakCache[$cacheKey])) {
+            return $this->rakCache[$cacheKey];
+        }
+
+        // Cari dulu apakah rak sudah ada di gudang ini (berdasarkan id, nama, atau kode)
+        $existingId = $this->resolveRakId($raw, $gudangId);
+        if ($existingId) {
+            $this->rakCache[$cacheKey] = $existingId;
+
+            return $existingId;
+        }
+
+        // Buat rak baru dengan kode unik aman
+        $baseKode = Str::upper(Str::slug($raw));
+        if ($baseKode === '') {
+            $baseKode = 'RAK';
+        }
+        $kodeUnik = $baseKode;
+        $counter = 1;
+        while (Rak::where('kode', $kodeUnik)->exists()) {
+            $kodeUnik = "{$baseKode}-G{$gudangId}-{$counter}";
+            $counter++;
+            if ($counter > 50) {
+                $kodeUnik = "{$baseKode}-".strtoupper(Str::random(5));
+                break;
+            }
+        }
+
+        $rakBaru = Rak::create([
+            'gudang_id' => $gudangId,
+            'nama' => $raw,
+            'kode' => $kodeUnik,
+            'is_active' => true,
+        ]);
+
+        $this->rakCache[$cacheKey] = $rakBaru->id;
+
+        return $rakBaru->id;
     }
 
     /** Kolom template (urutan = heading export). */
@@ -647,6 +956,136 @@ class ImportProdukService
     }
 
     /**
+     * Generate SKU unik otomatis ketika kolom SKU dikosongkan pada baris import.
+     */
+    public function generateFallbackSku(?string $nama, array &$konteks = []): string
+    {
+        $clean = preg_replace('/[^A-Za-z0-9]/', '', (string) $nama);
+        $prefix = strtoupper(substr($clean, 0, 6));
+        if (strlen($prefix) < 3) {
+            $prefix = 'PRD';
+        }
+
+        $candidate = $prefix.'-'.strtoupper(Str::random(6));
+        $counter = 0;
+        while (
+            isset($konteks['skuDalamFile'][$candidate])
+            || SkuVariant::where('sku', $candidate)->exists()
+        ) {
+            $candidate = $prefix.'-'.strtoupper(Str::random(6));
+            $counter++;
+            if ($counter > 50) {
+                $candidate = 'SKU-'.time().'-'.strtoupper(Str::random(4));
+                break;
+            }
+        }
+
+        $konteks['skuDalamFile'][$candidate] = true;
+
+        return $candidate;
+    }
+
+    /**
+     * Generate SKU unik baru dari SKU yang terdeteksi duplikat (misal: SKU-V2, SKU-V3, SKU-DUP1).
+     */
+    public function generateUniqueSkuSuffix(string $sku, array $konteks = []): string
+    {
+        $base = trim($sku);
+        if ($base === '') {
+            $dummy = $konteks;
+
+            return $this->generateFallbackSku(null, $dummy);
+        }
+
+        // Coba suffix -V2, -V3, dst
+        for ($i = 2; $i <= 99; $i++) {
+            $candidate = "{$base}-V{$i}";
+            if (! isset($konteks['skuDalamFile'][$candidate]) && ! SkuVariant::where('sku', $candidate)->exists()) {
+                return $candidate;
+            }
+        }
+
+        return "{$base}-".strtoupper(Str::random(4));
+    }
+
+    /**
+     * Deteksi apakah baris memiliki SKU atau Barcode yang duplikat (dengan database atau intra-file).
+     */
+    public function detectDuplikatRow(array $row, int $nomorBaris, array $konteks): ?array
+    {
+        $sku = trim((string) ($row['sku'] ?? ''));
+        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
+        $nama = trim((string) ($row['nama'] ?? ''));
+
+        $isSkuFile = $sku !== '' && isset($konteks['skuDalamFile'][$sku]);
+        $variantDb = $sku !== '' ? SkuVariant::with('produk')->where('sku', $sku)->first() : null;
+        $isSkuDb = $variantDb !== null;
+
+        $isBarcodeFile = $barcode !== '' && isset($konteks['barcodeDalamFile'][$barcode]);
+        $isBarcodeDb = false;
+        $barcodeTargetProduk = null;
+        if ($barcode !== '') {
+            $variantBarcode = SkuVariant::with('produk')->where('barcode', $barcode)->first();
+            if ($variantBarcode) {
+                $isBarcodeDb = true;
+                $barcodeTargetProduk = $variantBarcode->produk;
+            } else {
+                $produkBarcode = Produk::where('barcode', $barcode)->first();
+                if ($produkBarcode) {
+                    $isBarcodeDb = true;
+                    $barcodeTargetProduk = $produkBarcode;
+                }
+            }
+        }
+
+        if (! $isSkuFile && ! $isSkuDb && ! $isBarcodeFile && ! $isBarcodeDb) {
+            return null;
+        }
+
+        $tipe = ($isSkuDb || $isSkuFile) ? 'sku' : 'barcode';
+        $lokasi = ($isSkuDb || $isBarcodeDb) ? 'database' : 'intra_file';
+
+        $targetProdukId = $variantDb?->produk_id ?? $barcodeTargetProduk?->id ?? null;
+        $targetProdukNama = $variantDb?->produk?->nama ?? $barcodeTargetProduk?->nama ?? null;
+        $targetProdukSku = $variantDb?->sku ?? $barcodeTargetProduk?->skuVariants?->first()?->sku ?? null;
+
+        $targetBaris = null;
+        if ($lokasi === 'intra_file' && ! empty($konteks['namaDalamFile'])) {
+            foreach ($konteks['namaDalamFile'] as $prev) {
+                if ($sku !== '' && strcasecmp($prev['sku'], $sku) === 0) {
+                    $targetBaris = $prev['baris'];
+                    $targetProdukNama = $prev['nama'];
+                    break;
+                }
+            }
+        }
+
+        $skuRekomendasi = $this->generateUniqueSkuSuffix($sku, $konteks);
+
+        $ket = match ($lokasi) {
+            'database' => "{$tipe} '{$sku}' sudah terdaftar di master produk database ({$targetProdukNama}).",
+            default => "{$tipe} '{$sku}' duplikat dengan baris {$targetBaris} pada file import ini.",
+        };
+
+        return [
+            'baris' => $nomorBaris,
+            'sku' => $sku,
+            'sku_rekomendasi' => $skuRekomendasi,
+            'sku_baru' => $skuRekomendasi,
+            'barcode' => $barcode,
+            'nama' => $nama,
+            'tipe' => $tipe,
+            'lokasi' => $lokasi,
+            'target_produk_id' => $targetProdukId,
+            'target_produk_nama' => $targetProdukNama,
+            'target_produk_sku' => $targetProdukSku,
+            'target_baris' => $targetBaris,
+            'default_aksi' => 'ganti_sku',
+            'keterangan' => $ket,
+        ];
+    }
+
+    /**
      * Validasi satu baris → daftar pesan error (kosong = valid).
      */
     public function validateRow(array $row, array $konteks): array
@@ -673,12 +1112,12 @@ class ImportProdukService
         }
 
         $satuanRaw = trim((string) ($row['satuan'] ?? ''));
-        if (! $satuanRaw || in_array(strtolower($satuanRaw), ['-', 'none', 'null'], true)) {
+        if (! $satuanRaw || in_array(strtolower($satuanRaw), ['-', 'none', 'null', 'kosong'], true)) {
             $satuan = 'pcs';
         } else {
             $satuan = $this->normalizeSatuan($satuanRaw);
-            if (! SatuanUnit::where('kode', $satuan)->where('is_active', true)->exists()) {
-                $errors[] = "Satuan '{$satuanRaw}' tidak terdaftar di satuan_unit";
+            if ($satuan === '') {
+                $satuan = 'pcs';
             }
         }
 
@@ -711,13 +1150,9 @@ class ImportProdukService
 
         $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
-        if (! $gudangKosong && ! $this->resolveGudangId($gudangRaw)) {
-            $errors[] = "Gudang '{$gudangRaw}' tidak ditemukan";
-        } elseif ((float) $stokAwal > 0 && $gudangKosong) {
+        if ((float) $stokAwal > 0 && $gudangKosong) {
             $errors[] = 'gudang_id wajib diisi bila stok_awal > 0';
         }
-
-        // Rak id bersifat opsional dan fleksibel: kosong, strip (-), 0, atau tidak ditemukan tidak menggagalkan baris (warning dicatat di checkRowWarnings).
 
         return $errors;
     }
@@ -728,7 +1163,7 @@ class ImportProdukService
      * [B-10f/P1-5] Validasi lintas cabang dijalankan di preview (fail fast)
      * supaya user tahu SEBELUM commit.
      */
-    public function preview(string $filePath): array
+    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN): array
     {
         $rows = $this->parseRows($filePath);
         // [B-10f] File lintas cabang ditolak (tidak ada mutasi stok/jurnal yg bisa dicocokkan)
@@ -752,13 +1187,23 @@ class ImportProdukService
         ];
 
         $hasil = [];
+        $kemiripanRows = [];
+        $duplikatRows = [];
         $valid = 0;
         $invalid = 0;
         $totalPeringatan = 0;
         foreach ($rows as $i => $row) {
             $nomorBaris = $i + 2; // +1 heading
             $errors = $this->validateRow($row, $konteks);
-            $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks);
+            $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks, $threshold);
+            $kemiripan = $this->detectKemiripanRow($row, $nomorBaris, $konteks, $threshold);
+            $duplikat = $this->detectDuplikatRow($row, $nomorBaris, $konteks);
+            if ($kemiripan) {
+                $kemiripanRows[] = $kemiripan;
+            }
+            if ($duplikat) {
+                $duplikatRows[] = $duplikat;
+            }
             $this->catatKonteks($row, $nomorBaris, $konteks);
             if ($errors) {
                 $invalid++;
@@ -821,6 +1266,8 @@ class ImportProdukService
             $rakVal = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
             if ($rakVal !== '' && ! in_array(strtolower($rakVal), ['-', '0', 'none', 'null', 'kosong'], true)) {
                 $refValues['rak'][$rakVal] = true;
+            } else {
+                $refValues['rak']['Rak Default'] = true;
             }
         }
 
@@ -851,12 +1298,20 @@ class ImportProdukService
                 'keterangan' => "Rak '{$nilai}' belum ada di sistem — akan didaftarkan otomatis ke gudang terkait.",
             ];
         }
+        if (! Gudang::exists()) {
+            $konfirmasi[] = [
+                'tipe' => 'gudang',
+                'nilai' => 'Gudang Utama',
+                'aksi' => 'auto_create',
+                'keterangan' => 'Belum ada gudang di sistem — Gudang Utama default akan dibuat otomatis sebagai parent lokasi rak dan inventori.',
+            ];
+        }
         foreach ($referensiSummary['gudang']['new'] ?? [] as $nilai) {
             $konfirmasi[] = [
                 'tipe' => 'gudang',
                 'nilai' => $nilai,
-                'aksi' => 'tidak_ditemukan',
-                'keterangan' => "Gudang '{$nilai}' tidak ditemukan — baris terkait akan menggunakan gudang default.",
+                'aksi' => 'auto_create',
+                'keterangan' => "Gudang '{$nilai}' belum ada di sistem — akan dibuat otomatis saat import.",
             ];
         }
 
@@ -879,10 +1334,24 @@ class ImportProdukService
             'status_preview' => $statusPreview,
             'label_status' => $labelStatus,
             'sampel' => array_slice($hasil, 0, 5),
-            'error_rows' => array_values(array_filter($hasil, fn ($h) => ! $h['valid'])),
-            'warning_rows' => array_values(array_filter($hasil, fn ($h) => ! empty($h['warnings']))),
+            // Rincian seluruh baris error satu per satu (tanpa dipotong agar pengguna dapat memperbaiki semua error)
+            'error_rows' => array_values(array_map(fn ($h) => [
+                'baris' => $h['baris'],
+                'sku' => $h['sku'],
+                'nama' => $h['nama'],
+                'errors' => $h['errors'],
+            ], array_filter($hasil, fn ($h) => ! $h['valid']))),
+            'total_error_rows' => $invalid,
+            'warning_rows' => array_slice(array_values(array_filter($hasil, fn ($h) => ! empty($h['warnings']))), 0, 10),
+            'total_warning_rows' => $totalPeringatan,
+            'kemiripan_rows' => $kemiripanRows,
+            'total_kemiripan_rows' => count($kemiripanRows),
+            'duplikat_rows' => $duplikatRows,
+            'total_duplikat_rows' => count($duplikatRows),
+            'threshold_kemiripan' => $threshold,
             'referensi_summary' => $referensiSummary,
-            'konfirmasi' => $konfirmasi,
+            'konfirmasi' => array_slice($konfirmasi, 0, 20),
+            'total_konfirmasi' => count($konfirmasi),
         ];
     }
 
@@ -952,16 +1421,20 @@ class ImportProdukService
             $summary['kualitas'][$exists ? 'existing' : 'new'][] = $kual;
         }
 
-        // Satuan: check by kode
+        // Satuan: check by kode or nama
         foreach (array_keys($refValues['satuan']) as $sat) {
-            $exists = SatuanUnit::where('kode', $sat)->exists();
+            $exists = SatuanUnit::whereRaw('LOWER(kode) = ?', [strtolower($sat)])
+                ->orWhereRaw('LOWER(nama) = ?', [strtolower($sat)])
+                ->exists();
             $summary['satuan'][$exists ? 'existing' : 'new'][] = $sat;
         }
 
         // Gudang: check by nama or kode
         if (! empty($refValues['gudang'])) {
             foreach (array_keys($refValues['gudang']) as $g) {
-                $exists = Gudang::where('nama', $g)->orWhere('kode', $g)->exists()
+                $exists = Gudang::whereRaw('LOWER(nama) = ?', [strtolower($g)])
+                    ->orWhereRaw('LOWER(kode) = ?', [strtolower($g)])
+                    ->exists()
                     || (is_numeric($g) && Gudang::find((int) $g));
                 $summary['gudang'][$exists ? 'existing' : 'new'][] = $g;
             }
@@ -970,7 +1443,9 @@ class ImportProdukService
         // Rak: check by nama or kode
         if (! empty($refValues['rak'])) {
             foreach (array_keys($refValues['rak']) as $r) {
-                $exists = Rak::where('nama', $r)->orWhere('kode', $r)->exists()
+                $exists = Rak::whereRaw('LOWER(nama) = ?', [strtolower($r)])
+                    ->orWhereRaw('LOWER(kode) = ?', [strtolower($r)])
+                    ->exists()
                     || (is_numeric($r) && Rak::find((int) $r));
                 $summary['rak'][$exists ? 'existing' : 'new'][] = $r;
             }
@@ -992,7 +1467,7 @@ class ImportProdukService
      * - branches:chunk dipakai karena RAM 1GB — satu file besar tidak boleh jadi
      *   satu transaksi raksasa yang menahan lock (/tmp) lama.
      */
-    public function commit(string $filePath, int $importLogId, ?int $userId = null): array
+    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN): array
     {
         $rows = $this->parseRows($filePath);
         // [B-10f] Validasi lintas cabang (fail fast, SEBELUM ada mutasi apa pun)
@@ -1007,16 +1482,59 @@ class ImportProdukService
         $importedSkuToId = [];
 
         foreach (array_chunk($rows, 100) as $indexChunk => $chunk) {
-            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId) {
+            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId, $aksiKemiripan, $resolusiDuplikat, $threshold) {
                 // Akumulator NILAI per chunk: jurnal di-post dalam transaksi yang
                 // SAMA dengan mutasi stok baris-baris chunk ini.
                 $nilaiChunk = 0.0;
 
                 foreach ($chunk as $i => $row) {
                     $nomorBaris = $indexChunk * 100 + $i + 2;
+                    $skuRaw = trim((string) ($row['sku'] ?? ''));
+
+                    // Resolusi Duplikat SKU / Barcode dari input pengguna
+                    $resDup = $resolusiDuplikat[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiDuplikat[$skuRaw] ?? null) : null);
+                    $aksiDup = is_array($resDup) ? ($resDup['aksi'] ?? null) : $resDup;
+                    $skuBaru = is_array($resDup) ? trim((string) ($resDup['sku_baru'] ?? '')) : '';
+
+                    if ($aksiDup === 'skip') {
+                        $detail[] = [
+                            'baris' => $nomorBaris,
+                            'sku' => $skuRaw,
+                            'nama' => $row['nama'] ?? '',
+                            'status' => 'skip',
+                            'catatan' => 'Dilewati oleh pengguna (resolusi duplikat: lewati)',
+                        ];
+
+                        continue;
+                    }
+
+                    if ($aksiDup === 'ganti_sku' && $skuBaru !== '') {
+                        $row['sku'] = $skuBaru;
+                        $skuRaw = $skuBaru;
+                    }
+
+                    // Aksi Kemiripan Produk
+                    $aksi = $aksiKemiripan[$nomorBaris] ?? ($skuRaw !== '' ? ($aksiKemiripan[$skuRaw] ?? null) : null) ?? 'terpisah';
+
+                    if ($aksi === 'skip') {
+                        $detail[] = [
+                            'baris' => $nomorBaris,
+                            'sku' => $skuRaw,
+                            'nama' => $row['nama'] ?? '',
+                            'status' => 'skip',
+                            'catatan' => 'Dilewati oleh pengguna (pencocokan kemiripan: lewati)',
+                        ];
+
+                        continue;
+                    }
+
                     $errors = $this->validateRow($row, $konteks);
-                    $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks);
+                    if ($aksi === 'gabung' || $aksiDup === 'timpa_update') {
+                        $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat')));
+                    }
+                    $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks, $threshold);
                     $this->catatKonteks($row, $nomorBaris, $konteks);
+
                     try {
                         if ($errors) {
                             throw new \Exception(implode('; ', $errors));
@@ -1024,7 +1542,18 @@ class ImportProdukService
                         // [B-10f] Savepoint per baris (nested transaction): baris gagal
                         // tidak boleh meninggalkan produk/sku setengah tertulis di dalam
                         // chunk yang sama — nilai jurnal chunk tetap = mutasi utuh.
-                        $result = DB::transaction(fn () => $this->prosesSatuBaris($row, $importLogId, $userId));
+                        $result = DB::transaction(function () use ($row, $importLogId, $userId, $aksi, $aksiDup, &$importedSkuToId, $nomorBaris, $konteks, $threshold) {
+                            if ($aksiDup === 'timpa_update') {
+                                return $this->prosesTimpaUpdateBaris($row, $importLogId, $userId, $nomorBaris);
+                            }
+
+                            if ($aksi === 'gabung') {
+                                return $this->prosesGabungBaris($row, $importLogId, $userId, $importedSkuToId, $nomorBaris, $konteks, $threshold);
+                            }
+
+                            return $this->prosesSatuBaris($row, $importLogId, $userId);
+                        });
+
                         $sukses++;
                         $nilaiChunk += $result['stok_nilai'];
                         $totalStokNilai += $result['stok_nilai'];
@@ -1034,11 +1563,21 @@ class ImportProdukService
                         if (! empty($warnings)) {
                             $totalPeringatan++;
                         }
+                        $catatanStatus = null;
+                        if (! empty($result['timpa'])) {
+                            $catatanStatus = "Diperbarui/ditimpa ke produk eksisting [{$result['sku']}] {$result['nama']}";
+                        } elseif (! empty($result['gabung'])) {
+                            $catatanStatus = "Digabungkan ke master produk [ID: {$result['produk_id']}] {$result['nama']}";
+                        } elseif ($aksiDup === 'ganti_sku' && $skuBaru !== '') {
+                            $catatanStatus = "SKU disesuaikan menjadi {$skuBaru}";
+                        }
+
                         $detail[] = [
                             'baris' => $nomorBaris,
-                            'sku' => $row['sku'] ?? '',
+                            'sku' => $result['sku'] ?? $skuRaw,
                             'nama' => $row['nama'] ?? '',
                             'status' => 'ok',
+                            'catatan' => $catatanStatus,
                             'warning' => ! empty($warnings) ? implode('; ', $warnings) : null,
                         ];
                     } catch (\Throwable $e) {
@@ -1179,23 +1718,311 @@ class ImportProdukService
     }
 
     /**
+     * Proses penggabungan baris ke master produk yang sudah ada (merge varian, tipe HP, dan stok).
+     */
+    protected function prosesGabungBaris(array $row, int $importLogId, ?int $userId, array &$importedSkuToId, int $nomorBaris, array $konteks, int $threshold = self::THRESHOLD_PENCOCOKAN): array
+    {
+        $nama = trim((string) ($row['nama'] ?? ''));
+        $sku = trim((string) ($row['sku'] ?? ''));
+        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
+        $hargaBeli = round((float) ($row['harga_beli'] ?? 0), 2);
+        $hargaJual = round((float) ($row['harga_jual'] ?? 0), 2);
+        $stokAwal = (int) ($row['stok_awal'] ?? 0);
+        $satuan = $this->resolveOrCreateSatuan($row['satuan'] ?? 'pcs');
+
+        // Cari target produk yang mirip (baik dari DB atau intra-file)
+        $targetProduk = null;
+        $existing = $this->findSimilarExistingProduct($nama, $sku, $threshold);
+        if ($existing) {
+            $targetProduk = Produk::with(['tipeHps', 'skuVariants'])->find($existing->id);
+        }
+
+        if (! $targetProduk && ! empty($konteks['namaDalamFile'])) {
+            foreach ($konteks['namaDalamFile'] as $prev) {
+                if (strcasecmp($prev['sku'], $sku) === 0) {
+                    continue;
+                }
+                $lenDiff = abs(strlen($nama) - strlen($prev['nama']));
+                if ($lenDiff > 12) {
+                    continue;
+                }
+                similar_text(strtolower($nama), strtolower($prev['nama']), $pct);
+                if ($pct >= $threshold) {
+                    $targetProdukId = $importedSkuToId[$prev['sku']] ?? null;
+                    if ($targetProdukId) {
+                        $targetProduk = Produk::with(['tipeHps', 'skuVariants'])->find($targetProdukId);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (! $targetProduk) {
+            return $this->prosesSatuBaris($row, $importLogId, $userId);
+        }
+
+        // 1. Merge Tipe HP & Kompatibilitas
+        $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);
+        $daftarTipe = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
+        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null);
+        if (! $daftarTipe && $kompat) {
+            $daftarTipe = $kompat;
+        }
+
+        if ($daftarTipe) {
+            $ids = [];
+            foreach ($daftarTipe as $t) {
+                $cacheKey = $t['merk'].'|'.$t['model'];
+                if (! isset($this->tipeHpCache[$cacheKey])) {
+                    $this->tipeHpCache[$cacheKey] = TipeHp::firstOrCreate(
+                        ['merk' => $t['merk'], 'model' => $t['model']],
+                        ['nama' => $t['merk'].' '.$t['model'], 'is_active' => true]
+                    )->id;
+                }
+                $ids[] = $this->tipeHpCache[$cacheKey];
+            }
+            $targetProduk->tipeHps()->syncWithoutDetaching($ids);
+
+            $existingKompat = is_array($targetProduk->kompatibilitas_hp) ? $targetProduk->kompatibilitas_hp : [];
+            $mergedKompat = array_values(array_unique(array_merge($existingKompat, $daftarTipe), SORT_REGULAR));
+            $targetProduk->update(['kompatibilitas_hp' => $mergedKompat]);
+        }
+
+        // 2. Variant resolution
+        $variant = null;
+        if ($sku !== '') {
+            $variant = SkuVariant::where('sku', $sku)->first();
+            if (! $variant) {
+                $variant = SkuVariant::create([
+                    'produk_id' => $targetProduk->id,
+                    'sku' => $sku,
+                    'barcode' => $barcode ?: null,
+                    'nama_varian' => trim((string) ($row['nama_varian'] ?? '')) ?: 'Varian '.$sku,
+                    'satuan_kode' => $satuan,
+                    'harga_beli' => $hargaBeli > 0 ? $hargaBeli : (float) $targetProduk->harga_beli,
+                    'harga_jual_retail' => $hargaJual > 0 ? $hargaJual : (float) $targetProduk->harga_jual_retail,
+                    'is_active' => true,
+                ]);
+            }
+        }
+        if (! $variant) {
+            $variant = $targetProduk->skuVariants()->first();
+        }
+
+        // 3. Stok awal & Lokasi
+        $cabangIdSession = session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+        $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
+        $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
+        $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
+        $rakKosong = $rakRaw === '' || in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true);
+
+        $targetGudangId = $gudangKosong
+            ? $this->resolveOrCreateGudangDefault($cabangIdSession)
+            : $this->resolveOrCreateGudang($gudangRaw, $cabangIdSession);
+
+        $rakId = $this->resolveOrCreateRak($rakRaw, $targetGudangId);
+        $gudangId = ($stokAwal > 0 || ! $gudangKosong || ! $rakKosong) ? $targetGudangId : null;
+
+        $stokNilai = 0.0;
+        if ($gudangId && $variant) {
+            $minStock = isset($row['min_stock']) && is_numeric($row['min_stock']) ? (int) $row['min_stock'] : 0;
+            $stok = StokItem::firstOrCreate(
+                ['produk_id' => $targetProduk->id, 'sku_variant_id' => $variant->id, 'gudang_id' => $gudangId],
+                ['jumlah' => 0, 'jumlah_minimum' => $minStock, 'rak_id' => $rakId]
+            );
+
+            if ($rakId && $stok->rak_id !== $rakId) {
+                $stok->update(['rak_id' => $rakId]);
+            }
+
+            if ($stokAwal > 0) {
+                $sebelum = $stok->jumlah;
+                $stok->update(['jumlah' => $sebelum + $stokAwal, 'rak_id' => $rakId]);
+
+                StokLog::create([
+                    'gudang_id' => $gudangId,
+                    'produk_id' => $targetProduk->id,
+                    'sku_variant_id' => $variant->id,
+                    'user_id' => $userId,
+                    'jenis' => 'import',
+                    'referensi_tipe' => ImportLog::class,
+                    'referensi_id' => $importLogId,
+                    'jumlah_sebelum' => $sebelum,
+                    'perubahan' => $stokAwal,
+                    'jumlah_setelah' => $sebelum + $stokAwal,
+                    'catatan' => "Stok awal import (gabung ke master: {$targetProduk->nama})",
+                ]);
+
+                StockMutationLog::create([
+                    'produk_id' => $targetProduk->id,
+                    'sku_variant_id' => $variant->id,
+                    'gudang_id' => $gudangId,
+                    'user_id' => $userId,
+                    'delta' => $stokAwal,
+                    'sumber' => 'import:excel',
+                    'referensi_tipe' => ImportLog::class,
+                    'referensi_id' => $importLogId,
+                    'terjadi_at' => now(),
+                ]);
+
+                $hpp = $hargaBeli > 0 ? $hargaBeli : (float) $targetProduk->harga_beli;
+                $stokNilai = round($stokAwal * $hpp, 2);
+            }
+        }
+
+        return [
+            'produk_id' => $targetProduk->id,
+            'sku' => $variant?->sku ?? $sku,
+            'nama' => $targetProduk->nama,
+            'stok_nilai' => $stokNilai,
+            'gabung' => true,
+        ];
+    }
+
+    /**
+     * Proses timpa/update produk eksisting ketika user memilih opsi timpa untuk duplikat database.
+     */
+    protected function prosesTimpaUpdateBaris(array $row, int $importLogId, ?int $userId, int $nomorBaris): array
+    {
+        $sku = trim((string) ($row['sku'] ?? ''));
+        $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
+        $hargaBeli = round((float) ($row['harga_beli'] ?? 0), 2);
+        $hargaJual = round((float) ($row['harga_jual'] ?? 0), 2);
+        $stokAwal = (int) ($row['stok_awal'] ?? 0);
+
+        $variant = null;
+        if ($sku !== '') {
+            $variant = SkuVariant::with('produk')->where('sku', $sku)->first();
+        }
+        if (! $variant && $barcode !== '') {
+            $variant = SkuVariant::with('produk')->where('barcode', $barcode)->first();
+        }
+
+        if (! $variant) {
+            return $this->prosesSatuBaris($row, $importLogId, $userId);
+        }
+
+        $produk = $variant->produk;
+
+        // Update harga dan barcode jika ada
+        $variantUpdate = [];
+        if ($hargaBeli > 0) {
+            $variantUpdate['harga_beli'] = $hargaBeli;
+        }
+        if ($hargaJual > 0) {
+            $variantUpdate['harga_jual_retail'] = $hargaJual;
+        }
+        if ($barcode && ! $variant->barcode) {
+            $variantUpdate['barcode'] = $barcode;
+        }
+        if (! empty($variantUpdate)) {
+            $variant->update($variantUpdate);
+        }
+
+        // Sync Tipe HP jika diisi
+        $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);
+        $daftarTipe = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
+        if ($daftarTipe) {
+            $ids = [];
+            foreach ($daftarTipe as $t) {
+                $cacheKey = $t['merk'].'|'.$t['model'];
+                if (! isset($this->tipeHpCache[$cacheKey])) {
+                    $this->tipeHpCache[$cacheKey] = TipeHp::firstOrCreate(
+                        ['merk' => $t['merk'], 'model' => $t['model']],
+                        ['nama' => $t['merk'].' '.$t['model'], 'is_active' => true]
+                    )->id;
+                }
+                $ids[] = $this->tipeHpCache[$cacheKey];
+            }
+            $produk->tipeHps()->syncWithoutDetaching($ids);
+        }
+
+        // Tambah stok awal jika diisi
+        $cabangIdSession = session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+        $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
+        $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
+        $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
+        $rakKosong = $rakRaw === '' || in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true);
+
+        $targetGudangId = $gudangKosong
+            ? $this->resolveOrCreateGudangDefault($cabangIdSession)
+            : $this->resolveOrCreateGudang($gudangRaw, $cabangIdSession);
+
+        $rakId = $this->resolveOrCreateRak($rakRaw, $targetGudangId);
+        $gudangId = ($stokAwal > 0 || ! $gudangKosong || ! $rakKosong) ? $targetGudangId : null;
+
+        $stokNilai = 0.0;
+        if ($gudangId) {
+            $stok = StokItem::firstOrCreate(
+                ['produk_id' => $produk->id, 'sku_variant_id' => $variant->id, 'gudang_id' => $gudangId],
+                ['jumlah' => 0, 'jumlah_minimum' => 0, 'rak_id' => $rakId]
+            );
+
+            if ($rakId && $stok->rak_id !== $rakId) {
+                $stok->update(['rak_id' => $rakId]);
+            }
+
+            if ($stokAwal > 0) {
+                $sebelum = $stok->jumlah;
+                $stok->update(['jumlah' => $sebelum + $stokAwal, 'rak_id' => $rakId]);
+
+                StokLog::create([
+                    'gudang_id' => $gudangId,
+                    'produk_id' => $produk->id,
+                    'sku_variant_id' => $variant->id,
+                    'user_id' => $userId,
+                    'jenis' => 'import',
+                    'referensi_tipe' => ImportLog::class,
+                    'referensi_id' => $importLogId,
+                    'jumlah_sebelum' => $sebelum,
+                    'perubahan' => $stokAwal,
+                    'jumlah_setelah' => $sebelum + $stokAwal,
+                    'catatan' => "Stok awal import (update produk eksisting: {$produk->nama})",
+                ]);
+
+                StockMutationLog::create([
+                    'produk_id' => $produk->id,
+                    'sku_variant_id' => $variant->id,
+                    'gudang_id' => $gudangId,
+                    'user_id' => $userId,
+                    'delta' => $stokAwal,
+                    'sumber' => 'import:excel',
+                    'referensi_tipe' => ImportLog::class,
+                    'referensi_id' => $importLogId,
+                    'terjadi_at' => now(),
+                ]);
+
+                $hpp = $hargaBeli > 0 ? $hargaBeli : (float) $variant->harga_beli;
+                $stokNilai = round($stokAwal * $hpp, 2);
+            }
+        }
+
+        return [
+            'produk_id' => $produk->id,
+            'sku' => $variant->sku,
+            'nama' => $produk->nama,
+            'stok_nilai' => $stokNilai,
+            'timpa' => true,
+        ];
+    }
+
+    /**
      * Proses satu baris valid: produk + sku_variant + harga_tier + tipe_hp + stok awal.
      */
     protected function prosesSatuBaris(array $row, int $importLogId, ?int $userId): array
     {
-        $nama = trim((string) $row['nama']);
-        $sku = trim((string) $row['sku']);
+        $nama = trim((string) ($row['nama'] ?? ''));
+        $sku = trim((string) ($row['sku'] ?? ''));
+        if ($sku === '') {
+            $dummyKonteks = [];
+            $sku = $this->generateFallbackSku($nama, $dummyKonteks);
+        }
+        if ($nama === '') {
+            $nama = 'Produk '.$sku;
+        }
         $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
 
-        $satuanRaw = trim((string) ($row['satuan'] ?? 'pcs'));
-        if (! $satuanRaw || in_array(strtolower($satuanRaw), ['-', 'none', 'null'], true)) {
-            $satuan = 'pcs';
-        } else {
-            $satuan = $this->normalizeSatuan($satuanRaw);
-        }
-        if (! SatuanUnit::where('kode', $satuan)->exists()) {
-            SatuanUnit::create(['kode' => $satuan, 'nama' => ucfirst($satuan), 'is_active' => true]);
-        }
+        $satuan = $this->resolveOrCreateSatuan($row['satuan'] ?? 'pcs');
 
         $kategoriUtamaInput = trim((string) ($row['kategori'] ?? $row['kategori_utama'] ?? '')) ?: 'Umum';
         $subKategoriInput = trim((string) ($row['sub_kategori'] ?? ''));
@@ -1203,72 +2030,64 @@ class ImportProdukService
         $hargaJual = round((float) ($row['harga_jual'] ?? 0), 2);
         $stokAwal = (int) ($row['stok_awal'] ?? 0);
 
+        $cabangIdSession = session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
         $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
-        $gudangId = $this->resolveGudangId($gudangRaw);
-        if (! $gudangId && $stokAwal > 0) {
-            $cabangIdSession = session('cabang_id');
-            $gudangId = Gudang::when($cabangIdSession, fn ($q, $c) => $q->where('cabang_id', $c))
-                ->where('is_active', true)
-                ->value('id') ?? Gudang::where('is_active', true)->value('id');
-        }
-
+        $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
         $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
-        $rakId = $this->resolveRakId($rakRaw, $gudangId);
-        if (! $rakId && $rakRaw !== '' && ! in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true) && $gudangId) {
-            $rakBaru = Rak::create([
-                'gudang_id' => $gudangId,
-                'nama' => $rakRaw,
-                'kode' => Str::upper(Str::slug($rakRaw)) ?: 'RAK-'.strtoupper(Str::random(4)),
-                'is_active' => true,
-            ]);
-            $rakId = $rakBaru->id;
-        }
+        $rakKosong = $rakRaw === '' || in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true);
+
+        $targetGudangId = $gudangKosong
+            ? $this->resolveOrCreateGudangDefault($cabangIdSession)
+            : $this->resolveOrCreateGudang($gudangRaw, $cabangIdSession);
+
+        $rakId = $this->resolveOrCreateRak($rakRaw, $targetGudangId);
+        $gudangId = ($stokAwal > 0 || ! $gudangKosong || ! $rakKosong) ? $targetGudangId : null;
 
         $supplierRaw = trim((string) ($row['supplier'] ?? ''));
         $supplierId = $this->resolveSupplierId($supplierRaw);
 
         $kondisi = $this->normalizeKondisi((string) ($row['kondisi'] ?? 'baru'));
-        $minStock = isset($row['min_stock']) && is_numeric($row['min_stock']) ? (int) $row['min_stock'] : null;
-        $reorderPoint = isset($row['reorder_point']) && is_numeric($row['reorder_point']) ? (int) $row['reorder_point'] : null;
-        $sn = $this->normalizeSn($row['sn'] ?? null);
+        $minStock = isset($row['min_stock']) && is_numeric($row['min_stock']) ? (int) $row['min_stock'] : 0;
+        $reorderPoint = isset($row['reorder_point']) && is_numeric($row['reorder_point']) ? (int) $row['reorder_point'] : 0;
+        $sn = $this->normalizeSn($row['sn'] ?? 'tidak');
         $deskripsi = trim((string) ($row['deskripsi'] ?? '')) ?: null;
 
         // Brand & kualitas: runtime cache to accelerate massive imports
-        $brandId = null;
         $brandName = trim((string) ($row['brand'] ?? ''));
-        if ($brandName !== '') {
-            if (! isset($this->brandCache[$brandName])) {
-                $this->brandCache[$brandName] = Brand::firstOrCreate(
-                    ['nama' => $brandName],
-                    ['is_active' => true]
-                )->id;
-            }
-            $brandId = $this->brandCache[$brandName];
+        if ($brandName === '' || in_array(strtolower($brandName), ['-', 'none', 'null', 'kosong'], true)) {
+            $brandName = 'OEM';
         }
+        if (! isset($this->brandCache[$brandName])) {
+            $this->brandCache[$brandName] = Brand::firstOrCreate(
+                ['nama' => $brandName],
+                ['is_active' => true]
+            )->id;
+        }
+        $brandId = $this->brandCache[$brandName];
 
-        $kualitasId = null;
         $kualitasName = $this->normalizeKualitas(trim((string) ($row['kualitas'] ?? '')));
-        if ($kualitasName !== '') {
-            $cacheKey = "{$brandId}:{$kualitasName}";
-            if (! isset($this->kualitasCache[$cacheKey])) {
-                $kualitasRow = KualitasProduk::where('nama', $kualitasName)
-                    ->where(function ($q) use ($brandId) {
-                        $q->where('brand_id', $brandId)
-                            ->orWhereNull('brand_id');
-                    })
-                    ->orderByRaw('brand_id IS NOT NULL DESC')
-                    ->first();
-
-                if (! $kualitasRow) {
-                    $kualitasRow = KualitasProduk::firstOrCreate(
-                        ['nama' => $kualitasName, 'brand_id' => $brandId],
-                        ['is_active' => true]
-                    );
-                }
-                $this->kualitasCache[$cacheKey] = $kualitasRow->id;
-            }
-            $kualitasId = $this->kualitasCache[$cacheKey];
+        if ($kualitasName === '') {
+            $kualitasName = 'Original';
         }
+        $cacheKey = "{$brandId}:{$kualitasName}";
+        if (! isset($this->kualitasCache[$cacheKey])) {
+            $kualitasRow = KualitasProduk::where('nama', $kualitasName)
+                ->where(function ($q) use ($brandId) {
+                    $q->where('brand_id', $brandId)
+                        ->orWhereNull('brand_id');
+                })
+                ->orderByRaw('brand_id IS NOT NULL DESC')
+                ->first();
+
+            if (! $kualitasRow) {
+                $kualitasRow = KualitasProduk::firstOrCreate(
+                    ['nama' => $kualitasName, 'brand_id' => $brandId],
+                    ['is_active' => true]
+                );
+            }
+            $this->kualitasCache[$cacheKey] = $kualitasRow->id;
+        }
+        $kualitasId = $this->kualitasCache[$cacheKey];
 
         // Kategori & sub-kategori: runtime cache & firstOrCreate
         $kategoriId = null;
@@ -1421,6 +2240,10 @@ class ImportProdukService
                 ['produk_id' => $produk->id, 'sku_variant_id' => $variant->id, 'gudang_id' => $gudangId],
                 ['jumlah' => 0, 'jumlah_minimum' => $minStock ?? 0, 'rak_id' => $rakId]
             );
+
+            if ($rakId && $stok->rak_id !== $rakId) {
+                $stok->update(['rak_id' => $rakId]);
+            }
 
             if ($stokAwal > 0) {
                 $sebelum = $stok->jumlah;
@@ -1793,16 +2616,11 @@ class ImportProdukService
                 continue;
             }
 
-            $satuanKode = $this->normalizeSatuan($parts[0]);
+            $satuanKode = $this->resolveOrCreateSatuan($parts[0]);
             $pengali = (float) $parts[1];
 
             if ($satuanKode === '' || $pengali <= 0) {
                 continue;
-            }
-
-            // Pastikan satuan tujuan terdaftar di master satuan_unit
-            if (! SatuanUnit::where('kode', $satuanKode)->exists()) {
-                SatuanUnit::create(['kode' => $satuanKode, 'nama' => ucfirst($satuanKode), 'is_active' => true]);
             }
 
             $hargaJual = isset($parts[2]) && is_numeric($parts[2]) ? round((float) $parts[2], 2) : null;

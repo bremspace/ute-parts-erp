@@ -2,16 +2,17 @@
     <!-- TAB 4: PO & SUPPLIER [T-10] -->
         <div class="space-y-5">
             <!-- Action Toolbar PO & WMS Procurement -->
-            <div class="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                 <div>
                     <h3 class="text-sm font-bold text-white tracking-wide">Daftar Purchase Order (PO)</h3>
                     <p class="text-xs text-ink-400">Pengadaan barang ke supplier dengan tracking harga otomatis &amp; strategi reorder ABC</p>
                 </div>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <button wire:click="openProcurementModal" wire:loading.attr="disabled" class="px-3.5 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97]" title="Rekomendasi Pengadaan Berdasarkan Stok & Demand">
-                        <span>📊</span> Rekomendasi Pengadaan
+                <div class="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                    <button wire:click="openProcurementModal" wire:loading.attr="disabled" class="flex-1 sm:flex-initial justify-center px-3 sm:px-3.5 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97] min-h-[40px] whitespace-nowrap" title="Rekomendasi Pengadaan Berdasarkan Stok & Demand">
+                        <span>📊</span>
+                        <span class="inline">Rekomendasi PO</span>
                     </button>
-                    <button wire:click="openPoModal" wire:loading.attr="disabled" class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.97]">
+                    <button wire:click="openPoModal" wire:loading.attr="disabled" class="flex-1 sm:flex-initial justify-center px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.97] min-h-[40px] whitespace-nowrap">
                         + Buat PO
                     </button>
                 </div>
@@ -34,7 +35,7 @@
                         <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $po->jatuh_tempo?->format('d/m/Y') ?? '-' }}</td>
                         <td class="py-3.5 px-4"><x-prism.status-pill :status="str_replace('_','-',$po->status)" /></td>
                         <td class="py-3.5 px-4">
-                            <div class="flex items-center gap-1.5 flex-nowrap">
+                            <div class="flex items-center gap-1 flex-wrap min-w-[140px]">
                                 @if($po->status === 'usulan')
                                     <button wire:click="konfirmasiUsulan({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-accent hover:brightness-110 text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Konfirmasi</button>
                                 @elseif($po->status === 'draft')
@@ -44,7 +45,52 @@
                                         📦 Terima (GRN)
                                     </button>
                                 @endif
+
+                                @if(in_array($po->status, ['draft', 'dikirim'], true))
+                                    <button
+                                        type="button"
+                                        wire:click="batalkanPo({{ $po->id }}, 'Dibatalkan langsung dari daftar PO')"
+                                        wire:confirm="Yakin ingin membatalkan Purchase Order {{ $po->no_po }}?"
+                                        class="px-2 py-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/20 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]"
+                                        title="Batalkan PO"
+                                    >
+                                        Batal
+                                    </button>
+                                @endif
+
                                 <button wire:click="bukaDetailPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Detail</button>
+
+                                <a
+                                    href="{{ route('wms.po.print', $po->id) }}"
+                                    target="_blank"
+                                    class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white text-[10px] font-bold flex items-center justify-center min-w-[28px] min-h-[28px]"
+                                    title="Cetak Surat Purchase Order Resmi (A4)"
+                                >
+                                    🖨️
+                                </a>
+
+                                @if($po->status === 'dibatalkan')
+                                    <a
+                                        href="{{ route('wms.po.print-penolakan', $po->id) }}"
+                                        target="_blank"
+                                        class="p-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 border border-up-red/20 text-up-red text-[10px] font-bold flex items-center justify-center min-w-[28px] min-h-[28px]"
+                                        title="Cetak Berita Acara Penolakan Barang / Kontra Bon Penolakan"
+                                    >
+                                        📄
+                                    </a>
+                                @endif
+
+                                @if($po->supplier?->telepon)
+                                    <a
+                                        href="{{ $po->status === 'dibatalkan' ? $po->generateWaPenolakanUrl() : $po->generateWaPesananUrl() }}"
+                                        target="_blank"
+                                        class="p-1.5 rounded-lg bg-up-mint/10 hover:bg-up-mint/20 border border-up-mint/20 text-up-mint text-[10px] font-bold flex items-center justify-center min-w-[28px] min-h-[28px]"
+                                        title="{{ $po->status === 'dibatalkan' ? 'Kirim WA Notifikasi Penolakan ke Supplier' : 'Kirim Pesanan PO via WhatsApp ke Supplier' }}"
+                                    >
+                                        💬
+                                    </a>
+                                @endif
+
                                 @if($po->status === 'diterima' && $po->sisa > 0)
                                     @if(auth()->user()?->hasRole('super-admin') || auth()->user()?->can('utang.manage') || auth()->user()?->can('akunting.create') || auth()->user()?->hasRole('akuntan') || auth()->user()?->hasRole('keuangan'))
                                         <button wire:click="bukaBayarPo({{ $po->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-accent text-white font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]">Bayar</button>
@@ -927,8 +973,23 @@
                                         <div class="text-[10px] text-ink-500">{{ $h['supplier_telepon'] }}</div>
                                     </td>
                                     <td class="py-3 px-3 text-right font-bold text-white tabular-nums">{{ number_format($h['jumlah']) }}</td>
-                                    <td class="py-3 px-3 text-right font-bold text-up-mint tabular-nums">
-                                        Rp {{ number_format($h['harga_beli'], 0, ',', '.') }}
+                                    <td class="py-3 px-3 text-right tabular-nums">
+                                        <div class="font-bold text-up-mint">Rp {{ number_format($h['harga_beli'], 0, ',', '.') }}</div>
+                                        @if(($h['trend'] ?? '') === 'naik')
+                                            <div class="text-[10px] text-red-400 font-semibold flex items-center justify-end gap-0.5 mt-0.5">
+                                                <span>▲ +{{ number_format($h['persentase'], 1) }}%</span>
+                                                <span class="text-ink-500 text-[9px]">(+Rp {{ number_format($h['selisih'], 0, ',', '.') }})</span>
+                                            </div>
+                                        @elseif(($h['trend'] ?? '') === 'turun')
+                                            <div class="text-[10px] text-emerald-400 font-semibold flex items-center justify-end gap-0.5 mt-0.5">
+                                                <span>▼ {{ number_format($h['persentase'], 1) }}%</span>
+                                                <span class="text-ink-500 text-[9px]">(-Rp {{ number_format(abs($h['selisih']), 0, ',', '.') }})</span>
+                                            </div>
+                                        @elseif(($h['trend'] ?? '') === 'tetap')
+                                            <div class="text-[10px] text-ink-500 flex items-center justify-end gap-0.5 mt-0.5">
+                                                <span>▬ Tetap</span>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="py-3 px-3 text-right text-ink-200 tabular-nums">
                                         Rp {{ number_format($h['subtotal'], 0, ',', '.') }}

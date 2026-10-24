@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Services;
 
+use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Wms\Models\Grn;
@@ -14,6 +15,7 @@ use App\Modules\Wms\Models\StokLog;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -142,6 +144,7 @@ class GrnService
 
                 $itemData[] = [
                     'produk_id' => $kodeProduk,
+                    'produk_nama' => $poItem->produk?->nama ?? ('Produk #'.$kodeProduk),
                     'sku_variant_id' => $poItem->sku_variant_id,
                     'satuan' => $poItem->satuan ?: ($poItem->produk?->satuan ?: 'pcs'),
                     'konversi' => $konversi,
@@ -165,7 +168,7 @@ class GrnService
             $totalHpp = round($totalHpp, 2);
 
             $grn = Grn::create([
-                'no_grn' => $this->jurnalService->generateNoJurnal('grn', $cabangId),
+                'no_grn' => $this->generateNoGrn($cabangId),
                 'po_id' => $po->id,
                 'cabang_id' => $cabangId,
                 'gudang_id' => $po->gudang_tujuan_id,
@@ -526,6 +529,58 @@ class GrnService
             'referensi_id' => $grn->id,
             'terjadi_at' => now(),
         ]);
+    }
+
+    /**
+     * Generate nomor dokumen GRN unik per cabang & tanggal.
+     * Memastikan counter memeriksa tabel grn secara langsung agar tidak bentrok (duplicate key).
+     */
+    public function generateNoGrn(?int $cabangId = null): string
+    {
+        $cabangId = $cabangId ?? 1;
+        $date = now()->format('Ymd');
+        $like = sprintf('JRL-GRN-%s-%s-%%', $cabangId, $date);
+
+        // Ambil counter terbesar yang sudah terpakai di tabel GRN
+        $terpakaiGrn = Grn::where('cabang_id', $cabangId)
+            ->where('no_grn', 'like', $like)
+            ->lockForUpdate()
+            ->pluck('no_grn')
+            ->map(function ($no) {
+                $parts = explode('-', (string) $no);
+
+                return (int) end($parts);
+            })
+            ->all();
+
+        // Ambil counter terbesar yang sudah terpakai di jurnal headers jika ada
+        $terpakaiJurnal = [];
+        if (class_exists(JurnalHeader::class) && Schema::hasTable('jurnal_headers')) {
+            $terpakaiJurnal = JurnalHeader::where('cabang_key', $cabangId)
+                ->where('no_jurnal', 'like', $like)
+                ->pluck('no_jurnal')
+                ->map(function ($no) {
+                    $parts = explode('-', (string) $no);
+
+                    return (int) end($parts);
+                })
+                ->all();
+        }
+
+        $semuaTerpakai = array_merge($terpakaiGrn, $terpakaiJurnal);
+        $next = ($semuaTerpakai ? max($semuaTerpakai) : 0) + 1;
+
+        // Loop safety guard untuk memastikan nomor benar-benar belum pernah dipakai di tabel grn
+        do {
+            $candidate = sprintf('JRL-GRN-%s-%s-%04d', $cabangId, $date, $next);
+            $exists = Grn::where('no_grn', $candidate)->exists();
+            if (! $exists) {
+                break;
+            }
+            $next++;
+        } while ($exists);
+
+        return $candidate;
     }
 
     /** Deteksi pelanggaran kunci unik/duplikat dari QueryException (MySQL 23000 / SQLite UNIQUE). */

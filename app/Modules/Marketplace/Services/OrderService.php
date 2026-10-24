@@ -12,6 +12,7 @@ use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Services\StockReservationService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -55,6 +56,20 @@ class OrderService
                 $qty = (int) $item['jumlah'];
                 $variant = isset($item['sku_variant_id']) ? SkuVariant::find($item['sku_variant_id']) : null;
 
+                // Checkout harus memakai stok cabang order, bukan agregat semua cabang.
+                // Stok dihitung dengan mengunci baris stok, dikurangi pending transfer lock dan active online reservation.
+                $reservationService = app(StockReservationService::class);
+                $stokTersedia = $reservationService->getAvailableStockForOrder(
+                    $cabangId,
+                    $produk->id,
+                    $variant?->id,
+                    lock: true
+                );
+
+                if ($qty <= 0 || $stokTersedia < $qty) {
+                    throw new \Exception("Stok {$produk->nama} tidak mencukupi di cabang yang dipilih (tersedia: {$stokTersedia})");
+                }
+
                 $pricing = $this->pricingService->resolve($produk, $pelanggan, $variant);
                 $harga = $pricing['harga'];
                 $lineSubtotal = round($harga * $qty, 2);
@@ -93,6 +108,7 @@ class OrderService
                 'jumlah_bayar' => 0,
                 'kembalian' => 0,
                 'status' => 'menunggu_pembayaran',
+                'expires_at' => now()->addMinutes((int) config('marketplace.reservation_minutes', 60)),
                 'catatan' => "Order marketplace [ambil: {$metodeAmbil}] ".($catatan ?? ''),
             ]);
 

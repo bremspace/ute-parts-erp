@@ -33,6 +33,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\NomorSeriService;
+use App\Modules\Wms\Services\StockReservationService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Collection;
@@ -554,10 +555,23 @@ class PosKasir extends Component
             return self::STOK_TANPA_GUDANG;
         }
 
-        return (int) StokItem::where('produk_id', $produkId)
+        $stokFisik = (int) StokItem::where('produk_id', $produkId)
             ->where('gudang_id', $gudangId)
             ->when($variantId, fn ($q) => $q->where('sku_variant_id', $variantId))
             ->sum('jumlah');
+
+        $gudang = Gudang::find($gudangId);
+        if (! $gudang) {
+            return $stokFisik;
+        }
+
+        $reserved = app(StockReservationService::class)->getActiveReservation(
+            $gudang->cabang_id,
+            $produkId,
+            $variantId
+        );
+
+        return max(0, $stokFisik - $reserved);
     }
 
     /**

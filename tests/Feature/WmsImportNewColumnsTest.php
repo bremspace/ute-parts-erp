@@ -330,10 +330,11 @@ class WmsImportNewColumnsTest extends TestCase
         $this->assertNull($p->supplier_id);
         $this->assertSame('pcs', $p->satuan);
 
-        $stok = StokItem::where('produk_id', $p->id)->first();
+        $stok = StokItem::with('rak')->where('produk_id', $p->id)->first();
         $this->assertNotNull($stok);
         $this->assertSame(4, $stok->jumlah);
-        $this->assertNull($stok->rak_id);
+        $this->assertNotNull($stok->rak_id);
+        $this->assertSame('Rak Default', $stok->rak?->nama);
 
         @unlink($filePath);
     }

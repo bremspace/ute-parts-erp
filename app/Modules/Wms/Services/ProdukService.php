@@ -750,8 +750,11 @@ class ProdukService
             $updateData['harga_jual_retail'] = $hargaJualBaru;
 
             HargaTier::where('produk_id', $produk->id)
-                ->where('tipe', 'retail')
-                ->update(['nominal_tetap' => $hargaJualBaru]);
+                ->where('tipe_konsumen', 'retail')
+                ->update([
+                    'nominal_tetap' => $hargaJualBaru,
+                    'harga' => $hargaJualBaru,
+                ]);
         }
 
         $produk->update($updateData);

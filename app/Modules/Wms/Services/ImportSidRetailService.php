@@ -380,7 +380,8 @@ class ImportSidRetailService
             'gudang_toko_id' => $gudangTokoId,
             'gudang_pusat_id' => $gudangPusatId,
             'sampel' => array_slice($items, 0, 5),
-            'items' => $items,
+            'items' => array_slice($items, 0, 10),
+            'total_items_preview' => count($items),
         ];
     }
 
@@ -710,13 +711,46 @@ class ImportSidRetailService
         // 10. Rak jika LOKASI terisi
         $rakId = null;
         $targetGudangRak = $gudangTokoId ?? $gudangPusatId;
-        if ($lokasiNama !== '' && $targetGudangRak) {
+        if ($lokasiNama !== '') {
+            if (! $targetGudangRak) {
+                $gudangDef = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first() ?? Gudang::first();
+                if (! $gudangDef) {
+                    $gudangDef = Gudang::create([
+                        'cabang_id' => $cabangId,
+                        'nama' => 'Gudang Utama',
+                        'kode' => 'GDG-UTAMA',
+                        'is_active' => true,
+                    ]);
+                }
+                $targetGudangRak = $gudangDef->id;
+            }
             $cacheKey = "{$targetGudangRak}|{$lokasiNama}";
             if (! isset($this->rakCache[$cacheKey])) {
-                $rak = Rak::firstOrCreate(
-                    ['gudang_id' => $targetGudangRak, 'nama' => $lokasiNama],
-                    ['kode' => Str::slug($lokasiNama), 'is_active' => true]
-                );
+                $rak = Rak::where('gudang_id', $targetGudangRak)
+                    ->where(function ($q) use ($lokasiNama) {
+                        $q->where('nama', $lokasiNama)->orWhere('kode', $lokasiNama);
+                    })->first();
+
+                if (! $rak) {
+                    $baseKode = Str::upper(Str::slug($lokasiNama)) ?: 'RAK';
+                    $kodeUnik = $baseKode;
+                    $counter = 1;
+                    while (Rak::where('kode', $kodeUnik)->exists()) {
+                        $kodeUnik = "{$baseKode}-G{$targetGudangRak}-{$counter}";
+                        $counter++;
+                        if ($counter > 50) {
+                            $kodeUnik = "{$baseKode}-".strtoupper(Str::random(5));
+                            break;
+                        }
+                    }
+
+                    $rak = Rak::create([
+                        'gudang_id' => $targetGudangRak,
+                        'nama' => $lokasiNama,
+                        'kode' => $kodeUnik,
+                        'is_active' => true,
+                    ]);
+                }
                 $this->rakCache[$cacheKey] = $rak->id;
             }
             $rakId = $this->rakCache[$cacheKey];
