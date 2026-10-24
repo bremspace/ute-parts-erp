@@ -262,10 +262,16 @@ class OmnichannelController extends Controller
         $signature = $request->header('Authorization') ?? $request->header('X-Shopee-Signature') ?? '';
         $adapter = $this->syncService->adapterFor($channel->platform);
 
-        if ($adapter && ! empty($partnerKey) && ! empty($signature)) {
+        if ($adapter && ! empty($partnerKey)) {
+            if (empty($signature)) {
+                Log::warning("Signature webhook {$channel->platform} tidak disertakan untuk channel #{$channel->id}");
+
+                return response()->json(['success' => false, 'message' => 'Signature wajib disertakan'], 401);
+            }
+
             $valid = $adapter->verifyWebhookSignature($request->fullUrl(), $request->getContent(), $signature, $partnerKey);
             if (! $valid) {
-                Log::warning("Signature webhook Shopee tidak valid untuk channel #{$channel->id}");
+                Log::warning("Signature webhook {$channel->platform} tidak valid untuk channel #{$channel->id}");
 
                 return response()->json(['success' => false, 'message' => 'Signature tidak valid'], 401);
             }

@@ -465,8 +465,23 @@ class ServisBoard extends Component
     private function scopeTiket(Builder $query): Builder
     {
         $cabangId = session('cabang_id');
+        $user = auth()->user();
 
-        return $cabangId ? $query->where('cabang_id', $cabangId) : $query;
+        if ($cabangId) {
+            if ($user && ! $user->bisaAksesCabang((int) $cabangId)) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            return $query->where('cabang_id', $cabangId);
+        }
+
+        if ($user && ! $user->hasAnyRole(['super-admin', 'owner'])) {
+            $userCabang = $user->cabangs()->first()?->id;
+
+            return $userCabang ? $query->where('cabang_id', $userCabang) : $query->whereRaw('1 = 0');
+        }
+
+        return $query;
     }
 
     /**

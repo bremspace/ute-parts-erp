@@ -32,11 +32,32 @@ class PosController extends Controller
         protected PricingService $pricingService
     ) {}
 
+    private function resolveCabangId(Request $request): int
+    {
+        $requestedCabangId = $request->query('cabang_id', $request->input('cabang_id'));
+        $sessionCabangId = session('cabang_id');
+        $user = $request->user();
+
+        $cabangId = $requestedCabangId ? (int) $requestedCabangId : ($sessionCabangId ? (int) $sessionCabangId : null);
+
+        if (! $cabangId && $user) {
+            $cabangId = $user->cabangs()->first()?->id ?? 1;
+        }
+
+        $cabangId = $cabangId ?? 1;
+
+        if ($user && ! $user->bisaAksesCabang($cabangId)) {
+            abort(403, 'Anda tidak memiliki akses ke cabang ini.');
+        }
+
+        return $cabangId;
+    }
+
     // [API: POS-02] Cari produk + stok untuk kasir
     public function products(Request $request)
     {
         $gudangId = $request->query('gudang_id', session('gudang_id'));
-        $cabangId = $request->query('cabang_id', session('cabang_id'));
+        $cabangId = $this->resolveCabangId($request);
         $customerId = $request->query('customer_id');
 
         // [T-07] Mode ringkas utk autocomplete/debounce: ?q= atau ?query= → payload kecil, limit 10
@@ -189,7 +210,7 @@ class PosController extends Controller
             }
         }
 
-        $cabangId = session('cabang_id') ?? auth()->user()->cabangs()->first()?->id;
+        $cabangId = $this->resolveCabangId($request);
         if (! $cabangId) {
             return $this->error('Cabang aktif belum dipilih', 400);
         }
@@ -413,14 +434,11 @@ class PosController extends Controller
     public function index(Request $request)
     {
         $status = $request->query('status');
-        $cabangId = $request->query('cabang_id') ?? session('cabang_id');
+        $cabangId = $this->resolveCabangId($request);
 
         $query = Transaksi::with(['items', 'pelanggan', 'kasir', 'cabang'])
+            ->where('cabang_id', $cabangId)
             ->latest();
-
-        if ($cabangId) {
-            $query->where('cabang_id', $cabangId);
-        }
 
         if ($status) {
             $query->where('status', $status);
@@ -432,8 +450,10 @@ class PosController extends Controller
     // [API: POS-04] Tahan transaksi (park) — simpan cart ke split_detail, status ditahan (belum kurangi stok)
     public function tahan(Request $request, $id)
     {
+        $cabangId = $this->resolveCabangId($request);
+
         $transaksi = Transaksi::where('id', $id)
-            ->where('cabang_id', session('cabang_id') ?? $request->user()->cabangs()->first()?->id)
+            ->where('cabang_id', $cabangId)
             ->where('status', 'draft')
             ->firstOrFail();
 
@@ -445,8 +465,10 @@ class PosController extends Controller
     // [API: POS-04b] Lanjutkan transaksi ditahan (resume) — status kembali draft utk dilanjutkan
     public function resume(Request $request, $id)
     {
+        $cabangId = $this->resolveCabangId($request);
+
         $transaksi = Transaksi::where('id', $id)
-            ->where('cabang_id', session('cabang_id') ?? $request->user()->cabangs()->first()?->id)
+            ->where('cabang_id', $cabangId)
             ->where('status', 'ditahan')
             ->firstOrFail();
 
@@ -487,10 +509,12 @@ class PosController extends Controller
             'akun_sumber_kode' => 'nullable|string|max:20',
         ]);
 
+        $cabangId = $this->resolveCabangId($request);
+
         try {
             $sesi = app(KasSesiState::class)->bukaKas(
                 (float) $request->saldo_awal,
-                $request->cabang_id ?? session('cabang_id'),
+                $cabangId,
                 auth()->id(),
                 'manual',
                 $request->input('akun_sumber_kode', '110-01')
@@ -521,8 +545,10 @@ class PosController extends Controller
     // [API: POS-09] Riwayat sesi kas per cabang
     public function riwayatKas(Request $request)
     {
+        $cabangId = $this->resolveCabangId($request);
+
         return $this->success(
-            app(KasSesiState::class)->riwayat($request->cabang_id ?? session('cabang_id')),
+            app(KasSesiState::class)->riwayat($cabangId),
             'Riwayat sesi kas berhasil dimuat'
         );
     }
@@ -530,7 +556,7 @@ class PosController extends Controller
     // [API: POS-10][T-35] Cetak struk thermal — hanya antri, tidak blocking request
     public function printStruk(int $id)
     {
-        $cabangId = session('cabang_id') ?? auth()->user()->cabangs()->first()?->id;
+        $cabangId = $this->resolveCabangId(request());
 
         $transaksi = Transaksi::where('id', $id)
             ->where('cabang_id', $cabangId)

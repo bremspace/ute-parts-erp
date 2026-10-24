@@ -46,12 +46,38 @@ class ServisController extends Controller
         }
     }
 
+    private function resolveCabangId(Request $request): ?int
+    {
+        $sessionCabangId = session('cabang_id');
+        $user = $request->user();
+
+        if ($sessionCabangId) {
+            $cabangId = (int) $sessionCabangId;
+            if ($user && ! $user->bisaAksesCabang($cabangId)) {
+                abort(403, 'Anda tidak memiliki akses ke cabang ini.');
+            }
+
+            return $cabangId;
+        }
+
+        if ($user && ! $user->hasAnyRole(['super-admin', 'owner'])) {
+            $userCabang = $user->cabangs()->first()?->id;
+            if (! $userCabang) {
+                abort(403, 'Akun Anda belum memiliki penugasan cabang.');
+            }
+
+            return $userCabang;
+        }
+
+        return null;
+    }
+
     // [API: SERVICE-02] Daftar tiket servis (all statuses, Kanban data)
     public function index(Request $request)
     {
         $status = $request->query('status');
         $search = $request->query('search');
-        $cabangId = session('cabang_id');
+        $cabangId = $this->resolveCabangId($request);
 
         // [B-07] Urut & paginasi dulu di kolom SEMPIT (`id`), baru hydrate row penuh.
         // Alasan: `foto_unit` (base64, bisa >400KB/baris) membuat filesort
@@ -106,8 +132,7 @@ class ServisController extends Controller
     private function tiketScoped(int|string $id): TiketServis
     {
         $query = TiketServis::query();
-
-        $cabangId = session('cabang_id');
+        $cabangId = $this->resolveCabangId(request());
 
         if ($cabangId) {
             $query->where('cabang_id', $cabangId);

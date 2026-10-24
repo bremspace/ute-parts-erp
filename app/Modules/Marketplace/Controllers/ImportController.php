@@ -25,53 +25,57 @@ class ImportController extends Controller
     public function previewProduk(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,csv',
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
         ]);
 
         $path = $request->file('file')->store('import-tmp');
         $realPath = Storage::disk('local')->path($path);
 
-        // Validasi heading awal — mapping kolom sumber → field Ute Parts (SID Retail generik)
         try {
-            $headings = Excel::toArray(new HeadingRowImport, $realPath);
-            $kolom = collect($headings[0][0] ?? [])->toArray();
-        } catch (\Throwable $e) {
-            // Bukan error fatal — ToModel WithValidation akan menangkap per-row
-            $kolom = [];
-        }
-
-        $import = new ProdukImport(preview: true);
-        $rows = Excel::toCollection($import, $realPath);
-
-        $valid = 0;
-        $invalid = 0;
-        $warnings = [];
-
-        foreach ($rows->flatten(1) as $row) {
-            if ($row['nama'] ?? false) {
-                $valid++;
-            } else {
-                $invalid++;
-                $warnings[] = 'Baris tanpa kolom "nama" terdeteksi';
+            // Validasi heading awal — mapping kolom sumber → field Ute Parts (SID Retail generik)
+            try {
+                $headings = Excel::toArray(new HeadingRowImport, $realPath);
+                $kolom = collect($headings[0][0] ?? [])->toArray();
+            } catch (\Throwable $e) {
+                // Bukan error fatal — ToModel WithValidation akan menangkap per-row
+                $kolom = [];
             }
+
+            $import = new ProdukImport(preview: true);
+            $rows = Excel::toCollection($import, $realPath);
+
+            $valid = 0;
+            $invalid = 0;
+            $warnings = [];
+
+            foreach ($rows->flatten(1) as $row) {
+                if ($row['nama'] ?? false) {
+                    $valid++;
+                } else {
+                    $invalid++;
+                    $warnings[] = 'Baris tanpa kolom "nama" terdeteksi';
+                }
+            }
+
+            // Cek duplikasi slug yang sudah ada
+            $duplikat = $rows->flatten(1)->filter(fn ($r) => $r['nama'] ?? false)
+                ->filter(fn ($r) => Produk::where('slug', Str::slug($r['nama']))->exists())
+                ->count();
+
+            $warnings[] = $duplikat > 0 ? "{$duplikat} baris nama sudah terdaftar (akan di-update via firstOrCreate)" : 'Tidak ada duplikat nama dengan produk existing';
+
+            return $this->success([
+                'kolom_terdeteksi' => $kolom,
+                'total_baris' => $valid + $invalid,
+                'valid' => $valid,
+                'invalid' => $invalid,
+                'duplikat_existing' => $duplikat,
+                'warnings' => $warnings,
+                'pesan' => 'Mode preview: belum ada data yang diubah. Upload ulang dengan mode commit untuk menyimpan.',
+            ], 'Preview import produk selesai');
+        } finally {
+            @unlink($realPath);
         }
-
-        // Cek duplikasi slug yang sudah ada
-        $duplikat = $rows->flatten(1)->filter(fn ($r) => $r['nama'] ?? false)
-            ->filter(fn ($r) => Produk::where('slug', Str::slug($r['nama']))->exists())
-            ->count();
-
-        $warnings[] = $duplikat > 0 ? "{$duplikat} baris nama sudah terdaftar (akan di-update via firstOrCreate)" : 'Tidak ada duplikat nama dengan produk existing';
-
-        return $this->success([
-            'kolom_terdeteksi' => $kolom,
-            'total_baris' => $valid + $invalid,
-            'valid' => $valid,
-            'invalid' => $invalid,
-            'duplikat_existing' => $duplikat,
-            'warnings' => $warnings,
-            'pesan' => 'Mode preview: belum ada data yang diubah. Upload ulang dengan mode commit untuk menyimpan.',
-        ], 'Preview import produk selesai');
     }
 
     /**
@@ -80,7 +84,7 @@ class ImportController extends Controller
     public function commitProduk(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,csv',
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
             'confirmed' => 'required|boolean|accepted', // wajib konfirmasi dari hasil preview
         ]);
 
