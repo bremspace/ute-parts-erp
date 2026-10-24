@@ -1068,7 +1068,7 @@ class GrnTest extends TestCase
 
         $this->assertNull($po->jatuh_tempo, 'PO tunai tidak boleh memiliki jatuh tempo');
 
-        // Terima barang via GRN dengan konfirmasi bayar dari Kas Laci oleh Budi Kasir
+        // Terima barang via GRN dengan konfirmasi bayar dari Kas Laci otomatis oleh user aktif
         $grn = $this->service()->inputGudang(
             $po,
             [$this->produk->id => 2],
@@ -1076,13 +1076,12 @@ class GrnTest extends TestCase
             [],
             [],
             [],
-            '110-04',
-            'Budi Kasir'
+            '110-04'
         );
 
         $this->assertEquals('terima', $grn->status);
         $this->assertEquals('110-04', $grn->fresh()->akun_kas_bank);
-        $this->assertEquals('Budi Kasir', $grn->fresh()->dibayar_oleh);
+        $this->assertEquals($this->user->name, $grn->fresh()->dibayar_oleh, 'Nama pembayar harus otomatis dari user aktif');
 
         // Verifikasi PO terupdate lunas dan akun kas tersinkron
         $poFresh = $po->fresh();
@@ -1106,6 +1105,96 @@ class GrnTest extends TestCase
             ->first();
         $this->assertNotNull($jurnalPersediaan);
         $this->assertEquals(100000, (float) $jurnalPersediaan->debit);
+    }
+
+    public function test_staff_gudang_tanpa_izin_kas_ditolak_menerima_po_tunai(): void
+    {
+        Queue::fake();
+
+        // Buat user yang hanya memiliki role staff-gudang (tanpa izin kas / pos / finance)
+        $staffGudang = User::create([
+            'name' => 'Staf Gudang Murni',
+            'email' => 'staff-gudang@test.com',
+            'password' => Hash::make('password'),
+            'is_active' => true,
+        ]);
+        $staffGudang->assignRole('staff-gudang');
+        $staffGudang->cabangs()->attach($this->cabang->id);
+
+        $po = PurchaseOrder::create([
+            'no_po' => 'PO-TEST-REJECT-001',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'status' => 'dikirim',
+            'metode_bayar' => 'tunai',
+            'akun_kas_bank' => '110-01',
+            'jatuh_tempo' => null,
+            'total' => 50000,
+            'total_dibayar' => 0,
+        ]);
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_beli' => 50000,
+            'subtotal' => 50000,
+        ]);
+
+        // Cek via GrnService::inputGudang harus melempar Exception otorisasi kas
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('tidak memiliki role/hak akses untuk mengotorisasi transaksi pembayaran kas tunai PO');
+
+        $this->service()->inputGudang(
+            $po,
+            [$this->produk->id => 1],
+            $staffGudang->id
+        );
+    }
+
+    public function test_livewire_grn_tab_menolak_staff_gudang_menerima_po_tunai(): void
+    {
+        $staffGudang = User::create([
+            'name' => 'Staf Gudang Komponen',
+            'email' => 'staff-komponen@test.com',
+            'password' => Hash::make('password'),
+            'is_active' => true,
+        ]);
+        $staffGudang->assignRole('staff-gudang');
+        $staffGudang->cabangs()->attach($this->cabang->id);
+
+        $po = PurchaseOrder::create([
+            'no_po' => 'PO-TEST-REJECT-002',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'status' => 'dikirim',
+            'metode_bayar' => 'tunai',
+            'akun_kas_bank' => '110-01',
+            'jatuh_tempo' => null,
+            'total' => 50000,
+            'total_dibayar' => 0,
+        ]);
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_beli' => 50000,
+            'subtotal' => 50000,
+        ]);
+
+        $this->actingAs($staffGudang);
+        session(['cabang_id' => $this->cabang->id]);
+
+        Livewire::test(GrnTab::class)
+            ->call('openGrnModal', $po->id)
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'error'
+                    && str_contains($payload['message'], 'tidak memiliki role/hak akses untuk mengotorisasi pembayaran kas');
+            })
+            ->assertSet('showGrnModal', false);
     }
 
     public function test_wms_print_documents_return_200_with_a5_default(): void

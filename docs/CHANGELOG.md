@@ -3,6 +3,20 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-24 — WMS: Resolusi Default Master Data Import (OEM, Original, Kategori Umum, dan Rak Bawaan) ✅
+
+- **MasterDataSeeder & KategoriProdukSeeder**:
+  - Menambahkan brand `OEM` pada daftar brand bawaan `MasterDataSeeder`.
+  - Menambahkan kategori root default `Umum` pada `KategoriProdukSeeder::defaultTree()` sehingga selalu tersedia di master tree kategori.
+- **ImportProdukService & ImportSidRetailService**:
+  - `ImportProdukService::prosesSatuBaris`: kategori kosong atau 'Umum' otomatis tertaut ke kategori seeded `Umum` di database (`kategori_id` tidak lagi `null`).
+  - `ImportProdukService::resolveOrCreateRakDefault`: memprioritaskan pencarian rak seeded `RAK-01` / `Rak Utama` / rak aktif pertama di gudang target sebelum membuat fallback `RAK-DEF%`.
+  - `ImportSidRetailService`: resolusi default `kualitas_id` produk terisi ID kualitas seeded `Original`.
+- **Pengujian & Verifikasi**:
+  - Menambahkan pengujian integrasi terfokus `tests/Feature/ImportMinimalBlankResolutionTest.php`: verifikasi resolusi blank import ke OEM, Original, kategori Umum, dan RAK-01.
+  - Berhasil menjalankan 32 targeted import tests (`ImportProdukAtomikTest`, `ImportSidRetailTest`, `WmsImportRakDanSatuanTest`, `WmsImportNewColumnsTest`, `KategoriKoneksiTest`, `ImportMinimalBlankResolutionTest`).
+  - Laravel Pint clean.
+
 ## 2026-10-24 — WMS & RBAC: Alur PO Tunai, Konfirmasi Kas GRN, dan Format Cetak Setengah A4 (A5) ✅
 
 - **Alur PO Tunai (Cash / COD)**:
@@ -11,9 +25,12 @@ Format: `[Fase X] T-XX — ringkasan`.
   - Normalisasi data PO tunai lama agar `jatuh_tempo` menjadi `NULL`.
 - **Konfirmasi Kas & Pembayar saat Penerimaan Barang (GRN)**:
   - Migrasi `2026_10_24_230000_add_payment_fields_to_grn_table`: menambahkan kolom `akun_kas_bank` dan `dibayar_oleh` pada tabel `grn`.
-  - Update `GrnTab` & modal penerimaan barang: menambahkan card "Konfirmasi Pembayaran PO Tunai" yang mewajibkan/mengizinkan pengisian nama pembayar (`dibayar_oleh`) dan pemilihan akun kas/bank (`akun_kas_bank`, misal: Kas Laci `110-04`, Kas `110-01`, Bank `110-02`).
+  - Update `GrnTab` & modal penerimaan barang: nama pembayar (`dibayar_oleh`) diambil secara **otomatis dari user aktif yang login** (`auth()->user()->name`), tidak lagi diisi manual. Tampilan form menyajikan kartu verifikasi akun dan role aktif secara readonly.
+  - **Otorisasi & Hak Akses Kas Ketat**:
+    - `GrnService::userBolehOtorisasiKas()`: memvalidasi bahwa hanya user dengan role berwenang (`super-admin`, `owner`, `admin-toko`, `finance`, `kasir`) atau memiliki permission transaksi kas (`akunting.create`, `pos.create`, `approve-workflow`) yang dapat menerima & mengonfirmasi pembayaran PO tunai.
+    - Role non-kasir seperti `staff-gudang` murni ditolak saat mencoba membuka modal penerimaan atau mengeksekusi PO tunai.
   - Update `GrnService::inputGudang` & `selesaikanGrn`:
-    - Pada transaksi tunai, jurnal penerimaan barang langsung mengkredit akun kas/bank yang dipilih (bukan Utang `210-01`), dengan deskripsi mencantumkan nama pembayar dan kode kas.
+    - Pada transaksi tunai, jurnal penerimaan barang langsung mengkredit akun kas/bank yang dipilih (bukan Utang `210-01`), dengan deskripsi mencantumkan nama pembayar terverifikasi dan kode kas.
     - Status PO di-update menjadi `diterima`, `total_dibayar` penuh, akun kas tersinkron, dan tidak mencatat subledger `Utang`.
     - Transaksi tempo (`kredit`) tetap mencatat jurnal utang `210-01` dan subledger `Utang`.
 - **Format Cetak Dokumen WMS (Setengah A4 / A5) & Pengaturan Printer**:

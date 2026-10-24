@@ -124,6 +124,15 @@ class GrnTab extends Component
         // [P1-1] Scope cabang — PO harus milik cabang aktif di session
         $this->tolakJikaBukanCabang($po->gudangTujuan?->cabang_id, 'PO bukan milik cabang aktif');
 
+        if ($po->metode_bayar === 'tunai' && ! GrnService::userBolehOtorisasiKas(auth()->user())) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'PO ini bertipe pembayaran tunai. Anda tidak memiliki role/hak akses untuk mengotorisasi pembayaran kas (memerlukan role Kasir, Finance, atau Admin Toko).',
+            ]);
+
+            return;
+        }
+
         $this->gudangRaks = Rak::where('gudang_id', $po->gudang_tujuan_id)
             ->where('is_active', true)
             ->orderBy('nama')
@@ -435,6 +444,18 @@ class GrnTab extends Component
         // [P1-1] Scope cabang — jangan izinkan input GRN utk PO cabang lain
         $this->tolakJikaBukanCabang($cabangId, 'PO bukan milik cabang aktif');
 
+        if ($po->metode_bayar === 'tunai') {
+            if (! GrnService::userBolehOtorisasiKas(auth()->user())) {
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => 'Anda tidak memiliki role/hak akses untuk mengotorisasi transaksi pembayaran kas tunai PO ini. Memerlukan role Kasir, Finance, atau Admin Toko.',
+                ]);
+
+                return;
+            }
+            $this->grnForm['dibayar_oleh'] = auth()->user()?->name ?? 'Kasir / Staf';
+        }
+
         try {
             // [F2-3] Kumpulkan daftar SN + qty per baris — kunci komposit "produk|sku"
             // (P1-4: baris dgn produk sama + sku_variant berbeda tidak boleh tabrakan).
@@ -570,6 +591,15 @@ class GrnTab extends Component
         abort_unless(auth()->user()?->can('approve-workflow'), 403);
 
         $grn = $this->grnCabangAktif($grnId); // [P1-1] scope cabang
+
+        if ($grn->purchaseOrder?->metode_bayar === 'tunai' && ! GrnService::userBolehOtorisasiKas(auth()->user())) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'GRN ini terkait pembayaran PO Tunai. Anda tidak memiliki role/hak akses untuk mengotorisasi transaksi kas.',
+            ]);
+
+            return;
+        }
 
         $this->confirmGrnId = $grn->id;
         $this->confirmActionedBy = auth()->id();

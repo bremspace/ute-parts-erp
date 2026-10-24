@@ -72,6 +72,22 @@ class GrnService
     }
 
     /**
+     * Cek apakah user memiliki hak akses / wewenang untuk otorisasi transaksi kas (PO tunai).
+     * Memerlukan role: super-admin, owner, admin-toko, finance, kasir, atau permission akunting.create/pos.create/approve-workflow.
+     */
+    public static function userBolehOtorisasiKas(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasAnyRole(['super-admin', 'owner', 'admin-toko', 'finance', 'kasir'])
+            || $user->can('akunting.create')
+            || $user->can('pos.create')
+            || $user->can('approve-workflow');
+    }
+
+    /**
      * Terima barang dari PO. Melempar Exception Indonesia bila:
      * - PO bukan status 'dikirim', atau sudah punya GRN (satu PO satu GRN, F2-2),
      * - qty diterima > qty PO (validasi PRD F2-2),
@@ -107,8 +123,19 @@ class GrnService
         }
 
         $pemohon = ApprovalService::pemohon($userId ?? auth()->id());
+        $userPemohon = User::find($pemohon);
 
-        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $itemRakId, $pemohon, $cabangId, $akunKasBank, $dibayarOleh) {
+        if ($po->metode_bayar === 'tunai') {
+            if (! static::userBolehOtorisasiKas($userPemohon)) {
+                throw new \Exception("Pengguna {$userPemohon?->name} tidak memiliki role/hak akses untuk mengotorisasi transaksi pembayaran kas tunai PO. Memerlukan role Kasir, Finance, atau Admin Toko.");
+            }
+        }
+
+        $namaPembayarOtomatis = $po->metode_bayar === 'tunai'
+            ? ($userPemohon?->name ?? ($dibayarOleh ?: 'Kasir / Staf'))
+            : null;
+
+        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $itemRakId, $pemohon, $cabangId, $akunKasBank, $namaPembayarOtomatis) {
             $itemData = [];
             $totalHpp = 0;
             $needsApproval = false;
@@ -185,7 +212,7 @@ class GrnService
                 'status' => 'draft',
                 'total_hpp' => $totalHpp,
                 'akun_kas_bank' => $akunKasBank ?: $po->akun_kas_bank,
-                'dibayar_oleh' => $dibayarOleh,
+                'dibayar_oleh' => $namaPembayarOtomatis,
                 'item_qty_received' => $itemData,
             ]);
 

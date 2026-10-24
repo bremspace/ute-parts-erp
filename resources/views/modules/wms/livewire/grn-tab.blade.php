@@ -636,8 +636,28 @@
                             </p>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                                 <div>
-                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Dibayar Oleh *</label>
-                                    <input type="text" wire:model="grnForm.dibayar_oleh" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[40px]" placeholder="Nama pembayar / staf / kasir" required />
+                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Petugas Pembayar (Otomatis Akun Aktif)</label>
+                                    <div class="px-3 py-2 rounded-xl bg-black/[0.04] dark:bg-white/[0.05] border border-black/10 dark:border-white/10 flex items-center justify-between min-h-[40px]">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-2 h-2 rounded-full bg-up-mint"></span>
+                                            <span class="font-bold text-xs text-ink-900 dark:text-white">{{ auth()->user()?->name ?? 'User Aktif' }}</span>
+                                        </div>
+                                        <span class="text-[10px] font-semibold text-up-primary uppercase tracking-wider px-2 py-0.5 rounded-md bg-up-primary/10 border border-up-primary/20">
+                                            {{ auth()->user()?->roles->pluck('name')->map(fn($r) => ucfirst(str_replace('-', ' ', $r)))->implode(', ') ?: 'Staff' }}
+                                        </span>
+                                    </div>
+                                    @php $bolehKas = \App\Modules\Wms\Services\GrnService::userBolehOtorisasiKas(auth()->user()); @endphp
+                                    @if($bolehKas)
+                                        <p class="text-[10px] text-up-mint mt-1 flex items-center gap-1 font-medium">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                            Hak akses otorisasi pembayaran kas terverifikasi.
+                                        </p>
+                                    @else
+                                        <p class="text-[10px] text-up-red mt-1 flex items-center gap-1 font-semibold">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            Akun Anda tidak memiliki role/izin pengeluaran kas (butuh role Kasir, Finance, atau Admin Toko).
+                                        </p>
+                                    @endif
                                 </div>
                                 <div>
                                     <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Sumber Kas / Bank *</label>
@@ -646,6 +666,7 @@
                                             <option value="{{ $ak->kode }}" class="bg-ink-900 text-white">[{{ $ak->kode }}] {{ $ak->nama }} ({{ ucfirst($ak->kelompok) }})</option>
                                         @endforeach
                                     </select>
+                                    <p class="text-[10px] text-ink-500 mt-1">Pilih kas laci kasir atau rekening bank tempat uang keluar.</p>
                                 </div>
                             </div>
                         </div>
@@ -660,7 +681,14 @@
                 <!-- Footer Modal -->
                 <div class="flex gap-3 pt-3 mt-3 border-t border-black/10 dark:border-white/10 shrink-0">
                     <button wire:click="cancelGrnModal" class="flex-1 py-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.97]">Batal</button>
-                    <button wire:click="simpanGrn" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-primary/25 transition active:scale-[0.97]">Simpan GRN</button>
+                    @php $tombolDisabled = !empty($grnForm['is_cash']) && ! \App\Modules\Wms\Services\GrnService::userBolehOtorisasiKas(auth()->user()); @endphp
+                    <button
+                        wire:click="simpanGrn"
+                        @if($tombolDisabled) disabled title="Akun Anda tidak memiliki role/izin untuk otorisasi pembayaran kas" @endif
+                        class="flex-1 py-3 rounded-xl {{ $tombolDisabled ? 'bg-ink-700 opacity-50 cursor-not-allowed text-ink-300' : 'bg-up-primary hover:bg-up-primary-dark text-white cursor-pointer shadow-lg shadow-up-primary/25 active:scale-[0.97]' }} font-bold text-xs min-h-[44px] transition"
+                    >
+                        {{ $tombolDisabled ? 'Izin Kas Tidak Memadai' : 'Simpan GRN' }}
+                    </button>
                 </div>
             </div>
         </div>
