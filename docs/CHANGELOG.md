@@ -3,6 +3,29 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-24 — WMS: Perbaikan Notifikasi Ganda & Progress Bar Real-time Import ✅
+
+- **Pencegahan Eksekusi & Notifikasi Ganda**:
+  - Mengubah `$tries = 1` dan `$timeout = 900` pada `ImportProdukExcelJob` sehingga job impor berukuran besar tidak di-retry otomatis oleh queue worker.
+  - Menambahkan atomic idempotency guard: jika `ImportLog` sudah berstatus `'selesai'`, proses dibatalkan seketika.
+  - Meningkatkan `DB_QUEUE_RETRY_AFTER` dari default 90 detik menjadi 900 detik (15 menit) pada `config/queue.php` dan `.env` agar worker kedua tidak mengambil alih job yang sedang berjalan.
+  - Menambahkan debouncing/click lock pada tombol commit import (`x-data="{ submitting: false }"`) dan guard backend pada `ImportExportPage::commitImport`.
+- **Progress Bar Real-time & Update Bertahap**:
+  - `total_baris` kini disimpan ke `ImportLog` sejak awal inisiasi impor.
+  - `ImportProdukService::commit()` dan `ImportSidRetailService::commit()` kini mengupdate penghitung `sukses` dan `gagal` ke database secara berkala setiap selesai 1 chunk (setiap 50–100 baris). Polling Livewire `cekStatusImport` membaca data secara langsung sehingga progress bar dan indikator jumlah baris berjalan real-time.
+- **Pemulihan Status saat Laman Di-refresh**:
+  - `ImportExportPage::mount()` kini mendeteksi apakah ada `ImportLog` milik user yang berstatus `'proses'`. Jika browser di-refresh di tengah jalan, sistem tetap menampilkan layar progress bar yang berjalan, bukan kembali ke form upload.
+- **Verifikasi**: `php artisan queue:restart`, seluruh test suite lolos (69 tests, 697 assertions), Pint clean.
+
+## 2026-10-24 — WMS: Penyelarasan Bidirectional Format Template & Ekspor Master Produk ✅
+
+- **Standarisasi Format Kolom (27 Kolom Identik)**: Struktur header, urutan kolom, dan format data file ekspor master produk (`ExportMasterProdukService`) diselaraskan 100% dengan template impor (`ImportProdukTemplateExport` / `ImportProdukService::templateColumns`). File hasil ekspor katalog produk dapat langsung diimpor kembali ke sistem tanpa penyesuaian manual (round-trip compatible).
+- **Ekstraksi Service Terpadu**: Membuat `ExportMasterProdukService` untuk sentralisasi ekspor katalog master produk multi-sheet (Sheet 1: Data Produk, Sheet 2: Referensi Sistem, Sheet 3: Petunjuk, Sheet 4: Tambah Tipe Baru) baik untuk format Excel (.xlsx) maupun CSV.
+- **Penyelarasan Livewire & UI Workspace**:
+  - `ProdukTab::exportMaster()` didelegasikan ke `ExportMasterProdukService`.
+  - `ImportExportPage::exportData()` di `/app/wms/import-export` kini menyediakan opsi unduh Ekspor Master Data Katalog (.xlsx), Ekspor (.csv), dan Template Resmi (.xlsx).
+- **Verifikasi**: Test suite `ExportImportUnifiedTest` dan `MasterProdukExportTest` lulus (69 test WMS passed, 697 assertions). Pint PSR-12 clean.
+
 ## 2026-10-24 — WMS: Threshold Kemiripan 99%, Resolusi Duplikat SKU Interaktif & Workspace Terpisah ✅
 
 - **Pengaturan Manual Threshold Kemiripan di UI**: Menambahkan slider dan input angka threshold (50%–100%, default 99%, preset 90%/95%/98%/99%/100%) baik pada formulir upload maupun langsung di panel pratinjau. Menggeser slider pada layar pratinjau langsung mengevaluasi ulang deteksi kemiripan secara real-time tanpa perlu mengunggah ulang file.

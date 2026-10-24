@@ -408,6 +408,12 @@ class ImportSidRetailService
         $chunk = [];
         $chunkIndex = 0;
 
+        ImportLog::where('id', $importLogId)->update([
+            'sukses' => 0,
+            'gagal' => 0,
+            'status' => 'proses',
+        ]);
+
         foreach ($this->streamRows($filePath) as $row) {
             $totalBaris++;
             $chunk[] = [
@@ -423,6 +429,12 @@ class ImportSidRetailService
                 $detail = array_merge($detail, $res['detail']);
                 $chunk = [];
                 $chunkIndex++;
+
+                ImportLog::where('id', $importLogId)->update([
+                    'total_baris' => $totalBaris,
+                    'sukses' => $sukses,
+                    'gagal' => $gagal,
+                ]);
             }
         }
 
@@ -432,6 +444,12 @@ class ImportSidRetailService
             $gagal += $res['gagal'];
             $totalJurnalNilai += $res['nilai_chunk'];
             $detail = array_merge($detail, $res['detail']);
+
+            ImportLog::where('id', $importLogId)->update([
+                'total_baris' => $totalBaris,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+            ]);
         }
 
         return [

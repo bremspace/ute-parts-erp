@@ -7,10 +7,12 @@ use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Livewire\ProdukTab;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ImportProdukService;
@@ -182,6 +184,7 @@ class ExportImportUnifiedTest extends TestCase
 
         $produk = Produk::create([
             'nama' => 'LCD Samsung A52 Original',
+            'kode' => 'LCD-A52-ORI',
             'barcode' => 'BC-TEST-001',
             'kategori_id' => $kat->id,
             'brand_id' => $brand->id,
@@ -190,6 +193,16 @@ class ExportImportUnifiedTest extends TestCase
             'model_kompatibel' => 'Galaxy A52',
             'kondisi' => 'baru',
             'satuan' => 'pcs',
+            'harga_beli' => 500000,
+            'harga_jual_retail' => 900000,
+            'is_active' => true,
+        ]);
+
+        $variant = SkuVariant::create([
+            'produk_id' => $produk->id,
+            'sku' => 'LCD-A52-ORI',
+            'nama_varian' => 'Default',
+            'barcode' => 'BC-TEST-001',
             'harga_beli' => 500000,
             'harga_jual_retail' => 900000,
             'is_active' => true,
@@ -215,12 +228,11 @@ class ExportImportUnifiedTest extends TestCase
         // Should have 4 sheets
         $this->assertCount(4, $sheets);
 
-        // Sheet 1: Data Produk - should contain our product
+        // Sheet 1: Data Produk - should contain our product and headings identical to templateColumns
         $sheet1 = $sheets[0];
         $headings1 = $sheet1[0];
-        $this->assertContains('sku', $headings1);
-        $this->assertContains('nama', $headings1);
-        $this->assertContains('kategori', $headings1);
+        $expectedColumns = app(ImportProdukService::class)->templateColumns();
+        $this->assertSame($expectedColumns, $headings1, 'Header Sheet 1 hasil ekspor harus identik dengan templateColumns()');
 
         // Sheet 2: Referensi Sistem - should have our reference data
         $sheet2 = $sheets[1];
@@ -243,5 +255,36 @@ class ExportImportUnifiedTest extends TestCase
         $sheet4 = $sheets[3];
         $headings4 = $sheet4[0];
         $this->assertSame(['merk_hp_baru', 'model_hp_baru', 'keterangan'], $headings4);
+
+        // Verifikasi round-trip: file hasil export xlsx dipratinjau kembali
+        $importService = app(ImportProdukService::class);
+        $preview = $importService->preview($fullPath);
+
+        $this->assertGreaterThan(0, $preview['total_baris']);
+        $this->assertNotEmpty($preview['duplikat_rows']);
+        $this->assertSame(1, $preview['total_duplikat_rows']);
+
+        // Verifikasi detectDuplikatRow mendeteksinya sebagai duplikat eksisting database
+        $duplikatItem = $preview['duplikat_rows'][0];
+        $this->assertSame('LCD-A52-ORI', $duplikatItem['sku']);
+        $this->assertSame('database', $duplikatItem['lokasi']);
+        $this->assertSame($produk->id, $duplikatItem['target_produk_id']);
+
+        // Uji resolusi timpa_update saat commit
+        $log = ImportLog::create([
+            'tipe' => 'produk_excel',
+            'nama_file' => 'test_roundtrip.xlsx',
+            'status' => 'proses',
+            'user_id' => $this->user->id,
+        ]);
+
+        $resolusi = [
+            2 => ['aksi' => 'timpa_update'],
+        ];
+
+        $commitResult = $importService->commit($fullPath, $log->id, $this->user->id, [], $resolusi);
+
+        $this->assertSame(1, $commitResult['sukses'], 'Commit timpa_update harus berhasil 100% memperbarui data');
+        $this->assertSame(0, $commitResult['gagal']);
     }
 }

@@ -1470,6 +1470,15 @@ class ImportProdukService
     public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN): array
     {
         $rows = $this->parseRows($filePath);
+        $totalBaris = count($rows);
+
+        ImportLog::where('id', $importLogId)->update([
+            'total_baris' => $totalBaris,
+            'sukses' => 0,
+            'gagal' => 0,
+            'status' => 'proses',
+        ]);
+
         // [B-10f] Validasi lintas cabang (fail fast, SEBELUM ada mutasi apa pun)
         $cabangId = $this->cabangTunggalDariRows($rows);
         $konteks = ['skuDalamFile' => [], 'barcodeDalamFile' => [], 'namaDalamFile' => []];
@@ -1605,6 +1614,11 @@ class ImportProdukService
                     );
                 }
             });
+
+            ImportLog::where('id', $importLogId)->update([
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+            ]);
         }
 
         // Pass 2: Resolusi kompatibilitas antar produk (substitusi) via SKU

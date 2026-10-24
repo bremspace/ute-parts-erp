@@ -559,6 +559,8 @@
                     </button>
 
                     <button type="button"
+                            x-data="{ submitting: false }"
+                            x-on:click="if (submitting) return false; submitting = true;"
                             wire:click="commitImport"
                             wire:loading.attr="disabled"
                             class="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-up-mint hover:bg-up-mint/90 text-ink-950 font-black text-xs cursor-pointer shadow-lg shadow-up-mint/20 transition flex items-center justify-center gap-2">
@@ -643,7 +645,11 @@
                         <div class="space-y-1.5">
                             <div class="flex items-center justify-between text-[11px] font-mono">
                                 <span class="text-ink-400 font-semibold">Kemajuan Proses:</span>
-                                <span class="text-up-mint font-black">{{ $persen }}% ({{ $selesaiCount }}/{{ $totalBaris }} Baris)</span>
+                                @if($totalBaris > 0)
+                                    <span class="text-up-mint font-black">{{ $persen }}% ({{ $selesaiCount }} dari {{ $totalBaris }} baris)</span>
+                                @else
+                                    <span class="text-up-mint font-black">{{ $persen }}%</span>
+                                @endif
                             </div>
                             <div class="w-full h-3 rounded-full bg-black/60 overflow-hidden p-0.5 border border-white/10">
                                 <div class="h-full rounded-full bg-gradient-to-r from-up-primary via-up-mint to-up-mint transition-all duration-300 {{ $isProses ? 'animate-pulse' : '' }}"
@@ -704,18 +710,38 @@
                         <span>Ekspor Master Data Katalog Produk</span>
                     </h3>
                     <p class="text-xs text-ink-400">
-                        Unduh seluruh data produk, SKU varian, harga tier membership, tipe HP kompatibel, dan saldo stok gudang aktif.
+                        Unduh seluruh data produk, SKU varian, harga tier membership, tipe HP kompatibel, dan saldo stok gudang aktif. File hasil ekspor memiliki struktur yang identik 100% dengan template impor resmi sehingga dapat diedit massal dan langsung diimpor kembali (bidirectional / round-trip compatible).
                     </p>
                 </div>
 
                 <div class="space-y-3 pt-2">
+                    <button type="button"
+                            wire:click="exportData('xlsx')"
+                            class="w-full py-3 px-4 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-between cursor-pointer shadow-md shadow-up-primary/20">
+                        <span class="flex items-center gap-2">
+                            <span>📊</span>
+                            <span>Ekspor Data Master Produk (.xlsx)</span>
+                        </span>
+                        <span>Unduh .XLSX ↓</span>
+                    </button>
+
+                    <button type="button"
+                            wire:click="exportData('csv')"
+                            class="w-full py-3 px-4 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 border border-black/10 dark:border-white/10 text-ink-900 dark:text-white font-bold text-xs transition flex items-center justify-between cursor-pointer">
+                        <span class="flex items-center gap-2">
+                            <span>📄</span>
+                            <span>Ekspor Data Master Produk (.csv)</span>
+                        </span>
+                        <span>Unduh .CSV ↓</span>
+                    </button>
+
                     <a href="/api/wms/produk/import/template"
                        class="w-full py-3 px-4 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/30 text-up-primary font-bold text-xs transition flex items-center justify-between cursor-pointer">
                         <span class="flex items-center gap-2">
                             <span>📗</span>
-                            <span>Template Import Resmi (Excel .xlsx)</span>
+                            <span>Template Import Resmi (.xlsx)</span>
                         </span>
-                        <span>Unduh ↓</span>
+                        <span>Unduh Template ↓</span>
                     </a>
                 </div>
             </div>

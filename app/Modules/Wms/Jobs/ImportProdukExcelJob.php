@@ -22,9 +22,9 @@ class ImportProdukExcelJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 2;
+    public int $tries = 1;
 
-    public int $timeout = 3600;
+    public int $timeout = 900;
 
     public function __construct(
         public int $importLogId,
@@ -48,7 +48,7 @@ class ImportProdukExcelJob implements ShouldQueue
         @set_time_limit(0);
 
         $log = ImportLog::find($this->importLogId);
-        if (! $log) {
+        if (! $log || $log->status === 'selesai') {
             return;
         }
 

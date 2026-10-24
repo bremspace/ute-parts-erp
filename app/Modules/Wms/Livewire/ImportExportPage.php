@@ -6,7 +6,7 @@ use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
-use App\Modules\Wms\Models\Produk;
+use App\Modules\Wms\Services\ExportMasterProdukService;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\ImportSidRetailService;
 use Illuminate\Support\Facades\Storage;
@@ -57,6 +57,16 @@ class ImportExportPage extends Component
         if ($gudangPertama) {
             $this->gudangTokoId = $gudangPertama->id;
             $this->gudangPusatId = $gudangPertama->id;
+        }
+
+        $runningLog = ImportLog::where('user_id', auth()->id())
+            ->where('status', 'proses')
+            ->latest()
+            ->first();
+        if ($runningLog) {
+            $this->importLogId = $runningLog->id;
+            $this->importStep = 'selesai';
+            $this->cekStatusImport();
         }
     }
 
@@ -210,6 +220,10 @@ class ImportExportPage extends Component
 
     public function commitImport(): void
     {
+        if ($this->importStep === 'selesai') {
+            return;
+        }
+
         if (! $this->importFilePath) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'File import tidak ditemukan. Silakan upload ulang.']);
 
@@ -226,6 +240,7 @@ class ImportExportPage extends Component
                     'nama_file' => $this->importFile?->getClientOriginalName() ?? 'sid-retail-import.xlsx',
                     'status' => 'proses',
                     'user_id' => auth()->id(),
+                    'total_baris' => $totalBaris,
                 ]);
                 $this->importLogId = $log->id;
                 $filePath = $this->importFilePath;
@@ -258,6 +273,7 @@ class ImportExportPage extends Component
                     'nama_file' => $this->importFile?->getClientOriginalName() ?? 'produk-import.xlsx',
                     'status' => 'proses',
                     'user_id' => auth()->id(),
+                    'total_baris' => $totalBaris,
                 ]);
                 $this->importLogId = $log->id;
                 $filePath = $this->importFilePath;
@@ -332,8 +348,14 @@ class ImportExportPage extends Component
 
     public function exportData(string $format = 'xlsx'): mixed
     {
-        // Panggil download data master produk langsung
-        return redirect()->route('wms.produk.import.template'); // fallback jika template
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Ekspor master produk dimulai — unduhan segera berjalan.',
+        ]);
+
+        return app(ExportMasterProdukService::class)->export($format, $cabangId);
     }
 
     public function render()
