@@ -644,11 +644,21 @@ class ImportProdukService
         }
 
         $rak = Rak::where('gudang_id', $gudangId)
+            ->where('is_active', true)
             ->where(function ($q) {
-                $q->where('nama', 'Rak Default')
+                $q->where('kode', 'RAK-01')
+                    ->orWhere('nama', 'Rak Utama')
+                    ->orWhere('nama', 'Rak Default')
                     ->orWhere('kode', 'like', 'RAK-DEF%')
                     ->orWhere('nama', 'Default');
             })->first();
+
+        if (! $rak) {
+            $rak = Rak::where('gudang_id', $gudangId)
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->first();
+        }
 
         if (! $rak) {
             $kodeUnik = "RAK-DEF-G{$gudangId}";
@@ -2106,61 +2116,59 @@ class ImportProdukService
         // Kategori & sub-kategori: runtime cache & firstOrCreate
         $kategoriId = null;
         $kategoriSimpan = $kategoriUtamaInput;
-        if (! empty($kategoriUtamaInput) && $kategoriUtamaInput !== 'Umum') {
-            $cacheKey = $kategoriUtamaInput.'|'.$subKategoriInput;
-            if (! isset($this->kategoriCache[$cacheKey])) {
-                $parent = KategoriProduk::where('nama', $kategoriUtamaInput)
-                    ->orWhere('slug', Str::slug($kategoriUtamaInput))
-                    ->first();
+        $cacheKey = $kategoriUtamaInput.'|'.$subKategoriInput;
+        if (! isset($this->kategoriCache[$cacheKey])) {
+            $parent = KategoriProduk::where('nama', $kategoriUtamaInput)
+                ->orWhere('slug', Str::slug($kategoriUtamaInput))
+                ->first();
 
-                if (! $parent) {
-                    $parent = KategoriProduk::create([
-                        'nama' => $kategoriUtamaInput,
-                        'slug' => Str::slug($kategoriUtamaInput),
-                        'parent_id' => null,
-                        'is_active' => true,
-                    ]);
-                }
-
-                if ($subKategoriInput !== '') {
-                    $child = KategoriProduk::where('parent_id', $parent->id)
-                        ->where(function ($q) use ($subKategoriInput) {
-                            $q->where('nama', $subKategoriInput)
-                                ->orWhere('slug', Str::slug($subKategoriInput));
-                        })->first();
-
-                    if (! $child) {
-                        $existing = KategoriProduk::where('nama', $subKategoriInput)
-                            ->orWhere('slug', Str::slug($subKategoriInput))
-                            ->first();
-
-                        if ($existing && (empty($existing->parent_id) || (int) $existing->parent_id === 0)) {
-                            $existing->update(['parent_id' => $parent->id]);
-                            $child = $existing;
-                        } else {
-                            $child = KategoriProduk::create([
-                                'nama' => $subKategoriInput,
-                                'parent_id' => $parent->id,
-                                'is_active' => true,
-                            ]);
-                        }
-                    }
-                    $kategoriId = $child->id;
-                    $kategoriSimpan = $subKategoriInput;
-                } else {
-                    $kategoriId = $parent->id;
-                    $kategoriSimpan = $kategoriUtamaInput;
-                }
-
-                $this->kategoriCache[$cacheKey] = [
-                    'id' => $kategoriId,
-                    'nama' => $kategoriSimpan,
-                ];
+            if (! $parent) {
+                $parent = KategoriProduk::create([
+                    'nama' => $kategoriUtamaInput,
+                    'slug' => Str::slug($kategoriUtamaInput),
+                    'parent_id' => null,
+                    'is_active' => true,
+                ]);
             }
 
-            $kategoriId = $this->kategoriCache[$cacheKey]['id'];
-            $kategoriSimpan = $this->kategoriCache[$cacheKey]['nama'];
+            if ($subKategoriInput !== '') {
+                $child = KategoriProduk::where('parent_id', $parent->id)
+                    ->where(function ($q) use ($subKategoriInput) {
+                        $q->where('nama', $subKategoriInput)
+                            ->orWhere('slug', Str::slug($subKategoriInput));
+                    })->first();
+
+                if (! $child) {
+                    $existing = KategoriProduk::where('nama', $subKategoriInput)
+                        ->orWhere('slug', Str::slug($subKategoriInput))
+                        ->first();
+
+                    if ($existing && (empty($existing->parent_id) || (int) $existing->parent_id === 0)) {
+                        $existing->update(['parent_id' => $parent->id]);
+                        $child = $existing;
+                    } else {
+                        $child = KategoriProduk::create([
+                            'nama' => $subKategoriInput,
+                            'parent_id' => $parent->id,
+                            'is_active' => true,
+                        ]);
+                    }
+                }
+                $kategoriId = $child->id;
+                $kategoriSimpan = $subKategoriInput;
+            } else {
+                $kategoriId = $parent->id;
+                $kategoriSimpan = $kategoriUtamaInput;
+            }
+
+            $this->kategoriCache[$cacheKey] = [
+                'id' => $kategoriId,
+                'nama' => $kategoriSimpan,
+            ];
         }
+
+        $kategoriId = $this->kategoriCache[$cacheKey]['id'];
+        $kategoriSimpan = $this->kategoriCache[$cacheKey]['nama'];
 
         // Merk Smartphone & Tipe HP kompatibilitas
         $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);

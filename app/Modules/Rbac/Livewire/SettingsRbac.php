@@ -80,7 +80,7 @@ class SettingsRbac extends Component
     ];
 
     // Konfigurasi Printer Label QR Produk & Struk Kasir
-    public string $printerSubTab = 'struk'; // 'struk' | 'label'
+    public string $printerSubTab = 'struk'; // 'struk' | 'label' | 'wms_doc'
 
     public array $printerForm = [
         'label_preset' => '33x15',
@@ -95,6 +95,15 @@ class SettingsRbac extends Component
         'label_show_sku' => true,
         'struk_default_width' => '80mm',
         'struk_footer' => 'Terima kasih atas kunjungan Anda',
+    ];
+
+    public array $wmsDocForm = [
+        'paper_size' => 'a5',
+        'orientation' => 'portrait',
+        'margin_mm' => 8,
+        'font_size' => '10pt',
+        'show_kop' => true,
+        'show_ttd' => true,
     ];
 
     public array $strukForm = [
@@ -238,6 +247,7 @@ class SettingsRbac extends Component
         $strukCfg = $config->getStrukConfig();
 
         $this->strukForm = array_merge($this->strukForm, $strukCfg);
+        $this->wmsDocForm = $config->getWmsDocConfig();
 
         $this->printerForm = [
             'label_preset' => (string) ($labelCfg['preset'] ?? '33x15'),
@@ -347,6 +357,37 @@ class SettingsRbac extends Component
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => 'Pengaturan Printer & Label QR berhasil disimpan.',
+        ]);
+    }
+
+    public function simpanPengaturanWmsDoc(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi cetak dokumen WMS.')) {
+            return;
+        }
+
+        $this->validate([
+            'wmsDocForm.paper_size' => 'required|in:a5,a4',
+            'wmsDocForm.orientation' => 'required|in:portrait,landscape',
+            'wmsDocForm.margin_mm' => 'required|numeric|min:2|max:30',
+            'wmsDocForm.font_size' => 'required|string',
+            'wmsDocForm.show_kop' => 'boolean',
+            'wmsDocForm.show_ttd' => 'boolean',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+        $config->set('wms_doc_config', $this->wmsDocForm, 'Pengaturan format kertas dan margin dokumen WMS (PO & GRN)');
+
+        app(AuditService::class)->catat(
+            'Konfigurasi',
+            'update',
+            null,
+            "Format cetak dokumen WMS diperbarui (Kertas: {$this->wmsDocForm['paper_size']}, Margin: {$this->wmsDocForm['margin_mm']}mm)"
+        );
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Pengaturan format cetak dokumen WMS berhasil disimpan.',
         ]);
     }
 

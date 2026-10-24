@@ -22,6 +22,7 @@
             { id: 'servis', label: 'Master Servis & Garansi', subModul: 'operasional', tab: 'master', subTab: null, icon: '🛠️', group: 'Operasional & Periferal', desc: 'Katalog jasa servis, estimasi waktu teknisi, masa garansi klaim', keywords: 'servis service jasa perbaikan teknisi garansi klaim pengerjaan tarif' },
             { id: 'struk', label: 'Template Struk & Faktur POS', subModul: 'operasional', tab: 'printer', subTab: 'struk', icon: '🧾', group: 'Operasional & Periferal', desc: 'Kustomisasi header/footer struk thermal, QR retur, kertas 58/80mm', keywords: 'struk printer thermal nota faktur kasir thermal print kertas retur' },
             { id: 'label', label: 'Format Label Barcode & QR SKU', subModul: 'operasional', tab: 'printer', subTab: 'label', icon: '🏷️', group: 'Operasional & Periferal', desc: 'Tata letak cetak stiker barcode produk untuk scanner gudang', keywords: 'label barcode qr code stiker cetak scanner printer bluetooth label' },
+            { id: 'wms_doc', label: 'Format Cetak Dokumen WMS (PO & GRN)', subModul: 'operasional', tab: 'printer', subTab: 'wms_doc', icon: '📦', group: 'Operasional & Periferal', desc: 'Ukuran kertas A5/A4 dan margin cetak Purchase Order serta Bukti Penerimaan Barang', keywords: 'po wms grn print cetak kertas a5 a4 margin nota logistik penerimaan' },
 
             { id: 'wa', label: 'WhatsApp Gateway & Notifikasi', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '💬', group: 'Gateway & Integrasi', desc: 'Konfigurasi Fonnte / Wablas, token API, dan pengujian kirim WA', keywords: 'whatsapp wa fonnte wablas gateway notifikasi pesan chat token phone' },
             { id: 'duitku', label: 'Payment Gateway Duitku', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '💳', group: 'Gateway & Integrasi', desc: 'Atur Merchant Code, API Key, Sandbox vs Production, dan callback URL', keywords: 'payment pembayaran duitku gateway qris va virtual account kartu kredit sandbox' },
@@ -848,6 +849,13 @@
                 >
                     <span>🏷️ Label Barcode & QR Master Produk</span>
                 </button>
+                <button
+                    type="button"
+                    wire:click="$set('printerSubTab', 'wms_doc')"
+                    class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'wms_doc' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    <span>📦 Format Cetak Dokumen WMS (PO & GRN)</span>
+                </button>
             </div>
 
             @if($printerSubTab === 'struk')
@@ -1150,7 +1158,7 @@
                         </x-prism.glass-card>
                     </div>
                 </div>
-            @else
+            @elseif($printerSubTab === 'label')
                 <!-- SUB-TAB 2: LABEL BARCODE & QR MASTER PRODUK -->
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     <!-- Form Pengaturan -->
@@ -1285,6 +1293,114 @@
                                 <a href="{{ route('barcode.print') }}" target="_blank" class="flex-1 py-2.5 px-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs text-center shadow-md shadow-up-primary/25 transition-colors">
                                     🖨️ Buka Sampel Cetak Label →
                                 </a>
+                            </div>
+                        </x-prism.glass-card>
+                    </div>
+                </div>
+            @elseif($printerSubTab === 'wms_doc')
+                <!-- SUB-TAB 3: FORMAT CETAK DOKUMEN WMS (PURCHASE ORDER & GRN) -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Form Konfigurasi Dokumen WMS -->
+                    <div class="lg:col-span-7 space-y-6">
+                        <x-prism.glass-card title="Format Cetak Dokumen WMS & Logistik" subtitle="Atur ukuran kertas default (setengah A4 / A5), orientasi, dan margin cetak Purchase Order serta Bukti Penerimaan Barang">
+                            <form wire:submit.prevent="simpanPengaturanWmsDoc" class="space-y-5">
+                                <div class="space-y-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Ukuran Kertas Default *</label>
+                                            <select wire:model="wmsDocForm.paper_size" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                                <option value="a5" class="bg-ink-900 text-white">Setengah A4 (A5 - 148 × 210 mm) [Rekomendasi Hemat Kertas]</option>
+                                                <option value="a4" class="bg-ink-900 text-white">Standar A4 (210 × 297 mm)</option>
+                                            </select>
+                                            <p class="text-[11px] text-ink-500 mt-1">Ukuran A5 membagi lembar A4 menjadi dua nota, ideal untuk faktur dan PO fisik.</p>
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Orientasi Kertas *</label>
+                                            <select wire:model="wmsDocForm.orientation" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                                <option value="portrait" class="bg-ink-900 text-white">Potret (Portrait / Tegak)</option>
+                                                <option value="landscape" class="bg-ink-900 text-white">Lanskap (Landscape / Memanjang)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Batas Margin Halaman (mm) *</label>
+                                            <div class="relative">
+                                                <input type="number" step="1" min="2" max="30" wire:model="wmsDocForm.margin_mm" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold font-mono text-white min-h-[44px]" required>
+                                                <span class="absolute right-3.5 top-3 text-xs text-ink-400 font-mono">mm</span>
+                                            </div>
+                                            <p class="text-[11px] text-ink-500 mt-1">Margin 8mm memberi ruang cetak maksimal pada format setengah A4.</p>
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Ukuran Huruf / Font Dokumen *</label>
+                                            <select wire:model="wmsDocForm.font_size" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                                                <option value="9pt" class="bg-ink-900 text-white">9pt (Sangat Kompak & Padat)</option>
+                                                <option value="10pt" class="bg-ink-900 text-white">10pt (Standar A5 - Jelas & Rapi)</option>
+                                                <option value="11pt" class="bg-ink-900 text-white">11pt (Lebih Besar / Ramah Pembaca)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="pt-2 border-t border-white/5 space-y-3">
+                                        <label class="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition">
+                                            <input type="checkbox" wire:model="wmsDocForm.show_kop" class="rounded text-up-primary focus:ring-0 w-4 h-4 cursor-pointer">
+                                            <div class="text-xs">
+                                                <strong class="text-white block">Tampilkan Kop Surat / Identitas Toko & Cabang</strong>
+                                                <span class="text-ink-400 text-[11px]">Mencantumkan nama toko, alamat cabang, dan nomor telepon pengirim di bagian atas dokumen.</span>
+                                            </div>
+                                        </label>
+
+                                        <label class="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition">
+                                            <input type="checkbox" wire:model="wmsDocForm.show_ttd" class="rounded text-up-primary focus:ring-0 w-4 h-4 cursor-pointer">
+                                            <div class="text-xs">
+                                                <strong class="text-white block">Tampilkan Kolom Tanda Tangan & Verifikasi</strong>
+                                                <span class="text-ink-400 text-[11px]">Menyediakan kolom tanda tangan pihak pembuat PO, pihak penerima barang (gudang), dan kurir/supplier.</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="pt-4 border-t border-white/10 flex items-center justify-between">
+                                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.98]">
+                                        💾 Simpan Format Dokumen WMS
+                                    </button>
+                                    <span class="text-[11px] text-ink-400">Default: <strong class="text-white">A5 (Setengah A4) · Margin 8mm</strong></span>
+                                </div>
+                            </form>
+                        </x-prism.glass-card>
+                    </div>
+
+                    <!-- Panduan & Pratinjau Kertas A5 -->
+                    <div class="lg:col-span-5 space-y-6">
+                        <x-prism.glass-card title="Panduan Cetak Setengah A4 (A5)" subtitle="Standar operasional nota gudang & dokumen PO">
+                            <div class="p-4 rounded-2xl bg-ink-950/40 border border-white/5 space-y-3 text-xs text-ink-300">
+                                <div class="flex items-center gap-2 text-white font-bold">
+                                    <span class="text-base">📄</span>
+                                    <span>Mengapa Ukuran A5 (Setengah A4)?</span>
+                                </div>
+                                <p class="leading-relaxed text-[11px]">
+                                    Format <strong>A5 (148 × 210 mm)</strong> adalah ukuran ideal untuk dokumen internal logistik, Purchase Order, dan Berita Acara Penerimaan Barang. Selain menghemat 50% penggunaan kertas fisik kantor, format ini pas dipegang oleh staf gudang saat proses penghitungan fisik barang.
+                                </p>
+
+                                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-2 text-[11px]">
+                                    <div class="text-white font-semibold">Petunjuk Setelan Printer Browser (Chrome / Edge / Firefox):</div>
+                                    <ol class="list-decimal list-inside space-y-1 text-ink-400">
+                                        <li>Di jendela Print browser, pilih <strong>Destination: Printer Anda</strong>.</li>
+                                        <li>Pilih <strong>Paper size: A5</strong> (atau A4 jika mencetak 2 dokumen sekaligus).</li>
+                                        <li>Pilih <strong>Margins: Default / Minimum</strong> (agar CSS margin 8mm diterapkan presisi).</li>
+                                        <li>Centang <strong>Background graphics</strong> agar border dan badge tampil tajam.</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-up-mint/5 border border-up-mint/20 text-xs space-y-1">
+                                <span class="text-up-mint font-bold block">✨ Otomatis Mengikuti Setelan</span>
+                                <p class="text-[11px] text-ink-400 leading-relaxed">
+                                    Semua dokumen cetak WMS seperti <strong>Purchase Order Fisik</strong>, <strong>Berita Acara Penolakan PO</strong>, dan <strong>Bukti Penerimaan Barang (GRN)</strong> akan otomatis mengacu pada pengaturan ini.
+                                </p>
                             </div>
                         </x-prism.glass-card>
                     </div>

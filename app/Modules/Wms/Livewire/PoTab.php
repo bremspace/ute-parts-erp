@@ -567,7 +567,9 @@ class PoTab extends Component
             'status' => 'draft',
             'metode_bayar' => $this->poForm['metode_bayar'],
             'akun_kas_bank' => $this->poForm['metode_bayar'] === 'tunai' ? ($this->poForm['akun_kas_bank'] ?? '110-01') : null,
-            'jatuh_tempo' => $this->poForm['jatuh_tempo'] ?: now()->addDays((int) Supplier::find($this->poForm['supplier_id'])?->termin_hari ?? 30)->toDateString(),
+            'jatuh_tempo' => $this->poForm['metode_bayar'] === 'kredit'
+                ? ($this->poForm['jatuh_tempo'] ?: now()->addDays((int) Supplier::find($this->poForm['supplier_id'])?->termin_hari ?? 30)->toDateString())
+                : null,
             'total' => $total,
             'total_dibayar' => 0,
         ]);

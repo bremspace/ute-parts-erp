@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Livewire\ProdukTab;
@@ -200,5 +201,29 @@ class SettingsRbacRakAndStokScopingTest extends TestCase
                 return (int) $p->total_stok === 50
                     && $p->stokItems->sum('jumlah') === 50;
             });
+    }
+
+    public function test_pengaturan_format_cetak_dokumen_wms_tersimpan(): void
+    {
+        $this->actingAs($this->superAdmin, 'web');
+        session(['cabang_id' => $this->cabangA->id]);
+
+        Livewire::test(SettingsRbac::class, ['activeTab' => 'printer'])
+            ->set('printerSubTab', 'wms_doc')
+            ->set('wmsDocForm.paper_size', 'a5')
+            ->set('wmsDocForm.orientation', 'portrait')
+            ->set('wmsDocForm.margin_mm', 8)
+            ->set('wmsDocForm.font_size', '10pt')
+            ->call('simpanPengaturanWmsDoc')
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success';
+            });
+
+        $config = app(KonfigurasiService::class)->getWmsDocConfig();
+        $this->assertEquals('a5', $config['paper_size']);
+        $this->assertEquals('portrait', $config['orientation']);
+        $this->assertEquals(8, $config['margin_mm']);
     }
 }

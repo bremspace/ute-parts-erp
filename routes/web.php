@@ -43,6 +43,7 @@ use App\Modules\Wms\Livewire\CycleCountPage;
 use App\Modules\Wms\Livewire\ImportExportPage;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
 use App\Modules\Wms\Livewire\WmsDashboard;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Workflow\Livewire\ApprovalInbox;
@@ -630,6 +631,13 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
 
         return view('wms.po-print-penolakan', ['po' => $po]);
     })->name('wms.po.print-penolakan')->middleware('permission:wms.view');
+
+    // Cetak Dokumen Bukti Penerimaan Barang (GRN) Setengah A4 (A5)
+    Route::get('/wms/grn/{id}/print', function ($id) {
+        $grn = Grn::with(['purchaseOrder.supplier', 'purchaseOrder.gudangTujuan.cabang', 'gudang.cabang', 'user'])->findOrFail($id);
+
+        return view('wms.grn-print', ['grn' => $grn]);
+    })->name('wms.grn.print')->middleware('permission:wms.view');
 
     // [F3-7] Cycle Count Otomatis (G-18) — jadwal CRUD + daftar task count
     // RBAC: permission wms.view utk lihat; mutasi (jadwal/count) di-gate wms.opname di komponen

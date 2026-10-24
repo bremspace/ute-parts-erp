@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Services;
 
+use App\Models\User;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
@@ -81,8 +82,16 @@ class GrnService
      * @param  array<int|string, float>  $itemHargaBeli  [kunci sama => harga_beli aktual saat GRN]
      * @param  array<int|string, int|null>  $itemRakId  [kunci sama => rak_id tujuan penerimaan]
      */
-    public function inputGudang(PurchaseOrder $po, array $itemReceived, ?int $userId = null, array $snPerProduk = [], array $itemHargaBeli = [], array $itemRakId = []): Grn
-    {
+    public function inputGudang(
+        PurchaseOrder $po,
+        array $itemReceived,
+        ?int $userId = null,
+        array $snPerProduk = [],
+        array $itemHargaBeli = [],
+        array $itemRakId = [],
+        ?string $akunKasBank = null,
+        ?string $dibayarOleh = null
+    ): Grn {
         $cabangId = $po->gudangTujuan?->cabang_id;
         if (! $cabangId) {
             throw new \Exception('PO harus memiliki gudang tujuan dengan cabang_id');
@@ -99,7 +108,7 @@ class GrnService
 
         $pemohon = ApprovalService::pemohon($userId ?? auth()->id());
 
-        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $itemRakId, $pemohon, $cabangId) {
+        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $itemRakId, $pemohon, $cabangId, $akunKasBank, $dibayarOleh) {
             $itemData = [];
             $totalHpp = 0;
             $needsApproval = false;
@@ -175,6 +184,8 @@ class GrnService
                 'user_id' => $pemohon,
                 'status' => 'draft',
                 'total_hpp' => $totalHpp,
+                'akun_kas_bank' => $akunKasBank ?: $po->akun_kas_bank,
+                'dibayar_oleh' => $dibayarOleh,
                 'item_qty_received' => $itemData,
             ]);
 
@@ -308,10 +319,15 @@ class GrnService
         }
 
         $isKredit = ($po?->metode_bayar ?? 'kredit') === 'kredit';
-        $akunKas = $po?->akun_kas_bank ?: '110-01';
+        $akunKas = $grn->akun_kas_bank ?: ($po?->akun_kas_bank ?: '110-01');
+        $dibayarOleh = $grn->dibayar_oleh ?: (User::find($actionedBy)?->name ?? 'Kasir / Staf');
         $akunKredit = $isKredit ? '210-01' : $akunKas;
 
         if ($totalHpp > 0) {
+            $keteranganJurnal = $isKredit
+                ? "GRN {$grn->no_grn} — {$keterangan} (PO {$noPo})"
+                : "GRN {$grn->no_grn} — Pembayaran Tunai oleh {$dibayarOleh} [{$akunKas}] (PO {$noPo})";
+
             $this->jurnalService->post(
                 $grn->no_grn,
                 now(),
@@ -320,7 +336,7 @@ class GrnService
                     ['akun_kode' => '130-01', 'debit' => $totalHpp, 'kredit' => 0],
                     ['akun_kode' => $akunKredit, 'debit' => 0, 'kredit' => $totalHpp],
                 ],
-                "GRN {$grn->no_grn} — {$keterangan} (PO {$noPo})",
+                $keteranganJurnal,
                 (int) $grn->cabang_id,
                 $actionedBy,
                 Grn::class,
@@ -398,6 +414,7 @@ class GrnService
             ];
             if (! $isKredit) {
                 $poUpdates['total_dibayar'] = $totalHpp;
+                $poUpdates['akun_kas_bank'] = $akunKas;
             }
             $po->update($poUpdates);
         }

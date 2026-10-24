@@ -37,4 +37,9 @@ class Gudang extends Model
     {
         return $this->hasMany(StokItem::class);
     }
+
+    public function raks(): HasMany
+    {
+        return $this->hasMany(Rak::class);
+    }
 }

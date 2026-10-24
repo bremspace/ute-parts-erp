@@ -17,7 +17,7 @@ use Spatie\Activitylog\Support\LogOptions;
  */
 #[Fillable([
     'no_grn', 'po_id', 'cabang_id', 'gudang_id', 'user_id', 'status',
-    'total_hpp', 'item_qty_received', 'catatan',
+    'total_hpp', 'akun_kas_bank', 'dibayar_oleh', 'item_qty_received', 'catatan',
 ])]
 class Grn extends Model
 {

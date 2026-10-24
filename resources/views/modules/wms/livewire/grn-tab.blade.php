@@ -246,6 +246,14 @@
                             >
                                 Detail
                             </button>
+                            <a
+                                href="{{ route('wms.grn.print', $grn->id) }}"
+                                target="_blank"
+                                class="px-2.5 py-1.5 rounded-lg bg-up-primary/15 hover:bg-up-primary/25 border border-up-primary/30 text-up-primary font-bold text-[10px] cursor-pointer active:scale-95 transition"
+                                title="Cetak Bukti Penerimaan Barang (Format A5)"
+                            >
+                                Cetak
+                            </a>
                             <button
                                 wire:click="bukaRiwayat('grn', {{ $grn->id }})"
                                 class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer active:scale-95 transition"
@@ -617,6 +625,32 @@
                         @endforeach
                     </div>
 
+                    @if(!empty($grnForm['is_cash']))
+                        <div class="p-3.5 rounded-2xl bg-up-mint/5 border border-up-mint/20 space-y-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
+                                <span class="text-xs font-bold text-up-mint uppercase tracking-wider">Konfirmasi Pembayaran PO Tunai (Cash / COD / Transfer)</span>
+                            </div>
+                            <p class="text-[11px] text-ink-500 dark:text-ink-400 leading-relaxed">
+                                PO ini menggunakan metode <strong class="text-up-mint">Tunai Langsung</strong> (tanpa jatuh tempo). Konfirmasikan siapa yang membayar dan kas/bank yang digunakan saat barang diterima.
+                            </p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Dibayar Oleh *</label>
+                                    <input type="text" wire:model="grnForm.dibayar_oleh" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[40px]" placeholder="Nama pembayar / staf / kasir" required />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Sumber Kas / Bank *</label>
+                                    <select wire:model="grnForm.akun_kas_bank" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[40px]" required>
+                                        @foreach($akunKasBankList ?? [] as $ak)
+                                            <option value="{{ $ak->kode }}" class="bg-ink-900 text-white">[{{ $ak->kode }}] {{ $ak->nama }} ({{ ucfirst($ak->kelompok) }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <div class="pt-1 shrink-0">
                         <label class="block text-xs font-semibold text-ink-300 mb-1">Catatan Penerimaan</label>
                         <textarea wire:model="grnForm.catatan" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs" placeholder="Opsional — misal nomor surat jalan, kondisi kemasan, atau catatan selisih"></textarea>
@@ -655,7 +689,7 @@
                 </div>
 
                 <!-- Summary Info -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 my-4 text-xs">
                     <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
                         <span class="text-[10px] text-ink-400 block font-semibold uppercase">Supplier</span>
                         <div class="font-bold text-white">{{ $detailGrn->purchaseOrder?->supplier?->nama ?? '-' }}</div>
@@ -671,6 +705,24 @@
                                 Total HPP: —
                             @endcansee
                         </div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
+                        <span class="text-[10px] text-ink-400 block font-semibold uppercase">Metode & Pembayaran</span>
+                        <div class="font-bold {{ $detailGrn->purchaseOrder?->metode_bayar === 'tunai' ? 'text-up-mint' : 'text-up-amber' }}">
+                            {{ $detailGrn->purchaseOrder?->metode_bayar === 'tunai' ? 'TUNAI LANGSUNG' : 'KREDIT / TEMPO' }}
+                        </div>
+                        @if($detailGrn->purchaseOrder?->metode_bayar === 'tunai')
+                            <div class="text-[11px] text-ink-300">
+                                Kas: <span class="font-mono text-white">{{ $detailGrn->akun_kas_bank ?: ($detailGrn->purchaseOrder?->akun_kas_bank ?: '110-01') }}</span>
+                                @if($detailGrn->dibayar_oleh)
+                                    · Oleh: <span class="text-white">{{ $detailGrn->dibayar_oleh }}</span>
+                                @endif
+                            </div>
+                        @else
+                            <div class="text-[11px] text-ink-400">
+                                Tempo: {{ $detailGrn->purchaseOrder?->jatuh_tempo?->format('d/m/Y') ?? '-' }}
+                            </div>
+                        @endif
                     </div>
                 </div>
 
@@ -739,7 +791,11 @@
                 </div>
 
                 <!-- Footer -->
-                <div class="flex items-center justify-end pt-4 border-t border-white/10 mt-2">
+                <div class="flex items-center justify-between pt-4 border-t border-white/10 mt-2 gap-3">
+                    <a href="{{ route('wms.grn.print', $detailGrn->id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer shadow-lg shadow-up-primary/25 transition active:scale-[0.97]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                        Cetak Bukti GRN (A5)
+                    </a>
                     <button wire:click="tutupDetailGrn" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
                         Tutup
                     </button>

@@ -45,6 +45,10 @@ class KategoriProdukSeeder extends Seeder
                     'Casing & Pelindung',
                 ],
             ],
+            [
+                'nama' => 'Umum',
+                'children' => [],
+            ],
         ];
     }
 

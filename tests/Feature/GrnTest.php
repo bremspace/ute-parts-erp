@@ -1031,4 +1031,108 @@ class GrnTest extends TestCase
         $this->assertDatabaseHas('grn', ['id' => $grn1->id, 'no_grn' => $grn1->no_grn]);
         $this->assertDatabaseHas('grn', ['id' => $grn2->id, 'no_grn' => $grn2->no_grn]);
     }
+
+    public function test_po_tunai_tanpa_jatuh_tempo_dan_grn_mencatat_konfirmasi_kas_serta_pembayar(): void
+    {
+        Queue::fake();
+
+        // Siapkan akun kas laci 110-04
+        AkunCOA::firstOrCreate(
+            ['kode' => '110-04'],
+            ['nama' => 'Kas Laci', 'tipe' => 'aset', 'kelompok' => 'kas', 'saldo_normal' => 'debit']
+        );
+
+        session(['cabang_id' => $this->cabang->id]);
+        $this->actingAs($this->user);
+
+        // Buat PO Tunai
+        $po = PurchaseOrder::create([
+            'no_po' => 'PO-TEST-CASH-001',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'status' => 'dikirim',
+            'metode_bayar' => 'tunai',
+            'akun_kas_bank' => '110-01',
+            'jatuh_tempo' => null,
+            'total' => 100000,
+            'total_dibayar' => 0,
+        ]);
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 2,
+            'harga_beli' => 50000,
+            'subtotal' => 100000,
+        ]);
+
+        $this->assertNull($po->jatuh_tempo, 'PO tunai tidak boleh memiliki jatuh tempo');
+
+        // Terima barang via GRN dengan konfirmasi bayar dari Kas Laci oleh Budi Kasir
+        $grn = $this->service()->inputGudang(
+            $po,
+            [$this->produk->id => 2],
+            $this->user->id,
+            [],
+            [],
+            [],
+            '110-04',
+            'Budi Kasir'
+        );
+
+        $this->assertEquals('terima', $grn->status);
+        $this->assertEquals('110-04', $grn->fresh()->akun_kas_bank);
+        $this->assertEquals('Budi Kasir', $grn->fresh()->dibayar_oleh);
+
+        // Verifikasi PO terupdate lunas dan akun kas tersinkron
+        $poFresh = $po->fresh();
+        $this->assertEquals('diterima', $poFresh->status);
+        $this->assertEquals(100000, (float) $poFresh->total_dibayar);
+        $this->assertEquals('110-04', $poFresh->akun_kas_bank);
+        $this->assertNull($poFresh->jatuh_tempo);
+
+        // Verifikasi tidak ada utang yang dibuat untuk PO tunai
+        $this->assertEquals(0, Utang::where('referensi_tipe', PurchaseOrder::class)->where('referensi_id', $po->id)->count());
+
+        // Verifikasi jurnal: Debit Persediaan 130-01, Kredit Kas Laci 110-04
+        $jurnalKas = JurnalAkuntansi::where('no_jurnal', $grn->no_grn)
+            ->whereHas('akun', fn ($q) => $q->where('kode', '110-04'))
+            ->first();
+        $this->assertNotNull($jurnalKas, 'Jurnal harus mengkredit Kas Laci 110-04');
+        $this->assertEquals(100000, (float) $jurnalKas->kredit);
+
+        $jurnalPersediaan = JurnalAkuntansi::where('no_jurnal', $grn->no_grn)
+            ->whereHas('akun', fn ($q) => $q->where('kode', '130-01'))
+            ->first();
+        $this->assertNotNull($jurnalPersediaan);
+        $this->assertEquals(100000, (float) $jurnalPersediaan->debit);
+    }
+
+    public function test_wms_print_documents_return_200_with_a5_default(): void
+    {
+        $this->actingAs($this->user);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $po = $this->buatPoDikirim(2, 50000);
+        $grn = $this->service()->inputGudang($po, [$this->produk->id => 2], $this->user->id);
+
+        // 1. Cetak PO Fisik
+        $responsePo = $this->get(route('wms.po.print', $po->id));
+        $responsePo->assertOk();
+        $responsePo->assertSee('Purchase Order');
+        $responsePo->assertSee($po->no_po);
+        $responsePo->assertSee('A5 (Setengah A4)');
+
+        // 2. Cetak Berita Acara Penolakan
+        $responsePenolakan = $this->get(route('wms.po.print-penolakan', $po->id));
+        $responsePenolakan->assertOk();
+        $responsePenolakan->assertSee('Berita Acara Penolakan');
+
+        // 3. Cetak Bukti GRN
+        $responseGrn = $this->get(route('wms.grn.print', $grn->id));
+        $responseGrn->assertOk();
+        $responseGrn->assertSee('Bukti Terima Barang');
+        $responseGrn->assertSee($grn->no_grn);
+        $responseGrn->assertSee('A5 (Setengah A4)');
+    }
 }

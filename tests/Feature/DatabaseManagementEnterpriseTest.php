@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Modules\Rbac\Livewire\DatabaseManagement;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\DatabaseManagementService;
+use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\Rak;
 use Database\Seeders\RoleUserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -153,6 +155,17 @@ class DatabaseManagementEnterpriseTest extends TestCase
     {
         $this->actingAs($this->superAdmin);
 
+        // Buat rak custom sebelum reset untuk memverifikasi penghapusan dan pengembalian rak default
+        $gudang = Gudang::first();
+        if ($gudang) {
+            Rak::create([
+                'gudang_id' => $gudang->id,
+                'kode' => 'CUSTOM-RAK-99',
+                'nama' => 'Rak Custom Temporary',
+                'is_active' => true,
+            ]);
+        }
+
         Livewire::test(DatabaseManagement::class)
             ->set('resetMode', 'factory_reset')
             ->set('confirmResetText', 'RESET PABRIK')
@@ -172,6 +185,15 @@ class DatabaseManagementEnterpriseTest extends TestCase
         $this->assertDatabaseHas('tier_memberships', ['kode' => 'silver', 'diskon_persen' => 3]);
         $this->assertDatabaseHas('tier_memberships', ['kode' => 'gold', 'diskon_persen' => 5]);
         $this->assertDatabaseHas('tier_memberships', ['kode' => 'platinum', 'diskon_persen' => 10]);
+
+        // Verifikasi rak: custom rak terhapus dan rak default dipulihkan
+        $this->assertDatabaseMissing('rak', ['kode' => 'CUSTOM-RAK-99']);
+        $this->assertDatabaseHas('rak', ['kode' => 'RAK-01', 'nama' => 'Rak Utama']);
+
+        // Verifikasi master referensi ter-reseed
+        $this->assertDatabaseHas('satuan_unit', ['kode' => 'pcs']);
+        $this->assertDatabaseHas('brands', ['nama' => 'Apple']);
+        $this->assertDatabaseHas('kualitas_produk', ['nama' => 'Original']);
 
         $service = app(DatabaseManagementService::class);
         foreach ($service->listBackups() as $b) {
@@ -198,6 +220,46 @@ class DatabaseManagementEnterpriseTest extends TestCase
         $admin = User::where('email', 'superadmin@uteparts.id')->first();
         $this->assertNotNull($admin);
         $this->assertTrue($admin->hasRole('super-admin'));
+
+        $service = app(DatabaseManagementService::class);
+        foreach ($service->listBackups() as $b) {
+            $service->deleteBackup($b['filename']);
+        }
+    }
+
+    public function test_full_wipe_preserves_authenticated_owner_without_superadmin_email(): void
+    {
+        // Custom owner dengan email non-superadmin
+        $customOwner = User::factory()->create([
+            'email' => 'custom-owner@perusahaan.co.id',
+            'name' => 'Bapak Owner Mandiri',
+            'password' => Hash::make('Password123!'),
+            'is_active' => true,
+        ]);
+        $customOwner->assignRole('owner');
+
+        $this->actingAs($customOwner);
+
+        Livewire::test(DatabaseManagement::class)
+            ->set('resetMode', 'full_wipe')
+            ->set('confirmResetText', 'FULL WIPE DATABASE')
+            ->set('confirmPassword', 'Password123!')
+            ->call('eksekusiReset')
+            ->assertDispatched('alert', function ($event, $params) {
+                $payload = $params[0] ?? $params;
+
+                return ($payload['type'] ?? '') === 'success' && str_contains($payload['message'], 'Full Wipe');
+            });
+
+        // Verifikasi akun owner yang menjalankan operasi tidak dihapus dan rolenya tetap bertahan
+        $preservedUser = User::where('email', 'custom-owner@perusahaan.co.id')->first();
+        $this->assertNotNull($preservedUser);
+        $this->assertEquals($customOwner->id, $preservedUser->id);
+        $this->assertTrue($preservedUser->is_active);
+        $this->assertTrue($preservedUser->hasRole('owner'));
+
+        // Pastikan user lain sudah terhapus
+        $this->assertEquals(1, User::count());
 
         $service = app(DatabaseManagementService::class);
         foreach ($service->listBackups() as $b) {

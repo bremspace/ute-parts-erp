@@ -243,4 +243,24 @@ class KonfigurasiService
 
         return is_array($cfg) ? array_merge($default, $cfg) : $default;
     }
+
+    /**
+     * Konfigurasi format cetak dokumen WMS (Purchase Order, Bukti GRN, Berita Acara).
+     * Default format: Setengah A4 (A5 portrait) dengan margin 8mm.
+     */
+    public function getWmsDocConfig(): array
+    {
+        $default = [
+            'paper_size' => 'a5', // a5, a4
+            'orientation' => 'portrait', // portrait, landscape
+            'margin_mm' => 8,
+            'font_size' => '10pt',
+            'show_kop' => true,
+            'show_ttd' => true,
+        ];
+
+        $cfg = $this->get('wms_doc_config');
+
+        return is_array($cfg) ? array_merge($default, $cfg) : $default;
+    }
 }

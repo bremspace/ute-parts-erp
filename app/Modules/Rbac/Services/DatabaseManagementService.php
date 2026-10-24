@@ -11,6 +11,7 @@ use Database\Seeders\CabangSeeder;
 use Database\Seeders\JenisServisSeeder;
 use Database\Seeders\KategoriProdukSeeder;
 use Database\Seeders\KomisiSkemaSeeder;
+use Database\Seeders\MasterDataSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\RoleUserSeeder;
 use Database\Seeders\TierMembershipSeeder;
@@ -411,6 +412,7 @@ class DatabaseManagementService
                 $seeders = [
                     RolesAndPermissionsSeeder::class,
                     CabangSeeder::class,
+                    MasterDataSeeder::class,
                     TierMembershipSeeder::class,
                     KategoriProdukSeeder::class,
                     AdminUserSeeder::class,
@@ -453,11 +455,17 @@ class DatabaseManagementService
                 $savedName = $currentUser?->name ?? 'Super Administrator';
                 $defaultPassword = 'Password123!';
 
+                // Tangkap role yang dimiliki akun saat ini untuk dipertahankan
+                $savedRoles = $currentUser ? $currentUser->getRoleNames()->toArray() : [];
+                if (empty($savedRoles)) {
+                    $savedRoles = ['super-admin'];
+                }
+
                 // Dapatkan seluruh tabel di database kecuali users
                 $allTables = array_merge($transactionTables, $masterTables, $orgTables);
                 $clearedCount = $this->truncateTables($allTables);
 
-                // Anti-lockout: Hapus semua user lain, pertahankan akun super admin aktif & reset 2FA
+                // Anti-lockout: Hapus semua user lain, pertahankan akun super admin / owner aktif & reset 2FA
                 if ($savedId) {
                     User::where('id', '!=', $savedId)->delete();
                     $admin = User::find($savedId);
@@ -493,7 +501,7 @@ class DatabaseManagementService
                         ['nama' => 'Cabang Utama', 'is_active' => true]
                     );
                     if ($admin) {
-                        $admin->assignRole('super-admin');
+                        $admin->syncRoles($savedRoles);
                         $admin->cabangs()->syncWithoutDetaching([$cabang->id => ['is_default' => true]]);
                         auth()->login($admin);
                     }

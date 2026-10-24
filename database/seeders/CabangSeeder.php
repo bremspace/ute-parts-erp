@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
+use App\Modules\Wms\Models\Rak;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -19,9 +20,14 @@ class CabangSeeder extends Seeder
         );
 
         // Pastikan cabang utama memiliki gudang utama default agar hirarki siap pakai
-        Gudang::firstOrCreate(
+        $g1 = Gudang::firstOrCreate(
             ['kode' => 'GDG-01'],
             ['cabang_id' => $c1->id, 'nama' => 'Gudang Utama', 'is_active' => true]
+        );
+
+        Rak::firstOrCreate(
+            ['kode' => 'RAK-01'],
+            ['gudang_id' => $g1->id, 'nama' => 'Rak Utama', 'is_active' => true]
         );
 
         Cabang::firstOrCreate(

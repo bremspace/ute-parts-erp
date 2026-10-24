@@ -3,6 +3,45 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-24 — WMS & RBAC: Alur PO Tunai, Konfirmasi Kas GRN, dan Format Cetak Setengah A4 (A5) ✅
+
+- **Alur PO Tunai (Cash / COD)**:
+  - PO dengan metode pembayaran `tunai` tidak memiliki `jatuh_tempo` (di-set `NULL` dan tidak menampilkan tanggal tempo utang di list maupun detail).
+  - Kolom `jatuh_tempo` pada list PO dan detail PO kini menampilkan badge "Tunai / COD" atau status "Tunai Langsung (Tanpa Jatuh Tempo)" ketika metode bayar adalah `tunai`.
+  - Normalisasi data PO tunai lama agar `jatuh_tempo` menjadi `NULL`.
+- **Konfirmasi Kas & Pembayar saat Penerimaan Barang (GRN)**:
+  - Migrasi `2026_10_24_230000_add_payment_fields_to_grn_table`: menambahkan kolom `akun_kas_bank` dan `dibayar_oleh` pada tabel `grn`.
+  - Update `GrnTab` & modal penerimaan barang: menambahkan card "Konfirmasi Pembayaran PO Tunai" yang mewajibkan/mengizinkan pengisian nama pembayar (`dibayar_oleh`) dan pemilihan akun kas/bank (`akun_kas_bank`, misal: Kas Laci `110-04`, Kas `110-01`, Bank `110-02`).
+  - Update `GrnService::inputGudang` & `selesaikanGrn`:
+    - Pada transaksi tunai, jurnal penerimaan barang langsung mengkredit akun kas/bank yang dipilih (bukan Utang `210-01`), dengan deskripsi mencantumkan nama pembayar dan kode kas.
+    - Status PO di-update menjadi `diterima`, `total_dibayar` penuh, akun kas tersinkron, dan tidak mencatat subledger `Utang`.
+    - Transaksi tempo (`kredit`) tetap mencatat jurnal utang `210-01` dan subledger `Utang`.
+- **Format Cetak Dokumen WMS (Setengah A4 / A5) & Pengaturan Printer**:
+  - `KonfigurasiService::getWmsDocConfig()`: konfigurasi terpusat format dokumen logistik WMS (`paper_size = 'a5'`, `orientation = 'portrait'`, `margin_mm = 8`, `font_size = '10pt'`).
+  - `SettingsRbac` & view `settings-rbac.blade.php`: integrasi tab "Format Cetak Dokumen WMS (PO & GRN)" di menu Setelan Printer (`/app/pengaturan?tab=printer`).
+  - Template cetak PO (`po-print.blade.php`) & Berita Acara Penolakan (`po-print-penolakan.blade.php`): diperbarui dengan CSS `@page { size: A5 portrait; margin: 8mm; }`, container proporsional, serta toolbar pilihan kertas cepat (A5/A4, Portrait/Landscape). PO tunai tidak menampilkan tanggal tempo.
+  - Template cetak bukti GRN baru (`grn-print.blade.php`) dan route `/wms/grn/{id}/print`: dokumen bukti penerimaan fisik format setengah A4 (A5) lengkap dengan rincian rak, status pembayaran kas, dan tanda tangan.
+- **Pengujian & Verifikasi**:
+  - `tests/Feature/GrnTest.php`: pengujian end-to-end alur PO tunai, GRN kas, verifikasi jurnal, dan pengujian HTTP cetak dokumen WMS format A5 (34 tests passed).
+  - `tests/Feature/SettingsRbacRakAndStokScopingTest.php`: pengujian penyimpanan konfigurasi dokumen WMS di settings printer.
+  - Formatter Pint clean.
+
+## 2026-10-24 — RBAC & DB: Perbaikan Reset Database (Factory Reset Rak & Full Wipe Anti-Lockout Owner) ✅
+
+- **Factory Reset Semantics**:
+  - `DatabaseManagementService`: `CabangSeeder` kini menjamin inisialisasi default `Rak` (`RAK-01`, "Rak Utama") pada `Gudang Utama` default sehingga tidak ada data rak yatim/kosong setelah reset pabrik.
+  - Menambahkan seeder terisolasi `MasterDataSeeder` (`SatuanUnit`, `Brands`, `KualitasProduk`, `TipeHp`) dan mendaftarkannya pada pipeline seeder bawaan `factory_reset` serta `DatabaseSeeder` utama.
+  - Memastikan seluruh tabel master/referensi terisi kembali dengan setelan default bawaan sistem.
+  - Menambahkan relasi `raks()` pada model `Gudang`.
+- **Harden Full Wipe Anti-Lockout**:
+  - Menjaga akun authenticated user (baik Super Admin maupun Owner) agar tidak terhapus saat `full_wipe` dipicu oleh user dengan email non-standar (`custom-owner@...`).
+  - Mempertahankan role asli yang dimiliki pengguna saat ini (`$currentUser->getRoleNames()`), status aktif (`is_active = true`), kredensial, serta reset 2FA anti-lockout.
+  - Mengisolasi pembersihan user lain dengan aman tanpa membuang akun owner/superadmin yang sedang login.
+- **Pengujian & Verifikasi**:
+  - Menambahkan pengujian di `DatabaseManagementEnterpriseTest`: verifikasi rak kustom terhapus dan rak default dipulihkan saat `factory_reset`, serta verifikasi preservasi akun dan role owner custom saat `full_wipe`.
+  - Targeted tests lulus 100% (10 tests, 33 assertions). Laravel Pint clean.
+
+
 ## 2026-10-24 — WMS: Perbaikan Notifikasi Ganda & Progress Bar Real-time Import ✅
 
 - **Pencegahan Eksekusi & Notifikasi Ganda**:

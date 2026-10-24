@@ -9,6 +9,7 @@ use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Models\KategoriProduk;
+use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
@@ -36,6 +37,8 @@ class ImportSidRetailService
     protected array $satuanCache = [];
 
     protected array $rakCache = [];
+
+    protected ?int $defaultKualitasId = null;
 
     /**
      * Resolusi path file fleksibel (lokal, storage app/private, atau storage app).
@@ -644,10 +647,16 @@ class ImportSidRetailService
         }
 
         // 6. Buat / update Produk
+        if ($this->defaultKualitasId === null) {
+            $this->defaultKualitasId = KualitasProduk::where('nama', 'Original')->value('id')
+                ?? KualitasProduk::firstOrCreate(['nama' => 'Original'], ['is_active' => true])->id;
+        }
+
         $produkData = [
             'nama' => $nama,
             'barcode' => $barcode ?: null,
             'brand_id' => $brandId,
+            'kualitas_id' => $this->defaultKualitasId,
             'kategori_id' => $kategoriId,
             'satuan' => $satuanClean,
             'harga_beli' => $hpp,

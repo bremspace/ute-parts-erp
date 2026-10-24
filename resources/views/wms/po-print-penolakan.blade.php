@@ -1,3 +1,12 @@
+@php
+    $wmsConfig = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getWmsDocConfig();
+    $paperSize = request('paper', $wmsConfig['paper_size'] ?? 'a5');
+    $orientation = request('orient', $wmsConfig['orientation'] ?? 'portrait');
+    $marginMm = (int) request('margin', $wmsConfig['margin_mm'] ?? 8);
+    $fontSize = request('font', $wmsConfig['font_size'] ?? '10pt');
+    $showKop = (bool) ($wmsConfig['show_kop'] ?? true);
+    $showTtd = (bool) ($wmsConfig['show_ttd'] ?? true);
+@endphp
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -6,23 +15,30 @@
     <title>Berita Acara Penolakan Barang — {{ $po->no_po }}</title>
     <style>
         @page {
-            size: A4 portrait;
-            margin: 15mm;
+            size: {{ $paperSize }} {{ $orientation }};
+            margin: {{ $marginMm }}mm;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            font-size: 11pt;
+            font-size: {{ $fontSize }};
             color: #111827;
-            background: #f9fafb;
+            background: #f3f4f6;
             margin: 0;
-            padding: 20px;
+            padding: 12px;
+            line-height: 1.35;
         }
         .container {
-            max-width: 800px;
+            width: 100%;
+            max-width: {{ $paperSize === 'a5' && $orientation === 'portrait' ? '148mm' : ($paperSize === 'a5' ? '210mm' : '210mm') }};
             margin: 0 auto;
             background: #fff;
-            padding: 28px 32px;
-            border-radius: 8px;
+            padding: 14px 16px;
+            border-radius: 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         .header {
@@ -30,37 +46,37 @@
             justify-content: space-between;
             align-items: flex-start;
             border-bottom: 2px solid #ef4444;
-            padding-bottom: 16px;
-            margin-bottom: 20px;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
         }
         .brand-title {
-            font-size: 18pt;
+            font-size: 14pt;
             font-weight: 800;
             color: #111827;
-            letter-spacing: -0.5px;
-            margin: 0 0 4px 0;
+            letter-spacing: -0.3px;
+            margin: 0 0 2px 0;
         }
         .brand-subtitle {
-            font-size: 9pt;
-            color: #6b7280;
+            font-size: 8pt;
+            color: #4b5563;
             margin: 0;
-            line-height: 1.4;
+            line-height: 1.3;
         }
         .doc-title-box {
             text-align: right;
         }
         .doc-title {
-            font-size: 15pt;
+            font-size: 12pt;
             font-weight: 800;
             color: #dc2626;
-            margin: 0 0 4px 0;
+            margin: 0 0 2px 0;
             text-transform: uppercase;
         }
         .doc-badge {
             display: inline-block;
-            padding: 4px 10px;
+            padding: 2px 6px;
             border-radius: 4px;
-            font-size: 9.5pt;
+            font-size: 8pt;
             font-weight: 700;
             text-transform: uppercase;
             background: #fee2e2;
@@ -69,38 +85,48 @@
         }
         .alert-box {
             background: #fef2f2;
-            border: 1px solid #fca5a5;
-            border-radius: 8px;
-            padding: 14px 16px;
+            border: 1px solid #fecaca;
+            border-left: 4px solid #ef4444;
+            border-radius: 5px;
+            padding: 8px 10px;
+            margin-bottom: 12px;
+            font-size: 8pt;
             color: #991b1b;
-            font-size: 9.5pt;
-            line-height: 1.5;
-            margin-bottom: 20px;
+        }
+        .alert-box strong {
+            font-size: 8.5pt;
+            display: block;
+            margin-bottom: 2px;
         }
         .grid-info {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
+            gap: 10px;
+            margin-bottom: 12px;
         }
         .info-card {
             background: #f9fafb;
             border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            padding: 12px 14px;
+            border-radius: 5px;
+            padding: 8px 10px;
         }
         .info-card h4 {
-            margin: 0 0 8px 0;
-            font-size: 9pt;
+            margin: 0 0 6px 0;
+            font-size: 8pt;
             text-transform: uppercase;
             color: #6b7280;
             letter-spacing: 0.5px;
+            border-bottom: 1px dashed #e5e7eb;
+            padding-bottom: 3px;
         }
         .info-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 4px;
-            font-size: 9.5pt;
+            margin-bottom: 3px;
+            font-size: 8.5pt;
+        }
+        .info-row:last-child {
+            margin-bottom: 0;
         }
         .info-label {
             color: #6b7280;
@@ -108,27 +134,29 @@
         .info-value {
             font-weight: 600;
             color: #111827;
+            text-align: right;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
         th {
-            background: #f3f4f6;
-            color: #374151;
-            font-size: 9pt;
+            background: #fef2f2;
+            color: #991b1b;
+            font-size: 8pt;
             font-weight: 700;
             text-transform: uppercase;
-            padding: 10px 12px;
-            border-top: 1px solid #e5e7eb;
-            border-bottom: 1px solid #e5e7eb;
+            padding: 6px 8px;
+            border-top: 1px solid #fecaca;
+            border-bottom: 1px solid #fecaca;
             text-align: left;
         }
         td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #e5e7eb;
-            font-size: 9.5pt;
+            padding: 6px 8px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 8.5pt;
+            vertical-align: top;
         }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
@@ -136,50 +164,70 @@
         .signatures {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 20px;
+            gap: 10px;
             text-align: center;
-            margin-top: 40px;
+            margin-top: 18px;
             page-break-inside: avoid;
         }
         .signature-box {
-            padding-top: 60px;
+            padding-top: 42px;
             border-top: 1px dashed #9ca3af;
-            font-size: 9pt;
+            font-size: 8pt;
             font-weight: 600;
+            color: #374151;
         }
         .signature-title {
-            font-size: 8.5pt;
+            font-size: 7.5pt;
             color: #6b7280;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
+            text-transform: uppercase;
         }
         .action-bar {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            top: 12px;
+            right: 12px;
             display: flex;
-            gap: 10px;
-            z-index: 100;
+            align-items: center;
+            gap: 8px;
+            background: #111827;
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            z-index: 999;
+            color: #fff;
+            font-size: 11px;
+        }
+        .action-select {
+            background: #1f2937;
+            color: #fff;
+            border: 1px solid #374151;
+            padding: 5px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            outline: none;
+            cursor: pointer;
         }
         .btn {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 10px 18px;
-            border-radius: 8px;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 6px;
             font-weight: 700;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
             text-decoration: none;
             border: none;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            transition: opacity 0.2s;
         }
+        .btn:hover { opacity: 0.9; }
         .btn-print { background: #dc2626; color: #fff; }
         .btn-wa { background: #10b981; color: #fff; }
-        .btn-close { background: #e5e7eb; color: #374151; }
+        .btn-close { background: #374151; color: #e5e7eb; }
 
         @media print {
-            body { background: #fff; padding: 0; }
-            .container { box-shadow: none; padding: 0; max-width: 100%; }
+            body { background: #fff; padding: 0; margin: 0; }
+            .container { box-shadow: none; padding: 0; max-width: 100% !important; border-radius: 0; }
             .action-bar { display: none !important; }
         }
     </style>
@@ -187,154 +235,139 @@
 <body>
 
 <div class="action-bar">
+    <div style="font-weight: 600; margin-right: 4px;">Kertas:</div>
+    <select class="action-select" onchange="location.href='?paper='+this.value+'&orient={{ $orientation }}&margin={{ $marginMm }}'">
+        <option value="a5" {{ $paperSize === 'a5' ? 'selected' : '' }}>A5 (Setengah A4)</option>
+        <option value="a4" {{ $paperSize === 'a4' ? 'selected' : '' }}>A4 Standar</option>
+    </select>
+    <select class="action-select" onchange="location.href='?paper={{ $paperSize }}&orient='+this.value+'&margin={{ $marginMm }}'">
+        <option value="portrait" {{ $orientation === 'portrait' ? 'selected' : '' }}>Potret</option>
+        <option value="landscape" {{ $orientation === 'landscape' ? 'selected' : '' }}>Lanskap</option>
+    </select>
     @if($po->supplier?->telepon)
         <a href="{{ $po->generateWaPenolakanUrl() }}" target="_blank" class="btn btn-wa">
-            💬 Kirim WA Penolakan
+            💬 WA
         </a>
     @endif
     <button onclick="window.print()" class="btn btn-print">
-        🖨️ Cetak Berita Acara
+        🖨️ Cetak
     </button>
     <button onclick="window.close()" class="btn btn-close">
-        ✕ Tutup
+        ✕
     </button>
 </div>
 
 <div class="container">
-    <!-- Header -->
-    <div class="header">
-        <div>
-            <div class="brand-title">{{ $po->gudangTujuan?->cabang?->nama ?? 'UTE PARTS ERP' }}</div>
-            <p class="brand-subtitle">
-                Departemen Logistik &amp; Quality Control Gudang<br>
-                {{ $po->gudangTujuan?->cabang?->alamat ?? 'Kantor Pusat & Gudang Utama' }}<br>
-                Telp: {{ $po->gudangTujuan?->cabang?->telepon ?? '-' }}
-            </p>
-        </div>
-        <div class="doc-title-box">
-            <h1 class="doc-title">Berita Acara Penolakan</h1>
-            <div style="font-family: monospace; font-size: 11pt; color: #4b5563; margin-bottom: 4px;">
-                Ref. PO: <strong>{{ $po->no_po }}</strong>
+    @if($showKop)
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <div class="brand-title">{{ $po->gudangTujuan?->cabang?->nama ?? 'UTE PARTS ERP' }}</div>
+                <p class="brand-subtitle">
+                    Gudang &amp; Distribusi Sparepart Ponsel<br>
+                    {{ $po->gudangTujuan?->cabang?->alamat ?? 'Kantor Pusat & Gudang Utama' }}<br>
+                    Telp: {{ $po->gudangTujuan?->cabang?->telepon ?? '-' }}
+                </p>
             </div>
-            <span class="doc-badge">BARANG DITOLAK / BATAL</span>
+            <div class="doc-title-box">
+                <h1 class="doc-title">Berita Acara Penolakan</h1>
+                <div style="font-family: monospace; font-size: 11pt; font-weight: bold; margin-bottom: 2px;">
+                    PO: {{ $po->no_po }}
+                </div>
+                <span class="doc-badge">DITOLAK / RETUR PENUH</span>
+            </div>
         </div>
-    </div>
+    @endif
 
-    <!-- Pernyataan Penolakan -->
+    <!-- Alert Box -->
     <div class="alert-box">
-        <strong>PEMBERITAHUAN RESMI PENOLAKAN PENERIMAAN BARANG:</strong><br>
-        Berdasarkan hasil pemeriksaan fisik dan Quality Control saat pengiriman tiba di gudang kami, dinyatakan bahwa kiriman untuk pesanan tersebut di bawah ini <strong>TIDAK DAPAT DITERIMA (DITOLAK)</strong> dan seluruh fisik barang dikembalikan kepada pihak Supplier / Ekspedisi pengirim.
+        <strong>Pemberitahuan Resmi Penolakan Barang:</strong>
+        Barang kiriman dari Purchase Order di bawah ini tidak dapat diterima ke dalam persediaan gudang karena tidak memenuhi standar fisik / segel / spesifikasi teknis dan telah dikembalikan secara penuh ke supplier / kurir pengantar.
     </div>
 
     <!-- Info Grid -->
     <div class="grid-info">
         <div class="info-card">
-            <h4>Data Supplier / Pengirim</h4>
+            <h4>Pihak Supplier (Pengirim)</h4>
             <div class="info-row">
                 <span class="info-label">Nama Supplier:</span>
                 <span class="info-value">{{ $po->supplier?->nama ?? '-' }}</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Telepon / WhatsApp:</span>
-                <span class="info-value">{{ $po->supplier?->telepon ?? '-' }}</span>
+                <span class="info-label">Kontak:</span>
+                <span class="info-value">{{ $po->supplier?->kontak ?? '-' }}</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Alamat Supplier:</span>
-                <span class="info-value" style="max-width: 220px; text-align: right;">{{ $po->supplier?->alamat ?? '-' }}</span>
+                <span class="info-label">Telp / WA:</span>
+                <span class="info-value">{{ $po->supplier?->telepon ?? '-' }}</span>
             </div>
         </div>
 
         <div class="info-card">
-            <h4>Detail Dokumen &amp; Lokasi</h4>
-            <div class="info-row">
-                <span class="info-label">Nomor PO:</span>
-                <span class="info-value" style="font-family: monospace;">{{ $po->no_po }}</span>
-            </div>
+            <h4>Detail Verifikasi Gudang</h4>
             <div class="info-row">
                 <span class="info-label">Tanggal Penolakan:</span>
-                <span class="info-value">{{ now()->format('d/m/Y H:i') }} WIB</span>
+                <span class="info-value">{{ date('d/m/Y H:i') }}</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Gudang Pemeriksa:</span>
+                <span class="info-label">Lokasi Gudang:</span>
                 <span class="info-value">{{ $po->gudangTujuan?->nama ?? '-' }}</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Status Sistem:</span>
-                <span class="info-value" style="color: #dc2626;">DIBATALKAN</span>
+                <span class="info-label">Alasan Utama:</span>
+                <span class="info-value" style="color: #dc2626;">{{ $po->catatan ?: 'Fisik rusak / segel cacat' }}</span>
             </div>
         </div>
     </div>
 
-    <!-- Catatan Alasan Penolakan -->
-    <div style="background: #fff; border: 2px solid #ef4444; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px;">
-        <h4 style="margin: 0 0 6px 0; color: #dc2626; font-size: 10pt; text-transform: uppercase;">Alasan Penolakan Kiriman:</h4>
-        <div style="font-size: 11pt; font-weight: 600; color: #111827; line-height: 1.5;">
-            {{ $po->catatan ?: 'Ketidaksesuaian fisik barang, kemasan rusak, atau spesifikasi tidak sesuai dengan Purchase Order saat diterima di pintu gudang.' }}
-        </div>
-    </div>
-
-    <!-- Daftar Item Terkait -->
-    <h4 style="margin: 0 0 8px 0; font-size: 10pt; text-transform: uppercase; color: #374151;">Daftar Item dalam Purchase Order Terkait:</h4>
+    <!-- Items Table -->
     <table>
         <thead>
             <tr>
-                <th style="width: 30px;" class="text-center">No</th>
-                <th>Nama Part / Produk</th>
-                <th style="width: 120px;">SKU</th>
-                <th style="width: 80px;" class="text-right">Qty PO</th>
-                <th style="width: 70px;">Satuan</th>
-                <th style="width: 120px;" class="text-center">Status Barang</th>
+                <th style="width: 25px;" class="text-center">No</th>
+                <th>Item Produk / SKU yang Ditolak</th>
+                <th style="width: 70px;" class="text-center">Qty PO</th>
+                <th style="width: 80px;" class="text-center">Status</th>
             </tr>
         </thead>
         <tbody>
-            @forelse($po->items as $idx => $item)
-                @php
-                    $prod = $item->produk;
-                @endphp
+            @foreach($po->items as $index => $item)
                 <tr>
-                    <td class="text-center">{{ $idx + 1 }}</td>
+                    <td class="text-center tabular">{{ $index + 1 }}</td>
                     <td>
-                        <div style="font-weight: 700; color: #111827;">{{ $prod?->nama ?? ('Produk #' . $item->produk_id) }}</div>
+                        <div style="font-weight: 700; color: #111827;">{{ $item->produk?->nama ?? '-' }}</div>
+                        <div style="font-size: 7.5pt; font-family: monospace; color: #6b7280;">
+                            SKU: {{ $item->skuVariant?->sku ?? $item->produk?->kode ?? '-' }}
+                        </div>
                     </td>
-                    <td style="font-family: monospace;">{{ $prod?->sku ?? '-' }}</td>
-                    <td class="text-right tabular" style="font-weight: 700;">{{ number_format($item->jumlah) }}</td>
-                    <td>{{ $item->satuan ?: ($prod?->satuan ?: 'pcs') }}</td>
+                    <td class="text-center tabular font-bold">
+                        {{ $item->jumlah }} {{ $item->satuan ?? 'pcs' }}
+                    </td>
                     <td class="text-center">
-                        <span style="color: #dc2626; font-weight: 700; font-size: 8.5pt;">DITOLAK KEMBALI</span>
+                        <span style="color: #dc2626; font-weight: 700; font-size: 8pt;">DITOLAK 100%</span>
                     </td>
                 </tr>
-            @empty
-                <tr>
-                    <td colspan="6" class="text-center" style="padding: 20px; color: #9ca3af;">Tidak ada item data.</td>
-                </tr>
-            @endforelse
+            @endforeach
         </tbody>
     </table>
 
-    <!-- Keterangan Finansial & Administrasi -->
-    <div style="font-size: 8.5pt; color: #4b5563; line-height: 1.5; margin-bottom: 24px; border-left: 3px solid #ef4444; padding-left: 10px;">
-        <strong>Catatan Administrasi &amp; Keuangan:</strong><br>
-        1. Dengan diterbitkannya Berita Acara ini, dokumen PO berstatus <strong>DIBATALKAN</strong>.<br>
-        2. <strong>Tidak ada barang yang masuk</strong> ke stok fisik maupun sistem inventori gudang Ute Parts.<br>
-        3. <strong>Tidak ada Utang Usaha (AP)</strong> atau kewajiban pembayaran yang timbul atas pengiriman ini.<br>
-        4. Supplier wajib menarik kembali barang atau melakukan pengiriman ulang unit pengganti yang sesuai melalui penerbitan PO baru.
-    </div>
-
-    <!-- Signatures -->
-    <div class="signatures">
-        <div>
-            <div class="signature-title">Pemeriksa Gudang (QC / Penerima)</div>
-            <div class="signature-box">( ............................................ )</div>
+    @if($showTtd)
+        <!-- Signatures -->
+        <div class="signatures">
+            <div>
+                <div class="signature-title">Petugas QC Gudang</div>
+                <div class="signature-box">Staff Pemeriksa Fisik</div>
+            </div>
+            <div>
+                <div class="signature-title">Mengetahui Kepala Gudang</div>
+                <div class="signature-box">Kepala Cabang / Gudang</div>
+            </div>
+            <div>
+                <div class="signature-title">Kurir / Supir Ekspedisi</div>
+                <div class="signature-box">Nama Jelas &amp; Tanda Tangan</div>
+            </div>
         </div>
-        <div>
-            <div class="signature-title">Mengetahui (Kepala Gudang)</div>
-            <div class="signature-box">( ............................................ )</div>
-        </div>
-        <div>
-            <div class="signature-title">Pembawa Barang (Kurir / Ekspedisi)</div>
-            <div class="signature-box">( ............................................ )</div>
-        </div>
-    </div>
+    @endif
 </div>
 
 </body>

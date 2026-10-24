@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
@@ -172,6 +173,9 @@ class GrnTab extends Component
         $this->activeItemQty = '';
         $this->grnForm = [
             'po_id' => $poId,
+            'is_cash' => $po->metode_bayar === 'tunai',
+            'akun_kas_bank' => $po->akun_kas_bank ?: '110-01',
+            'dibayar_oleh' => auth()->user()?->name ?? 'Kasir / Staf',
             'item_qty' => $itemForms,
             'catatan' => '',
         ];
@@ -409,6 +413,8 @@ class GrnTab extends Component
 
         $this->validate([
             'grnForm.po_id' => 'required|exists:purchase_order,id',
+            'grnForm.akun_kas_bank' => 'nullable|string',
+            'grnForm.dibayar_oleh' => 'nullable|string|max:100',
             'grnForm.item_qty' => 'required|array|min:1',
             'grnForm.item_qty.*.produk_id' => 'required|integer',
             'grnForm.item_qty.*.qty_received' => 'required|integer|min:0',
@@ -459,7 +465,9 @@ class GrnTab extends Component
                 auth()->id(),
                 $snPerProduk,
                 $hargaPerProduk,
-                $itemRakId
+                $itemRakId,
+                $this->grnForm['akun_kas_bank'] ?? null,
+                $this->grnForm['dibayar_oleh'] ?? null
             );
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
@@ -757,6 +765,7 @@ class GrnTab extends Component
             'countDitolak' => $countDitolak,
             'countTotal' => $countTotal,
             'countPoSiapTerima' => $countPoSiapTerima,
+            'akunKasBankList' => AkunCOA::whereIn('kelompok', ['kas', 'bank'])->where('is_active', true)->orderBy('kode')->get(),
         ]);
     }
 }

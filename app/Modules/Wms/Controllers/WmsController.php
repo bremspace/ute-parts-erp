@@ -734,7 +734,10 @@ class WmsController extends Controller
                 'gudang_tujuan_id' => $request->gudang_tujuan_id,
                 'status' => 'draft',
                 'metode_bayar' => $request->metode_bayar,
-                'jatuh_tempo' => $request->jatuh_tempo ?? now()->addDays((int) (Supplier::find($request->supplier_id)?->termin_hari ?? 30))->toDateString(),
+                'akun_kas_bank' => $request->metode_bayar === 'tunai' ? ($request->akun_kas_bank ?? '110-01') : null,
+                'jatuh_tempo' => $request->metode_bayar === 'kredit'
+                    ? ($request->jatuh_tempo ?? now()->addDays((int) (Supplier::find($request->supplier_id)?->termin_hari ?? 30))->toDateString())
+                    : null,
                 'total' => $total,
                 'total_dibayar' => 0,
                 'catatan' => $request->catatan,

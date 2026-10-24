@@ -32,7 +32,13 @@
                         </td>
                         <td class="py-3.5 px-4 tabular-nums font-bold text-white">Rp {{ number_format($po->total, 0, ',', '.') }}</td>
                         <td class="py-3.5 px-4 tabular-nums text-up-mint">Rp {{ number_format($po->total_dibayar, 0, ',', '.') }}</td>
-                        <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $po->jatuh_tempo?->format('d/m/Y') ?? '-' }}</td>
+                        <td class="py-3.5 px-4 text-ink-300 tabular-nums">
+                            @if($po->metode_bayar === 'tunai')
+                                <span class="px-2 py-0.5 rounded-md bg-up-mint/10 text-up-mint font-semibold text-[11px]">Tunai / COD</span>
+                            @else
+                                {{ $po->jatuh_tempo?->format('d/m/Y') ?? '-' }}
+                            @endif
+                        </td>
                         <td class="py-3.5 px-4"><x-prism.status-pill :status="str_replace('_','-',$po->status)" /></td>
                         <td class="py-3.5 px-4">
                             <div class="flex items-center gap-1 flex-wrap min-w-[140px]">
@@ -528,7 +534,12 @@
                             </span>
                         </div>
                         <p class="text-xs text-ink-400 mt-1">
-                            Dibuat: {{ $detailPo->created_at->format('d/m/Y H:i') }} · Jatuh Tempo: {{ $detailPo->jatuh_tempo?->format('d/m/Y') ?? '-' }}
+                            Dibuat: {{ $detailPo->created_at->format('d/m/Y H:i') }} · 
+                            @if($detailPo->metode_bayar === 'tunai')
+                                Pembayaran: <span class="text-up-mint font-semibold">Tunai Langsung (Tanpa Jatuh Tempo)</span>
+                            @else
+                                Jatuh Tempo: {{ $detailPo->jatuh_tempo?->format('d/m/Y') ?? '-' }}
+                            @endif
                         </p>
                     </div>
                     <button wire:click="tutupDetailPo" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
