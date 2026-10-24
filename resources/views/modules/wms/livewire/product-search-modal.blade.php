@@ -30,16 +30,16 @@
                  x-transition:leave="ease-in duration-100"
                  x-transition:leave-start="opacity-100 scale-100"
                  x-transition:leave-end="opacity-0 scale-[0.97]"
-                 class="relative transform overflow-hidden rounded-3xl glass-panel border border-white/10 text-left shadow-2xl transition-[opacity,transform] sm:my-8 sm:w-full sm:max-w-3xl bg-[#0e1017]/95 text-white">
+                 class="relative transform overflow-hidden rounded-3xl glass-panel border border-black/10 dark:border-white/10 text-left shadow-2xl transition-[opacity,transform] sm:my-8 sm:w-full sm:max-w-3xl bg-white/95 dark:bg-[#0e1017]/95 text-ink-900 dark:text-white">
 
                 <!-- Header -->
-                <div class="px-6 pt-6 pb-4 border-b border-white/10 flex items-center justify-between">
+                <div class="px-6 pt-6 pb-4 border-b border-black/10 dark:border-white/10 flex items-center justify-between">
                     <div>
-                        <h3 class="text-base font-bold text-white flex items-center gap-2" id="modal-title">
+                        <h3 class="text-base font-bold text-ink-900 dark:text-white flex items-center gap-2" id="modal-title">
                             <span>Cari Produk</span>
                             <span class="text-xs px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary font-mono font-medium">Global</span>
                         </h3>
-                        <p class="text-xs text-ink-400 mt-0.5">
+                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
                             Cari produk berdasarkan nama, barcode, SKU, atau kompatibilitas tipe HP.
                         </p>
                     </div>
@@ -47,7 +47,7 @@
                         <!-- Tombol Set Filter Preferensi -->
                         <button type="button"
                                 wire:click="$toggle('showCustomFilterSettings')"
-                                class="px-2.5 py-1.5 rounded-xl border border-white/10 text-xs font-medium text-ink-300 hover:text-white hover:bg-white/5 transition flex items-center gap-1.5"
+                                class="px-2.5 py-1.5 rounded-xl border border-black/10 dark:border-white/10 text-xs font-medium text-ink-700 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-1.5 cursor-pointer"
                                 title="Atur checkbox filter kustom">
                             <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
@@ -57,7 +57,7 @@
                         <button type="button"
                                 wire:click="closeModal"
                                 @click="show = false"
-                                class="p-1.5 rounded-lg text-ink-400 hover:text-white hover:bg-white/5 transition">
+                                class="p-1.5 rounded-lg text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -67,47 +67,47 @@
 
                 <!-- Custom Filter Preferences Drawer / Accordion -->
                 @if($showCustomFilterSettings)
-                    <div class="px-6 py-3 bg-white/[0.03] border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+                    <div class="px-6 py-3 bg-black/[0.02] dark:bg-white/[0.03] border-b border-black/10 dark:border-white/10 flex flex-wrap items-center justify-between gap-3">
                         <div class="flex items-center gap-3 flex-wrap">
-                            <span class="text-xs font-semibold text-ink-300">Tampilkan Filter:</span>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-kategori-{{ $visibleFilters['kategori'] ? '1' : '0' }}" wire:click="toggleFilter('kategori')" @checked($visibleFilters['kategori']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <span class="text-xs font-semibold text-ink-700 dark:text-ink-300">Tampilkan Filter:</span>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-kategori-{{ $visibleFilters['kategori'] ? '1' : '0' }}" wire:click="toggleFilter('kategori')" @checked($visibleFilters['kategori']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Kategori</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-brand-{{ $visibleFilters['brand'] ? '1' : '0' }}" wire:click="toggleFilter('brand')" @checked($visibleFilters['brand']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-brand-{{ $visibleFilters['brand'] ? '1' : '0' }}" wire:click="toggleFilter('brand')" @checked($visibleFilters['brand']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Brand</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-kualitas-{{ $visibleFilters['kualitas'] ? '1' : '0' }}" wire:click="toggleFilter('kualitas')" @checked($visibleFilters['kualitas']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-kualitas-{{ $visibleFilters['kualitas'] ? '1' : '0' }}" wire:click="toggleFilter('kualitas')" @checked($visibleFilters['kualitas']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Kualitas</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-tipe_hp-{{ $visibleFilters['tipe_hp'] ? '1' : '0' }}" wire:click="toggleFilter('tipe_hp')" @checked($visibleFilters['tipe_hp']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-tipe_hp-{{ $visibleFilters['tipe_hp'] ? '1' : '0' }}" wire:click="toggleFilter('tipe_hp')" @checked($visibleFilters['tipe_hp']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Tipe HP</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-brand_kompatibel-{{ $visibleFilters['brand_kompatibel'] ? '1' : '0' }}" wire:click="toggleFilter('brand_kompatibel')" @checked($visibleFilters['brand_kompatibel']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-brand_kompatibel-{{ $visibleFilters['brand_kompatibel'] ? '1' : '0' }}" wire:click="toggleFilter('brand_kompatibel')" @checked($visibleFilters['brand_kompatibel']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Brand Kompatibel</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-model_kompatibel-{{ $visibleFilters['model_kompatibel'] ? '1' : '0' }}" wire:click="toggleFilter('model_kompatibel')" @checked($visibleFilters['model_kompatibel']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-model_kompatibel-{{ $visibleFilters['model_kompatibel'] ? '1' : '0' }}" wire:click="toggleFilter('model_kompatibel')" @checked($visibleFilters['model_kompatibel']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Model Kompatibel</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-kondisi-{{ $visibleFilters['kondisi'] ? '1' : '0' }}" wire:click="toggleFilter('kondisi')" @checked($visibleFilters['kondisi']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-kondisi-{{ $visibleFilters['kondisi'] ? '1' : '0' }}" wire:click="toggleFilter('kondisi')" @checked($visibleFilters['kondisi']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Kondisi</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-satuan-{{ $visibleFilters['satuan'] ? '1' : '0' }}" wire:click="toggleFilter('satuan')" @checked($visibleFilters['satuan']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-satuan-{{ $visibleFilters['satuan'] ? '1' : '0' }}" wire:click="toggleFilter('satuan')" @checked($visibleFilters['satuan']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Satuan</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-abc_class-{{ $visibleFilters['abc_class'] ? '1' : '0' }}" wire:click="toggleFilter('abc_class')" @checked($visibleFilters['abc_class']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-abc_class-{{ $visibleFilters['abc_class'] ? '1' : '0' }}" wire:click="toggleFilter('abc_class')" @checked($visibleFilters['abc_class']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Kelas ABC</span>
                             </label>
-                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
-                                <input type="checkbox" wire:key="psm-chk-stok-{{ $visibleFilters['stok'] ? '1' : '0' }}" wire:click="toggleFilter('stok')" @checked($visibleFilters['stok']) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-800 dark:text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="psm-chk-stok-{{ $visibleFilters['stok'] ? '1' : '0' }}" wire:click="toggleFilter('stok')" @checked($visibleFilters['stok']) class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Hanya Ready Stok</span>
                             </label>
                         </div>
@@ -168,13 +168,13 @@
                             <input type="text"
                                    wire:model.live.debounce.250ms="search"
                                    wire:keydown.enter="scanBarcodeDirect($event.target.value)"
-                                   class="w-full pl-10 pr-10 py-2.5 rounded-xl glass-input text-xs sm:text-sm text-white placeholder-ink-400 min-h-[44px] focus:ring-1 focus:ring-up-primary"
+                                   class="w-full pl-10 pr-10 py-2.5 rounded-xl glass-input text-xs sm:text-sm text-ink-900 dark:text-white bg-white/90 dark:bg-ink-900/90 border border-black/10 dark:border-white/10 placeholder-ink-400 min-h-[44px] focus:ring-1 focus:ring-up-primary"
                                    placeholder="Ketik nama, barcode, SKU, tipe HP, atau scan..."
                                    autofocus>
                             @if(!empty($search))
                                 <button type="button"
                                         wire:click="$set('search', '')"
-                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-ink-400 hover:text-white cursor-pointer">
+                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer">
                                     ✕
                                 </button>
                             @endif

@@ -365,7 +365,7 @@
 
                         <template x-for="(pt, idx) in points" :key="idx">
                             <g>
-                                <rect :x="pt.x - 10" y="0" width="20" height="{{ $svgH }}" fill="transparent" class="cursor-pointer" x-on:mouseenter="setActive(idx)" />
+                                <rect :x="pt.x - 10" y="0" width="20" height="{{ $svgH }}" fill="transparent" class="cursor-pointer" x-on:mouseenter="setActive(idx)" x-on:touchstart.passive="setActive(idx)" />
                                 <line x1="0" y1="{{ $padY }}" x2="0" y2="{{ $svgH - $padY }}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="2 2" :transform="'translate(' + pt.x + ', 0)'" x-show="activeIdx === idx" />
                                 <circle :cx="pt.x" :cy="pt.y" r="5" fill="#4F46E5" stroke="#ffffff" stroke-width="2" x-show="activeIdx === idx" />
                             </g>

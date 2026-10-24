@@ -190,7 +190,7 @@
                             </div>
 
                             <div class="pt-2.5 mt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-2">
-                                <button type="button" wire:click="bukaUbahRak({{ $stok->id }})" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 text-[10px] font-semibold border border-white/10 cursor-pointer">
+                                <button type="button" wire:click="bukaUbahRak({{ $stok->id }})" class="px-2 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 text-[10px] font-semibold border border-black/10 dark:border-white/10 cursor-pointer">
                                     Ubah Rak
                                 </button>
                                 @can('lihat-audit-log')
@@ -216,40 +216,40 @@
     <!-- MODAL: ATUR RAK [T-12] -->
     @if($showRakModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-lg glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">{{ $editRakId ? 'Edit Rak (Bin)' : 'Manajemen Rak (Bin)' }}</h3>
-                    <button wire:click="$set('showRakModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+            <div class="w-full max-w-lg glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-black/10 dark:border-white/10">
+                    <h3 class="text-lg font-bold text-ink-900 dark:text-white">{{ $editRakId ? 'Edit Rak (Bin)' : 'Manajemen Rak (Bin)' }}</h3>
+                    <button wire:click="$set('showRakModal', false)" class="text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer">✕</button>
                 </div>
 
                 <div class="space-y-3 mb-4">
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1">Gudang *</label>
-                            <select wire:model="rakForm.gudang_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                            <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Gudang *</label>
+                            <select wire:model="rakForm.gudang_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
                                 @foreach($gudangs as $g)
-                                    <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }}</option>
+                                    <option value="{{ $g->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $g->nama }}</option>
                                 @endforeach
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1">Kode Rak *</label>
-                            <input type="text" wire:model="rakForm.kode" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" placeholder="RAK-A1" />
+                            <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Kode Rak *</label>
+                            <input type="text" wire:model="rakForm.kode" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="RAK-A1" />
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1">Nama / Label</label>
-                            <input type="text" wire:model="rakForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" placeholder="Rak LCD & Baterai" />
+                            <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Nama / Label</label>
+                            <input type="text" wire:model="rakForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="Rak LCD & Baterai" />
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1">Zona</label>
-                            <input type="text" wire:model="rakForm.zona" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" placeholder="A" />
+                            <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Zona</label>
+                            <input type="text" wire:model="rakForm.zona" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="A" />
                         </div>
                     </div>
                     <div class="flex gap-2">
                         @if($editRakId)
-                            <button type="button" wire:click="$set('editRakId', null); $set('rakForm', ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''])" class="px-4 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                            <button type="button" wire:click="$set('editRakId', null); $set('rakForm', ['gudang_id' => null, 'nama' => '', 'kode' => '', 'zona' => ''])" class="px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                         @endif
                         <button wire:click="simpanRak" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">
                             {{ $editRakId ? '💾 Simpan Perubahan Rak' : '+ Tambah Rak' }}
@@ -258,16 +258,16 @@
                 </div>
 
                 <div class="space-y-2">
-                    <p class="text-xs font-bold text-ink-300 uppercase">Rak Terdaftar</p>
+                    <p class="text-xs font-bold text-ink-700 dark:text-ink-300 uppercase">Rak Terdaftar</p>
                     @forelse($raks as $rk)
-                        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-white/[0.03] border border-white/5 text-xs">
+                        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/5 text-xs">
                             <div class="flex items-center gap-2">
                                 <span class="font-mono text-up-primary font-bold">{{ $rk->kode }}</span>
-                                <span class="text-ink-200">{{ $rk->nama }}</span>
-                                <span class="text-ink-400 text-[10px]">({{ $rk->gudang?->nama }})</span>
+                                <span class="text-ink-800 dark:text-ink-200">{{ $rk->nama }}</span>
+                                <span class="text-ink-500 dark:text-ink-400 text-[10px]">({{ $rk->gudang?->nama }})</span>
                             </div>
                             <div class="flex items-center gap-1">
-                                <button type="button" wire:click="editRak({{ $rk->id }})" class="p-1 rounded bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white text-xs cursor-pointer" title="Edit Rak">
+                                <button type="button" wire:click="editRak({{ $rk->id }})" class="p-1 rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer" title="Edit Rak">
                                     ✏️
                                 </button>
                                 <button type="button" wire:click="hapusRak({{ $rk->id }})" wire:confirm="Yakin ingin menghapus rak '{{ $rk->kode }}'?" class="p-1 rounded bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 text-xs cursor-pointer" title="Hapus Rak">
@@ -286,29 +286,29 @@
     <!-- MODAL: UBAH LOKASI RAK STOK ITEM -->
     @if($showUbahRakModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
-                <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+            <div class="w-full max-w-md glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-black/10 dark:border-white/10">
                     <div>
-                        <h3 class="text-base font-bold text-white">Atur Lokasi Rak</h3>
-                        <p class="text-xs text-ink-400">{{ $ubahRakProdukNama }} — {{ $ubahRakGudangNama }}</p>
+                        <h3 class="text-base font-bold text-ink-900 dark:text-white">Atur Lokasi Rak</h3>
+                        <p class="text-xs text-ink-500 dark:text-ink-400">{{ $ubahRakProdukNama }} — {{ $ubahRakGudangNama }}</p>
                     </div>
-                    <button wire:click="$set('showUbahRakModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                    <button wire:click="$set('showUbahRakModal', false)" class="text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer">✕</button>
                 </div>
 
                 <div class="space-y-4 mb-5">
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Pilih Rak / Bin Penempatan</label>
-                        <select wire:model="selectedRakId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono">
-                            <option value="" class="bg-ink-900">— Tanpa Rak (Kosong) —</option>
+                        <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Pilih Rak / Bin Penempatan</label>
+                        <select wire:model="selectedRakId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                            <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">— Tanpa Rak (Kosong) —</option>
                             @foreach($ubahRakPilihan as $r)
-                                <option value="{{ $r['id'] }}" class="bg-ink-900">{{ $r['nama'] }} ({{ $r['kode'] }})</option>
+                                <option value="{{ $r['id'] }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $r['nama'] }} ({{ $r['kode'] }})</option>
                             @endforeach
                         </select>
                     </div>
                 </div>
 
                 <div class="flex gap-3">
-                    <button wire:click="$set('showUbahRakModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="$set('showUbahRakModal', false)" class="flex-1 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
                     <button wire:click="simpanUbahRak" class="flex-1 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer shadow-lg shadow-up-primary/25">Simpan Lokasi</button>
                 </div>
             </div>

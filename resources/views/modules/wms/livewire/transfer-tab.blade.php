@@ -66,9 +66,9 @@
 
     <!-- MODAL: BUAT TRANSFER BARU [T-41] -->
     @if($showTransferModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
             <form
-                class="w-full max-w-2xl glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative"
+                class="w-full max-w-2xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-4 sm:p-6 rounded-3xl border border-black/10 dark:border-white/10 shadow-2xl relative my-auto max-h-[92vh] flex flex-col"
                 x-data="{
                     stokInfo: {{ \Illuminate\Support\Js::from($transferStokRows) }},
                     errors: {},
@@ -89,16 +89,18 @@
                 }"
                 @submit.prevent="validasiStok() && $wire.saveTransfer()"
             >
-                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-4 border-b border-white/10">
+                <div class="flex items-center justify-between pb-3 sm:pb-4 mb-3 border-b border-black/10 dark:border-white/10 shrink-0">
                     <div>
-                        <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                        <h3 class="text-base sm:text-lg font-bold text-ink-900 dark:text-white flex items-center gap-2">
                             <span>Buat Transfer Antar Gudang</span>
                             <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary border border-up-primary/30">WMS</span>
                         </h3>
-                        <p class="text-[11px] text-ink-400">Pindahkan stok fisik dari gudang asal ke gudang cabang tujuan</p>
+                        <p class="text-[11px] text-ink-500 dark:text-ink-400">Pindahkan stok fisik dari gudang asal ke gudang cabang tujuan</p>
                     </div>
-                    <button type="button" wire:click="$set('showTransferModal', false)" class="p-1.5 rounded-xl text-ink-400 hover:text-white hover:bg-white/5 transition cursor-pointer">✕</button>
+                    <button type="button" wire:click="$set('showTransferModal', false)" class="p-2 rounded-xl text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer text-base font-bold min-w-[36px] min-h-[36px] flex items-center justify-center" title="Batal / Tutup Modal">✕</button>
                 </div>
+
+                <div class="overflow-y-auto flex-1 pr-1 space-y-4">
 
                 <!-- Gudang Asal & Tujuan Selection -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 p-3.5 rounded-2xl bg-white/[0.02] border border-white/5">
@@ -321,29 +323,36 @@
                     @endforeach
                 </div>
 
-                <div class="mb-5">
-                    <label class="block text-xs font-semibold text-ink-300 mb-1.5">Catatan Pengiriman</label>
-                    <textarea wire:model="transferCatatan" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs" placeholder="Misal: Restok darurat LCD iPhone 13..."></textarea>
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Catatan Pengiriman</label>
+                    <textarea wire:model="transferCatatan" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="Misal: Restok darurat LCD iPhone 13..."></textarea>
                 </div>
+            </div>
 
-                <div class="flex gap-3">
-                    <button type="button" wire:click="$set('showTransferModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button type="submit" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px]">Simpan Draft Transfer</button>
-                </div>
-            </form>
-        </div>
-    @endif
+            <div class="flex items-center gap-3 pt-3 border-t border-black/10 dark:border-white/10 mt-3 shrink-0">
+                <button type="button" wire:click="$set('showTransferModal', false)" class="flex-1 py-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs cursor-pointer min-h-[44px] transition active:scale-95 flex items-center justify-center gap-1.5">
+                    <span>✕</span>
+                    <span>Batal / Tutup</span>
+                </button>
+                <button type="submit" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-lg shadow-up-primary/25 cursor-pointer min-h-[44px] transition active:scale-95 flex items-center justify-center gap-1.5">
+                    <span>✓</span>
+                    <span>Simpan Draft Transfer</span>
+                </button>
+            </div>
+        </form>
+    </div>
+@endif
 
     <!-- MODAL: DETAIL TRANSFER & MUTASI STOK -->
     @if($showDetailModal && $selectedTransfer)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-3xl glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative max-h-[90vh] overflow-y-auto space-y-5">
-                <div class="flex items-center justify-between pb-3 border-b border-white/10">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+            <div class="w-full max-w-3xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-4 sm:p-6 rounded-3xl border border-black/10 dark:border-white/10 shadow-2xl relative max-h-[90vh] overflow-y-auto space-y-5 my-auto">
+                <div class="flex items-center justify-between pb-3 border-b border-black/10 dark:border-white/10">
                     <div class="flex items-center gap-3">
-                        <h3 class="text-base font-bold text-white font-mono">{{ $selectedTransfer->no_transfer }}</h3>
+                        <h3 class="text-base font-bold text-ink-900 dark:text-white font-mono">{{ $selectedTransfer->no_transfer }}</h3>
                         <x-prism.status-pill :status="$selectedTransfer->status" />
                     </div>
-                    <button type="button" wire:click="tutupDetail" class="text-ink-400 hover:text-white text-base">✕</button>
+                    <button type="button" wire:click="tutupDetail" class="p-1.5 rounded-xl text-ink-400 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer text-base font-bold">✕</button>
                 </div>
 
                 <!-- Info Header Ringkasan -->

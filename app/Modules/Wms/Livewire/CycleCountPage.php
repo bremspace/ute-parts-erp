@@ -300,8 +300,13 @@ class CycleCountPage extends Component
         }
 
         if ($needUpdate) {
-            $task->update(['sample_items' => $sampleItems]);
+            $task->update([
+                'sample_items' => $sampleItems,
+                'user_id' => $task->user_id ?? auth()->id(),
+            ]);
             $task->refresh();
+        } else {
+            $task->update(['user_id' => $task->user_id ?? auth()->id()]);
         }
 
         $this->selectedTaskId = $taskId;
@@ -336,7 +341,7 @@ class CycleCountPage extends Component
         }
 
         $service = app(CycleCountService::class);
-        $task = $service->hitung($task, $this->fisikPerItem);
+        $task = $service->hitung($task, $this->fisikPerItem, auth()->id());
 
         $this->dispatch('alert', [
             'type' => 'success',

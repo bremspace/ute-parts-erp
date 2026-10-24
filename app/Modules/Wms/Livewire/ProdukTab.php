@@ -2056,9 +2056,19 @@ class ProdukTab extends Component
 
     // Quick action header "Export Master Produk" (dari shell WmsDashboard via $dispatch)
     #[On('wms-export-master')]
-    public function openExportMasterModal(string $format = 'xlsx')
+    public function openExportMasterModal($format = 'xlsx')
     {
-        return $this->exportMaster($format);
+        $fmt = is_array($format) ? ($format['format'] ?? 'xlsx') : (is_string($format) ? $format : 'xlsx');
+
+        return $this->exportMaster($fmt);
+    }
+
+    #[On('wms-export-terpilih')]
+    public function openExportTerpilihModal($format = 'xlsx')
+    {
+        $fmt = is_array($format) ? ($format['format'] ?? 'xlsx') : (is_string($format) ? $format : 'xlsx');
+
+        return $this->exportTerpilih($fmt);
     }
 
     public function tutupImportModal()

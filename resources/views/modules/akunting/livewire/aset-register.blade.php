@@ -136,7 +136,7 @@
                     aria-valuenow="{{ $persenSusut }}"
                 >
                     <div
-                        class="h-full rounded-full bg-gradient-to-r from-up-primary via-up-primary to-up-accent transition-[width] duration-500"
+                        class="h-full rounded-full bg-gradient-to-r from-up-primary via-up-primary to-up-accent transition-[width] duration-250 ease-out"
                         style="width: {{ max($persenSusut, $rekap['harga'] > 0 ? 1.5 : 0) }}%"
                     ></div>
                 </div>

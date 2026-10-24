@@ -451,7 +451,7 @@
 
                         <!-- Progress Bar Keseluruhan -->
                         <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                            <div class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-2.5 rounded-full transition-[width] duration-500" style="width: {{ $tiket['progress'][0]['persentase'] }}%"></div>
+                            <div class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-2.5 rounded-full transition-[width] duration-250 ease-out" style="width: {{ $tiket['progress'][0]['persentase'] }}%"></div>
                         </div>
 
                         <!-- Timeline Log Progress -->

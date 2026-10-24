@@ -126,31 +126,32 @@
                 }
             }"
         >
-            <div class="w-full max-w-3xl glass-panel p-4 sm:p-6 rounded-3xl relative my-auto max-h-[92vh] flex flex-col border border-white/10 shadow-2xl">
+            <div class="w-full max-w-3xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-4 sm:p-6 rounded-3xl relative my-auto max-h-[92vh] flex flex-col border border-black/10 dark:border-white/10 shadow-2xl">
                 <!-- Header -->
-                <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10 shrink-0">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-black/10 dark:border-white/10 shrink-0">
                     <div>
-                        <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                        <h3 class="text-base sm:text-lg font-bold text-ink-900 dark:text-white flex items-center gap-2">
                             <span>Input GRN (Penerimaan Barang)</span>
                             <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary border border-up-primary/30">Penerimaan PO</span>
                         </h3>
-                        <p class="text-[11px] text-ink-400">Scan barcode atau ketik qty barang yang diterima dari supplier</p>
+                        <p class="text-[11px] text-ink-500 dark:text-ink-400">Scan barcode atau ketik qty barang yang diterima dari supplier</p>
                     </div>
-                    <button wire:click="cancelGrnModal" class="p-1.5 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition cursor-pointer">✕</button>
+                    <button wire:click="cancelGrnModal" class="p-1.5 text-ink-400 hover:text-ink-900 dark:hover:text-white rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer font-bold">✕</button>
                 </div>
 
                 <div class="overflow-y-auto flex-1 pr-1 space-y-3.5">
                     {{-- Barcode Scanner & Search Bar (Sama seperti Stock Opname) --}}
-                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs font-bold text-ink-200 flex items-center gap-1.5">
+                    <div class="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 space-y-3">
+                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                            <span class="text-xs font-bold text-ink-700 dark:text-ink-200 flex items-center gap-1.5">
                                 <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
                                 <span>Pencarian Cepat & Scan Barcode Penerimaan PO</span>
                             </span>
                             <button
                                 type="button"
                                 wire:click="terimaSemuaItem"
-                                class="text-[10px] text-up-mint hover:underline font-bold cursor-pointer flex items-center gap-1"
+                                class="px-2.5 py-1 rounded-lg bg-up-mint/20 hover:bg-up-mint/30 border border-up-mint/40 text-up-mint text-xs font-bold cursor-pointer flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                                title="Set seluruh item PO ke kuantitas maksimal diterima"
                             >
                                 <span>⚡ Terima Semua Lengkap (Max)</span>
                             </button>
@@ -169,7 +170,7 @@
                                     wire:model.live.debounce.250ms="barcodeInput"
                                     wire:keydown.enter.prevent="prosesBarcode(barcodeInput)"
                                     placeholder="Scan barcode fisik atau ketik nama part / SKU PO..."
-                                    class="w-full pl-9 pr-10 py-2.5 rounded-xl glass-input text-xs sm:text-sm text-white placeholder-ink-400 min-h-[44px] focus:ring-1 focus:ring-up-primary"
+                                    class="w-full pl-9 pr-10 py-2.5 rounded-xl glass-input text-xs sm:text-sm text-ink-900 dark:text-white bg-white/90 dark:bg-ink-900/90 border border-black/10 dark:border-white/10 placeholder-ink-400 min-h-[44px] focus:ring-1 focus:ring-up-primary"
                                     autofocus
                                 />
                                 @if(!empty($barcodeInput))
@@ -465,8 +466,8 @@
                 </div>
 
                 <!-- Footer Modal -->
-                <div class="flex gap-3 pt-3 mt-3 border-t border-white/10 shrink-0">
-                    <button wire:click="cancelGrnModal" class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.97]">Batal</button>
+                <div class="flex gap-3 pt-3 mt-3 border-t border-black/10 dark:border-white/10 shrink-0">
+                    <button wire:click="cancelGrnModal" class="flex-1 py-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.97]">Batal</button>
                     <button wire:click="simpanGrn" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-primary/25 transition active:scale-[0.97]">Simpan GRN</button>
                 </div>
             </div>

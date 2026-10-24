@@ -1,4 +1,12 @@
 <div class="space-y-6">
+    <!-- Navigasi Kembali ke WMS -->
+    <div class="flex items-center justify-between gap-3">
+        <a href="{{ route('wms', ['tab' => 'opname']) }}" wire:navigate class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 border border-black/10 dark:border-white/10 text-xs font-bold transition active:scale-95 cursor-pointer shadow-sm">
+            <span>←</span>
+            <span>Kembali ke WMS (Opname)</span>
+        </a>
+    </div>
+
     <!-- [F3-7] Cycle Count Otomatis (G-18) -->
     <x-prism.glass-card title="Cycle Count Otomatis" subtitle="Jadwal & tugas hitung stok berkala">
         <div class="flex justify-between items-center mb-4">
@@ -312,37 +320,52 @@
         </div>
 
         @foreach($tasks as $task)
-            <div class="p-3 rounded-lg bg-white/[0.03] border border-white/5 mb-2 hover:bg-white/[0.05] transition-colors">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <button
-                            type="button"
-                            wire:click="bukaDetail({{ $task->id }})"
-                            class="font-mono text-sm text-ink-100 font-bold hover:text-teal-400 hover:underline transition-colors text-left cursor-pointer"
-                        >
-                            {{ $task->no_task }}
-                        </button>
-                        <span class="text-xs text-ink-400 ml-2">
+            <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-black/10 dark:border-white/5 mb-2.5 hover:bg-white/[0.05] transition-colors shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                wire:click="bukaDetail({{ $task->id }})"
+                                class="font-mono text-sm text-ink-900 dark:text-ink-100 font-bold hover:text-teal-400 hover:underline transition-colors text-left cursor-pointer"
+                            >
+                                {{ $task->no_task }}
+                            </button>
                             <x-prism.status-pill :status="$task->status" />
-                        </span>
-                        @if($task->target_label)
-                            <span class="text-xs text-ink-400 ml-2">({{ $task->target_label }})</span>
-                        @endif
+                            @if($task->target_label)
+                                <span class="text-xs text-ink-500 dark:text-ink-400 font-medium">({{ $task->target_label }})</span>
+                            @endif
+                        </div>
+                        <div class="flex items-center gap-2 text-[11px] text-ink-500 dark:text-ink-400 flex-wrap">
+                            <span>📅 {{ $task->tanggal ? $task->tanggal->format('d/m/Y') : '-' }}</span>
+                            <span>•</span>
+                            @if($task->user || $task->pembuat)
+                                <span class="inline-flex items-center gap-1 text-teal-400 font-medium">
+                                    <span>👤</span>
+                                    <span>Pelaksana: {{ $task->user?->name ?? $task->pembuat?->name }}</span>
+                                </span>
+                            @else
+                                <span class="text-ink-400 italic">Pelaksana: Belum ada</span>
+                            @endif
+                        </div>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
                         <button
                             type="button"
                             wire:click="bukaDetail({{ $task->id }})"
-                            class="px-2.5 py-1 bg-white/10 hover:bg-white/15 text-white rounded text-xs transition cursor-pointer"
+                            class="px-3 py-1.5 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-900 dark:text-white rounded-xl text-xs font-semibold transition cursor-pointer border border-black/10 dark:border-white/10 min-h-[36px]"
                         >
                             Detail
                         </button>
                         @if($task->status === 'menunggu_count')
-                            <button wire:click="mulaiCount({{ $task->id }})" class="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded text-xs font-semibold cursor-pointer">Input Count</button>
+                            <button wire:click="mulaiCount({{ $task->id }})" class="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold cursor-pointer transition shadow-md shadow-teal-600/20 active:scale-95 min-h-[36px] flex items-center gap-1.5">
+                                <span>📝</span>
+                                <span>Input Count</span>
+                            </button>
                         @elseif($task->status === 'menunggu_approval')
                             @can('wms.approve-opname')
-                                <button wire:click="approveTask({{ $task->id }})" class="px-2.5 py-1 bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs rounded transition shadow-sm cursor-pointer">Approve</button>
-                                <button wire:click="tolakTask({{ $task->id }})" class="px-2.5 py-1 bg-up-red/20 hover:bg-up-red/30 text-up-red font-bold text-xs rounded transition cursor-pointer">Tolak</button>
+                                <button wire:click="approveTask({{ $task->id }})" class="px-3 py-1.5 bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs rounded-xl transition shadow-sm cursor-pointer min-h-[36px]">Approve</button>
+                                <button wire:click="tolakTask({{ $task->id }})" class="px-3 py-1.5 bg-up-red/20 hover:bg-up-red/30 text-up-red font-bold text-xs rounded-xl transition cursor-pointer min-h-[36px]">Tolak</button>
                             @endcan
                         @endif
                     </div>

@@ -627,22 +627,22 @@
     <!-- MODAL: REKOMENDASI PENGADAAN (ABC, ROP, MIN-MAX, MODIFIED JIT) -->
     @if($showProcurementModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
-            <div class="w-full max-w-5xl glass-panel p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+            <div class="w-full max-w-5xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-black/10 dark:border-white/10 shadow-2xl">
                 <!-- Header Modal -->
-                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-black/10 dark:border-white/10 gap-3">
                     <div>
                         <div class="flex items-center gap-2">
                             <span class="text-xl">📦</span>
-                            <h3 class="text-lg font-bold text-white tracking-wide">Rekomendasi Pengadaan Stok (WMS)</h3>
+                            <h3 class="text-lg font-bold text-ink-900 dark:text-white tracking-wide">Rekomendasi Pengadaan Stok (WMS)</h3>
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
                                 ROP • Min-Max • JIT Demand
                             </span>
                         </div>
-                        <p class="text-xs text-ink-400 mt-1">
+                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-1">
                             Rekomendasi terarah &amp; akurat berdasarkan titik pesan kembali (ROP), batas aman min-max, dan kebutuhan servis aktif.
                         </p>
                     </div>
-                    <button wire:click="closeProcurementModal" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                    <button wire:click="closeProcurementModal" class="p-2 text-ink-400 hover:text-ink-900 dark:hover:text-white rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-base font-bold">
                         ✕
                     </button>
                 </div>
@@ -818,7 +818,7 @@
                 </div>
 
                 <!-- Footer Modal -->
-                <div class="flex flex-wrap items-center justify-between pt-4 border-t border-white/10 mt-3 gap-2">
+                <div class="flex flex-wrap items-center justify-between pt-4 border-t border-black/10 dark:border-white/10 mt-3 gap-2">
                     <span class="text-[11px] text-ink-500">
                         Formula ROP &amp; Min-Max disesuaikan otomatis dengan riwayat penjualan kasir &amp; pesanan servis aktif.
                     </span>
@@ -826,12 +826,13 @@
                         @if(($procurementSummary['total_needs_order'] ?? 0) > 0)
                             <button type="button"
                                     wire:click="masukkanSemuaRekomendasiKePo"
-                                    wire:confirm="Masukkan seluruh {{ $procurementSummary['total_needs_order'] }} produk yang perlu order ke dalam draft PO baru?"
-                                    class="px-4 py-2.5 rounded-xl bg-up-accent hover:bg-up-accent/90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-accent/20 active:scale-95 transition">
-                                📦 Masukkan Semua ({{ $procurementSummary['total_needs_order'] }} SKU) ke PO
+                                    wire:confirm="Sistem akan otomatis mengelompokkan barang berdasarkan supplier dan membuat draft PO terpisah untuk masing-masing supplier. Lanjutkan?"
+                                    class="px-4 py-2.5 rounded-xl bg-up-accent hover:bg-up-accent/90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-accent/20 active:scale-95 transition flex items-center gap-1.5">
+                                <span>📦</span>
+                                <span>Buat PO Otomatis per Supplier ({{ $procurementSummary['total_needs_order'] }} SKU)</span>
                             </button>
                         @endif
-                        <button wire:click="closeProcurementModal" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer">
+                        <button wire:click="closeProcurementModal" class="px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-700 dark:text-white font-semibold text-xs cursor-pointer">
                             Tutup
                         </button>
                     </div>

@@ -3,6 +3,66 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-24 — WMS Frontend, Workflow & Contrast Comprehensive Polish (13 Poin User) ✅
+
+- **[T-01 & T-04: Toolbar Filter & Popover Kolom Master Produk]**:
+  - Restrukturisasi flex/grid filter toolbar responsif agar tidak bertumpuk/berantakan saat seluruh checkbox filter diaktifkan.
+  - Perbaikan styling popover filter kolom (`produk-tab.blade.php`) dengan glass-card rapi, high-contrast, dan transisi smooth origin-aware.
+- **[T-02: Export Menu Terpusat di Header WMS]**:
+  - Menghapus box export dari toolbar filter dan memindahkannya ke header atas berdampingan dengan tombol Import.
+  - Mendukung ekspor semua produk (format Excel/CSV) serta ekspor item terpilih (`selectedProdukIds`).
+- **[T-03: Performa Render Master Produk & Gating Saldo Awal]**:
+  - Tombol `+ Saldo Awal` dibatasi ketat hanya untuk produk baru yang belum memiliki stok (`total_stok == 0`) dan belum memiliki histori kartu stok (`stok_logs_count == 0`).
+- **[T-05: Mode Gelap/Terang Adaptif & High Contrast]**:
+  - Menghapus background hardcoded ink-900 tanpa fallback light mode di input, modal dialog, drawer, dan card modul WMS. Teks dan border jelas terbaca di kedua mode.
+- **[T-06: Form Transfer Barang & Kontrol Batal/Tutup]**:
+  - Modal transfer barang kini memiliki tombol Batal dan ikon tutup (✕) eksplisit, layout form scrollable rapi di mobile.
+- **[T-07 & T-08: Pelaksana & Navigasi Cycle Count]**:
+  - Mencatat ID pelaksana penghitung (`user_id = auth()->id()`) saat tugas cycle count dijalankan dan disubmit.
+  - Menambahkan navigasi kembali (← Kembali ke WMS) di halaman cycle count.
+- **[T-09: Rekomendasi Pengadaan & Pemisahan PO per Supplier]**:
+  - Menata UI modal rekomendasi pengadaan (ROP & Min-Max).
+  - Aksi pembuatan PO dari rekomendasi otomatis memisahkan draft PO per supplier secara pintar, mencegah penggabungan produk beda supplier ke 1 PO.
+- **[T-10: Pencarian Produk Global Pembuatan PO]**:
+  - Modal pencarian produk global (`ProductSearchModal`) disempurnakan dengan tema adaptif, kurasi supplier PO, dan auto-close saat produk dipilih.
+- **[T-11: Workflow Input GRN & Tombol Terima Semua Lengkap]**:
+  - Handler `terimaSemuaItem()` dan tombol quick-set kini mensinkronkan kuantitas aktif penerimaan dan seluruh item PO.
+  - Styling kontras tinggi untuk tombol "Terima Semua Lengkap (Max)".
+- **[T-12: Responsivitas Navigasi Tab WMS]**:
+  - Menghilangkan lag pergantian tab pada `wms-dashboard.blade.php`, menambahkan loading indicator transisi instan, dan evaluasi sub-modul reaktif.
+- **[T-13: Workflow Retur Pembelian & Approval]**:
+  - Menambahkan aksi Setujui & Eksekusi Retur serta Tolak Retur pada dokumen retur berstatus menunggu di `ReturnPembelianTab`.
+  - Styling adaptif pada modal retur PO dan pool karantina barang supplier.
+- **[T-14: Perbaikan Error Unpack Export Master Produk]**:
+  - Memperbaiki fatal error Livewire 3 `Only arrays and Traversables can be unpacked, string given` pada aksi Export Master Produk (Semua Produk & Item Terpilih, XLSX & CSV).
+  - Mengubah payload Alpine `$dispatch` dari string primitif (`'xlsx'`) menjadi objek dictionary (`{ format: 'xlsx' }` / `{ format: 'csv' }`).
+  - Menormalisasi parameter `$format` pada listener `openExportMasterModal` dan `openExportTerpilihModal` (`ProdukTab.php`) untuk menerima format array maupun string dengan aman.
+- **[T-15: Kontras Tombol Rak & Import di Mode Terang]**:
+  - Memperbaiki visibilitas box tombol Atur Rak, Import Excel, dan + Supplier pada header desktop & mobile toolbar WMS (`wms-dashboard.blade.php`). Mengganti `bg-white/5 border-white/10 text-ink-300` dengan `bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200`.
+  - Memperbaiki kontras modal Atur Rak (`stok-tab.blade.php`) dan modal Import Excel (`produk-tab.blade.php`) agar jelas terbaca pada light mode.
+- **[T-16: Verifikasi]**:
+  - Pint PSR-12 passed 100%.
+  - Vite build bundle sukses (2.61s).
+  - PHPUnit test suite passed.
+
+## 2026-10-24 — Frontend & Mobile Ergonomics Polish (Ute Prism & Emil Design Eng) ✅
+
+- **[Micro-Interactions & Transitions]**:
+  - Replaced `transition: all` and sluggish `ease-in` leaves with `--ease-out` sub-200ms curves and explicit properties (`transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1), opacity 200ms ease-out`).
+  - Added trigger-aware `origin-top-right` / `origin-top` on dropdowns and popovers across backoffice header, marketplace navigation, and notification center.
+  - Added tactile `:active` feedback (`active:scale-95`) to pagination buttons, toggles, hamburger drawer triggers, and modal action buttons.
+  - Reduced progress bar transitions to 250ms `ease-out` across tracking publik, customer portal, and asset registers.
+- **[HR Module Dark Mode & Ute Prism Tokens]**:
+  - Replaced unstyled AI slop tables and inputs in `absensi.blade.php` and `komisi-skema.blade.php` with `glass-card`, `dark:border-white/10`, `dark:bg-ink-900`, `dark:text-white`, and accessible status badges.
+- **[POS & WMS Mobile Ergonomics]**:
+  - Removed hardcoded dark classes in POS filter dropdowns, allowing dynamic adaptation to active theme.
+  - Enforced ≥44px touch targets on mobile sub-module action buttons and drawer triggers.
+  - Ensured smooth touch-pan-x scrolling and fixed dynamic class safelisting on Servis & CRM Kanban status badges.
+- **[Verification]**:
+  - Vite asset compilation (`npm run build`) succeeded in 3s.
+  - Formatter (`./vendor/bin/pint --test`) passed 100%.
+  - Regression unit & feature tests passing on SQLite in-memory.
+
 ## 2026-10-24 — Restrukturisasi Hierarki Parent-Child & Multi-Satuan Template Produk (WMS) ✅
 
 - **[27 Kolom Baku Import/Export]** Struktur kolom tersusun dengan hierarki lengkap:

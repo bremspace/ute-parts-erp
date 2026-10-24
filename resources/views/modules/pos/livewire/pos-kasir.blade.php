@@ -37,10 +37,10 @@
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="opacity-0 translate-y-2 scale-[0.98]"
                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                    x-transition:leave="transition ease-in duration-100"
+                    x-transition:leave="transition ease-out duration-100"
                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                     x-transition:leave-end="opacity-0 translate-y-2 scale-[0.98]"
-                    class="absolute left-0 right-0 sm:left-0 sm:right-auto sm:w-[580px] lg:w-[680px] top-full mt-2 z-50 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border border-ink-200/90 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden max-h-[70vh] flex flex-col"
+                    class="absolute left-0 right-0 sm:left-0 sm:right-auto sm:w-[580px] lg:w-[680px] top-full mt-2 z-50 origin-top bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-xl border border-ink-200/90 dark:border-white/15 rounded-2xl shadow-2xl overflow-hidden max-h-[70vh] flex flex-col"
                     x-cloak
                 >
                     <div class="px-3.5 sm:px-4 py-2.5 bg-ink-50/90 dark:bg-white/[0.04] border-b border-ink-200/80 dark:border-white/10 flex items-center justify-between text-xs flex-shrink-0">
@@ -540,7 +540,7 @@
         @if(collect($visibleFilters)->contains(true))
             <div class="flex items-center gap-2 flex-wrap pt-1 text-xs">
                 @if($visibleFilters['kategori'])
-                    <select wire:model.live="filterKategoriId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterKategoriId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Kategori</option>
                         @foreach($kategoriList as $parent)
                             <option value="{{ $parent->id }}">{{ $parent->nama }}</option>
@@ -551,7 +551,7 @@
                     </select>
                 @endif
                 @if($visibleFilters['brand'])
-                    <select wire:model.live="filterBrandId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterBrandId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Brand Part</option>
                         @foreach($brandList as $b)
                             <option value="{{ $b->id }}">{{ $b->nama }}</option>
@@ -559,7 +559,7 @@
                     </select>
                 @endif
                 @if($visibleFilters['kualitas'])
-                    <select wire:model.live="filterKualitasId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterKualitasId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Kualitas</option>
                         @foreach($kualitasList as $k)
                             <option value="{{ $k->id }}">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
@@ -567,7 +567,7 @@
                     </select>
                 @endif
                 @if($visibleFilters['tipe_hp'])
-                    <select wire:model.live="filterTipeHpId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterTipeHpId" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Tipe HP</option>
                         @foreach($tipeHpList as $th)
                             <option value="{{ $th->id }}">{{ $th->merk }} - {{ $th->model }}</option>
@@ -575,7 +575,7 @@
                     </select>
                 @endif
                 @if($visibleFilters['brand_kompatibel'])
-                    <select wire:model.live="filterBrandKompatibel" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterBrandKompatibel" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Brand Kompatibel</option>
                         @foreach($brandKompatibelList as $bk)
                             <option value="{{ $bk }}">{{ $bk }}</option>
@@ -583,7 +583,7 @@
                     </select>
                 @endif
                 @if($visibleFilters['model_kompatibel'])
-                    <select wire:model.live="filterModelKompatibel" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterModelKompatibel" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Model Kompatibel</option>
                         @foreach($modelKompatibelList as $mk)
                             <option value="{{ $mk }}">{{ $mk }}</option>
@@ -591,7 +591,7 @@
                     </select>
                 @endif
                 @if($visibleFilters['kondisi'])
-                    <select wire:model.live="filterKondisi" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterKondisi" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Kondisi</option>
                         @foreach($kondisiList as $kd)
                             <option value="{{ is_array($kd) ? $kd['kode'] : $kd }}">{{ is_array($kd) ? $kd['nama'] : ucfirst($kd) }}</option>
@@ -599,7 +599,7 @@
                     </select>
                 @endif
                 @if($visibleFilters['satuan'])
-                    <select wire:model.live="filterSatuan" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterSatuan" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Satuan</option>
                         @foreach($satuanList as $su)
                             <option value="{{ is_object($su) ? $su->kode : $su }}">{{ is_object($su) ? ($su->nama . ' (' . $su->kode . ')') : strtoupper($su) }}</option>
@@ -607,7 +607,7 @@
                     </select>
                 @endif
                 @if($visibleFilters['abc_class'])
-                    <select wire:model.live="filterAbcClass" class="px-2.5 py-1.5 rounded-xl glass-input text-xs bg-ink-900 text-white min-h-[34px]">
+                    <select wire:model.live="filterAbcClass" class="px-2.5 py-1.5 rounded-xl glass-input text-xs min-h-[38px] sm:min-h-[34px]">
                         <option value="">Semua Kelas ABC</option>
                         <option value="A">Kelas A (Fast Moving)</option>
                         <option value="B">Kelas B (Medium Moving)</option>
@@ -1186,8 +1186,15 @@
                                         <!-- Flex Price Popover -->
                                         <div
                                             x-show="flexOpen"
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            x-transition:leave="transition ease-out duration-100"
+                                            x-transition:leave-start="opacity-100 scale-100"
+                                            x-transition:leave-end="opacity-0 scale-95"
                                             @click.outside="flexOpen = false"
-                                            class="absolute right-0 bottom-full mb-2 z-30 min-w-[210px] p-3 rounded-2xl bg-white dark:bg-[#0B1120] border border-ink-200/90 dark:border-white/10 shadow-2xl text-left"
+                                            @keydown.escape="flexOpen = false"
+                                            class="absolute right-0 bottom-full mb-2 z-30 min-w-[210px] p-3 rounded-2xl bg-white dark:bg-[#0B1120] border border-ink-200/90 dark:border-white/10 shadow-2xl text-left origin-bottom-right"
                                             x-cloak
                                         >
                                             <label class="block text-[10px] font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider mb-1">Ubah Harga</label>
@@ -1270,7 +1277,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-16 sm:py-20">
+                            <td colspan="8" class="text-center py-16 sm:py-20">
                                 <div class="max-w-md mx-auto flex flex-col items-center">
                                     <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary mb-3">
                                         <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">

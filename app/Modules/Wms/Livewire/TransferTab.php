@@ -22,6 +22,9 @@ class TransferTab extends Component
     /** [B-15c] Pengaman jumlah gudang per cabang (normally < 10). */
     public const GUDANG_DROPDOWN_LIMIT = 100;
 
+    /** [B-15c] Pengaman jumlah produk dalam dropdown transfer (P2 N+1 audit). */
+    public const PRODUK_DROPDOWN_LIMIT = 300;
+
     public ?int $filterGudangId = null;
 
     // New Transfer Modal state
@@ -64,6 +67,15 @@ class TransferTab extends Component
         $this->transferItems = [
             ['produk_id' => null, 'produk_nama' => '', 'sku_variant_id' => null, 'rak_id' => null, 'jumlah' => 1],
         ];
+
+        $totalProduk = $this->scopeStokCabangAktif(Produk::query())->count();
+        if ($totalProduk > self::PRODUK_DROPDOWN_LIMIT) {
+            $this->dispatch('alert', [
+                'type' => 'info',
+                'message' => 'Daftar Produk dibatasi hingga '.self::PRODUK_DROPDOWN_LIMIT.' item pertama. Gunakan pencarian untuk produk lainnya.',
+            ]);
+        }
+
         $this->showTransferModal = true;
     }
 

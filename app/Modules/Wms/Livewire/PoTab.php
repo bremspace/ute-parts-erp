@@ -13,6 +13,7 @@ use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\PurchaseOrderService;
 use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ParsesNominal;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -108,22 +109,38 @@ class PoTab extends Component
 
     public function terapkanKePo(int $produkId, int $qty): void
     {
-        $produk = Produk::find($produkId);
+        $produk = Produk::with(['skuVariants', 'satuanKonversi', 'supplier'])->find($produkId);
         if (! $produk) {
             return;
         }
 
+        $cabangId = session('cabang_id');
+        $defaultGudangId = Gudang::where('cabang_id', $cabangId)->first()?->id;
+
+        $daftarSatuan = $produk->getDaftarSatuan();
+        $satuanBeli = $produk->satuanKonversi->firstWhere('is_satuan_beli', true);
+        $satuanKode = $satuanBeli?->satuan_kode ?: ($produk->satuan ?: 'pcs');
+        $satuanData = collect($daftarSatuan)->firstWhere('satuan_kode', $satuanKode) ?: $daftarSatuan[0];
+
+        $konversi = max(0.0001, (float) ($satuanData['faktor_konversi'] ?? 1));
+        $hargaBeli = ! empty($satuanData['harga_beli']) ? (float) $satuanData['harga_beli'] : (float) $produk->harga_beli;
+
         $this->poForm = [
-            'supplier_id' => null,
-            'gudang_tujuan_id' => null,
+            'supplier_id' => $produk->supplier_id,
+            'gudang_tujuan_id' => $defaultGudangId,
             'metode_bayar' => 'kredit',
             'akun_kas_bank' => '110-01',
             'jatuh_tempo' => '',
             'items' => [
                 [
                     'produk_id' => $produk->id,
+                    'produk_nama' => $produk->nama,
                     'sku_variant_id' => $produk->skuVariants()->first()?->id,
-                    'harga_beli' => (float) $produk->harga_beli,
+                    'satuan' => $satuanKode,
+                    'konversi' => $konversi,
+                    'jumlah_dasar' => max(1, $qty) * $konversi,
+                    'daftar_satuan' => $daftarSatuan,
+                    'harga_beli' => $hargaBeli,
                     'jumlah' => max(1, $qty),
                 ],
             ],
@@ -133,13 +150,24 @@ class PoTab extends Component
         $this->showPoModal = true;
         $this->dispatch('alert', [
             'type' => 'info',
-            'message' => "Produk {$produk->nama} ({$qty} unit) dimasukkan ke usulan PO",
+            'message' => "Produk {$produk->nama} ({$qty} {$satuanKode}) dimasukkan ke usulan PO",
         ]);
     }
 
     public function masukkanSemuaRekomendasiKePo(): void
     {
+        if (! $this->boleh('wms.create', 'Anda tidak memiliki izin membuat PO.')) {
+            return;
+        }
+
         $cabangId = session('cabang_id');
+        $defaultGudang = Gudang::where('cabang_id', $cabangId)->first();
+        if (! $defaultGudang) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gudang tujuan belum tersedia di cabang ini.']);
+
+            return;
+        }
+
         $service = app(ProcurementService::class);
         $filterPayload = [
             'abc_class' => $this->procurementFilter['abc_class'],
@@ -150,42 +178,146 @@ class PoTab extends Component
         ];
         $items = $service->getProcurementRecommendations($cabangId, $filterPayload);
 
-        $orderItems = [];
+        // Kelompokkan item rekomendasi per supplier
+        $itemsPerSupplier = [];
         foreach ($items as $item) {
             if ($item['action'] === 'ORDER' && $item['recommended_order'] > 0) {
-                $p = Produk::find($item['produk_id']);
+                $p = Produk::with(['skuVariants', 'satuanKonversi', 'supplier'])->find($item['produk_id']);
                 if ($p) {
-                    $orderItems[] = [
-                        'produk_id' => $p->id,
-                        'sku_variant_id' => $p->skuVariants()->first()?->id,
-                        'harga_beli' => (float) $p->harga_beli,
-                        'jumlah' => (int) $item['recommended_order'],
+                    $supId = $p->supplier_id ?: 0;
+                    $itemsPerSupplier[$supId][] = [
+                        'produk' => $p,
+                        'qty' => (int) $item['recommended_order'],
                     ];
                 }
             }
         }
 
-        if (empty($orderItems)) {
+        if (empty($itemsPerSupplier)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tidak ada item rekomendasi yang perlu dipesan.']);
 
             return;
         }
 
-        $this->poForm = [
-            'supplier_id' => null,
-            'gudang_tujuan_id' => null,
-            'metode_bayar' => 'kredit',
-            'akun_kas_bank' => '110-01',
-            'jatuh_tempo' => '',
-            'items' => $orderItems,
-        ];
+        $createdPoCount = 0;
+        $unassignedItems = [];
+
+        DB::transaction(function () use ($itemsPerSupplier, $defaultGudang, &$createdPoCount, &$unassignedItems) {
+            foreach ($itemsPerSupplier as $supplierId => $groupedItems) {
+                if ($supplierId === 0) {
+                    $unassignedItems = array_merge($unassignedItems, $groupedItems);
+
+                    continue;
+                }
+
+                $supplier = Supplier::find($supplierId);
+                if (! $supplier) {
+                    $unassignedItems = array_merge($unassignedItems, $groupedItems);
+
+                    continue;
+                }
+
+                $today = now()->format('Ymd');
+                $count = PurchaseOrder::whereDate('created_at', now()->toDateString())->count() + 1;
+                $noPo = sprintf('PO-%s-%03d', $today, $count);
+
+                $total = 0;
+                $poItemsData = [];
+                foreach ($groupedItems as $gItem) {
+                    $prod = $gItem['produk'];
+                    $qty = $gItem['qty'];
+
+                    $daftarSatuan = $prod->getDaftarSatuan();
+                    $satuanBeli = $prod->satuanKonversi->firstWhere('is_satuan_beli', true);
+                    $satuanKode = $satuanBeli?->satuan_kode ?: ($prod->satuan ?: 'pcs');
+                    $satuanData = collect($daftarSatuan)->firstWhere('satuan_kode', $satuanKode) ?: $daftarSatuan[0];
+
+                    $konversi = max(0.0001, (float) ($satuanData['faktor_konversi'] ?? 1));
+                    $hargaBeli = ! empty($satuanData['harga_beli']) ? (float) $satuanData['harga_beli'] : (float) $prod->harga_beli;
+                    $subtotal = $hargaBeli * $qty;
+                    $total += $subtotal;
+
+                    $poItemsData[] = [
+                        'produk_id' => $prod->id,
+                        'sku_variant_id' => $prod->skuVariants()->first()?->id,
+                        'satuan' => $satuanKode,
+                        'konversi' => $konversi,
+                        'harga_beli' => $hargaBeli,
+                        'jumlah' => $qty,
+                        'jumlah_dasar' => $qty * $konversi,
+                        'subtotal' => $subtotal,
+                    ];
+                }
+
+                $po = PurchaseOrder::create([
+                    'no_po' => $noPo,
+                    'supplier_id' => $supplier->id,
+                    'gudang_tujuan_id' => $defaultGudang->id,
+                    'status' => 'draft',
+                    'metode_bayar' => 'kredit',
+                    'jatuh_tempo' => now()->addDays((int) ($supplier->termin_hari ?? 30))->toDateString(),
+                    'total' => $total,
+                    'total_dibayar' => 0,
+                    'catatan' => 'Auto-generate rekomendasi pengadaan WMS',
+                ]);
+
+                foreach ($poItemsData as $pid) {
+                    $pid['purchase_order_id'] = $po->id;
+                    PurchaseOrderItem::create($pid);
+                }
+
+                $createdPoCount++;
+            }
+        });
 
         $this->showProcurementModal = false;
-        $this->showPoModal = true;
-        $this->dispatch('alert', [
-            'type' => 'success',
-            'message' => count($orderItems).' produk rekomendasi berhasil dimasukkan ke form PO!',
-        ]);
+
+        if ($createdPoCount > 0 && empty($unassignedItems)) {
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Berhasil memisahkan & membuat {$createdPoCount} Draft PO per supplier!",
+            ]);
+        } elseif (! empty($unassignedItems)) {
+            // Siapkan unassigned items ke poForm agar pengguna memilih supplier
+            $formItems = [];
+            foreach ($unassignedItems as $uItem) {
+                $p = $uItem['produk'];
+                $qty = $uItem['qty'];
+                $daftarSatuan = $p->getDaftarSatuan();
+                $satuanKode = $p->satuan ?: 'pcs';
+                $formItems[] = [
+                    'produk_id' => $p->id,
+                    'produk_nama' => $p->nama,
+                    'sku_variant_id' => $p->skuVariants()->first()?->id,
+                    'satuan' => $satuanKode,
+                    'konversi' => 1,
+                    'jumlah_dasar' => $qty,
+                    'daftar_satuan' => $daftarSatuan,
+                    'harga_beli' => (float) $p->harga_beli,
+                    'jumlah' => $qty,
+                ];
+            }
+
+            $this->poForm = [
+                'supplier_id' => null,
+                'gudang_tujuan_id' => $defaultGudang->id,
+                'metode_bayar' => 'kredit',
+                'akun_kas_bank' => '110-01',
+                'jatuh_tempo' => '',
+                'items' => $formItems,
+            ];
+
+            $this->showPoModal = true;
+
+            $msg = $createdPoCount > 0
+                ? "Dibuat {$createdPoCount} Draft PO per supplier. Terdapat ".count($formItems).' item rekomendasi berhasil dimasukkan ke form PO manual.'
+                : count($formItems).' produk rekomendasi berhasil dimasukkan ke form PO!';
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => $msg,
+            ]);
+        }
     }
 
     #[On('order-po-produk')]

@@ -539,7 +539,7 @@
                 <div class="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1 sm:flex-initial mr-1 sm:mr-0">
                     <!-- Menu Button: <768 toggle drawer · >=768 toggle collapse icon-rail (persist) -->
                     <button @click="toggleSidebar()"
-                            class="p-1.5 sm:p-2 rounded-xl text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink-900 dark:hover:text-white transition-colors cursor-pointer flex-shrink-0"
+                            class="p-1.5 sm:p-2 rounded-xl text-ink-500 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-ink-900 dark:hover:text-white active:scale-95 transition cursor-pointer flex-shrink-0"
                             aria-label="Toggle menu"
                             aria-expanded="false"
                             :aria-expanded="(isMobile ? sidebarOpen : sidebarCollapsed).toString()">
@@ -591,18 +591,20 @@
                 <div class="flex items-center gap-1 sm:gap-2 lg:gap-3 flex-shrink-0">
                     <x-prism.pwa-install-prompt variant="button" />
 
-                    <div class="hidden lg:flex items-center gap-2 text-xs text-ink-400">
-                        <span class="px-1.5 py-0.5 rounded bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 font-mono text-[11px]">F2</span>
-                        <span>Cari</span>
-                        <span class="mx-1 text-ink-600 dark:text-white/20">|</span>
-                        <span class="px-1.5 py-0.5 rounded bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 font-mono text-[11px]">F4</span>
-                        <span>Bayar</span>
-                        <span class="mx-1 text-ink-600 dark:text-white/20">|</span>
-                        <span class="px-1.5 py-0.5 rounded bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 font-mono text-[11px]">ESC</span>
-                        <span>Batal</span>
-                    </div>
+                    @if(request()->routeIs('pos*'))
+                        <div class="hidden lg:flex items-center gap-2 text-xs text-ink-400">
+                            <span class="px-1.5 py-0.5 rounded bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 font-mono text-[11px]">F2</span>
+                            <span>Cari</span>
+                            <span class="mx-1 text-ink-600 dark:text-white/20">|</span>
+                            <span class="px-1.5 py-0.5 rounded bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 font-mono text-[11px]">F4</span>
+                            <span>Bayar</span>
+                            <span class="mx-1 text-ink-600 dark:text-white/20">|</span>
+                            <span class="px-1.5 py-0.5 rounded bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 font-mono text-[11px]">ESC</span>
+                            <span>Batal</span>
+                        </div>
 
-                    <div class="h-4 w-[1px] bg-black/10 dark:bg-white/10 hidden lg:block"></div>
+                        <div class="h-4 w-[1px] bg-black/10 dark:bg-white/10 hidden lg:block"></div>
+                    @endif
 
                     <!-- Online Status Indicator: Green Dot (Hidden label on mobile) -->
                     <div class="flex items-center gap-1.5 text-xs font-medium text-up-mint px-1 py-1 flex-shrink-0" title="Status Database & Sistem Online">
@@ -626,10 +628,10 @@
                              x-transition:enter="transition ease-out duration-120"
                              x-transition:enter-start="opacity-0 scale-95"
                              x-transition:enter-end="opacity-100 scale-100"
-                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave="transition ease-out duration-100"
                              x-transition:leave-start="opacity-100 scale-100"
                              x-transition:leave-end="opacity-0 scale-95"
-                             class="absolute right-0 mt-2 w-48 py-2 rounded-2xl bg-white dark:bg-[#0F172A] border border-ink-200/80 dark:border-white/10 shadow-xl z-50">
+                             class="absolute right-0 mt-2 w-48 origin-top-right py-2 rounded-2xl bg-white dark:bg-[#0F172A] border border-ink-200/80 dark:border-white/10 shadow-xl z-50">
                             <div class="px-3 py-1 text-[11px] font-semibold text-ink-400 uppercase tracking-wider">
                                 Ukuran Font
                             </div>

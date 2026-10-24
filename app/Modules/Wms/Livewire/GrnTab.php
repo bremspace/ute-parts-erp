@@ -344,12 +344,18 @@ class GrnTab extends Component
         foreach ($this->grnForm['item_qty'] as $idx => $item) {
             $this->grnForm['item_qty'][$idx]['qty_received'] = (int) $item['qty_po'];
         }
+        if ($this->activeItemIndex !== null && isset($this->grnForm['item_qty'][$this->activeItemIndex])) {
+            $this->activeItemQty = (string) $this->grnForm['item_qty'][$this->activeItemIndex]['qty_received'];
+        }
     }
 
     public function setItemLengkap(int $idx): void
     {
         if (isset($this->grnForm['item_qty'][$idx])) {
             $this->grnForm['item_qty'][$idx]['qty_received'] = (int) $this->grnForm['item_qty'][$idx]['qty_po'];
+            if ($this->activeItemIndex === $idx) {
+                $this->activeItemQty = (string) $this->grnForm['item_qty'][$idx]['qty_received'];
+            }
         }
     }
 
@@ -358,7 +364,11 @@ class GrnTab extends Component
         if (isset($this->grnForm['item_qty'][$idx])) {
             $max = (int) $this->grnForm['item_qty'][$idx]['qty_po'];
             $current = (int) $this->grnForm['item_qty'][$idx]['qty_received'];
-            $this->grnForm['item_qty'][$idx]['qty_received'] = max(0, min($max, $current + $delta));
+            $newVal = max(0, min($max, $current + $delta));
+            $this->grnForm['item_qty'][$idx]['qty_received'] = $newVal;
+            if ($this->activeItemIndex === $idx) {
+                $this->activeItemQty = (string) $newVal;
+            }
         }
     }
 

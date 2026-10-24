@@ -120,10 +120,10 @@
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="opacity-0 translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0"
-                    x-transition:leave="transition ease-in duration-100"
+                    x-transition:leave="transition ease-out duration-100"
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 translate-y-1"
-                    class="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#0B1120] border border-ink-200/90 dark:border-white/15 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto"
+                    class="absolute left-0 right-0 top-full mt-2 origin-top bg-white dark:bg-[#0B1120] border border-ink-200/90 dark:border-white/15 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto"
                 >
                     <div class="p-2 border-b border-black/5 dark:border-white/5 text-[11px] font-semibold text-ink-400 flex items-center justify-between">
                         <span>Hasil Pencarian</span>

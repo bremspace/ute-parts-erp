@@ -158,7 +158,7 @@
                     </div>
 
                     <!-- Order Summary Column -->
-                    <div class="lg:col-span-5 space-y-5">
+                    <div class="lg:col-span-5 space-y-5 lg:sticky lg:top-24">
                         <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100/80 dark:border-white/10 p-5 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-4">
                             <span class="text-xs font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">Rincian Belanja</span>
                             <div class="space-y-3 max-h-72 overflow-y-auto pr-1">

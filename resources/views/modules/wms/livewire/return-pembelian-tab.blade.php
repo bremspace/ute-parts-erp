@@ -194,50 +194,51 @@
     {{-- MODAL PROSES RETUR DARI POOL KARANTINA --}}
     @if($showPoolReturModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-            <div class="w-full max-w-lg glass-panel p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
-                <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-white/10">
+            <div class="w-full max-w-lg glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-black/10 dark:border-white/10 shadow-2xl">
+                <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-black/10 dark:border-white/10">
                     <div>
-                        <h3 class="text-base font-bold text-white">Kirim Retur ke Supplier</h3>
-                        <p class="text-[10px] text-ink-400">Konfirmasi pengembalian barang rusak dari karantina toko</p>
+                        <h3 class="text-base font-bold text-ink-900 dark:text-white">Kirim Retur ke Supplier</h3>
+                        <p class="text-[10px] text-ink-500 dark:text-ink-400">Konfirmasi pengembalian barang rusak dari karantina toko</p>
                     </div>
-                    <button wire:click="tutupModalPoolRetur" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                    <button wire:click="tutupModalPoolRetur" class="text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer font-bold text-base">✕</button>
                 </div>
 
                 <div class="space-y-4 text-xs">
                     <div>
-                        <label class="block font-bold text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Supplier Tujuan *</label>
-                        <select wire:model.live="selectedPoolSupplierId" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 min-h-[42px]">
+                        <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Supplier Tujuan *</label>
+                        <select wire:model.live="selectedPoolSupplierId" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white bg-white/90 dark:bg-ink-900 border border-black/10 dark:border-white/10 min-h-[42px]">
                             <option value="">Pilih Supplier</option>
                             @foreach($suppliers as $s)
-                                <option value="{{ $s->id }}">{{ $s->nama }} (Saldo: Rp {{ number_format($s->saldo_deposit, 0, ',', '.') }})</option>
+                                <option value="{{ $s->id }}" class="bg-white dark:bg-ink-900">{{ $s->nama }} (Saldo: Rp {{ number_format($s->saldo_deposit, 0, ',', '.') }})</option>
                             @endforeach
                         </select>
                     </div>
 
                     <div>
-                        <label class="block font-bold text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Metode Penyelesaian Kompensasi *</label>
-                        <select wire:model="poolMetodePengembalian" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 min-h-[42px]">
-                            <option value="saldo">Saldo Deposit Supplier (Potong Utang Berjalan / Kredit Belanja PO)</option>
-                            <option value="utang">Potong Tagihan Utang PO Tertentu</option>
-                            <option value="kas">Pengembalian Dana / Transfer Supplier (Kas Toko)</option>
+                        <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Metode Penyelesaian Kompensasi *</label>
+                        <select wire:model="poolMetodePengembalian" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white bg-white/90 dark:bg-ink-900 border border-black/10 dark:border-white/10 min-h-[42px]">
+                            <option value="saldo" class="bg-white dark:bg-ink-900">Saldo Deposit Supplier (Potong Utang Berjalan / Kredit Belanja PO)</option>
+                            <option value="utang" class="bg-white dark:bg-ink-900">Potong Tagihan Utang PO Tertentu</option>
+                            <option value="kas" class="bg-white dark:bg-ink-900">Pengembalian Dana / Transfer Supplier (Kas Toko)</option>
                         </select>
                     </div>
 
                     <div>
-                        <label class="block font-bold text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Catatan / Alasan Retur</label>
+                        <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Catatan / Alasan Retur</label>
                         <textarea
                             wire:model="poolAlasan"
                             rows="2"
-                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
+                            placeholder="Alasan retur..."
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-ink-900 dark:text-white bg-white/90 dark:bg-ink-900 border border-black/10 dark:border-white/10"
                         ></textarea>
                     </div>
                 </div>
 
-                <div class="flex gap-2.5 pt-4 border-t border-white/10 mt-5">
+                <div class="flex gap-2.5 pt-4 border-t border-black/10 dark:border-white/10 mt-5">
                     <button
                         type="button"
                         wire:click="tutupModalPoolRetur"
-                        class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-bold text-xs cursor-pointer min-h-[44px]"
+                        class="flex-1 py-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs cursor-pointer min-h-[44px]"
                     >
                         Batal
                     </button>
@@ -256,11 +257,11 @@
     {{-- MODAL TAMBAH RETUR PEMBELIAN DARI PO --}}
     @if($showCreateModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+            <div class="w-full max-w-2xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-black/10 dark:border-white/10 shadow-2xl">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-black/10 dark:border-white/10">
                     <div>
-                        <h3 class="text-base font-bold text-white">Buat Retur Pembelian (PO)</h3>
-                        <p class="text-[10px] text-ink-400">Pengurangan persediaan gudang & penyesuaian utang usaha</p>
+                        <h3 class="text-base font-bold text-ink-900 dark:text-white">Buat Retur Pembelian (PO)</h3>
+                        <p class="text-[10px] text-ink-500 dark:text-ink-400">Pengurangan persediaan gudang & penyesuaian utang usaha</p>
                     </div>
                     <button wire:click="tutupModalTambah" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
                 </div>
@@ -308,37 +309,37 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block font-bold text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Metode Kompensasi *</label>
-                            <select wire:model="metodePengembalian" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 min-h-[44px]">
-                                <option value="saldo">Saldo Deposit Supplier (Kredit PO)</option>
-                                <option value="utang">Potong Saldo Utang PO</option>
-                                <option value="kas">Pengembalian Dana Tunai/Transfer</option>
+                            <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Metode Kompensasi *</label>
+                            <select wire:model="metodePengembalian" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white bg-white/90 dark:bg-ink-900 border border-black/10 dark:border-white/10 min-h-[44px]">
+                                <option value="saldo" class="bg-white dark:bg-ink-900">Saldo Deposit Supplier (Kredit PO)</option>
+                                <option value="utang" class="bg-white dark:bg-ink-900">Potong Saldo Utang PO</option>
+                                <option value="kas" class="bg-white dark:bg-ink-900">Pengembalian Dana Tunai/Transfer</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block font-bold text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Alasan Retur *</label>
+                            <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Alasan Retur *</label>
                             <input
                                 type="text"
                                 wire:model="alasan"
                                 placeholder="Contoh: Barang rusak saat pengiriman"
-                                class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-white min-h-[44px]"
+                                class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white bg-white/90 dark:bg-ink-900 border border-black/10 dark:border-white/10 min-h-[44px]"
                             />
                         </div>
                     </div>
                 </div>
 
-                <div class="flex gap-2.5 pt-4 border-t border-white/10 mt-4">
+                <div class="flex gap-2.5 pt-4 border-t border-black/10 dark:border-white/10 mt-4">
                     <button
                         type="button"
                         wire:click="tutupModalTambah"
-                        class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-bold text-xs cursor-pointer min-h-[44px]"
+                        class="flex-1 py-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs cursor-pointer min-h-[44px]"
                     >
                         Batal
                     </button>
                     <button
                         type="button"
                         wire:click="simpanRetur"
-                        class="flex-1 py-3 rounded-xl bg-up-red hover:bg-up-red-dark text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-red/25"
+                        class="flex-1 py-3 rounded-xl bg-up-red hover:bg-up-red-dark text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-red/25 active:scale-[0.98] transition"
                     >
                         Proses Retur Pembelian
                     </button>
@@ -350,46 +351,49 @@
     {{-- MODAL DETAIL RETUR --}}
     @if($detailRetur)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-            <div class="w-full max-w-xl glass-panel p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
-                <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-white/10">
+            <div class="w-full max-w-xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-black/10 dark:border-white/10 shadow-2xl">
+                <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-black/10 dark:border-white/10">
                     <div>
-                        <h3 class="text-base font-bold text-white">{{ $detailRetur->no_return }}</h3>
-                        <p class="text-[10px] text-ink-400">Detail dokumen retur pembelian supplier</p>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base font-bold text-ink-900 dark:text-white font-mono">{{ $detailRetur->no_return }}</h3>
+                            <x-prism.status-pill :status="str_replace('_','-',$detailRetur->status)" size="sm" />
+                        </div>
+                        <p class="text-[10px] text-ink-500 dark:text-ink-400 mt-0.5">Detail dokumen retur pembelian supplier</p>
                     </div>
-                    <button wire:click="tutupDetail" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                    <button wire:click="tutupDetail" class="text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer font-bold text-base">✕</button>
                 </div>
 
                 <div class="space-y-3 flex-1 overflow-y-auto pr-1 text-xs">
-                    <div class="grid grid-cols-2 gap-2 p-3 rounded-xl bg-white/5">
+                    <div class="grid grid-cols-2 gap-2 p-3 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/5 dark:border-white/5">
                         <div>
-                            <span class="text-ink-400 block text-[10px]">Supplier:</span>
-                            <span class="font-bold text-white">{{ $detailRetur->supplier?->nama ?? '-' }}</span>
+                            <span class="text-ink-500 dark:text-ink-400 block text-[10px]">Supplier:</span>
+                            <span class="font-bold text-ink-900 dark:text-white">{{ $detailRetur->supplier?->nama ?? '-' }}</span>
                         </div>
                         <div>
-                            <span class="text-ink-400 block text-[10px]">No. PO:</span>
-                            <span class="font-mono text-white">{{ $detailRetur->purchaseOrder?->no_po ?? 'Pool Karantina' }}</span>
+                            <span class="text-ink-500 dark:text-ink-400 block text-[10px]">No. PO:</span>
+                            <span class="font-mono text-ink-900 dark:text-white">{{ $detailRetur->purchaseOrder?->no_po ?? 'Pool Karantina' }}</span>
                         </div>
                         <div>
-                            <span class="text-ink-400 block text-[10px]">Tanggal:</span>
-                            <span class="font-semibold text-white">{{ $detailRetur->tanggal?->format('d/m/Y') ?? '-' }}</span>
+                            <span class="text-ink-500 dark:text-ink-400 block text-[10px]">Tanggal:</span>
+                            <span class="font-semibold text-ink-900 dark:text-white">{{ $detailRetur->tanggal?->format('d/m/Y') ?? '-' }}</span>
                         </div>
                         <div>
-                            <span class="text-ink-400 block text-[10px]">Metode:</span>
+                            <span class="text-ink-500 dark:text-ink-400 block text-[10px]">Metode:</span>
                             <span class="font-bold uppercase text-up-mint">{{ $detailRetur->metode_pengembalian }}</span>
                         </div>
                     </div>
 
                     <div class="space-y-1.5">
-                        <label class="block font-bold text-ink-300 uppercase tracking-wider text-[10px]">Daftar Item</label>
-                        <div class="rounded-xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+                        <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[10px]">Daftar Item</label>
+                        <div class="rounded-xl border border-black/10 dark:border-white/10 divide-y divide-black/5 dark:divide-white/5 overflow-hidden">
                             @foreach($detailRetur->items as $dItem)
                                 <div class="p-2.5 flex items-center justify-between gap-2">
                                     <div>
-                                        <div class="font-bold text-white text-xs">{{ $dItem->produk?->nama ?? '-' }}</div>
-                                        <div class="text-[10px] text-ink-400 font-mono">{{ $dItem->produk?->kode }}</div>
+                                        <div class="font-bold text-ink-900 dark:text-white text-xs">{{ $dItem->produk?->nama ?? '-' }}</div>
+                                        <div class="text-[10px] text-ink-500 dark:text-ink-400 font-mono">{{ $dItem->produk?->kode }}</div>
                                     </div>
                                     <div class="text-right">
-                                        <div class="font-bold text-white">{{ (int) $dItem->jumlah }} unit</div>
+                                        <div class="font-bold text-ink-900 dark:text-white">{{ (int) $dItem->jumlah }} unit</div>
                                         <div class="text-[10px] text-up-red font-mono">Rp {{ number_format($dItem->subtotal, 0, ',', '.') }}</div>
                                     </div>
                                 </div>
@@ -398,16 +402,43 @@
                     </div>
 
                     <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/20 flex items-center justify-between">
-                        <span class="font-bold text-ink-200">Total Nilai Retur:</span>
+                        <span class="font-bold text-ink-700 dark:text-ink-200">Total Nilai Retur:</span>
                         <span class="font-bold text-base text-up-red tabular-nums">Rp {{ number_format($detailRetur->jumlah, 0, ',', '.') }}</span>
                     </div>
+
+                    @if(!empty($detailRetur->alasan))
+                        <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5">
+                            <span class="text-[10px] font-bold text-ink-500 dark:text-ink-400 uppercase tracking-wider block mb-1">Alasan Retur:</span>
+                            <p class="text-xs text-ink-800 dark:text-ink-200 italic">{{ $detailRetur->alasan }}</p>
+                        </div>
+                    @endif
                 </div>
 
-                <div class="pt-4 border-t border-white/10 mt-4">
+                <div class="pt-4 border-t border-black/10 dark:border-white/10 mt-4 flex items-center gap-2">
+                    @if($detailRetur->status === 'menunggu')
+                        @canany(['wms.approve', 'wms.update'])
+                            <button
+                                type="button"
+                                wire:click="setujuiRetur({{ $detailRetur->id }})"
+                                wire:confirm="Setujui dan proses eksekusi retur ini? Stok barang akan disesuaikan dan kompensasi dicatat."
+                                class="flex-1 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-mint/20 active:scale-[0.97] transition"
+                            >
+                                ✓ Setujui &amp; Eksekusi
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="tolakRetur({{ $detailRetur->id }})"
+                                wire:confirm="Tolak pengajuan retur pembelian ini?"
+                                class="px-4 py-2.5 rounded-xl bg-up-red/15 hover:bg-up-red/25 text-up-red border border-up-red/30 font-bold text-xs cursor-pointer active:scale-[0.97] transition"
+                            >
+                                ✕ Tolak
+                            </button>
+                        @endcanany
+                    @endif
                     <button
                         type="button"
                         wire:click="tutupDetail"
-                        class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs cursor-pointer"
+                        class="{{ $detailRetur->status === 'menunggu' ? 'px-4' : 'w-full' }} py-2.5 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-700 dark:text-white font-bold text-xs cursor-pointer"
                     >
                         Tutup
                     </button>

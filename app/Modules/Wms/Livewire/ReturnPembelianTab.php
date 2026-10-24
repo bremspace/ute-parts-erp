@@ -108,6 +108,60 @@ class ReturnPembelianTab extends Component
         $this->detailReturId = null;
     }
 
+    public function setujuiRetur(int $id): void
+    {
+        abort_unless(
+            auth()->user()?->can('wms.approve') || auth()->user()?->can('wms.update'),
+            403,
+            'Anda tidak memiliki izin menyetujui retur pembelian.'
+        );
+
+        $retur = ReturnPembelian::findOrFail($id);
+        if ($retur->status !== 'menunggu') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya retur berstatus menunggu yang dapat disetujui.']);
+
+            return;
+        }
+
+        try {
+            app(ReturnPembelianService::class)->eksekusiRetur($retur, auth()->id());
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Retur {$retur->no_return} berhasil disetujui dan stok telah disesuaikan.",
+            ]);
+            $this->tutupDetail();
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function tolakRetur(int $id, string $alasan = 'Ditolak oleh admin'): void
+    {
+        abort_unless(
+            auth()->user()?->can('wms.approve') || auth()->user()?->can('wms.update'),
+            403,
+            'Anda tidak memiliki izin menolak retur pembelian.'
+        );
+
+        $retur = ReturnPembelian::findOrFail($id);
+        if ($retur->status !== 'menunggu') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya retur berstatus menunggu yang dapat ditolak.']);
+
+            return;
+        }
+
+        try {
+            app(ReturnPembelianService::class)->tolakRetur($retur, $alasan);
+            $this->dispatch('alert', [
+                'type' => 'info',
+                'message' => "Retur {$retur->no_return} telah ditolak.",
+            ]);
+            $this->tutupDetail();
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
     public function simpanRetur(): void
     {
         abort_unless(

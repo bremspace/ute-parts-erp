@@ -31,7 +31,7 @@
                         <!-- Tombol Atur Filter Kustom -->
                         <button type="button"
                                 wire:click="$toggle('showCustomFilterSettings')"
-                                class="px-2.5 py-2 rounded-xl border border-white/10 text-xs font-medium text-ink-300 hover:text-white hover:bg-white/5 transition flex items-center gap-1.5 min-h-[40px] cursor-pointer whitespace-nowrap {{ $showCustomFilterSettings ? 'bg-up-primary/20 text-up-primary border-up-primary/40' : '' }}"
+                                class="px-2.5 py-2 rounded-xl border border-black/10 dark:border-white/10 text-xs font-medium text-ink-700 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-1.5 min-h-[40px] cursor-pointer whitespace-nowrap {{ $showCustomFilterSettings ? 'bg-up-primary/20 text-up-primary border-up-primary/40' : '' }}"
                                 title="Atur checkbox filter kustom">
                             <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
@@ -47,174 +47,105 @@
                         <!-- Tombol Atur Kolom Master Produk -->
                         <button type="button"
                                 wire:click="$toggle('showColumnSettings')"
-                                class="px-2.5 py-2 rounded-xl border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[40px] {{ $showColumnSettings ? 'bg-up-primary/20 text-up-primary border-up-primary/40' : 'bg-white/5 text-ink-300 hover:text-white hover:bg-white/10' }}"
+                                class="px-2.5 py-2 rounded-xl border border-black/10 dark:border-white/10 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer whitespace-nowrap min-h-[40px] {{ $showColumnSettings ? 'bg-up-primary/20 text-up-primary border-up-primary/40' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10' }}"
                                 title="Sesuaikan Kolom Tabel Master Produk">
                             <span>📐</span>
                             <span class="hidden sm:inline">Kolom</span>
-                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-ink-200 font-bold">
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10 text-ink-800 dark:text-ink-200 font-bold">
                                 {{ count(array_filter($visibleColumns)) }}
                             </span>
                         </button>
 
                         @if($visibleFilters['kategori'] ?? true)
-                            <select wire:model.live="filterKategoriId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Semua Kategori</option>
+                            <select wire:model.live="filterKategoriId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kategori</option>
                                 @foreach($kategoriTree as $parent)
-                                    <option value="{{ $parent->id }}" class="bg-ink-900 font-bold text-white">{{ $parent->nama }}</option>
+                                    <option value="{{ $parent->id }}" class="bg-white dark:bg-ink-900 font-bold text-ink-900 dark:text-white">{{ $parent->nama }}</option>
                                     @foreach($parent->children as $child)
-                                        <option value="{{ $child->id }}" class="bg-ink-900 text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                                        <option value="{{ $child->id }}" class="bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
                                     @endforeach
                                 @endforeach
                             </select>
                         @endif
 
                         @if($visibleFilters['brand'] ?? true)
-                            <select wire:model.live="filterBrandId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Semua Brand Part</option>
+                            <select wire:model.live="filterBrandId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Brand Part</option>
                                 @foreach($brands as $b)
-                                    <option value="{{ $b->id }}" class="bg-ink-900">{{ $b->nama }}</option>
+                                    <option value="{{ $b->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $b->nama }}</option>
                                 @endforeach
                             </select>
                         @endif
 
                         @if($visibleFilters['kualitas'] ?? false)
-                            <select wire:model.live="filterKualitasId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Semua Kualitas</option>
+                            <select wire:model.live="filterKualitasId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kualitas</option>
                                 @foreach($kualitasList as $k)
-                                    <option value="{{ $k->id }}" class="bg-ink-900">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
+                                    <option value="{{ $k->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
                                 @endforeach
                             </select>
                         @endif
 
                         @if(($visibleFilters['brand_kompatibel'] ?? false) || ($visibleFilters['merk_hp'] ?? false))
-                            <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]" title="Filter berdasarkan Merk Smartphone Kompatibel">
-                                <option value="">Semua Merk HP</option>
+                            <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Merk Smartphone Kompatibel">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Merk HP</option>
                                 @foreach($brandKompatibelList as $bk)
-                                    <option value="{{ $bk }}" class="bg-ink-900">{{ $bk }}</option>
+                                    <option value="{{ $bk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $bk }}</option>
                                 @endforeach
                             </select>
                         @endif
 
                         @if(($visibleFilters['model_kompatibel'] ?? false) || ($visibleFilters['tipe_hp'] ?? false))
-                            <select wire:model.live="filterModelKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]" title="Filter berdasarkan Tipe/Model Smartphone Kompatibel">
-                                <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
+                            <select wire:model.live="filterModelKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Tipe/Model Smartphone Kompatibel">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
                                 @foreach($modelKompatibelList as $mk)
-                                    <option value="{{ $mk }}" class="bg-ink-900">{{ $mk }}</option>
+                                    <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mk }}</option>
                                 @endforeach
                             </select>
                         @endif
 
                         @if($visibleFilters['kondisi'] ?? false)
-                            <select wire:model.live="filterKondisi" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Semua Kondisi</option>
+                            <select wire:model.live="filterKondisi" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kondisi</option>
                                 @foreach($kondisiList as $kd)
-                                    <option value="{{ $kd['kode'] }}" class="bg-ink-900">{{ $kd['nama'] }}</option>
+                                    <option value="{{ $kd['kode'] }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $kd['nama'] }}</option>
                                 @endforeach
                             </select>
                         @endif
 
                         @if($visibleFilters['satuan'] ?? false)
-                            <select wire:model.live="filterSatuan" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Semua Satuan</option>
+                            <select wire:model.live="filterSatuan" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Satuan</option>
                                 @foreach($satuanUnits as $su)
-                                    <option value="{{ $su->kode }}" class="bg-ink-900">{{ $su->nama }} ({{ $su->kode }})</option>
+                                    <option value="{{ $su->kode }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $su->nama }} ({{ $su->kode }})</option>
                                 @endforeach
                             </select>
                         @endif
 
                         @if($visibleFilters['abc_class'] ?? false)
-                            <select wire:model.live="filterAbcClass" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Kelas ABC</option>
-                                <option value="A" class="bg-ink-900">Kelas A</option>
-                                <option value="B" class="bg-ink-900">Kelas B</option>
-                                <option value="C" class="bg-ink-900">Kelas C</option>
+                            <select wire:model.live="filterAbcClass" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas ABC</option>
+                                <option value="A" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas A</option>
+                                <option value="B" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas B</option>
+                                <option value="C" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas C</option>
                             </select>
                         @endif
 
                         @if($visibleFilters['stok'] ?? false)
-                            <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ink-900/60 border border-white/10 text-xs text-ink-200 cursor-pointer select-none min-h-[40px]">
-                                <input type="checkbox" wire:model.live="filterHanyaReadyStok" class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                            <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 text-xs text-ink-900 dark:text-ink-200 cursor-pointer select-none min-h-[40px]">
+                                <input type="checkbox" wire:model.live="filterHanyaReadyStok" class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
                                 <span>Ready Stok</span>
                             </label>
                         @endif
 
                         @if($visibleFilters['supplier'] ?? false)
-                            <select wire:model.live="filterSupplierId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-200 bg-ink-900/60 min-h-[40px]">
-                                <option value="">Semua Supplier</option>
+                            <select wire:model.live="filterSupplierId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px] cursor-pointer">
+                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Supplier</option>
                                 @foreach($suppliers as $sup)
-                                    <option value="{{ $sup->id }}" class="bg-ink-900">{{ $sup->nama }}</option>
+                                    <option value="{{ $sup->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $sup->nama }}</option>
                                 @endforeach
                             </select>
                         @endif
-
-                        @if($visibleFilters['tier'] ?? true)
-                            <!-- PRICELIST: Eksternal / Customer-facing (sesuai tier) -->
-                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 bg-up-primary/10 border border-up-primary/20 p-1.5 rounded-xl min-w-[200px] sm:min-w-0 flex-1 sm:flex-none" title="Pricelist untuk konsumen (harga sesuai tier)">
-                                <span class="px-2 py-1 text-[10px] uppercase tracking-wider text-up-primary font-bold hidden sm:flex items-center">📊 Pricelist</span>
-                                <select wire:model.live="filterTierHarga" class="px-3 py-2 rounded-lg bg-black/40 border-0 text-xs font-medium text-white min-h-[44px] outline-none cursor-pointer w-full sm:w-auto" title="Pilih tier harga untuk ekspor pricelist">
-                                    <option value="retail" class="bg-ink-900 text-white">Tier: Retail Standar</option>
-                                    <option value="reseller" class="bg-ink-900 text-white">Tier: Reseller</option>
-                                    <option value="agen" class="bg-ink-900 text-white">Tier: Agen</option>
-                                    @foreach($tierMemberships as $tm)
-                                        <option value="tier_{{ $tm->id }}" class="bg-ink-900 text-white">Tier CRM: {{ $tm->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="flex items-center gap-1.5 w-full sm:w-auto">
-                                    <button type="button" wire:click="exportPricelist('xlsx')" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-up-primary hover:bg-up-primary/80 text-white font-semibold text-xs min-h-[44px] cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist Excel (untuk konsumen)">
-                                        <span class="hidden xs:inline">📊 </span><span>Excel</span>
-                                    </button>
-                                    <button type="button" wire:click="exportPricelist('csv')" class="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-ink-200 font-semibold text-xs min-h-[44px] cursor-pointer transition-[transform,background-color] active:scale-[0.97]" title="Export Pricelist CSV (untuk konsumen)">
-                                        <span class="hidden xs:inline">📄 </span><span>CSV</span>
-                                    </button>
-                                </div>
-                            </div>
-                        @endif
-
-                        <!-- Divider visual pemisah -->
-                        <div class="hidden sm:block w-px h-8 bg-white/10 mx-1.5"></div>
-                        <div class="sm:hidden w-full h-px bg-white/10 my-1.5"></div>
-
-                        <!-- MASTER PRODUK: Internal / Untuk manajemen & update data (sejajar Import) -->
-                        @php $hasSelected = ! empty($selectedProdukIds); $selectedCount = count($selectedProdukIds); @endphp
-                        <div class="relative text-left w-full sm:w-auto" x-data="{ open: false }" @click.away="open = false" @keydown.escape.window="open = false">
-                            <button type="button"
-                                    @click="open = !open"
-                                    aria-haspopup="true" :aria-expanded="open"
-                                    class="w-full sm:w-auto px-3 py-2 rounded-xl bg-ink-900/60 hover:bg-black/40 border border-white/10 text-ink-200 font-semibold text-xs flex items-center justify-center sm:justify-start gap-1.5 transition-[transform,background-color] active:scale-95 cursor-pointer whitespace-nowrap min-h-[44px]"
-                                     title="Export Master Produk (internal; lengkap, untuk import update / backup)">
-                                <span>📦</span>
-                                <span class="hidden sm:inline">Master Produk</span>
-                                <span class="text-[9px] ml-auto sm:ml-0" :class="open ? 'rotate-180' : ''" style="transition: transform 150ms">▼</span>
-                            </button>
-
-                            <div x-show="open" x-cloak
-                                 x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                                 x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                                 class="absolute left-0 right-0 sm:right-auto z-50 mt-2 w-full sm:w-60 rounded-xl glass-card bg-ink-900 border border-white/10 shadow-2xl py-2 origin-top-left"
-                                 style="display: none;">
-                                <!-- Section: Semua (Sesuai Filter) -->
-                                <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-up-mint font-bold">📤 Semua (Sesuai Filter)</div>
-                                <button type="button" wire:click="exportMaster('xlsx')" class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px]" title="Export SEMUA produk yang terlihat (mengikuti filter aktif) — Excel">
-                                    <span>📊</span><span>Excel (xlsx)</span>
-                                </button>
-                                <button type="button" wire:click="exportMaster('csv')" class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px]" title="Export SEMUA produk yang terlihat (mengikuti filter aktif) — CSV">
-                                    <span>📊</span><span>CSV</span>
-                                </button>
-
-                                <div class="my-1.5 border-t border-white/10"></div>
-
-                                <!-- Section: Terpilih -->
-                                <div class="px-3 pb-1.5 text-[10px] uppercase tracking-wider text-up-amber font-bold">🖨 Terpilih ({{ $selectedCount }} item)</div>
-                                <button type="button" wire:click="exportTerpilih('xlsx')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang checkbox di tabel)" @endif
-                                        class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px] @if(! $hasSelected) opacity-50 pointer-events-none @endif">
-                                     <span>🖨</span><span>Export Pricelist Terpilih (xlsx)</span>
-                                </button>
-                                <button type="button" wire:click="exportTerpilih('csv')" @if($hasSelected) wire:loading.attr="disabled" @else disabled title="Pilih minimal satu produk dulu (centang checkbox di tabel)" @endif
-                                        class="w-full text-left px-3 py-2.5 text-xs text-ink-200 hover:bg-white/5 hover:text-white flex items-center gap-2 cursor-pointer min-h-[44px] @if(! $hasSelected) opacity-50 pointer-events-none @endif">
-                                     <span>🖨</span><span>Export Pricelist Terpilih (CSV)</span>
-                                </button>
-                            </div>
-                        </div>
 
                         @if($this->activeFilterCount > 0)
                             <button type="button"
@@ -559,61 +490,64 @@
                                     <div
                                         x-show="open"
                                         x-cloak
-                                        x-transition:enter="transition ease-out duration-150"
+                                        x-transition:enter="transition ease-out duration-100"
                                         x-transition:enter-start="opacity-0 scale-95"
                                         x-transition:enter-end="opacity-100 scale-100"
-                                        class="absolute left-0 mt-2 z-30 w-72 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                        x-transition:leave="transition ease-in duration-75"
+                                        x-transition:leave-start="opacity-100 scale-100"
+                                        x-transition:leave-end="opacity-0 scale-95"
+                                        class="absolute left-0 mt-2 z-40 w-72 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
                                     >
-                                        <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                            <span class="text-xs font-bold text-white">Filter Produk</span>
-                                            <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                        <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                            <span class="text-xs font-bold text-ink-900 dark:text-white">Filter Produk</span>
+                                            <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                         </div>
 
                                         <div class="space-y-2">
                                             <div>
-                                                <label class="block text-[11px] text-ink-300 mb-1">Cari Nama / Model</label>
-                                                <input type="text" wire:model.live.debounce.300ms="produkSearch" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs" placeholder="Ketik kata kunci...">
+                                                <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Cari Nama / Model</label>
+                                                <input type="text" wire:model.live.debounce.300ms="produkSearch" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="Ketik kata kunci...">
                                             </div>
 
                                             <div>
-                                                <label class="block text-[11px] text-ink-300 mb-1">Kategori</label>
-                                                <select wire:model.live="filterKategoriId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Semua Kategori</option>
+                                                <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Kategori</label>
+                                                <select wire:model.live="filterKategoriId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kategori</option>
                                                     @foreach($kategoriTree as $kat)
-                                                        <option value="{{ $kat->id }}">{{ $kat->nama }}</option>
+                                                        <option value="{{ $kat->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white font-bold">{{ $kat->nama }}</option>
                                                         @foreach($kat->children as $child)
-                                                            <option value="{{ $child->id }}">└ {{ $child->nama }}</option>
+                                                            <option value="{{ $child->id }}" class="bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300">└ {{ $child->nama }}</option>
                                                         @endforeach
                                                     @endforeach
                                                 </select>
                                             </div>
 
                                             <div>
-                                                <label class="block text-[11px] text-ink-300 mb-1">Brand Part</label>
-                                                <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Semua Brand Part</option>
+                                                <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Brand Part</label>
+                                                <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Brand Part</option>
                                                     @foreach($brands as $b)
-                                                        <option value="{{ $b->id }}">{{ $b->nama }}</option>
+                                                        <option value="{{ $b->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $b->nama }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
 
                                             <div>
-                                                <label class="block text-[11px] text-ink-300 mb-1">Kualitas</label>
-                                                <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Semua Kualitas</option>
+                                                <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Kualitas</label>
+                                                <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kualitas</option>
                                                     @foreach($kualitasList as $k)
-                                                        <option value="{{ $k->id }}">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
+                                                        <option value="{{ $k->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
                                         </div>
 
-                                        <div class="pt-2 border-t border-white/10 flex justify-between">
-                                            <button type="button" wire:click="resetFilterKolom('produk')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                        <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                            <button type="button" wire:click="resetFilterKolom('produk')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">
                                                 Reset Kolom Ini
                                             </button>
-                                            <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                            <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">
                                                 Tutup
                                             </button>
                                         </div>
@@ -639,23 +573,30 @@
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                                             @if($filterKategoriId) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
                                         </button>
-                                        <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter Kategori</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                        <div x-show="open" x-cloak
+                                             x-transition:enter="transition ease-out duration-100"
+                                             x-transition:enter-start="opacity-0 scale-95"
+                                             x-transition:enter-end="opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-75"
+                                             x-transition:leave-start="opacity-100 scale-100"
+                                             x-transition:leave-end="opacity-0 scale-95"
+                                             class="absolute left-0 mt-2 z-40 w-64 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter Kategori</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
-                                            <select wire:model.live="filterKategoriId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                <option value="">Semua Kategori</option>
+                                            <select wire:model.live="filterKategoriId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kategori</option>
                                                 @foreach($kategoriTree as $kat)
-                                                    <option value="{{ $kat->id }}">{{ $kat->nama }}</option>
+                                                    <option value="{{ $kat->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white font-bold">{{ $kat->nama }}</option>
                                                     @foreach($kat->children as $child)
-                                                        <option value="{{ $child->id }}">└ {{ $child->nama }}</option>
+                                                        <option value="{{ $child->id }}" class="bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300">└ {{ $child->nama }}</option>
                                                     @endforeach
                                                 @endforeach
                                             </select>
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('kategori')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('kategori')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">Tutup</button>
                                             </div>
                                         </div>
                                     </div>
@@ -680,24 +621,31 @@
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                                             @if($filterBrandId || $filterKualitasId) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
                                         </button>
-                                        <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter Brand Part & Kualitas</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                        <div x-show="open" x-cloak
+                                             x-transition:enter="transition ease-out duration-100"
+                                             x-transition:enter-start="opacity-0 scale-95"
+                                             x-transition:enter-end="opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-75"
+                                             x-transition:leave-start="opacity-100 scale-100"
+                                             x-transition:leave-end="opacity-0 scale-95"
+                                             class="absolute left-0 mt-2 z-40 w-64 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter Brand Part & Kualitas</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
                                             <div class="space-y-2">
-                                                <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Semua Brand Part</option>
-                                                    @foreach($brands as $b) <option value="{{ $b->id }}">{{ $b->nama }}</option> @endforeach
+                                                <select wire:model.live="filterBrandId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Brand Part</option>
+                                                    @foreach($brands as $b) <option value="{{ $b->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $b->nama }}</option> @endforeach
                                                 </select>
-                                                <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Semua Kualitas</option>
-                                                    @foreach($kualitasList as $k) <option value="{{ $k->id }}">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option> @endforeach
+                                                <select wire:model.live="filterKualitasId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kualitas</option>
+                                                    @foreach($kualitasList as $k) <option value="{{ $k->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option> @endforeach
                                                 </select>
                                             </div>
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('brand')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('brand')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">Tutup</button>
                                             </div>
                                         </div>
                                     </div>
@@ -715,30 +663,37 @@
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                                             @if($filterTipeHpId || $filterBrandKompatibel || $filterModelKompatibel) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
                                         </button>
-                                        <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter Kompatibilitas</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                        <div x-show="open" x-cloak
+                                             x-transition:enter="transition ease-out duration-100"
+                                             x-transition:enter-start="opacity-0 scale-95"
+                                             x-transition:enter-end="opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-75"
+                                             x-transition:leave-start="opacity-100 scale-100"
+                                             x-transition:leave-end="opacity-0 scale-95"
+                                             class="absolute left-0 mt-2 z-40 w-64 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter Kompatibilitas</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
                                             <div class="space-y-2">
                                                 <div>
-                                                    <label class="block text-[10px] uppercase font-bold text-ink-400 mb-1">Merk HP</label>
-                                                    <select wire:model.live="filterBrandKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs text-ink-200 bg-ink-900">
-                                                        <option value="">Semua Merk HP</option>
-                                                        @foreach($brandKompatibelList as $bk) <option value="{{ $bk }}">{{ $bk }}</option> @endforeach
+                                                    <label class="block text-[10px] uppercase font-bold text-ink-700 dark:text-ink-400 mb-1">Merk HP</label>
+                                                    <select wire:model.live="filterBrandKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                        <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Merk HP</option>
+                                                        @foreach($brandKompatibelList as $bk) <option value="{{ $bk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $bk }}</option> @endforeach
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label class="block text-[10px] uppercase font-bold text-ink-400 mb-1">Tipe HP</label>
-                                                    <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs text-ink-200 bg-ink-900">
-                                                        <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
-                                                        @foreach($modelKompatibelList as $mk) <option value="{{ $mk }}">{{ $mk }}</option> @endforeach
+                                                    <label class="block text-[10px] uppercase font-bold text-ink-700 dark:text-ink-400 mb-1">Tipe HP</label>
+                                                    <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                        <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
+                                                        @foreach($modelKompatibelList as $mk) <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mk }}</option> @endforeach
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('kompatibilitas')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('kompatibilitas')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">Tutup</button>
                                             </div>
                                         </div>
                                     </div>
@@ -768,31 +723,34 @@
                                         <div
                                             x-show="open"
                                             x-cloak
-                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter="transition ease-out duration-100"
                                             x-transition:enter-start="opacity-0 scale-95"
                                             x-transition:enter-end="opacity-100 scale-100"
-                                            class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="opacity-100 scale-100"
+                                            x-transition:leave-end="opacity-0 scale-95"
+                                            class="absolute left-0 mt-2 z-40 w-64 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
                                         >
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter Supplier</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter Supplier</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
 
                                             <div>
-                                                <label class="block text-[11px] text-ink-300 mb-1">Pilih Supplier</label>
-                                                <select wire:model.live="filterSupplierId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium">
-                                                    <option value="">Semua Supplier</option>
+                                                <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Pilih Supplier</label>
+                                                <select wire:model.live="filterSupplierId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-medium bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Supplier</option>
                                                     @foreach($suppliers as $sup)
-                                                        <option value="{{ $sup->id }}">{{ $sup->nama }}</option>
+                                                        <option value="{{ $sup->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $sup->nama }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
 
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('supplier')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('supplier')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">
                                                     Reset Kolom Ini
                                                 </button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">
                                                     Tutup
                                                 </button>
                                             </div>
@@ -832,26 +790,29 @@
                                         <div
                                             x-show="open"
                                             x-cloak
-                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter="transition ease-out duration-100"
                                             x-transition:enter-start="opacity-0 scale-95"
                                             x-transition:enter-end="opacity-100 scale-100"
-                                            class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="opacity-100 scale-100"
+                                            x-transition:leave-end="opacity-0 scale-95"
+                                            class="absolute left-0 mt-2 z-40 w-64 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
                                         >
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter SKU / Barcode</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter SKU / Barcode</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
 
                                             <div>
-                                                <label class="block text-[11px] text-ink-300 mb-1">Cari Kode SKU atau Barcode</label>
-                                                <input type="text" wire:model.live.debounce.300ms="filterSku" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="Ketik kode SKU...">
+                                                <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Cari Kode SKU atau Barcode</label>
+                                                <input type="text" wire:model.live.debounce.300ms="filterSku" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="Ketik kode SKU...">
                                             </div>
 
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('sku')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('sku')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">
                                                     Reset Kolom Ini
                                                 </button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">
                                                     Tutup
                                                 </button>
                                             </div>
@@ -878,18 +839,25 @@
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                                             @if($filterMinHargaBeli !== null || $filterMaxHargaBeli !== null) <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-up-primary animate-pulse"></span> @endif
                                         </button>
-                                        <div x-show="open" x-cloak class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case">
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter Harga Beli</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                        <div x-show="open" x-cloak
+                                             x-transition:enter="transition ease-out duration-100"
+                                             x-transition:enter-start="opacity-0 scale-95"
+                                             x-transition:enter-end="opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-75"
+                                             x-transition:leave-start="opacity-100 scale-100"
+                                             x-transition:leave-end="opacity-0 scale-95"
+                                             class="absolute left-0 mt-2 z-40 w-64 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case">
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter Harga Beli</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
                                             <div class="grid grid-cols-2 gap-2">
-                                                <input type="number" wire:model.live.debounce.400ms="filterMinHargaBeli" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="Min Rp">
-                                                <input type="number" wire:model.live.debounce.400ms="filterMaxHargaBeli" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="Maks Rp">
+                                                <input type="number" wire:model.live.debounce.400ms="filterMinHargaBeli" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-mono bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="Min Rp">
+                                                <input type="number" wire:model.live.debounce.400ms="filterMaxHargaBeli" class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-mono bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="Maks Rp">
                                             </div>
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('harga_beli')" @click="open = false" class="text-[11px] text-up-red hover:underline">Reset</button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">Tutup</button>
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('harga_beli')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">Reset</button>
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">Tutup</button>
                                             </div>
                                         </div>
                                     </div>
@@ -927,39 +895,42 @@
                                         <div
                                             x-show="open"
                                             x-cloak
-                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter="transition ease-out duration-100"
                                             x-transition:enter-start="opacity-0 scale-95"
                                             x-transition:enter-end="opacity-100 scale-100"
-                                            class="absolute left-0 mt-2 z-30 w-72 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="opacity-100 scale-100"
+                                            x-transition:leave-end="opacity-0 scale-95"
+                                            class="absolute left-0 sm:left-auto right-0 mt-2 z-40 w-72 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal origin-top-right"
                                         >
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter & Urutkan Harga</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter & Urutkan Harga</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
 
                                             <!-- Opsi Sort Cepat Harga -->
                                             <div class="space-y-1">
-                                                <span class="text-[10px] uppercase font-bold text-ink-400 tracking-wider">Urutan Cepat</span>
+                                                <span class="text-[10px] uppercase font-bold text-ink-700 dark:text-ink-400 tracking-wider">Urutan Cepat</span>
                                                 <div class="grid grid-cols-2 gap-1.5">
-                                                    <button type="button" wire:click="updatedSortPreset('harga_jual_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                    <button type="button" wire:click="updatedSortPreset('harga_jual_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-900 dark:text-ink-200 cursor-pointer">
                                                         📈 Jual Tertinggi
                                                     </button>
-                                                    <button type="button" wire:click="updatedSortPreset('harga_jual_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                    <button type="button" wire:click="updatedSortPreset('harga_jual_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-900 dark:text-ink-200 cursor-pointer">
                                                         📉 Jual Terendah
                                                     </button>
-                                                    <button type="button" wire:click="updatedSortPreset('harga_beli_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                    <button type="button" wire:click="updatedSortPreset('harga_beli_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-900 dark:text-ink-200 cursor-pointer">
                                                         📦 Beli Tertinggi
                                                     </button>
-                                                    <button type="button" wire:click="updatedSortPreset('harga_beli_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                    <button type="button" wire:click="updatedSortPreset('harga_beli_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-900 dark:text-ink-200 cursor-pointer">
                                                         🏷️ Beli Terendah
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            <div class="space-y-2 pt-2 border-t border-white/10">
+                                            <div class="space-y-2 pt-2 border-t border-black/10 dark:border-white/10">
                                                 <div>
-                                                    <label class="block text-[11px] text-ink-300 mb-1">Tier Harga Aktif</label>
-                                                    <select wire:model.live="filterTierHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Tier Harga Aktif</label>
+                                                    <select wire:model.live="filterTierHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
                                                         <option value="retail">Retail (Umum)</option>
                                                         <option value="reseller">Reseller</option>
                                                         <option value="agen">Agen</option>
@@ -971,21 +942,21 @@
 
                                                 <div class="grid grid-cols-2 gap-2">
                                                     <div>
-                                                        <label class="block text-[11px] text-ink-300 mb-1">Min (Rp)</label>
-                                                        <input type="number" wire:model.live.debounce.400ms="filterMinHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="0">
+                                                        <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Min (Rp)</label>
+                                                        <input type="number" wire:model.live.debounce.400ms="filterMinHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="0">
                                                     </div>
                                                     <div>
-                                                        <label class="block text-[11px] text-ink-300 mb-1">Maks (Rp)</label>
-                                                        <input type="number" wire:model.live.debounce.400ms="filterMaxHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono" placeholder="Tak terbatas">
+                                                        <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Maks (Rp)</label>
+                                                        <input type="number" wire:model.live.debounce.400ms="filterMaxHarga" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-mono bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10" placeholder="Tak terbatas">
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('harga')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('harga')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">
                                                     Reset Kolom Ini
                                                 </button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">
                                                     Tutup
                                                 </button>
                                             </div>
@@ -1025,33 +996,36 @@
                                         <div
                                             x-show="open"
                                             x-cloak
-                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter="transition ease-out duration-100"
                                             x-transition:enter-start="opacity-0 scale-95"
                                             x-transition:enter-end="opacity-100 scale-100"
-                                            class="absolute left-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="opacity-100 scale-100"
+                                            x-transition:leave-end="opacity-0 scale-95"
+                                            class="absolute left-0 sm:left-auto right-0 mt-2 z-40 w-64 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal origin-top-right"
                                         >
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter & Sort Stok</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter & Sort Stok</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
 
                                             <!-- Opsi Sort Cepat Stok -->
                                             <div class="space-y-1">
-                                                <span class="text-[10px] uppercase font-bold text-ink-400 tracking-wider">Urutan Cepat</span>
+                                                <span class="text-[10px] uppercase font-bold text-ink-700 dark:text-ink-400 tracking-wider">Urutan Cepat</span>
                                                 <div class="grid grid-cols-2 gap-1.5">
-                                                    <button type="button" wire:click="updatedSortPreset('stok_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                    <button type="button" wire:click="updatedSortPreset('stok_desc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-900 dark:text-ink-200 cursor-pointer">
                                                         📦 Stok Terbanyak
                                                     </button>
-                                                    <button type="button" wire:click="updatedSortPreset('stok_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-white/5 hover:bg-white/10 text-ink-200">
+                                                    <button type="button" wire:click="updatedSortPreset('stok_asc')" @click="open = false" class="px-2 py-1.5 rounded-lg text-left text-[11px] bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-900 dark:text-ink-200 cursor-pointer">
                                                         ⚠️ Stok Menipis
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            <div class="space-y-2 pt-2 border-t border-white/10">
+                                            <div class="space-y-2 pt-2 border-t border-black/10 dark:border-white/10">
                                                 <div>
-                                                    <label class="block text-[11px] text-ink-300 mb-1">Status Ketersediaan</label>
-                                                    <select wire:model.live="filterStokStatus" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
+                                                    <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Status Ketersediaan</label>
+                                                    <select wire:model.live="filterStokStatus" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
                                                         <option value="semua">Semua Stok</option>
                                                         <option value="ready">✅ Ready Stok Saja (&gt; 0)</option>
                                                         <option value="menipis">⚠️ Stok Menipis (≤ Min)</option>
@@ -1060,11 +1034,11 @@
                                                 </div>
                                             </div>
 
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('stok')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('stok')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">
                                                     Reset Kolom Ini
                                                 </button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">
                                                     Tutup
                                                 </button>
                                             </div>
@@ -1097,31 +1071,34 @@
                                         <div
                                             x-show="open"
                                             x-cloak
-                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter="transition ease-out duration-100"
                                             x-transition:enter-start="opacity-0 scale-95"
                                             x-transition:enter-end="opacity-100 scale-100"
-                                            class="absolute right-0 mt-2 z-30 w-64 p-3.5 rounded-2xl glass-panel bg-ink-950/95 border border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="opacity-100 scale-100"
+                                            x-transition:leave-end="opacity-0 scale-95"
+                                            class="absolute right-0 mt-2 z-40 w-64 max-w-[90vw] p-3.5 rounded-2xl glass-card bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl space-y-3 font-normal normal-case tracking-normal origin-top-right"
                                         >
-                                            <div class="flex items-center justify-between pb-2 border-b border-white/10">
-                                                <span class="text-xs font-bold text-white">Filter Gudang</span>
-                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-white text-xs">✕</button>
+                                            <div class="flex items-center justify-between pb-2 border-b border-black/10 dark:border-white/10">
+                                                <span class="text-xs font-bold text-ink-900 dark:text-white">Filter Gudang</span>
+                                                <button type="button" @click="open = false" class="text-ink-400 hover:text-ink-900 dark:hover:text-white text-xs cursor-pointer">✕</button>
                                             </div>
 
                                             <div>
-                                                <label class="block text-[11px] text-ink-300 mb-1">Pilih Gudang Cabang</label>
-                                                <select wire:model.live="filterGudangId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs">
-                                                    <option value="">Semua Gudang</option>
+                                                <label class="block text-[11px] text-ink-700 dark:text-ink-300 mb-1">Pilih Gudang Cabang</label>
+                                                <select wire:model.live="filterGudangId" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
+                                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Gudang</option>
                                                     @foreach($gudangsCabang as $g)
-                                                        <option value="{{ $g->id }}">{{ $g->nama }}</option>
+                                                        <option value="{{ $g->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $g->nama }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
 
-                                            <div class="pt-2 border-t border-white/10 flex justify-between">
-                                                <button type="button" wire:click="resetFilterKolom('gudang')" @click="open = false" class="text-[11px] text-up-red hover:underline">
+                                            <div class="pt-2 border-t border-black/10 dark:border-white/10 flex justify-between">
+                                                <button type="button" wire:click="resetFilterKolom('gudang')" @click="open = false" class="text-[11px] text-up-red hover:underline cursor-pointer">
                                                     Reset Kolom Ini
                                                 </button>
-                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary text-white text-[11px] font-bold">
+                                                <button type="button" @click="open = false" class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold cursor-pointer">
                                                     Tutup
                                                 </button>
                                             </div>
@@ -2811,30 +2788,30 @@
     <!-- MODAL: IMPORT PRODUK EXCEL [T-43] -->
     @if($showImportModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
-                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">Import Master Produk (Excel)</h3>
-                    <button wire:click="tutupImportModal" class="text-ink-400 hover:text-white">✕</button>
+            <div class="w-full max-w-2xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 border border-black/10 dark:border-white/10 shadow-2xl p-6 rounded-3xl relative max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-black/10 dark:border-white/10">
+                    <h3 class="text-lg font-bold text-ink-900 dark:text-white">Import Master Produk (Excel)</h3>
+                    <button wire:click="tutupImportModal" class="text-ink-400 hover:text-ink-900 dark:hover:text-white cursor-pointer">✕</button>
                 </div>
 
                 @if($importStep === 'upload')
                     <div class="space-y-4">
                         {{-- Format Selector Radio Pills --}}
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-2">Pilih Format Sumber Data</label>
+                            <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-2">Pilih Format Sumber Data</label>
                             <div class="grid grid-cols-2 gap-2">
-                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-[background-color,border-color,color] duration-140 {{ $importFormat === 'standar' ? 'bg-up-primary/15 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}">
+                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-[background-color,border-color,color] duration-140 {{ $importFormat === 'standar' ? 'bg-up-primary/15 border-up-primary text-up-primary font-bold' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}">
                                     <input type="radio" wire:model.live="importFormat" value="standar" class="accent-up-primary" />
                                     <div>
                                         <div class="text-xs font-bold leading-none">Template Standar UteParts</div>
-                                        <div class="text-[10px] text-ink-400 mt-1">Format Excel baku dengan kolom lengkap</div>
+                                        <div class="text-[10px] text-ink-500 dark:text-ink-400 mt-1">Format Excel baku dengan kolom lengkap</div>
                                     </div>
                                 </label>
-                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-[background-color,border-color,color] duration-140 {{ $importFormat === 'sid_retail' ? 'bg-up-primary/15 border-up-primary text-white' : 'bg-white/5 border-white/10 text-ink-300 hover:bg-white/10' }}">
+                                <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-[background-color,border-color,color] duration-140 {{ $importFormat === 'sid_retail' ? 'bg-up-primary/15 border-up-primary text-up-primary font-bold' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}">
                                     <input type="radio" wire:model.live="importFormat" value="sid_retail" class="accent-up-primary" />
                                     <div>
                                         <div class="text-xs font-bold leading-none">Export SID Retail Pro</div>
-                                        <div class="text-[10px] text-ink-400 mt-1">Mapping otomatis stok etalase & gudang</div>
+                                        <div class="text-[10px] text-ink-500 dark:text-ink-400 mt-1">Mapping otomatis stok etalase & gudang</div>
                                     </div>
                                 </label>
                             </div>
@@ -2842,21 +2819,21 @@
 
                         @if($importFormat === 'sid_retail')
                             {{-- Info Box SID Retail --}}
-                            <div class="p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/25 text-[11px] text-ink-200 leading-relaxed">
+                            <div class="p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/25 text-[11px] text-ink-800 dark:text-ink-200 leading-relaxed">
                                 <div class="flex items-center gap-2 mb-1.5">
                                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary text-white uppercase tracking-wider">SID Retail Pro</span>
                                     <span class="font-bold text-up-primary">Otomatis Terpetakan</span>
                                 </div>
-                                Kolom <span class="font-semibold text-white">KODE_BARANG</span>, <span class="font-semibold text-white">BARCODE</span>, <span class="font-semibold text-white">NAMA</span>, <span class="font-semibold text-white">KATEGORI</span>, <span class="font-semibold text-white">SUB_KATEGORI</span>, <span class="font-semibold text-white">HPP</span>, <span class="font-semibold text-white">HARGA_TOKO_1/2</span>, <span class="font-semibold text-white">HARGA_PARTAI_1</span>, serta stok <span class="font-semibold text-white">TOKO</span> dan <span class="font-semibold text-white">GUDANG</span> akan diproses otomatis secara hemat memori (streaming XML).
+                                Kolom <span class="font-semibold text-ink-900 dark:text-white">KODE_BARANG</span>, <span class="font-semibold text-ink-900 dark:text-white">BARCODE</span>, <span class="font-semibold text-ink-900 dark:text-white">NAMA</span>, <span class="font-semibold text-ink-900 dark:text-white">KATEGORI</span>, <span class="font-semibold text-ink-900 dark:text-white">SUB_KATEGORI</span>, <span class="font-semibold text-ink-900 dark:text-white">HPP</span>, <span class="font-semibold text-ink-900 dark:text-white">HARGA_TOKO_1/2</span>, <span class="font-semibold text-ink-900 dark:text-white">HARGA_PARTAI_1</span>, serta stok <span class="font-semibold text-ink-900 dark:text-white">TOKO</span> dan <span class="font-semibold text-ink-900 dark:text-white">GUDANG</span> akan diproses otomatis secara hemat memori (streaming XML).
                             </div>
 
                             {{-- Dropdown Pilihan Gudang Cabang --}}
-                            <div class="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-white/5 border border-white/10">
+                            <div class="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10">
                                 <div>
-                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1.5">
+                                    <label class="block text-[11px] font-semibold text-ink-700 dark:text-ink-300 mb-1.5">
                                         🏪 Gudang untuk Kolom <strong class="text-up-mint">TOKO</strong> (Etalase)
                                     </label>
-                                    <select wire:model="gudangTokoId" class="w-full text-xs bg-slate-900/80 border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-up-primary cursor-pointer">
+                                    <select wire:model="gudangTokoId" class="w-full text-xs bg-white dark:bg-slate-900/80 border border-black/10 dark:border-white/15 rounded-xl px-3 py-2 text-ink-900 dark:text-white focus:outline-none focus:border-up-primary cursor-pointer">
                                         <option value="">-- Lewati Stok Toko --</option>
                                         @foreach($gudangsCabang as $g)
                                             <option value="{{ $g->id }}">{{ $g->nama }} ({{ $g->kode }})</option>
@@ -2864,10 +2841,10 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-semibold text-ink-300 mb-1.5">
+                                    <label class="block text-[11px] font-semibold text-ink-700 dark:text-ink-300 mb-1.5">
                                         🏢 Gudang untuk Kolom <strong class="text-up-amber">GUDANG</strong> (Penyimpanan)
                                     </label>
-                                    <select wire:model="gudangPusatId" class="w-full text-xs bg-slate-900/80 border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-up-primary cursor-pointer">
+                                    <select wire:model="gudangPusatId" class="w-full text-xs bg-white dark:bg-slate-900/80 border border-black/10 dark:border-white/15 rounded-xl px-3 py-2 text-ink-900 dark:text-white focus:outline-none focus:border-up-primary cursor-pointer">
                                         <option value="">-- Lewati Stok Gudang --</option>
                                         @foreach($gudangsCabang as $g)
                                             <option value="{{ $g->id }}">{{ $g->nama }} ({{ $g->kode }})</option>
@@ -2877,7 +2854,7 @@
                             </div>
                         @else
                             {{-- Info Box & Download Template Standar --}}
-                            <div class="p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/25 text-[11px] text-ink-200 leading-relaxed">
+                            <div class="p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/25 text-[11px] text-ink-800 dark:text-ink-200 leading-relaxed">
                                 <p class="font-bold text-up-primary mb-1">📥 Template &amp; cara pakai</p>
                                 Unduh template di bawah, isi (baris contoh bisa dihapus), lalu upload.<br>
                                 <strong class="text-up-amber">Import = inisialisasi master produk</strong> (termasuk stok awal modal: jurnal Debit Persediaan / Kredit Modal).
@@ -2890,12 +2867,12 @@
                         @endif
 
                         <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">File Excel (.xlsx / .xls / .csv, maks 5MB)</label>
-                            <input type="file" wire:model="importFile" accept=".xlsx,.xls,.csv" class="w-full text-xs text-ink-300 file:mr-3 file:px-4 file:py-2 file:rounded-xl file:border-0 file:bg-up-primary file:text-white file:font-bold file:text-xs file:cursor-pointer" />
+                            <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">File Excel (.xlsx / .xls / .csv, maks 5MB)</label>
+                            <input type="file" wire:model="importFile" accept=".xlsx,.xls,.csv" class="w-full text-xs text-ink-700 dark:text-ink-300 file:mr-3 file:px-4 file:py-2 file:rounded-xl file:border-0 file:bg-up-primary file:text-white file:font-bold file:text-xs file:cursor-pointer" />
                             @error('importFile') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                         </div>
                         <div class="flex gap-3 pt-3">
-                            <button wire:click="tutupImportModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                            <button wire:click="tutupImportModal" class="flex-1 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                             <button wire:click="previewImport" wire:loading.attr="disabled" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer min-h-[44px]">
                                 <span wire:loading.remove wire:target="previewImport">🔍 Preview (Dry-run)</span>
                                 <span wire:loading wire:target="previewImport">Memeriksa…</span>
@@ -2905,29 +2882,29 @@
                 @elseif($importStep === 'preview')
                     <div class="space-y-4">
                         <div class="grid grid-cols-4 gap-2 text-center text-[11px]">
-                            <div class="p-2.5 rounded-xl bg-white/5 border border-white/10">
-                                <span class="text-ink-400 block text-[9px] uppercase font-bold tracking-wider">Total Baris</span>
-                                <span class="text-white text-base font-extrabold tabular-nums">{{ $importPreview['total_baris'] ?? 0 }}</span>
+                            <div class="p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                                <span class="text-ink-500 dark:text-ink-400 block text-[9px] uppercase font-bold tracking-wider">Total Baris</span>
+                                <span class="text-ink-900 dark:text-white text-base font-extrabold tabular-nums">{{ $importPreview['total_baris'] ?? 0 }}</span>
                             </div>
                             <div class="p-2.5 rounded-xl bg-up-mint/10 border border-up-mint/30">
                                 <span class="text-up-mint block text-[9px] uppercase font-bold tracking-wider">Valid (Siap)</span>
                                 <span class="text-up-mint text-base font-extrabold tabular-nums">{{ $importPreview['valid'] ?? 0 }}</span>
                             </div>
-                            <div class="p-2.5 rounded-xl {{ ($importPreview['invalid'] ?? 0) > 0 ? 'bg-up-red/10 border border-up-red/30' : 'bg-white/5 border border-white/10' }}">
-                                <span class="{{ ($importPreview['invalid'] ?? 0) > 0 ? 'text-up-red' : 'text-ink-400' }} block text-[9px] uppercase font-bold tracking-wider">Error (Dilewati)</span>
-                                <span class="{{ ($importPreview['invalid'] ?? 0) > 0 ? 'text-up-red' : 'text-ink-400' }} text-base font-extrabold tabular-nums">{{ $importPreview['invalid'] ?? 0 }}</span>
+                            <div class="p-2.5 rounded-xl {{ ($importPreview['invalid'] ?? 0) > 0 ? 'bg-up-red/10 border border-up-red/30' : 'bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10' }}">
+                                <span class="{{ ($importPreview['invalid'] ?? 0) > 0 ? 'text-up-red' : 'text-ink-500 dark:text-ink-400' }} block text-[9px] uppercase font-bold tracking-wider">Error (Dilewati)</span>
+                                <span class="{{ ($importPreview['invalid'] ?? 0) > 0 ? 'text-up-red' : 'text-ink-500 dark:text-ink-400' }} text-base font-extrabold tabular-nums">{{ $importPreview['invalid'] ?? 0 }}</span>
                             </div>
-                            <div class="p-2.5 rounded-xl {{ ($importPreview['total_peringatan'] ?? 0) > 0 ? 'bg-up-amber/10 border border-up-amber/30' : 'bg-white/5 border border-white/10' }}">
-                                <span class="{{ ($importPreview['total_peringatan'] ?? 0) > 0 ? 'text-up-amber' : 'text-ink-400' }} block text-[9px] uppercase font-bold tracking-wider">Perhatian Khusus</span>
-                                <span class="{{ ($importPreview['total_peringatan'] ?? 0) > 0 ? 'text-up-amber' : 'text-ink-400' }} text-base font-extrabold tabular-nums">{{ $importPreview['total_peringatan'] ?? 0 }}</span>
+                            <div class="p-2.5 rounded-xl {{ ($importPreview['total_peringatan'] ?? 0) > 0 ? 'bg-up-amber/10 border border-up-amber/30' : 'bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10' }}">
+                                <span class="{{ ($importPreview['total_peringatan'] ?? 0) > 0 ? 'text-up-amber' : 'text-ink-500 dark:text-ink-400' }} block text-[9px] uppercase font-bold tracking-wider">Perhatian Khusus</span>
+                                <span class="{{ ($importPreview['total_peringatan'] ?? 0) > 0 ? 'text-up-amber' : 'text-ink-500 dark:text-ink-400' }} text-base font-extrabold tabular-nums">{{ $importPreview['total_peringatan'] ?? 0 }}</span>
                             </div>
                         </div>
 
                         @if(! empty($importPreview['referensi_summary']))
-                            <div class="p-3 rounded-xl bg-white/5 border border-white/10 text-[10px]">
-                                <strong class="text-white">Ringkasan master:</strong>
+                            <div class="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-[10px]">
+                                <strong class="text-ink-900 dark:text-white">Ringkasan master:</strong>
                                 @foreach($importPreview['referensi_summary'] as $jenis => $items)
-                                    <span class="mr-3 text-ink-300">{{ $jenis }}: {{ count($items['existing'] ?? []) }} ada, {{ count($items['new'] ?? []) }} baru</span>
+                                    <span class="mr-3 text-ink-700 dark:text-ink-300">{{ $jenis }}: {{ count($items['existing'] ?? []) }} ada, {{ count($items['new'] ?? []) }} baru</span>
                                 @endforeach
                             </div>
                         @endif
@@ -3020,8 +2997,8 @@
                         @endif
 
                         <div class="flex gap-3 pt-3">
-                            <button wire:click="previewImport" class="px-4 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Upload ulang</button>
-                            <button wire:click="tutupImportModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                            <button wire:click="previewImport" class="px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Upload ulang</button>
+                            <button wire:click="tutupImportModal" class="flex-1 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                             <button wire:click="commitImport" wire:loading.attr="disabled" class="flex-1 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">
                                 <span wire:loading.remove wire:target="commitImport">✅ Import Sekarang</span>
                                 <span wire:loading wire:target="commitImport">Mengirim…</span>

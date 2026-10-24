@@ -84,10 +84,10 @@
         x-transition:enter="transition ease-out duration-100"
         x-transition:enter-start="opacity-0 scale-95"
         x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-75"
+        x-transition:leave="transition ease-out duration-75"
         x-transition:leave-start="opacity-100 scale-100"
         x-transition:leave-end="opacity-0 scale-95"
-        class="absolute z-50 left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-xl bg-white dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-1.5 space-y-0.5"
+        class="absolute z-50 left-0 right-0 mt-1 origin-top max-h-56 overflow-y-auto rounded-xl bg-white dark:bg-ink-950/95 backdrop-blur-md border border-ink-200 dark:border-white/10 shadow-2xl p-1.5 space-y-0.5"
         style="display: none;"
     >
         <template x-for="opt in filteredOptions" :key="opt.id">

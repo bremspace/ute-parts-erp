@@ -431,7 +431,7 @@
                         x-transition:enter="transition duration-200 ease-out"
                         x-transition:enter-start="translate-y-8 opacity-0 sm:translate-y-0 sm:scale-[0.97]"
                         x-transition:enter-end="translate-y-0 opacity-100 sm:scale-100"
-                        x-transition:leave="transition duration-150 ease-in"
+                        x-transition:leave="transition duration-150 ease-out"
                         x-transition:leave-start="translate-y-0 opacity-100 sm:scale-100"
                         x-transition:leave-end="translate-y-8 opacity-0 sm:translate-y-0 sm:scale-[0.97]"
                         class="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto bg-white dark:bg-ink-900 border border-ink-100 dark:border-white/10 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl"
@@ -827,7 +827,7 @@
                                     <span class="font-bold text-up-primary tabular-nums">{{ $membershipInfo['progress'] }}%</span>
                                 </div>
                                 <div class="w-full h-2 rounded-full bg-ink-100 dark:bg-white/10 overflow-hidden">
-                                    <div class="h-full bg-gradient-to-r from-up-primary to-up-mint rounded-full transition-[width] duration-500" style="width: {{ $membershipInfo['progress'] }}%"></div>
+                                    <div class="h-full bg-gradient-to-r from-up-primary to-up-mint rounded-full transition-[width] duration-250 ease-out" style="width: {{ $membershipInfo['progress'] }}%"></div>
                                 </div>
                                 <p class="text-[11px] text-ink-400 mt-2">
                                     Belanja <strong class="text-ink-800 dark:text-ink-200 tabular-nums">Rp {{ number_format($membershipInfo['kekurangan'], 0, ',', '.') }}</strong> lagi untuk naik tingkat.

@@ -122,10 +122,10 @@
                          x-transition:enter="transition ease-out duration-120"
                          x-transition:enter-start="opacity-0 scale-95"
                          x-transition:enter-end="opacity-100 scale-100"
-                         x-transition:leave="transition ease-in duration-100"
+                         x-transition:leave="transition ease-out duration-100"
                          x-transition:leave-start="opacity-100 scale-100"
                          x-transition:leave-end="opacity-0 scale-95"
-                         class="absolute right-0 mt-2 w-48 py-2 rounded-2xl bg-white dark:bg-[#0F172A] border border-ink-200/80 dark:border-white/10 shadow-xl z-50">
+                         class="absolute right-0 mt-2 w-48 origin-top-right py-2 rounded-2xl bg-white dark:bg-[#0F172A] border border-ink-200/80 dark:border-white/10 shadow-xl z-50">
                         <div class="px-3 py-1 text-[11px] font-semibold text-ink-400 uppercase tracking-wider">
                             Ukuran Font
                         </div>
@@ -188,10 +188,10 @@
                              x-transition:enter="transition ease-out duration-150"
                              x-transition:enter-start="opacity-0 translate-y-2 scale-95"
                              x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave="transition ease-out duration-100"
                              x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                              x-transition:leave-end="opacity-0 translate-y-2 scale-95"
-                             class="absolute right-0 mt-2 w-72 sm:w-80 rounded-3xl bg-white/95 dark:bg-[#0D1526]/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.6)] p-3.5 z-50">
+                             class="absolute right-0 mt-2 w-72 sm:w-80 origin-top-right rounded-3xl bg-white/95 dark:bg-[#0D1526]/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.6)] p-3.5 z-50">
                             <!-- User Summary -->
                             <div class="p-3 rounded-2xl bg-slate-50 dark:bg-white/[0.04] border border-slate-100 dark:border-white/5 mb-2">
                                 <div class="flex items-center gap-3">
@@ -298,10 +298,10 @@
                              x-transition:enter="transition ease-out duration-150"
                              x-transition:enter-start="opacity-0 translate-y-2 scale-95"
                              x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave="transition ease-out duration-100"
                              x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                              x-transition:leave-end="opacity-0 translate-y-2 scale-95"
-                             class="absolute right-0 mt-2 w-72 sm:w-80 rounded-3xl bg-white/95 dark:bg-[#0D1526]/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.6)] p-3.5 z-50">
+                             class="absolute right-0 mt-2 w-72 sm:w-80 origin-top-right rounded-3xl bg-white/95 dark:bg-[#0D1526]/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.6)] p-3.5 z-50">
                             <div class="p-3 text-center mb-2">
                                 <div class="w-11 h-11 mx-auto rounded-2xl bg-up-primary/10 text-up-primary flex items-center justify-center mb-2">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

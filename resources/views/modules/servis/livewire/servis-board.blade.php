@@ -118,10 +118,21 @@
                      @dragleave="overCol = null"
                      @drop.prevent="if (dragId) { $wire.dropTicket(dragId, '{{ $status }}'); dragId = null; overCol = null; }">
                     <!-- Column Header -->
+                    @php
+                        $dotColor = match($col['color'] ?? '') {
+                            'up-primary' => 'bg-up-primary',
+                            'up-amber' => 'bg-up-amber',
+                            'up-red' => 'bg-up-red',
+                            'up-mint' => 'bg-up-mint',
+                            'up-accent' => 'bg-up-accent',
+                            'ink-100' => 'bg-ink-100',
+                            default => 'bg-ink-400',
+                        };
+                    @endphp
                     <div class="px-4 py-3 flex items-center justify-between border-b border-white/5 flex-shrink-0"
                          :class="overCol === '{{ $status }}' ? 'bg-up-primary/10' : 'bg-white/[0.02]'">
                         <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-{{ $col['color'] }}"></span>
+                            <span class="w-2 h-2 rounded-full {{ $dotColor }}"></span>
                             <h3 class="text-xs font-bold text-white uppercase tracking-wider">{{ $col['label'] }}</h3>
                             <span class="text-[10px] font-mono text-ink-400 tabular-nums bg-white/5 px-1.5 py-0.5 rounded">
                                 {{ ($groupedTikets[$status] ?? collect())->count() }}
