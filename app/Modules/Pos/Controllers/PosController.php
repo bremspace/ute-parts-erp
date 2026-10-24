@@ -245,21 +245,18 @@ class PosController extends Controller
 
                     // Cek ketersediaan stok di gudang jika gudang ditentukan (memperhitungkan reservasi aktif)
                     if ($gudangId) {
-                        $stokItem = StokItem::firstOrCreate(
-                            [
-                                'produk_id' => $produk->id,
-                                'sku_variant_id' => $item['sku_variant_id'] ?? null,
-                                'gudang_id' => $gudangId,
-                            ],
-                            ['jumlah' => 0, 'jumlah_minimum' => 0]
-                        );
+                        $variantId = $item['sku_variant_id'] ?? null;
+                        $stokFisik = (int) StokItem::where('produk_id', $produk->id)
+                            ->where('gudang_id', $gudangId)
+                            ->when($variantId, fn ($q) => $q->where('sku_variant_id', $variantId))
+                            ->sum('jumlah');
 
                         $reserved = app(StockReservationService::class)->getActiveReservation(
                             $cabangId,
                             $produk->id,
-                            $item['sku_variant_id'] ?? null
+                            $variantId
                         );
-                        $stokBisaJual = max(0, (int) $stokItem->jumlah - $reserved);
+                        $stokBisaJual = max(0, $stokFisik - $reserved);
 
                         if ($stokBisaJual < $qty) {
                             // [B-02 revisi] Exception domain → controller mengembalikan 422

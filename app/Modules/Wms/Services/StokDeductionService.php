@@ -277,6 +277,19 @@ class StokDeductionService
             $query->lockForUpdate();
         }
 
+        // 1. Coba baris tanpa varian yang masih ada saldo stok (> 0)
+        $tanpaVarianDenganStok = (clone $query)->whereNull('sku_variant_id')->where('jumlah', '>', 0)->orderBy('id')->first();
+        if ($tanpaVarianDenganStok) {
+            return $tanpaVarianDenganStok;
+        }
+
+        // 2. Jika tidak ada baris tanpa varian bersaldo positif, ambil baris kanonik dengan saldo terbesar > 0 (mis. baris varian)
+        $barisStokTerbesar = (clone $query)->where('jumlah', '>', 0)->orderByDesc('jumlah')->orderBy('id')->first();
+        if ($barisStokTerbesar) {
+            return $barisStokTerbesar;
+        }
+
+        // 3. Fallback jika seluruh baris saldo <= 0: prioritaskan baris tanpa varian bila ada, atau baris pertama
         $tanpaVarian = (clone $query)->whereNull('sku_variant_id')->orderBy('id')->first();
         if ($tanpaVarian) {
             return $tanpaVarian;
@@ -303,18 +316,24 @@ class StokDeductionService
             return null;
         }
 
-        $tanpaVarian = $rows->first(fn (StokItem $row) => $row->sku_variant_id === null);
-        if ($tanpaVarian) {
-            return $tanpaVarian;
+        // 1. Coba baris tanpa varian yang memiliki stok > 0
+        $tanpaVarianDenganStok = $rows->first(fn (StokItem $row) => $row->sku_variant_id === null && (int) $row->jumlah > 0);
+        if ($tanpaVarianDenganStok) {
+            return $tanpaVarianDenganStok;
         }
 
-        // Varian default = jumlah terbesar (tie-break: id terkecil) — sama dgn cariBarisStok()
+        // 2. Baris dengan jumlah stok terbesar > 0
         $terbesar = (int) $rows->max('jumlah');
+        if ($terbesar > 0) {
+            return $rows
+                ->filter(fn (StokItem $row) => (int) $row->jumlah === $terbesar)
+                ->sortBy('id')
+                ->first();
+        }
 
-        return $rows
-            ->filter(fn (StokItem $row) => (int) $row->jumlah === $terbesar)
-            ->sortBy('id')
-            ->first();
+        // 3. Fallback jika semua saldo <= 0
+        return $rows->first(fn (StokItem $row) => $row->sku_variant_id === null)
+            ?? $rows->sortBy('id')->first();
     }
 
     /**

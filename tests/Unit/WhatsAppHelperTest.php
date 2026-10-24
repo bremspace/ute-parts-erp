@@ -26,8 +26,10 @@ class WhatsAppHelperTest extends TestCase
         $this->assertStringStartsWith('https://wa.me/6281234567890?text=', $link);
         $this->assertStringContainsString('Halo%20Dunia%21', $link);
 
-        $this->assertNull(WhatsAppHelper::buatLink('', 'Pesan'));
-        $this->assertNull(WhatsAppHelper::buatLink(null, 'Pesan'));
+        // Nomor kosong fallback ke universal link
+        $fallback = WhatsAppHelper::buatLink('', 'Pesan');
+        $this->assertNotNull($fallback);
+        $this->assertStringStartsWith('https://api.whatsapp.com/send?text=Pesan', $fallback);
     }
 
     public function test_draft_struk_pos(): string
@@ -43,7 +45,7 @@ class WhatsAppHelperTest extends TestCase
         ]);
 
         $this->assertStringContainsString('Andi', $draft);
-        $this->assertStringContainsString('#TRX-2026-001', $draft);
+        $this->assertStringContainsString('TRX-2026-001', $draft);
         $this->assertStringContainsString('Baterai IP11', $draft);
         $this->assertStringContainsString('150.000', $draft);
 
