@@ -118,7 +118,7 @@
 
         {{-- Ringkasan Total & Jurnal --}}
         @if($totalGaji > 0)
-            <div class="glass-card p-5 border-l-4 border-up-primary flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="glass-card p-5 border border-up-primary/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <span class="text-xs uppercase font-semibold text-ink-500 dark:text-ink-400">Total Pengeluaran Payroll Periode {{ $periode }}</span>
                     <p class="text-2xl font-bold tabular-nums text-up-primary">Rp {{ number_format($totalGaji, 0, ',', '.') }}</p>

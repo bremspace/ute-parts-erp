@@ -44,20 +44,11 @@
         bot.addEventListener('touchcancel', () => { isTouching = false; }, { passive: true });
 
         // Horizontal mouse wheel handling for desktop:
-        // 1. Shift + Mouse Wheel anywhere inside dual-scroll -> horizontal scroll
-        // 2. Mouse Wheel on top scrollbar or non-vertical-scroll areas -> horizontal scroll
+        // Shift + Wheel on table OR Wheel directly on the top scrollbar -> horizontal scroll
         const handleWheel = (e) => {
-            if (e.shiftKey) {
+            if (e.shiftKey || e.currentTarget === top) {
                 e.preventDefault();
                 bot.scrollLeft += (e.deltaY || e.deltaX);
-                lastKnownScrollLeft = bot.scrollLeft;
-                return;
-            }
-
-            const targetScrollable = e.target.closest('.overflow-y-auto');
-            if (!targetScrollable && e.deltaY !== 0) {
-                e.preventDefault();
-                bot.scrollLeft += e.deltaY;
                 lastKnownScrollLeft = bot.scrollLeft;
             }
         };

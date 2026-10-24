@@ -119,8 +119,11 @@ button:not(:disabled),
 
 /* [T-30] Mobile touch-friendly form elements */
 @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+    select,
+    textarea,
     .glass-input {
-        font-size: 16px; /* Prevents zoom on iOS */
+        font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
     }
     select.glass-input {
         padding: 12px 16px;
@@ -135,13 +138,12 @@ button:not(:disabled),
     }
 }
 
-/* Accessible motion reduction */
+/* Accessible motion reduction (preserves intentional opacity & feedback, removes spatial motion) */
 @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after {
-        animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+        transform: none !important;
     }
     button:not(:disabled):active,
     [role="button"]:not([aria-disabled="true"]):active,

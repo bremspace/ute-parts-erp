@@ -49,6 +49,10 @@
 </head>
 <body class="bg-[#F1F5F9] dark:bg-[#090D16] text-ink-900 dark:text-ink-100 font-sans antialiased min-h-screen flex flex-col overflow-x-clip selection:bg-up-primary selection:text-white"
       style="padding-bottom: env(safe-area-inset-bottom, 0);">
+    <!-- Skip to main content (WCAG 2.4.1) -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-up-primary focus:text-white focus:font-semibold focus:text-xs focus:rounded-xl focus:shadow-xl focus:outline-none focus:ring-2 focus:ring-white">
+        Lewati ke konten utama
+    </a>
 
     <!-- Top Bar: Apple-inspired frosted glass chrome with optical typography -->
     <header class="bg-white/85 dark:bg-[#090D16]/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] sticky top-0 z-40 transition-colors duration-200 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]"
@@ -339,7 +343,7 @@
     </header>
 
     <!-- Content -->
-    <main class="flex-1 pb-28 md:pb-0">
+    <main id="main-content" tabindex="-1" class="flex-1 pb-28 md:pb-0 outline-none">
         {{ $slot }}
     </main>
 

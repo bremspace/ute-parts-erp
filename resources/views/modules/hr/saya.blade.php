@@ -25,7 +25,7 @@
         </div>
     @else
         {{-- CARD 1: AKSI ABSENSI HARI INI --}}
-        <div class="glass-card p-5 border-l-4 border-emerald-500 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-emerald-500/5">
+        <div class="glass-card p-5 border border-emerald-500/30 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-emerald-500/5">
             <div class="space-y-1">
                 <div class="flex items-center gap-2">
                     <span class="inline-flex w-2.5 h-2.5 rounded-full {{ $logHariIni?->jam_masuk ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500' }}"></span>
@@ -82,7 +82,7 @@
             </div>
 
             {{-- Kartu Slip Gaji Saya --}}
-            <div class="glass-card p-5 flex flex-col justify-between space-y-4 border-l-4 border-up-primary">
+            <div class="glass-card p-5 flex flex-col justify-between space-y-4 border border-up-primary/30">
                 <div>
                     <div class="flex items-center justify-between">
                         <span class="text-xs uppercase font-bold text-ink-500">Slip Gaji Saya</span>

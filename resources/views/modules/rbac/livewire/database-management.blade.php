@@ -201,7 +201,7 @@
                         Batal
                     </button>
                     <button type="button" wire:click="eksekusiRestore" wire:loading.attr="disabled"
-                        class="px-4 py-2 rounded-xl bg-up-amber hover:bg-amber-600 text-gray-900 text-xs font-bold shadow-md transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer">
+                        class="px-4 py-2 rounded-xl bg-up-amber hover:bg-amber-400 text-ink-950 text-xs font-bold shadow-md transition-[background-color,transform] duration-100 active:scale-[0.98] cursor-pointer">
                         <span wire:loading.remove wire:target="eksekusiRestore">Ya, Pulihkan Database</span>
                         <span wire:loading wire:target="eksekusiRestore">Memulihkan...</span>
                     </button>

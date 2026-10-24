@@ -50,9 +50,9 @@
         </div>
 
         <!-- Sedang Dikemas -->
-        <div wire:click="$set('statusFilter', 'diproses')" class="w-[145px] min-w-[145px] sm:w-auto sm:min-w-0 flex-shrink-0 p-3.5 sm:p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'diproses' ? 'bg-indigo-500/10 border-indigo-500 ring-2 ring-indigo-500/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-indigo-500/50' }}">
+        <div wire:click="$set('statusFilter', 'diproses')" class="w-[145px] min-w-[145px] sm:w-auto sm:min-w-0 flex-shrink-0 p-3.5 sm:p-4 rounded-2xl border transition-all duration-150 cursor-pointer {{ $statusFilter === 'diproses' ? 'bg-up-primary/10 border-up-primary ring-2 ring-up-primary/20' : 'bg-white dark:bg-ink-900 border-ink-200/80 dark:border-white/10 hover:border-up-primary/50' }}">
             <span class="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400 whitespace-nowrap">Sedang Dikemas</span>
-            <p class="text-2xl font-black text-indigo-400 mt-1 tabular-nums">{{ $counts['diproses'] }}</p>
+            <p class="text-2xl font-black text-up-primary mt-1 tabular-nums">{{ $counts['diproses'] }}</p>
             <p class="text-[10px] text-ink-400 mt-0.5 line-clamp-1">Proses penyiapan</p>
         </div>
 

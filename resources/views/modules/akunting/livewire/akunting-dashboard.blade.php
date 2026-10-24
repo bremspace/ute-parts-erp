@@ -632,7 +632,7 @@
                 </div>
 
                 <!-- Kesimpulan Naratif AI / Audit Engine -->
-                <div class="p-4 rounded-xl bg-white/[0.03] border-l-4 {{ $hasilDiagnosa['is_balance'] ? 'border-up-mint bg-up-mint/[0.02]' : 'border-up-red bg-up-red/[0.02]' }} border-y border-r border-white/5 space-y-2">
+                <div class="p-4 rounded-xl border {{ $hasilDiagnosa['is_balance'] ? 'border-up-mint/30 bg-up-mint/[0.04]' : 'border-up-red/30 bg-up-red/[0.04]' }} space-y-2">
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-bold uppercase tracking-wider {{ $hasilDiagnosa['is_balance'] ? 'text-up-mint' : 'text-up-red' }}">
                             💡 Analisa Otomatis Sistem Cerdas Ute Parts:

@@ -2,12 +2,12 @@
 name: Ute Prism Enterprise
 description: Precision high-density operational aesthetic and fluid touch commerce for multi-branch hardware retail & repair lifecycle
 colors:
-  primary: "#5B4FE9"
-  primary-hover: "#493ED9"
-  primary-active: "#3B2FC9"
-  accent: "#E8873B"
-  mint: "#1FBF8F"
-  amber: "#F5A623"
+  primary: "#4F46E5"
+  primary-hover: "#4338CA"
+  primary-active: "#3730A3"
+  accent: "#D97706"
+  mint: "#10B981"
+  amber: "#F59E0B"
   red: "#EF4444"
   # Dark Spectrum (Backoffice Default - OLED/Neutral Slate)
   ink-950: "#070A14"

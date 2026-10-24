@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,14 +8,49 @@
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
+
+    <script>
+        (function () {
+            var pref = null;
+            try { pref = localStorage.getItem('ute-theme'); } catch (e) {}
+            if (!pref) pref = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            var dark = pref === 'dark';
+            var root = document.documentElement;
+            root.dataset.theme = dark ? 'dark' : 'light';
+            root.classList.toggle('dark', dark);
+        })();
+    </script>
+
     @livewireStyles
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-[#F8FAFC] text-slate-900 font-sans antialiased min-h-screen flex flex-col items-center justify-start p-4 md:p-8 relative selection:bg-indigo-600 selection:text-white">
-    <div class="w-full max-w-2xl relative z-10 my-auto">
+<body class="bg-[#F8FAFC] dark:bg-[#090D16] text-ink-900 dark:text-ink-100 font-sans antialiased min-h-screen flex flex-col items-center justify-start p-4 md:p-8 relative selection:bg-up-primary selection:text-white">
+    <!-- Skip to main content (WCAG 2.4.1) -->
+    <a href="#tracking-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-up-primary focus:text-white focus:rounded-xl focus:shadow-lg focus:outline-none">
+        Lewati ke konten tracking
+    </a>
+
+    <!-- Theme Mode Switcher -->
+    <div class="absolute top-4 right-4 z-50">
+        <button type="button" x-data="themeManager()" @click="cycleTheme()"
+                title="Ganti tema tampilan" aria-label="Ganti tema tampilan"
+                class="min-h-[40px] min-w-[40px] p-2 rounded-full bg-white dark:bg-ink-900 border border-slate-200 dark:border-white/10 text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white shadow-sm transition-[background-color,color,transform] duration-140 active:scale-[0.95] cursor-pointer flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'dark'" x-cloak>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'light'" x-cloak>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+            </svg>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-show="theme === 'auto'" x-cloak>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+        </button>
+    </div>
+
+    <div id="tracking-content" class="w-full max-w-2xl relative z-10 my-auto outline-none" tabindex="-1">
         <!-- Brand Header -->
         <div class="text-center mb-6 flex justify-center">
-            <x-prism.logo size="lg" layout="vertical" mode="light" title="Status Servis & Perbaikan" subtitle="Pantau perkembangan perbaikan gadget Anda secara transparan" :href="route('shop')" />
+            <x-prism.logo size="lg" layout="vertical" mode="auto" title="Status Servis & Perbaikan" subtitle="Pantau perkembangan perbaikan gadget Anda secara transparan" :href="route('shop')" />
         </div>
 
         <!-- Flash Messages -->
@@ -48,32 +83,32 @@
 
         @if($perluVerifikasi ?? false)
             <!-- Form Verifikasi 5 Digit No HP -->
-            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 md:p-8 text-center max-w-md mx-auto">
-                <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center mb-4 shadow-sm">
+            <div class="bg-white dark:bg-[#0B1120] rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-200 dark:border-white/10 p-6 md:p-8 text-center max-w-md mx-auto">
+                <div class="w-14 h-14 rounded-2xl bg-up-primary/10 text-up-primary mx-auto flex items-center justify-center mb-4 shadow-sm">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
 
-                <h3 class="font-bold text-slate-900 text-lg">Verifikasi Keamanan Tracking</h3>
-                <p class="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
-                    Untuk melindungi privasi data perbaikan, silakan masukkan <span class="font-bold text-slate-700">5 digit terakhir nomor HP</span> yang didaftarkan saat servis unit ini.
+                <h3 class="font-bold text-slate-900 dark:text-white text-lg">Verifikasi Keamanan Tracking</h3>
+                <p class="text-xs text-slate-500 dark:text-ink-400 mt-1 mb-4 leading-relaxed">
+                    Untuk melindungi privasi data perbaikan, silakan masukkan <span class="font-bold text-slate-700 dark:text-ink-200">5 digit terakhir nomor HP</span> yang didaftarkan saat servis unit ini.
                 </p>
 
                 @if(!empty($tiketSummary))
-                    <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 mb-5 text-left text-xs space-y-1.5">
+                    <div class="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/10 rounded-2xl p-3.5 mb-5 text-left text-xs space-y-1.5">
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-500">Nomor Tiket:</span>
-                            <span class="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{{ $tiketSummary['no_tiket'] }}</span>
+                            <span class="text-slate-500 dark:text-ink-400">Nomor Tiket:</span>
+                            <span class="font-mono font-bold text-up-primary bg-up-primary/10 px-2 py-0.5 rounded border border-up-primary/20">{{ $tiketSummary['no_tiket'] }}</span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-500">Unit:</span>
-                            <span class="font-medium text-slate-800">{{ $tiketSummary['jenis_hp'] }} {{ $tiketSummary['seri_hp'] ?? '' }}</span>
+                            <span class="text-slate-500 dark:text-ink-400">Unit:</span>
+                            <span class="font-medium text-slate-800 dark:text-white">{{ $tiketSummary['jenis_hp'] }} {{ $tiketSummary['seri_hp'] ?? '' }}</span>
                         </div>
                         @if(!empty($tiketSummary['cabang']))
                             <div class="flex justify-between items-center">
-                                <span class="text-slate-500">Cabang:</span>
-                                <span class="text-slate-600">{{ $tiketSummary['cabang'] }}</span>
+                                <span class="text-slate-500 dark:text-ink-400">Cabang:</span>
+                                <span class="text-slate-600 dark:text-ink-300">{{ $tiketSummary['cabang'] }}</span>
                             </div>
                         @endif
                     </div>
@@ -82,7 +117,7 @@
                 <form action="{{ route('servis.tracking.verify', $token) }}" method="POST" class="space-y-4">
                     @csrf
                     <div>
-                        <label for="no_hp" class="block text-xs font-semibold text-slate-700 text-left mb-1.5">
+                        <label for="no_hp" class="block text-xs font-semibold text-slate-700 dark:text-ink-300 text-left mb-1.5">
                             5 Digit Terakhir No. HP
                         </label>
                         <input
@@ -95,30 +130,30 @@
                             placeholder="Contoh: 56789"
                             required
                             autofocus
-                            class="w-full text-center tracking-[0.3em] font-mono text-lg font-bold px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
+                            class="w-full text-center tracking-[0.3em] font-mono text-lg font-bold px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-ink-900 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-up-primary focus:bg-white dark:focus:bg-ink-950"
                         />
                     </div>
 
-                    <button type="submit" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-colors cursor-pointer">
+                    <button type="submit" class="w-full py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-md transition-colors cursor-pointer">
                         Verifikasi & Lihat Tracking
                     </button>
                 </form>
 
-                <div class="mt-5 pt-4 border-t border-slate-100 text-xs text-slate-500">
+                <div class="mt-5 pt-4 border-t border-slate-100 dark:border-white/5 text-xs text-slate-500 dark:text-ink-400">
                     Memiliki akun terdaftar?
-                    <a href="{{ route('customer.login') }}" class="font-semibold text-indigo-600 hover:underline">
+                    <a href="{{ route('customer.login') }}" class="font-semibold text-up-primary hover:underline">
                         Login ke akun web
                     </a>
                 </div>
             </div>
         @elseif($tiket)
             <!-- Main Tracking Card -->
-            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 md:p-8 space-y-6">
+            <div class="bg-white dark:bg-[#0B1120] rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-200 dark:border-white/10 p-6 md:p-8 space-y-6">
                 <!-- Header Info -->
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-5">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 dark:border-white/5 pb-5">
                     <div>
                         <div class="flex items-center gap-2">
-                            <span class="font-mono text-indigo-600 font-bold text-sm bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
+                            <span class="font-mono text-up-primary font-bold text-sm bg-up-primary/10 px-2.5 py-1 rounded-lg border border-up-primary/20">
                                 {{ $tiket['no_tiket'] }}
                             </span>
                             @if(($tiket['status_pembayaran'] ?? '') === 'lunas')
@@ -204,15 +239,15 @@
                             @endphp
                             <div class="flex flex-col items-center text-center">
                                 <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-[background-color,color,box-shadow] duration-140
-                                    {{ $isCurrent ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40 ring-4 ring-indigo-100' :
-                                       ($isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400 border border-slate-200') }}">
+                                    {{ $isCurrent ? 'bg-up-primary text-white shadow-md shadow-up-primary/40 ring-4 ring-up-primary/20' :
+                                       ($isCompleted ? 'bg-up-mint text-ink-950 font-bold' : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-ink-400 border border-slate-200 dark:border-white/10') }}">
                                     @if($isCompleted)
                                         ✓
                                     @else
                                         {{ $i + 1 }}
                                     @endif
                                 </div>
-                                <span class="text-[11px] mt-1.5 font-medium {{ $isCurrent ? 'text-indigo-600 font-bold' : ($isCompleted ? 'text-slate-700' : 'text-slate-400') }}">
+                                <span class="text-[11px] mt-1.5 font-medium {{ $isCurrent ? 'text-up-primary font-bold' : ($isCompleted ? 'text-slate-700 dark:text-ink-200' : 'text-slate-400 dark:text-ink-500') }}">
                                     {{ $labels[$step] }}
                                 </span>
                             </div>
@@ -222,17 +257,17 @@
 
                 <!-- Card Approval Estimasi (Jika menunggu_approval) -->
                 @if($tiket['status'] === 'menunggu_approval')
-                    <div class="rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 p-5 md:p-6 space-y-4">
+                    <div class="rounded-2xl border border-up-primary/30 bg-up-primary/5 dark:bg-up-primary/10 p-5 md:p-6 space-y-4">
                         <div class="flex items-center justify-between flex-wrap gap-2">
                             <div>
-                                <span class="text-xs font-bold text-indigo-700 uppercase tracking-wider bg-indigo-100 px-2 py-0.5 rounded-full">
+                                <span class="text-xs font-bold text-up-primary uppercase tracking-wider bg-up-primary/15 px-2.5 py-1 rounded-full">
                                     Memerlukan Persetujuan Anda
                                 </span>
-                                <h3 class="text-lg font-bold text-slate-900 mt-1">Persetujuan Estimasi Biaya</h3>
+                                <h3 class="text-lg font-bold text-slate-900 dark:text-white mt-1">Persetujuan Estimasi Biaya</h3>
                             </div>
                             <div class="text-right">
-                                <span class="text-xs text-slate-500 block">Total Estimasi</span>
-                                <span class="text-2xl font-black text-indigo-700 tabular-nums">
+                                <span class="text-xs text-slate-500 dark:text-ink-400 block">Total Estimasi</span>
+                                <span class="text-2xl font-black text-up-primary tabular-nums">
                                     Rp {{ number_format((float) ($tiket['estimasi_biaya'] ?? 0), 0, ',', '.') }}
                                 </span>
                             </div>
@@ -489,18 +524,18 @@
 
                 <!-- Garansi Info -->
                 @if($tiket['garansi'])
-                    <div class="p-4 rounded-2xl {{ $tiket['garansi']['aktif'] ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200' }}">
+                    <div class="p-4 rounded-2xl {{ $tiket['garansi']['aktif'] ? 'bg-up-mint/10 border border-up-mint/30 dark:bg-up-mint/15' : 'bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10' }}">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center {{ $tiket['garansi']['aktif'] ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500' }}">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center {{ $tiket['garansi']['aktif'] ? 'bg-up-mint text-ink-950 font-bold' : 'bg-ink-100 dark:bg-white/10 text-ink-500 dark:text-ink-400' }}">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                                 </svg>
                             </div>
                             <div>
-                                <p class="text-sm font-bold {{ $tiket['garansi']['aktif'] ? 'text-emerald-900' : 'text-slate-700' }}">
+                                <p class="text-sm font-bold {{ $tiket['garansi']['aktif'] ? 'text-up-mint' : 'text-slate-700 dark:text-ink-200' }}">
                                     {{ $tiket['garansi']['aktif'] ? 'Unit dalam Masa Garansi Resmi' : 'Garansi Servis Telah Berakhir' }}
                                 </p>
-                                <p class="text-xs text-slate-500 tabular-nums mt-0.5">
+                                <p class="text-xs text-slate-500 dark:text-ink-400 tabular-nums mt-0.5">
                                     Periode: {{ $tiket['garansi']['mulai'] }} s.d. {{ $tiket['garansi']['berakhir'] }}
                                 </p>
                             </div>
@@ -553,22 +588,22 @@
             </div>
         @else
             <!-- Form Pencarian & Tracking Servis -->
-            <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 md:p-8 text-center max-w-lg mx-auto">
-                <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center mb-3">
+            <div class="bg-white dark:bg-[#0B1120] rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-200 dark:border-white/10 p-6 md:p-8 text-center max-w-lg mx-auto">
+                <div class="w-14 h-14 rounded-2xl bg-up-primary/10 text-up-primary mx-auto flex items-center justify-center mb-3">
                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </div>
-                <h3 class="font-bold text-slate-800 text-lg">Lacak Status Servis Gadget</h3>
-                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto mb-6">
+                <h3 class="font-bold text-slate-800 dark:text-white text-lg">Lacak Status Servis Gadget</h3>
+                <p class="text-xs sm:text-sm text-slate-500 dark:text-ink-400 mt-1 max-w-sm mx-auto mb-6">
                     Masukkan nomor tiket servis dan 5 digit terakhir nomor HP yang didaftarkan untuk memantau perbaikan.
                 </p>
 
                 <form action="{{ route('servis.tracking.search') }}" method="POST" class="space-y-3.5 text-left">
                     @csrf
                     <div>
-                        <label for="search_q" class="block text-xs font-semibold text-slate-700 mb-1">
-                            Nomor Tiket atau Token Servis <span class="text-rose-500">*</span>
+                        <label for="search_q" class="block text-xs font-semibold text-slate-700 dark:text-ink-200 mb-1">
+                            Nomor Tiket atau Token Servis <span class="text-up-red">*</span>
                         </label>
                         <input
                             type="text"
@@ -578,17 +613,17 @@
                             placeholder="Contoh: SRV-2026-0001 atau token"
                             required
                             autofocus
-                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
+                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-ink-900 text-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-up-primary focus:bg-white dark:focus:bg-ink-950"
                         />
                     </div>
 
                     <div>
                         <div class="flex items-center justify-between mb-1">
-                            <label for="search_no_hp" class="block text-xs font-semibold text-slate-700">
+                            <label for="search_no_hp" class="block text-xs font-semibold text-slate-700 dark:text-ink-200">
                                 5 Digit Terakhir No. HP Terdaftar
                             </label>
                             @if(auth('customer')->check() || auth('web')->check())
-                                <span class="text-[11px] text-emerald-600 font-medium">✓ Akun login terdeteksi</span>
+                                <span class="text-[11px] text-up-mint font-semibold">✓ Akun login terdeteksi</span>
                             @endif
                         </div>
                         <input
@@ -600,19 +635,19 @@
                             maxlength="5"
                             value="{{ old('no_hp') }}"
                             placeholder="Contoh: 56789 (opsional jika sudah login)"
-                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
+                            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-ink-900 text-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-up-primary focus:bg-white dark:focus:bg-ink-950"
                         />
                     </div>
 
-                    <button type="submit" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-colors cursor-pointer">
+                    <button type="submit" class="w-full py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-sm shadow-md transition-colors cursor-pointer active:scale-[0.98]">
                         Lacak Status Servis
                     </button>
                 </form>
 
                 @if(!auth('customer')->check() && !auth('web')->check())
-                    <div class="mt-5 pt-4 border-t border-slate-100 text-xs text-slate-500">
+                    <div class="mt-5 pt-4 border-t border-slate-100 dark:border-white/5 text-xs text-slate-500 dark:text-ink-400">
                         Punya akun terdaftar di web?
-                        <a href="{{ route('customer.login') }}" class="font-semibold text-indigo-600 hover:underline">
+                        <a href="{{ route('customer.login') }}" class="font-semibold text-up-primary hover:underline">
                             Login di sini
                         </a>
                         untuk tracking otomatis.
@@ -621,8 +656,8 @@
             </div>
         @endif
 
-        <p class="text-center text-xs text-slate-400 mt-6">
-            <a href="{{ route('shop') }}" class="hover:text-indigo-600 transition-colors">← Kembali ke Halaman Utama</a>
+        <p class="text-center text-xs text-slate-400 dark:text-ink-400 mt-6">
+            <a href="{{ route('shop') }}" class="hover:text-up-primary transition-colors">← Kembali ke Halaman Utama</a>
         </p>
     </div>
 

@@ -54,6 +54,11 @@
       data-cabang-count="{{ auth()->user()?->daftarCabangAkses()->count() ?? 0 }}"
       data-cabang-id="{{ session('cabang_id') ?? '' }}"
       style="padding-bottom: env(safe-area-inset-bottom, 0);">
+    <!-- Skip to main content (WCAG 2.4.1) -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-up-primary focus:text-white focus:font-semibold focus:text-xs focus:rounded-xl focus:shadow-xl focus:outline-none focus:ring-2 focus:ring-white">
+        Lewati ke konten utama
+    </a>
+
     <div class="flex-1 flex overflow-hidden relative h-full">
         <!-- Mobile Sidebar Overlay (hanya < md — drawer) -->
         <div x-show="sidebarOpen"
@@ -684,7 +689,7 @@
             </header>
 
             <!-- Page Content -->
-            <main class="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6 bg-transparent">
+            <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6 bg-transparent outline-none">
                 {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out, bisa skip per sesi/disimpan) --}}
                 @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
                     <div x-data="{

@@ -424,7 +424,7 @@
                                         $isActive = ($activeItemIndex === $idx);
                                         $isCounted = is_numeric($r['stok_fisik']);
                                     @endphp
-                                    <tr class="hover:bg-white/[0.04] transition {{ $isActive ? 'bg-teal-500/15 border-l-4 border-l-teal-400' : '' }}">
+                                    <tr class="hover:bg-white/[0.04] transition {{ $isActive ? 'bg-teal-500/20 ring-1 ring-inset ring-teal-400/40' : '' }}">
                                         <td class="p-3 text-center text-ink-400 tabular-nums">{{ $idx + 1 }}</td>
                                         <td class="p-3">
                                             <div class="font-medium text-white flex items-center gap-1.5">
