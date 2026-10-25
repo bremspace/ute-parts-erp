@@ -34,21 +34,42 @@ if "%PHP_BIN%"=="" (
 
 echo [OK] PHP terdeteksi: %PHP_BIN%
 
-:: 2. Cek dependensi vendor/autoload.php, jalankan composer install jika ada composer
-if not exist "vendor\autoload.php" (
-    echo [INFO] Folder vendor belum lengkap. Memeriksa Composer...
-    where composer >nul 2>nul
-    if %errorlevel% equ 0 (
-        echo [INFO] Menjalankan composer install...
-        composer install --no-interaction --prefer-dist --optimize-autoloader
-    ) else (
-        echo [WARN] Composer tidak ditemukan di PATH. Penginstalan dependensi dapat diproses via GUI.
+:: 2. Auto-Fix Direktori Storage & Cache
+if not exist "storage\framework\cache\data" mkdir "storage\framework\cache\data" 2>nul
+if not exist "storage\framework\sessions" mkdir "storage\framework\sessions" 2>nul
+if not exist "storage\framework\views" mkdir "storage\framework\views" 2>nul
+if not exist "storage\logs" mkdir "storage\logs" 2>nul
+if not exist "storage\app\public" mkdir "storage\app\public" 2>nul
+if not exist "bootstrap\cache" mkdir "bootstrap\cache" 2>nul
+
+:: 3. Deteksi & Auto-Download Composer
+set "COMPOSER_CMD="
+where composer >nul 2>nul
+if %errorlevel% equ 0 (
+    set "COMPOSER_CMD=composer"
+) else (
+    if not exist "composer.phar" (
+        echo [INFO] Mengunduh composer.phar otomatis via PowerShell...
+        powershell -Command "Invoke-WebRequest -Uri https://getcomposer.org/composer-stable.phar -OutFile composer.phar" 2>nul
+    )
+    if exist "composer.phar" (
+        set "COMPOSER_CMD="%PHP_BIN%" composer.phar"
     )
 )
 
-:: 3. Cari port bebas (8000..8010)
+:: 4. Auto-Fix Dependensi Vendor
+if not exist "vendor\autoload.php" (
+    if not "%COMPOSER_CMD%"=="" (
+        echo [INFO] Menjalankan composer install untuk melengkapi dependensi vendor...
+        %COMPOSER_CMD% install --no-interaction --prefer-dist --optimize-autoloader
+    ) else (
+        echo [WARN] Composer belum terpasang. Dependensi dapat dilengkapi via GUI Installer.
+    )
+)
+
+:: 5. Cari port bebas (8000..8015)
 set "PORT=8000"
-for /l %%P in (8000,1,8010) do (
+for /l %%P in (8000,1,8015) do (
     netstat -ano | findstr /r /c:":%%P " >nul 2>nul
     if errorlevel 1 (
         set "PORT=%%P"
@@ -62,10 +83,10 @@ echo [OK] Port terpilih: %PORT%
 echo [INFO] Membuka browser ke %URL% ...
 echo.
 
-:: 4. Buka Browser
+:: 6. Buka Browser
 start "" "%URL%"
 
-:: 5. Jalankan Built-in Web Server
+:: 7. Jalankan Built-in Web Server
 echo ======================================================================
 echo    Server berjalan di http://localhost:%PORT%
 echo    Tutup jendela ini jika ingin mematikan server.

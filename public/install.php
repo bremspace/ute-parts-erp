@@ -55,6 +55,71 @@ function getPhpBinary(): string
     return 'php';
 }
 
+function getComposerCommand(): string
+{
+    $baseDir = dirname(__DIR__);
+    $phpBin = getPhpBinary();
+
+    if (runCommand('which composer')['status'] === 0) {
+        return 'composer';
+    }
+
+    if (file_exists($baseDir.'/composer.phar')) {
+        return $phpBin.' '.escapeshellarg($baseDir.'/composer.phar');
+    }
+
+    return '';
+}
+
+function downloadComposerPhar(): bool
+{
+    $baseDir = dirname(__DIR__);
+    $pharFile = $baseDir.'/composer.phar';
+    if (file_exists($pharFile) && filesize($pharFile) > 1000000) {
+        @chmod($pharFile, 0755);
+
+        return true;
+    }
+
+    // Coba via curl CLI
+    $curlRes = runCommand("curl -sS -L https://getcomposer.org/composer-stable.phar -o {$pharFile}");
+    if ($curlRes['status'] === 0 && file_exists($pharFile) && filesize($pharFile) > 1000000) {
+        @chmod($pharFile, 0755);
+
+        return true;
+    }
+
+    // Coba via PHP cURL extension
+    if (function_exists('curl_init')) {
+        $ch = curl_init('https://getcomposer.org/composer-stable.phar');
+        $fp = @fopen($pharFile, 'w+');
+        if ($fp) {
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_FILE, $fp);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_exec($ch);
+            curl_close($ch);
+            fclose($fp);
+            if (file_exists($pharFile) && filesize($pharFile) > 1000000) {
+                @chmod($pharFile, 0755);
+
+                return true;
+            }
+        }
+    }
+
+    // Fallback: installer script
+    $phpBin = getPhpBinary();
+    runCommand("cd {$baseDir} && curl -sS https://getcomposer.org/installer | {$phpBin} -- --install-dir={$baseDir} --filename=composer.phar");
+    if (file_exists($pharFile) && filesize($pharFile) > 1000000) {
+        @chmod($pharFile, 0755);
+
+        return true;
+    }
+
+    return false;
+}
+
 function runCommand(string $command): array
 {
     $descriptors = [
@@ -142,8 +207,9 @@ function checkServerDiagnostics(): array
     }
 
     // 5. System Tools
+    $baseDir = dirname(__DIR__);
     $tools = [
-        'composer' => runCommand('which composer')['status'] === 0,
+        'composer' => (runCommand('which composer')['status'] === 0 || file_exists($baseDir.'/composer.phar')),
         'git' => runCommand('which git')['status'] === 0,
         'node' => runCommand('which node')['status'] === 0,
         'npm' => runCommand('which npm')['status'] === 0,
@@ -154,7 +220,6 @@ function checkServerDiagnostics(): array
     ];
 
     // 6. Directory Permissions & Vendor
-    $baseDir = dirname(__DIR__);
     $writableStorage = is_writable($baseDir.'/storage');
     $writableCache = is_writable($baseDir.'/bootstrap/cache');
     $writableEnv = is_writable($baseDir) || (file_exists($baseDir.'/.env') && is_writable($baseDir.'/.env'));
@@ -189,6 +254,122 @@ function checkServerDiagnostics(): array
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json; charset=utf-8');
     $action = $_POST['action'];
+
+    if ($action === 'auto_fix') {
+        $baseDir = dirname(__DIR__);
+        $phpBin = getPhpBinary();
+        $logs = [];
+
+        // 1. Direktori Wajib & Izin Akses
+        $dirs = [
+            'storage',
+            'storage/app',
+            'storage/app/public',
+            'storage/framework',
+            'storage/framework/cache',
+            'storage/framework/cache/data',
+            'storage/framework/sessions',
+            'storage/framework/views',
+            'storage/logs',
+            'bootstrap/cache',
+        ];
+        foreach ($dirs as $dir) {
+            $fullPath = $baseDir.'/'.$dir;
+            if (! is_dir($fullPath)) {
+                @mkdir($fullPath, 0775, true);
+            }
+            @chmod($fullPath, 0775);
+        }
+        runCommand("chmod -R 775 {$baseDir}/storage {$baseDir}/bootstrap/cache 2>/dev/null || true");
+        $logs[] = 'Direktori storage & bootstrap/cache disiapkan dengan hak izin tulis.';
+
+        // 2. Ekstensi PHP via APT (Jika Ubuntu/Debian & memiliki akses root/sudo)
+        if (file_exists('/etc/debian_version')) {
+            $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
+            $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
+            if ($isRoot || $canSudo) {
+                $sudoPrefix = $isRoot ? '' : 'sudo ';
+                $extMapping = [
+                    'pdo_mysql' => 'php-mysql',
+                    'gd' => 'php-gd',
+                    'mbstring' => 'php-mbstring',
+                    'curl' => 'php-curl',
+                    'zip' => 'php-zip',
+                    'intl' => 'php-intl',
+                    'bcmath' => 'php-bcmath',
+                    'imagick' => 'php-imagick',
+                ];
+                $missingPkgs = [];
+                foreach ($extMapping as $ext => $pkg) {
+                    if (! extension_loaded($ext)) {
+                        $missingPkgs[] = $pkg;
+                    }
+                }
+                if (! empty($missingPkgs)) {
+                    $pkgList = implode(' ', $missingPkgs).' unzip';
+                    runCommand("export DEBIAN_FRONTEND=noninteractive && {$sudoPrefix}apt-get update -y && {$sudoPrefix}apt-get install -y {$pkgList} 2>&1");
+                    $logs[] = 'Menginstal ekstensi sistem yang kurang via apt ('.implode(', ', $missingPkgs).').';
+                }
+            }
+        }
+
+        // 3. Swap Memori 2GB (Jika RAM <= 1.5GB dan belum memiliki Swap)
+        $diagCheck = checkServerDiagnostics();
+        if ($diagCheck['ram_total_mb'] > 0 && $diagCheck['ram_total_mb'] <= 1500 && $diagCheck['swap_mb'] < 512) {
+            $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
+            $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
+            if ($isRoot || $canSudo) {
+                $sudoPrefix = $isRoot ? '' : 'sudo ';
+                runCommand("{$sudoPrefix}fallocate -l 2G /swapfile 2>/dev/null || {$sudoPrefix}dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null");
+                runCommand("{$sudoPrefix}chmod 600 /swapfile && {$sudoPrefix}mkswap /swapfile 2>/dev/null && {$sudoPrefix}swapon /swapfile 2>/dev/null");
+                $logs[] = 'Swap memori 2GB berhasil diaktifkan untuk proteksi RAM VPS.';
+            }
+        }
+
+        // 4. Unduh Composer jika belum tersedia di sistem
+        $composerCmd = getComposerCommand();
+        if (empty($composerCmd)) {
+            $dlSuccess = downloadComposerPhar();
+            if ($dlSuccess) {
+                $composerCmd = getComposerCommand();
+                $logs[] = 'Composer binary (composer.phar) berhasil diunduh dan disiapkan.';
+            } else {
+                $logs[] = 'Composer tidak ditemukan dan unduhan otomatis belum berhasil.';
+            }
+        } else {
+            $logs[] = 'Composer terdeteksi: '.$composerCmd;
+        }
+
+        // 5. Unduh & Pasang dependensi vendor/ jika belum ada
+        if (! file_exists($baseDir.'/vendor/autoload.php')) {
+            if (! empty($composerCmd)) {
+                $compRes = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader 2>&1");
+                if ($compRes['status'] === 0) {
+                    $logs[] = 'Dependensi vendor Composer berhasil diinstal lengkap.';
+                } else {
+                    $logs[] = 'Composer install: '.substr($compRes['output'], -200);
+                }
+            }
+        } else {
+            $logs[] = 'Dependensi vendor Composer sudah lengkap.';
+        }
+
+        // 6. Buat file .env dari .env.example jika .env belum ada
+        if (! file_exists($baseDir.'/.env') && file_exists($baseDir.'/.env.example')) {
+            @copy($baseDir.'/.env.example', $baseDir.'/.env');
+            $logs[] = 'File template .env berhasil disiapkan.';
+        }
+
+        $freshDiag = checkServerDiagnostics();
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Proses auto-fix selesai.',
+            'logs' => $logs,
+            'diagnostics' => $freshDiag,
+        ]);
+        exit;
+    }
 
     if ($action === 'test_db') {
         $host = trim($_POST['db_host'] ?? '127.0.0.1');
@@ -305,7 +486,15 @@ EOF;
 
                 case 'check_vendor':
                     if (! file_exists($baseDir.'/vendor/autoload.php')) {
-                        $resComp = runCommand("cd {$baseDir} && composer install --no-interaction --prefer-dist --optimize-autoloader");
+                        $composerCmd = getComposerCommand();
+                        if (empty($composerCmd)) {
+                            downloadComposerPhar();
+                            $composerCmd = getComposerCommand();
+                        }
+                        if (empty($composerCmd)) {
+                            throw new RuntimeException('Composer tidak ditemukan dan gagal mengunduh composer.phar.');
+                        }
+                        $resComp = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader 2>&1");
                         if ($resComp['status'] !== 0) {
                             throw new RuntimeException('Gagal instalasi composer: '.$resComp['output']);
                         }
@@ -436,15 +625,41 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                     <span>🔍</span>
                     <span>Diagnostik Kesehatan Server Otomatis</span>
                 </h2>
-                <?php if ($diag['is_ready']) { ?>
+                <?php if ($diag['is_ready'] && $diag['vendor_ready']) { ?>
                     <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
                         ✓ Server Memenuhi Syarat
                     </span>
                 <?php } else { ?>
-                    <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30">
-                        ⚠️ Perlu Penyesuaian
+                    <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30 animate-pulse">
+                        ⚡ Mempersiapkan Otomatis
                     </span>
                 <?php } ?>
+            </div>
+
+            <!-- Auto-Fix Action Box -->
+            <div id="autofix-banner" class="p-4 rounded-xl bg-gradient-to-r from-indigo-500/15 via-purple-500/10 to-orange-500/10 border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                <div class="space-y-0.5">
+                    <div class="font-bold text-white text-xs flex items-center gap-2">
+                        <span>⚡ Penyiapan Lingkungan &amp; Auto-Fix Dependensi</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">1-Klik Universal</span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 leading-relaxed">
+                        Perbaiki otomatis izin direktori storage/cache, unduh composer.phar jika belum ada, pasang dependensi vendor, serta konfigurasi ekstensi &amp; swap server sesuai kondisi sistem Anda.
+                    </p>
+                </div>
+                <button type="button" id="btn-autofix" onclick="runAutoFix()" class="px-5 py-2.5 rounded-xl brand-gradient text-white font-bold text-xs transition shadow-lg shadow-indigo-600/20 shrink-0 flex items-center gap-1.5 cursor-pointer hover:opacity-95">
+                    <span id="autofix-spinner" class="hidden animate-spin">⟳</span>
+                    <span id="autofix-btn-text">⚡ Jalankan Auto-Fix Sekarang</span>
+                </button>
+            </div>
+
+            <!-- Auto-Fix Live Log Box (Hidden at first) -->
+            <div id="autofix-log-container" class="hidden p-3.5 rounded-xl bg-black/60 border border-indigo-500/30 text-[11px] font-mono text-slate-300 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] uppercase font-bold text-indigo-400">Log Hasil Auto-Fix:</span>
+                    <span id="autofix-status-badge" class="text-[10px] text-emerald-400 font-bold"></span>
+                </div>
+                <div id="autofix-log-items" class="space-y-1 max-h-40 overflow-y-auto"></div>
             </div>
 
             <!-- Server Metrics Grid -->
@@ -755,6 +970,71 @@ function goToStep(step) {
         }
     }
 }
+
+async function runAutoFix() {
+    const btn = document.getElementById('btn-autofix');
+    const spinner = document.getElementById('autofix-spinner');
+    const btnText = document.getElementById('autofix-btn-text');
+    const logBox = document.getElementById('autofix-log-container');
+    const logItems = document.getElementById('autofix-log-items');
+    const statusBadge = document.getElementById('autofix-status-badge');
+
+    btn.disabled = true;
+    btn.classList.add('opacity-75', 'cursor-not-allowed');
+    spinner.classList.remove('hidden');
+    btnText.textContent = 'Menyiapkan sistem otomatis...';
+    logBox.classList.remove('hidden');
+    logItems.innerHTML = '<div class="text-indigo-300">⏳ Sedang memeriksa dan memperbaiki lingkungan sistem otomatis...</div>';
+
+    const formData = new FormData();
+    formData.append('action', 'auto_fix');
+
+    try {
+        const res = await fetch('install.php', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        logItems.innerHTML = '';
+        if (data.logs && Array.isArray(data.logs)) {
+            data.logs.forEach(msg => {
+                const item = document.createElement('div');
+                item.className = 'text-emerald-300 flex items-center gap-1.5';
+                item.innerHTML = '<span>✓</span> <span>' + msg + '</span>';
+                logItems.appendChild(item);
+            });
+        }
+
+        if (data.success) {
+            btnText.textContent = '✓ Sistem Siap Digunakan!';
+            btn.className = 'px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shrink-0 flex items-center gap-1.5 cursor-default';
+            statusBadge.textContent = '● Status: Siap';
+            statusBadge.className = 'text-[10px] text-emerald-400 font-bold';
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 1200);
+        } else {
+            btnText.textContent = '⚡ Coba Lagi Auto-Fix';
+            btn.disabled = false;
+            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            statusBadge.textContent = '● Status: Perlu Perhatian';
+            statusBadge.className = 'text-[10px] text-rose-400 font-bold';
+        }
+    } catch (e) {
+        logItems.innerHTML += '<div class="text-rose-400">✕ Terjadi kendala request: ' + e.message + '</div>';
+        btnText.textContent = '⚡ Coba Lagi Auto-Fix';
+        btn.disabled = false;
+        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+    } finally {
+        spinner.classList.add('hidden');
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    <?php if (! $diag['is_ready'] || ! $diag['vendor_ready']) { ?>
+    // Otomatis picu penyiapan lingkungan saat awal diagnosa jika ada kebutuhan yang belum siap
+    runAutoFix();
+    <?php } ?>
+});
 
 async function testDatabaseConnection() {
     const resBox = document.getElementById('db-test-result');

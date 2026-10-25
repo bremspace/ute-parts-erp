@@ -3,8 +3,16 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
-## 2026-10-25 — Deployment & DevOps: Universal GUI Installer, Git CI/CD Webhook & AI Dev Maintenance Stack ✅
+## 2026-10-25 — Deployment & DevOps: Universal GUI Installer, Auto-Fix System Engine, Git CI/CD & AI Stack ✅
 
+- **Auto-Fix & Universal Self-Healing Engine (`public/install.php`, `start-install.sh`, `start-install.bat`)**:
+  - Deteksi dan perbaikan otomatis seluruh kebutuhan server saat membuka `localhost`:
+    - Pembuatan struktur direktori `storage/framework/*`, `storage/logs`, `storage/app/public`, dan `bootstrap/cache` dengan hak akses tulis `0775/0777`.
+    - Auto-download portable `composer.phar` secara otomatis via curl/PowerShell jika Composer belum ada di sistem.
+    - Eksekusi otomatis `composer install` jika folder `vendor/` belum lengkap.
+    - Deteksi & auto-install paket ekstensi PHP Linux (`php-mysql`, `php-gd`, `php-mbstring`, `php-curl`, `php-zip`, `php-intl`, `php-bcmath`, `php-imagick`) via `apt-get` jika memiliki akses root/sudo.
+    - Auto-alokasi Swap 2GB otomatis untuk VPS RAM kecil (<= 1.5GB) guna proteksi stabilitas memori.
+    - Tombol *Auto-Fix 1-Klik* + auto-run background saat Step 1 mendeteksi dependensi belum lengkap, disertai log hasil realtime dan auto-refresh metrik hijau.
 - **Universal Web GUI Installer (`public/install.php`)**:
   - Wizard antarmuka modern design system Ute Prism:
     - **Step 1 (Diagnostik Kesehatan Server)**: Deteksi otomatis OS & kernel, memori RAM & status Swap (proteksi OOM), sisa disk storage, versi PHP (8.3+ / 8.4+), ekstensi wajib & opsional (GD, Imagick multi-format), izin tulis direktori (`storage`, `bootstrap/cache`), dan alat sistem (Composer, Node.js, Git, Supervisor, Nginx).
