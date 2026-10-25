@@ -12,6 +12,8 @@ Format: `[Fase X] T-XX — ringkasan`.
     - Eksekusi otomatis `composer install` jika folder `vendor/` belum lengkap.
     - Ekstensi PHP auto-fix: aktivasi otomatis baris `extension=...` di `php.ini` (Windows/Laragon/XAMPP) atau instalasi paket apt di Debian/Ubuntu dengan deteksi restart server PHP.
     - Penyiapan sekuensial modular (`dirs` -> `extensions` -> `composer` -> `vendor` -> `swap`) tanpa looping reload browser otomatis.
+    - Penanganan komprehensif paket XML/DOM (`php-xml`: `dom`, `xml`, `simplexml`, `xmlwriter`) untuk kebutuhan Blade template, PhpSpreadsheet Excel, dan barcode generator.
+    - Fallback otomatis Composer platform-req (`--ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter` atau `--ignore-platform-reqs`) untuk mencegah kegagalan instalasi vendor di GUI installer dan launcher CLI.
     - Auto-alokasi Swap 2GB otomatis untuk VPS RAM kecil (<= 1.5GB) guna proteksi stabilitas memori.
     - Interactive log console dengan tombol 1-klik salin clipboard (*Salin Log Diagnostik Lengkap*) dan *Salin Perintah Terminal* untuk pelaporan bug cepat.
     - Kunci navigasi protektif ke Step 2 sampai seluruh prasyarat wajib (`is_ready` & `vendor_ready`) terverifikasi hijau.

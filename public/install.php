@@ -142,6 +142,36 @@ function runCommand(string $command): array
     ];
 }
 
+function runComposerInstallWithFallback(string $baseDir, string $composerCmd): array
+{
+    // 1. Coba composer install standar
+    $res = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader 2>&1");
+    if ($res['status'] === 0) {
+        return ['status' => 0, 'output' => $res['output'], 'fallback' => false];
+    }
+
+    // 2. Jika gagal karena platform requirement (seperti missing ext-dom, ext-xml, ext-simplexml, dll)
+    $output = $res['output'];
+    if (stripos($output, '--ignore-platform-req') !== false || stripos($output, 'ext-') !== false || stripos($output, 'requires ext-') !== false) {
+        $fallbackCmd = "cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter 2>&1";
+        $fbRes = runCommand($fallbackCmd);
+        if ($fbRes['status'] === 0) {
+            return ['status' => 0, 'output' => $fbRes['output'], 'fallback' => true, 'fallback_type' => 'xml_dom'];
+        }
+
+        // 3. Fallback toleran menyeluruh jika ada ekstensi lain yang belum termuat di runtime CLI
+        $fallbackAllCmd = "cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs 2>&1";
+        $fbAllRes = runCommand($fallbackAllCmd);
+        if ($fbAllRes['status'] === 0) {
+            return ['status' => 0, 'output' => $fbAllRes['output'], 'fallback' => true, 'fallback_type' => 'all'];
+        }
+
+        return ['status' => $fbAllRes['status'], 'output' => $fbAllRes['output'], 'fallback' => false];
+    }
+
+    return ['status' => $res['status'], 'output' => $res['output'], 'fallback' => false];
+}
+
 function checkServerDiagnostics(): array
 {
     // 1. OS & Kernel
@@ -174,9 +204,13 @@ function checkServerDiagnostics(): array
     $diskFreeGb = round(disk_free_space(__DIR__) / (1024 * 1024 * 1024), 1);
     $diskTotalGb = round(disk_total_space(__DIR__) / (1024 * 1024 * 1024), 1);
 
-    // 4. PHP Extensions Check
+    // 4. PHP Extensions Check (Wajib untuk Laravel 13, WMS, Excel & E-Payment)
     $requiredExts = [
         'pdo_mysql' => 'Koneksi database MySQL',
+        'dom' => 'Manipulasi DOM, Blade view compiler & PhpSpreadsheet',
+        'xml' => 'Penguraian XML & konfigurasi Laravel/Excel',
+        'simplexml' => 'Format XML data export & barcode generator',
+        'xmlwriter' => 'Export Excel (Maatwebsite) & manifest XML',
         'gd' => 'Kompresi & manipulasi gambar WebP',
         'mbstring' => 'Pemrosesan string UTF-8 multibyte',
         'curl' => 'Koneksi API Duitku & Biteship',
@@ -185,6 +219,8 @@ function checkServerDiagnostics(): array
         'bcmath' => 'Kalkulasi finansial & double-entry',
         'fileinfo' => 'Validasi MIME type berkas',
         'openssl' => 'Enkripsi data & security token',
+        'tokenizer' => 'Parser kode Laravel Blade & Livewire',
+        'ctype' => 'Validasi karakter string standar Laravel',
     ];
 
     $optionalExts = [
@@ -235,7 +271,7 @@ function checkServerDiagnostics(): array
         }
     }
 
-    $recommendedCmd = 'sudo apt-get update && sudo apt-get install -y php'.$majorMinor.'-mysql php'.$majorMinor.'-gd php'.$majorMinor.'-mbstring php'.$majorMinor.'-curl php'.$majorMinor.'-zip php'.$majorMinor.'-intl php'.$majorMinor.'-bcmath php'.$majorMinor.'-imagick unzip';
+    $recommendedCmd = 'sudo apt-get update && sudo apt-get install -y php'.$majorMinor.'-mysql php'.$majorMinor.'-xml php'.$majorMinor.'-gd php'.$majorMinor.'-mbstring php'.$majorMinor.'-curl php'.$majorMinor.'-zip php'.$majorMinor.'-intl php'.$majorMinor.'-bcmath php'.$majorMinor.'-imagick unzip';
 
     return [
         'os' => $osInfo,
@@ -314,7 +350,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             case 'extensions':
                 $iniFile = php_ini_loaded_file();
-                $extsToCheck = ['pdo_mysql', 'gd', 'mbstring', 'curl', 'zip', 'intl', 'bcmath', 'fileinfo', 'openssl'];
+                $extsToCheck = ['pdo_mysql', 'dom', 'xml', 'simplexml', 'xmlwriter', 'gd', 'mbstring', 'curl', 'zip', 'intl', 'bcmath', 'fileinfo', 'openssl', 'tokenizer', 'ctype'];
                 $missing = [];
                 foreach ($extsToCheck as $e) {
                     if (! extension_loaded($e)) {
@@ -352,6 +388,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $pkgList = [];
                     $extPkgMap = [
                         'pdo_mysql' => "php{$majorMinor}-mysql",
+                        'dom' => "php{$majorMinor}-xml",
+                        'xml' => "php{$majorMinor}-xml",
+                        'simplexml' => "php{$majorMinor}-xml",
+                        'xmlwriter' => "php{$majorMinor}-xml",
                         'gd' => "php{$majorMinor}-gd",
                         'mbstring' => "php{$majorMinor}-mbstring",
                         'curl' => "php{$majorMinor}-curl",
@@ -359,9 +399,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         'intl' => "php{$majorMinor}-intl",
                         'bcmath' => "php{$majorMinor}-bcmath",
                         'imagick' => "php{$majorMinor}-imagick",
+                        'tokenizer' => "php{$majorMinor}-common",
+                        'ctype' => "php{$majorMinor}-common",
                     ];
                     foreach ($missing as $m) {
-                        if (isset($extPkgMap[$m])) {
+                        if (isset($extPkgMap[$m]) && ! in_array($extPkgMap[$m], $pkgList, true)) {
                             $pkgList[] = $extPkgMap[$m];
                         }
                     }
@@ -410,9 +452,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (! file_exists($baseDir.'/vendor/autoload.php')) {
                     if (! empty($composerCmd)) {
                         $logs[] = 'Menjalankan composer install... (mohon tunggu sebentar)';
-                        $compRes = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader 2>&1");
+                        $compRes = runComposerInstallWithFallback($baseDir, $composerCmd);
                         if ($compRes['status'] === 0) {
-                            $logs[] = 'Dependensi vendor Composer berhasil diinstal lengkap!';
+                            if (! empty($compRes['fallback'])) {
+                                $logs[] = 'Dependensi vendor Composer berhasil diinstal (menggunakan toleransi ekstensi platform).';
+                                $logs[] = 'PENTING: Pastikan paket php-xml tetap diinstal agar manipulasi XML & export Excel berjalan optimal.';
+                            } else {
+                                $logs[] = 'Dependensi vendor Composer berhasil diinstal lengkap!';
+                            }
                         } else {
                             $logs[] = 'Composer install: '.substr($compRes['output'], -250);
                         }
@@ -577,11 +624,14 @@ EOF;
                         if (empty($composerCmd)) {
                             throw new RuntimeException('Composer tidak ditemukan dan gagal mengunduh composer.phar.');
                         }
-                        $resComp = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader 2>&1");
+                        $resComp = runComposerInstallWithFallback($baseDir, $composerCmd);
                         if ($resComp['status'] !== 0) {
                             throw new RuntimeException('Gagal instalasi composer: '.$resComp['output']);
                         }
-                        echo json_encode(['success' => true, 'message' => 'Dependensi Composer berhasil diinstal.']);
+                        $msg = ! empty($resComp['fallback'])
+                            ? 'Dependensi Composer berhasil diinstal (dengan toleransi platform requirements).'
+                            : 'Dependensi Composer berhasil diinstal.';
+                        echo json_encode(['success' => true, 'message' => $msg]);
                     } else {
                         echo json_encode(['success' => true, 'message' => 'Dependensi Composer sudah lengkap.']);
                     }

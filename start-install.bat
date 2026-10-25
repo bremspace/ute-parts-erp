@@ -62,6 +62,13 @@ if not exist "vendor\autoload.php" (
     if not "%COMPOSER_CMD%"=="" (
         echo [INFO] Menjalankan composer install untuk melengkapi dependensi vendor...
         %COMPOSER_CMD% install --no-interaction --prefer-dist --optimize-autoloader
+        if not exist "vendor\autoload.php" (
+            echo [WARN] Menjalankan fallback composer install dengan toleransi ekstensi platform...
+            %COMPOSER_CMD% install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter
+        )
+        if not exist "vendor\autoload.php" (
+            %COMPOSER_CMD% install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
+        )
     ) else (
         echo [WARN] Composer belum terpasang. Dependensi dapat dilengkapi via GUI Installer.
     )

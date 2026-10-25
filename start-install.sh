@@ -35,18 +35,27 @@ done
 if [ -z "$PHP_BIN" ]; then
     echo "ℹ PHP belum terpasang. Mencoba instalasi PHP 8.4 otomatis..."
     if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update -y && sudo apt-get install -y php8.4-cli php8.4-fpm php8.4-mysql php8.4-gd php8.4-mbstring php8.4-curl php8.4-zip php8.4-intl php8.4-bcmath php8.4-imagick unzip || true
+        sudo apt-get update -y && sudo apt-get install -y php8.4-cli php8.4-fpm php8.4-mysql php8.4-xml php8.4-gd php8.4-mbstring php8.4-curl php8.4-zip php8.4-intl php8.4-bcmath php8.4-imagick unzip || true
         PHP_BIN="$(which php || echo /usr/bin/php8.4)"
     fi
 fi
 
 if [ -z "$PHP_BIN" ] || [ ! -x "$PHP_BIN" ]; then
     echo "❌ [ERROR] PHP tidak ditemukan di sistem!"
-    echo "Silakan install PHP >= 8.3 (Ubuntu: sudo apt install php8.4, macOS: brew install php)."
+    echo "Silakan install PHP >= 8.3 (Ubuntu: sudo apt install php8.4 php8.4-xml, macOS: brew install php)."
     exit 1
 fi
 
 echo "✔ [OK] PHP terdeteksi: $PHP_BIN ($("$PHP_BIN" -v | head -n 1))"
+
+# Cek ekstensi kritis php-xml jika di lingkungan Linux Debian/Ubuntu
+if command -v apt-get >/dev/null 2>&1; then
+    if ! "$PHP_BIN" -m | grep -qi "dom" || ! "$PHP_BIN" -m | grep -qi "xml"; then
+        echo "ℹ [AUTO-FIX] Ekstensi php-xml belum aktif di CLI PHP. Menginstal paket php-xml..."
+        PHP_VER="$("$PHP_BIN" -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+        sudo apt-get update -y && sudo apt-get install -y "php${PHP_VER}-xml" "php-xml" unzip || true
+    fi
+fi
 
 # 2. Siapkan direktori storage & bootstrap/cache
 echo "ℹ [AUTO-FIX] Menyiapkan direktori storage & izin tulis..."
@@ -73,11 +82,13 @@ else
     fi
 fi
 
-# 4. Instalasi dependensi vendor/ jika belum ada
+# 4. Instalasi dependensi vendor/ jika belum ada (dengan resilient platform-fallback)
 if [ ! -f "vendor/autoload.php" ]; then
     if [ -n "$COMPOSER_CMD" ]; then
         echo "ℹ [AUTO-FIX] Menjalankan composer install untuk melengkapi vendor..."
-        $COMPOSER_CMD install --no-interaction --prefer-dist --optimize-autoloader || true
+        $COMPOSER_CMD install --no-interaction --prefer-dist --optimize-autoloader || \
+        $COMPOSER_CMD install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-dom --ignore-platform-req=ext-xml --ignore-platform-req=ext-simplexml --ignore-platform-req=ext-xmlwriter || \
+        $COMPOSER_CMD install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs || true
     else
         echo "⚠️ [WARN] Composer belum tersedia. Dependensi dapat dilengkapi via GUI Installer."
     fi
