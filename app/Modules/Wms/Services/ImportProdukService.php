@@ -287,6 +287,10 @@ class ImportProdukService
         }
 
         // 1. Cek potensi kemiripan dengan baris lain di dalam file yang sama (Intra-file)
+        if ($konteks['skipFuzzy'] ?? false) {
+            return $warnings;
+        }
+
         if (! empty($konteks['namaDalamFile'])) {
             foreach ($konteks['namaDalamFile'] as $prev) {
                 if (strcasecmp($prev['sku'], $sku) === 0) {
@@ -323,7 +327,7 @@ class ImportProdukService
         $sku = trim((string) ($row['sku'] ?? ''));
         $tipeHp = trim((string) ($row['tipe_hp'] ?? ''));
 
-        if ($nama === '') {
+        if ($nama === '' || ($konteks['skipFuzzy'] ?? false)) {
             return null;
         }
 
@@ -1010,7 +1014,10 @@ class ImportProdukService
         // Coba suffix -V2, -V3, dst
         for ($i = 2; $i <= 99; $i++) {
             $candidate = "{$base}-V{$i}";
-            if (! isset($konteks['skuDalamFile'][$candidate]) && ! SkuVariant::where('sku', $candidate)->exists()) {
+            $inDb = isset($konteks['existingSkuDb'])
+                ? isset($konteks['existingSkuDb'][strtolower($candidate)])
+                : SkuVariant::where('sku', $candidate)->exists();
+            if (! isset($konteks['skuDalamFile'][$candidate]) && ! $inDb) {
                 return $candidate;
             }
         }
@@ -1028,22 +1035,56 @@ class ImportProdukService
         $nama = trim((string) ($row['nama'] ?? ''));
 
         $isSkuFile = $sku !== '' && isset($konteks['skuDalamFile'][$sku]);
-        $variantDb = $sku !== '' ? SkuVariant::with('produk')->where('sku', $sku)->first() : null;
-        $isSkuDb = $variantDb !== null;
+
+        // Fast in-memory lookup if preloaded in $konteks, otherwise query DB
+        $skuLower = strtolower($sku);
+        $variantData = null;
+        if ($sku !== '') {
+            if (isset($konteks['existingSkuDb'])) {
+                $variantData = $konteks['existingSkuDb'][$skuLower] ?? null;
+            } else {
+                $v = SkuVariant::with('produk')->where('sku', $sku)->first();
+                if ($v) {
+                    $variantData = [
+                        'sku' => $v->sku,
+                        'produk_id' => $v->produk_id,
+                        'produk_nama' => $v->produk?->nama ?? '',
+                        'barcode' => $v->barcode,
+                    ];
+                }
+            }
+        }
+        $isSkuDb = $variantData !== null;
 
         $isBarcodeFile = $barcode !== '' && isset($konteks['barcodeDalamFile'][$barcode]);
         $isBarcodeDb = false;
-        $barcodeTargetProduk = null;
+        $barcodeTargetProdukId = null;
+        $barcodeTargetProdukNama = null;
+        $barcodeTargetSku = null;
+
         if ($barcode !== '') {
-            $variantBarcode = SkuVariant::with('produk')->where('barcode', $barcode)->first();
-            if ($variantBarcode) {
-                $isBarcodeDb = true;
-                $barcodeTargetProduk = $variantBarcode->produk;
-            } else {
-                $produkBarcode = Produk::where('barcode', $barcode)->first();
-                if ($produkBarcode) {
+            if (isset($konteks['existingBarcodeDb'])) {
+                $bData = $konteks['existingBarcodeDb'][$barcode] ?? null;
+                if ($bData) {
                     $isBarcodeDb = true;
-                    $barcodeTargetProduk = $produkBarcode;
+                    $barcodeTargetProdukId = $bData['produk_id'];
+                    $barcodeTargetProdukNama = $bData['produk_nama'];
+                    $barcodeTargetSku = $bData['sku'] ?? null;
+                }
+            } else {
+                $variantBarcode = SkuVariant::with('produk')->where('barcode', $barcode)->first();
+                if ($variantBarcode) {
+                    $isBarcodeDb = true;
+                    $barcodeTargetProdukId = $variantBarcode->produk_id;
+                    $barcodeTargetProdukNama = $variantBarcode->produk?->nama ?? '';
+                    $barcodeTargetSku = $variantBarcode->sku;
+                } else {
+                    $produkBarcode = Produk::where('barcode', $barcode)->first();
+                    if ($produkBarcode) {
+                        $isBarcodeDb = true;
+                        $barcodeTargetProdukId = $produkBarcode->id;
+                        $barcodeTargetProdukNama = $produkBarcode->nama;
+                    }
                 }
             }
         }
@@ -1055,17 +1096,22 @@ class ImportProdukService
         $tipe = ($isSkuDb || $isSkuFile) ? 'sku' : 'barcode';
         $lokasi = ($isSkuDb || $isBarcodeDb) ? 'database' : 'intra_file';
 
-        $targetProdukId = $variantDb?->produk_id ?? $barcodeTargetProduk?->id ?? null;
-        $targetProdukNama = $variantDb?->produk?->nama ?? $barcodeTargetProduk?->nama ?? null;
-        $targetProdukSku = $variantDb?->sku ?? $barcodeTargetProduk?->skuVariants?->first()?->sku ?? null;
+        $targetProdukId = $variantData['produk_id'] ?? $barcodeTargetProdukId ?? null;
+        $targetProdukNama = $variantData['produk_nama'] ?? $barcodeTargetProdukNama ?? null;
+        $targetProdukSku = $variantData['sku'] ?? $barcodeTargetSku ?? null;
 
         $targetBaris = null;
-        if ($lokasi === 'intra_file' && ! empty($konteks['namaDalamFile'])) {
-            foreach ($konteks['namaDalamFile'] as $prev) {
-                if ($sku !== '' && strcasecmp($prev['sku'], $sku) === 0) {
-                    $targetBaris = $prev['baris'];
-                    $targetProdukNama = $prev['nama'];
-                    break;
+        if ($lokasi === 'intra_file') {
+            if ($sku !== '' && isset($konteks['skuBarisMap'][$sku])) {
+                $targetBaris = $konteks['skuBarisMap'][$sku]['baris'];
+                $targetProdukNama = $konteks['skuBarisMap'][$sku]['nama'];
+            } elseif (! empty($konteks['namaDalamFile'])) {
+                foreach ($konteks['namaDalamFile'] as $prev) {
+                    if ($sku !== '' && strcasecmp($prev['sku'], $sku) === 0) {
+                        $targetBaris = $prev['baris'];
+                        $targetProdukNama = $prev['nama'];
+                        break;
+                    }
                 }
             }
         }
@@ -1107,13 +1153,19 @@ class ImportProdukService
 
         if (! $sku) {
             $errors[] = 'SKU wajib diisi';
-        } elseif (isset($konteks['skuDalamFile'][$sku]) || SkuVariant::where('sku', $sku)->exists()) {
-            $errors[] = "SKU '{$sku}' duplikat (sudah ada di file atau database)";
+        } else {
+            $skuExistsInDb = isset($konteks['existingSkuDb'])
+                ? isset($konteks['existingSkuDb'][strtolower($sku)])
+                : SkuVariant::where('sku', $sku)->exists();
+            if (isset($konteks['skuDalamFile'][$sku]) || $skuExistsInDb) {
+                $errors[] = "SKU '{$sku}' duplikat (sudah ada di file atau database)";
+            }
         }
         if ($barcode) {
-            if (isset($konteks['barcodeDalamFile'][$barcode])
-                || SkuVariant::where('barcode', $barcode)->exists()
-                || Produk::where('barcode', $barcode)->exists()) {
+            $barcodeExistsInDb = isset($konteks['existingBarcodeDb'])
+                ? isset($konteks['existingBarcodeDb'][$barcode])
+                : (SkuVariant::where('barcode', $barcode)->exists() || Produk::where('barcode', $barcode)->exists());
+            if (isset($konteks['barcodeDalamFile'][$barcode]) || $barcodeExistsInDb) {
                 $errors[] = "Barcode '{$barcode}' duplikat (sudah ada di file atau database)";
             }
         }
@@ -1168,19 +1220,91 @@ class ImportProdukService
     }
 
     /**
+     * Preload SKU dan Barcode dari database sekaligus untuk mencegah N-queries per baris.
+     */
+    public function preloadExistingDb(array $rows): array
+    {
+        $fileSkus = [];
+        $fileBarcodes = [];
+        foreach ($rows as $r) {
+            $s = trim((string) ($r['sku'] ?? ''));
+            if ($s !== '') {
+                $fileSkus[strtolower($s)] = $s;
+            }
+            $b = $this->normalizeBarcode($r['barcode'] ?? null);
+            if ($b !== '') {
+                $fileBarcodes[$b] = $b;
+            }
+        }
+
+        $existingSkuDb = [];
+        if (! empty($fileSkus)) {
+            foreach (array_chunk(array_values($fileSkus), 1000) as $skuChunk) {
+                $variants = SkuVariant::with('produk:id,nama')
+                    ->whereIn('sku', $skuChunk)
+                    ->get(['id', 'produk_id', 'sku', 'barcode']);
+                foreach ($variants as $v) {
+                    $existingSkuDb[strtolower($v->sku)] = [
+                        'sku' => $v->sku,
+                        'produk_id' => $v->produk_id,
+                        'produk_nama' => $v->produk?->nama ?? '',
+                        'barcode' => $v->barcode,
+                    ];
+                }
+            }
+        }
+
+        $existingBarcodeDb = [];
+        if (! empty($fileBarcodes)) {
+            foreach (array_chunk(array_values($fileBarcodes), 1000) as $barcodeChunk) {
+                $variants = SkuVariant::with('produk:id,nama')
+                    ->whereIn('barcode', $barcodeChunk)
+                    ->get(['id', 'produk_id', 'sku', 'barcode']);
+                foreach ($variants as $v) {
+                    $existingBarcodeDb[$v->barcode] = [
+                        'sku' => $v->sku,
+                        'produk_id' => $v->produk_id,
+                        'produk_nama' => $v->produk?->nama ?? '',
+                    ];
+                }
+                $produks = Produk::whereIn('barcode', $barcodeChunk)->get(['id', 'nama', 'barcode']);
+                foreach ($produks as $p) {
+                    if (! isset($existingBarcodeDb[$p->barcode])) {
+                        $existingBarcodeDb[$p->barcode] = [
+                            'sku' => null,
+                            'produk_id' => $p->id,
+                            'produk_nama' => $p->nama,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return [$existingSkuDb, $existingBarcodeDb];
+    }
+
+    /**
      * Preview (dry-run): validasi seluruh baris, tanpa mengubah data.
      *
      * [B-10f/P1-5] Validasi lintas cabang dijalankan di preview (fail fast)
      * supaya user tahu SEBELUM commit.
      */
-    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN): array
+    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiDuplikat = []): array
     {
         $rows = $this->parseRows($filePath);
         // [B-10f] File lintas cabang ditolak (tidak ada mutasi stok/jurnal yg bisa dicocokkan)
         $this->cabangTunggalDariRows($rows);
-        // Konteks duplikat diakumulasi per baris SETELAH validasi (prebuild file-penuh
-        // menandai baris itu sendiri → semua baris dianggap duplikat).
-        $konteks = ['skuDalamFile' => [], 'barcodeDalamFile' => [], 'namaDalamFile' => []];
+
+        [$existingSkuDb, $existingBarcodeDb] = $this->preloadExistingDb($rows);
+        $konteks = [
+            'skuDalamFile' => [],
+            'barcodeDalamFile' => [],
+            'namaDalamFile' => [],
+            'skuBarisMap' => [],
+            'existingSkuDb' => $existingSkuDb,
+            'existingBarcodeDb' => $existingBarcodeDb,
+            'skipFuzzy' => count($rows) > 300,
+        ];
 
         // Collect unique reference values for smart preview
         $refValues = [
@@ -1204,7 +1328,22 @@ class ImportProdukService
         $totalPeringatan = 0;
         foreach ($rows as $i => $row) {
             $nomorBaris = $i + 2; // +1 heading
-            $errors = $this->validateRow($row, $konteks);
+            $skuRaw = trim((string) ($row['sku'] ?? ''));
+
+            $resDup = $resolusiDuplikat[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiDuplikat[$skuRaw] ?? null) : null);
+            $aksiDup = is_array($resDup) ? ($resDup['aksi'] ?? null) : $resDup;
+            $skuBaru = is_array($resDup) ? trim((string) ($resDup['sku_baru'] ?? '')) : '';
+
+            $rowValidasi = $row;
+            if ($aksiDup === 'ganti_sku' && $skuBaru !== '') {
+                $rowValidasi['sku'] = $skuBaru;
+            }
+
+            $errors = $this->validateRow($rowValidasi, $konteks);
+            if (in_array($aksiDup, ['ganti_sku', 'timpa_update', 'skip'], true)) {
+                $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat')));
+            }
+
             $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks, $threshold);
             $kemiripan = $this->detectKemiripanRow($row, $nomorBaris, $konteks, $threshold);
             $duplikat = $this->detectDuplikatRow($row, $nomorBaris, $konteks);
@@ -1214,7 +1353,7 @@ class ImportProdukService
             if ($duplikat) {
                 $duplikatRows[] = $duplikat;
             }
-            $this->catatKonteks($row, $nomorBaris, $konteks);
+            $this->catatKonteks($rowValidasi, $nomorBaris, $konteks);
             if ($errors) {
                 $invalid++;
             } else {
@@ -1225,7 +1364,7 @@ class ImportProdukService
             }
             $hasil[] = [
                 'baris' => $nomorBaris,
-                'sku' => trim((string) ($row['sku'] ?? '')),
+                'sku' => trim((string) ($rowValidasi['sku'] ?? '')),
                 'nama' => trim((string) ($row['nama'] ?? '')),
                 'valid' => empty($errors),
                 'errors' => $errors,
@@ -1399,15 +1538,21 @@ class ImportProdukService
         }
 
         // Brand: check by nama
-        foreach (array_keys($refValues['brand']) as $brand) {
-            $exists = Brand::where('nama', $brand)->exists();
-            $summary['brand'][$exists ? 'existing' : 'new'][] = $brand;
+        if (! empty($refValues['brand'])) {
+            $brandList = array_keys($refValues['brand']);
+            $existingBrands = Brand::whereIn('nama', $brandList)->pluck('nama')->map(fn ($v) => strtolower($v))->flip()->all();
+            foreach ($brandList as $brand) {
+                $exists = isset($existingBrands[strtolower($brand)]);
+                $summary['brand'][$exists ? 'existing' : 'new'][] = $brand;
+            }
         }
 
         // Supplier: check by nama
         if (! empty($refValues['supplier'])) {
-            foreach (array_keys($refValues['supplier']) as $sup) {
-                $exists = Supplier::where('nama', $sup)->exists();
+            $supList = array_keys($refValues['supplier']);
+            $existingSups = Supplier::whereIn('nama', $supList)->pluck('nama')->map(fn ($v) => strtolower($v))->flip()->all();
+            foreach ($supList as $sup) {
+                $exists = isset($existingSups[strtolower($sup)]);
                 $summary['supplier'][$exists ? 'existing' : 'new'][] = $sup;
             }
         }
@@ -1426,9 +1571,13 @@ class ImportProdukService
         }
 
         // Kualitas: check by nama (global)
-        foreach (array_keys($refValues['kualitas']) as $kual) {
-            $exists = KualitasProduk::where('nama', $kual)->exists();
-            $summary['kualitas'][$exists ? 'existing' : 'new'][] = $kual;
+        if (! empty($refValues['kualitas'])) {
+            $kualList = array_keys($refValues['kualitas']);
+            $existingKuals = KualitasProduk::whereIn('nama', $kualList)->pluck('nama')->map(fn ($v) => strtolower($v))->flip()->all();
+            foreach ($kualList as $kual) {
+                $exists = isset($existingKuals[strtolower($kual)]);
+                $summary['kualitas'][$exists ? 'existing' : 'new'][] = $kual;
+            }
         }
 
         // Satuan: check by kode or nama
@@ -1491,7 +1640,16 @@ class ImportProdukService
 
         // [B-10f] Validasi lintas cabang (fail fast, SEBELUM ada mutasi apa pun)
         $cabangId = $this->cabangTunggalDariRows($rows);
-        $konteks = ['skuDalamFile' => [], 'barcodeDalamFile' => [], 'namaDalamFile' => []];
+        [$existingSkuDb, $existingBarcodeDb] = $this->preloadExistingDb($rows);
+        $konteks = [
+            'skuDalamFile' => [],
+            'barcodeDalamFile' => [],
+            'namaDalamFile' => [],
+            'skuBarisMap' => [],
+            'existingSkuDb' => $existingSkuDb,
+            'existingBarcodeDb' => $existingBarcodeDb,
+            'skipFuzzy' => count($rows) > 300,
+        ];
 
         $sukses = 0;
         $gagal = 0;
@@ -1548,7 +1706,7 @@ class ImportProdukService
                     }
 
                     $errors = $this->validateRow($row, $konteks);
-                    if ($aksi === 'gabung' || $aksiDup === 'timpa_update') {
+                    if ($aksi === 'gabung' || in_array($aksiDup, ['timpa_update', 'ganti_sku', 'skip'], true)) {
                         $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat')));
                     }
                     $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks, $threshold);
@@ -1722,8 +1880,10 @@ class ImportProdukService
     protected function catatKonteks(array $row, int $nomorBaris, array &$konteks): void
     {
         $s = trim((string) ($row['sku'] ?? ''));
+        $n = trim((string) ($row['nama'] ?? ''));
         if ($s !== '') {
             $konteks['skuDalamFile'][$s] = true;
+            $konteks['skuBarisMap'][$s] = ['baris' => $nomorBaris, 'nama' => $n];
         }
         $b = $this->normalizeBarcode($row['barcode'] ?? null);
         if ($b !== '') {

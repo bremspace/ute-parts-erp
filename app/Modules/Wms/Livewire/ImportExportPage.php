@@ -233,11 +233,51 @@ class ImportExportPage extends Component
 
     public function setAksiDuplikat(int $baris, string $aksi): void
     {
+        $dr = collect($this->importPreview['duplikat_rows'] ?? [])->firstWhere('baris', $baris);
+        $rekomendasi = $dr['sku_rekomendasi'] ?? '';
+
         if (! isset($this->resolusiDuplikat[$baris])) {
-            $this->resolusiDuplikat[$baris] = ['aksi' => $aksi, 'sku_baru' => ''];
+            $this->resolusiDuplikat[$baris] = [
+                'aksi' => $aksi,
+                'sku_baru' => $aksi === 'ganti_sku' ? $rekomendasi : '',
+            ];
         } else {
             $this->resolusiDuplikat[$baris]['aksi'] = $aksi;
+            if ($aksi === 'ganti_sku' && empty($this->resolusiDuplikat[$baris]['sku_baru'])) {
+                $this->resolusiDuplikat[$baris]['sku_baru'] = $rekomendasi;
+            }
         }
+    }
+
+    public function setAksiDuplikatSemua(string $aksi): void
+    {
+        if (empty($this->importPreview['duplikat_rows'])) {
+            return;
+        }
+
+        foreach ($this->importPreview['duplikat_rows'] as $dr) {
+            $baris = (int) $dr['baris'];
+            $targetAksi = $aksi;
+            if ($aksi === 'timpa_update' && ($dr['lokasi'] ?? '') !== 'database') {
+                $targetAksi = 'ganti_sku';
+            }
+            $this->resolusiDuplikat[$baris] = [
+                'aksi' => $targetAksi,
+                'sku_baru' => $dr['sku_rekomendasi'] ?? '',
+            ];
+        }
+
+        $label = match ($aksi) {
+            'ganti_sku' => 'Ganti SKU Otomatis',
+            'timpa_update' => 'Timpa/Update Data',
+            'skip' => 'Lewati (Skip)',
+            default => $aksi,
+        };
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Tindakan '{$label}' berhasil diterapkan untuk seluruh baris duplikat.",
+        ]);
     }
 
     public function updateSkuBaru(int $baris, string $val): void
@@ -411,7 +451,12 @@ class ImportExportPage extends Component
                 'fotoZip.max' => 'Ukuran berkas ZIP maksimal 50MB.',
             ]);
 
-            $tempDir = storage_path('app/tmp_foto_'.auth()->id().'_'.time());
+            $time = time();
+            $folderName = 'tmp_foto_'.auth()->id().'_'.$time;
+            $tempDir = Storage::disk('local')->path($folderName);
+            if (! is_dir($tempDir)) {
+                @mkdir($tempDir, 0775, true);
+            }
             $this->fotoTempDir = $tempDir;
             $zipRealPath = $this->fotoZip->getRealPath();
 
@@ -441,7 +486,9 @@ class ImportExportPage extends Component
             ]);
 
             $items = [];
-            $tempDir = storage_path('app/tmp_foto_'.auth()->id().'_'.time());
+            $time = time();
+            $folderName = 'tmp_foto_'.auth()->id().'_'.$time;
+            $tempDir = Storage::disk('local')->path($folderName);
             if (! is_dir($tempDir)) {
                 @mkdir($tempDir, 0775, true);
             }
@@ -449,7 +496,7 @@ class ImportExportPage extends Component
 
             foreach ($this->fotoUploads as $idx => $file) {
                 $origName = $file->getClientOriginalName();
-                $tempStored = $file->storeAs('tmp_foto_'.auth()->id().'_'.time(), 'f_'.$idx.'_'.Str::slug(pathinfo($origName, PATHINFO_FILENAME)).'.'.$file->getClientOriginalExtension());
+                $tempStored = $file->storeAs($folderName, 'f_'.$idx.'_'.Str::slug(pathinfo($origName, PATHINFO_FILENAME)).'.'.$file->getClientOriginalExtension(), 'local');
                 $absStored = Storage::disk('local')->path($tempStored);
 
                 $items[] = [

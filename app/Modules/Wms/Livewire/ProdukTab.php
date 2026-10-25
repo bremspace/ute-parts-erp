@@ -929,7 +929,7 @@ class ProdukTab extends Component
             'produkForm.satuan_kode' => 'required|exists:satuan_unit,kode',
             'produkForm.harga_beli' => 'required|numeric|min:0',
             'produkForm.harga_jual_retail' => 'required|numeric|min:0',
-            'fotoUploads.*' => 'nullable|image|max:10240',
+            'fotoUploads.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,webp,heic,heif,bmp|max:20480',
             // [T-44] minimal 1 harga tier (retail wajib isi)
             'produkForm.harga_tier.retail.nominal_tetap' => 'nullable|numeric|min:0',
             // [HARGA FLEKSIBEL]
@@ -1259,7 +1259,7 @@ class ProdukTab extends Component
     {
         if ($file) {
             $this->validateOnly('fotoKameraUpload', [
-                'fotoKameraUpload' => 'image|max:15360',
+                'fotoKameraUpload' => 'nullable|file|mimes:jpeg,png,jpg,gif,webp,heic,heif,bmp|max:20480',
             ]);
             $this->fotoUploads[] = $file;
             $this->fotoKameraUpload = null;
@@ -1271,7 +1271,7 @@ class ProdukTab extends Component
     {
         if ($file) {
             $this->validateOnly('editFotoKameraUpload', [
-                'editFotoKameraUpload' => 'image|max:15360',
+                'editFotoKameraUpload' => 'nullable|file|mimes:jpeg,png,jpg,gif,webp,heic,heif,bmp|max:20480',
             ]);
             $this->editFotoUploads[] = $file;
             $this->editFotoKameraUpload = null;
@@ -1325,7 +1325,7 @@ class ProdukTab extends Component
             'editProdukForm.barcode' => 'nullable|string|max:50|unique:produk,barcode,'.$this->editProdukId,
             'editProdukForm.harga_beli' => 'required|numeric|min:0',
             'editProdukForm.harga_jual_retail' => 'required|numeric|min:0',
-            'editFotoUploads.*' => 'nullable|image|max:10240',
+            'editFotoUploads.*' => 'nullable|file|mimes:jpeg,png,jpg,gif,webp,heic,heif,bmp|max:20480',
         ], [
             'editProdukForm.sku.unique' => 'Kode SKU sudah digunakan oleh produk lain.',
         ]);

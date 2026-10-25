@@ -35,6 +35,8 @@ class ProductImageService
      */
     public function prosesDanSimpan(UploadedFile|string $file, string $disk = 'public'): array
     {
+        @ini_set('memory_limit', '512M');
+
         $realPath = $file instanceof UploadedFile ? $file->getRealPath() : $file;
         if (! file_exists($realPath) || ! is_readable($realPath)) {
             throw new \InvalidArgumentException('File gambar tidak ditemukan atau tidak dapat dibaca');

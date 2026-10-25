@@ -260,18 +260,53 @@
 
                 <!-- PANEL 1: PENYESUAIAN DUPLIKASI SKU / BARCODE -->
                 @if(! empty($importPreview['duplikat_rows']))
+                    @php
+                        $duplikatList = $importPreview['duplikat_rows'] ?? [];
+                        $totalDuplikatCount = count($duplikatList);
+                        $displayedDuplikatRows = array_slice($duplikatList, 0, 100);
+                    @endphp
                     <div class="p-5 rounded-2xl bg-up-primary/10 border border-up-primary/30 space-y-4">
                         <div class="flex items-center justify-between flex-wrap gap-2">
                             <div>
                                 <h3 class="text-sm font-bold text-up-primary flex items-center gap-2">
                                     <span>⚡</span>
-                                    <span>Penyesuaian Duplikasi SKU / Barcode ({{ count($importPreview['duplikat_rows']) }} Baris)</span>
+                                    <span>Penyesuaian Duplikasi SKU / Barcode ({{ $totalDuplikatCount }} Baris)</span>
                                 </h3>
                                 <p class="text-[11px] text-ink-300 mt-0.5">
                                     Daripada baris ini dilewati, Anda dapat <strong>mengubah SKU langsung</strong> di sini, memilih opsi <strong>timpa/update data produk eksisting</strong>, atau melewati baris tersebut.
                                 </p>
                             </div>
                         </div>
+
+                        <!-- Toolbar: Pilih Semua Tindakan Duplikat -->
+                        <div class="p-3 rounded-xl bg-black/30 border border-white/10 flex items-center justify-between flex-wrap gap-3">
+                            <span class="text-[11px] text-ink-300 font-semibold">Terapkan ke Seluruh Duplikat (Pilih Semua):</span>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button type="button"
+                                        wire:click="setAksiDuplikatSemua('ganti_sku')"
+                                        class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-up-primary hover:bg-up-primary/80 text-white cursor-pointer transition shadow flex items-center gap-1.5">
+                                    <span>✏️</span> Ganti Semua SKU Otomatis
+                                </button>
+                                <button type="button"
+                                        wire:click="setAksiDuplikatSemua('timpa_update')"
+                                        class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-up-mint hover:bg-up-mint/80 text-ink-950 font-black cursor-pointer transition shadow flex items-center gap-1.5"
+                                        title="Timpa/update data produk eksisting di database">
+                                    <span>🔄</span> Timpa Semua Data DB
+                                </button>
+                                <button type="button"
+                                        wire:click="setAksiDuplikatSemua('skip')"
+                                        class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-up-red/80 hover:bg-up-red text-white cursor-pointer transition shadow flex items-center gap-1.5">
+                                    <span>⏭️</span> Lewati Semua Duplikat
+                                </button>
+                            </div>
+                        </div>
+
+                        @if($totalDuplikatCount > 100)
+                            <div class="p-2.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-ink-300 flex items-center justify-between">
+                                <span>Menampilkan 100 dari {{ $totalDuplikatCount }} baris duplikat.</span>
+                                <span class="text-ink-400">Gunakan tombol 'Terapkan ke Seluruh Duplikat' di atas untuk mengatur tindakan massal.</span>
+                            </div>
+                        @endif
 
                         <!-- Desktop Table View (md and up) -->
                         <div class="hidden md:block overflow-x-auto rounded-xl border border-white/10 bg-black/40">
@@ -287,7 +322,7 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-white/5 text-[11px]">
-                                    @foreach($importPreview['duplikat_rows'] as $dr)
+                                    @foreach($displayedDuplikatRows as $dr)
                                         @php
                                             $currentAksi = $resolusiDuplikat[$dr['baris']]['aksi'] ?? ($dr['lokasi'] === 'database' ? 'timpa_update' : 'ganti_sku');
                                             $currentSkuBaru = $resolusiDuplikat[$dr['baris']]['sku_baru'] ?? $dr['sku_rekomendasi'];
@@ -350,7 +385,7 @@
 
                         <!-- Mobile Card Stack View (< md) -->
                         <div class="block md:hidden space-y-3">
-                            @foreach($importPreview['duplikat_rows'] as $dr)
+                            @foreach($displayedDuplikatRows as $dr)
                                 @php
                                     $currentAksi = $resolusiDuplikat[$dr['baris']]['aksi'] ?? ($dr['lokasi'] === 'database' ? 'timpa_update' : 'ganti_sku');
                                     $currentSkuBaru = $resolusiDuplikat[$dr['baris']]['sku_baru'] ?? $dr['sku_rekomendasi'];
@@ -502,18 +537,40 @@
                 </div>
 
                 <!-- PANEL 3: RINCIAN SELURUH BARIS ERROR -->
-                @if(! empty($importPreview['error_rows']))
+                @php
+                    $allErrorRows = $importPreview['error_rows'] ?? [];
+                    $activeErrorRows = array_values(array_filter($allErrorRows, function ($errRow) use ($resolusiDuplikat) {
+                        $baris = $errRow['baris'];
+                        $sku = $errRow['sku'];
+                        $res = $resolusiDuplikat[$baris] ?? ($sku !== '' ? ($resolusiDuplikat[$sku] ?? null) : null);
+                        $aksi = is_array($res) ? ($res['aksi'] ?? null) : $res;
+                        if (in_array($aksi, ['ganti_sku', 'timpa_update', 'skip'], true)) {
+                            $nonDup = array_filter($errRow['errors'] ?? [], fn ($e) => ! str_contains($e, 'duplikat'));
+                            return ! empty($nonDup);
+                        }
+                        return true;
+                    }));
+                    $totalErrorCount = count($activeErrorRows);
+                    $displayedErrorRows = array_slice($activeErrorRows, 0, 100);
+                @endphp
+                @if($totalErrorCount > 0)
                     <div class="p-5 rounded-2xl bg-up-red/10 border border-up-red/30 space-y-4">
                         <div class="flex items-center justify-between flex-wrap gap-2">
                             <h3 class="text-sm font-bold text-up-red flex items-center gap-2">
                                 <span>⛔</span>
-                                <span>Rincian Seluruh Baris Error ({{ count($importPreview['error_rows']) }} Baris)</span>
+                                <span>Rincian Seluruh Baris Error ({{ $totalErrorCount }} Baris)</span>
                             </h3>
                             <span class="text-[10px] text-ink-400">Rincian error lengkap agar Anda dapat memperbaiki data pada file</span>
                         </div>
 
+                        @if($totalErrorCount > 100)
+                            <div class="p-2.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-ink-300">
+                                Menampilkan 100 dari {{ $totalErrorCount }} baris error pertama.
+                            </div>
+                        @endif
+
                         <div class="max-h-80 overflow-y-auto space-y-2.5 pr-1 divide-y divide-white/5">
-                            @foreach($importPreview['error_rows'] as $errRow)
+                            @foreach($displayedErrorRows as $errRow)
                                 <div class="pt-2.5 first:pt-0 p-3 rounded-xl bg-black/40 border border-up-red/20 space-y-1.5">
                                     <div class="flex items-center justify-between text-xs font-mono flex-wrap gap-1">
                                         <span class="font-bold px-2 py-0.5 rounded bg-up-red/20 text-up-red border border-up-red/30">Baris #{{ $errRow['baris'] }}</span>

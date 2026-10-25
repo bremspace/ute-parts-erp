@@ -2761,7 +2761,7 @@
                                 <div class="flex gap-2 flex-wrap">
                                     @foreach($fotoUploads as $idx => $fu)
                                         <div class="w-16 h-16 rounded-xl overflow-hidden border border-white/20 bg-black/40 relative group shadow-sm">
-                                            <img src="{{ $fu->temporaryUrl() }}" class="w-full h-full object-cover">
+                                            <img src="{{ rescue(fn () => $fu->temporaryUrl(), '') }}" class="w-full h-full object-cover">
                                             <span class="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-mono text-center text-white truncate py-0.5">
                                                 {{ $idx === 0 ? 'Utama' : '#' . ($idx + 1) }}
                                             </span>
@@ -3688,7 +3688,7 @@
                                     <div class="flex gap-2 flex-wrap">
                                         @foreach($editFotoUploads as $idx => $efu)
                                             <div class="w-14 h-14 rounded-lg overflow-hidden border border-white/20 bg-black/40 relative group">
-                                                <img src="{{ $efu->temporaryUrl() }}" class="w-full h-full object-cover">
+                                                <img src="{{ rescue(fn () => $efu->temporaryUrl(), '') }}" class="w-full h-full object-cover">
                                                 <button type="button" wire:click="hapusEditFotoUploadBaru({{ $idx }})" class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-up-red text-white flex items-center justify-center text-[10px] opacity-80 hover:opacity-100 cursor-pointer shadow" title="Hapus foto ini">
                                                     ✕
                                                 </button>

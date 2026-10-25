@@ -181,17 +181,34 @@ class BulkProductImageImportService
 
         $lookupKeys = array_keys($skuCandidates);
 
-        // Cari di tabel sku_variants yang berelasi ke produk
-        $dbVariants = SkuVariant::query()
-            ->with(['produk:id,nama,gambar,foto'])
-            ->where(function ($q) use ($lookupKeys) {
-                foreach (array_chunk($lookupKeys, 200) as $chunk) {
-                    $placeholders = implode(',', array_fill(0, count($chunk), '?'));
-                    $q->orWhereRaw("LOWER(TRIM(sku)) IN ({$placeholders})", $chunk);
-                }
-            })
-            ->get()
-            ->keyBy(fn ($item) => strtolower(trim((string) $item->sku)));
+        $dbVariants = collect();
+        $dbBarcodes = collect();
+
+        if (! empty($lookupKeys)) {
+            // Cari di tabel sku_variants yang berelasi ke produk berdasarkan SKU
+            $dbVariants = SkuVariant::query()
+                ->with(['produk:id,nama,gambar,foto'])
+                ->where(function ($q) use ($lookupKeys) {
+                    foreach (array_chunk($lookupKeys, 200) as $chunk) {
+                        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                        $q->orWhereRaw("LOWER(TRIM(sku)) IN ({$placeholders})", $chunk);
+                    }
+                })
+                ->get()
+                ->keyBy(fn ($item) => strtolower(trim((string) $item->sku)));
+
+            // Cari juga berdasarkan Barcode pada sku_variants
+            $dbBarcodes = SkuVariant::query()
+                ->with(['produk:id,nama,gambar,foto'])
+                ->where(function ($q) use ($lookupKeys) {
+                    foreach (array_chunk($lookupKeys, 200) as $chunk) {
+                        $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                        $q->orWhereRaw("LOWER(TRIM(barcode)) IN ({$placeholders})", $chunk);
+                    }
+                })
+                ->get()
+                ->keyBy(fn ($item) => strtolower(trim((string) $item->barcode)));
+        }
 
         foreach ($files as $idx => $f) {
             $name = $f['name'] ?? 'file_'.$idx;
@@ -218,11 +235,16 @@ class BulkProductImageImportService
             $matchedVariant = null;
             $matchedSku = null;
 
-            // Coba satu per satu kandidat terhadap hasil database
+            // Coba satu per satu kandidat terhadap hasil database (SKU dan Barcode)
             foreach ($candidates as $cand) {
                 $norm = strtolower($cand);
                 if (isset($dbVariants[$norm]) && $dbVariants[$norm]->produk) {
                     $matchedVariant = $dbVariants[$norm];
+                    $matchedSku = $matchedVariant->sku;
+                    break;
+                }
+                if (isset($dbBarcodes[$norm]) && $dbBarcodes[$norm]->produk) {
+                    $matchedVariant = $dbBarcodes[$norm];
                     $matchedSku = $matchedVariant->sku;
                     break;
                 }
@@ -407,6 +429,7 @@ class BulkProductImageImportService
                 continue;
             }
 
+            $ext = strtolower(pathinfo($entryName, PATHINFO_EXTENSION));
             $safeFilename = Str::slug(pathinfo($entryName, PATHINFO_FILENAME)).'_'.Str::random(8).'.'.$ext;
             $destPath = $extractTargetDir.'/'.$safeFilename;
             $destStream = fopen($destPath, 'wb');
