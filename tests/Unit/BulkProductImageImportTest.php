@@ -267,4 +267,23 @@ class BulkProductImageImportTest extends TestCase
         $this->assertCount(2, $log->detail);
         $this->assertEquals('skip', $log->detail[1]['status']);
     }
+
+    public function test_prescan_can_handle_thousands_of_files(): void
+    {
+        $startTime = microtime(true);
+
+        $files = [];
+        for ($i = 1; $i <= 1000; $i++) {
+            $files[] = [
+                'name' => 'SKU-BATCH-TEST-'.($i % 20).'.jpg',
+                'size' => 1024,
+            ];
+        }
+
+        $res = $this->service->preScanFiles($files);
+        $duration = microtime(true) - $startTime;
+
+        $this->assertEquals(1000, $res['total']);
+        $this->assertLessThan(3.0, $duration, 'Pre-scan 1000 file harus selesai dalam < 3 detik');
+    }
 }

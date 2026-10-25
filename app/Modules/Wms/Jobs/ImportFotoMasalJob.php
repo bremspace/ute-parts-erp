@@ -145,7 +145,8 @@ class ImportFotoMasalJob implements ShouldQueue
                 }
 
                 // Update ticker progress real-time per item / small batches
-                if ($nomor % 2 === 0 || $nomor === $totalItems) {
+                $updateInterval = $totalItems > 500 ? 10 : ($totalItems > 100 ? 5 : 2);
+                if ($nomor % $updateInterval === 0 || $nomor === $totalItems) {
                     $log->update([
                         'total_baris' => $totalItems,
                         'sukses' => $sukses,

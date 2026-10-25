@@ -1274,9 +1274,11 @@
                                         'skipped' => $skippedList,
                                         default => array_merge($matchedList, $skippedList),
                                     };
+                                    $totalDisplayCount = count($displayList);
+                                    $slicedDisplayList = array_slice($displayList, 0, 100);
                                 @endphp
 
-                                @forelse($displayList as $idx => $row)
+                                @forelse($slicedDisplayList as $idx => $row)
                                     @php $isMatched = isset($row['produk_id']); @endphp
                                     <tr class="hover:bg-black/5 dark:hover:bg-white/[0.02] transition">
                                         <td class="py-2 px-3 text-ink-400">{{ $idx + 1 }}</td>
@@ -1327,6 +1329,12 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @if($totalDisplayCount > 100)
+                        <div class="p-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-ink-400 text-center">
+                            Menampilkan 100 dari total {{ number_format($totalDisplayCount, 0, ',', '.') }} berkas foto pertama. Seluruh berkas akan diproses oleh antrian sistem di latar belakang.
+                        </div>
+                    @endif
 
                     <!-- Bottom Action Controls -->
                     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-black/5 dark:border-white/5">

@@ -662,11 +662,11 @@ class ImportExportPage extends Component
 
         if ($this->fotoSourceType === 'zip') {
             $this->validate([
-                'fotoZip' => 'required|file|mimes:zip|max:51200',
+                'fotoZip' => 'required|file|mimes:zip|max:512000',
             ], [
                 'fotoZip.required' => 'Pilih berkas ZIP foto terlebih dahulu.',
                 'fotoZip.mimes' => 'Berkas harus berupa arsip ZIP (.zip).',
-                'fotoZip.max' => 'Ukuran berkas ZIP maksimal 50MB.',
+                'fotoZip.max' => 'Ukuran berkas ZIP maksimal 500MB.',
             ]);
 
             $time = time();
