@@ -3,6 +3,110 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-25 — CRM & POS: Buku Besar Mutasi Poin Loyalty & Proteksi Siklus Hidup Komisi Anti-Double Claim/Payout ✅
+
+- **Buku Besar Mutasi Poin Loyalty (`PelangganPoinLog`)**:
+  - Migrasi tabel `pelanggan_poin_log` (`earned`, `redeemed`, `refund`, `penyesuaian`) dengan snapshot `saldo_sebelum` dan `saldo_sesudah`.
+  - Pemotongan dan perolehan poin dipusatkan di `PelangganService` (`tukarPoin()`, `tambahBelanjaDanPoin()`, `kembalikanPoin()`, `tarikPoinBatal()`) dengan transaksi database dan pessimistic locking (`lockForUpdate()`).
+  - Penukaran poin di kasir POS otomatis terpotong saat checkout dan tercatat di buku besar mutasi; saldo poin akhir struk langsung tersinkronisasi.
+  - Void transaksi POS secara otomatis mengembalikan poin yang ditukar (`refund`) dan membatalkan poin yang didapat dari belanja (`penyesuaian`).
+- **Siklus Hidup Komisi Mitra Definitif & Anti Double Claim**:
+  - Penambahan status definitif `Komisi::STATUS_CAIR = 'cair'` dan kolom `paid_at` pada tabel `komisi`.
+  - Guard idempotensi pada `KomisiService::hitungKomisi` mencegah duplikasi komisi dari transaksi yang sama.
+  - Method `KomisiService::cairkanKomisi()` dengan locking idempoten menolak double payout / double claim dengan error domain eksplisit.
+  - Integrasi pelunasan utang komisi di `PembayaranSubledgerService::bayarUtang()` otomatis memperbarui status komisi menjadi `cair` dan mencatat `paid_at` serta audit log.
+  - Integrasi pembayaran slip bulanan karyawan di `PayrollService::bayarPayroll()` menandai komisi internal periode terkait menjadi `cair`.
+  - Guard `TransaksiVoidService`: Transaksi yang komisinya sudah `cair` dilarang dibatalkan (void) sembarangan sebelum administrasi pencairan diselesaikan.
+  - Dashboard Mitra Reseller (`ResellerDashboard`) dan badge `x-prism.status-pill` mendukung filter dan tampilan ringkasan komisi `cair`.
+- **Pengujian & Verifikasi**:
+  - `LoyaltyPoinMutasiDanKomisiAntiDoubleClaimTest` (5 tests, 29 assertions) lulus 100%.
+  - `PosKasirMemberTest` (5 tests, 29 assertions) dan `PosMitraPoinPartaiTest` (10 tests, 106 assertions) lulus 100%.
+  - `./vendor/bin/pint` dan `npm run build` lulus tanpa error.
+
+## 2026-10-25 — POS: Riwayat Void & Retur Transaksi ✅
+
+- Riwayat transaksi global mendukung filter status `void` dan jenis `retur`, termasuk nominal arus kas keluar, operator, alasan, serta batas tanggal dan scope cabang aktif.
+- Detail transaksi void kini menyertakan supervisor, waktu, dan alasan void; kompatibel dengan aksi audit `bukaRiwayat('transaksi', id)`.
+- Pengujian fokus mencakup filter void/retur dan payload audit; Laravel Pint dijalankan.
+
+## 2026-10-25 — POS: Otorisasi Void Transaksi Supervisor & Presets Tanggal Timezone-Aware pada Riwayat Transaksi ✅
+
+- **Aksi Void & Retur Transaksi**:
+  - Direct return link (`/app/pos/retur?transaksi_id=...`) dengan proteksi izin `pos.view`, `pos.view-own`, atau `pos.create`.
+  - Tombol aksi `Void` dengan proteksi izin `pos.void` dan otorisasi modal supervisor (`TransaksiVoidService::verifikasiSupervisor` & `voidTransaksi`).
+  - Pembalikan stok WMS, entri jurnal akuntansi double-entry reversal, pembatalan piutang, dan penyesuaian CRM/poin saat transaksi di-void.
+- **Filter Tanggal Presets & Timezone-Aware UTC**:
+  - Filter preset: `Hari Ini` (`today`), `Kemarin` (`yesterday`), `Minggu Ini` (`this_week`), `Bulan Ini` (`this_month`), dan rentang kustom (`custom`).
+  - Konversi batas waktu awal/akhir hari dari timezone lokal aplikasi (`Asia/Jakarta`) ke format UTC sebelum query database.
+  - Strict branch scoping berbasis `session('cabang_id')`.
+- **Pengujian & Verifikasi**:
+  - `RiwayatTransaksiActionsTest` (3 tests, 20 assertions) lulus 100%.
+  - `RiwayatTransaksiGlobalTest` (3 tests, 48 assertions) lulus 100%.
+  - `./vendor/bin/pint` lulus tanpa error formatting.
+
+## 2026-10-25 — POS & CRM: Opsi Komisi Akumulasi vs Diskon Langsung Mitra, Penukaran Poin Loyalitas Kasir, Diskon Harga Partai Otomatis & Transparansi Struk ✅
+
+- **Opsi Reward Mitra (Reseller & Agen)**:
+  - Migrasi `mode_reward_mitra` pada `pelanggan` dan `transaksi` (`diskon_langsung` vs `komisi_akumulasi`), plus `komisi_mitra_nominal`.
+  - Pelanggan reseller/agen dapat memilih reward diskon langsung di kasir atau akumulasi komisi (harga kasir normal/retail, selisih tercatat sebagai komisi).
+  - Resolusi harga di `PelangganService` dan `PricingService` mendukung mode komisi akumulasi (menghitung `potensi_komisi`).
+  - Auto-record komisi mitra saat checkout POS dengan status `pending` jika mode komisi akumulasi aktif.
+- **Penukaran Poin Loyalitas Member**:
+  - Kolom `poin_ditukar` dan `diskon_poin` di tabel `transaksi`.
+  - Konfigurasi konversi poin loyalty via `KonfigurasiService::poinRedeemRupiah()` (default Rp 100 / poin).
+  - Kasir POS mendukung input poin ditukar atau tombol "Semua Poin", otomatis memotong DPP & PPN sebelum checkout, serta mendepresiasi saldo poin member.
+- **Harga Partai Otomatis (Member)**:
+  - Kolom `diskon_partai` di tabel `transaksi`.
+  - Konfigurasi batas kuantitas minimum (`harga_partai_min_qty`) dan batas nominal minimum (`harga_partai_min_nominal`) dengan diskon persentase otomatis.
+  - Member otomatis mendapatkan harga partai di kasir jika keranjang belanja memenuhi ambang kuantitas atau nominal.
+- **Transparansi Struk & BLE ESC/POS Thermal**:
+  - Penyelarasan `$receiptData` di `PosKasir` dan `RiwayatTransaksiIndex` mencakup `subtotal_retail`, `diskon_tier`, `komisi_mitra_nominal`, `diskon_partai`, `diskon_poin`, `poin_ditukar`, `saldo_poin`, dan `hemat_total`.
+  - Pembaruan modal struk web (`thermal-receipt-modal.blade.php`), printer native (`EscPosWriter.php`), dan BLE thermal printer (`thermal-print.js`).
+- **Pengujian & Verifikasi**:
+  - `PosMitraPoinPartaiTest` (4 tests, 29 assertions) lulus 100%.
+  - `npm run build` dan `./vendor/bin/pint` lulus bersih.
+
+## 2026-10-25 — WMS, CRM & POS: Sinkronisasi Harga Tier Reseller/Agen Dua Arah, Default Persen Global, Rincian Struk & Cetak BLE ESC/POS QR Code ✅
+
+- **Konfigurasi Global & CRM**:
+  - Menambahkan method `resellerDefaultPersen()` (default 1.0%) dan `agenDefaultPersen()` (default 2.0%) di `KonfigurasiService`.
+  - Menambahkan form setelan persentase default Reseller & Agen di `ResellerDashboard` (`reseller-dashboard.blade.php`) dengan validasi `reseller.manage`.
+- **Master Produk WMS (ProdukTab)**:
+  - Sinkronisasi dua arah (bi-directional sync) antara nominal dan persen harga tier konsumen.
+  - Perubahan `harga_jual_retail` otomatis menghitung `nominal_tetap` reseller dan agen berdasarkan persentase diskon.
+  - Perubahan `persen_diskon` otomatis menghitung `nominal_tetap`, dan perubahan `nominal_tetap` otomatis menghitung `persen_diskon`.
+  - Guard di `simpanProduk()` dan `updateProduk()` memastikan nominal reseller dan agen tidak kosong (fallback otomatis ke default persen jika kosong).
+  - Pemasangan `wire:model.live.debounce.300ms` pada form modal create dan edit produk.
+- **POS & Struk Transaksi**:
+  - Memperkaya `$receiptData` di `PosKasir` dan `RiwayatTransaksiIndex` dengan `harga_retail`, `diskon_per_unit`, `diskon_total`, `subtotal_retail`, `diskon_tier`, `tipe_konsumen`, dan `saldo_poin`.
+  - Memperbarui `thermal-receipt-modal.blade.php` untuk menampilkan status tier/mitra, saldo poin loyalitas, harga retail coret, rincian potongan hemat mitra, dan subtotal retail.
+- **ESC/POS & Thermal BLE Print (ADR 0009)**:
+  - Mengimplementasikan perintah native ESC/POS Model 2 QR Code (`GS ( k`) di `EscPos` (`thermal-print.js`) dan `EscPosWriter.php`.
+  - Memperbarui layout 58mm dan 80mm BLE untuk mencetak QR Code faktur retur & klaim garansi, rincian diskon tier, saldo poin reward, dan footer kebijakan toko.
+  - Build aset Vite (`npm run build`) sukses terkompilasi.
+- **Pengujian & Verifikasi**:
+  - `MasterProdukManagementTest::test_sinkronisasi_bi_directional_dan_default_persen_harga_tier_reseller_agen` (18 assertions) passed.
+  - `AgenDanResellerIntegrasiTest::test_pengaturan_persentase_default_reseller_dan_agen_dapat_disimpan` (24 assertions) passed.
+  - `ThermalPrintReceiptOptimizationTest` (37 assertions) passed.
+  - Format kode sesuai PSR-12 dengan Laravel Pint.
+
+## 2026-10-24 — POS: Penyempurnaan Retur Tukar Produk (Exchange), Validasi Kategori/Harga, Deferred Stock & Jurnal Pembukuan ✅
+
+- **ReturnPenjualanService**:
+  - Validasi ketat produk pengganti: kategori produk pengganti wajib sama dengan produk yang diretur (`kategori_id` atau string `kategori`).
+  - Validasi harga unit produk pengganti: harga satuan produk pengganti wajib `>=` harga satuan barang yang diretur (penukaran ke harga lebih murah ditolak).
+  - Integrasi workflow approval: jika retur memerlukan persetujuan (`ApprovalService::butuhApproval`), payload disimpan di `tukar_items_payload`, dan stok pengganti **tidak dipotong** sebelum disetujui.
+  - Saat dieksekusi (langsung atau via approval), pemotongan stok pengganti didelegasikan ke `StokDeductionService::kurangi()`, dan pengembalian stok barang bagus menggunakan `StokDeductionService::kembalikan()`.
+  - Pembukuan ganda retur tukar produk (`tukar_produk`): mencatat debit `410-02` (Retur Penjualan), debit `130-01` (Persediaan retur), kredit `510-02` (HPP retur), kredit `410-01` (Pendapatan Penjualan pengganti), debit `510-02` (HPP pengganti), kredit `130-01` (Persediaan pengganti), dan debit `110-01` (Kas Toko) atas selisih nominal berbayar.
+- **ReturPenjualanIndex (Livewire) & Blade View**:
+  - Filter pencarian produk pengganti: mencari produk aktif berdasarkan nama atau barcode dengan harga acuan `harga_jual_retail ?? harga_jual`.
+  - Validasi realtime pada Livewire saat menambahkan item pengganti agar sesuai kategori dan batas harga minimum barang yang diretur.
+  - Tampilan struk & barcode di hasil pencarian modal retur.
+- **Pengujian & Regresi**:
+  - `tests/Feature/ReturPenjualanExchangeTest.php`: verifikasi pencarian barcode/nama, penolakan beda kategori, penolakan harga unit lebih murah, alur tukar langsung instan, alur tunda stok pending approval hingga disetujui, dan pembukuan jurnal balance.
+  - Pembaruan `tests/Feature/ReturBarangTest.php` dan suite Livewire test.
+  - Format kode sesuai PSR-12 dengan Laravel Pint.
+
 ## 2026-10-24 — WMS: Resolusi Default Master Data Import (OEM, Original, Kategori Umum, dan Rak Bawaan) ✅
 
 - **MasterDataSeeder & KategoriProdukSeeder**:

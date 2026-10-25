@@ -1347,4 +1347,72 @@ class MasterProdukManagementTest extends TestCase
         $comp->set('produkForm.kualitas_id', $kualLain->id);
         $this->assertSame($brandLain->id, $comp->get('produkForm.brand_id'));
     }
+
+    public function test_sinkronisasi_bi_directional_dan_default_persen_harga_tier_reseller_agen(): void
+    {
+        $this->authedAdmin();
+
+        // 1. Verifikasi default config global persentase reseller (1%) & agen (2%)
+        $config = app(KonfigurasiService::class);
+        $this->assertSame(1.0, $config->resellerDefaultPersen());
+        $this->assertSame(2.0, $config->agenDefaultPersen());
+
+        // 2. Buka form tambah produk di ProdukTab -> persen default terisi otomatis
+        $comp = Livewire::test(ProdukTab::class)
+            ->call('openProdukModal');
+
+        $this->assertSame(1.0, (float) $comp->get('produkForm.harga_tier.reseller.persen_diskon'));
+        $this->assertSame(2.0, (float) $comp->get('produkForm.harga_tier.agen.persen_diskon'));
+
+        // 3. Set harga jual retail -> nominal reseller & agen otomatis terhitung
+        $comp->set('produkForm.harga_jual_retail', 100000);
+        $this->assertSame(100000.0, (float) $comp->get('produkForm.harga_tier.retail.nominal_tetap'));
+        // 1% diskon dari 100.000 = 99.000
+        $this->assertSame(99000.0, (float) $comp->get('produkForm.harga_tier.reseller.nominal_tetap'));
+        // 2% diskon dari 100.000 = 98.000
+        $this->assertSame(98000.0, (float) $comp->get('produkForm.harga_tier.agen.nominal_tetap'));
+
+        // 4. Ubah persen reseller menjadi 5% -> nominal otomatis berubah jadi 95.000
+        $comp->set('produkForm.harga_tier.reseller.persen_diskon', 5.0);
+        $this->assertSame(95000.0, (float) $comp->get('produkForm.harga_tier.reseller.nominal_tetap'));
+
+        // 5. Ubah nominal agen menjadi 90.000 -> persen diskon otomatis terhitung jadi 10%
+        $comp->set('produkForm.harga_tier.agen.nominal_tetap', 90000);
+        $this->assertSame(10.0, (float) $comp->get('produkForm.harga_tier.agen.persen_diskon'));
+
+        // 6. Simpan produk ke database
+        $comp->set('produkForm.nama', 'LCD BiDirectional Test')
+            ->set('produkForm.satuan_kode', 'pcs')
+            ->set('produkForm.harga_beli', 60000)
+            ->call('simpanProduk')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
+
+        $produk = Produk::where('nama', 'LCD BiDirectional Test')->first();
+        $this->assertNotNull($produk);
+
+        $this->assertDatabaseHas('harga_tier', [
+            'produk_id' => $produk->id,
+            'tipe_konsumen' => 'reseller',
+            'nominal_tetap' => 95000,
+        ]);
+        $this->assertDatabaseHas('harga_tier', [
+            'produk_id' => $produk->id,
+            'tipe_konsumen' => 'agen',
+            'nominal_tetap' => 90000,
+        ]);
+
+        // 7. Buka modal edit produk -> pastikan bi-directional sync di form edit juga berjalan
+        $comp->call('openEditProdukModal', $produk->id)
+            ->assertSet('showEditProdukModal', true);
+
+        $this->assertSame(95000.0, (float) $comp->get('editProdukForm.harga_tier.reseller.nominal_tetap'));
+        $this->assertSame(5.0, (float) $comp->get('editProdukForm.harga_tier.reseller.persen_diskon'));
+
+        // Ubah retail di form edit jadi 200.000
+        $comp->set('editProdukForm.harga_jual_retail', 200000);
+        // Reseller 5% dari 200.000 = 190.000
+        $this->assertSame(190000.0, (float) $comp->get('editProdukForm.harga_tier.reseller.nominal_tetap'));
+        // Agen 10% dari 200.000 = 180.000
+        $this->assertSame(180000.0, (float) $comp->get('editProdukForm.harga_tier.agen.nominal_tetap'));
+    }
 }

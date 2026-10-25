@@ -339,6 +339,11 @@ class ApprovalService
         return true;
     }
 
+    public function butuhApproval(string $entityType, int|string|null $cabangId, ?float $amount): bool
+    {
+        return $this->cariRule($entityType, $cabangId, $amount, 1) !== null;
+    }
+
     public function adaPending(string $entityType, int $entityId): bool
     {
         return ApprovalRequest::where('entity_type', $entityType)

@@ -262,7 +262,7 @@ class StokDeductionService
      *   kanonik utk produk+gudang (jumlah terbesar, id terkecil sbg tie-break),
      *   sehingga gauge POS (agregat produk) & potong stok tidak lagi beda angka.
      */
-    private function cariBarisStok(int $produkId, ?int $skuVariantId, int $gudangId, bool $lock): ?StokItem
+    public function cariBarisStok(int $produkId, ?int $skuVariantId, int $gudangId, bool $lock): ?StokItem
     {
         if ($skuVariantId !== null) {
             $query = StokItem::where('produk_id', $produkId)

@@ -23,8 +23,8 @@ class PricingService
      *
      * @return array{harga: float, harga_dasar: float, diskon_nominal: float, alasan: string, tier: string|null}
      */
-    public function resolve(Produk $produk, ?Pelanggan $pelanggan = null, ?SkuVariant $variant = null): array
+    public function resolve(Produk $produk, ?Pelanggan $pelanggan = null, ?SkuVariant $variant = null, ?string $overrideModeReward = null): array
     {
-        return app(PelangganService::class)->resolveHarga($produk, $pelanggan, $variant);
+        return app(PelangganService::class)->resolveHarga($produk, $pelanggan, $variant, $overrideModeReward);
     }
 }

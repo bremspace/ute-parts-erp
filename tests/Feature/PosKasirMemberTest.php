@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Marketplace\Services\OrderService;
+use App\Modules\Pos\Livewire\PesananOnlineIndex;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\KasSesiState;
@@ -263,5 +265,69 @@ class PosKasirMemberTest extends TestCase
 
         $nullRowsAfter = StokItem::where('produk_id', $this->produk->id)->whereNull('sku_variant_id')->count();
         $this->assertSame($nullRowsBefore, $nullRowsAfter);
+    }
+
+    public function test_transparansi_harga_tier_member_otomatis_aktif_di_pos_dan_struk(): void
+    {
+        $this->actingAs($this->kasir);
+
+        // Produk retail 15.000, member Gold diskon 10% -> potongan 1.500, harga akhir 13.500
+        $test = Livewire::test(PosKasir::class)
+            ->call('addToCart', $this->produk->id)
+            ->call('setPelanggan', $this->member->id)
+            ->assertSet('subtotalRetail', 15000.0)
+            ->assertSet('diskonTierTotal', 1500.0)
+            ->assertSet('subtotal', 13500.0)
+            ->assertSet('hematTotal', 1500.0)
+            ->assertSet('totalAkhir', 13500.0);
+
+        // Selesaikan pembayaran dan periksa struk
+        $test->call('openPaymentModal')
+            ->set('metodeBayar', 'tunai')
+            ->set('jumlahBayar', 20000)
+            ->call('processTransaction');
+
+        $receipt = $test->get('receiptData');
+        $this->assertNotNull($receipt);
+        $this->assertEquals(15000.0, (float) $receipt['subtotal_retail']);
+        $this->assertEquals(1500.0, (float) $receipt['diskon_tier']);
+        $this->assertEquals(13500.0, (float) $receipt['subtotal']);
+        $this->assertEquals(1500.0, (float) $receipt['hemat_total']);
+        $this->assertEquals('Gold', $receipt['tier']);
+    }
+
+    public function test_transparansi_harga_tier_member_di_pesanan_online_dan_struk_pickup(): void
+    {
+        $orderService = app(OrderService::class);
+
+        // Pesan 1 pcs lewat pesanan online oleh member Gold
+        $transaksi = $orderService->buatOrder(
+            pelanggan: $this->member,
+            items: [
+                ['produk_id' => $this->produk->id, 'sku_variant_id' => SkuVariant::first()->id, 'jumlah' => 1],
+            ],
+            cabangId: $this->cabang->id,
+            metodeAmbil: 'ambil_ke_toko',
+            catatan: 'ambil_ke_toko siang ini'
+        );
+
+        $this->assertEquals(13500.0, (float) $transaksi->subtotal);
+        $item = $transaksi->items()->first();
+        $this->assertNotNull($item);
+        $this->assertEquals(13500.0, (float) $item->harga_satuan);
+        $this->assertEquals(1500.0, (float) $item->diskon_nominal);
+
+        // Buka kasir pesanan online dan cetak struk pickup
+        $this->actingAs($this->kasir);
+        $onlineIndex = Livewire::test(PesananOnlineIndex::class)
+            ->call('cetakLabel', $transaksi->id);
+
+        $receipt = $onlineIndex->get('receiptData');
+        $this->assertNotNull($receipt);
+        $this->assertEquals(15000.0, (float) $receipt['subtotal_retail']);
+        $this->assertEquals(1500.0, (float) $receipt['diskon_tier']);
+        $this->assertEquals(13500.0, (float) $receipt['subtotal']);
+        $this->assertEquals(1500.0, (float) $receipt['hemat_total']);
+        $this->assertEquals('Gold', $receipt['tier']);
     }
 }

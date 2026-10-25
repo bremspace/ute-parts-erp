@@ -335,6 +335,153 @@
             </div>
         </div>
 
+        <!-- Panel Konfigurasi Loyalty Global & Diskon Partai -->
+        @can('tier.manage')
+        <div class="p-4 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/5">
+                <div>
+                    <h4 class="text-xs font-bold text-white flex items-center gap-2">
+                        <span>⚙️</span>
+                        <span>Konfigurasi Global Poin Loyalty & Harga Partai Member</span>
+                    </h4>
+                    <p class="text-[11px] text-ink-400 mt-0.5">
+                        Berlaku sebagai nilai default bagi seluruh pelanggan retail/member yang tidak memiliki rasio kustom khusus di tier masing-masing.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="simpanPengaturanLoyaltyGlobal"
+                    class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-up-primary/20 transition active:scale-95 cursor-pointer self-start sm:self-auto"
+                >
+                    <span>💾 Simpan Pengaturan Global</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <!-- 1. Nilai Tukar Poin Global -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                    <label class="block font-semibold text-ink-300 text-[11px]">Nilai Tukar Poin Default (Rp)</label>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-ink-400 font-bold">1 pt = Rp</span>
+                        <input
+                            type="number"
+                            wire:model="poinRedeemRupiahGlobal"
+                            min="0"
+                            step="10"
+                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white"
+                        />
+                    </div>
+                    <span class="text-[10px] text-ink-400 block">Default diskon saat penukaran poin di POS kasir</span>
+                </div>
+
+                <!-- 2. Status Diskon Partai -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                    <label class="block font-semibold text-ink-300 text-[11px]">Harga Partai Member</label>
+                    <label class="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            wire:model.live="hargaPartaiAktif"
+                            class="accent-up-mint w-4 h-4 rounded cursor-pointer"
+                        />
+                        <span class="font-bold {{ $hargaPartaiAktif ? 'text-up-mint' : 'text-ink-400' }}">
+                            {{ $hargaPartaiAktif ? 'Aktif Otomatis' : 'Nonaktif' }}
+                        </span>
+                    </label>
+                    <span class="text-[10px] text-ink-400 block">Pilih metode Qty, Nominal, atau keduanya di samping</span>
+                </div>
+
+                <!-- 3. Aturan Partai Berbasis Qty (Opsional) -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5 transition {{ (!$hargaPartaiAktif || !$hargaPartaiOpsiQty) ? 'opacity-60' : '' }}">
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-1.5 cursor-pointer select-none font-semibold text-ink-200 text-[11px]">
+                            <input
+                                type="checkbox"
+                                wire:model.live="hargaPartaiOpsiQty"
+                                @disabled(!$hargaPartaiAktif)
+                                class="accent-up-mint w-3.5 h-3.5 rounded cursor-pointer"
+                            />
+                            <span>Metode Qty</span>
+                        </label>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded {{ $hargaPartaiOpsiQty && $hargaPartaiAktif ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : 'bg-white/5 text-ink-400 border border-white/10' }}">
+                            {{ $hargaPartaiOpsiQty && $hargaPartaiAktif ? 'Aktif' : 'Off' }}
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <span class="text-[10px] text-ink-400 block">Min Qty</span>
+                            <input
+                                type="number"
+                                wire:model="hargaPartaiMinQty"
+                                min="1"
+                                @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiQty)
+                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                placeholder="5"
+                            />
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-ink-400 block">Diskon %</span>
+                            <input
+                                type="number"
+                                wire:model="hargaPartaiQtyDiskon"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiQty)
+                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-up-mint disabled:opacity-40 disabled:cursor-not-allowed"
+                                placeholder="3"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Aturan Partai Berbasis Nominal (Opsional) -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5 transition {{ (!$hargaPartaiAktif || !$hargaPartaiOpsiNominal) ? 'opacity-60' : '' }}">
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-1.5 cursor-pointer select-none font-semibold text-ink-200 text-[11px]">
+                            <input
+                                type="checkbox"
+                                wire:model.live="hargaPartaiOpsiNominal"
+                                @disabled(!$hargaPartaiAktif)
+                                class="accent-up-mint w-3.5 h-3.5 rounded cursor-pointer"
+                            />
+                            <span>Metode Nominal</span>
+                        </label>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded {{ $hargaPartaiOpsiNominal && $hargaPartaiAktif ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : 'bg-white/5 text-ink-400 border border-white/10' }}">
+                            {{ $hargaPartaiOpsiNominal && $hargaPartaiAktif ? 'Aktif' : 'Off' }}
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <span class="text-[10px] text-ink-400 block">Min Belanja Rp</span>
+                            <input
+                                type="number"
+                                wire:model="hargaPartaiMinNominal"
+                                min="0"
+                                step="50000"
+                                @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiNominal)
+                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                placeholder="1000000"
+                            />
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-ink-400 block">Diskon %</span>
+                            <input
+                                type="number"
+                                wire:model="hargaPartaiNominalDiskon"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiNominal)
+                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-up-mint disabled:opacity-40 disabled:cursor-not-allowed"
+                                placeholder="2"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endcan
+
         <!-- Grid Cards Tier Membership -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             @forelse($tiers as $t)
@@ -372,6 +519,20 @@
                             <div class="flex items-center justify-between">
                                 <span class="text-ink-400">Pengali Poin Loyalty:</span>
                                 <span class="font-bold text-up-primary tabular-nums">{{ number_format($t->poin_multiplier, 1) }}x</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-ink-400">Nilai Tukar Poin:</span>
+                                @if((float) ($t->poin_redeem_rupiah ?? 0) > 0)
+                                    <span class="font-bold text-amber-400 tabular-nums">
+                                        Rp {{ number_format($t->poin_redeem_rupiah, 0, ',', '.') }}/pt
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-normal">Kustom</span>
+                                    </span>
+                                @else
+                                    <span class="font-bold text-ink-300 tabular-nums">
+                                        Rp {{ number_format($poinRedeemRupiahGlobal, 0, ',', '.') }}/pt
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-ink-400 border border-white/10 font-normal">Default</span>
+                                    </span>
+                                @endif
                             </div>
                             <div class="flex items-center justify-between pt-1">
                                 <span class="text-ink-400">Member Terdaftar:</span>
@@ -450,6 +611,11 @@
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Pengali Poin Loyalty</label>
                             <input type="number" wire:model="tierForm.poin_multiplier" step="0.1" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                         </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nilai Tukar 1 Poin (Rp) - Kustom Tier</label>
+                        <input type="text" inputmode="numeric" x-format-number wire:model="tierForm.poin_redeem_rupiah" min="0" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" placeholder="Kosongkan untuk pakai default sistem (Rp {{ number_format($poinRedeemRupiahGlobal, 0, ',', '.') }})" />
+                        <span class="text-[10px] text-ink-400 mt-1 block">Bila kosong/0, kasir POS otomatis memakai nilai default global (saat ini Rp {{ number_format($poinRedeemRupiahGlobal, 0, ',', '.') }}/pt).</span>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>

@@ -4,6 +4,8 @@ namespace App\Modules\Akunting\Services;
 
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
+use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Wms\Models\PembayaranSupplier;
 use App\Modules\Wms\Models\PurchaseOrder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -149,6 +151,15 @@ class PembayaranSubledgerService
                 throw new \Exception('Pembayaran melebihi sisa utang');
             }
 
+            // Proteksi anti double claim komisi: jika utang komisi, pastikan komisi belum berstatus cair
+            $komisiModel = null;
+            if ($utang->referensi_tipe === 'komisi' || $utang->referensi_tipe === Komisi::class) {
+                $komisiModel = Komisi::where('id', $utang->referensi_id)->lockForUpdate()->first();
+                if ($komisiModel && $komisiModel->status === Komisi::STATUS_CAIR) {
+                    throw new \DomainException("Komisi {$komisiModel->no_komisi} sudah berstatus cair. Pembayaran ganda dicegah.");
+                }
+            }
+
             $status = $dibayar >= (float) $utang->jumlah ? 'lunas' : 'sebagian';
 
             // Utang komisi reseller memakai akun 210-03 (kontra Pendapatan)
@@ -176,6 +187,23 @@ class PembayaranSubledgerService
                 'jumlah_dibayar' => $dibayar,
                 'status' => $status,
             ]);
+
+            // Sinkronkan ke Komisi mitra jika utang berasal dari komisi dan lunas
+            if ($komisiModel && $status === 'lunas') {
+                $statusLama = $komisiModel->status;
+                $komisiModel->update([
+                    'status' => Komisi::STATUS_CAIR,
+                    'paid_at' => now(),
+                    'keterangan' => trim(($komisiModel->keterangan ?? '')." [Dicairkan via pembayaran utang {$utang->no_utang}]"),
+                ]);
+
+                app(AuditService::class)->catat(
+                    'Komisi', 'pencairan_utang', $komisiModel->id,
+                    "Komisi {$komisiModel->no_komisi} lunas dicairkan via pembayaran utang {$utang->no_utang}",
+                    ['status' => $statusLama],
+                    ['status' => Komisi::STATUS_CAIR, 'paid_at' => now()->toDateTimeString()]
+                );
+            }
 
             // [SYNC PO & WMS] Sinkronkan ke Purchase Order jika utang berasal dari PO
             if ($utang->referensi_tipe === PurchaseOrder::class || $utang->referensi_tipe === 'PurchaseOrder') {

@@ -450,11 +450,57 @@
                 <!-- Status & Info Konsumen Terpilih -->
                 <div class="flex items-center gap-1.5 text-xs">
                     @if($customer)
-                        <div class="px-3 py-1.5 rounded-xl bg-up-primary/10 border border-up-primary/30 text-ink-900 dark:text-white font-semibold flex items-center gap-2">
+                        <div class="px-3 py-1.5 rounded-xl bg-up-primary/10 border border-up-primary/30 text-ink-900 dark:text-white font-semibold flex items-center gap-2 flex-wrap">
                             <span class="text-up-primary font-bold">👤 {{ $customer->nama }}</span>
                             <span class="px-2 py-0.5 rounded-md bg-up-primary text-white text-[10px] font-black uppercase">
-                                {{ $customer->tierMembership?->nama ?? 'Retail' }}
+                                {{ $customer->tierMembership?->nama ?? ($customer->tipe_konsumen === 'reseller' ? 'Reseller' : ($customer->tipe_konsumen === 'agen' ? 'Agen' : 'Member')) }}
                             </span>
+                            <span class="px-2 py-0.5 rounded-md bg-up-amber/15 text-up-amber text-[10px] font-bold border border-up-amber/30 tabular-nums">
+                                ⭐ {{ number_format($customer->poin_loyalty ?? 0) }} pts
+                            </span>
+
+                            <!-- Opsi Poin Member: Simpan Poin (Akumulasi) vs Tukar Diskon Langsung -->
+                            @if(($customer->poin_loyalty ?? 0) > 0 || $poinDitukar > 0)
+                                <button
+                                    type="button"
+                                    wire:click="toggleModePoinMember"
+                                    class="px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 {{ $poinDitukar > 0 ? 'bg-up-mint/20 text-up-mint border-up-mint/30 shadow-sm' : 'bg-white/10 text-ink-700 dark:text-ink-200 border-ink-200 dark:border-white/15 hover:bg-white/15' }}"
+                                    title="Klik untuk ubah: Simpan Poin (Akumulasi) vs Tukar Poin Jadi Diskon Langsung"
+                                >
+                                    @if($poinDitukar > 0)
+                                        <span>🏷️ Poin: Diskon (-Rp {{ number_format($diskonPoin, 0, ',', '.') }})</span>
+                                    @else
+                                        <span>🎁 Poin: Disimpan</span>
+                                    @endif
+                                </button>
+                            @endif
+
+                            <!-- Opsi Reward Mitra: Diskon Langsung vs Komisi Akumulasi -->
+                            @if($customer->is_reseller || in_array($customer->tipe_konsumen, ['reseller', 'agen'], true))
+                                <button
+                                    type="button"
+                                    wire:click="toggleModeRewardMitra"
+                                    class="px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 {{ $modeRewardMitra === 'komisi_akumulasi' ? 'bg-up-amber text-ink-950 border-up-amber' : 'bg-up-mint/20 text-up-mint border-up-mint/30' }}"
+                                    title="Klik untuk ubah: Diskon Langsung vs Simpan Komisi Mitra"
+                                >
+                                    {{ $modeRewardMitra === 'komisi_akumulasi' ? '💰 Mitra: Simpan Komisi' : '🏷️ Mitra: Diskon Langsung' }}
+                                </button>
+                            @endif
+
+                            <!-- Menu Pengaturan Skema & Diskon Manual -->
+                            <button
+                                type="button"
+                                wire:click="openDiskonModal"
+                                class="px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 {{ ($diskonNominal > 0 || $diskonPersen > 0) ? 'bg-up-amber text-ink-950 border-up-amber shadow-sm' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 border-ink-200/80 dark:border-white/10 hover:bg-black/10' }}"
+                                title="Buka Pengaturan Skema Poin, Komisi Mitra, dan Diskon Manual Khusus"
+                            >
+                                <span>⚙️ Skema / Diskon</span>
+                                @if($diskonPersen > 0)
+                                    <span class="bg-black/20 px-1 py-0.2 rounded font-black text-[9px]">{{ $diskonPersen }}%</span>
+                                @elseif($diskonNominal > 0)
+                                    <span class="bg-black/20 px-1 py-0.2 rounded font-black text-[9px]">-Rp {{ number_format($diskonNominal / 1000) }}rb</span>
+                                @endif
+                            </button>
                             @if($customer->telepon)
                                 <span class="text-[11px] text-ink-400 font-mono hidden md:inline">({{ $customer->telepon }})</span>
                             @endif
@@ -471,6 +517,14 @@
                         <div class="px-2.5 py-1.5 rounded-xl bg-black/5 dark:bg-white/5 border border-ink-200/80 dark:border-white/10 text-ink-500 text-[11px] font-medium flex items-center gap-1.5">
                             <span class="w-1.5 h-1.5 rounded-full bg-ink-400"></span>
                             <span>Konsumen: <strong>Pelanggan Umum</strong></span>
+                            <button
+                                type="button"
+                                wire:click="openDiskonModal"
+                                class="ml-1 px-1.5 py-0.5 rounded bg-up-amber/15 text-up-amber hover:bg-up-amber/25 text-[10px] font-bold border border-up-amber/30 cursor-pointer"
+                                title="Beri Diskon Langsung pada transaksi"
+                            >
+                                🏷️ Diskon
+                            </button>
                         </div>
                     @endif
                 </div>
@@ -1300,6 +1354,81 @@
             </table>
         </div>
 
+        <!-- MEMBER LOYALTY & DISKON BAR -->
+        @if($customer || $diskonPartai > 0 || $diskonPoin > 0)
+            <div class="mt-2.5 p-2 rounded-xl bg-ink-50/70 dark:bg-white/[0.02] border border-ink-200/60 dark:border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs flex-shrink-0">
+                <!-- Sisi Kiri: Info Mitra & Partai -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    @if($diskonPartai > 0)
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-up-mint/15 text-up-mint border border-up-mint/30 font-bold text-[11px]">
+                            <span>🎉 {{ $alasanPartai }}</span>
+                            <span class="tabular-nums">-Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
+                        </div>
+                    @elseif($customer && app(\App\Modules\Crm\Services\KonfigurasiService::class)->hargaPartaiAktif())
+                        @php
+                            $cfgPartai = app(\App\Modules\Crm\Services\KonfigurasiService::class);
+                            $syaratList = [];
+                            if ($cfgPartai->hargaPartaiMinQty() > 0 && $cfgPartai->hargaPartaiQtyDiskonPersen() > 0) {
+                                $syaratList[] = 'min. ' . $cfgPartai->hargaPartaiMinQty() . ' pcs (' . $cfgPartai->hargaPartaiQtyDiskonPersen() . '%)';
+                            }
+                            if ($cfgPartai->hargaPartaiMinNominal() > 0 && $cfgPartai->hargaPartaiNominalDiskonPersen() > 0) {
+                                $syaratList[] = 'min. Rp ' . number_format($cfgPartai->hargaPartaiMinNominal(), 0, ',', '.') . ' (' . $cfgPartai->hargaPartaiNominalDiskonPersen() . '%)';
+                            }
+                        @endphp
+                        @if(count($syaratList) > 0)
+                            <div class="text-[11px] text-ink-400">
+                                <span>📦 Syarat Diskon Partai Member: {{ implode(' atau ', $syaratList) }}</span>
+                            </div>
+                        @endif
+                    @endif
+                </div>
+
+                <!-- Sisi Kanan: Penukaran Poin Member -->
+                @if($customer && ($customer->poin_loyalty > 0 || $poinDitukar > 0))
+                    @php
+                        $ratePoin = app(\App\Modules\Crm\Services\PelangganService::class)->nilaiTukarPoinPelanggan($customer);
+                    @endphp
+                    <div class="flex items-center gap-2 flex-wrap ml-auto">
+                        <span class="text-[11px] text-ink-500">Saldo: <strong class="text-ink-800 dark:text-white font-bold">{{ number_format($customer->poin_loyalty ?? 0) }} pts</strong> (Rp {{ number_format(($customer->poin_loyalty ?? 0) * $ratePoin, 0, ',', '.') }} · @ Rp {{ number_format($ratePoin, 0, ',', '.') }}/pt)</span>
+                        <div class="inline-flex items-center gap-1 bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 rounded-lg p-0.5">
+                            <span class="text-[10px] text-ink-400 pl-1.5 font-bold">Tukar Poin:</span>
+                            <input
+                                type="number"
+                                wire:model.live.debounce.300ms="poinDitukar"
+                                min="0"
+                                max="{{ $customer->poin_loyalty ?? 0 }}"
+                                class="w-14 px-1 py-0.5 text-xs font-bold text-center bg-transparent border-0 focus:outline-none tabular-nums text-ink-900 dark:text-white"
+                                placeholder="0"
+                            />
+                            <span class="text-[10px] text-ink-400 pr-1">pts</span>
+                            @if($poinDitukar < ($customer->poin_loyalty ?? 0))
+                                <button
+                                    type="button"
+                                    wire:click="tukarSemuaPoin"
+                                    class="px-2 py-0.5 text-[10px] font-bold rounded bg-up-primary/10 hover:bg-up-primary/20 text-up-primary cursor-pointer transition"
+                                >
+                                    Semua
+                                </button>
+                            @else
+                                <button
+                                    type="button"
+                                    wire:click="batalTukarPoin"
+                                    class="px-2 py-0.5 text-[10px] font-bold rounded bg-ink-100 hover:bg-ink-200 dark:bg-white/10 text-ink-600 dark:text-ink-300 cursor-pointer transition"
+                                >
+                                    Reset
+                                </button>
+                            @endif
+                        </div>
+                        @if($diskonPoin > 0)
+                            <span class="text-xs font-bold text-emerald-500 tabular-nums">
+                                -Rp {{ number_format($diskonPoin, 0, ',', '.') }}
+                            </span>
+                        @endif
+                    </div>
+                @endif
+            </div>
+        @endif
+
         <!-- BOTTOM CONTROL CENTER: Status Sesi Kas, Ditahan & Action Bayar -->
         <div class="border-t border-ink-200/70 dark:border-white/10 pt-3 mt-2.5 flex-shrink-0 flex items-center justify-between gap-3 flex-wrap">
             <!-- Left Info & Sesi Kas -->
@@ -1354,10 +1483,36 @@
                         <span>Subtotal:</span>
                         <span class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
                     </div>
-                    @if($diskonNominal > 0 || $diskonPersen > 0)
-                        <div class="text-up-amber font-semibold">
+                    @if($diskonTotal > 0)
+                        <button
+                            type="button"
+                            wire:click="openDiskonModal"
+                            class="text-up-amber font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                            title="Klik untuk ubah Diskon Langsung"
+                        >
                             <span>Diskon:</span>
                             <span class="tabular-nums">-Rp {{ number_format($diskonTotal, 0, ',', '.') }}</span>
+                        </button>
+                    @else
+                        <button
+                            type="button"
+                            wire:click="openDiskonModal"
+                            class="px-2 py-0.5 rounded-md bg-up-amber/10 hover:bg-up-amber/20 text-up-amber border border-up-amber/25 font-bold text-[11px] cursor-pointer transition active:scale-95"
+                            title="Beri Diskon Langsung pada transaksi"
+                        >
+                            + Diskon Langsung
+                        </button>
+                    @endif
+                    @if($diskonPartai > 0)
+                        <div class="text-up-mint font-semibold text-[11px]">
+                            <span>Partai:</span>
+                            <span class="tabular-nums">-Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
+                        </div>
+                    @endif
+                    @if($diskonPoin > 0)
+                        <div class="text-emerald-500 font-semibold text-[11px]">
+                            <span>Poin:</span>
+                            <span class="tabular-nums">-Rp {{ number_format($diskonPoin, 0, ',', '.') }}</span>
                         </div>
                     @endif
                     @if($pajakNominal > 0)
@@ -1413,6 +1568,7 @@
     </div>
 
     <!-- MODALS SECTION -->
+    @include('modules.pos.livewire.modals.diskon-modal')
     @include('modules.pos.livewire.modals.payment-modal')
     @include('partials.thermal-receipt-modal')
     @include('modules.pos.livewire.modals.riwayat-transaksi-modal')

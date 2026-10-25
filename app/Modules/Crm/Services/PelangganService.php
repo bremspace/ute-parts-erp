@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Services;
 
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\PelangganPoinLog;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\Transaksi;
@@ -13,6 +14,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -196,26 +198,156 @@ class PelangganService
      * Tambah akumulasi belanja & poin loyalty pelanggan serta cek rekalkulasi tier.
      * Single source of truth untuk POS kasir, pembayaran marketplace online, dan pelunasan servis.
      */
-    public function tambahBelanjaDanPoin(Pelanggan|int $pelanggan, float $nominal): void
+    public function tambahBelanjaDanPoin(Pelanggan|int $pelanggan, float $nominal, ?int $transaksiId = null): void
     {
         if ($nominal <= 0) {
             return;
         }
 
-        $model = $pelanggan instanceof Pelanggan ? $pelanggan : Pelanggan::find($pelanggan);
-        if (! $model) {
+        $pelangganId = $pelanggan instanceof Pelanggan ? $pelanggan->id : $pelanggan;
+
+        DB::transaction(function () use ($pelangganId, $nominal, $transaksiId) {
+            $model = Pelanggan::where('id', $pelangganId)->lockForUpdate()->first();
+            if (! $model) {
+                return;
+            }
+
+            $model->increment('total_belanja_12bulan', $nominal);
+
+            $tierService = app(TierService::class);
+            $poin = $tierService->hitungPoin($nominal, $model->tierMembership);
+            if ($poin > 0) {
+                $saldoSebelum = (int) $model->poin_loyalty;
+                $saldoSesudah = $saldoSebelum + $poin;
+                $model->update(['poin_loyalty' => $saldoSesudah]);
+
+                PelangganPoinLog::create([
+                    'pelanggan_id' => $model->id,
+                    'transaksi_id' => $transaksiId,
+                    'tipe' => PelangganPoinLog::TIPE_EARNED,
+                    'poin' => $poin,
+                    'saldo_sebelum' => $saldoSebelum,
+                    'saldo_sesudah' => $saldoSesudah,
+                    'keterangan' => 'Perolehan poin dari transaksi'.($transaksiId ? " #{$transaksiId}" : ''),
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
+            $tierService->recalcSatu($model);
+        });
+    }
+
+    /**
+     * Potong poin loyalty pelanggan untuk penukaran diskon (atomic & recorded).
+     */
+    public function tukarPoin(Pelanggan|int $pelanggan, int $poinDitukar, ?int $transaksiId = null, string $keterangan = ''): bool
+    {
+        if ($poinDitukar <= 0) {
+            return true;
+        }
+
+        $pelangganId = $pelanggan instanceof Pelanggan ? $pelanggan->id : $pelanggan;
+
+        return DB::transaction(function () use ($pelangganId, $poinDitukar, $transaksiId, $keterangan) {
+            $model = Pelanggan::where('id', $pelangganId)->lockForUpdate()->first();
+            if (! $model) {
+                throw new \DomainException('Pelanggan tidak ditemukan untuk penukaran poin.');
+            }
+
+            $saldoSebelum = (int) $model->poin_loyalty;
+            if ($saldoSebelum < $poinDitukar) {
+                throw new \DomainException("Saldo poin pelanggan tidak mencukupi (Tersedia: {$saldoSebelum}, Diminta: {$poinDitukar})");
+            }
+
+            $saldoSesudah = $saldoSebelum - $poinDitukar;
+            $model->update(['poin_loyalty' => $saldoSesudah]);
+
+            PelangganPoinLog::create([
+                'pelanggan_id' => $model->id,
+                'transaksi_id' => $transaksiId,
+                'tipe' => PelangganPoinLog::TIPE_REDEEMED,
+                'poin' => -$poinDitukar,
+                'saldo_sebelum' => $saldoSebelum,
+                'saldo_sesudah' => $saldoSesudah,
+                'keterangan' => $keterangan ?: 'Penukaran poin pada transaksi'.($transaksiId ? " #{$transaksiId}" : ''),
+                'created_by' => auth()->id(),
+            ]);
+
+            return true;
+        });
+    }
+
+    /**
+     * Kembalikan poin loyalty yang telah ditukar (misalnya saat transaksi di-void/batal).
+     */
+    public function kembalikanPoin(Pelanggan|int $pelanggan, int $poinDikembalikan, ?int $transaksiId = null, string $keterangan = ''): void
+    {
+        if ($poinDikembalikan <= 0) {
             return;
         }
 
-        $model->increment('total_belanja_12bulan', $nominal);
+        $pelangganId = $pelanggan instanceof Pelanggan ? $pelanggan->id : $pelanggan;
 
-        $tierService = app(TierService::class);
-        $poin = $tierService->hitungPoin($nominal, $model->tierMembership);
-        if ($poin > 0) {
-            $model->increment('poin_loyalty', $poin);
+        DB::transaction(function () use ($pelangganId, $poinDikembalikan, $transaksiId, $keterangan) {
+            $model = Pelanggan::where('id', $pelangganId)->lockForUpdate()->first();
+            if (! $model) {
+                return;
+            }
+
+            $saldoSebelum = (int) $model->poin_loyalty;
+            $saldoSesudah = $saldoSebelum + $poinDikembalikan;
+            $model->update(['poin_loyalty' => $saldoSesudah]);
+
+            PelangganPoinLog::create([
+                'pelanggan_id' => $model->id,
+                'transaksi_id' => $transaksiId,
+                'tipe' => PelangganPoinLog::TIPE_REFUND,
+                'poin' => $poinDikembalikan,
+                'saldo_sebelum' => $saldoSebelum,
+                'saldo_sesudah' => $saldoSesudah,
+                'keterangan' => $keterangan ?: 'Pengembalian poin (transaksi void/batal)'.($transaksiId ? " #{$transaksiId}" : ''),
+                'created_by' => auth()->id(),
+            ]);
+        });
+    }
+
+    /**
+     * Tarik kembali poin perolehan belanja yang dibatalkan karena transaksi di-void.
+     */
+    public function tarikPoinBatal(Pelanggan|int $pelanggan, int $poinBatal, ?int $transaksiId = null, string $keterangan = ''): void
+    {
+        if ($poinBatal <= 0) {
+            return;
         }
 
-        $tierService->recalcSatu($model);
+        $pelangganId = $pelanggan instanceof Pelanggan ? $pelanggan->id : $pelanggan;
+
+        DB::transaction(function () use ($pelangganId, $poinBatal, $transaksiId, $keterangan) {
+            $model = Pelanggan::where('id', $pelangganId)->lockForUpdate()->first();
+            if (! $model) {
+                return;
+            }
+
+            $saldoSebelum = (int) $model->poin_loyalty;
+            $potong = min($saldoSebelum, $poinBatal);
+            if ($potong <= 0) {
+                return;
+            }
+
+            $saldoSesudah = $saldoSebelum - $potong;
+            $model->update(['poin_loyalty' => $saldoSesudah]);
+
+            PelangganPoinLog::create([
+                'pelanggan_id' => $model->id,
+                'transaksi_id' => $transaksiId,
+                'tipe' => PelangganPoinLog::TIPE_PENYESUAIAN,
+                'poin' => -$potong,
+                'saldo_sebelum' => $saldoSebelum,
+                'saldo_sesudah' => $saldoSesudah,
+                'keterangan' => $keterangan ?: 'Pembatalan poin perolehan belanja (transaksi void)'.($transaksiId ? " #{$transaksiId}" : ''),
+                'created_by' => auth()->id(),
+            ]);
+        });
     }
 
     /**
@@ -236,11 +368,43 @@ class PelangganService
     }
 
     /**
+     * Mode reward mitra (diskon_langsung | komisi_akumulasi).
+     */
+    public function modeRewardMitra(?Pelanggan $pelanggan): string
+    {
+        if (! $pelanggan) {
+            return 'diskon_langsung';
+        }
+
+        if (! empty($pelanggan->mode_reward_mitra)) {
+            return $pelanggan->mode_reward_mitra;
+        }
+
+        $config = app(KonfigurasiService::class);
+
+        return $config->mitraRewardMode();
+    }
+
+    /**
+     * Nilai tukar 1 poin loyalitas menjadi rupiah untuk pelanggan.
+     * Mengutamakan rasio khusus pada tier membership pelanggan (bila dikonfigurasi),
+     * atau fallback ke konfigurasi global sistem (default Rp 100).
+     */
+    public function nilaiTukarPoinPelanggan(?Pelanggan $pelanggan): float
+    {
+        if ($pelanggan && $pelanggan->tierMembership && (float) $pelanggan->tierMembership->poin_redeem_rupiah > 0) {
+            return (float) $pelanggan->tierMembership->poin_redeem_rupiah;
+        }
+
+        return app(KonfigurasiService::class)->poinRedeemRupiah();
+    }
+
+    /**
      * Resolusi harga final per produk + pelanggan (SATU SUMBER KEBENARAN).
      *
-     * @return array{harga: float, harga_dasar: float, diskon_nominal: float, alasan: string, tier: string|null}
+     * @return array{harga: float, harga_dasar: float, diskon_nominal: float, potensi_komisi: float, mode_reward: string, alasan: string, tier: string|null}
      */
-    public function resolveHarga(Produk $produk, ?Pelanggan $pelanggan = null, ?SkuVariant $variant = null): array
+    public function resolveHarga(Produk $produk, ?Pelanggan $pelanggan = null, ?SkuVariant $variant = null, ?string $overrideModeReward = null): array
     {
         $hargaDasar = $variant && $variant->harga_jual_retail !== null
             ? (float) $variant->harga_jual_retail
@@ -251,10 +415,17 @@ class PelangganService
                 'harga' => $hargaDasar,
                 'harga_dasar' => $hargaDasar,
                 'diskon_nominal' => 0.0,
+                'potensi_komisi' => 0.0,
+                'mode_reward' => 'diskon_langsung',
                 'alasan' => 'Harga Retail Standar',
                 'tier' => null,
             ];
         }
+
+        $tipe = $this->tipeKonsumen($pelanggan);
+        $modeReward = ($tipe === 'reseller' || $tipe === 'agen')
+            ? ($overrideModeReward ?: $this->modeRewardMitra($pelanggan))
+            : 'diskon_langsung';
 
         // [B-FIX] `Model::getConnectionResolver()` adalah static GLOBAL: hanya
         // di-set sekali saat container Laravel boot dan tidak pernah
@@ -268,7 +439,48 @@ class PelangganService
         $hasDb = Model::getConnectionResolver() !== null
             && Container::getInstance()->bound('config');
         $rows = $this->rowsHargaTier($produk, $variant, $hasDb);
-        $tipe = $this->tipeKonsumen($pelanggan);
+
+        // Jika mode komisi_akumulasi aktif untuk reseller/agen:
+        // Hitung harga tier mitra secara shadow untuk menentukan komisi, tetapi harga tagihan tetap retail.
+        if ($modeReward === 'komisi_akumulasi' && ($tipe === 'reseller' || $tipe === 'agen')) {
+            $hargaTierMitra = null;
+            if ($pelanggan->tier_membership_id) {
+                $eksak = $this->filterRows($rows, tierId: $pelanggan->tier_membership_id, tipe: $tipe)
+                    ->first(fn ($r) => $r->nominal_tetap !== null || $r->persen_diskon !== null);
+                if ($eksak) {
+                    $hasilMitra = $this->hitungDariTierBaru($eksak, $hargaDasar, '', null);
+                    $hargaTierMitra = $hasilMitra['harga'];
+                }
+            }
+
+            if ($hargaTierMitra === null) {
+                $tipeDefault = $this->filterRows($rows, tierId: null, tipe: $tipe)
+                    ->first(fn ($r) => ($r->nominal_tetap !== null || $r->persen_diskon !== null) && $r->is_reseller !== true);
+                if ($tipeDefault) {
+                    $hasilMitra = $this->hitungDariTierBaru($tipeDefault, $hargaDasar, '', null);
+                    $hargaTierMitra = $hasilMitra['harga'];
+                }
+            }
+
+            if ($hargaTierMitra === null && $pelanggan->is_reseller) {
+                $legacyReseller = $rows->first(fn ($r) => $r->is_reseller === true && $r->tier_membership_id === null);
+                if ($legacyReseller && (float) $legacyReseller->harga > 0) {
+                    $hargaTierMitra = (float) $legacyReseller->harga;
+                }
+            }
+
+            $potensiKomisi = $hargaTierMitra !== null ? max(0.0, round($hargaDasar - $hargaTierMitra, 2)) : 0.0;
+
+            return [
+                'harga' => $hargaDasar,
+                'harga_dasar' => $hargaDasar,
+                'diskon_nominal' => 0.0,
+                'potensi_komisi' => $potensiKomisi,
+                'mode_reward' => 'komisi_akumulasi',
+                'alasan' => 'Harga Retail (Komisi Akumulasi '.($tipe === 'reseller' ? 'Reseller' : 'Agen').')',
+                'tier' => $tipe === 'reseller' ? 'Reseller' : 'Agen',
+            ];
+        }
 
         // 1. HargaTier baru — eksak (produk [+ varian], tier pelanggan, tipe_konsumen)
         if ($pelanggan->tier_membership_id) {
@@ -347,6 +559,8 @@ class PelangganService
             'harga' => $hargaDasar,
             'harga_dasar' => $hargaDasar,
             'diskon_nominal' => 0.0,
+            'potensi_komisi' => 0.0,
+            'mode_reward' => 'diskon_langsung',
             'alasan' => 'Harga Retail Standar',
             'tier' => null,
         ];
@@ -409,6 +623,8 @@ class PelangganService
             'harga' => max(0, $final),
             'harga_dasar' => $hargaDasar,
             'diskon_nominal' => max(0, $hargaDasar - max(0, $final)),
+            'potensi_komisi' => 0.0,
+            'mode_reward' => 'diskon_langsung',
             'alasan' => $alasan,
             'tier' => $tier,
         ];

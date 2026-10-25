@@ -50,6 +50,8 @@ class ReturPenjualanIndex extends Component
     // State Tukar Produk
     public string $tukarSearch = '';
 
+    public string $tukarBarcode = '';
+
     public array $tukarItems = [];
 
     // Modal Detail
@@ -63,13 +65,19 @@ class ReturPenjualanIndex extends Component
 
     public function mount(): void
     {
-        if (request()->has('transaksi_id')) {
-            $input = (string) request()->query('transaksi_id');
-            $this->bukaModalTambah();
-            $this->kwitansiInput = $input;
-            $this->cariKwitansi();
-        } elseif (request()->has('no_faktur')) {
-            $input = (string) request()->query('no_faktur');
+        $input = null;
+        if (request()->filled('no_faktur') || request()->has('no_faktur')) {
+            $input = trim((string) (request()->query('no_faktur') ?? request('no_faktur')));
+        } elseif (request()->filled('transaksi_id') || request()->has('transaksi_id')) {
+            $trxId = (int) (request()->query('transaksi_id') ?? request('transaksi_id'));
+            if ($trxId > 0) {
+                $cabangId = session('cabang_id');
+                $trx = Transaksi::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->find($trxId);
+                $input = $trx?->no_transaksi ?? (string) $trxId;
+            }
+        }
+
+        if ($input !== null && $input !== '') {
             $this->bukaModalTambah();
             $this->kwitansiInput = $input;
             $this->cariKwitansi();
@@ -113,6 +121,7 @@ class ReturPenjualanIndex extends Component
         $this->alasan = '';
         $this->catatanQc = '';
         $this->tukarSearch = '';
+        $this->tukarBarcode = '';
         $this->tukarItems = [];
         $this->showCreateModal = false;
     }
@@ -201,6 +210,40 @@ class ReturPenjualanIndex extends Component
             return;
         }
 
+        // Cek kategori & harga minimum terhadap item transaksi yang dipilih untuk diretur
+        $selectedItems = [];
+        foreach ($this->itemInputs as $itemId => $input) {
+            if ((float) ($input['jumlah'] ?? 0) > 0 && isset($this->transaksiItemData[$itemId])) {
+                $selectedItems[] = $this->transaksiItemData[$itemId];
+            }
+        }
+
+        if (! empty($selectedItems)) {
+            $returProdukIds = array_unique(array_column($selectedItems, 'produk_id'));
+            $returProduks = Produk::whereIn('id', $returProdukIds)->get();
+
+            $allowedKategoriIds = array_filter($returProduks->pluck('kategori_id')->all());
+            $allowedKategoriStrings = array_filter(array_map('strtolower', array_map('trim', $returProduks->pluck('kategori')->all())));
+            $minHargaUnit = (float) max(array_column($selectedItems, 'harga_final'));
+
+            if (! empty($allowedKategoriIds) || ! empty($allowedKategoriStrings)) {
+                $matchId = $produk->kategori_id && in_array((int) $produk->kategori_id, $allowedKategoriIds, true);
+                $matchString = $produk->kategori && in_array(trim(strtolower($produk->kategori)), $allowedKategoriStrings, true);
+                if (! $matchId && ! $matchString) {
+                    $this->dispatch('alert', ['type' => 'warning', 'message' => "Produk pengganti [{$produk->nama}] harus berada dalam kategori yang sama dengan produk yang diretur."]);
+
+                    return;
+                }
+            }
+
+            $hargaPengganti = (float) ($produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
+            if ($hargaPengganti < $minHargaUnit) {
+                $this->dispatch('alert', ['type' => 'warning', 'message' => 'Harga satuan produk pengganti (Rp '.number_format($hargaPengganti, 0, ',', '.').') tidak boleh lebih rendah dari harga barang yang diretur (Rp '.number_format($minHargaUnit, 0, ',', '.').').']);
+
+                return;
+            }
+        }
+
         $cabangId = session('cabang_id');
         $gudangId = $this->selectedTransaksi?->gudang_id;
 
@@ -229,7 +272,7 @@ class ReturPenjualanIndex extends Component
             }
         }
 
-        $harga = (float) $produk->harga_jual;
+        $harga = (float) ($produk->harga_jual_retail ?? $produk->harga_jual ?? 0);
         $this->tukarItems[] = [
             'produk_id' => $produk->id,
             'nama' => $produk->nama,
@@ -240,6 +283,25 @@ class ReturPenjualanIndex extends Component
         ];
 
         $this->tukarSearch = '';
+    }
+
+    public function cariTukarDenganBarcode(string $barcode): void
+    {
+        $barcode = trim($barcode);
+        $this->tukarBarcode = '';
+
+        if ($barcode === '') {
+            return;
+        }
+
+        $produk = Produk::where('is_active', true)->where('barcode', $barcode)->first();
+        if (! $produk) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => "Produk dengan barcode {$barcode} tidak ditemukan."]);
+
+            return;
+        }
+
+        $this->tambahTukarItem($produk->id);
     }
 
     public function hapusTukarItem(int $index): void
@@ -257,10 +319,9 @@ class ReturPenjualanIndex extends Component
 
         $gudangId = $this->selectedTransaksi?->gudang_id;
 
-        return Produk::where('status', 'aktif')
+        return Produk::where('is_active', true)
             ->where(function ($q) use ($term) {
                 $q->where('nama', 'like', "%{$term}%")
-                    ->orWhere('kode', 'like', "%{$term}%")
                     ->orWhere('barcode', 'like', "%{$term}%");
             })
             ->with(['stokItems' => fn ($q) => $q->when($gudangId, fn ($sq) => $sq->where('gudang_id', $gudangId))])
@@ -270,7 +331,10 @@ class ReturPenjualanIndex extends Component
 
     public function simpanRetur(): void
     {
+        $this->resetErrorBag();
+
         if (! $this->selectedTransaksi) {
+            $this->addError('kwitansiInput', 'Wajib memasukkan dan memverifikasi nomor kwitansi / faktur terlebih dahulu.');
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Wajib memasukkan dan memverifikasi nomor kwitansi / faktur terlebih dahulu.']);
 
             return;
@@ -280,15 +344,27 @@ class ReturPenjualanIndex extends Component
             'alasan' => 'required|string|max:500',
             'metodePengembalian' => 'required|in:kas,piutang,saldo',
             'tipePenyelesaian' => 'required|in:refund,tukar_produk',
+        ], [
+            'alasan.required' => 'Alasan retur wajib diisi.',
+            'alasan.max' => 'Alasan retur maksimal 500 karakter.',
+            'metodePengembalian.required' => 'Metode pengembalian wajib dipilih.',
+            'tipePenyelesaian.required' => 'Bentuk penyelesaian retur wajib dipilih.',
         ]);
 
         $items = [];
+        $totalReturQty = 0;
+        $hasSnError = false;
+
         foreach ($this->itemInputs as $itemId => $input) {
             $qty = (float) ($input['jumlah'] ?? 0);
             if ($qty > 0) {
-                $sisaMax = $this->transaksiItemData[$itemId]['sisa_bisa_diretur'] ?? 0;
+                $totalReturQty += $qty;
+                $itemInfo = $this->transaksiItemData[$itemId] ?? null;
+                $sisaMax = $itemInfo['sisa_bisa_diretur'] ?? 0;
+                $nama = $itemInfo['produk_nama'] ?? 'Item';
+
                 if ($qty > $sisaMax + 0.001) {
-                    $nama = $this->transaksiItemData[$itemId]['produk_nama'] ?? 'Item';
+                    $this->addError("itemInputs.{$itemId}.jumlah", "Qty retur {$nama} melebihi sisa yang dapat diretur ({$sisaMax}).");
                     $this->dispatch('alert', ['type' => 'error', 'message' => "Jumlah retur untuk {$nama} melebihi sisa yang dapat diretur ({$sisaMax})."]);
 
                     return;
@@ -300,6 +376,12 @@ class ReturPenjualanIndex extends Component
                     $snList = array_values(array_filter(array_map('trim', $snList)));
                 }
 
+                // Validasi SN jika produk memiliki SN (has_sn = true)
+                if (! empty($itemInfo['has_sn']) && empty($snList)) {
+                    $this->addError("itemInputs.{$itemId}.sn_raw", "Produk {$nama} memerlukan Serial Number (SN) unit yang diretur.");
+                    $hasSnError = true;
+                }
+
                 $items[] = [
                     'transaksi_item_id' => (int) $input['transaksi_item_id'],
                     'jumlah' => $qty,
@@ -309,13 +391,21 @@ class ReturPenjualanIndex extends Component
             }
         }
 
-        if (empty($items)) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih minimal satu barang dengan kuantiti retur > 0.']);
+        if ($hasSnError) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Lengkapi Nomor Seri (SN) untuk setiap barang yang mewajibkan Serial Number.']);
+
+            return;
+        }
+
+        if ($totalReturQty <= 0 || empty($items)) {
+            $this->addError('items', 'Belum ada barang yang dipilih untuk diretur. Masukkan kuantiti retur minimal 1 pada salah satu barang.');
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Belum memilih barang untuk diretur (kuantiti masih 0 semua). Masukkan kuantiti retur > 0.']);
 
             return;
         }
 
         if ($this->tipePenyelesaian === 'tukar_produk' && empty($this->tukarItems)) {
+            $this->addError('tukarItems', 'Pilih minimal 1 produk pengganti untuk opsi Tukar Produk.');
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih minimal satu produk pengganti untuk opsi Tukar Produk.']);
 
             return;

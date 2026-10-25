@@ -25,7 +25,40 @@ class CartService
 
     public function all(): array
     {
-        return Session::get('shop.cart', []);
+        $cart = Session::get('shop.cart', []);
+        $customer = auth('customer')->user();
+        if ($customer && ! empty($cart)) {
+            $changed = false;
+            foreach ($cart as $key => $item) {
+                $produk = Produk::find($item['product_id']);
+                if ($produk) {
+                    $variant = ! empty($item['variant_id']) ? SkuVariant::find($item['variant_id']) : null;
+                    $pricing = $this->pricingService->resolve($produk, $customer, $variant);
+                    $hargaRetail = $variant && $variant->harga_jual_retail !== null
+                        ? (float) $variant->harga_jual_retail
+                        : (float) $produk->harga_jual_retail;
+                    $diskonTier = max(0.0, $hargaRetail - (float) $pricing['harga']);
+
+                    if (
+                        (float) ($item['harga'] ?? 0) !== (float) $pricing['harga']
+                        || (float) ($item['harga_retail'] ?? 0) !== $hargaRetail
+                        || empty($item['tier_nama'])
+                    ) {
+                        $cart[$key]['harga'] = (float) $pricing['harga'];
+                        $cart[$key]['harga_retail'] = $hargaRetail;
+                        $cart[$key]['diskon_tier'] = $diskonTier;
+                        $cart[$key]['tier_nama'] = $pricing['tier'] ?? null;
+                        $cart[$key]['alasan_harga'] = $pricing['alasan'] ?? null;
+                        $changed = true;
+                    }
+                }
+            }
+            if ($changed) {
+                Session::put('shop.cart', $cart);
+            }
+        }
+
+        return $cart;
     }
 
     public function isi(int $produkId, ?int $variantId = null, int $qty = 1): array
@@ -57,6 +90,10 @@ class CartService
             : null;
 
         $pricing = $this->pricingService->resolve($produk, $customer, $variant);
+        $hargaRetail = $variant && $variant->harga_jual_retail !== null
+            ? (float) $variant->harga_jual_retail
+            : (float) $produk->harga_jual_retail;
+        $diskonTier = max(0.0, $hargaRetail - (float) $pricing['harga']);
 
         $cart[$key] = [
             'key' => $key,
@@ -64,8 +101,10 @@ class CartService
             'variant_id' => $variantId,
             'name' => $produk->nama,
             'variant_name' => $variant?->nama_varian,
-            'harga' => $pricing['harga'],
-            'harga_retail' => (float) $produk->harga_jual_retail,
+            'harga' => (float) $pricing['harga'],
+            'harga_retail' => $hargaRetail,
+            'diskon_tier' => $diskonTier,
+            'tier_nama' => $pricing['tier'] ?? null,
             'qty' => $newQty,
             'alasan_harga' => $pricing['alasan'],
             'stok_max' => (int) $stokTotal,
@@ -120,6 +159,22 @@ class CartService
         }
 
         return $total;
+    }
+
+    public function hitungSubtotalRetail(): float
+    {
+        $total = 0.0;
+        foreach ($this->all() as $item) {
+            $retail = (float) ($item['harga_retail'] ?? $item['harga']);
+            $total += $retail * (int) $item['qty'];
+        }
+
+        return $total;
+    }
+
+    public function hitungDiskonTier(): float
+    {
+        return max(0.0, $this->hitungSubtotalRetail() - $this->hitungSubtotal());
     }
 
     public function jumlahItem(): int

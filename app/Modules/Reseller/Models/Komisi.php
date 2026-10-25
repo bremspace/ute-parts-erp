@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'no_komisi', 'pelanggan_id', 'transaksi_id', 'skema_komisi_id',
     'aktor_tipe', 'aktor_id', 'komisi_skema_id', 'lead_id', 'tiket_servis_id', 'idempotensi_key',
-    'jumlah_transaksi', 'nominal_komisi', 'status', 'approved_by_id', 'approved_at', 'keterangan',
+    'jumlah_transaksi', 'nominal_komisi', 'status', 'approved_by_id', 'approved_at', 'paid_at', 'keterangan',
 ])]
 class Komisi extends Model
 {
@@ -25,12 +25,15 @@ class Komisi extends Model
 
     public const STATUS_DITOLAK = 'ditolak';
 
+    public const STATUS_CAIR = 'cair';
+
     protected $table = 'komisi';
 
     protected $casts = [
         'jumlah_transaksi' => 'decimal:2',
         'nominal_komisi' => 'decimal:2',
         'approved_at' => 'datetime',
+        'paid_at' => 'datetime',
     ];
 
     public function pelanggan(): BelongsTo

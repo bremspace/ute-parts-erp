@@ -600,10 +600,12 @@ class ReturBarangTest extends TestCase
         $produkBaru = Produk::create([
             'kode' => 'PRD-PENGGANTI',
             'nama' => 'LCD Pengganti Premium',
+            'kategori' => 'LCD',
             'harga_beli' => 120000,
             'harga_jual' => 200000,
             'status' => 'aktif',
         ]);
+        $this->produk->update(['kategori' => 'LCD']);
 
         $stokPengganti = StokItem::create([
             'gudang_id' => $this->gudang->id,

@@ -56,6 +56,16 @@ class CartCheckout extends Component
         return app(CartService::class)->hitungSubtotal();
     }
 
+    public function getSubtotalRetailProperty(): float
+    {
+        return app(CartService::class)->hitungSubtotalRetail();
+    }
+
+    public function getDiskonTierProperty(): float
+    {
+        return app(CartService::class)->hitungDiskonTier();
+    }
+
     public function getJumlahItemProperty(): int
     {
         return app(CartService::class)->jumlahItem();

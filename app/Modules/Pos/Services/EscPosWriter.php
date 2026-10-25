@@ -62,6 +62,13 @@ class EscPosWriter
         $this->text('Tgl   : '.$data['tanggal']);
         $this->text('Kasir : '.$data['kasir']);
         $this->text('Cabang: '.$data['cabang']);
+        if (! empty($data['pelanggan']) && $data['pelanggan'] !== 'Umum') {
+            $this->text('Plg   : '.$data['pelanggan']);
+            if (! empty($data['tier']) && $data['tier'] !== 'Retail' && $data['tier'] !== 'Umum') {
+                $lbl = in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Mitra : ' : 'Tier  : ';
+                $this->text($lbl.$data['tier']);
+            }
+        }
         $this->rule();
 
         foreach ($data['items'] as $item) {
@@ -72,23 +79,66 @@ class EscPosWriter
                 "{$item['qty']} x ".$this->money($item['harga']),
                 $this->money($item['subtotal'])
             ));
+            if (! empty($item['harga_retail']) && (float) $item['harga_retail'] > (float) $item['harga']) {
+                $this->text('  (Normal: '.$this->money($item['harga_retail']).')');
+            }
         }
 
         $this->rule();
+        if (! empty($data['subtotal_retail']) && ! empty($data['diskon_tier']) && (float) $data['diskon_tier'] > 0) {
+            $this->text($this->pad('Subtotal Retail', $this->money($data['subtotal_retail'])));
+            $tierLabel = ! empty($data['tier']) && $data['tier'] !== 'Retail'
+                ? "Potongan {$data['tier']}"
+                : (in_array($data['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Potongan Mitra' : 'Potongan Tier');
+            $this->text($this->pad($tierLabel, '-'.$this->money($data['diskon_tier'])));
+            $this->text($this->pad('Subtotal', $this->money($data['subtotal'] ?? $data['total'])));
+        } else {
+            $this->text($this->pad('Subtotal', $this->money($data['subtotal'] ?? $data['total'])));
+        }
+
+        if (! empty($data['diskon_partai']) && (float) $data['diskon_partai'] > 0) {
+            $this->text($this->pad('Diskon Partai', '-'.$this->money($data['diskon_partai'])));
+        }
+
+        if (! empty($data['diskon_poin']) && (float) $data['diskon_poin'] > 0) {
+            $pts = $data['poin_ditukar'] ?? 0;
+            $this->text($this->pad("Tukar Poin ({$pts}p)", '-'.$this->money($data['diskon_poin'])));
+        }
+
+        if (! empty($data['diskon']) && (float) $data['diskon'] > 0) {
+            $lbl = ! empty($data['diskon_persen']) && (float) $data['diskon_persen'] > 0 ? "Diskon ({$data['diskon_persen']}%)" : 'Diskon Kasir';
+            $this->text($this->pad($lbl, '-'.$this->money($data['diskon'])));
+        }
+
+        if (! empty($data['pajak']) && (float) $data['pajak'] > 0) {
+            $ppnLabel = ! empty($data['ppn_persen']) ? "PPN ({$data['ppn_persen']}%)" : 'PPN';
+            $this->text($this->pad($ppnLabel, '+'.$this->money($data['pajak'])));
+        }
+
         $this->bold(true)->text($this->pad('TOTAL', $this->money($data['total'])))->bold(false);
         $this->text('Bayar   : '.$this->money($data['bayar']));
         $this->text('Kembali : '.$this->money($data['kembali']));
         $this->text('Metode  : '.$data['metode_bayar']);
 
+        if (! empty($data['hemat_total']) && (float) $data['hemat_total'] > 0) {
+            $this->bold(true)->text($this->pad('TOTAL HEMAT', $this->money($data['hemat_total'])))->bold(false);
+        }
+
+        if (! empty($data['komisi_mitra_nominal']) && (float) $data['komisi_mitra_nominal'] > 0) {
+            $this->text('Komisi  : +'.$this->money($data['komisi_mitra_nominal']).' (Saldo)');
+        }
+
+        if (isset($data['saldo_poin'])) {
+            $this->text('Sisa Poin: '.number_format((float) $data['saldo_poin']).' pts');
+        }
+
         $this->rule()->feed(1);
 
-        // Barcode Code128 (GS k m=73, panjang 2 byte little-endian) + HRI di bawah
-        $no = $this->ascii($data['no_transaksi']);
+        // QR Code Faktur Retur & Garansi ESC/POS native (Model 2)
         $this->align(1);
-        $this->buf .= "\x1d\x77\x02"; // GS w 2 (lebar modul aman untuk thermal 58mm)
-        $this->buf .= "\x1d\x68\x28"; // GS h 40 (tinggi barcode)
-        $this->buf .= "\x1d\x48\x02"; // HRI below
-        $this->buf .= "\x1d\x6b\x49".chr(strlen($no) & 0xFF).chr((strlen($no) >> 8) & 0xFF).$no;
+        $this->qrcode($data['no_transaksi']);
+        $this->text($data['no_transaksi']);
+        $this->text('Scan QR utk Retur/Garansi');
         $this->feed(1);
 
         // Footer
@@ -96,9 +146,37 @@ class EscPosWriter
             $this->text($line);
         }
 
-        $this->feed(3)->cut();
+        // Feed 1 baris minimal lalu cut (hemat kertas struk)
+        $this->feed(1)->cut();
 
         return $this->buf;
+    }
+
+    /** ESC/POS standard Model 2 QR Code. */
+    public function qrcode(string $content, int $size = 4): self
+    {
+        $d = $this->ascii($content);
+        if ($d === '') {
+            return $this;
+        }
+
+        $len = strlen($d) + 3;
+        $pL = chr($len & 0xFF);
+        $pH = chr(($len >> 8) & 0xFF);
+        $modSize = chr(max(2, min(8, $size)));
+
+        // 1. Model 2: GS ( k 4 0 49 65 50 0
+        $this->buf .= "\x1d\x28\x6b\x04\x00\x31\x41\x32\x00";
+        // 2. Module size: GS ( k 3 0 49 67 size
+        $this->buf .= "\x1d\x28\x6b\x03\x00\x31\x43".$modSize;
+        // 3. Error correction M: GS ( k 3 0 49 69 49
+        $this->buf .= "\x1d\x28\x6b\x03\x00\x31\x45\x31";
+        // 4. Store data: GS ( k pL pH 49 80 48 data
+        $this->buf .= "\x1d\x28\x6b".$pL.$pH."\x31\x50\x30".$d;
+        // 5. Print: GS ( k 3 0 49 81 48
+        $this->buf .= "\x1d\x28\x6b\x03\x00\x31\x51\x30";
+
+        return $this;
     }
 
     private function init(): self

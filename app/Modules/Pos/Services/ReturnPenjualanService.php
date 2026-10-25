@@ -9,12 +9,13 @@ use App\Modules\Pos\Models\ReturnPenjualanItem;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Wms\Models\NomorSeri;
+use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
-use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\NomorSeriService;
+use App\Modules\Wms\Services\StokDeductionService;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -211,15 +212,79 @@ class ReturnPenjualanService
                 }
             }
 
-            // Jika tipe tukar_produk, proses transaksi pengganti
             if ($tipePenyelesaian === 'tukar_produk' && ! empty($tukarItems)) {
-                $this->prosesTukarProduk($retur, $tukarItems, $userId);
+                // Validasi tukar barang: kategori harus sama dengan produk yang diretur dan harga unit pengganti >= harga unit item diretur
+                $returProdukIds = array_unique(array_map(fn ($p) => (int) $p['trx_item']->produk_id, $preparedItems));
+                $returProduks = Produk::whereIn('id', $returProdukIds)->get()->keyBy('id');
+
+                $tukarProdukIds = array_unique(array_map(fn ($t) => (int) $t['produk_id'], $tukarItems));
+                $tukarProduks = Produk::whereIn('id', $tukarProdukIds)->get()->keyBy('id');
+
+                // Kategori produk yang diretur
+                $allowedKategoriIds = [];
+                $allowedKategoriStrings = [];
+                $minHargaUnit = 0;
+                foreach ($preparedItems as $prep) {
+                    $pModel = $returProduks->get($prep['trx_item']->produk_id);
+                    if ($pModel?->kategori_id) {
+                        $allowedKategoriIds[] = (int) $pModel->kategori_id;
+                    }
+                    if ($pModel?->kategori) {
+                        $allowedKategoriStrings[] = trim(strtolower($pModel->kategori));
+                    }
+                    if ($prep['harga_satuan'] > $minHargaUnit) {
+                        $minHargaUnit = (float) $prep['harga_satuan'];
+                    }
+                }
+                $allowedKategoriIds = array_unique($allowedKategoriIds);
+                $allowedKategoriStrings = array_unique($allowedKategoriStrings);
+
+                foreach ($tukarItems as $tItem) {
+                    $tProduk = $tukarProduks->get($tItem['produk_id']);
+                    if (! $tProduk) {
+                        throw ValidationException::withMessages([
+                            'tukar_items' => "Produk pengganti #{$tItem['produk_id']} tidak ditemukan.",
+                        ]);
+                    }
+
+                    // Validasi kategori: jika produk yang diretur memiliki kategori, produk pengganti wajib berkategori sama
+                    if (! empty($allowedKategoriIds) || ! empty($allowedKategoriStrings)) {
+                        $matchId = $tProduk->kategori_id && in_array((int) $tProduk->kategori_id, $allowedKategoriIds, true);
+                        $matchString = $tProduk->kategori && in_array(trim(strtolower($tProduk->kategori)), $allowedKategoriStrings, true);
+                        if (! $matchId && ! $matchString) {
+                            throw ValidationException::withMessages([
+                                'tukar_items' => "Produk pengganti [{$tProduk->nama}] harus berada dalam kategori yang sama dengan produk yang diretur.",
+                            ]);
+                        }
+                    }
+
+                    // Validasi harga: harga unit produk pengganti >= harga unit barang yang diretur (harga lebih rendah dilarang)
+                    $hargaUnitPengganti = isset($tItem['harga_satuan'])
+                        ? (float) $tItem['harga_satuan']
+                        : (float) ($tProduk->harga_jual_retail ?? $tProduk->harga_jual ?? 0);
+
+                    if ($hargaUnitPengganti < $minHargaUnit) {
+                        throw ValidationException::withMessages([
+                            'tukar_items' => "Harga satuan produk pengganti [{$tProduk->nama}] (Rp ".number_format($hargaUnitPengganti, 0, ',', '.').') tidak boleh lebih rendah dari harga barang yang diretur (Rp '.number_format($minHargaUnit, 0, ',', '.').').',
+                        ]);
+                    }
+                }
             }
 
             // Cek apakah memerlukan persetujuan workflow (misal rule > threshold)
-            $needsApproval = $this->approvalService->adaPending('retur', $retur->id);
+            $needsApproval = $this->approvalService->butuhApproval('retur', $cabangId, (float) $totalRetur);
 
-            // Jika tidak ada approval pending
+            // Simpan payload produk pengganti pada retur
+            if ($tipePenyelesaian === 'tukar_produk' && ! empty($tukarItems)) {
+                $retur->update(['tukar_items_payload' => $tukarItems]);
+
+                // Eksekusi pemotongan stok & pembuatan transaksi tukar sekarang HANYA jika tidak butuh approval
+                if (! $needsApproval) {
+                    $this->prosesTukarProduk($retur, $tukarItems, $userId);
+                }
+            }
+
+            // Jika tidak ada approval yang dibutuhkan, langsung eksekusi selesai
             if (! $needsApproval) {
                 $this->eksekusiRetur($retur, $totalHpp, $userId);
             }
@@ -242,16 +307,15 @@ class ReturnPenjualanService
         $totalTukar = 0;
         $preparedTukar = [];
 
+        $stokDeductionService = app(StokDeductionService::class);
+
         foreach ($tukarItems as $tItem) {
             $qty = (float) $tItem['jumlah'];
             if ($qty <= 0) {
                 continue;
             }
 
-            $stok = StokItem::where('gudang_id', $gudangId)
-                ->where('produk_id', $tItem['produk_id'])
-                ->where('sku_variant_id', $tItem['sku_variant_id'] ?? null)
-                ->first();
+            $stok = $stokDeductionService->cariBarisStok($tItem['produk_id'], $tItem['sku_variant_id'] ?? null, $gudangId, false);
 
             $stokTersedia = $stok ? (int) $stok->jumlah : 0;
             if ($qty > $stokTersedia) {
@@ -261,7 +325,7 @@ class ReturnPenjualanService
                 ]);
             }
 
-            $harga = isset($tItem['harga_satuan']) ? (float) $tItem['harga_satuan'] : (float) ($stok?->produk?->harga_jual ?? 0);
+            $harga = isset($tItem['harga_satuan']) ? (float) $tItem['harga_satuan'] : (float) ($stok?->produk?->harga_jual_retail ?? $stok?->produk?->harga_jual ?? 0);
             $subtotal = round($harga * $qty, 2);
 
             $preparedTukar[] = [
@@ -299,6 +363,9 @@ class ReturnPenjualanService
         ]);
 
         foreach ($preparedTukar as $p) {
+            $pProduk = Produk::find($p['produk_id']);
+            $hppItem = (float) ($pProduk?->harga_beli ?? 0);
+
             TransaksiItem::create([
                 'transaksi_id' => $transaksiTukar->id,
                 'produk_id' => $p['produk_id'],
@@ -307,17 +374,21 @@ class ReturnPenjualanService
                 'harga_satuan' => $p['harga_satuan'],
                 'harga_final' => $p['harga_satuan'],
                 'subtotal' => $p['subtotal'],
+                'hpp' => $hppItem,
             ]);
 
-            // Potong stok barang pengganti
-            $stokItem = StokItem::where('gudang_id', $gudangId)
-                ->where('produk_id', $p['produk_id'])
-                ->where('sku_variant_id', $p['sku_variant_id'])
-                ->first();
-
-            if ($stokItem) {
-                $stokItem->decrement('jumlah', (int) $p['jumlah']);
-            }
+            // Potong stok barang pengganti via StokDeductionService kanonik
+            $stokDeductionService->kurangi(
+                produkId: (int) $p['produk_id'],
+                skuVariantId: $p['sku_variant_id'] ? (int) $p['sku_variant_id'] : null,
+                gudangId: $gudangId,
+                qty: (int) $p['jumlah'],
+                jenis: 'penjualan',
+                referensiTipe: Transaksi::class,
+                referensiId: $transaksiTukar->id,
+                userId: $userId,
+                catatan: "Tukar Produk Retur {$retur->no_return} TRX {$transaksiTukar->no_transaksi}"
+            );
         }
 
         $retur->update([
@@ -339,6 +410,7 @@ class ReturnPenjualanService
             $cabangId = (int) $retur->cabang_id;
             $gudangId = (int) $retur->gudang_id;
             $totalNilaiRetur = (float) $retur->jumlah;
+            $stokDeductionService = app(StokDeductionService::class);
 
             $hitungHpp = 0;
 
@@ -351,7 +423,8 @@ class ReturnPenjualanService
 
                 // HANYA barang berstatus BAGUS yang dimasukkan kembali ke stok aktif siap jual
                 if ($item->kondisi_barang === 'bagus') {
-                    $stokItem = StokItem::firstOrCreate([
+                    // Pastikan baris stok ada sebelum dikembalikan
+                    StokItem::firstOrCreate([
                         'gudang_id' => $gudangId,
                         'produk_id' => $produkId,
                         'sku_variant_id' => $skuVariantId,
@@ -359,37 +432,17 @@ class ReturnPenjualanService
                         'jumlah' => 0,
                     ]);
 
-                    $saldoAwal = (int) $stokItem->jumlah;
-                    $stokItem->increment('jumlah', $qty);
-                    $saldoAkhir = $saldoAwal + $qty;
-
-                    // Stok Log
-                    StokLog::create([
-                        'gudang_id' => $gudangId,
-                        'produk_id' => $produkId,
-                        'sku_variant_id' => $skuVariantId,
-                        'user_id' => $userId,
-                        'jenis' => 'masuk',
-                        'referensi_tipe' => ReturnPenjualan::class,
-                        'referensi_id' => $retur->id,
-                        'jumlah_sebelum' => $saldoAwal,
-                        'perubahan' => $qty,
-                        'jumlah_setelah' => $saldoAkhir,
-                        'catatan' => "Retur Penjualan {$retur->no_return} (Layak Jual)",
-                    ]);
-
-                    // Stock Mutation Log
-                    StockMutationLog::create([
-                        'produk_id' => $produkId,
-                        'sku_variant_id' => $skuVariantId,
-                        'gudang_id' => $gudangId,
-                        'user_id' => $userId,
-                        'delta' => $qty,
-                        'sumber' => 'retur_penjualan',
-                        'referensi_tipe' => ReturnPenjualan::class,
-                        'referensi_id' => $retur->id,
-                        'terjadi_at' => now(),
-                    ]);
+                    $stokDeductionService->kembalikan(
+                        produkId: $produkId,
+                        skuVariantId: $skuVariantId,
+                        gudangId: $gudangId,
+                        qty: $qty,
+                        jenis: 'retur_penjualan',
+                        referensiTipe: ReturnPenjualan::class,
+                        referensiId: $retur->id,
+                        userId: $userId,
+                        catatan: "Retur Penjualan {$retur->no_return} (Layak Jual)"
+                    );
                 } else {
                     // Barang Rusak: masuk karantina retur supplier, tidak dijual ke pelanggan lain
                     $item->update(['status_karantina' => 'karantina']);
@@ -409,6 +462,12 @@ class ReturnPenjualanService
             }
 
             $hppFinal = $totalHpp ?? $hitungHpp;
+
+            // Jika tukar_produk dan belum diproses transaksi penggantinya (misal dari deferred approval)
+            if ($retur->tipe_penyelesaian === 'tukar_produk' && ! $retur->tukar_transaksi_id && ! empty($retur->tukar_items_payload)) {
+                $this->prosesTukarProduk($retur, $retur->tukar_items_payload, $userId);
+                $retur->refresh();
+            }
 
             // Jurnal Pembukuan Retur:
             // Jika refund:
@@ -445,6 +504,67 @@ class ReturnPenjualanService
                     'manual',
                     $lines,
                     "Retur Penjualan {$retur->no_return} (Nota: {$retur->transaksi?->no_transaksi})",
+                    $cabangId,
+                    $userId,
+                    ReturnPenjualan::class,
+                    $retur->id
+                );
+            } elseif ($retur->tipe_penyelesaian === 'tukar_produk') {
+                // Jurnal Pembukuan Retur Tukar Produk (Exchange)
+                // 1. Pembalikan penjualan item retur:
+                //    Debit 410-02 (Retur Penjualan) = totalNilaiRetur
+                //    Debit 130-01 (Persediaan) = HPP item retur
+                //    Kredit 510-02 (HPP) = HPP item retur
+                // 2. Pengakuan penjualan barang pengganti:
+                //    Kredit 410-01 (Pendapatan Penjualan) = totalNilaiPengganti
+                //    Debit 510-02 (HPP) = HPP barang pengganti
+                //    Kredit 130-01 (Persediaan) = HPP barang pengganti
+                // 3. Selisih kas tambahan (jika ada selisih lebih mahal):
+                //    Debit 110-01 (Kas Toko) = selisih
+                //
+                // Keseimbangan Jurnal:
+                // Debit: 410-02 ($totalNilaiRetur) + [110-01 ($selisih)] + 130-01 ($hppFinal) + 510-02 ($hppPengganti)
+                // Kredit: 410-01 ($totalNilaiPengganti) + 510-02 ($hppFinal) + 130-01 ($hppPengganti)
+                // Karena $totalNilaiRetur + $selisih == $totalNilaiPengganti, sisi nominal pendapatan seimbang.
+
+                $tukarTrx = $retur->tukarTransaksi;
+                $totalNilaiPengganti = $tukarTrx ? (float) $tukarTrx->total_akhir : $totalNilaiRetur;
+                $selisihNominal = max(0, round((float) ($retur->selisih_nominal ?? ($totalNilaiPengganti - $totalNilaiRetur)), 2));
+
+                $hppPengganti = 0;
+                if ($tukarTrx) {
+                    $tukarTrx->loadMissing('items.produk');
+                    foreach ($tukarTrx->items as $tItem) {
+                        $hppSatuanPengganti = (float) ($tItem->hpp ?? $tItem->produk?->harga_beli ?? 0);
+                        $hppPengganti += ($hppSatuanPengganti * (float) $tItem->jumlah);
+                    }
+                }
+
+                $lines = [
+                    ['akun_kode' => '410-02', 'debit' => $totalNilaiRetur, 'kredit' => 0],
+                    ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $totalNilaiPengganti],
+                ];
+
+                if ($selisihNominal > 0) {
+                    $lines[] = ['akun_kode' => '110-01', 'debit' => $selisihNominal, 'kredit' => 0];
+                }
+
+                if ($hppFinal > 0) {
+                    $lines[] = ['akun_kode' => '130-01', 'debit' => $hppFinal, 'kredit' => 0];
+                    $lines[] = ['akun_kode' => '510-02', 'debit' => 0, 'kredit' => $hppFinal];
+                }
+
+                if ($hppPengganti > 0) {
+                    $lines[] = ['akun_kode' => '510-02', 'debit' => $hppPengganti, 'kredit' => 0];
+                    $lines[] = ['akun_kode' => '130-01', 'debit' => 0, 'kredit' => $hppPengganti];
+                }
+
+                $this->jurnalService->post(
+                    $retur->no_return,
+                    now(),
+                    'manual',
+                    $lines,
+                    "Retur Tukar Produk {$retur->no_return} (Nota: {$retur->transaksi?->no_transaksi})",
                     $cabangId,
                     $userId,
                     ReturnPenjualan::class,

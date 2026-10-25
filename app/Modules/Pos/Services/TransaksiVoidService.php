@@ -5,8 +5,10 @@ namespace App\Modules\Pos\Services;
 use App\Models\User;
 use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
+use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Reseller\Models\Komisi;
@@ -126,26 +128,61 @@ class TransaksiVoidService
                 ]);
             }
 
-            // 4. Batalkan Komisi Terkait (jika ada komisi reseller/agen yang pending/disetujui)
+            // 4. Batalkan Komisi Terkait (proteksi komisi yang sudah cair)
             $komisiList = Komisi::where('transaksi_id', $transaksi->id)->get();
             foreach ($komisiList as $komisi) {
+                if ($komisi->status === Komisi::STATUS_CAIR) {
+                    throw new \DomainException(
+                        "Transaksi {$transaksi->no_transaksi} tidak dapat dibatalkan (void) karena komisi sebesar Rp ".
+                        number_format((float) $komisi->nominal_komisi, 0, ',', '.').
+                        " ({$komisi->no_komisi}) sudah dicairkan. Harap batalkan administrasi pencairan komisi terlebih dahulu."
+                    );
+                }
+
+                // Jika sudah disetujui dan ada entri utang belum lunas, batalkan utangnya
+                if ($komisi->status === Komisi::STATUS_DISETUJUI) {
+                    Utang::where('referensi_tipe', 'komisi')
+                        ->where('referensi_id', $komisi->id)
+                        ->where('status', 'belum_lunas')
+                        ->update([
+                            'status' => 'batal',
+                            'keterangan' => trim(($komisi->keterangan ?? '')." [Batal void transaksi {$transaksi->no_transaksi}]"),
+                        ]);
+                }
+
                 $komisi->update([
-                    'status' => 'ditolak',
+                    'status' => Komisi::STATUS_DITOLAK,
                     'keterangan' => trim(($komisi->keterangan ?? '')." [Dibatalkan karena transaksi {$transaksi->no_transaksi} di-void: {$alasan}]"),
                 ]);
             }
 
-            // 5. Kurangi Akumulasi Belanja CRM & Poin Pelanggan
+            // 5. Kembalikan Poin yang Ditukar & Batalkan Akumulasi Belanja CRM Pelanggan
             if ($transaksi->pelanggan_id) {
                 $pelanggan = Pelanggan::find($transaksi->pelanggan_id);
                 if ($pelanggan) {
+                    $pelangganService = app(PelangganService::class);
+                    $poinDitukar = (int) ($transaksi->poin_ditukar ?? 0);
+                    if ($poinDitukar > 0) {
+                        $pelangganService->kembalikanPoin(
+                            $pelanggan,
+                            $poinDitukar,
+                            $transaksi->id,
+                            "Pengembalian {$poinDitukar} poin karena transaksi {$transaksi->no_transaksi} di-void: {$alasan}"
+                        );
+                    }
+
                     $totalAkhir = (float) $transaksi->total_akhir;
                     $pelanggan->decrement('total_belanja_12bulan', min((float) $pelanggan->total_belanja_12bulan, $totalAkhir));
 
                     $tierService = app(TierService::class);
-                    $poin = $tierService->hitungPoin($totalAkhir, $pelanggan->tierMembership);
-                    if ($poin > 0) {
-                        $pelanggan->decrement('poin_loyalty', min((int) $pelanggan->poin_loyalty, $poin));
+                    $poinEarned = $tierService->hitungPoin($totalAkhir, $pelanggan->tierMembership);
+                    if ($poinEarned > 0) {
+                        $pelangganService->tarikPoinBatal(
+                            $pelanggan,
+                            $poinEarned,
+                            $transaksi->id,
+                            "Pembatalan {$poinEarned} poin belanja transaksi {$transaksi->no_transaksi} di-void: {$alasan}"
+                        );
                     }
 
                     $tierService->recalcSatu($pelanggan);

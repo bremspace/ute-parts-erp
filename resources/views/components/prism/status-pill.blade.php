@@ -5,7 +5,7 @@
 
 @php
 $config = match(strtolower($status)) {
-    'selesai', 'diterima', 'disetujui', 'aktif' => [
+    'selesai', 'diterima', 'disetujui', 'aktif', 'cair', 'lunas', 'paid' => [
         'bg' => 'bg-up-mint/15',
         'text' => 'text-up-mint',
         'border' => 'border-up-mint/30',

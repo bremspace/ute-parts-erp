@@ -166,9 +166,15 @@
                                     <div class="flex items-center justify-between gap-3 py-2 border-b border-ink-100/60 dark:border-white/[0.06] last:border-0">
                                         <div class="min-w-0 space-y-0.5">
                                             <p class="text-xs font-bold text-ink-900 dark:text-white truncate">{{ $item['name'] }}</p>
-                                            <p class="text-[11px] text-ink-400">
-                                                {{ $item['qty'] }} × Rp {{ number_format($item['harga'], 0, ',', '.') }}
-                                            </p>
+                                            <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
+                                                <span class="text-ink-400 font-semibold">{{ $item['qty'] }} × Rp {{ number_format($item['harga'], 0, ',', '.') }}</span>
+                                                @if(!empty($item['diskon_tier']) && (float) $item['diskon_tier'] > 0)
+                                                    <span class="line-through text-ink-400 text-[10px]">Rp {{ number_format($item['harga_retail'], 0, ',', '.') }}</span>
+                                                    <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-black">
+                                                        -Rp {{ number_format($item['diskon_tier'], 0, ',', '.') }}
+                                                    </span>
+                                                @endif
+                                            </div>
                                         </div>
                                         <div class="text-xs font-bold text-ink-900 dark:text-white tabular-nums flex-shrink-0">
                                             Rp {{ number_format($item['harga'] * $item['qty'], 0, ',', '.') }}
@@ -178,10 +184,26 @@
                             </div>
 
                             <div class="pt-4 border-t border-ink-100/80 dark:border-white/10 space-y-2 text-xs">
-                                <div class="flex justify-between items-center text-ink-600 dark:text-ink-400">
-                                    <span>Subtotal</span>
-                                    <span class="font-bold tabular-nums text-ink-900 dark:text-white">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
-                                </div>
+                                @if(($diskonTier ?? 0) > 0)
+                                    <div class="flex justify-between items-center text-ink-500">
+                                        <span>Subtotal Retail</span>
+                                        <span class="tabular-nums line-through">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-up-mint font-semibold">
+                                        <span>Potongan Tier Member ({{ $pelanggan->tierMembership?->nama ?? ($pelanggan->tipe_konsumen === 'reseller' ? 'Reseller' : 'Member') }})</span>
+                                        <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-ink-700 dark:text-ink-300 font-bold pt-1 border-t border-ink-100/60 dark:border-white/5">
+                                        <span>Subtotal Bersih</span>
+                                        <span class="tabular-nums text-ink-900 dark:text-white">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
+                                    </div>
+                                @else
+                                    <div class="flex justify-between items-center text-ink-600 dark:text-ink-400">
+                                        <span>Subtotal</span>
+                                        <span class="font-bold tabular-nums text-ink-900 dark:text-white">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
+                                    </div>
+                                @endif
+
                                 @if(!empty($pajakPreview['enabled']) && $pajakPreview['ppn_nominal'] > 0)
                                     <div class="flex justify-between items-center text-ink-500">
                                         <span>PPN ({{ $pajakPreview['ppn_percent'] }}%)</span>
@@ -195,6 +217,12 @@
                                     </span>
                                 </div>
                             </div>
+
+                            @if(($diskonTier ?? 0) > 0)
+                                <div class="p-2.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-center text-xs font-bold text-up-mint">
+                                    🎉 Anda menghemat Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan harga khusus member!
+                                </div>
+                            @endif
 
                             <button
                                 type="button"
@@ -312,10 +340,20 @@
                                         </button>
                                     </div>
 
-                                    <div class="text-right sm:w-28 min-w-0">
+                                    <div class="text-right sm:w-32 min-w-0 space-y-0.5">
                                         <span class="text-xs sm:text-sm font-black text-ink-900 dark:text-white tabular-nums block truncate">
                                             Rp {{ number_format($item['harga'] * $item['qty'], 0, ',', '.') }}
                                         </span>
+                                        @if(!empty($item['diskon_tier']) && (float) $item['diskon_tier'] > 0)
+                                            <div class="flex items-center justify-end gap-1 text-[10px]">
+                                                <span class="line-through text-ink-400 tabular-nums">
+                                                    Rp {{ number_format($item['harga_retail'] * $item['qty'], 0, ',', '.') }}
+                                                </span>
+                                                <span class="px-1 py-0.2 rounded bg-up-mint/15 text-up-mint font-black">
+                                                    -Rp {{ number_format($item['diskon_tier'] * $item['qty'], 0, ',', '.') }}
+                                                </span>
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -325,12 +363,29 @@
                     <div class="pt-6 border-t border-ink-100/80 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div class="text-xs text-ink-500 dark:text-ink-400">
                             Total pesanan terhitung untuk <strong class="text-ink-900 dark:text-white">{{ $jumlahItem }} suku cadang</strong>
+                            @if(($diskonTier ?? 0) > 0)
+                                <div class="mt-1 text-up-mint font-bold text-[11px]">
+                                    🎉 Anda menghemat total Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan harga tier member
+                                </div>
+                            @endif
                         </div>
-                        <div class="flex items-baseline gap-2">
-                            <span class="text-xs font-semibold text-ink-400 uppercase tracking-wider">Subtotal:</span>
-                            <span class="text-2xl font-black text-up-primary tabular-nums">
-                                Rp {{ number_format($subtotal, 0, ',', '.') }}
-                            </span>
+                        <div class="flex flex-col items-end gap-1">
+                            @if(($diskonTier ?? 0) > 0)
+                                <div class="flex items-center gap-2 text-xs text-ink-500">
+                                    <span>Subtotal Retail:</span>
+                                    <span class="line-through tabular-nums">Rp {{ number_format($subtotalRetail, 0, ',', '.') }}</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-up-mint font-semibold">
+                                    <span>Potongan Tier:</span>
+                                    <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
+                                </div>
+                            @endif
+                            <div class="flex items-baseline gap-2">
+                                <span class="text-xs font-semibold text-ink-400 uppercase tracking-wider">Subtotal:</span>
+                                <span class="text-2xl font-black text-up-primary tabular-nums">
+                                    Rp {{ number_format($subtotal, 0, ',', '.') }}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>

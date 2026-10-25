@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['nama', 'kode', 'min_belanja_12bulan', 'diskon_persen', 'poin_multiplier', 'urutan', 'is_active'])]
+#[Fillable(['nama', 'kode', 'min_belanja_12bulan', 'diskon_persen', 'poin_multiplier', 'poin_redeem_rupiah', 'urutan', 'is_active'])]
 class TierMembership extends Model
 {
     use CatatAktivitas;
@@ -27,6 +27,7 @@ class TierMembership extends Model
         'min_belanja_12bulan' => 'decimal:2',
         'diskon_persen' => 'decimal:2',
         'poin_multiplier' => 'decimal:1',
+        'poin_redeem_rupiah' => 'decimal:2',
     ];
 
     public function pelanggan(): HasMany

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Pos\Livewire;
 
+use App\Models\User;
 use App\Models\UserPreference;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\Piutang;
@@ -19,6 +20,7 @@ use App\Modules\Pos\Services\PricingService;
 use App\Modules\Pos\Services\TransaksiVoidService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
+use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
@@ -39,6 +41,7 @@ use App\Traits\ParsesNominal;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -118,6 +121,35 @@ class PosKasir extends Component
     public float $diskonPersen = 0.0;
 
     public float $diskonNominal = 0.0;
+
+    public int $poinDitukar = 0;
+
+    public float $diskonPoin = 0.0;
+
+    public float $diskonPartai = 0.0;
+
+    public string $alasanPartai = '';
+
+    public string $modeRewardMitra = 'diskon_langsung'; // diskon_langsung | komisi_akumulasi
+
+    // Diskon langsung modal state & Otorisasi Owner/Super Admin
+    public bool $showDiskonModal = false;
+
+    public string $tipeDiskonPilihan = 'persen'; // persen | nominal
+
+    public float $tempDiskonPersen = 0.0;
+
+    public string $tempDiskonNominal = '0';
+
+    public ?int $diskonManualAuthorizedById = null;
+
+    public string $diskonManualAuthorizedByName = '';
+
+    public string $diskonManualAlasan = '';
+
+    public string $diskonSupervisorAuth = '';
+
+    public string $diskonSupervisorPassword = '';
 
     public float $pajakNominal = 0.0;
 
@@ -625,6 +657,29 @@ class PosKasir extends Component
             : null;
     }
 
+    public function getSubtotalRetailProperty(): float
+    {
+        return array_reduce(
+            $this->cart,
+            fn ($carry, $item) => $carry + (((float) ($item['harga_dasar'] ?? $item['harga'])) * (int) ($item['qty'] ?? 1)),
+            0.0
+        );
+    }
+
+    public function getDiskonTierTotalProperty(): float
+    {
+        if ($this->modeRewardMitra === 'komisi_akumulasi') {
+            return 0.0;
+        }
+
+        return max(0.0, $this->subtotalRetail - $this->subtotal);
+    }
+
+    public function getHematTotalProperty(): float
+    {
+        return $this->diskonTierTotal + $this->diskonTotal;
+    }
+
     public function getSubtotalProperty(): float
     {
         return array_reduce($this->cart, fn ($carry, $item) => $carry + ($item['subtotal'] ?? 0), 0.0);
@@ -632,13 +687,9 @@ class PosKasir extends Component
 
     public function getTotalAkhirProperty(): float
     {
-        $sub = $this->subtotal;
-        $diskon = $this->diskonNominal;
-        if ($this->diskonPersen > 0) {
-            $diskon += round(($sub * $this->diskonPersen) / 100, 2);
-        }
+        $dpp = max(0.0, $this->subtotal - $this->diskonTotal);
 
-        return max(0.0, $sub - $diskon + $this->pajakNominal);
+        return max(0.0, $dpp + $this->pajakNominal);
     }
 
     /**
@@ -648,6 +699,20 @@ class PosKasir extends Component
      */
     private function recalcPajak(): void
     {
+        // Pastikan poin ditukar tidak melebihi sisa tagihan belanja
+        if ($this->poinDitukar > 0) {
+            $saldo = (int) ($this->customer?->poin_loyalty ?? 0);
+            $konversi = app(PelangganService::class)->nilaiTukarPoinPelanggan($this->customer);
+            $diskonSebelumPoin = $this->diskonNominal + $this->diskonPartai;
+            if ($this->diskonPersen > 0) {
+                $diskonSebelumPoin += round(($this->subtotal * $this->diskonPersen) / 100, 2);
+            }
+            $maksRupiah = max(0.0, $this->subtotal - $diskonSebelumPoin);
+            $maksPoin = $konversi > 0 ? (int) floor($maksRupiah / $konversi) : 0;
+            $this->poinDitukar = min($saldo, min($this->poinDitukar, $maksPoin));
+            $this->diskonPoin = round($this->poinDitukar * $konversi, 2);
+        }
+
         $cabangId = session('cabang_id');
         $pajakService = app(PajakService::class);
         $dpp = max(0.0, $this->subtotal - $this->diskonTotal);
@@ -680,6 +745,306 @@ class PosKasir extends Component
         $this->recalcPajak();
     }
 
+    public function updatedPoinDitukar(mixed $val): void
+    {
+        $val = max(0, (int) $val);
+        $saldo = (int) ($this->customer?->poin_loyalty ?? 0);
+        $konversi = app(PelangganService::class)->nilaiTukarPoinPelanggan($this->customer);
+
+        if ($konversi <= 0 || ! $this->customer) {
+            $this->poinDitukar = 0;
+            $this->diskonPoin = 0.0;
+            $this->resetComputedTotals();
+            $this->recalcPajak();
+
+            return;
+        }
+
+        $diskonSebelumPoin = $this->diskonNominal + $this->diskonPartai;
+        if ($this->diskonPersen > 0) {
+            $diskonSebelumPoin += round(($this->subtotal * $this->diskonPersen) / 100, 2);
+        }
+        $maksRupiah = max(0.0, $this->subtotal - $diskonSebelumPoin);
+        $maksPoin = (int) floor($maksRupiah / $konversi);
+
+        $this->poinDitukar = min($saldo, min($val, $maksPoin));
+        $this->diskonPoin = round($this->poinDitukar * $konversi, 2);
+
+        $this->resetComputedTotals();
+        $this->recalcPajak();
+    }
+
+    public function tukarSemuaPoin(): void
+    {
+        $saldo = (int) ($this->customer?->poin_loyalty ?? 0);
+        $this->updatedPoinDitukar($saldo);
+    }
+
+    public function batalTukarPoin(): void
+    {
+        $this->poinDitukar = 0;
+        $this->diskonPoin = 0.0;
+        $this->resetComputedTotals();
+        $this->recalcPajak();
+    }
+
+    public function toggleModeRewardMitra(): void
+    {
+        $this->modeRewardMitra = ($this->modeRewardMitra === 'diskon_langsung') ? 'komisi_akumulasi' : 'diskon_langsung';
+        $this->recalculateCartPrices();
+        $this->hitungDiskonPartai();
+        $this->resetComputedTotals();
+        $this->recalcPajak();
+    }
+
+    public function setModeRewardMitra(string $mode): void
+    {
+        $this->modeRewardMitra = in_array($mode, ['diskon_langsung', 'komisi_akumulasi'], true) ? $mode : 'diskon_langsung';
+        $this->recalculateCartPrices();
+        $this->hitungDiskonPartai();
+        $this->resetComputedTotals();
+        $this->recalcPajak();
+    }
+
+    public function getIsUserOwnerOrSuperAdminProperty(): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasRole(['super-admin', 'owner']);
+    }
+
+    public function toggleModePoinMember(): void
+    {
+        if ($this->poinDitukar > 0) {
+            $this->batalTukarPoin();
+        } else {
+            $this->tukarSemuaPoin();
+        }
+    }
+
+    public function openDiskonModal(): void
+    {
+        $this->tempDiskonPersen = $this->diskonPersen;
+        $this->tempDiskonNominal = $this->diskonNominal > 0 ? (string) (int) $this->diskonNominal : '0';
+        $this->tipeDiskonPilihan = ($this->diskonNominal > 0 && $this->diskonPersen <= 0) ? 'nominal' : 'persen';
+        $this->diskonSupervisorPassword = '';
+        $this->showDiskonModal = true;
+    }
+
+    public function closeDiskonModal(): void
+    {
+        $this->showDiskonModal = false;
+    }
+
+    public function terapkanDiskonLangsung(): void
+    {
+        $targetDiskonPersen = 0.0;
+        $targetDiskonNominal = 0.0;
+
+        if ($this->tipeDiskonPilihan === 'persen') {
+            $targetDiskonPersen = max(0.0, min(100.0, (float) $this->tempDiskonPersen));
+        } else {
+            $targetDiskonNominal = max(0.0, (float) $this->parseNominal($this->tempDiskonNominal));
+        }
+
+        $adaDiskonManual = ($targetDiskonPersen > 0 || $targetDiskonNominal > 0);
+
+        // Diskon manual kasir bersifat opsional dan KHUSUS dengan otorisasi Owner/Superadmin
+        if ($adaDiskonManual) {
+            if ($this->isUserOwnerOrSuperAdmin) {
+                // User login adalah Owner atau Super Admin
+                $this->diskonManualAuthorizedById = auth()->id();
+                $this->diskonManualAuthorizedByName = auth()->user()->name ?? 'Owner/Super Admin';
+            } else {
+                // Kasir biasa wajib otorisasi kredensial Owner / Super Admin
+                try {
+                    $supervisor = $this->verifikasiOtorisasiOwnerSuperAdmin(
+                        $this->diskonSupervisorAuth,
+                        $this->diskonSupervisorPassword
+                    );
+                    $this->diskonManualAuthorizedById = $supervisor->id;
+                    $this->diskonManualAuthorizedByName = $supervisor->name;
+                    $this->diskonSupervisorPassword = '';
+                } catch (\Exception $e) {
+                    $this->dispatch('alert', [
+                        'type' => 'error',
+                        'message' => 'Otorisasi Diskon Gagal: '.$e->getMessage(),
+                    ]);
+
+                    return;
+                }
+            }
+        } else {
+            $this->diskonManualAuthorizedById = null;
+            $this->diskonManualAuthorizedByName = '';
+            $this->diskonManualAlasan = '';
+            $this->diskonSupervisorAuth = '';
+            $this->diskonSupervisorPassword = '';
+        }
+
+        $this->diskonPersen = $targetDiskonPersen;
+        $this->diskonNominal = $targetDiskonNominal;
+
+        $this->resetComputedTotals();
+        $this->recalcPajak();
+        $this->showDiskonModal = false;
+
+        $potongan = $this->diskonNominal + ($this->diskonPersen > 0 ? round(($this->subtotal * $this->diskonPersen) / 100, 2) : 0);
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => $potongan > 0
+                ? 'Diskon manual kasir berhasil diterapkan: -Rp '.number_format($potongan, 0, ',', '.').($this->diskonManualAuthorizedByName ? " (Otorisasi: {$this->diskonManualAuthorizedByName})" : '')
+                : 'Diskon manual dihapus',
+        ]);
+    }
+
+    public function resetDiskonLangsung(): void
+    {
+        $this->diskonPersen = 0.0;
+        $this->diskonNominal = 0.0;
+        $this->tempDiskonPersen = 0.0;
+        $this->tempDiskonNominal = '0';
+        $this->diskonManualAuthorizedById = null;
+        $this->diskonManualAuthorizedByName = '';
+        $this->diskonManualAlasan = '';
+        $this->diskonSupervisorAuth = '';
+        $this->diskonSupervisorPassword = '';
+        $this->resetComputedTotals();
+        $this->recalcPajak();
+        $this->showDiskonModal = false;
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Diskon manual kasir di-reset',
+        ]);
+    }
+
+    protected function verifikasiOtorisasiOwnerSuperAdmin(string $authInput, string $password): User
+    {
+        $authInput = trim($authInput);
+        if (empty($authInput) || empty($password)) {
+            throw new \Exception('Username/Email dan Password Owner/Super Admin wajib diisi.');
+        }
+
+        $user = User::where('email', $authInput)
+            ->orWhere('name', $authInput)
+            ->first();
+
+        if (! $user || ! Hash::check($password, $user->password)) {
+            throw new \Exception('Kredensial Owner/Super Admin salah atau user tidak ditemukan.');
+        }
+
+        if (! $user->hasRole(['super-admin', 'owner'])) {
+            throw new \Exception("User '{$user->name}' bukan Owner atau Super Admin. Diskon manual kasir hanya boleh diotorisasi oleh Owner atau Super Admin.");
+        }
+
+        return $user;
+    }
+
+    public function setPresetDiskonPersen(float $p): void
+    {
+        $this->tipeDiskonPilihan = 'persen';
+        $this->tempDiskonPersen = $p;
+    }
+
+    public function setPresetDiskonNominal(float $n): void
+    {
+        $this->tipeDiskonPilihan = 'nominal';
+        $this->tempDiskonNominal = (string) (int) $n;
+    }
+
+    public function hitungDiskonPartai(): void
+    {
+        $this->diskonPartai = 0.0;
+        $this->alasanPartai = '';
+
+        if (! $this->customer) {
+            return;
+        }
+
+        $config = app(KonfigurasiService::class);
+        if (! $config->hargaPartaiAktif()) {
+            return;
+        }
+
+        $isMember = $this->customer->tier_membership_id !== null
+            || (bool) $this->customer->is_reseller
+            || in_array($this->customer->tipe_konsumen, ['reseller', 'agen'], true);
+
+        if (! $isMember) {
+            return;
+        }
+
+        $totalQty = array_reduce($this->cart, fn ($carry, $item) => $carry + (int) ($item['qty'] ?? 1), 0);
+        $subtotal = $this->subtotal;
+
+        $minQty = $config->hargaPartaiMinQty();
+        $diskonQtyPersen = $config->hargaPartaiQtyDiskonPersen();
+
+        $minNominal = $config->hargaPartaiMinNominal();
+        $diskonNominalPersen = $config->hargaPartaiNominalDiskonPersen();
+
+        $persenTerpilih = 0.0;
+        $alasan = '';
+
+        if ($minQty > 0 && $diskonQtyPersen > 0 && $totalQty >= $minQty) {
+            $persenTerpilih = $diskonQtyPersen;
+            $alasan = "Harga Partai (Qty >= {$minQty} pcs)";
+        }
+
+        if ($minNominal > 0 && $diskonNominalPersen > 0 && $subtotal >= $minNominal) {
+            if ($diskonNominalPersen > $persenTerpilih) {
+                $persenTerpilih = $diskonNominalPersen;
+                $alasan = 'Harga Partai (Belanja >= Rp '.number_format($minNominal, 0, ',', '.').')';
+            } elseif ($persenTerpilih > 0) {
+                $alasan .= ' + Belanja Besar';
+            }
+        }
+
+        if ($persenTerpilih > 0) {
+            $this->diskonPartai = round(($subtotal * $persenTerpilih) / 100, 2);
+            $this->alasanPartai = $alasan." ({$persenTerpilih}%)";
+        }
+    }
+
+    public function recalculateCartPrices(): void
+    {
+        $pricingService = app(PricingService::class);
+        foreach ($this->cart as $key => $item) {
+            $produk = Produk::with('satuanKonversi')->find($item['produk_id']);
+            $variant = $item['sku_variant_id'] ? SkuVariant::find($item['sku_variant_id']) : null;
+            if ($produk) {
+                $pricing = $pricingService->resolve($produk, $this->customer, $variant, $this->modeRewardMitra);
+                $baseHarga = (float) $pricing['harga'];
+                $satuanDasar = $produk->satuan ?: 'pcs';
+                $satuanTarget = $item['satuan'] ?? $satuanDasar;
+                $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+
+                if ($satuanTarget !== $satuanDasar) {
+                    $sk = $produk->satuanKonversi ? $produk->satuanKonversi->firstWhere('satuan_kode', $satuanTarget) : null;
+                    if ($sk && $sk->harga_jual > 0) {
+                        $hargaTierSatuan = round($baseHarga * $konversi, 2);
+                        $harga = min((float) $sk->harga_jual, $hargaTierSatuan);
+                    } else {
+                        $harga = round($baseHarga * $konversi, 2);
+                    }
+                } else {
+                    $harga = $baseHarga;
+                }
+
+                $this->cart[$key]['harga'] = $harga;
+                $this->cart[$key]['harga_dasar'] = (float) ($pricing['harga_dasar'] * $konversi);
+                $this->cart[$key]['diskon'] = (float) ($pricing['diskon_nominal'] ?? 0.0) * $konversi;
+                $this->cart[$key]['potensi_komisi'] = (float) ($pricing['potensi_komisi'] ?? 0.0) * $konversi;
+                $this->cart[$key]['tier_nama'] = $pricing['tier'] ?? null;
+                $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $harga;
+            }
+        }
+    }
+
     /**
      * Reset Livewire memoized computed property cache.
      * Wajib dipanggil saat cart/diskon berubah agar getter getXxxProperty()
@@ -689,6 +1054,9 @@ class PosKasir extends Component
     {
         unset(
             $this->subtotal,
+            $this->subtotalRetail,
+            $this->diskonTierTotal,
+            $this->hematTotal,
             $this->totalAkhir,
             $this->total,
             $this->diskonTotal,
@@ -710,8 +1078,10 @@ class PosKasir extends Component
         if ($this->diskonPersen > 0) {
             $diskon += round(($this->subtotal * $this->diskonPersen) / 100, 2);
         }
+        $diskon += $this->diskonPartai;
+        $diskon += $this->diskonPoin;
 
-        return $diskon;
+        return min($this->subtotal, $diskon);
     }
 
     public function getTotalBayarProperty(): float
@@ -849,7 +1219,7 @@ class PosKasir extends Component
 
         // Resolusi harga dasar
         $pricingService = app(PricingService::class);
-        $pricing = $pricingService->resolve($produk, $this->customer, $variant);
+        $pricing = $pricingService->resolve($produk, $this->customer, $variant, $this->modeRewardMitra);
         $baseHarga = (float) $pricing['harga'];
 
         $daftarSatuan = [
@@ -958,6 +1328,7 @@ class PosKasir extends Component
                 'harga_beli' => (float) ($produk->harga_beli * $faktorKonversi),
                 'qty' => 1,
                 'diskon' => (float) ($pricing['diskon_nominal'] ?? 0.0) * $faktorKonversi,
+                'potensi_komisi' => (float) ($pricing['potensi_komisi'] ?? 0.0) * $faktorKonversi,
                 'tier_nama' => $pricing['tier'] ?? null,
                 'subtotal' => $harga,
                 'stok_max' => $stokMaxSatuan,
@@ -968,6 +1339,7 @@ class PosKasir extends Component
         }
 
         // Reset computed properties cache & recalc pajak SETELAH item masuk keranjang
+        $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
     }
@@ -987,7 +1359,7 @@ class PosKasir extends Component
 
         $satuanDasar = $produk->satuan ?: 'pcs';
         $variant = $item['sku_variant_id'] ? SkuVariant::find($item['sku_variant_id']) : null;
-        $pricing = app(PricingService::class)->resolve($produk, $this->customer, $variant);
+        $pricing = app(PricingService::class)->resolve($produk, $this->customer, $variant, $this->modeRewardMitra);
         $baseHarga = (float) $pricing['harga'];
 
         $faktorKonversi = 1.0;
@@ -1031,6 +1403,8 @@ class PosKasir extends Component
         $item['harga'] = $harga;
         $item['harga_dasar'] = (float) ($pricing['harga_dasar'] * $faktorKonversi);
         $item['harga_beli'] = (float) ($produk->harga_beli * $faktorKonversi);
+        $item['diskon'] = (float) ($pricing['diskon_nominal'] ?? 0.0) * $faktorKonversi;
+        $item['potensi_komisi'] = (float) ($pricing['potensi_komisi'] ?? 0.0) * $faktorKonversi;
         $item['qty'] = $newQty;
         $item['stok_max'] = $maxQty;
         $item['subtotal'] = $newQty * $harga;
@@ -1047,6 +1421,7 @@ class PosKasir extends Component
             $this->cart[$itemKey] = $item;
         }
 
+        $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
 
@@ -1248,6 +1623,7 @@ class PosKasir extends Component
             ]);
         }
 
+        $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
     }
@@ -1255,6 +1631,7 @@ class PosKasir extends Component
     public function removeFromCart(string $itemKey)
     {
         unset($this->cart[$itemKey]);
+        $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
     }
@@ -1264,6 +1641,15 @@ class PosKasir extends Component
         $this->cart = [];
         $this->diskonPersen = 0.0;
         $this->diskonNominal = 0.0;
+        $this->diskonManualAuthorizedById = null;
+        $this->diskonManualAuthorizedByName = '';
+        $this->diskonManualAlasan = '';
+        $this->diskonSupervisorAuth = '';
+        $this->diskonSupervisorPassword = '';
+        $this->poinDitukar = 0;
+        $this->diskonPoin = 0.0;
+        $this->diskonPartai = 0.0;
+        $this->alasanPartai = '';
         $this->pajakNominal = 0.0;
         $this->dpp = 0.0;
         $this->ppnPersen = 0.0;
@@ -1349,34 +1735,23 @@ class PosKasir extends Component
     {
         $this->selectedCustomerId = $customerId;
         $this->pelangganSearch = '';
-        // Recalculate cart prices when customer/tier changes
-        $pricingService = app(PricingService::class);
-        foreach ($this->cart as $key => $item) {
-            $produk = Produk::with('satuanKonversi')->find($item['produk_id']);
-            $variant = $item['sku_variant_id'] ? SkuVariant::find($item['sku_variant_id']) : null;
-            if ($produk) {
-                $pricing = $pricingService->resolve($produk, $this->customer, $variant);
-                $baseHarga = (float) $pricing['harga'];
-                $satuanDasar = $produk->satuan ?: 'pcs';
-                $satuanTarget = $item['satuan'] ?? $satuanDasar;
-                $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+        $this->poinDitukar = 0;
+        $this->diskonPoin = 0.0;
 
-                if ($satuanTarget !== $satuanDasar) {
-                    $sk = $produk->satuanKonversi ? $produk->satuanKonversi->firstWhere('satuan_kode', $satuanTarget) : null;
-                    if ($sk && $sk->harga_jual > 0) {
-                        $hargaTierSatuan = round($baseHarga * $konversi, 2);
-                        $harga = min((float) $sk->harga_jual, $hargaTierSatuan);
-                    } else {
-                        $harga = round($baseHarga * $konversi, 2);
-                    }
-                } else {
-                    $harga = $baseHarga;
-                }
-
-                $this->cart[$key]['harga'] = $harga;
-                $this->cart[$key]['subtotal'] = $this->cart[$key]['qty'] * $harga;
+        $customer = $this->customer;
+        if ($customer) {
+            $tipe = app(PelangganService::class)->tipeKonsumen($customer);
+            if ($tipe === 'reseller' || $tipe === 'agen') {
+                $this->modeRewardMitra = app(PelangganService::class)->modeRewardMitra($customer);
+            } else {
+                $this->modeRewardMitra = 'diskon_langsung';
             }
+        } else {
+            $this->modeRewardMitra = 'diskon_langsung';
         }
+
+        $this->recalculateCartPrices();
+        $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
     }
@@ -1498,6 +1873,12 @@ class PosKasir extends Component
 
     public function processTransaction()
     {
+        if (empty($this->cart)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Keranjang masih kosong']);
+
+            return;
+        }
+
         $cabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
 
         // [B-02/P1-2] Gudang wajib milik cabang aktif — validasi ulang sebelum potong stok
@@ -1558,6 +1939,10 @@ class PosKasir extends Component
                     ->count() + 1;
                 $noTransaksi = sprintf('TRX-C%02d-%s-%04d', $cabangId, $today, $countToday);
 
+                $pelangganSaatTransaksi = $this->selectedCustomerId ? Pelanggan::with('tierMembership')->find($this->selectedCustomerId) : null;
+                $namaTierTransaksi = $pelangganSaatTransaksi?->tierMembership?->nama;
+                $tipeKonsumenTransaksi = $pelangganSaatTransaksi ? app(PelangganService::class)->tipeKonsumen($pelangganSaatTransaksi) : 'retail';
+
                 $splitData = $this->metodeBayar === 'split' ? [
                     'tunai' => $this->splitTunai,
                     'non_tunai' => $this->splitNonTunai,
@@ -1567,6 +1952,12 @@ class PosKasir extends Component
                 $durasiGaransi = $this->hitungDurasiGaransiHari();
                 $garansiTeks = $this->generateGaransiTeks($durasiGaransi);
                 $garansiBerakhir = $durasiGaransi > 0 ? now()->addDays($durasiGaransi)->toDateString() : null;
+
+                $totalKomisiMitra = array_reduce(
+                    $this->cart,
+                    fn ($carry, $it) => $carry + ((float) ($it['potensi_komisi'] ?? 0) * (int) ($it['qty'] ?? 1)),
+                    0.0
+                );
 
                 $transaksi = Transaksi::create([
                     'no_transaksi' => $noTransaksi,
@@ -1578,6 +1969,13 @@ class PosKasir extends Component
                     'subtotal' => $this->subtotal,
                     'diskon_persen' => $this->diskonPersen,
                     'diskon_nominal' => $this->diskonNominal,
+                    'diskon_manual_authorized_by_id' => $this->diskonManualAuthorizedById,
+                    'diskon_manual_alasan' => $this->diskonManualAlasan ?: null,
+                    'diskon_poin' => $this->diskonPoin,
+                    'poin_ditukar' => $this->poinDitukar,
+                    'diskon_partai' => $this->diskonPartai,
+                    'mode_reward_mitra' => $this->modeRewardMitra,
+                    'komisi_mitra_nominal' => $totalKomisiMitra,
                     'dpp' => $this->dpp,
                     'pajak_nominal' => $this->pajakNominal,
                     'ppn_nominal' => $this->pajakNominal,
@@ -1657,9 +2055,22 @@ class PosKasir extends Component
                     }
                 }
 
-                // Customer points & spending increment (sinkron CRM)
+                // Customer points & loyalty ledger (sinkron CRM & mutasi tercatat)
+                if ($this->poinDitukar > 0 && $this->selectedCustomerId) {
+                    app(PelangganService::class)->tukarPoin(
+                        $this->selectedCustomerId,
+                        $this->poinDitukar,
+                        $transaksi->id,
+                        "Tukar {$this->poinDitukar} poin pada transaksi {$transaksi->no_transaksi}"
+                    );
+                }
+
                 if ($this->selectedCustomerId) {
-                    app(PelangganService::class)->tambahBelanjaDanPoin($this->selectedCustomerId, (float) $this->totalAkhir);
+                    app(PelangganService::class)->tambahBelanjaDanPoin(
+                        $this->selectedCustomerId,
+                        (float) $this->totalAkhir,
+                        $transaksi->id
+                    );
                 }
 
                 // Jurnal akuntansi otomatis (PRD §4.6)
@@ -1723,8 +2134,33 @@ class PosKasir extends Component
                     $transaksi->id
                 );
 
+                $pelangganModel = $this->selectedCustomerId ? Pelanggan::with('tierMembership')->find($this->selectedCustomerId) : null;
+                $saldoPoin = $pelangganModel?->poin_loyalty ?? 0;
+                $tipeKonsumen = $pelangganModel ? app(PelangganService::class)->tipeKonsumen($pelangganModel) : 'retail';
+
                 // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif
                 app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
+
+                // Pencatatan komisi akumulasi jika mode komisi_akumulasi aktif & belum dicatat rule engine
+                if ($transaksi->mode_reward_mitra === 'komisi_akumulasi' && (float) $transaksi->komisi_mitra_nominal > 0 && $this->selectedCustomerId) {
+                    $sudahAda = Komisi::where('transaksi_id', $transaksi->id)->where('pelanggan_id', $this->selectedCustomerId)->exists();
+                    if (! $sudahAda) {
+                        $today = now()->format('Ymd');
+                        $count = Komisi::whereDate('created_at', now()->toDateString())->count() + 1;
+                        $noKomisi = sprintf('KMS-%s-%04d', $today, $count);
+                        Komisi::create([
+                            'no_komisi' => $noKomisi,
+                            'pelanggan_id' => $this->selectedCustomerId,
+                            'transaksi_id' => $transaksi->id,
+                            'aktor_tipe' => $tipeKonsumen === 'agen' ? 'agen' : 'reseller',
+                            'aktor_id' => $this->selectedCustomerId,
+                            'nominal_komisi' => $transaksi->komisi_mitra_nominal,
+                            'jumlah_transaksi' => $transaksi->total_akhir,
+                            'status' => Komisi::STATUS_PENDING,
+                            'keterangan' => 'Komisi akumulasi mitra transaksi '.$transaksi->no_transaksi,
+                        ]);
+                    }
+                }
 
                 // Kasbon → catat Piutang (AR)
                 if ($kasbon && $this->selectedCustomerId) {
@@ -1744,24 +2180,66 @@ class PosKasir extends Component
                     ]);
                 }
 
+                $itemsReceipt = array_map(function ($it) {
+                    $hargaDasar = (float) ($it['harga_dasar'] ?? $it['harga']);
+                    $hargaSatuan = (float) ($it['harga'] ?? 0);
+                    $qty = (int) ($it['qty'] ?? 1);
+                    $diskonPerUnit = max(0, $hargaDasar - $hargaSatuan);
+                    $diskonTotal = $diskonPerUnit * $qty;
+
+                    return array_merge($it, [
+                        'harga_retail' => $hargaDasar,
+                        'diskon_per_unit' => $diskonPerUnit,
+                        'diskon_total' => $diskonTotal,
+                        'subtotal_retail' => $hargaDasar * $qty,
+                    ]);
+                }, array_values($this->cart));
+
+                $totalRetail = array_sum(array_column($itemsReceipt, 'subtotal_retail'));
+                $totalDiskonTier = max(0, $totalRetail - $this->subtotal);
+
+                $sisaPoin = $saldoPoin;
+                $diskonTierStruk = ($this->modeRewardMitra === 'komisi_akumulasi' ? 0.0 : $totalDiskonTier);
+                $diskonKasirLangsung = $this->diskonNominal;
+                if ($this->diskonPersen > 0) {
+                    $diskonKasirLangsung += round(($this->subtotal * $this->diskonPersen) / 100, 2);
+                }
+                $hematTotal = $diskonTierStruk + $this->diskonPartai + $this->diskonPoin + $diskonKasirLangsung;
+
                 $this->receiptData = [
                     'no_transaksi' => $transaksi->no_transaksi,
                     'waktu' => now()->format('d/m/Y H:i'),
                     'kasir' => auth()->user()?->name ?? 'Kasir',
-                    'pelanggan' => $this->customer?->nama ?? 'Umum',
-                    'telepon' => $this->customer?->telepon ?? null,
-                    'tier' => $this->customer?->tierMembership?->nama ?? 'Retail',
-                    'items' => array_values($this->cart),
+                    'pelanggan' => $pelangganSaatTransaksi?->nama ?? 'Umum',
+                    'telepon' => $pelangganSaatTransaksi?->telepon ?? null,
+                    'tier' => $namaTierTransaksi ?? ($tipeKonsumenTransaksi === 'reseller' ? 'Reseller' : ($tipeKonsumenTransaksi === 'agen' ? 'Agen' : 'Retail')),
+                    'tipe_konsumen' => $tipeKonsumenTransaksi,
+                    'saldo_poin' => $sisaPoin,
+                    'poin_ditukar' => $this->poinDitukar,
+                    'diskon_poin' => $this->diskonPoin,
+                    'diskon_partai' => $this->diskonPartai,
+                    'alasan_partai' => $this->alasanPartai,
+                    'mode_reward_mitra' => $this->modeRewardMitra,
+                    'komisi_mitra_nominal' => $totalKomisiMitra,
+                    'items' => $itemsReceipt,
+                    'subtotal_retail' => $totalRetail,
+                    'diskon_tier' => $diskonTierStruk,
                     'subtotal' => $this->subtotal,
-                    'diskon' => $this->diskonNominal,
+                    'diskon' => $diskonKasirLangsung,
+                    'diskon_nominal' => $this->diskonNominal,
+                    'diskon_persen' => $this->diskonPersen,
+                    'diskon_manual_authorized_by' => $this->diskonManualAuthorizedByName ?: ($this->diskonManualAuthorizedById ? User::find($this->diskonManualAuthorizedById)?->name : null),
+                    'diskon_manual_alasan' => $this->diskonManualAlasan ?: null,
                     'dpp' => $this->dpp,
                     'pajak' => $this->pajakNominal,
                     'ppn_persen' => $this->ppnPersen,
                     'total' => $this->totalAkhir,
                     'bayar' => $transaksi->jumlah_bayar,
                     'kembali' => $this->kembalian,
+                    'hemat_total' => $hematTotal,
                     'metode' => strtoupper($this->metodeBayar),
                     'garansi' => $garansiTeks,
+                    'cabang' => session('cabang_nama') ?? auth()->user()?->cabang?->nama ?? null,
                 ];
 
                 $this->completedTransactionId = $transaksi->id;
@@ -1793,18 +2271,48 @@ class PosKasir extends Component
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
 
+        $pelanggan = $transaksi->pelanggan;
+        $saldoPoin = $pelanggan?->poin_loyalty ?? 0;
+        $tipeKonsumen = $pelanggan ? app(PelangganService::class)->tipeKonsumen($pelanggan) : 'retail';
+
         $items = $transaksi->items->map(function ($item) {
+            $retailPerUnit = (float) ($item->produk?->harga_jual_retail ?? $item->harga_satuan);
+            if ($item->konversi > 0 && $item->satuan !== ($item->produk?->satuan ?: 'pcs')) {
+                $retailPerUnit = round($retailPerUnit * (float) $item->konversi, 2);
+            }
+            $hargaSatuan = (float) $item->harga_satuan;
+            $qty = (int) $item->jumlah;
+            $diskonPerUnit = max(0, $retailPerUnit - $hargaSatuan);
+
             return [
                 'nama' => $item->produk?->nama ?? 'Produk',
                 'sku' => $item->produk?->sku ?? '-',
-                'jumlah' => (int) $item->jumlah,
-                'qty' => (int) $item->jumlah,
+                'jumlah' => $qty,
+                'qty' => $qty,
                 'satuan' => $item->satuan,
                 'konversi' => $item->konversi,
-                'harga' => (float) $item->harga_satuan,
+                'harga' => $hargaSatuan,
+                'harga_retail' => $retailPerUnit,
+                'diskon_per_unit' => $diskonPerUnit,
+                'diskon_total' => $diskonPerUnit * $qty,
+                'subtotal_retail' => $retailPerUnit * $qty,
                 'subtotal' => (float) $item->subtotal,
             ];
         })->toArray();
+
+        $subtotalRetail = array_sum(array_column($items, 'subtotal_retail'));
+        $modeReward = $transaksi->mode_reward_mitra ?? 'diskon_langsung';
+        $diskonTier = $modeReward === 'komisi_akumulasi' ? 0.0 : max(0, $subtotalRetail - (float) $transaksi->subtotal);
+
+        $diskonPartai = (float) ($transaksi->diskon_partai ?? 0);
+        $diskonPoin = (float) ($transaksi->diskon_poin ?? 0);
+        $poinDitukar = (int) ($transaksi->poin_ditukar ?? 0);
+        $komisiMitra = (float) ($transaksi->komisi_mitra_nominal ?? 0);
+        $diskonKasir = (float) $transaksi->diskon_nominal;
+        if ((float) ($transaksi->diskon_persen ?? 0) > 0) {
+            $diskonKasir += round(((float) $transaksi->subtotal * (float) $transaksi->diskon_persen) / 100, 2);
+        }
+        $hematTotal = $diskonTier + $diskonPartai + $diskonPoin + $diskonKasir;
 
         $this->receiptData = [
             'no_transaksi' => $transaksi->no_transaksi,
@@ -1812,19 +2320,33 @@ class PosKasir extends Component
             'kasir' => $transaksi->kasir?->name ?? 'Kasir',
             'pelanggan' => $transaksi->pelanggan?->nama ?? 'Umum',
             'telepon' => $transaksi->pelanggan?->telepon ?? null,
-            'tier' => $transaksi->pelanggan?->tierMembership?->nama ?? 'Retail',
+            'tier' => $transaksi->pelanggan?->tierMembership?->nama ?? ($tipeKonsumen === 'reseller' ? 'Reseller' : ($tipeKonsumen === 'agen' ? 'Agen' : 'Retail')),
+            'tipe_konsumen' => $tipeKonsumen,
+            'saldo_poin' => $saldoPoin,
+            'poin_ditukar' => $poinDitukar,
+            'diskon_poin' => $diskonPoin,
+            'diskon_partai' => $diskonPartai,
+            'mode_reward_mitra' => $modeReward,
+            'komisi_mitra_nominal' => $komisiMitra,
             'items' => $items,
+            'subtotal_retail' => $subtotalRetail,
+            'diskon_tier' => $diskonTier,
             'subtotal' => (float) $transaksi->subtotal,
-            'diskon' => (float) $transaksi->diskon_nominal,
-            'dpp' => (float) $transaksi->subtotal - (float) $transaksi->diskon_nominal,
+            'diskon' => $diskonKasir,
+            'diskon_nominal' => (float) $transaksi->diskon_nominal,
+            'diskon_persen' => (float) ($transaksi->diskon_persen ?? 0),
+            'dpp' => (float) $transaksi->subtotal - $diskonKasir,
             'pajak' => (float) $transaksi->pajak_nominal,
             'ppn_persen' => (float) $transaksi->pajak_persen,
             'total' => (float) $transaksi->total_akhir,
             'bayar' => (float) $transaksi->jumlah_bayar,
             'kembali' => (float) $transaksi->kembalian,
+            'hemat_total' => $hematTotal,
             'metode' => strtoupper($transaksi->metode_bayar ?? 'TUNAI'),
             'status' => $transaksi->status,
             'void_alasan' => $transaksi->void_alasan,
+            'garansi' => $transaksi->garansi_teks,
+            'cabang' => $transaksi->cabang?->nama ?? session('cabang_nama') ?? null,
         ];
 
         $this->completedTransactionId = $transaksi->id;
@@ -1988,6 +2510,8 @@ class PosKasir extends Component
                         'cart' => array_values($this->cart),
                         'diskon_persen' => $this->diskonPersen,
                         'diskon_nominal' => $this->diskonNominal,
+                        'poin_ditukar' => $this->poinDitukar,
+                        'mode_reward_mitra' => $this->modeRewardMitra,
                         'catatan' => 'Ditahan (park) oleh '.(auth()->user()?->name ?? 'kasir'),
                     ],
                     'status' => 'ditahan',
@@ -2051,9 +2575,12 @@ class PosKasir extends Component
         }
         $this->diskonPersen = (float) ($detail['diskon_persen'] ?? 0);
         $this->diskonNominal = (float) ($detail['diskon_nominal'] ?? 0);
+        $this->poinDitukar = (int) ($detail['poin_ditukar'] ?? 0);
+        $this->modeRewardMitra = (string) ($detail['mode_reward_mitra'] ?? 'diskon_langsung');
+        $this->selectedCustomerId = $transaksi->pelanggan_id;
+        $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak(); // [F1-2] resume park → rehitung PPN dari diskon tersimpan
-        $this->selectedCustomerId = $transaksi->pelanggan_id;
 
         // Tandai transaksi asli dipindahkan → status 'batal' (tidak dipakai lagi), tanpa jurnal
         $transaksi->update(['status' => 'dibatalkan', 'catatan' => 'Dilanjutkan (resume) oleh '.(auth()->user()?->name ?? 'kasir')]);

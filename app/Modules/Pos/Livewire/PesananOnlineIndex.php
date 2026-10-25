@@ -622,6 +622,15 @@ class PesananOnlineIndex extends Component
 
         $isPickup = str_contains(strtolower($transaksi->catatan ?? ''), 'ambil_ke_toko');
 
+        $subtotalRetail = $transaksi->items->sum(function ($it) {
+            $retail = (float) ($it->produk?->harga_jual_retail ?? ($it->harga_satuan + $it->diskon_nominal));
+
+            return $retail * (int) $it->jumlah;
+        });
+        $diskonTier = max(0.0, $subtotalRetail - (float) $transaksi->subtotal);
+        $tierNama = $transaksi->pelanggan?->tierMembership?->nama ?? ($transaksi->pelanggan?->is_reseller ? 'Reseller' : null);
+        $tipeKonsumen = $transaksi->pelanggan?->tipe_konsumen ?? ($transaksi->pelanggan?->is_reseller ? 'reseller' : 'retail');
+
         $this->receiptData = [
             'no_transaksi' => $transaksi->no_transaksi,
             'tanggal' => $transaksi->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
@@ -633,14 +642,30 @@ class PesananOnlineIndex extends Component
             'resi' => $transaksi->pengiriman?->tracking_id ?? '-',
             'is_pickup' => $isPickup,
             'metode_bayar' => strtoupper($transaksi->metode_bayar ?? 'ONLINE'),
-            'items' => $transaksi->items->map(fn ($it) => [
-                'nama' => $it->produk?->nama ?? 'Produk',
-                'sku' => $it->produk?->sku ?? '-',
-                'qty' => (int) $it->jumlah,
-                'harga' => (float) $it->harga_satuan,
-                'subtotal' => (float) $it->subtotal,
-            ])->toArray(),
+            'tier' => $tierNama,
+            'tipe_konsumen' => $tipeKonsumen,
+            'items' => $transaksi->items->map(function ($it) {
+                $retail = (float) ($it->produk?->harga_jual_retail ?? ($it->harga_satuan + $it->diskon_nominal));
+
+                return [
+                    'nama' => $it->produk?->nama ?? 'Produk',
+                    'sku' => $it->produk?->sku ?? '-',
+                    'qty' => (int) $it->jumlah,
+                    'harga' => (float) $it->harga_satuan,
+                    'harga_retail' => $retail,
+                    'subtotal' => (float) $it->subtotal,
+                ];
+            })->toArray(),
+            'subtotal_retail' => $subtotalRetail,
+            'diskon_tier' => $diskonTier,
+            'subtotal' => (float) $transaksi->subtotal,
+            'diskon' => (float) ($transaksi->diskon_nominal ?? 0),
+            'diskon_persen' => (float) ($transaksi->diskon_persen ?? 0),
+            'dpp' => (float) ($transaksi->dpp ?? $transaksi->subtotal),
+            'pajak' => (float) ($transaksi->pajak_nominal ?? 0),
+            'ppn_persen' => (float) ($transaksi->ppn_persen ?? 0),
             'total' => (float) $transaksi->total_akhir,
+            'hemat_total' => $diskonTier + (float) ($transaksi->diskon_nominal ?? 0),
             'bayar' => (float) ($transaksi->jumlah_bayar ?: $transaksi->total_akhir),
             'kembalian' => (float) ($transaksi->kembalian ?? 0),
             'status' => strtoupper($transaksi->status),

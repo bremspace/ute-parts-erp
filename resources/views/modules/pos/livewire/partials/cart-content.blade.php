@@ -179,9 +179,37 @@
                                 </div>
                             </div>
                         @else
-                            <span class="tabular-nums font-semibold text-xs text-ink-600 dark:text-ink-400">
-                                @ {{ number_format($item['harga'], 0, ',', '.') }}
-                            </span>
+                            @php
+                                $hargaDasar = (float) ($item['harga_dasar'] ?? $item['harga']);
+                                $hargaAktif = (float) $item['harga'];
+                                $adaDiskonTier = ($modeRewardMitra !== 'komisi_akumulasi' && $hargaDasar > $hargaAktif);
+                            @endphp
+                            <div class="flex flex-col">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="tabular-nums font-bold text-xs {{ $adaDiskonTier ? 'text-up-mint font-black' : 'text-ink-600 dark:text-ink-400' }}">
+                                        @ {{ number_format($hargaAktif, 0, ',', '.') }}
+                                    </span>
+                                    @if($adaDiskonTier)
+                                        <span class="line-through text-[10px] text-ink-400 tabular-nums">
+                                            Rp {{ number_format($hargaDasar, 0, ',', '.') }}
+                                        </span>
+                                    @endif
+                                </div>
+                                @if($adaDiskonTier)
+                                    <div class="flex items-center gap-1 mt-0.5 flex-wrap">
+                                        <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-black tabular-nums border border-up-mint/30">
+                                            Hemat Rp {{ number_format($hargaDasar - $hargaAktif, 0, ',', '.') }}
+                                        </span>
+                                        @if(!empty($item['tier_nama']))
+                                            <span class="text-[9px] text-up-primary font-bold">({{ $item['tier_nama'] }})</span>
+                                        @endif
+                                    </div>
+                                @elseif($modeRewardMitra === 'komisi_akumulasi' && !empty($item['potensi_komisi']) && $item['potensi_komisi'] > 0)
+                                    <span class="text-[9px] text-up-amber font-semibold mt-0.5">
+                                        Komisi: +Rp {{ number_format($item['potensi_komisi'], 0, ',', '.') }}
+                                    </span>
+                                @endif
+                            </div>
                         @endif
                     </div>
 
@@ -226,15 +254,68 @@
 
     <!-- Payment Summary -->
     <div class="p-3.5 rounded-2xl bg-ink-50/70 dark:bg-white/[0.02] border border-ink-200/80 dark:border-white/5 space-y-2">
-        <div class="flex justify-between text-xs text-ink-600 dark:text-ink-400">
-            <span>Subtotal</span>
-            <span class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($total ?? 0, 0, ',', '.') }}</span>
-        </div>
+        @if(($diskonTierTotal ?? 0) > 0)
+            <div class="flex justify-between text-xs text-ink-500 dark:text-ink-400">
+                <span>Subtotal Retail</span>
+                <span class="tabular-nums line-through">Rp {{ number_format($subtotalRetail ?? 0, 0, ',', '.') }}</span>
+            </div>
+            <div class="flex justify-between text-xs text-up-mint font-semibold">
+                <span>- Diskon Tier ({{ $customer?->tierMembership?->nama ?? ($customer?->tipe_konsumen === 'reseller' ? 'Reseller' : ($customer?->tipe_konsumen === 'agen' ? 'Agen' : 'Member')) }})</span>
+                <span class="tabular-nums">-Rp {{ number_format($diskonTierTotal, 0, ',', '.') }}</span>
+            </div>
+            <div class="flex justify-between text-xs text-ink-700 dark:text-ink-300 font-semibold pt-1 border-t border-ink-200/50 dark:border-white/5">
+                <span>Subtotal Bersih</span>
+                <span class="tabular-nums text-ink-900 dark:text-white">Rp {{ number_format($subtotal ?? 0, 0, ',', '.') }}</span>
+            </div>
+        @else
+            <div class="flex justify-between text-xs text-ink-600 dark:text-ink-400">
+                <span>Subtotal</span>
+                <span class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($total ?? 0, 0, ',', '.') }}</span>
+            </div>
+        @endif
 
         @if(($diskonTotal ?? 0) > 0)
             <div class="flex justify-between text-xs text-up-amber">
-                <span>Diskon</span>
+                <button type="button" wire:click="openDiskonModal" class="hover:underline flex items-center gap-1 cursor-pointer">
+                    <span>Potongan Tambahan</span>
+                    <span class="text-[10px]">✏️</span>
+                </button>
                 <span class="font-semibold tabular-nums">-Rp {{ number_format($diskonTotal, 0, ',', '.') }}</span>
+            </div>
+            @if(($diskonNominal ?? 0) > 0 || ($diskonPersen ?? 0) > 0)
+                <div class="flex justify-between text-[11px] text-up-amber">
+                    <span>- Diskon Kasir ({{ $diskonPersen > 0 ? $diskonPersen.'%' : 'Langsung' }})</span>
+                    <span class="font-semibold tabular-nums">-Rp {{ number_format($diskonNominal + round(($subtotal * $diskonPersen)/100, 2), 0, ',', '.') }}</span>
+                </div>
+            @endif
+            @if(($diskonPartai ?? 0) > 0)
+                <div class="flex justify-between text-[11px] text-up-mint">
+                    <span>- Diskon Partai (Member)</span>
+                    <span class="font-semibold tabular-nums">-Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
+                </div>
+            @endif
+            @if(($diskonPoin ?? 0) > 0)
+                <div class="flex justify-between text-[11px] text-emerald-500">
+                    <span>- Tukar Poin ({{ number_format($poinDitukar ?? 0) }} pts)</span>
+                    <span class="font-semibold tabular-nums">-Rp {{ number_format($diskonPoin, 0, ',', '.') }}</span>
+                </div>
+            @endif
+        @else
+            <div class="flex justify-end pt-0.5">
+                <button
+                    type="button"
+                    wire:click="openDiskonModal"
+                    class="text-[11px] font-bold text-up-amber hover:underline cursor-pointer inline-flex items-center gap-1"
+                >
+                    <span>🏷️ + Diskon / Reward</span>
+                </button>
+            </div>
+        @endif
+
+        @if(($hematTotal ?? 0) > 0)
+            <div class="p-2 rounded-xl bg-up-mint/10 border border-up-mint/20 flex items-center justify-between text-[11px] font-bold text-up-mint">
+                <span>Total Penghematan:</span>
+                <span class="tabular-nums">-Rp {{ number_format($hematTotal, 0, ',', '.') }}</span>
             </div>
         @endif
 

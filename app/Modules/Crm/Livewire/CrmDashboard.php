@@ -6,6 +6,7 @@ use App\Modules\Crm\Models\KampanyeBroadcast;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\BroadcastService;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
@@ -51,8 +52,45 @@ class CrmDashboard extends Component
 
     public array $tierForm = [
         'id' => null, 'nama' => '', 'kode' => '', 'min_belanja_12bulan' => 0,
-        'diskon_persen' => 0, 'poin_multiplier' => 1.0, 'urutan' => 0, 'is_active' => true,
+        'diskon_persen' => 0, 'poin_multiplier' => 1.0, 'poin_redeem_rupiah' => null, 'urutan' => 0, 'is_active' => true,
     ];
+
+    // Konfigurasi Global Loyalty & Partai
+    public float $poinRedeemRupiahGlobal = 100.0;
+
+    public bool $hargaPartaiAktif = true;
+
+    public bool $hargaPartaiOpsiQty = true;
+
+    public ?int $hargaPartaiMinQty = 5;
+
+    public ?float $hargaPartaiQtyDiskon = 3.0;
+
+    public bool $hargaPartaiOpsiNominal = true;
+
+    public ?float $hargaPartaiMinNominal = 1000000.0;
+
+    public ?float $hargaPartaiNominalDiskon = 2.0;
+
+    public function mount(): void
+    {
+        $config = app(KonfigurasiService::class);
+        $this->poinRedeemRupiahGlobal = $config->poinRedeemRupiah();
+        $this->hargaPartaiAktif = $config->hargaPartaiAktif();
+
+        $minQty = $config->hargaPartaiMinQty();
+        $qtyDiskon = $config->hargaPartaiQtyDiskonPersen();
+        $minNominal = $config->hargaPartaiMinNominal();
+        $nominalDiskon = $config->hargaPartaiNominalDiskonPersen();
+
+        $this->hargaPartaiOpsiQty = ($minQty > 0 && $qtyDiskon > 0);
+        $this->hargaPartaiMinQty = $minQty > 0 ? $minQty : 5;
+        $this->hargaPartaiQtyDiskon = $qtyDiskon > 0 ? $qtyDiskon : 3.0;
+
+        $this->hargaPartaiOpsiNominal = ($minNominal > 0 && $nominalDiskon > 0);
+        $this->hargaPartaiMinNominal = $minNominal > 0 ? $minNominal : 1000000.0;
+        $this->hargaPartaiNominalDiskon = $nominalDiskon > 0 ? $nominalDiskon : 2.0;
+    }
 
     // Broadcast modal
     public bool $showBroadcastModal = false;
@@ -335,7 +373,7 @@ class CrmDashboard extends Component
         } else {
             $this->tierForm = [
                 'id' => null, 'nama' => '', 'kode' => '', 'min_belanja_12bulan' => 0,
-                'diskon_persen' => 0, 'poin_multiplier' => 1.0, 'urutan' => 0, 'is_active' => true,
+                'diskon_persen' => 0, 'poin_multiplier' => 1.0, 'poin_redeem_rupiah' => null, 'urutan' => 0, 'is_active' => true,
             ];
         }
         $this->showTierModal = true;
@@ -348,6 +386,9 @@ class CrmDashboard extends Component
         }
 
         $this->tierForm['min_belanja_12bulan'] = $this->parseNominal($this->tierForm['min_belanja_12bulan'] ?? 0);
+        $this->tierForm['poin_redeem_rupiah'] = (! empty($this->tierForm['poin_redeem_rupiah']) && $this->tierForm['poin_redeem_rupiah'] > 0)
+            ? (float) $this->parseNominal($this->tierForm['poin_redeem_rupiah'])
+            : null;
 
         $this->validate([
             'tierForm.nama' => 'required|string|max:255',
@@ -355,6 +396,7 @@ class CrmDashboard extends Component
             'tierForm.min_belanja_12bulan' => 'required|numeric|min:0',
             'tierForm.diskon_persen' => 'required|numeric|min:0|max:100',
             'tierForm.poin_multiplier' => 'required|numeric|min:0',
+            'tierForm.poin_redeem_rupiah' => 'nullable|numeric|min:0',
         ]);
 
         if ($this->tierForm['id']) {
@@ -366,6 +408,60 @@ class CrmDashboard extends Component
         }
 
         $this->showTierModal = false;
+    }
+
+    public function simpanPengaturanLoyaltyGlobal(): void
+    {
+        if (! $this->boleh('tier.manage', 'Anda tidak memiliki izin mengelola konfigurasi loyalty.')) {
+            return;
+        }
+
+        $rules = [
+            'poinRedeemRupiahGlobal' => 'required|numeric|min:0',
+        ];
+
+        if ($this->hargaPartaiAktif) {
+            if (! $this->hargaPartaiOpsiQty && ! $this->hargaPartaiOpsiNominal) {
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => 'Pilih setidaknya salah satu metode harga partai (Qty atau Nominal) saat status diaktifkan.',
+                ]);
+
+                return;
+            }
+
+            if ($this->hargaPartaiOpsiQty) {
+                $rules['hargaPartaiMinQty'] = 'required|integer|min:1';
+                $rules['hargaPartaiQtyDiskon'] = 'required|numeric|gt:0|max:100';
+            }
+
+            if ($this->hargaPartaiOpsiNominal) {
+                $rules['hargaPartaiMinNominal'] = 'required|numeric|gt:0';
+                $rules['hargaPartaiNominalDiskon'] = 'required|numeric|gt:0|max:100';
+            }
+        }
+
+        $this->validate($rules);
+
+        $config = app(KonfigurasiService::class);
+        $config->set('poin_redeem_rupiah', (float) $this->poinRedeemRupiahGlobal, 'Nilai tukar 1 poin loyalitas menjadi rupiah (diskon)');
+        $config->set('harga_partai_aktif', (bool) $this->hargaPartaiAktif, 'Status aktif diskon harga partai member');
+
+        $finalMinQty = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiQty) ? max(1, (int) $this->hargaPartaiMinQty) : 0;
+        $finalQtyDiskon = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiQty) ? (float) $this->hargaPartaiQtyDiskon : 0.0;
+
+        $finalMinNominal = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiNominal) ? max(0.0, (float) $this->hargaPartaiMinNominal) : 0.0;
+        $finalNominalDiskon = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiNominal) ? (float) $this->hargaPartaiNominalDiskon : 0.0;
+
+        $config->set('harga_partai_min_qty', $finalMinQty, 'Minimal kuantitas barang untuk mendapatkan harga partai');
+        $config->set('harga_partai_qty_diskon_persen', $finalQtyDiskon, 'Persentase diskon harga partai berbasis qty');
+        $config->set('harga_partai_min_nominal', $finalMinNominal, 'Minimal belanja untuk mendapatkan diskon partai nominal');
+        $config->set('harga_partai_nominal_diskon_persen', $finalNominalDiskon, 'Persentase diskon harga partai berbasis nominal');
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Pengaturan global poin loyalty & harga partai berhasil disimpan',
+        ]);
     }
 
     public function hapusTier(int $id): void

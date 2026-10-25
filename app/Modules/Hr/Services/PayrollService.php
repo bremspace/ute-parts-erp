@@ -229,13 +229,16 @@ class PayrollService
 
             PayrollPeriode::where('id', $periodeId)->update(['status' => 'dibayar']);
 
-            // Tandai komisi internal periode ini sebagai disetujui
+            // Tandai komisi internal periode ini sebagai cair/dibayar
             $mulai = $periode.'-01 00:00:00';
             $selesai = date('Y-m-t', strtotime($periode.'-01')).' 23:59:59';
             Komisi::where('aktor_tipe', 'karyawan')
-                ->where('status', Komisi::STATUS_PENDING)
+                ->whereIn('status', [Komisi::STATUS_PENDING, Komisi::STATUS_DISETUJUI])
                 ->whereBetween('created_at', [$mulai, $selesai])
-                ->update(['status' => Komisi::STATUS_DISETUJUI]);
+                ->update([
+                    'status' => Komisi::STATUS_CAIR,
+                    'paid_at' => now(),
+                ]);
 
             return ['no_jurnal' => $noJurnal, 'total' => $total];
         }, 3);

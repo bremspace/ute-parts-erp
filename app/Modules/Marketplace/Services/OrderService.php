@@ -72,6 +72,7 @@ class OrderService
 
                 $pricing = $this->pricingService->resolve($produk, $pelanggan, $variant);
                 $harga = $pricing['harga'];
+                $diskonPerUnit = (float) ($pricing['diskon_nominal'] ?? 0);
                 $lineSubtotal = round($harga * $qty, 2);
                 $subtotal += $lineSubtotal;
 
@@ -80,6 +81,7 @@ class OrderService
                     'sku_variant_id' => $variant?->id,
                     'jumlah' => $qty,
                     'harga_satuan' => $harga,
+                    'diskon_nominal' => round($diskonPerUnit * $qty, 2),
                     'hpp' => (float) $produk->harga_beli,
                     'subtotal' => $lineSubtotal,
                 ];
@@ -121,7 +123,7 @@ class OrderService
                     'satuan' => $row['satuan'] ?? ($row['produk']->satuan ?: 'pcs'),
                     'konversi' => $row['konversi'] ?? 1,
                     'harga_satuan' => $row['harga_satuan'],
-                    'diskon_nominal' => 0,
+                    'diskon_nominal' => $row['diskon_nominal'] ?? 0,
                     'subtotal' => $row['subtotal'],
                     'hpp' => $row['hpp'],
                 ]);

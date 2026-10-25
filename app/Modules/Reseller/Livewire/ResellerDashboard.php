@@ -5,6 +5,7 @@ namespace App\Modules\Reseller\Livewire;
 use App\Modules\Akunting\Jobs\ExportLaporanJob;
 use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Reseller\Services\KomisiService;
@@ -44,6 +45,41 @@ class ResellerDashboard extends Component
     public bool $showSkemaModal = false;
 
     public array $skemaForm = ['id' => null, 'nama' => '', 'kategori' => '', 'tipe' => 'persen', 'nilai' => 5, 'is_active' => true];
+
+    // Konfigurasi global persentase default reseller & agen
+    public float $resellerDefaultPersen = 1.0;
+
+    public float $agenDefaultPersen = 2.0;
+
+    public function mount(): void
+    {
+        $config = app(KonfigurasiService::class);
+        $this->resellerDefaultPersen = (float) ($config->get('reseller_default_persen') ?? 1.0);
+        $this->agenDefaultPersen = (float) ($config->get('agen_default_persen') ?? 2.0);
+    }
+
+    public function simpanKonfigurasiPersenDefault(): void
+    {
+        if (! auth()->user()?->can('reseller.manage')) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Anda tidak memiliki izin mengelola konfigurasi reseller / agen.']);
+
+            return;
+        }
+
+        $this->validate([
+            'resellerDefaultPersen' => 'required|numeric|min:0|max:100',
+            'agenDefaultPersen' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+        $config->set('reseller_default_persen', (float) $this->resellerDefaultPersen, 'Default persentase diskon harga jual Reseller dari harga retail');
+        $config->set('agen_default_persen', (float) $this->agenDefaultPersen, 'Default persentase diskon harga jual Agen dari harga retail');
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Pengaturan persentase default berhasil disimpan: Reseller {$this->resellerDefaultPersen}%, Agen {$this->agenDefaultPersen}%.",
+        ]);
+    }
 
     public function getResellersProperty()
     {
@@ -98,6 +134,7 @@ class ResellerDashboard extends Component
                     'total_belanja' => $r->total_belanja_12bulan,
                     'tier' => $r->tierMembership?->nama,
                     'komisi_terhutang' => $r->komisi->where('status', 'disetujui')->sum('nominal_komisi'),
+                    'komisi_cair' => $r->komisi->where('status', 'cair')->sum('nominal_komisi'),
                     'komisi_pending' => $r->komisi->where('status', 'pending')->sum('nominal_komisi'),
                 ];
             });

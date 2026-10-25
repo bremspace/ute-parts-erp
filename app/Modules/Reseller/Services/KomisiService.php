@@ -105,6 +105,15 @@ class KomisiService
      */
     public function hitungKomisi(Transaksi $transaksi, Pelanggan $pelanggan): ?Komisi
     {
+        // Guard idempotensi: jika komisi transaksi untuk pelanggan ini sudah pernah dicatat, jangan duplikasi
+        $komisiEksis = Komisi::where('transaksi_id', $transaksi->id)
+            ->where('pelanggan_id', $pelanggan->id)
+            ->whereIn('status', [Komisi::STATUS_PENDING, Komisi::STATUS_DISETUJUI, Komisi::STATUS_CAIR])
+            ->first();
+        if ($komisiEksis) {
+            return $komisiEksis;
+        }
+
         // Produk dalam transaksi (via items.produk.kategori)
         $grouped = $transaksi->items()->with('produk')->get()
             ->groupBy(fn ($item) => $item->produk?->kategori ?? 'umum');
@@ -693,5 +702,46 @@ class KomisiService
         });
 
         return $approvedUtangIds;
+    }
+
+    /**
+     * Cairkan komisi secara definitif (status cair/paid) dengan proteksi anti double claim/payout.
+     */
+    public function cairkanKomisi(Komisi|int $komisi, int $userId, string $catatan = ''): Komisi
+    {
+        $komisiId = $komisi instanceof Komisi ? $komisi->id : $komisi;
+
+        return DB::transaction(function () use ($komisiId, $catatan) {
+            $k = Komisi::where('id', $komisiId)->lockForUpdate()->firstOrFail();
+
+            if ($k->status === Komisi::STATUS_CAIR) {
+                throw new \DomainException(
+                    "Komisi {$k->no_komisi} sudah dicairkan pada ".
+                    ($k->paid_at ? $k->paid_at->format('d/m/Y H:i') : 'sebelumnya').
+                    ' dan tidak dapat dicairkan kembali (anti double claim).'
+                );
+            }
+
+            if ($k->status === Komisi::STATUS_DITOLAK) {
+                throw new \DomainException("Komisi {$k->no_komisi} berstatus ditolak sehingga tidak dapat dicairkan.");
+            }
+
+            $statusLama = $k->status;
+
+            $k->update([
+                'status' => Komisi::STATUS_CAIR,
+                'paid_at' => now(),
+                'keterangan' => trim(($k->keterangan ?? '').($catatan ? " [Cair: {$catatan}]" : ' [Dicairkan]')),
+            ]);
+
+            app(AuditService::class)->catat(
+                'Komisi', 'cair', $k->id,
+                "Komisi {$k->no_komisi} berhasil dicairkan (Rp {$k->nominal_komisi})",
+                ['status' => $statusLama],
+                ['status' => Komisi::STATUS_CAIR, 'paid_at' => now()->toDateTimeString()]
+            );
+
+            return $k;
+        });
     }
 }

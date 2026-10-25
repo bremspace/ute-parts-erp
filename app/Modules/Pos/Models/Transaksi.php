@@ -20,7 +20,8 @@ use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'no_transaksi', 'cabang_id', 'kasir_id', 'pelanggan_id', 'tiket_servis_id', 'gudang_id',
-    'sumber', 'subtotal', 'diskon_persen', 'diskon_nominal', 'dpp', 'pajak_nominal', 'ppn_nominal',
+    'sumber', 'subtotal', 'diskon_persen', 'diskon_nominal', 'diskon_poin', 'poin_ditukar', 'diskon_partai',
+    'mode_reward_mitra', 'komisi_mitra_nominal', 'dpp', 'pajak_nominal', 'ppn_nominal',
     'total_akhir', 'metode_bayar', 'jumlah_bayar', 'kembalian', 'split_detail',
     'status', 'catatan',
     'durasi_garansi_hari', 'garansi_teks', 'garansi_berakhir_pada', 'catatan_garansi',
@@ -30,6 +31,7 @@ use Spatie\Activitylog\Support\LogOptions;
     // membuang nilainya (webhook PaymentController + seeder demo): paid_at hilang
     // diam-diam, payment_reference/payment_url juga. Sumber kebenaran paid_at
     // tetap `transaksi.paid_at` (tidak ada duplikasi ke tabel lain).
+    'diskon_manual_authorized_by_id', 'diskon_manual_alasan',
     'payment_reference', 'payment_url', 'paid_at',
     'void_by_id', 'void_at', 'void_alasan',
     'expires_at',
@@ -50,6 +52,10 @@ class Transaksi extends Model
         'subtotal' => 'decimal:2',
         'diskon_persen' => 'decimal:2',
         'diskon_nominal' => 'decimal:2',
+        'diskon_poin' => 'decimal:2',
+        'poin_ditukar' => 'integer',
+        'diskon_partai' => 'decimal:2',
+        'komisi_mitra_nominal' => 'decimal:2',
         'dpp' => 'decimal:2',
         'pajak_nominal' => 'decimal:2',
         'ppn_nominal' => 'decimal:2',
@@ -60,6 +66,7 @@ class Transaksi extends Model
         // [B-10f] paid_at kini benar-benar tersimpan (sebelumnya dibuang fillable)
         'paid_at' => 'datetime',
         'expires_at' => 'datetime',
+        'void_at' => 'datetime',
         'garansi_berakhir_pada' => 'date',
     ];
 
@@ -106,5 +113,15 @@ class Transaksi extends Model
     public function voidBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'void_by_id');
+    }
+
+    public function diskonAuthorizedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'diskon_manual_authorized_by_id');
+    }
+
+    public function returnPenjualan(): HasMany
+    {
+        return $this->hasMany(ReturnPenjualan::class, 'transaksi_id');
     }
 }

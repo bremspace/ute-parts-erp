@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Crm\Livewire\CrmDashboard;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Reseller\Livewire\ResellerDashboard;
 use App\Modules\Reseller\Models\Komisi;
@@ -133,5 +134,21 @@ class AgenDanResellerIntegrasiTest extends TestCase
             ->set('filterAktor', 'agen')
             ->assertSee('KMS-AGN-001')
             ->assertSee('Agen B2B');
+    }
+
+    public function test_pengaturan_persentase_default_reseller_dan_agen_dapat_disimpan(): void
+    {
+        Livewire::actingAs($this->admin)
+            ->test(ResellerDashboard::class)
+            ->assertSet('resellerDefaultPersen', 1.0)
+            ->assertSet('agenDefaultPersen', 2.0)
+            ->set('resellerDefaultPersen', 3.5)
+            ->set('agenDefaultPersen', 5.0)
+            ->call('simpanKonfigurasiPersenDefault')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
+
+        $config = app(KonfigurasiService::class);
+        $this->assertSame(3.5, $config->resellerDefaultPersen());
+        $this->assertSame(5.0, $config->agenDefaultPersen());
     }
 }

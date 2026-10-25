@@ -2307,12 +2307,12 @@
                                     <input type="text"
                                         inputmode="numeric"
                                         x-format-number
-                                        wire:model.live="produkForm.harga_tier.{{ $tipe }}.nominal_tetap"
+                                        wire:model.live.debounce.300ms="produkForm.harga_tier.{{ $tipe }}.nominal_tetap"
                                         placeholder="Nominal"
                                         @if($tipe === 'retail') readonly tabindex="-1" title="Terkunci: otomatis sama dengan Harga Jual Retail" @endif
                                         class="w-full px-2 py-2 rounded-lg glass-input text-xs font-bold tabular-nums @if($tipe === 'retail') bg-white/5 opacity-80 cursor-not-allowed @endif" />
                                     <input type="number"
-                                        wire:model.live="produkForm.harga_tier.{{ $tipe }}.persen_diskon"
+                                        wire:model.live.debounce.300ms="produkForm.harga_tier.{{ $tipe }}.persen_diskon"
                                         min="0" max="100" step="0.5"
                                         placeholder="% diskon"
                                         @if($tipe === 'retail') disabled tabindex="-1" @endif
@@ -3206,12 +3206,12 @@
                                     <input type="text"
                                         inputmode="numeric"
                                         x-format-number
-                                        wire:model="editProdukForm.harga_tier.{{ $tipe }}.nominal_tetap"
+                                        wire:model.live.debounce.300ms="editProdukForm.harga_tier.{{ $tipe }}.nominal_tetap"
                                         placeholder="Nominal"
                                         @if($tipe === 'retail') readonly tabindex="-1" title="Terkunci: otomatis sama dengan Harga Jual Retail" @endif
                                         class="w-full px-2 py-2 rounded-lg glass-input text-xs font-bold tabular-nums @if($tipe === 'retail') bg-white/5 opacity-80 cursor-not-allowed @endif" />
                                     <input type="number"
-                                        wire:model="editProdukForm.harga_tier.{{ $tipe }}.persen_diskon"
+                                        wire:model.live.debounce.300ms="editProdukForm.harga_tier.{{ $tipe }}.persen_diskon"
                                         min="0" max="100" step="0.5"
                                         placeholder="% diskon"
                                         @if($tipe === 'retail') disabled tabindex="-1" @endif

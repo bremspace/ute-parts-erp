@@ -40,6 +40,39 @@
                 <span class="text-3xl font-black text-up-mint tabular-nums tracking-tight">
                     Rp {{ number_format($totalAkhir, 0, ',', '.') }}
                 </span>
+                @if($diskonTotal > 0 || ($diskonTierTotal ?? 0) > 0)
+                    <div class="mt-2 pt-2 border-t border-up-mint/20 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px]">
+                        @if(($diskonTierTotal ?? 0) > 0)
+                            <span class="text-up-mint font-bold">Tier ({{ $customer?->tierMembership?->nama ?? ($customer?->tipe_konsumen === 'reseller' ? 'Reseller' : 'Member') }}): -Rp {{ number_format($diskonTierTotal, 0, ',', '.') }}</span>
+                        @endif
+                        @if($diskonPartai > 0)
+                            <span class="text-up-mint font-semibold">Partai: -Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
+                        @endif
+                        @if($diskonPoin > 0)
+                            <span class="text-emerald-500 font-semibold">Poin ({{ number_format($poinDitukar) }} pts): -Rp {{ number_format($diskonPoin, 0, ',', '.') }}</span>
+                        @endif
+                        @if($diskonNominal > 0 || $diskonPersen > 0)
+                            <button type="button" wire:click="openDiskonModal" class="text-up-amber font-semibold hover:underline cursor-pointer">
+                                Diskon Kasir: -Rp {{ number_format($diskonNominal + round(($subtotal * $diskonPersen)/100, 2), 0, ',', '.') }} ✏️
+                            </button>
+                        @endif
+                    </div>
+                @else
+                    <div class="mt-2 pt-2 border-t border-up-mint/20 flex justify-center">
+                        <button
+                            type="button"
+                            wire:click="openDiskonModal"
+                            class="text-[11px] font-bold text-up-amber hover:underline cursor-pointer inline-flex items-center gap-1"
+                        >
+                            <span>🏷️ Tambah Diskon Langsung</span>
+                        </button>
+                    </div>
+                @endif
+                @if($modeRewardMitra === 'komisi_akumulasi' && ($customer?->is_reseller || in_array($customer?->tipe_konsumen, ['reseller', 'agen'], true)))
+                    <div class="mt-1 text-[10px] text-up-amber font-bold">
+                        💰 Mode: Komisi Akumulasi Mitra (Harga Retail)
+                    </div>
+                @endif
             </div>
 
             <!-- Payment Method Selector -->

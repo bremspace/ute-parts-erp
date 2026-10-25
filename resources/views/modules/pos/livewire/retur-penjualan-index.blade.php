@@ -1,6 +1,7 @@
 <div
     class="p-4 sm:p-6 space-y-6"
     x-data="{
+        openFilter: false,
         openCameraRetur() {
             if (window.uteBarcode && window.uteBarcode.openCameraScanner) {
                 window.uteBarcode.openCameraScanner({
@@ -19,15 +20,31 @@
             } else {
                 alert('Modul barcode/QR scanner sedang dimuat...');
             }
+        },
+        openCameraTukar() {
+            if (window.uteBarcode && window.uteBarcode.openCameraScanner) {
+                window.uteBarcode.openCameraScanner({
+                    title: 'Scan Barcode / QR Produk Pengganti',
+                    continuous: false,
+                    onScan: (code) => {
+                        const clean = (code || '').trim();
+                        if (clean) {
+                            $wire.cariTukarDenganBarcode(clean);
+                        }
+                    }
+                });
+            } else {
+                alert('Modul barcode/QR scanner sedang dimuat...');
+            }
         }
     }"
-    @ute:barcode-scanned.window="if ($wire.showCreateModal) { $wire.set('kwitansiInput', $event.detail.code); $nextTick(() => { $wire.call('cariKwitansi'); }); }"
+    @ute:barcode-scanned.window="if ($wire.showCreateModal) { if ($wire.tipePenyelesaian === 'tukar_produk') { $wire.cariTukarDenganBarcode($event.detail.code); } else { $wire.set('kwitansiInput', $event.detail.code); $nextTick(() => { $wire.call('cariKwitansi'); }); } }"
 >
     {{-- Header & Aksi Utama --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h1 class="text-xl sm:text-2xl font-bold text-ink-900 dark:text-white flex items-center gap-2.5">
-                <span class="w-8 h-8 rounded-xl bg-up-red/10 border border-up-red/20 flex items-center justify-center text-up-red text-base">↩</span>
+                <span class="w-8 h-8 rounded-xl bg-up-red/10 border border-up-red/20 flex items-center justify-center text-up-red text-base shrink-0">↩</span>
                 <span>Manajemen Retur Konsumen</span>
             </h1>
             <p class="text-xs sm:text-sm text-ink-400 mt-1">
@@ -35,25 +52,26 @@
             </p>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             <button
                 type="button"
                 @click="openCameraRetur()"
-                class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-up-mint hover:text-white text-xs font-bold transition active:scale-[0.98] cursor-pointer"
+                class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-up-mint hover:text-white text-xs font-bold transition active:scale-[0.98] cursor-pointer min-h-[44px]"
                 title="Scan QR Code Struk Menggunakan Kamera"
+                aria-label="Scan QR Code Struk Menggunakan Kamera"
             >
-                <svg class="w-4 h-4 text-up-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-up-mint shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                 </svg>
-                <span>📷 Scan QR Struk</span>
+                <span>Scan QR Struk</span>
             </button>
 
             <button
                 type="button"
                 wire:click="bukaModalTambah"
-                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-up-red to-rose-600 hover:opacity-95 text-white text-xs font-bold shadow-md shadow-up-red/20 transition active:scale-[0.98] cursor-pointer"
+                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-up-red to-rose-600 hover:opacity-95 text-white text-xs font-bold shadow-md shadow-up-red/20 transition active:scale-[0.98] cursor-pointer min-h-[44px]"
             >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
                 <span>+ Buat Retur Konsumen Baru</span>
@@ -104,49 +122,91 @@
         </div>
     </div>
 
-    {{-- Filter Bar --}}
-    <div class="p-4 rounded-2xl glass-panel border border-white/10 space-y-3">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <div>
-                <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Cari Data</label>
+    {{-- Filter Bar (Collapsible on Mobile, Expanded on Desktop) --}}
+    @php
+        $hasActiveFilter = ($filterStatus !== 'all') || ($filterTipe !== 'all') || !empty($filterTanggalDari) || !empty($filterTanggalSampai) || !empty($search);
+    @endphp
+    <div class="p-3.5 sm:p-4 rounded-2xl glass-panel border border-white/10 space-y-3">
+        <div class="flex items-center gap-2">
+            <div class="relative flex-1">
                 <input
                     type="text"
                     wire:model.live.debounce.300ms="search"
-                    placeholder="No. Retur / No. Kwitansi / Pelanggan..."
-                    class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                    placeholder="Cari No. Retur / No. Kwitansi / Pelanggan..."
+                    class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white min-h-[44px]"
                 />
+                @if($search)
+                    <button
+                        type="button"
+                        wire:click="$set('search', '')"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white text-xs p-1 cursor-pointer"
+                        title="Hapus pencarian"
+                    >✕</button>
+                @endif
             </div>
 
-            <div>
-                <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Status Dokumen</label>
-                <select wire:model.live="filterStatus" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900">
-                    <option value="all">Semua Status</option>
-                    <option value="draft">Draft / Menunggu Approval</option>
-                    <option value="disetujui">Disetujui</option>
-                    <option value="selesai">Selesai</option>
-                    <option value="ditolak">Ditolak</option>
-                </select>
-            </div>
+            {{-- Mobile Filter Toggle Button --}}
+            <button
+                type="button"
+                @click="openFilter = !openFilter"
+                class="sm:hidden px-3.5 py-2.5 rounded-xl border border-white/10 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer min-h-[44px] shrink-0"
+                :class="openFilter || {{ $hasActiveFilter ? 'true' : 'false' }} ? 'bg-up-primary text-white border-up-primary' : 'bg-white/5 text-ink-300 hover:bg-white/10'"
+                aria-label="Filter"
+            >
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                <span>Filter</span>
+                @if($hasActiveFilter)
+                    <span class="w-2 h-2 rounded-full bg-up-accent animate-pulse"></span>
+                @endif
+            </button>
+        </div>
 
-            <div>
-                <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Bentuk Penyelesaian</label>
-                <select wire:model.live="filterTipe" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900">
-                    <option value="all">Semua Tipe</option>
-                    <option value="refund">Pengembalian Uang (Refund)</option>
-                    <option value="tukar_produk">Tukar Produk (Exchange)</option>
-                </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2">
+        {{-- Filter Parameters (Collapsible on mobile, always visible on sm+) --}}
+        <div :class="openFilter ? 'block' : 'hidden sm:block'" class="space-y-3 pt-1">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                 <div>
-                    <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Dari Tanggal</label>
-                    <input type="date" wire:model.live="filterTanggalDari" class="w-full px-2 py-2 rounded-xl glass-input text-xs text-white" />
+                    <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Status Dokumen</label>
+                    <select wire:model.live="filterStatus" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
+                        <option value="all">Semua Status</option>
+                        <option value="draft">Draft / Menunggu Approval</option>
+                        <option value="disetujui">Disetujui</option>
+                        <option value="selesai">Selesai</option>
+                        <option value="ditolak">Ditolak</option>
+                    </select>
                 </div>
+
                 <div>
-                    <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Sampai</label>
-                    <input type="date" wire:model.live="filterTanggalSampai" class="w-full px-2 py-2 rounded-xl glass-input text-xs text-white" />
+                    <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Bentuk Penyelesaian</label>
+                    <select wire:model.live="filterTipe" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
+                        <option value="all">Semua Tipe</option>
+                        <option value="refund">Pengembalian Uang (Refund)</option>
+                        <option value="tukar_produk">Tukar Produk (Exchange)</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Dari Tanggal</label>
+                        <input type="date" wire:model.live="filterTanggalDari" class="w-full px-2 py-2.5 rounded-xl glass-input text-xs text-white min-h-[44px] cursor-pointer" />
+                    </div>
+                    <div>
+                        <label class="block text-ink-400 text-[10px] font-bold uppercase tracking-wider mb-1">Sampai</label>
+                        <input type="date" wire:model.live="filterTanggalSampai" class="w-full px-2 py-2.5 rounded-xl glass-input text-xs text-white min-h-[44px] cursor-pointer" />
+                    </div>
                 </div>
             </div>
+
+            @if($hasActiveFilter)
+                <div class="flex items-center justify-end pt-1">
+                    <button
+                        type="button"
+                        wire:click="$set('search', ''); $set('filterStatus', 'all'); $set('filterTipe', 'all'); $set('filterTanggalDari', ''); $set('filterTanggalSampai', '');"
+                        class="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white text-xs font-semibold cursor-pointer transition text-center min-h-[42px] flex items-center justify-center gap-1.5"
+                    >
+                        <span>✕ Reset Filter</span>
+                    </button>
+                </div>
+            @endif
         </div>
     </div>
 
@@ -182,7 +242,7 @@
                         <button
                             type="button"
                             wire:click="bukaDetail({{ $row->id }})"
-                            class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[11px] cursor-pointer"
+                            class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-[11px] cursor-pointer transition active:scale-95"
                         >
                             Detail
                         </button>
@@ -190,7 +250,7 @@
                             <button
                                 type="button"
                                 wire:click="bukaRiwayat('retur_penjualan', {{ $row->id }})"
-                                class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 text-[11px] font-bold cursor-pointer"
+                                class="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 text-[11px] font-bold cursor-pointer transition active:scale-95"
                             >
                                 Audit
                             </button>
@@ -205,9 +265,68 @@
                 </td>
             </tr>
         @endforelse
-    </x-prism.data-table>
 
-    <div>{{ $returList->links() }}</div>
+        {{-- Mobile Cards Slot --}}
+        <x-slot:mobileCards>
+            @forelse($returList as $row)
+                <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <div>
+                            <span class="font-mono font-bold text-white text-xs block">{{ $row->no_return }}</span>
+                            <span class="text-[10px] text-ink-400 font-mono">Faktur: {{ $row->transaksi?->no_transaksi ?? '-' }}</span>
+                        </div>
+                        <x-prism.status-pill :status="str_replace('_','-', $row->status)" />
+                    </div>
+
+                    <div class="flex justify-between items-start text-xs gap-2 pt-1 border-t border-white/5">
+                        <div>
+                            <span class="text-white font-medium block">{{ $row->pelanggan?->nama ?? 'Umum' }}</span>
+                            <span class="text-ink-400 text-[11px] tabular-nums">{{ $row->tanggal?->format('d/m/Y') ?? '-' }}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-bold text-up-red tabular-nums text-sm block">Rp {{ number_format($row->jumlah, 0, ',', '.') }}</span>
+                            @if($row->tipe_penyelesaian === 'tukar_produk')
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary font-bold text-[10px] mt-0.5">
+                                    🔄 Tukar Produk
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-up-mint/20 text-up-mint font-bold text-[10px] mt-0.5">
+                                    💵 Refund ({{ strtoupper($row->metode_pengembalian) }})
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-2 border-t border-white/5">
+                        <button
+                            type="button"
+                            wire:click="bukaDetail({{ $row->id }})"
+                            class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                        >
+                            Detail
+                        </button>
+                        @can('lihat-audit-log')
+                            <button
+                                type="button"
+                                wire:click="bukaRiwayat('retur_penjualan', {{ $row->id }})"
+                                class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 text-xs font-bold cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                            >
+                                Audit
+                            </button>
+                        @endcan
+                    </div>
+                </div>
+            @empty
+                <div class="py-12 text-center text-ink-400 text-xs">
+                    Belum ada data retur penjualan yang sesuai dengan filter.
+                </div>
+            @endforelse
+        </x-slot:mobileCards>
+
+        <x-slot:pagination>
+            {{ $returList->links() }}
+        </x-slot:pagination>
+    </x-prism.data-table>
 
     {{-- MODAL: FORM PENGAJUAN RETUR BARU (WAJIB NO KWITANSI) --}}
     @if($showCreateModal)
@@ -236,16 +355,17 @@
                             <span class="text-[10px] text-ink-400">Scan QR di struk atau ketik no. faktur</span>
                         </div>
 
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <div class="relative flex-1">
                                 <!-- Tombol Kamera Scanner di dalam input -->
                                 <button
                                     type="button"
                                     @click="openCameraRetur()"
-                                    class="absolute left-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-up-primary hover:text-white hover:bg-up-primary/20 transition cursor-pointer"
+                                    class="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-lg text-up-primary hover:text-white hover:bg-up-primary/20 transition cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
                                     title="Scan QR Code / Barcode Struk menggunakan Kamera"
+                                    aria-label="Scan QR Code Kamera"
                                 >
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                     </svg>
                                 </button>
@@ -255,7 +375,7 @@
                                     wire:model="kwitansiInput"
                                     wire:keydown.enter="cariKwitansi"
                                     placeholder="Ketik atau Scan QR / Barcode Struk Faktur..."
-                                    class="w-full pl-10 pr-3.5 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-white min-h-[42px]"
+                                    class="w-full pl-11 pr-3.5 py-2.5 rounded-xl glass-input text-xs font-mono font-bold text-white min-h-[44px]"
                                     data-barcode-input="true"
                                     x-ref="kwitansiField"
                                 />
@@ -264,7 +384,7 @@
                             <button
                                 type="button"
                                 wire:click="cariKwitansi"
-                                class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs min-h-[42px] cursor-pointer transition active:scale-95 shrink-0"
+                                class="px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs min-h-[44px] cursor-pointer transition active:scale-95 shrink-0 flex items-center justify-center"
                             >
                                 Verifikasi Faktur
                             </button>
@@ -295,32 +415,59 @@
                     @if($selectedTransaksi)
                         <!-- LANGKAH 2: PILIH BARANG YANG DIKEMBALIKAN -->
                         <div class="space-y-2">
-                            <span class="font-bold text-white text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                                <span class="w-5 h-5 rounded-full bg-up-primary text-white flex items-center justify-center text-[10px]">2</span>
-                                <span>Pilih Barang & Tentukan Kondisi Fisik</span>
-                            </span>
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-white text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                    <span class="w-5 h-5 rounded-full bg-up-primary text-white flex items-center justify-center text-[10px]">2</span>
+                                    <span>Pilih Barang & Tentukan Kondisi Fisik</span>
+                                </span>
+                                @error('items')
+                                    <span class="text-[11px] font-bold text-up-red flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                        {{ $message }}
+                                    </span>
+                                @enderror
+                            </div>
 
-                            <div class="rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+                            @error('items')
+                                <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/30 text-up-red text-xs flex items-center gap-2">
+                                    <span class="text-base">⚠️</span>
+                                    <span><strong>Perhatian:</strong> Belum memilih barang untuk diretur (kuantiti masih 0 semua). Silakan tentukan Qty Retur pada salah satu barang di bawah.</span>
+                                </div>
+                            @enderror
+
+                            <div class="rounded-2xl border {{ $errors->has('items') ? 'border-up-red/50 ring-1 ring-up-red/30' : 'border-white/10' }} divide-y divide-white/5 overflow-hidden">
                                 @foreach($transaksiItemData as $itemId => $item)
-                                    <div class="p-3.5 bg-white/[0.02] space-y-2.5">
+                                    @php
+                                        $hasSnErr = $errors->has("itemInputs.{$itemId}.sn_raw");
+                                        $hasQtyErr = $errors->has("itemInputs.{$itemId}.jumlah");
+                                    @endphp
+                                    <div class="p-3.5 bg-white/[0.02] space-y-2.5 {{ ($hasSnErr || $hasQtyErr) ? 'bg-up-red/[0.03]' : '' }}">
                                         <div class="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
                                             <div class="min-w-0 flex-1">
-                                                <div class="font-bold text-white text-xs sm:text-sm">{{ $item['produk_nama'] }}</div>
+                                                <div class="font-bold text-white text-xs sm:text-sm flex items-center gap-2">
+                                                    <span>{{ $item['produk_nama'] }}</span>
+                                                    @if($item['has_sn'])
+                                                        <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 uppercase tracking-wider">Wajib SN</span>
+                                                    @endif
+                                                </div>
                                                 <div class="text-[10px] text-ink-400 mt-0.5">
                                                     SKU: {{ $item['kode'] }} · Qty Beli: <strong class="text-white">{{ $item['qty_beli'] }}</strong> · Pernah Diretur: <span class="text-up-amber font-semibold">{{ $item['sudah_diretur'] }}</span> · Sisa Bisa Diretur: <strong class="text-up-mint">{{ $item['sisa_bisa_diretur'] }}</strong>
                                                 </div>
                                             </div>
 
-                                            <div class="w-32 flex-shrink-0">
+                                            <div class="w-full sm:w-32 flex-shrink-0">
                                                 <label class="text-[10px] font-bold text-ink-400 uppercase tracking-wider block mb-1">Qty Retur</label>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     max="{{ $item['sisa_bisa_diretur'] }}"
                                                     wire:model.live="itemInputs.{{ $itemId }}.jumlah"
-                                                    class="w-full px-3 py-1.5 rounded-xl glass-input text-xs font-black tabular-nums text-center"
+                                                    class="w-full px-3 py-2 rounded-xl glass-input text-xs font-black tabular-nums text-center min-h-[44px] {{ $hasQtyErr ? '!border-up-red ring-1 ring-up-red' : '' }}"
                                                     {{ $item['sisa_bisa_diretur'] <= 0 ? 'disabled' : '' }}
                                                 />
+                                                @error("itemInputs.{$itemId}.jumlah")
+                                                    <span class="text-[10px] text-up-red font-medium block mt-1">{{ $message }}</span>
+                                                @enderror
                                             </div>
                                         </div>
 
@@ -328,22 +475,29 @@
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
                                                 <div>
                                                     <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">Kondisi Fisik Barang *</label>
-                                                    <select wire:model="itemInputs.{{ $itemId }}.kondisi_barang" class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs text-white bg-ink-900">
+                                                    <select wire:model="itemInputs.{{ $itemId }}.kondisi_barang" class="w-full px-2.5 py-2 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
                                                         <option value="rusak">⚠️ Cacat / Rusak (Masuk Pool Karantina Supplier)</option>
                                                         <option value="bagus">✅ Normal / Layak Jual (Kembali ke Stok Aktif)</option>
                                                     </select>
                                                 </div>
 
                                                 <div>
-                                                    <label class="text-[10px] font-bold text-ink-300 uppercase tracking-wider block mb-1">
-                                                        Nomor Seri (SN) {{ $item['has_sn'] ? '(Wajib SN Faktur Ini)' : '(Opsional)' }}
+                                                    <label class="text-[10px] font-bold uppercase tracking-wider block mb-1 {{ $item['has_sn'] ? 'text-amber-300' : 'text-ink-300' }}">
+                                                        Nomor Seri (SN) {{ $item['has_sn'] ? '(Wajib Diisi - Produk Ber-SN)' : '(Opsional)' }}
                                                     </label>
                                                     <input
                                                         type="text"
                                                         wire:model="itemInputs.{{ $itemId }}.sn_raw"
-                                                        placeholder="Ketik SN yang tertera pada unit..."
-                                                        class="w-full px-2.5 py-1.5 rounded-xl glass-input text-xs font-mono text-white"
+                                                        placeholder="{{ $item['has_sn'] ? 'Wajib ketik SN unit yang diretur...' : 'Ketik SN yang tertera pada unit...' }}"
+                                                        class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-mono text-white min-h-[44px] {{ $hasSnErr ? '!border-up-red ring-1 ring-up-red bg-up-red/[0.05]' : ($item['has_sn'] ? 'border-amber-500/40' : '') }}"
                                                     />
+                                                    @error("itemInputs.{$itemId}.sn_raw")
+                                                        <span class="text-[10px] text-up-red font-bold flex items-center gap-1 mt-1">
+                                                            <span>⚠️</span> {{ $message }}
+                                                        </span>
+                                                    @elseif($item['has_sn'])
+                                                        <span class="text-[9px] text-amber-300/80 block mt-0.5">Produk ini memiliki Serial Number aktif. Pastikan SN terverifikasi.</span>
+                                                    @enderror
                                                 </div>
                                             </div>
                                         @endif
@@ -359,7 +513,7 @@
                                 <span>Bentuk Penyelesaian Retur</span>
                             </span>
 
-                            <div class="grid grid-cols-2 gap-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <button
                                     type="button"
                                     wire:click="$set('tipePenyelesaian', 'refund')"
@@ -386,24 +540,75 @@
                             </div>
 
                             @if($tipePenyelesaian === 'refund')
-                                <div class="p-3 rounded-xl bg-white/5 border border-white/10">
+                                <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10">
                                     <label class="block text-ink-300 font-bold mb-1">Metode Pengembalian Dana *</label>
-                                    <select wire:model="metodePengembalian" class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white bg-ink-900">
+                                    <select wire:model="metodePengembalian" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs text-white bg-ink-900 min-h-[44px] cursor-pointer">
                                         <option value="kas">Kas Toko (110-01) — Pengembalian Tunai / Transfer</option>
                                         <option value="piutang">Piutang Usaha (120-01) — Potong Tagihan Konsumen</option>
                                     </select>
                                 </div>
                             @else
                                 <!-- Section Tukar Produk -->
-                                <div class="space-y-2 p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                                    <label class="block text-ink-200 font-bold">Cari Produk Pengganti</label>
-                                    <div class="relative">
-                                        <input
-                                            type="text"
-                                            wire:model.live.debounce.300ms="tukarSearch"
-                                            placeholder="Ketik nama produk, kode SKU, atau barcode pengganti..."
-                                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white"
-                                        />
+                                <div class="space-y-2.5 p-3.5 sm:p-4 rounded-2xl bg-white/5 border {{ $errors->has('tukarItems') ? 'border-up-red/50 ring-1 ring-up-red/30' : 'border-white/10' }}">
+                                    <div class="flex items-center justify-between">
+                                        <label class="block text-ink-200 font-bold text-xs">Cari Produk Pengganti *</label>
+                                        <span class="text-[10px] text-ink-400">Scan Barcode / QR atau ketik nama part</span>
+                                    </div>
+
+                                    @error('tukarItems')
+                                        <div class="p-2.5 rounded-xl bg-up-red/10 border border-up-red/30 text-up-red text-xs font-semibold flex items-center gap-2">
+                                            <span class="text-sm">⚠️</span>
+                                            <span>{{ $message }}</span>
+                                        </div>
+                                    @enderror
+
+                                    <div
+                                        x-data
+                                        @ute:barcode-scanned.window="if ($wire.showCreateModal && $wire.tipePenyelesaian === 'tukar_produk') { $wire.cariTukarDenganBarcode($event.detail.code); }"
+                                        class="relative space-y-2"
+                                    >
+                                        <div class="flex items-center gap-2">
+                                            <div class="relative flex-1">
+                                                <input
+                                                    type="text"
+                                                    wire:model.live.debounce.300ms="tukarSearch"
+                                                    data-barcode-input="true"
+                                                    placeholder="Scan barcode/QR atau ketik nama produk..."
+                                                    class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white min-h-[44px] focus:ring-1 focus:ring-up-primary"
+                                                />
+                                                @if(!empty($tukarSearch))
+                                                    <button
+                                                        type="button"
+                                                        wire:click="$set('tukarSearch', '')"
+                                                        class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-white text-xs p-1.5 cursor-pointer"
+                                                        title="Hapus pencarian"
+                                                    >✕</button>
+                                                @endif
+                                            </div>
+
+                                            {{-- Tombol Scan Barcode/QR Kamera Pengganti (Sesuai Standar Scanner Menu Lain) --}}
+                                            <button
+                                                type="button"
+                                                x-data="{}"
+                                                @click="if (window.uteBarcode && window.uteBarcode.openCameraScanner) {
+                                                    window.uteBarcode.openCameraScanner({
+                                                        title: 'Scan Barcode / QR Produk Pengganti',
+                                                        continuous: false,
+                                                        onScan: (code) => { $wire.cariTukarDenganBarcode(code); }
+                                                    });
+                                                } else {
+                                                    alert('Modul barcode/QR scanner sedang dimuat...');
+                                                }"
+                                                class="px-3.5 py-2.5 rounded-xl bg-up-primary/15 hover:bg-up-primary/25 border border-up-primary/30 text-up-primary text-xs font-bold min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer shrink-0 transition active:scale-95"
+                                                title="Buka Kamera HP untuk Scan Barcode / QR Produk Pengganti"
+                                                aria-label="Scan barcode kamera"
+                                            >
+                                                <svg class="w-4 h-4 text-up-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                                </svg>
+                                                <span>Scan Barcode/QR</span>
+                                            </button>
+                                        </div>
 
                                         @if(!empty($this->hasilCariTukarProduk) && count($this->hasilCariTukarProduk) > 0)
                                             <div class="relative mt-2 z-20 bg-ink-900 border border-white/10 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-white/5">
@@ -412,14 +617,14 @@
                                                     <button
                                                         type="button"
                                                         wire:click="tambahTukarItem({{ $pCari->id }})"
-                                                        class="w-full p-2.5 sm:p-3 text-left hover:bg-white/5 flex items-center justify-between gap-2.5 cursor-pointer transition active:scale-[0.99]"
+                                                        class="w-full p-2.5 sm:p-3 text-left hover:bg-white/5 flex items-center justify-between gap-2.5 cursor-pointer transition active:scale-[0.99] min-h-[44px]"
                                                     >
                                                         <div class="min-w-0 flex-1">
                                                             <div class="font-bold text-xs sm:text-sm text-white break-words">{{ $pCari->nama }}</div>
-                                                            <div class="text-[10px] text-ink-400 mt-0.5">Stok: <strong class="{{ $stokTersedia > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ $stokTersedia }}</strong> · SKU: {{ $pCari->kode }}</div>
+                                                            <div class="text-[10px] text-ink-400 mt-0.5">Stok: <strong class="{{ $stokTersedia > 0 ? 'text-up-mint' : 'text-up-red' }}">{{ $stokTersedia }}</strong> · SKU: {{ $pCari->kode }} @if($pCari->barcode)· Barcode: {{ $pCari->barcode }}@endif</div>
                                                         </div>
                                                         <div class="text-right shrink-0">
-                                                            <div class="font-bold text-xs text-up-mint tabular-nums">Rp {{ number_format($pCari->harga_jual, 0, ',', '.') }}</div>
+                                                            <div class="font-bold text-xs text-up-mint tabular-nums">Rp {{ number_format($pCari->harga_jual_retail ?? $pCari->harga_jual ?? 0, 0, ',', '.') }}</div>
                                                             <span class="text-[10px] text-up-primary font-bold px-2 py-0.5 rounded-md bg-up-primary/10 border border-up-primary/20 mt-1 inline-block">+ Pilih</span>
                                                         </div>
                                                     </button>
@@ -431,20 +636,25 @@
                                     @if(!empty($tukarItems))
                                         <div class="rounded-xl border border-white/10 divide-y divide-white/5 overflow-hidden">
                                             @foreach($tukarItems as $idx => $tItem)
-                                                <div class="p-2.5 bg-white/[0.02] flex items-center justify-between gap-2">
+                                                <div class="p-2.5 sm:p-3 bg-white/[0.02] flex items-center justify-between gap-2">
                                                     <div class="min-w-0 flex-1">
                                                         <div class="font-bold text-white text-xs truncate">{{ $tItem['nama'] }}</div>
                                                         <div class="text-[10px] text-ink-400">Rp {{ number_format($tItem['harga_satuan'], 0, ',', '.') }} · Stok: {{ $tItem['stok_tersedia'] }}</div>
                                                     </div>
-                                                    <div class="flex items-center gap-2">
+                                                    <div class="flex items-center gap-2 shrink-0">
                                                         <input
                                                             type="number"
                                                             min="1"
                                                             max="{{ $tItem['stok_tersedia'] }}"
                                                             wire:model.live="tukarItems.{{ $idx }}.jumlah"
-                                                            class="w-16 px-2 py-1 rounded-lg glass-input text-xs font-bold text-center"
+                                                            class="w-16 px-2 py-1.5 rounded-lg glass-input text-xs font-bold text-center min-h-[38px]"
                                                         />
-                                                        <button type="button" wire:click="hapusTukarItem({{ $idx }})" class="text-up-red p-1 hover:bg-up-red/10 rounded cursor-pointer">✕</button>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="hapusTukarItem({{ $idx }})"
+                                                            class="text-up-red p-2 hover:bg-up-red/10 rounded-lg cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center transition active:scale-95"
+                                                            title="Hapus barang penukar"
+                                                        >✕</button>
                                                     </div>
                                                 </div>
                                             @endforeach
@@ -457,13 +667,20 @@
                         <!-- LANGKAH 4: ALASAN & CATATAN QC -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10">
                             <div>
-                                <label class="block text-ink-300 font-bold mb-1">Alasan Retur Konsumen *</label>
+                                <label class="block text-ink-300 font-bold mb-1">
+                                    Alasan Retur Konsumen <span class="text-up-red">*</span>
+                                </label>
                                 <input
                                     type="text"
                                     wire:model="alasan"
                                     placeholder="Contoh: LCD bergaris / salah beli tipe / cacat pabrik"
-                                    class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                                    class="w-full px-3 py-2.5 rounded-xl glass-input text-xs text-white min-h-[44px] {{ $errors->has('alasan') ? '!border-up-red ring-1 ring-up-red bg-up-red/[0.05]' : '' }}"
                                 />
+                                @error('alasan')
+                                    <span class="text-[11px] text-up-red font-bold flex items-center gap-1 mt-1">
+                                        <span>⚠️</span> {{ $message }}
+                                    </span>
+                                @enderror
                             </div>
 
                             <div>
@@ -472,7 +689,7 @@
                                     type="text"
                                     wire:model="catatanQc"
                                     placeholder="Contoh: Segel garansi utuh, unit tidak ada bekas jatuh"
-                                    class="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
+                                    class="w-full px-3 py-2.5 rounded-xl glass-input text-xs text-white min-h-[44px]"
                                 />
                             </div>
                         </div>
@@ -484,7 +701,7 @@
                     <button
                         type="button"
                         wire:click="tutupModalTambah"
-                        class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-bold text-xs cursor-pointer min-h-[44px]"
+                        class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-bold text-xs cursor-pointer min-h-[46px] flex items-center justify-center transition active:scale-95"
                     >
                         Batal
                     </button>
@@ -492,7 +709,7 @@
                         <button
                             type="button"
                             wire:click="simpanRetur"
-                            class="flex-1 py-3 rounded-xl bg-gradient-to-r from-up-red to-rose-600 text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-red/25 transition active:scale-[0.98]"
+                            class="flex-1 py-3 rounded-xl bg-gradient-to-r from-up-red to-rose-600 hover:opacity-95 text-white font-bold text-xs cursor-pointer min-h-[46px] shadow-lg shadow-up-red/25 transition active:scale-[0.98] flex items-center justify-center"
                         >
                             {{ $tipePenyelesaian === 'tukar_produk' ? 'Proses Tukar Barang' : 'Proses Pengembalian Dana' }}
                         </button>
@@ -505,13 +722,18 @@
     {{-- MODAL DETAIL RETUR --}}
     @if($detailRetur)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-            <div class="w-full max-w-xl glass-panel p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl text-xs">
+            <div class="w-full max-w-xl glass-panel p-5 sm:p-6 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl text-xs">
                 <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-white/10">
                     <div>
                         <h3 class="text-base font-bold text-white">{{ $detailRetur->no_return }}</h3>
                         <p class="text-[10px] text-ink-400">Dokumen Retur Penjualan Konsumen</p>
                     </div>
-                    <button type="button" wire:click="tutupDetail" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                    <button
+                        type="button"
+                        wire:click="tutupDetail"
+                        class="text-ink-400 hover:text-white cursor-pointer p-2 rounded-xl hover:bg-white/5 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        title="Tutup"
+                    >✕</button>
                 </div>
 
                 <div class="space-y-3 flex-1 overflow-y-auto pr-1">
@@ -574,7 +796,7 @@
                     <button
                         type="button"
                         wire:click="tutupDetail"
-                        class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs cursor-pointer"
+                        class="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs cursor-pointer min-h-[46px] flex items-center justify-center transition active:scale-95"
                     >
                         Tutup
                     </button>

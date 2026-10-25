@@ -351,6 +351,12 @@ class ProdukTab extends Component
     public function mount()
     {
         $this->loadUserPreferences();
+
+        $config = app(KonfigurasiService::class);
+        $resellerDef = (float) ($config->get('reseller_default_persen') ?? 1.0);
+        $agenDef = (float) ($config->get('agen_default_persen') ?? 2.0);
+        $this->produkForm['harga_tier']['reseller']['persen_diskon'] = $resellerDef;
+        $this->produkForm['harga_tier']['agen']['persen_diskon'] = $agenDef;
     }
 
     public function loadUserPreferences(): void
@@ -560,6 +566,10 @@ class ProdukTab extends Component
     #[On('wms-produk-modal')]
     public function openProdukModal()
     {
+        $config = app(KonfigurasiService::class);
+        $resellerDef = (float) ($config->get('reseller_default_persen') ?? 1.0);
+        $agenDef = (float) ($config->get('agen_default_persen') ?? 2.0);
+
         $this->produkForm = [
             'nama' => '', 'barcode' => '', 'kategori' => '', 'kategori_id' => null, 'brand_kompatibel' => '', 'model_kompatibel' => '',
             'kondisi' => 'baru', 'harga_beli' => 0, 'harga_jual_retail' => 0,
@@ -569,8 +579,8 @@ class ProdukTab extends Component
             'brand_id' => null, 'kualitas_id' => null, 'supplier_id' => null, 'satuan_kode' => 'pcs',
             'tipe_hp_ids' => [], 'produk_kompatibel_ids' => [], 'harga_tier' => [
                 'retail' => ['nominal_tetap' => 0, 'persen_diskon' => null],
-                'reseller' => ['nominal_tetap' => null, 'persen_diskon' => null],
-                'agen' => ['nominal_tetap' => null, 'persen_diskon' => null],
+                'reseller' => ['nominal_tetap' => null, 'persen_diskon' => $resellerDef],
+                'agen' => ['nominal_tetap' => null, 'persen_diskon' => $agenDef],
             ],
             'harga_tier_tier_id' => null,
             // [HARGA FLEKSIBEL]
@@ -772,6 +782,68 @@ class ProdukTab extends Component
         }
     }
 
+    public function syncTierHargaDariRetail(string $mode = 'create'): void
+    {
+        $formKey = $mode === 'create' ? 'produkForm' : 'editProdukForm';
+        $retail = (float) $this->parseNominal($this->{$formKey}['harga_jual_retail'] ?? 0);
+        $this->{$formKey}['harga_tier']['retail']['nominal_tetap'] = $retail;
+
+        $config = app(KonfigurasiService::class);
+        $defaultPersen = [
+            'reseller' => (float) ($config->get('reseller_default_persen') ?? 1.0),
+            'agen' => (float) ($config->get('agen_default_persen') ?? 2.0),
+        ];
+
+        foreach (['reseller', 'agen'] as $tipe) {
+            $persen = $this->{$formKey}['harga_tier'][$tipe]['persen_diskon'] ?? null;
+            $nominal = $this->{$formKey}['harga_tier'][$tipe]['nominal_tetap'] ?? null;
+
+            if ($persen !== null && $persen !== '') {
+                $p = (float) $persen;
+                $this->{$formKey}['harga_tier'][$tipe]['nominal_tetap'] = $retail > 0 ? max(0, round($retail * (1 - ($p / 100)))) : 0;
+            } elseif ($nominal !== null && $nominal !== '') {
+                $nom = (float) $this->parseNominal($nominal);
+                if ($retail > 0) {
+                    $this->{$formKey}['harga_tier'][$tipe]['persen_diskon'] = round((($retail - $nom) / $retail) * 100, 2);
+                }
+            } else {
+                $defP = $defaultPersen[$tipe] ?? 0;
+                $this->{$formKey}['harga_tier'][$tipe]['persen_diskon'] = $defP;
+                $this->{$formKey}['harga_tier'][$tipe]['nominal_tetap'] = $retail > 0 ? max(0, round($retail * (1 - ($defP / 100)))) : 0;
+            }
+        }
+    }
+
+    public function syncBiDirectionalHargaTier(string $mode, string $tipe, string $field, mixed $val): void
+    {
+        $formKey = $mode === 'create' ? 'produkForm' : 'editProdukForm';
+        $retail = (float) $this->parseNominal($this->{$formKey}['harga_jual_retail'] ?? 0);
+
+        if ($field === 'nominal_tetap') {
+            $nom = (float) $this->parseNominal($val);
+            $this->{$formKey}['harga_tier'][$tipe]['nominal_tetap'] = $nom;
+            if ($retail > 0) {
+                $this->{$formKey}['harga_tier'][$tipe]['persen_diskon'] = round((($retail - $nom) / $retail) * 100, 2);
+            }
+        } elseif ($field === 'persen_diskon') {
+            $persen = is_numeric($val) ? (float) $val : 0;
+            $this->{$formKey}['harga_tier'][$tipe]['persen_diskon'] = $persen;
+            if ($retail > 0) {
+                $this->{$formKey}['harga_tier'][$tipe]['nominal_tetap'] = max(0, round($retail * (1 - ($persen / 100))));
+            }
+        }
+    }
+
+    public function updated($property, $value): void
+    {
+        if (preg_match('/^(produkForm|editProdukForm)\.harga_tier\.(reseller|agen)\.(nominal_tetap|persen_diskon)$/', $property, $matches)) {
+            $mode = $matches[1] === 'produkForm' ? 'create' : 'edit';
+            $tipe = $matches[2];
+            $field = $matches[3];
+            $this->syncBiDirectionalHargaTier($mode, $tipe, $field, $value);
+        }
+    }
+
     public function updatedProdukFormHargaJualRetail($value): void
     {
         $hargaJual = $this->parseNominal($value);
@@ -780,6 +852,7 @@ class ProdukTab extends Component
         if ($hargaBeli > 0 && empty($this->produkForm['hitung_dari_margin'])) {
             $this->produkForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
         }
+        $this->syncTierHargaDariRetail('create');
         $this->hitungKonversiMultiSatuan('create');
     }
 
@@ -791,6 +864,7 @@ class ProdukTab extends Component
             $hargaJual = round($hargaBeli * (1 + ($margin / 100)));
             $this->editProdukForm['harga_jual_retail'] = $hargaJual;
             $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = $hargaJual;
+            $this->syncTierHargaDariRetail('edit');
             $this->hitungKonversiMultiSatuan('edit');
         }
     }
@@ -827,6 +901,7 @@ class ProdukTab extends Component
         if ($hargaBeli > 0 && empty($this->editProdukForm['hitung_dari_margin'])) {
             $this->editProdukForm['margin_persen'] = round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2);
         }
+        $this->syncTierHargaDariRetail('edit');
         $this->hitungKonversiMultiSatuan('edit');
     }
 
@@ -838,6 +913,8 @@ class ProdukTab extends Component
 
         $this->produkForm['harga_beli'] = $this->parseNominal($this->produkForm['harga_beli'] ?? 0);
         $this->produkForm['harga_jual_retail'] = $this->parseNominal($this->produkForm['harga_jual_retail'] ?? 0);
+        $this->syncTierHargaDariRetail('create');
+
         if (isset($this->produkForm['harga_tier'])) {
             foreach ($this->produkForm['harga_tier'] as $k => $tier) {
                 if (isset($tier['nominal_tetap']) && $tier['nominal_tetap'] !== '' && $tier['nominal_tetap'] !== null) {
@@ -999,6 +1076,22 @@ class ProdukTab extends Component
                     'nominal_tetap' => $ht->nominal_tetap ? (float) $ht->nominal_tetap : null,
                     'persen_diskon' => $ht->persen_diskon ? (float) $ht->persen_diskon : null,
                 ];
+            }
+        }
+
+        $config = app(KonfigurasiService::class);
+        $resellerDef = (float) ($config->get('reseller_default_persen') ?? 1.0);
+        $agenDef = (float) ($config->get('agen_default_persen') ?? 2.0);
+        $retailHarga = (float) $p->harga_jual_retail;
+
+        foreach (['reseller' => $resellerDef, 'agen' => $agenDef] as $t => $defP) {
+            if ($tierMap[$t]['persen_diskon'] === null && $tierMap[$t]['nominal_tetap'] === null) {
+                $tierMap[$t]['persen_diskon'] = $defP;
+                $tierMap[$t]['nominal_tetap'] = $retailHarga > 0 ? max(0, round($retailHarga * (1 - ($defP / 100)))) : 0;
+            } elseif ($tierMap[$t]['persen_diskon'] !== null && $tierMap[$t]['nominal_tetap'] === null) {
+                $tierMap[$t]['nominal_tetap'] = $retailHarga > 0 ? max(0, round($retailHarga * (1 - ($tierMap[$t]['persen_diskon'] / 100)))) : 0;
+            } elseif ($tierMap[$t]['nominal_tetap'] !== null && $tierMap[$t]['persen_diskon'] === null && $retailHarga > 0) {
+                $tierMap[$t]['persen_diskon'] = round((($retailHarga - $tierMap[$t]['nominal_tetap']) / $retailHarga) * 100, 2);
             }
         }
 
@@ -1250,6 +1343,15 @@ class ProdukTab extends Component
 
         // Pastikan harga tier retail selalu sinkron dengan harga jual retail
         $this->editProdukForm['harga_tier']['retail']['nominal_tetap'] = (float) $this->editProdukForm['harga_jual_retail'];
+        $this->syncTierHargaDariRetail('edit');
+
+        if (isset($this->editProdukForm['harga_tier'])) {
+            foreach ($this->editProdukForm['harga_tier'] as $k => $tier) {
+                if (isset($tier['nominal_tetap']) && $tier['nominal_tetap'] !== '' && $tier['nominal_tetap'] !== null) {
+                    $this->editProdukForm['harga_tier'][$k]['nominal_tetap'] = $this->parseNominal($tier['nominal_tetap']);
+                }
+            }
+        }
 
         // Pastikan brand & model kompatibel sinkron dari Tipe HP bila ada
         $this->editProdukForm['tipe_hp_ids'] = array_values(array_unique(array_map('intval', (array) ($this->editProdukForm['tipe_hp_ids'] ?? []))));

@@ -80,6 +80,63 @@
             </div>
         </div>
 
+        <!-- Pengaturan Persentase Diskon Default Reseller & Agen Global -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-up-primary/10 via-white/[0.02] to-amber-500/10 border border-white/10 shadow-lg">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-up-mint animate-pulse"></span>
+                        <h4 class="text-sm font-bold text-white flex items-center gap-1.5">
+                            <span>🏷️</span> Persentase Diskon Default Mitra (Reseller &amp; Agen)
+                        </h4>
+                    </div>
+                    <p class="text-xs text-ink-300 leading-relaxed max-w-2xl">
+                        Persentase ini menjadi nilai bawaan global saat menambah produk baru di Master Produk WMS. Kolom nominal dan persen di produk akan terisi otomatis berdasarkan persentase ini dari harga retail.
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center gap-2 bg-black/20 dark:bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                        <label class="text-xs font-semibold text-up-accent whitespace-nowrap">Reseller:</label>
+                        <div class="relative w-20">
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="100"
+                                wire:model="resellerDefaultPersen"
+                                class="w-full pl-2 pr-5 py-1 rounded-lg glass-input text-xs font-mono font-bold text-right text-white"
+                            />
+                            <span class="absolute right-1.5 top-1 text-xs text-ink-400 font-bold">%</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 bg-black/20 dark:bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                        <label class="text-xs font-semibold text-amber-400 whitespace-nowrap">Agen:</label>
+                        <div class="relative w-20">
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="100"
+                                wire:model="agenDefaultPersen"
+                                class="w-full pl-2 pr-5 py-1 rounded-lg glass-input text-xs font-mono font-bold text-right text-white"
+                            />
+                            <span class="absolute right-1.5 top-1 text-xs text-ink-400 font-bold">%</span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        wire:click="simpanKonfigurasiPersenDefault"
+                        class="px-4 py-2 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs min-h-[38px] cursor-pointer shadow-md shadow-up-primary/25 transition active:scale-95 flex items-center gap-1.5"
+                    >
+                        <span>💾</span>
+                        <span>Simpan Pengaturan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toolbar Pencarian & Filter Mitra -->
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3 sm:p-3.5 rounded-2xl">
             <div class="flex-1 min-w-0 sm:max-w-md">
@@ -146,11 +203,11 @@
                             </div>
                         @endif
 
-                        <!-- Ringkasan Finansial: Omzet Pribadi, Komisi Pending & Terhutang -->
-                        <div class="grid grid-cols-3 gap-2 text-center mt-3 pt-3 border-t border-white/5">
+                        <!-- Ringkasan Finansial: Omzet Pribadi, Komisi Pending, Terhutang, & Sudah Cair -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mt-3 pt-3 border-t border-white/5">
                             <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
                                 <p class="text-sm font-bold text-white tabular-nums">Rp {{ number_format($r['total_belanja'], 0, ',', '.') }}</p>
-                                <p class="text-[10px] text-ink-400 uppercase font-semibold">Omzet Belanja</p>
+                                <p class="text-[10px] text-ink-400 uppercase font-semibold">Omzet</p>
                             </div>
                             <div class="p-2.5 rounded-xl bg-up-amber/5 border border-up-amber/20">
                                 <p class="text-sm font-bold text-up-amber tabular-nums">Rp {{ number_format($r['komisi_pending'], 0, ',', '.') }}</p>
@@ -159,6 +216,10 @@
                             <div class="p-2.5 rounded-xl bg-up-mint/5 border border-up-mint/20">
                                 <p class="text-sm font-bold text-up-mint tabular-nums">Rp {{ number_format($r['komisi_terhutang'], 0, ',', '.') }}</p>
                                 <p class="text-[10px] text-ink-400 uppercase font-semibold">Siap Cair</p>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-sky-500/5 border border-sky-500/20">
+                                <p class="text-sm font-bold text-sky-400 tabular-nums">Rp {{ number_format($r['komisi_cair'] ?? 0, 0, ',', '.') }}</p>
+                                <p class="text-[10px] text-ink-400 uppercase font-semibold">Sudah Cair</p>
                             </div>
                         </div>
                     </div>
@@ -191,6 +252,7 @@
                     <option value="" class="bg-ink-900">Semua Status Komisi</option>
                     <option value="pending" class="bg-ink-900">Pending</option>
                     <option value="disetujui" class="bg-ink-900">Disetujui</option>
+                    <option value="cair" class="bg-ink-900">Sudah Cair</option>
                     <option value="ditolak" class="bg-ink-900">Ditolak</option>
                 </select>
                 <select wire:model.live="filterAktor" class="px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px] w-full">

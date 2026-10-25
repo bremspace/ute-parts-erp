@@ -125,7 +125,55 @@ class KonfigurasiService
             'diskon_silver' => 3,
             'diskon_gold' => 5,
             'diskon_platinum' => 10,
+            'reseller_default_persen' => 1.0, // default % harga reseller dari retail
+            'agen_default_persen' => 2.0,     // default % harga agen dari retail
+            'mitra_reward_mode' => 'diskon_langsung', // diskon_langsung | komisi_akumulasi
+            'harga_partai_aktif' => true,
+            'harga_partai_min_qty' => 5,      // minimal qty 1 produk (atau akumulasi) untuk member
+            'harga_partai_qty_diskon_persen' => 3.0, // diskon % harga partai berbasis qty
+            'harga_partai_min_nominal' => 1000000.0, // minimal belanja keranjang member
+            'harga_partai_nominal_diskon_persen' => 2.0, // diskon % harga partai berbasis nominal belanja
         ];
+    }
+
+    public function resellerDefaultPersen(): float
+    {
+        return (float) ($this->get('reseller_default_persen') ?? 1.0);
+    }
+
+    public function agenDefaultPersen(): float
+    {
+        return (float) ($this->get('agen_default_persen') ?? 2.0);
+    }
+
+    public function mitraRewardMode(): string
+    {
+        return (string) ($this->get('mitra_reward_mode') ?? 'diskon_langsung');
+    }
+
+    public function hargaPartaiAktif(): bool
+    {
+        return (bool) ($this->get('harga_partai_aktif') ?? true);
+    }
+
+    public function hargaPartaiMinQty(): int
+    {
+        return (int) ($this->get('harga_partai_min_qty') ?? 5);
+    }
+
+    public function hargaPartaiQtyDiskonPersen(): float
+    {
+        return (float) ($this->get('harga_partai_qty_diskon_persen') ?? 3.0);
+    }
+
+    public function hargaPartaiMinNominal(): float
+    {
+        return (float) ($this->get('harga_partai_min_nominal') ?? 1000000.0);
+    }
+
+    public function hargaPartaiNominalDiskonPersen(): float
+    {
+        return (float) ($this->get('harga_partai_nominal_diskon_persen') ?? 2.0);
     }
 
     public function poinEarnPersen(): float
@@ -135,7 +183,7 @@ class KonfigurasiService
 
     public function poinRedeemRupiah(): float
     {
-        return (float) ($this->get('poin_redeem_rupiah') ?? 0);
+        return (float) ($this->get('poin_redeem_rupiah') ?? 100.0);
     }
 
     /**

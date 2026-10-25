@@ -97,6 +97,18 @@
                                 <span class="text-gray-600">Pelanggan:</span>
                                 <span class="text-gray-900 font-medium">{{ $receiptData['pelanggan'] }}</span>
                             </div>
+                            @if(!empty($receiptData['tier']) && $receiptData['tier'] !== 'Retail' && $receiptData['tier'] !== 'Umum')
+                                <div class="receipt-row flex justify-between">
+                                    <span class="text-gray-600">{{ in_array($receiptData['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Tipe Mitra:' : 'Tier Member:' }}</span>
+                                    <span class="text-up-primary font-bold">{{ $receiptData['tier'] }}</span>
+                                </div>
+                            @endif
+                            @if(isset($receiptData['saldo_poin']) && (int)$receiptData['saldo_poin'] > 0)
+                                <div class="receipt-row flex justify-between">
+                                    <span class="text-gray-600">Saldo Poin:</span>
+                                    <span class="text-amber-600 font-bold tabular-nums">{{ number_format($receiptData['saldo_poin']) }} Poin</span>
+                                </div>
+                            @endif
                         @endif
                     </div>
 
@@ -119,7 +131,16 @@
                                     </div>
                                 </div>
                                 <div class="receipt-row flex justify-between text-[10px] text-gray-600 mt-0.5">
-                                    <span>{{ $it['qty'] }}{{ !empty($it['satuan']) ? ' ' . strtoupper($it['satuan']) : '' }} x {{ number_format($it['harga'], 0, ',', '.') }}</span>
+                                    <span>
+                                        {{ $it['qty'] }}{{ !empty($it['satuan']) ? ' ' . strtoupper($it['satuan']) : '' }} x
+                                        @if(!empty($it['harga_retail']) && (float)$it['harga_retail'] > (float)$it['harga'])
+                                            <span class="line-through text-gray-400">Rp {{ number_format($it['harga_retail'], 0, ',', '.') }}</span>
+                                        @endif
+                                        <span class="font-bold text-gray-900">Rp {{ number_format($it['harga'], 0, ',', '.') }}</span>
+                                        @if(!empty($it['diskon_total']) && (float)$it['diskon_total'] > 0)
+                                            <span class="text-[9px] font-semibold text-emerald-700">(Hemat Rp {{ number_format($it['diskon_total'], 0, ',', '.') }})</span>
+                                        @endif
+                                    </span>
                                     <span class="font-bold text-gray-900">{{ number_format($it['subtotal'], 0, ',', '.') }}</span>
                                 </div>
                             </div>
@@ -142,7 +163,55 @@
 
                     <!-- Total & Pembayaran -->
                     <div class="space-y-1 text-[11px] pt-1 font-bold">
-                        <div class="receipt-row flex justify-between text-xs text-gray-950">
+                        @if(!empty($receiptData['diskon_tier']) && (float)$receiptData['diskon_tier'] > 0)
+                            <div class="receipt-row flex justify-between text-gray-600 font-normal text-[10px]">
+                                <span>Subtotal Retail:</span>
+                                <span>Rp {{ number_format($receiptData['subtotal_retail'] ?? ($receiptData['subtotal'] + $receiptData['diskon_tier']), 0, ',', '.') }}</span>
+                            </div>
+                            <div class="receipt-row flex justify-between text-emerald-700 font-bold text-[10px]">
+                                <span>Potongan {{ !empty($receiptData['tier']) && $receiptData['tier'] !== 'Retail' ? $receiptData['tier'] : (in_array($receiptData['tipe_konsumen'] ?? '', ['reseller', 'agen'], true) ? 'Mitra' : 'Tier Member') }}:</span>
+                                <span>-Rp {{ number_format($receiptData['diskon_tier'], 0, ',', '.') }}</span>
+                            </div>
+                            <div class="receipt-row flex justify-between text-gray-800 font-bold text-[10px] border-t border-dashed border-gray-200 pt-0.5">
+                                <span>Subtotal:</span>
+                                <span>Rp {{ number_format($receiptData['subtotal'], 0, ',', '.') }}</span>
+                            </div>
+                        @else
+                            <div class="receipt-row flex justify-between text-gray-800 font-bold text-[10px]">
+                                <span>Subtotal:</span>
+                                <span>Rp {{ number_format($receiptData['subtotal'] ?? $receiptData['total'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        @if(!empty($receiptData['diskon_partai']) && (float)$receiptData['diskon_partai'] > 0)
+                            <div class="receipt-row flex justify-between text-emerald-700 font-bold text-[10px]">
+                                <span>Diskon Partai (Member):</span>
+                                <span>-Rp {{ number_format($receiptData['diskon_partai'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        @if(!empty($receiptData['diskon_poin']) && (float)$receiptData['diskon_poin'] > 0)
+                            <div class="receipt-row flex justify-between text-emerald-700 font-bold text-[10px]">
+                                <span>Tukar Poin ({{ number_format($receiptData['poin_ditukar'] ?? 0) }} pts):</span>
+                                <span>-Rp {{ number_format($receiptData['diskon_poin'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        @if(!empty($receiptData['diskon']) && (float)$receiptData['diskon'] > 0)
+                            <div class="receipt-row flex justify-between text-emerald-700 font-bold text-[10px]">
+                                <span>Diskon Kasir{{ !empty($receiptData['diskon_persen']) && (float)$receiptData['diskon_persen'] > 0 ? ' ('.$receiptData['diskon_persen'].'%)' : '' }}{{ !empty($receiptData['diskon_manual_authorized_by']) ? ' [Acc: '.$receiptData['diskon_manual_authorized_by'].']' : '' }}:</span>
+                                <span>-Rp {{ number_format($receiptData['diskon'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        @if(!empty($receiptData['pajak']) && (float)$receiptData['pajak'] > 0)
+                            <div class="receipt-row flex justify-between text-gray-600 font-normal text-[10px]">
+                                <span>PPN {{ !empty($receiptData['ppn_persen']) ? '('.$receiptData['ppn_persen'].'%)' : '' }}:</span>
+                                <span>+Rp {{ number_format($receiptData['pajak'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        <div class="receipt-row flex justify-between text-xs text-gray-950 border-t border-dashed border-gray-300 pt-1">
                             <span class="tracking-wide">TOTAL:</span>
                             <span class="font-black">Rp {{ number_format($receiptData['total'], 0, ',', '.') }}</span>
                         </div>
@@ -154,6 +223,27 @@
                             <span>KEMBALI:</span>
                             <span>Rp {{ number_format($receiptData['kembali'] ?? 0, 0, ',', '.') }}</span>
                         </div>
+
+                        @if(!empty($receiptData['hemat_total']) && (float)$receiptData['hemat_total'] > 0)
+                            <div class="receipt-row flex justify-between text-emerald-800 font-black text-[10px] pt-1 border-t border-dashed border-gray-300">
+                                <span>TOTAL HEMAT BELANJA:</span>
+                                <span>Rp {{ number_format($receiptData['hemat_total'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        @if(!empty($receiptData['komisi_mitra_nominal']) && (float)$receiptData['komisi_mitra_nominal'] > 0)
+                            <div class="receipt-row flex justify-between text-amber-700 font-medium text-[9px] pt-0.5">
+                                <span>Komisi Mitra (Masuk Saldo):</span>
+                                <span>+Rp {{ number_format($receiptData['komisi_mitra_nominal'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        @if(isset($receiptData['saldo_poin']))
+                            <div class="receipt-row flex justify-between text-gray-600 font-medium text-[9px]">
+                                <span>Sisa Saldo Poin:</span>
+                                <span>{{ number_format($receiptData['saldo_poin']) }} pts</span>
+                            </div>
+                        @endif
                     </div>
 
                     <!-- QR Code Faktur / Retur & Garansi Anti-Fraud -->

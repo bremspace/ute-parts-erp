@@ -189,6 +189,126 @@ class ReturPenjualanIndexTest extends TestCase
         ]);
     }
 
+    public function test_mount_dengan_transaksi_id_menampilkan_nomor_faktur_bukan_id(): void
+    {
+        session(['cabang_id' => $this->cabang->id]);
+
+        $pelanggan = Pelanggan::create(['nama' => 'Rina', 'tipe' => 'retail']);
+        $transaksi = Transaksi::create([
+            'no_transaksi' => 'TRX-20261025-0042',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 1,
+            'subtotal' => 150000,
+            'total_akhir' => 150000,
+            'status' => 'selesai',
+        ]);
+
+        TransaksiItem::create([
+            'transaksi_id' => $transaksi->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_satuan' => 150000,
+            'subtotal' => 150000,
+            'hpp' => 100000,
+        ]);
+
+        $this->actingAs($this->user)
+            ->withSession(['cabang_id' => $this->cabang->id])
+            ->get('/app/pos/retur?transaksi_id='.$transaksi->id)
+            ->assertStatus(200)
+            ->assertSee('TRX-20261025-0042');
+
+        Livewire::actingAs($this->user)
+            ->withQueryParams(['transaksi_id' => (string) $transaksi->id])
+            ->test(ReturPenjualanIndex::class)
+            ->assertSet('kwitansiInput', 'TRX-20261025-0042')
+            ->assertSet('selectedTransaksi.id', $transaksi->id);
+    }
+
+    public function test_validasi_form_retur_alasan_dan_barang_kosong(): void
+    {
+        session(['cabang_id' => $this->cabang->id]);
+
+        $pelanggan = Pelanggan::create(['nama' => 'Joko', 'tipe' => 'retail']);
+        $transaksi = Transaksi::create([
+            'no_transaksi' => 'TRX-VALIDASI-01',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 1,
+            'subtotal' => 150000,
+            'total_akhir' => 150000,
+            'status' => 'selesai',
+        ]);
+
+        $trxItem = TransaksiItem::create([
+            'transaksi_id' => $transaksi->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_satuan' => 150000,
+            'subtotal' => 150000,
+            'hpp' => 100000,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(ReturPenjualanIndex::class)
+            ->set('kwitansiInput', 'TRX-VALIDASI-01')
+            ->call('cariKwitansi')
+            ->set('alasan', '') // kosong
+            ->call('simpanRetur')
+            ->assertHasErrors(['alasan' => 'required']);
+
+        Livewire::actingAs($this->user)
+            ->test(ReturPenjualanIndex::class)
+            ->set('kwitansiInput', 'TRX-VALIDASI-01')
+            ->call('cariKwitansi')
+            ->set('alasan', 'Barang cacat')
+            ->set("itemInputs.{$trxItem->id}.jumlah", 0) // belum pilih barang
+            ->call('simpanRetur')
+            ->assertHasErrors(['items']);
+    }
+
+    public function test_validasi_tukar_produk_wajib_pilih_produk_pengganti(): void
+    {
+        session(['cabang_id' => $this->cabang->id]);
+
+        $pelanggan = Pelanggan::create(['nama' => 'Doni', 'tipe' => 'retail']);
+        $transaksi = Transaksi::create([
+            'no_transaksi' => 'TRX-TUKAR-01',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => $this->gudang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'total_barang' => 1,
+            'subtotal' => 150000,
+            'total_akhir' => 150000,
+            'status' => 'selesai',
+        ]);
+
+        $trxItem = TransaksiItem::create([
+            'transaksi_id' => $transaksi->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_satuan' => 150000,
+            'subtotal' => 150000,
+            'hpp' => 100000,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(ReturPenjualanIndex::class)
+            ->set('kwitansiInput', 'TRX-TUKAR-01')
+            ->call('cariKwitansi')
+            ->set('alasan', 'Salah beli tipe ingin tukar')
+            ->set('tipePenyelesaian', 'tukar_produk')
+            ->set("itemInputs.{$trxItem->id}.jumlah", 1)
+            ->call('simpanRetur')
+            ->assertHasErrors(['tukarItems']);
+    }
+
     public function test_kustomisasi_template_struk_tersimpan_dengan_fitur_qr_faktur(): void
     {
         $adminRole = Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);

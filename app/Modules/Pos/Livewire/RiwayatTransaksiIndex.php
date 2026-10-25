@@ -2,7 +2,10 @@
 
 namespace App\Modules\Pos\Livewire;
 
+use App\Modules\Crm\Services\PelangganService;
+use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Services\TransaksiVoidService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Servis\Models\TiketServis;
 use Illuminate\Support\Carbon;
@@ -22,9 +25,30 @@ class RiwayatTransaksiIndex extends Component
 
     public string $filterTanggal = '';
 
+    public string $filterTanggalPreset = 'today'; // 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom'
+
+    public string $filterTanggalDari = '';
+
+    public string $filterTanggalSampai = '';
+
     public string $filterMetode = '';
 
     public string $filterStatus = '';
+
+    // Modal otorisasi void transaksi
+    public bool $showVoidModal = false;
+
+    public ?int $voidTransaksiId = null;
+
+    public ?string $voidNoTransaksi = null;
+
+    public float $voidTotalAkhir = 0;
+
+    public string $voidAlasan = '';
+
+    public string $voidSupervisorAuth = '';
+
+    public string $voidSupervisorPassword = '';
 
     // Modal detail transaksi / servis / mutasi
     public bool $showDetailModal = false;
@@ -41,15 +65,215 @@ class RiwayatTransaksiIndex extends Component
     protected $queryString = [
         'activeTab' => ['except' => 'global'],
         'search' => ['except' => ''],
-        'filterTanggal' => ['except' => ''],
+        'filterTanggalPreset' => ['except' => 'today'],
+        'filterTanggalDari' => ['except' => ''],
+        'filterTanggalSampai' => ['except' => ''],
         'filterMetode' => ['except' => ''],
         'filterStatus' => ['except' => ''],
     ];
 
-    public function mount(): void
+    public function mount(?string $activeTab = null): void
     {
-        $this->activeTab = request()->query('tab', request()->query('activeTab', 'global'));
-        $this->filterTanggal = request()->query('filterTanggal', now()->toDateString());
+        $this->activeTab = $activeTab ?? request()->query('tab', request()->query('activeTab', $this->activeTab ?: 'global'));
+
+        $preset = request()->query('preset', request()->query('filterTanggalPreset', ''));
+        $dari = request()->query('dari', request()->query('filterTanggalDari', ''));
+        $sampai = request()->query('sampai', request()->query('filterTanggalSampai', ''));
+
+        if ($dari || $sampai) {
+            $this->filterTanggalPreset = 'custom';
+            $this->filterTanggalDari = $dari ?: now()->toDateString();
+            $this->filterTanggalSampai = $sampai ?: $this->filterTanggalDari;
+        } elseif (in_array($preset, ['today', 'yesterday', 'this_week', 'this_month'], true)) {
+            $this->filterTanggalPreset = $preset;
+            $this->applyPresetDates($preset);
+        } elseif (request()->has('filterTanggal')) {
+            $tgl = (string) request()->query('filterTanggal');
+            $this->filterTanggalPreset = 'custom';
+            $this->filterTanggalDari = $tgl;
+            $this->filterTanggalSampai = $tgl;
+        } else {
+            $this->filterTanggalPreset = 'today';
+            $this->applyPresetDates('today');
+        }
+
+        $this->syncLegacyFilterTanggal();
+    }
+
+    public function updatedFilterTanggalPreset(string $preset): void
+    {
+        $this->resetPage();
+        if ($preset !== 'custom') {
+            $this->applyPresetDates($preset);
+        } else {
+            if (! $this->filterTanggalDari) {
+                $this->filterTanggalDari = now()->toDateString();
+            }
+            if (! $this->filterTanggalSampai) {
+                $this->filterTanggalSampai = $this->filterTanggalDari;
+            }
+        }
+        $this->syncLegacyFilterTanggal();
+    }
+
+    public function updatedFilterTanggalDari(): void
+    {
+        $this->filterTanggalPreset = 'custom';
+        $this->syncLegacyFilterTanggal();
+        $this->resetPage();
+    }
+
+    public function updatedFilterTanggalSampai(): void
+    {
+        $this->filterTanggalPreset = 'custom';
+        $this->syncLegacyFilterTanggal();
+        $this->resetPage();
+    }
+
+    protected function applyPresetDates(string $preset): void
+    {
+        $tz = config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($tz);
+
+        match ($preset) {
+            'yesterday' => (function () use ($now) {
+                $y = $now->copy()->subDay()->toDateString();
+                $this->filterTanggalDari = $y;
+                $this->filterTanggalSampai = $y;
+            })(),
+            'this_week' => (function () use ($now) {
+                $this->filterTanggalDari = $now->copy()->startOfWeek()->toDateString();
+                $this->filterTanggalSampai = $now->copy()->endOfWeek()->toDateString();
+            })(),
+            'this_month' => (function () use ($now) {
+                $this->filterTanggalDari = $now->copy()->startOfMonth()->toDateString();
+                $this->filterTanggalSampai = $now->copy()->endOfMonth()->toDateString();
+            })(),
+            default => (function () use ($now) {
+                $t = $now->toDateString();
+                $this->filterTanggalDari = $t;
+                $this->filterTanggalSampai = $t;
+            })(),
+        };
+    }
+
+    protected function syncLegacyFilterTanggal(): void
+    {
+        $this->filterTanggal = $this->filterTanggalDari ?: now()->toDateString();
+    }
+
+    /**
+     * Mendapatkan rentang batas waktu [start, end] dalam Carbon UTC
+     * berdasarkan input tanggal lokal cabang/aplikasi.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    protected function getDateBoundaries(): array
+    {
+        $tz = config('app.timezone', 'Asia/Jakarta');
+        $dari = $this->filterTanggalDari ?: now($tz)->toDateString();
+        $sampai = $this->filterTanggalSampai ?: $dari;
+
+        if ($dari > $sampai) {
+            [$dari, $sampai] = [$sampai, $dari];
+        }
+
+        $startLocal = Carbon::parse($dari.' 00:00:00', $tz);
+        $endLocal = Carbon::parse($sampai.' 23:59:59', $tz);
+
+        return [$startLocal->copy()->utc(), $endLocal->copy()->utc()];
+    }
+
+    public function bukaVoidModal(int $id): void
+    {
+        $cabangId = session('cabang_id');
+        $transaksi = Transaksi::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('id', $id)
+            ->first();
+
+        if (! $transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Transaksi tidak ditemukan']);
+
+            return;
+        }
+
+        if ($transaksi->status !== 'selesai') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Hanya transaksi berstatus 'selesai' yang dapat di-void (status saat ini: {$transaksi->status})"]);
+
+            return;
+        }
+
+        $this->voidTransaksiId = $transaksi->id;
+        $this->voidNoTransaksi = $transaksi->no_transaksi;
+        $this->voidTotalAkhir = (float) $transaksi->total_akhir;
+        $this->voidAlasan = '';
+        $this->voidSupervisorAuth = '';
+        $this->voidSupervisorPassword = '';
+        $this->resetValidation(['voidAlasan', 'voidSupervisorAuth', 'voidSupervisorPassword']);
+
+        $this->showVoidModal = true;
+    }
+
+    public function tutupVoidModal(): void
+    {
+        $this->showVoidModal = false;
+        $this->voidTransaksiId = null;
+        $this->voidNoTransaksi = null;
+        $this->resetValidation(['voidAlasan', 'voidSupervisorAuth', 'voidSupervisorPassword']);
+    }
+
+    public function prosesVoidTransaksi(): void
+    {
+        $this->validate([
+            'voidAlasan' => 'required|string|min:4|max:255',
+            'voidSupervisorAuth' => 'required|string',
+            'voidSupervisorPassword' => 'required|string',
+        ], [
+            'voidAlasan.required' => 'Alasan pembatalan (void) wajib diisi',
+            'voidAlasan.min' => 'Alasan minimal 4 karakter',
+            'voidSupervisorAuth.required' => 'Username/Email Supervisor wajib diisi',
+            'voidSupervisorPassword.required' => 'Password Supervisor wajib diisi',
+        ]);
+
+        if (! $this->voidTransaksiId) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak ada transaksi yang dipilih untuk di-void']);
+
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $transaksi = Transaksi::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->where('id', $this->voidTransaksiId)
+            ->first();
+
+        if (! $transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Data transaksi tidak ditemukan']);
+
+            return;
+        }
+
+        try {
+            $voidService = app(TransaksiVoidService::class);
+            $supervisor = $voidService->verifikasiSupervisor($this->voidSupervisorAuth, $this->voidSupervisorPassword);
+            $voidService->voidTransaksi($transaksi, $supervisor, $this->voidAlasan);
+
+            $noTrx = $transaksi->no_transaksi;
+            $this->tutupVoidModal();
+
+            if ($this->selectedDetail && ($this->selectedDetail['id'] ?? null) === $transaksi->id) {
+                $this->selectedDetail['status'] = 'void';
+            }
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Transaksi {$noTrx} berhasil di-VOID oleh {$supervisor->name}. Stok dan pembukuan jurnal telah dibalikkan.",
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function updatedActiveTab(): void
@@ -67,24 +291,33 @@ class RiwayatTransaksiIndex extends Component
 
     public function updatedFilterTanggal(): void
     {
+        $this->filterTanggalPreset = 'custom';
+        $this->filterTanggalDari = $this->filterTanggal;
+        $this->filterTanggalSampai = $this->filterTanggal;
         $this->resetPage();
     }
 
     public function resetFilter(): void
     {
         $this->reset(['search', 'filterMetode', 'filterStatus']);
-        $this->filterTanggal = now()->toDateString();
+        $this->filterTanggalPreset = 'today';
+        $this->applyPresetDates('today');
+        $this->syncLegacyFilterTanggal();
         $this->resetPage();
     }
 
     public function lihatDetailTransaksi(int $id): void
     {
         $cabangId = session('cabang_id');
-        $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'tiketServis', 'pengiriman', 'channelOrder.channel'])
+        $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'voidBy', 'tiketServis', 'pengiriman', 'channelOrder.channel', 'returnPenjualan.items.produk'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
 
         $isOnline = in_array($trx->sumber, ['marketplace']) || str_starts_with((string) $trx->sumber, 'channel:');
+        $diskonKasirItem = (float) $trx->diskon_nominal;
+        if ((float) ($trx->diskon_persen ?? 0) > 0) {
+            $diskonKasirItem += round(((float) $trx->subtotal * (float) $trx->diskon_persen) / 100, 2);
+        }
 
         $this->selectedDetail = [
             'tipe' => $isOnline ? 'online' : 'pos',
@@ -95,12 +328,26 @@ class RiwayatTransaksiIndex extends Component
             'pelanggan' => $trx->pelanggan?->nama ?? 'Pelanggan Umum',
             'metode_bayar' => $trx->metode_bayar,
             'subtotal' => (float) $trx->subtotal,
-            'diskon' => (float) $trx->diskon_nominal,
+            'diskon' => $diskonKasirItem,
             'pajak' => (float) $trx->pajak_nominal,
             'total' => (float) $trx->total_akhir,
             'bayar' => (float) $trx->jumlah_bayar,
             'kembalian' => (float) $trx->kembalian,
             'status' => $trx->status,
+            'void' => $trx->status === 'void' ? [
+                'oleh' => $trx->voidBy?->name ?? '-',
+                'pada' => $trx->void_at?->format('d/m/Y H:i:s'),
+                'alasan' => $trx->void_alasan,
+            ] : null,
+            'returns' => $trx->returnPenjualan->map(fn ($r) => [
+                'id' => $r->id,
+                'no_return' => $r->no_return,
+                'tanggal' => $r->tanggal?->format('d/m/Y'),
+                'status' => $r->status,
+                'tipe_penyelesaian' => $r->tipe_penyelesaian,
+                'jumlah' => (float) $r->jumlah,
+                'alasan' => $r->alasan,
+            ])->toArray(),
             'sumber' => $trx->sumber,
             'catatan' => $trx->catatan,
             'items' => $trx->items->map(fn ($it) => [
@@ -202,12 +449,54 @@ class RiwayatTransaksiIndex extends Component
         $this->showDetailModal = true;
     }
 
+    public function lihatDetailRetur(int $id): void
+    {
+        $cabangId = session('cabang_id');
+        $retur = ReturnPenjualan::with(['transaksi.items.produk', 'pelanggan', 'user', 'items.produk', 'tukarTransaksi', 'cabang'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->findOrFail($id);
+
+        $this->selectedDetail = [
+            'tipe' => 'retur',
+            'id' => $retur->id,
+            'no_return' => $retur->no_return,
+            'no_transaksi' => $retur->transaksi?->no_transaksi ?? '-',
+            'transaksi_id' => $retur->transaksi_id,
+            'tanggal' => $retur->tanggal?->format('d/m/Y') ?? $retur->created_at?->format('d/m/Y H:i'),
+            'pelanggan' => $retur->pelanggan?->nama ?? 'Pelanggan Umum',
+            'operator' => $retur->user?->name ?? 'Kasir',
+            'tipe_penyelesaian' => $retur->tipe_penyelesaian,
+            'metode_pengembalian' => $retur->metode_pengembalian,
+            'status' => $retur->status,
+            'jumlah' => (float) $retur->jumlah,
+            'alasan' => $retur->alasan ?? '-',
+            'catatan_qc' => $retur->catatan_qc ?? '-',
+            'items' => $retur->items->map(fn ($it) => [
+                'nama' => $it->produk?->nama ?? 'Produk',
+                'sku' => $it->produk?->sku ?? '-',
+                'qty' => (float) $it->jumlah,
+                'harga' => (float) $it->harga_satuan,
+                'subtotal' => (float) $it->subtotal,
+                'kondisi' => $it->kondisi_barang,
+                'sn' => $it->nomor_seri ?? [],
+            ])->toArray(),
+            'tukar_transaksi' => $retur->tukarTransaksi ? [
+                'id' => $retur->tukarTransaksi->id,
+                'no_transaksi' => $retur->tukarTransaksi->no_transaksi,
+                'total' => (float) $retur->tukarTransaksi->total_akhir,
+                'selisih' => (float) $retur->selisih_nominal,
+            ] : null,
+        ];
+
+        $this->showDetailModal = true;
+    }
+
     public function cetakUlangStruk(string $tipe, int $id): void
     {
         $cabangId = session('cabang_id');
 
         if ($tipe === 'pos' || $tipe === 'online') {
-            $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'cabang'])
+            $trx = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->find($id);
 
@@ -220,6 +509,47 @@ class RiwayatTransaksiIndex extends Component
                 $kasirName = $trx->sumber === 'marketplace' ? 'Web Store' : (str_starts_with((string) $trx->sumber, 'channel:') ? strtoupper(str_replace('channel:', '', $trx->sumber)) : 'Kasir');
             }
 
+            $pelanggan = $trx->pelanggan;
+            $saldoPoin = $pelanggan?->poin_loyalty ?? 0;
+            $tipeKonsumen = $pelanggan ? app(PelangganService::class)->tipeKonsumen($pelanggan) : 'retail';
+
+            $items = $trx->items->map(function ($it) {
+                $retailPerUnit = (float) ($it->produk?->harga_jual_retail ?? $it->harga_satuan);
+                if ($it->konversi > 0 && $it->satuan !== ($it->produk?->satuan ?: 'pcs')) {
+                    $retailPerUnit = round($retailPerUnit * (float) $it->konversi, 2);
+                }
+                $hargaSatuan = (float) $it->harga_satuan;
+                $qty = (int) $it->jumlah;
+                $diskonPerUnit = max(0, $retailPerUnit - $hargaSatuan);
+
+                return [
+                    'nama' => $it->produk?->nama ?? 'Produk',
+                    'qty' => $qty,
+                    'satuan' => $it->satuan,
+                    'konversi' => $it->konversi,
+                    'harga' => $hargaSatuan,
+                    'harga_retail' => $retailPerUnit,
+                    'diskon_per_unit' => $diskonPerUnit,
+                    'diskon_total' => $diskonPerUnit * $qty,
+                    'subtotal_retail' => $retailPerUnit * $qty,
+                    'subtotal' => (float) $it->subtotal,
+                ];
+            })->toArray();
+
+            $subtotalRetail = array_sum(array_column($items, 'subtotal_retail'));
+            $modeReward = $trx->mode_reward_mitra ?? 'diskon_langsung';
+            $diskonTier = $modeReward === 'komisi_akumulasi' ? 0.0 : max(0, $subtotalRetail - (float) $trx->subtotal);
+
+            $diskonPartai = (float) ($trx->diskon_partai ?? 0);
+            $diskonPoin = (float) ($trx->diskon_poin ?? 0);
+            $poinDitukar = (int) ($trx->poin_ditukar ?? 0);
+            $komisiMitra = (float) ($trx->komisi_mitra_nominal ?? 0);
+            $diskonKasir = (float) $trx->diskon_nominal;
+            if ((float) ($trx->diskon_persen ?? 0) > 0) {
+                $diskonKasir += round(((float) $trx->subtotal * (float) $trx->diskon_persen) / 100, 2);
+            }
+            $hematTotal = $diskonTier + $diskonPartai + $diskonPoin + $diskonKasir;
+
             $this->completedTransactionId = $trx->id;
             $this->receiptData = [
                 'no_transaksi' => $trx->no_transaksi,
@@ -227,18 +557,27 @@ class RiwayatTransaksiIndex extends Component
                 'kasir' => $kasirName,
                 'pelanggan' => $trx->pelanggan?->nama ?? 'Pelanggan Umum',
                 'telepon' => $trx->pelanggan?->telepon ?? null,
-                'items' => $trx->items->map(fn ($it) => [
-                    'nama' => $it->produk?->nama ?? 'Produk',
-                    'qty' => (int) $it->jumlah,
-                    'harga' => (float) $it->harga_satuan,
-                    'subtotal' => (float) $it->subtotal,
-                ])->toArray(),
+                'tier' => $trx->pelanggan?->tierMembership?->nama ?? ($tipeKonsumen === 'reseller' ? 'Reseller' : ($tipeKonsumen === 'agen' ? 'Agen' : 'Retail')),
+                'tipe_konsumen' => $tipeKonsumen,
+                'saldo_poin' => $saldoPoin,
+                'poin_ditukar' => $poinDitukar,
+                'diskon_poin' => $diskonPoin,
+                'diskon_partai' => $diskonPartai,
+                'mode_reward_mitra' => $modeReward,
+                'komisi_mitra_nominal' => $komisiMitra,
+                'items' => $items,
+                'subtotal_retail' => $subtotalRetail,
+                'diskon_tier' => $diskonTier,
                 'subtotal' => (float) $trx->subtotal,
-                'diskon' => (float) $trx->diskon_nominal,
+                'diskon' => $diskonKasir,
+                'diskon_nominal' => (float) $trx->diskon_nominal,
+                'diskon_persen' => (float) ($trx->diskon_persen ?? 0),
                 'pajak' => (float) $trx->pajak_nominal,
+                'ppn_persen' => (float) ($trx->ppn_persen ?? 0),
                 'total' => (float) $trx->total_akhir,
                 'bayar' => (float) ($trx->jumlah_bayar ?: $trx->total_akhir),
                 'kembalian' => (float) ($trx->kembalian ?? 0),
+                'hemat_total' => $hematTotal,
                 'metode' => strtoupper($trx->metode_bayar ?: 'ONLINE'),
                 'cabang' => $trx->cabang?->nama ?? 'Ute Parts Store',
                 'garansi' => $trx->garansi_teks ?: null,
@@ -280,6 +619,40 @@ class RiwayatTransaksiIndex extends Component
                 'cabang' => $tiket->cabang?->nama ?? 'Ute Parts Servis',
             ];
 
+        } elseif ($tipe === 'retur') {
+            $retur = ReturnPenjualan::with(['items.produk', 'pelanggan', 'user', 'cabang'])
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->find($id);
+
+            if (! $retur) {
+                return;
+            }
+
+            $items = $retur->items->map(fn ($it) => [
+                'nama' => '[RETUR] '.($it->produk?->nama ?? 'Produk'),
+                'qty' => (int) $it->jumlah,
+                'harga' => (float) $it->harga_satuan,
+                'subtotal' => (float) $it->subtotal,
+            ])->toArray();
+
+            $this->completedTransactionId = $retur->transaksi_id;
+            $this->receiptData = [
+                'no_transaksi' => $retur->no_return,
+                'waktu' => $retur->tanggal?->format('d/m/Y H:i') ?? $retur->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
+                'kasir' => $retur->user?->name ?? 'Kasir',
+                'pelanggan' => $retur->pelanggan?->nama ?? 'Pelanggan Umum',
+                'telepon' => $retur->pelanggan?->telepon ?? null,
+                'items' => $items,
+                'subtotal' => (float) $retur->jumlah,
+                'diskon' => 0.0,
+                'pajak' => 0.0,
+                'total' => (float) $retur->jumlah,
+                'bayar' => (float) $retur->jumlah,
+                'kembalian' => 0.0,
+                'metode' => 'RETUR ('.strtoupper($retur->metode_pengembalian ?? 'KAS').')',
+                'cabang' => $retur->cabang?->nama ?? 'Ute Parts Store',
+            ];
+
             $this->showReceiptModal = true;
         }
     }
@@ -293,8 +666,9 @@ class RiwayatTransaksiIndex extends Component
     public function render()
     {
         $cabangId = session('cabang_id');
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
 
-        // Ringkasan metrik hari ini / tanggal terpilih
+        // Ringkasan metrik periode / tanggal terpilih
         $ringkasan = [
             'total_penjualan_pos' => 0.0,
             'count_penjualan_pos' => 0,
@@ -309,14 +683,12 @@ class RiwayatTransaksiIndex extends Component
         ];
 
         if ($cabangId) {
-            $tgl = $this->filterTanggal ?: now()->toDateString();
-
             // POS penjualan (agregat total & count sekali query)
             $posStats = Transaksi::where('cabang_id', $cabangId)
                 ->where(function ($q) {
                     $q->whereNull('sumber')->orWhere('sumber', 'pos');
                 })
-                ->whereDate('created_at', $tgl)
+                ->whereBetween('created_at', [$startUtc, $endUtc])
                 ->where('status', 'selesai')
                 ->selectRaw('COALESCE(SUM(total_akhir), 0) as total, COUNT(*) as count')
                 ->first();
@@ -330,7 +702,7 @@ class RiwayatTransaksiIndex extends Component
                     $q->where('sumber', 'marketplace')
                         ->orWhere('sumber', 'like', 'channel:%');
                 })
-                ->whereDate('created_at', $tgl)
+                ->whereBetween('created_at', [$startUtc, $endUtc])
                 ->whereIn('status', ['lunas', 'diproses', 'dikirim', 'siap_diambil', 'selesai'])
                 ->selectRaw('COALESCE(SUM(total_akhir), 0) as total, COUNT(*) as count')
                 ->first();
@@ -341,7 +713,7 @@ class RiwayatTransaksiIndex extends Component
             // Mutasi kas laci
             $mutasiStats = DB::table('kas_mutasi_laci')
                 ->where('cabang_id', $cabangId)
-                ->whereDate('created_at', $tgl)
+                ->whereBetween('created_at', [$startUtc, $endUtc])
                 ->selectRaw("
                     COALESCE(SUM(CASE WHEN jenis = 'masuk' THEN nominal ELSE 0 END), 0) as total_masuk,
                     COALESCE(SUM(CASE WHEN jenis = 'keluar' THEN nominal ELSE 0 END), 0) as total_keluar
@@ -354,7 +726,7 @@ class RiwayatTransaksiIndex extends Component
             // Servis selesai & lunas (transaksi pos servis + tiket servis lunas langsung)
             $servisTrxStats = Transaksi::where('cabang_id', $cabangId)
                 ->where('sumber', 'servis')
-                ->whereDate('created_at', $tgl)
+                ->whereBetween('created_at', [$startUtc, $endUtc])
                 ->where('status', 'selesai')
                 ->selectRaw('COALESCE(SUM(total_akhir), 0) as total, COUNT(*) as count')
                 ->first();
@@ -362,9 +734,9 @@ class RiwayatTransaksiIndex extends Component
             $servisDirectStats = TiketServis::where('cabang_id', $cabangId)
                 ->whereNull('transaksi_id')
                 ->where('status_pembayaran', 'lunas')
-                ->where(function ($q) use ($tgl) {
-                    $q->whereDate('tanggal_bayar', $tgl)
-                        ->orWhereDate('tanggal_selesai', $tgl);
+                ->where(function ($q) use ($startUtc, $endUtc) {
+                    $q->whereBetween('tanggal_bayar', [$startUtc, $endUtc])
+                        ->orWhereBetween('tanggal_selesai', [$startUtc, $endUtc]);
                 })
                 ->selectRaw('COALESCE(SUM(estimasi_biaya), 0) as total, COUNT(*) as count')
                 ->first();
@@ -404,9 +776,9 @@ class RiwayatTransaksiIndex extends Component
 
     protected function getGlobalData(int $cabangId)
     {
-        $tanggal = $this->filterTanggal;
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
         $metode = $this->filterMetode;
-        $status = $this->filterStatus; // 'semua' | 'pos' | 'servis' | 'mutasi_masuk' | 'mutasi_keluar'
+        $status = $this->filterStatus; // 'semua' | 'pos' | 'online' | 'servis' | 'retur' | 'void' | 'mutasi_masuk' | 'mutasi_keluar'
         $search = trim($this->search);
 
         // 1. Transaksi POS Reguler
@@ -417,6 +789,7 @@ class RiwayatTransaksiIndex extends Component
             ->where(function ($q) {
                 $q->whereNull('t.sumber')->orWhere('t.sumber', 'pos');
             })
+            ->whereBetween('t.created_at', [$startUtc, $endUtc])
             ->select([
                 't.id as id',
                 DB::raw("'pos' as jenis"),
@@ -432,9 +805,6 @@ class RiwayatTransaksiIndex extends Component
                 't.id as target_id',
             ]);
 
-        if ($tanggal) {
-            $qPos->whereDate('t.created_at', $tanggal);
-        }
         if ($metode) {
             $qPos->where('t.metode_bayar', $metode);
         }
@@ -448,6 +818,7 @@ class RiwayatTransaksiIndex extends Component
                 $q->where('t.sumber', 'marketplace')
                     ->orWhere('t.sumber', 'like', 'channel:%');
             })
+            ->whereBetween('t.created_at', [$startUtc, $endUtc])
             ->select([
                 't.id as id',
                 DB::raw("'online' as jenis"),
@@ -463,9 +834,6 @@ class RiwayatTransaksiIndex extends Component
                 't.id as target_id',
             ]);
 
-        if ($tanggal) {
-            $qOnline->whereDate('t.created_at', $tanggal);
-        }
         if ($metode) {
             $qOnline->where('t.metode_bayar', $metode);
         }
@@ -477,6 +845,7 @@ class RiwayatTransaksiIndex extends Component
             ->leftJoin('tiket_servis as s', 't.tiket_servis_id', '=', 's.id')
             ->where('t.cabang_id', $cabangId)
             ->where('t.sumber', 'servis')
+            ->whereBetween('t.created_at', [$startUtc, $endUtc])
             ->select([
                 't.id as id',
                 DB::raw("'servis' as jenis"),
@@ -492,12 +861,33 @@ class RiwayatTransaksiIndex extends Component
                 DB::raw('COALESCE(s.id, t.id) as target_id'),
             ]);
 
-        if ($tanggal) {
-            $qServisTrx->whereDate('t.created_at', $tanggal);
-        }
         if ($metode) {
             $qServisTrx->where('t.metode_bayar', $metode);
         }
+
+        // 3b. Riwayat retur penjualan. `tanggal` adalah tanggal bisnis retur,
+        // bukan waktu pembuatan draft, sehingga filter tanggal tetap konsisten.
+        $qRetur = DB::table('return_penjualan as r')
+            ->leftJoin('users as u', 'r.user_id', '=', 'u.id')
+            ->leftJoin('pelanggan as p', 'r.pelanggan_id', '=', 'p.id')
+            ->leftJoin('transaksi as t', 'r.transaksi_id', '=', 't.id')
+            ->where('r.cabang_id', $cabangId)
+            ->whereDate('r.tanggal', '>=', $this->localDate($startUtc))
+            ->whereDate('r.tanggal', '<=', $this->localDate($endUtc))
+            ->select([
+                'r.id as id',
+                DB::raw("'retur' as jenis"),
+                'r.no_return as no_referensi',
+                DB::raw('COALESCE(r.updated_at, r.created_at) as waktu'),
+                DB::raw("COALESCE(p.nama, 'Pelanggan Umum') as pihak"),
+                DB::raw("COALESCE(u.name, 'Kasir') as operator"),
+                DB::raw("COALESCE(r.metode_pengembalian, 'retur') as metode"),
+                'r.jumlah as nominal',
+                DB::raw("'keluar' as arah_kas"),
+                'r.status as status',
+                DB::raw("COALESCE(r.alasan, CONCAT('Retur ', COALESCE(t.no_transaksi, '-'))) as deskripsi"),
+                'r.id as target_id',
+            ]);
 
         // 3. Servis Direct (TiketServis lunas tanpa transaksi_id)
         $qServisDirect = null;
@@ -508,6 +898,11 @@ class RiwayatTransaksiIndex extends Component
                 ->where('s.cabang_id', $cabangId)
                 ->whereNull('s.transaksi_id')
                 ->where('s.status_pembayaran', 'lunas')
+                ->where(function ($q) use ($startUtc, $endUtc) {
+                    $q->whereBetween('s.tanggal_bayar', [$startUtc, $endUtc])
+                        ->orWhereBetween('s.tanggal_selesai', [$startUtc, $endUtc])
+                        ->orWhereBetween('s.updated_at', [$startUtc, $endUtc]);
+                })
                 ->select([
                     's.id as id',
                     DB::raw("'servis' as jenis"),
@@ -523,13 +918,6 @@ class RiwayatTransaksiIndex extends Component
                     's.id as target_id',
                 ]);
 
-            if ($tanggal) {
-                $qServisDirect->where(function ($q) use ($tanggal) {
-                    $q->whereDate('s.tanggal_bayar', $tanggal)
-                        ->orWhereDate('s.tanggal_selesai', $tanggal)
-                        ->orWhereDate('s.updated_at', $tanggal);
-                });
-            }
             if ($metode) {
                 $qServisDirect->where('s.metode_pembayaran', $metode);
             }
@@ -541,6 +929,7 @@ class RiwayatTransaksiIndex extends Component
             $qMutasi = DB::table('kas_mutasi_laci as m')
                 ->leftJoin('users as u', 'm.user_id', '=', 'u.id')
                 ->where('m.cabang_id', $cabangId)
+                ->whereBetween('m.created_at', [$startUtc, $endUtc])
                 ->select([
                     'm.id as id',
                     DB::raw("CASE WHEN m.jenis = 'masuk' THEN 'mutasi_masuk' ELSE 'mutasi_keluar' END as jenis"),
@@ -555,16 +944,12 @@ class RiwayatTransaksiIndex extends Component
                     DB::raw("COALESCE(m.keterangan, 'Mutasi Kas Laci') as deskripsi"),
                     'm.id as target_id',
                 ]);
-
-            if ($tanggal) {
-                $qMutasi->whereDate('m.created_at', $tanggal);
-            }
         }
 
         // Susun queries berdasarkan filterStatus jenis
         $queries = [];
         if (! $status || $status === 'semua') {
-            $queries = [$qPos, $qOnline, $qServisTrx];
+            $queries = [$qPos, $qOnline, $qServisTrx, $qRetur];
             if ($qServisDirect) {
                 $queries[] = $qServisDirect;
             }
@@ -580,6 +965,13 @@ class RiwayatTransaksiIndex extends Component
             if ($qServisDirect) {
                 $queries[] = $qServisDirect;
             }
+        } elseif ($status === 'retur') {
+            $queries = [$qRetur];
+        } elseif ($status === 'void') {
+            $qPos->where('t.status', 'void');
+            $qOnline->where('t.status', 'void');
+            $qServisTrx->where('t.status', 'void');
+            $queries = [$qPos, $qOnline, $qServisTrx];
         } elseif ($status === 'mutasi_masuk' && $qMutasi) {
             $qMutasi->where('m.jenis', 'masuk');
             $queries = [$qMutasi];
@@ -611,16 +1003,29 @@ class RiwayatTransaksiIndex extends Component
         return $base->orderBy('waktu', 'desc')->paginate(15);
     }
 
+    protected function localDate(Carbon $utc): string
+    {
+        return $utc->copy()->setTimezone(config('app.timezone', 'Asia/Jakarta'))->toDateString();
+    }
+
     protected function getPosData(int $cabangId)
     {
-        $query = Transaksi::with(['kasir', 'pelanggan'])
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
+
+        $query = Transaksi::with(['kasir', 'pelanggan', 'returnPenjualan'])
             ->where('cabang_id', $cabangId)
             ->where(function ($q) {
                 $q->whereNull('sumber')->orWhere('sumber', 'pos');
             })
-            ->when($this->filterTanggal, fn ($q) => $q->whereDate('created_at', $this->filterTanggal))
+            ->whereBetween('created_at', [$startUtc, $endUtc])
             ->when($this->filterMetode, fn ($q) => $q->where('metode_bayar', $this->filterMetode))
-            ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
+            ->when($this->filterStatus, function ($q) {
+                if ($this->filterStatus === 'retur') {
+                    $q->has('returnPenjualan');
+                } else {
+                    $q->where('status', $this->filterStatus);
+                }
+            })
             ->when($this->search, function ($q) {
                 $q->where(function ($sub) {
                     $sub->where('no_transaksi', 'like', "%{$this->search}%")
@@ -635,13 +1040,15 @@ class RiwayatTransaksiIndex extends Component
 
     protected function getOnlineData(int $cabangId)
     {
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
+
         $query = Transaksi::with(['kasir', 'pelanggan', 'pengiriman', 'channelOrder.channel'])
             ->where('cabang_id', $cabangId)
             ->where(function ($q) {
                 $q->where('sumber', 'marketplace')
                     ->orWhere('sumber', 'like', 'channel:%');
             })
-            ->when($this->filterTanggal, fn ($q) => $q->whereDate('created_at', $this->filterTanggal))
+            ->whereBetween('created_at', [$startUtc, $endUtc])
             ->when($this->filterMetode, fn ($q) => $q->where('metode_bayar', $this->filterMetode))
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
             ->when($this->search, function ($q) {
@@ -662,6 +1069,8 @@ class RiwayatTransaksiIndex extends Component
         if (! Schema::hasTable('tiket_servis')) {
             return null;
         }
+
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
 
         $query = TiketServis::with(['pelanggan', 'teknisi', 'transaksi.kasir', 'items', 'spareparts.produk'])
             ->where('cabang_id', $cabangId);
@@ -684,13 +1093,11 @@ class RiwayatTransaksiIndex extends Component
         }
         // Jika filterStatus === 'semua', tidak memfilter status pengerjaan tiket
 
-        if ($this->filterTanggal) {
-            $query->where(function ($q) {
-                $q->whereDate('tanggal_selesai', $this->filterTanggal)
-                    ->orWhereDate('tanggal_bayar', $this->filterTanggal)
-                    ->orWhereDate('created_at', $this->filterTanggal);
-            });
-        }
+        $query->where(function ($q) use ($startUtc, $endUtc) {
+            $q->whereBetween('tanggal_selesai', [$startUtc, $endUtc])
+                ->orWhereBetween('tanggal_bayar', [$startUtc, $endUtc])
+                ->orWhereBetween('created_at', [$startUtc, $endUtc]);
+        });
 
         if ($this->filterMetode) {
             $query->where(function ($q) {
@@ -719,6 +1126,8 @@ class RiwayatTransaksiIndex extends Component
             return null;
         }
 
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
+
         $query = DB::table('kas_mutasi_laci')
             ->join('users', 'kas_mutasi_laci.user_id', '=', 'users.id')
             ->leftJoin('akun_coa', 'kas_mutasi_laci.akun_lawan_kode', '=', 'akun_coa.kode')
@@ -728,7 +1137,7 @@ class RiwayatTransaksiIndex extends Component
                 'akun_coa.nama as akun_nama'
             )
             ->where('kas_mutasi_laci.cabang_id', $cabangId)
-            ->when($this->filterTanggal, fn ($q) => $q->whereDate('kas_mutasi_laci.created_at', $this->filterTanggal))
+            ->whereBetween('kas_mutasi_laci.created_at', [$startUtc, $endUtc])
             ->when($this->filterStatus, fn ($q) => $q->where('kas_mutasi_laci.jenis', $this->filterStatus))
             ->when($this->search, function ($q) {
                 $q->where(function ($sub) {
