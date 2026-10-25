@@ -225,10 +225,24 @@ function checkServerDiagnostics(): array
     $writableEnv = is_writable($baseDir) || (file_exists($baseDir.'/.env') && is_writable($baseDir.'/.env'));
     $vendorReady = file_exists($baseDir.'/vendor/autoload.php');
 
+    $iniPath = php_ini_loaded_file() ?: 'Tidak terdeteksi (default)';
+    $majorMinor = PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;
+
+    $missingExtsList = [];
+    foreach ($extStatus as $ext => $info) {
+        if (! $info['loaded']) {
+            $missingExtsList[] = $ext.($info['required'] ? ' (wajib)' : ' (opsional)');
+        }
+    }
+
+    $recommendedCmd = 'sudo apt-get update && sudo apt-get install -y php'.$majorMinor.'-mysql php'.$majorMinor.'-gd php'.$majorMinor.'-mbstring php'.$majorMinor.'-curl php'.$majorMinor.'-zip php'.$majorMinor.'-intl php'.$majorMinor.'-bcmath php'.$majorMinor.'-imagick unzip';
+
     return [
         'os' => $osInfo,
         'php_version' => PHP_VERSION,
         'php_ok' => version_compare(PHP_VERSION, '8.3.0', '>='),
+        'php_ini' => $iniPath,
+        'php_binary' => getPhpBinary(),
         'ram_total_mb' => $totalRamMb,
         'ram_free_mb' => $freeRamMb,
         'swap_mb' => $swapMb,
@@ -236,6 +250,8 @@ function checkServerDiagnostics(): array
         'disk_total_gb' => $diskTotalGb,
         'extensions' => $extStatus,
         'extensions_ok' => $allReqPassed,
+        'missing_extensions' => $missingExtsList,
+        'recommended_cmd' => $recommendedCmd,
         'tools' => $tools,
         'vendor_ready' => $vendorReady,
         'permissions' => [
@@ -255,118 +271,185 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json; charset=utf-8');
     $action = $_POST['action'];
 
-    if ($action === 'auto_fix') {
+    if ($action === 'get_diagnostics') {
+        echo json_encode([
+            'success' => true,
+            'diagnostics' => checkServerDiagnostics(),
+        ]);
+        exit;
+    }
+
+    if ($action === 'autofix_step') {
+        $stepId = $_POST['step_id'] ?? '';
         $baseDir = dirname(__DIR__);
         $phpBin = getPhpBinary();
         $logs = [];
+        $restartNeeded = false;
+        $manualCmd = '';
 
-        // 1. Direktori Wajib & Izin Akses
-        $dirs = [
-            'storage',
-            'storage/app',
-            'storage/app/public',
-            'storage/framework',
-            'storage/framework/cache',
-            'storage/framework/cache/data',
-            'storage/framework/sessions',
-            'storage/framework/views',
-            'storage/logs',
-            'bootstrap/cache',
-        ];
-        foreach ($dirs as $dir) {
-            $fullPath = $baseDir.'/'.$dir;
-            if (! is_dir($fullPath)) {
-                @mkdir($fullPath, 0775, true);
-            }
-            @chmod($fullPath, 0775);
-        }
-        runCommand("chmod -R 775 {$baseDir}/storage {$baseDir}/bootstrap/cache 2>/dev/null || true");
-        $logs[] = 'Direktori storage & bootstrap/cache disiapkan dengan hak izin tulis.';
-
-        // 2. Ekstensi PHP via APT (Jika Ubuntu/Debian & memiliki akses root/sudo)
-        if (file_exists('/etc/debian_version')) {
-            $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
-            $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
-            if ($isRoot || $canSudo) {
-                $sudoPrefix = $isRoot ? '' : 'sudo ';
-                $extMapping = [
-                    'pdo_mysql' => 'php-mysql',
-                    'gd' => 'php-gd',
-                    'mbstring' => 'php-mbstring',
-                    'curl' => 'php-curl',
-                    'zip' => 'php-zip',
-                    'intl' => 'php-intl',
-                    'bcmath' => 'php-bcmath',
-                    'imagick' => 'php-imagick',
+        switch ($stepId) {
+            case 'dirs':
+                $dirs = [
+                    'storage',
+                    'storage/app',
+                    'storage/app/public',
+                    'storage/framework',
+                    'storage/framework/cache',
+                    'storage/framework/cache/data',
+                    'storage/framework/sessions',
+                    'storage/framework/views',
+                    'storage/logs',
+                    'bootstrap/cache',
                 ];
-                $missingPkgs = [];
-                foreach ($extMapping as $ext => $pkg) {
-                    if (! extension_loaded($ext)) {
-                        $missingPkgs[] = $pkg;
+                foreach ($dirs as $dir) {
+                    $fullPath = $baseDir.'/'.$dir;
+                    if (! is_dir($fullPath)) {
+                        @mkdir($fullPath, 0775, true);
+                    }
+                    @chmod($fullPath, 0775);
+                }
+                runCommand("chmod -R 775 {$baseDir}/storage {$baseDir}/bootstrap/cache 2>/dev/null || true");
+                $logs[] = 'Direktori storage & bootstrap/cache berhasil disiapkan dengan izin tulis (0775).';
+                break;
+
+            case 'extensions':
+                $iniFile = php_ini_loaded_file();
+                $extsToCheck = ['pdo_mysql', 'gd', 'mbstring', 'curl', 'zip', 'intl', 'bcmath', 'fileinfo', 'openssl'];
+                $missing = [];
+                foreach ($extsToCheck as $e) {
+                    if (! extension_loaded($e)) {
+                        $missing[] = $e;
                     }
                 }
-                if (! empty($missingPkgs)) {
-                    $pkgList = implode(' ', $missingPkgs).' unzip';
-                    runCommand("export DEBIAN_FRONTEND=noninteractive && {$sudoPrefix}apt-get update -y && {$sudoPrefix}apt-get install -y {$pkgList} 2>&1");
-                    $logs[] = 'Menginstal ekstensi sistem yang kurang via apt ('.implode(', ', $missingPkgs).').';
+
+                if (empty($missing)) {
+                    $logs[] = 'Semua ekstensi PHP wajib sudah aktif di memori.';
+                    break;
                 }
-            }
-        }
 
-        // 3. Swap Memori 2GB (Jika RAM <= 1.5GB dan belum memiliki Swap)
-        $diagCheck = checkServerDiagnostics();
-        if ($diagCheck['ram_total_mb'] > 0 && $diagCheck['ram_total_mb'] <= 1500 && $diagCheck['swap_mb'] < 512) {
-            $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
-            $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
-            if ($isRoot || $canSudo) {
-                $sudoPrefix = $isRoot ? '' : 'sudo ';
-                runCommand("{$sudoPrefix}fallocate -l 2G /swapfile 2>/dev/null || {$sudoPrefix}dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null");
-                runCommand("{$sudoPrefix}chmod 600 /swapfile && {$sudoPrefix}mkswap /swapfile 2>/dev/null && {$sudoPrefix}swapon /swapfile 2>/dev/null");
-                $logs[] = 'Swap memori 2GB berhasil diaktifkan untuk proteksi RAM VPS.';
-            }
-        }
+                // 1. Coba aktifkan di php.ini jika ada & writable (terutama Windows / Laragon / XAMPP)
+                if ($iniFile && is_file($iniFile) && is_writable($iniFile)) {
+                    $content = (string) file_get_contents($iniFile);
+                    $modified = false;
+                    foreach ($missing as $e) {
+                        $pattern = '/^[;\s]*extension\s*=\s*(php_)?'.preg_quote($e, '/').'(\.dll)?/mi';
+                        if (preg_match($pattern, $content)) {
+                            $content = preg_replace($pattern, 'extension='.$e, $content);
+                            $modified = true;
+                            $logs[] = "Mengaktifkan baris 'extension={$e}' di php.ini.";
+                        }
+                    }
+                    if ($modified) {
+                        file_put_contents($iniFile, $content);
+                        $restartNeeded = true;
+                        $logs[] = "File php.ini ({$iniFile}) berhasil diperbarui! Server PHP perlu di-restart agar ekstensi aktif di memori.";
+                    }
+                }
 
-        // 4. Unduh Composer jika belum tersedia di sistem
-        $composerCmd = getComposerCommand();
-        if (empty($composerCmd)) {
-            $dlSuccess = downloadComposerPhar();
-            if ($dlSuccess) {
+                // 2. Jika di Linux (Debian/Ubuntu), coba instalasi paket apt
+                if (file_exists('/etc/debian_version') || runCommand('which apt-get')['status'] === 0) {
+                    $majorMinor = PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;
+                    $pkgList = [];
+                    $extPkgMap = [
+                        'pdo_mysql' => "php{$majorMinor}-mysql",
+                        'gd' => "php{$majorMinor}-gd",
+                        'mbstring' => "php{$majorMinor}-mbstring",
+                        'curl' => "php{$majorMinor}-curl",
+                        'zip' => "php{$majorMinor}-zip",
+                        'intl' => "php{$majorMinor}-intl",
+                        'bcmath' => "php{$majorMinor}-bcmath",
+                        'imagick' => "php{$majorMinor}-imagick",
+                    ];
+                    foreach ($missing as $m) {
+                        if (isset($extPkgMap[$m])) {
+                            $pkgList[] = $extPkgMap[$m];
+                        }
+                    }
+                    if (! empty($pkgList)) {
+                        $manualCmd = 'sudo apt-get update && sudo apt-get install -y '.implode(' ', $pkgList).' unzip';
+                        $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
+                        $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
+
+                        if ($isRoot || $canSudo) {
+                            $pfx = $isRoot ? '' : 'sudo ';
+                            $aptRes = runCommand("export DEBIAN_FRONTEND=noninteractive && {$pfx}apt-get update -y && {$pfx}apt-get install -y ".implode(' ', $pkgList).' unzip 2>&1');
+                            if ($aptRes['status'] === 0) {
+                                $restartNeeded = true;
+                                $logs[] = 'Paket ekstensi ('.implode(', ', $pkgList).') berhasil diinstal via apt! Harap restart server PHP.';
+                            } else {
+                                $logs[] = 'Gagal otomatis via apt: '.$aptRes['output'];
+                            }
+                        } else {
+                            $logs[] = 'Ekstensi memerlukan izin root di terminal: '.$manualCmd;
+                        }
+                    }
+                }
+                break;
+
+            case 'composer':
                 $composerCmd = getComposerCommand();
-                $logs[] = 'Composer binary (composer.phar) berhasil diunduh dan disiapkan.';
-            } else {
-                $logs[] = 'Composer tidak ditemukan dan unduhan otomatis belum berhasil.';
-            }
-        } else {
-            $logs[] = 'Composer terdeteksi: '.$composerCmd;
-        }
-
-        // 5. Unduh & Pasang dependensi vendor/ jika belum ada
-        if (! file_exists($baseDir.'/vendor/autoload.php')) {
-            if (! empty($composerCmd)) {
-                $compRes = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader 2>&1");
-                if ($compRes['status'] === 0) {
-                    $logs[] = 'Dependensi vendor Composer berhasil diinstal lengkap.';
+                if (empty($composerCmd)) {
+                    $logs[] = 'Mengunduh binary Composer (composer.phar) portabel...';
+                    if (downloadComposerPhar()) {
+                        $composerCmd = getComposerCommand();
+                        $logs[] = 'Composer binary (composer.phar) berhasil disiapkan.';
+                    } else {
+                        $logs[] = 'Gagal mengunduh composer.phar. Silakan pasang Composer secara manual.';
+                    }
                 } else {
-                    $logs[] = 'Composer install: '.substr($compRes['output'], -200);
+                    $logs[] = 'Composer terdeteksi: '.$composerCmd;
                 }
-            }
-        } else {
-            $logs[] = 'Dependensi vendor Composer sudah lengkap.';
-        }
+                break;
 
-        // 6. Buat file .env dari .env.example jika .env belum ada
-        if (! file_exists($baseDir.'/.env') && file_exists($baseDir.'/.env.example')) {
-            @copy($baseDir.'/.env.example', $baseDir.'/.env');
-            $logs[] = 'File template .env berhasil disiapkan.';
-        }
+            case 'vendor':
+                $composerCmd = getComposerCommand();
+                if (empty($composerCmd)) {
+                    downloadComposerPhar();
+                    $composerCmd = getComposerCommand();
+                }
+                if (! file_exists($baseDir.'/vendor/autoload.php')) {
+                    if (! empty($composerCmd)) {
+                        $logs[] = 'Menjalankan composer install... (mohon tunggu sebentar)';
+                        $compRes = runCommand("cd {$baseDir} && {$composerCmd} install --no-interaction --prefer-dist --optimize-autoloader 2>&1");
+                        if ($compRes['status'] === 0) {
+                            $logs[] = 'Dependensi vendor Composer berhasil diinstal lengkap!';
+                        } else {
+                            $logs[] = 'Composer install: '.substr($compRes['output'], -250);
+                        }
+                    } else {
+                        $logs[] = 'Composer tidak ditemukan untuk menginstal vendor.';
+                    }
+                } else {
+                    $logs[] = 'Dependensi vendor Composer sudah lengkap (vendor/autoload.php terverifikasi).';
+                }
+                break;
 
-        $freshDiag = checkServerDiagnostics();
+            case 'swap':
+                $diagCheck = checkServerDiagnostics();
+                if ($diagCheck['ram_total_mb'] > 0 && $diagCheck['ram_total_mb'] <= 1500 && $diagCheck['swap_mb'] < 512) {
+                    $isRoot = (function_exists('posix_geteuid') && posix_geteuid() === 0) || (trim(runCommand('id -u')['output']) === '0');
+                    $canSudo = runCommand('sudo -n true 2>/dev/null')['status'] === 0;
+                    if ($isRoot || $canSudo) {
+                        $pfx = $isRoot ? '' : 'sudo ';
+                        runCommand("{$pfx}fallocate -l 2G /swapfile 2>/dev/null || {$pfx}dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null");
+                        runCommand("{$pfx}chmod 600 /swapfile && {$pfx}mkswap /swapfile 2>/dev/null && {$pfx}swapon /swapfile 2>/dev/null");
+                        $logs[] = 'Swap memori 2GB berhasil diaktifkan untuk menjaga stabilitas RAM.';
+                    } else {
+                        $logs[] = 'RAM server <= 1.5GB tanpa Swap. Disarankan alokasi swap dengan: sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile';
+                    }
+                } else {
+                    $logs[] = 'Alokasi memori RAM/Swap mencukupi.';
+                }
+                break;
+        }
 
         echo json_encode([
             'success' => true,
-            'message' => 'Proses auto-fix selesai.',
+            'step_id' => $stepId,
             'logs' => $logs,
-            'diagnostics' => $freshDiag,
+            'restart_needed' => $restartNeeded,
+            'manual_cmd' => $manualCmd,
+            'diagnostics' => checkServerDiagnostics(),
         ]);
         exit;
     }
@@ -621,75 +704,140 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
         <!-- STEP 1: KONDISI SERVER -->
         <div id="section-step-1" class="space-y-6">
             <div class="flex items-center justify-between border-b border-white/5 pb-3">
-                <h2 class="text-base font-bold text-white flex items-center gap-2">
-                    <span>🔍</span>
-                    <span>Diagnostik Kesehatan Server Otomatis</span>
-                </h2>
-                <?php if ($diag['is_ready'] && $diag['vendor_ready']) { ?>
-                    <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
-                        ✓ Server Memenuhi Syarat
-                    </span>
-                <?php } else { ?>
-                    <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30 animate-pulse">
-                        ⚡ Mempersiapkan Otomatis
-                    </span>
-                <?php } ?>
-            </div>
-
-            <!-- Auto-Fix Action Box -->
-            <div id="autofix-banner" class="p-4 rounded-xl bg-gradient-to-r from-indigo-500/15 via-purple-500/10 to-orange-500/10 border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
-                <div class="space-y-0.5">
-                    <div class="font-bold text-white text-xs flex items-center gap-2">
-                        <span>⚡ Penyiapan Lingkungan &amp; Auto-Fix Dependensi</span>
-                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">1-Klik Universal</span>
-                    </div>
-                    <p class="text-[11px] text-slate-300 leading-relaxed">
-                        Perbaiki otomatis izin direktori storage/cache, unduh composer.phar jika belum ada, pasang dependensi vendor, serta konfigurasi ekstensi &amp; swap server sesuai kondisi sistem Anda.
-                    </p>
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <span>🔍</span>
+                        <span>Diagnostik Kesehatan Server Otomatis</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Pemeriksaan dependensi &amp; kesiapan lingkungan kerja sistem.</p>
                 </div>
-                <button type="button" id="btn-autofix" onclick="runAutoFix()" class="px-5 py-2.5 rounded-xl brand-gradient text-white font-bold text-xs transition shadow-lg shadow-indigo-600/20 shrink-0 flex items-center gap-1.5 cursor-pointer hover:opacity-95">
-                    <span id="autofix-spinner" class="hidden animate-spin">⟳</span>
-                    <span id="autofix-btn-text">⚡ Jalankan Auto-Fix Sekarang</span>
-                </button>
-            </div>
-
-            <!-- Auto-Fix Live Log Box (Hidden at first) -->
-            <div id="autofix-log-container" class="hidden p-3.5 rounded-xl bg-black/60 border border-indigo-500/30 text-[11px] font-mono text-slate-300 space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] uppercase font-bold text-indigo-400">Log Hasil Auto-Fix:</span>
-                    <span id="autofix-status-badge" class="text-[10px] text-emerald-400 font-bold"></span>
+                <div id="server-status-pill">
+                    <?php if ($diag['is_ready'] && $diag['vendor_ready']) { ?>
+                        <span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5">
+                            <span>✓</span> <span>Server Siap Go-Live</span>
+                        </span>
+                    <?php } else { ?>
+                        <span class="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30 flex items-center gap-1.5">
+                            <span>⚠️</span> <span>Perlu Penyiapan Dependensi</span>
+                        </span>
+                    <?php } ?>
                 </div>
-                <div id="autofix-log-items" class="space-y-1 max-h-40 overflow-y-auto"></div>
             </div>
 
             <!-- Server Metrics Grid -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
                 <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
                     <div class="text-[10px] text-slate-400 uppercase font-sans">Sistem Operasi</div>
-                    <div class="font-bold text-white truncate mt-1" title="<?= htmlspecialchars($diag['os']) ?>"><?= htmlspecialchars($diag['os']) ?></div>
+                    <div id="metric-os" class="font-bold text-white truncate mt-1" title="<?= htmlspecialchars($diag['os']) ?>"><?= htmlspecialchars($diag['os']) ?></div>
                 </div>
                 <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
-                    <div class="text-[10px] text-slate-400 uppercase font-sans">PHP Version</div>
-                    <div class="font-bold <?= $diag['php_ok'] ? 'text-emerald-400' : 'text-rose-400' ?> mt-1">
+                    <div class="text-[10px] text-slate-400 uppercase font-sans">PHP Version &amp; Binary</div>
+                    <div id="metric-php" class="font-bold <?= $diag['php_ok'] ? 'text-emerald-400' : 'text-rose-400' ?> mt-1 truncate" title="<?= htmlspecialchars($diag['php_binary']) ?>">
                         PHP <?= $diag['php_version'] ?>
                     </div>
                 </div>
                 <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
                     <div class="text-[10px] text-slate-400 uppercase font-sans">RAM / Swap</div>
-                    <div class="font-bold text-white mt-1">
+                    <div id="metric-ram" class="font-bold text-white mt-1">
                         <?= $diag['ram_total_mb'] ?> MB <span class="text-[10px] text-slate-400">(Swap: <?= $diag['swap_mb'] ?>M)</span>
                     </div>
                 </div>
                 <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
                     <div class="text-[10px] text-slate-400 uppercase font-sans">Sisa Disk</div>
-                    <div class="font-bold text-white mt-1"><?= $diag['disk_free_gb'] ?> GB / <?= $diag['disk_total_gb'] ?> GB</div>
+                    <div id="metric-disk" class="font-bold text-white mt-1"><?= $diag['disk_free_gb'] ?> GB / <?= $diag['disk_total_gb'] ?> GB</div>
+                </div>
+            </div>
+
+            <!-- Auto-Fix Wizard Checklist Card -->
+            <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-orange-500/10 border border-indigo-500/30 space-y-4 shadow-xl">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="space-y-0.5">
+                        <div class="font-bold text-sm text-white flex items-center gap-2">
+                            <span>⚡ Wizard Penyiapan Otomatis (Step-by-Step Auto-Fix)</span>
+                        </div>
+                        <p class="text-xs text-slate-300">
+                            Sistem mengeksekusi penyiapan satu persatu dan memvalidasi hasilnya secara bertahap.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" id="btn-autofix" onclick="runSequentialAutoFix()" class="px-5 py-2.5 rounded-xl brand-gradient text-white font-bold text-xs transition shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer hover:opacity-95">
+                            <span id="autofix-spinner" class="hidden animate-spin">⟳</span>
+                            <span id="autofix-btn-text">⚡ Jalankan Auto-Fix Sekarang</span>
+                        </button>
+                        <button type="button" onclick="refreshDiagnostics()" class="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs border border-white/10 flex items-center gap-1.5 transition cursor-pointer" title="Periksa ulang kondisi terkini">
+                            <span>🔄</span>
+                            <span>Segarkan</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5 Sequential Checkpoints -->
+                <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-1 font-mono text-xs">
+                    <div id="card-step-dirs" class="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                        <div class="text-[10px] text-slate-400 font-sans">Step 1</div>
+                        <div class="font-bold text-slate-200 text-[11px] truncate">1. Folder Storage</div>
+                        <div id="status-step-dirs" class="text-[10px] <?= $diag['permissions']['storage'] && $diag['permissions']['cache'] ? 'text-emerald-400 font-bold' : 'text-slate-400' ?>">
+                            <?= $diag['permissions']['storage'] && $diag['permissions']['cache'] ? '✓ Siap' : '○ Menunggu' ?>
+                        </div>
+                    </div>
+                    <div id="card-step-extensions" class="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                        <div class="text-[10px] text-slate-400 font-sans">Step 2</div>
+                        <div class="font-bold text-slate-200 text-[11px] truncate">2. Ekstensi PHP</div>
+                        <div id="status-step-extensions" class="text-[10px] <?= $diag['extensions_ok'] ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold' ?>">
+                            <?= $diag['extensions_ok'] ? '✓ Lengkap' : '○ Perlu Dicek' ?>
+                        </div>
+                    </div>
+                    <div id="card-step-composer" class="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                        <div class="text-[10px] text-slate-400 font-sans">Step 3</div>
+                        <div class="font-bold text-slate-200 text-[11px] truncate">3. Composer Tool</div>
+                        <div id="status-step-composer" class="text-[10px] <?= $diag['tools']['composer'] ? 'text-emerald-400 font-bold' : 'text-slate-400' ?>">
+                            <?= $diag['tools']['composer'] ? '✓ Siap' : '○ Menunggu' ?>
+                        </div>
+                    </div>
+                    <div id="card-step-vendor" class="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                        <div class="text-[10px] text-slate-400 font-sans">Step 4</div>
+                        <div class="font-bold text-slate-200 text-[11px] truncate">4. Vendor Dependensi</div>
+                        <div id="status-step-vendor" class="text-[10px] <?= $diag['vendor_ready'] ? 'text-emerald-400 font-bold' : 'text-slate-400' ?>">
+                            <?= $diag['vendor_ready'] ? '✓ Terpasang' : '○ Menunggu' ?>
+                        </div>
+                    </div>
+                    <div id="card-step-swap" class="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                        <div class="text-[10px] text-slate-400 font-sans">Step 5</div>
+                        <div class="font-bold text-slate-200 text-[11px] truncate">5. Swap Memori</div>
+                        <div id="status-step-swap" class="text-[10px] <?= $diag['swap_mb'] > 0 || $diag['ram_total_mb'] > 1500 ? 'text-emerald-400 font-bold' : 'text-slate-400' ?>">
+                            <?= $diag['swap_mb'] > 0 || $diag['ram_total_mb'] > 1500 ? '✓ Aman' : '○ Menunggu' ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Callout jika membutuhkan restart atau aksi manual di terminal -->
+                <div id="manual-action-card" class="<?= ! empty($diag['missing_extensions']) ? '' : 'hidden' ?> p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="font-bold text-amber-300 flex items-center gap-1.5">
+                            <span>💡</span>
+                            <span id="manual-action-title">Perintah Terminal Diperlukan / Restart PHP</span>
+                        </div>
+                        <button type="button" onclick="copyManualCmd()" class="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-[11px] font-bold border border-amber-500/30 transition cursor-pointer flex items-center gap-1">
+                            <span>📋</span>
+                            <span>Salin Perintah</span>
+                        </button>
+                    </div>
+                    <p id="manual-action-desc" class="text-[11px] text-slate-300">
+                        Jika ekstensi PHP belum otomatis terpasang atau konfigurasi php.ini baru diubah, jalankan perintah ini di terminal Anda:
+                    </p>
+                    <pre id="manual-action-code" class="p-2.5 rounded-lg bg-black/60 font-mono text-[11px] text-amber-200 overflow-x-auto select-all"><?= htmlspecialchars($diag['recommended_cmd']) ?></pre>
+                    <div class="text-[10px] text-slate-400">
+                        *Setelah perintah selesai, hentikan PHP server (<code class="text-white">Ctrl+C</code>) lalu jalankan kembali launcher (<code class="text-white">./start-install.sh</code> atau <code class="text-white">start-install.bat</code>) kemudian klik <strong>Segarkan</strong>.
+                    </div>
                 </div>
             </div>
 
             <!-- Extensions Table -->
             <div class="space-y-2">
-                <div class="text-xs font-bold text-slate-300">Ekstensi PHP &amp; Fitur Gambar Universal:</div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                <div class="flex items-center justify-between text-xs font-bold text-slate-300">
+                    <span>Ekstensi PHP Terdeteksi (php.ini: <code class="font-mono text-indigo-300 text-[11px]" title="<?= htmlspecialchars($diag['php_ini']) ?>"><?= htmlspecialchars(basename($diag['php_ini'])) ?></code>):</span>
+                </div>
+                <div id="extensions-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] font-mono">
                     <?php foreach ($diag['extensions'] as $extName => $ext) { ?>
                         <div class="p-2.5 rounded-xl border flex items-center justify-between <?= $ext['loaded'] ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : ($ext['required'] ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' : 'bg-slate-800/40 border-white/5 text-slate-400') ?>">
                             <span><?= $extName ?></span>
@@ -705,32 +853,53 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                     <div class="font-bold text-slate-200">Izin Tulis Direktori:</div>
                     <div class="flex items-center justify-between font-mono text-[11px]">
                         <span>storage/</span>
-                        <span class="<?= $diag['permissions']['storage'] ? 'text-emerald-400' : 'text-rose-400' ?>"><?= $diag['permissions']['storage'] ? '✓ Writable' : '✕ Tidak Writable' ?></span>
+                        <span id="status-perm-storage" class="<?= $diag['permissions']['storage'] ? 'text-emerald-400' : 'text-rose-400' ?>"><?= $diag['permissions']['storage'] ? '✓ Writable' : '✕ Tidak Writable' ?></span>
                     </div>
                     <div class="flex items-center justify-between font-mono text-[11px]">
                         <span>bootstrap/cache/</span>
-                        <span class="<?= $diag['permissions']['cache'] ? 'text-emerald-400' : 'text-rose-400' ?>"><?= $diag['permissions']['cache'] ? '✓ Writable' : '✕ Tidak Writable' ?></span>
+                        <span id="status-perm-cache" class="<?= $diag['permissions']['cache'] ? 'text-emerald-400' : 'text-rose-400' ?>"><?= $diag['permissions']['cache'] ? '✓ Writable' : '✕ Tidak Writable' ?></span>
                     </div>
                     <div class="flex items-center justify-between font-mono text-[11px]">
                         <span>vendor/autoload.php</span>
-                        <span class="<?= $diag['vendor_ready'] ? 'text-emerald-400' : 'text-amber-400' ?>"><?= $diag['vendor_ready'] ? '✓ Lengkap' : '⚡ Diinstal otomatis' ?></span>
+                        <span id="status-vendor-ready" class="<?= $diag['vendor_ready'] ? 'text-emerald-400' : 'text-amber-400' ?>"><?= $diag['vendor_ready'] ? '✓ Lengkap' : '⚡ Belum Lengkap' ?></span>
                     </div>
                 </div>
                 <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
                     <div class="font-bold text-slate-200">Tools Sistem Terdeteksi:</div>
                     <div class="flex items-center gap-2 flex-wrap font-mono text-[10px]">
-                        <span class="px-2 py-0.5 rounded <?= $diag['tools']['composer'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">composer</span>
-                        <span class="px-2 py-0.5 rounded <?= $diag['tools']['git'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">git</span>
-                        <span class="px-2 py-0.5 rounded <?= $diag['tools']['node'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">node</span>
-                        <span class="px-2 py-0.5 rounded <?= $diag['tools']['supervisor'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">supervisor</span>
-                        <span class="px-2 py-0.5 rounded <?= $diag['tools']['opencode'] ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500' ?>">opencode</span>
-                        <span class="px-2 py-0.5 rounded <?= $diag['tools']['9router'] ? 'bg-orange-500/20 text-orange-300' : 'bg-slate-800 text-slate-500' ?>">9router</span>
+                        <span id="tool-composer" class="px-2 py-0.5 rounded <?= $diag['tools']['composer'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">composer</span>
+                        <span id="tool-git" class="px-2 py-0.5 rounded <?= $diag['tools']['git'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">git</span>
+                        <span id="tool-node" class="px-2 py-0.5 rounded <?= $diag['tools']['node'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">node</span>
+                        <span id="tool-supervisor" class="px-2 py-0.5 rounded <?= $diag['tools']['supervisor'] ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500' ?>">supervisor</span>
+                        <span id="tool-opencode" class="px-2 py-0.5 rounded <?= $diag['tools']['opencode'] ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500' ?>">opencode</span>
+                        <span id="tool-9router" class="px-2 py-0.5 rounded <?= $diag['tools']['9router'] ? 'bg-orange-500/20 text-orange-300' : 'bg-slate-800 text-slate-500' ?>">9router</span>
                     </div>
                 </div>
             </div>
 
-            <div class="flex justify-end pt-3">
-                <button type="button" onclick="goToStep(2)" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition flex items-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer">
+            <!-- Terminal-Style Log Console with 1-Click Copy -->
+            <div class="p-4 rounded-xl bg-black/70 border border-white/10 space-y-2">
+                <div class="flex items-center justify-between">
+                    <div class="font-bold text-slate-300 text-xs flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span>Console Log Eksekusi &amp; Diagnostik</span>
+                    </div>
+                    <button type="button" onclick="copyFullDiagnosticReport()" class="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-bold text-xs border border-indigo-500/40 transition flex items-center gap-1.5 cursor-pointer">
+                        <span>📋</span>
+                        <span id="copy-report-text">Salin Log Diagnostik Lengkap</span>
+                    </button>
+                </div>
+                <div id="execution-log-box" class="max-h-48 overflow-y-auto p-3 rounded-lg bg-black/60 font-mono text-[11px] text-slate-300 space-y-1 border border-white/5">
+                    <div class="text-slate-500">// Log aktivitas penyiapan server siap direkam di sini...</div>
+                </div>
+            </div>
+
+            <!-- Bottom Action Navigation -->
+            <div class="flex items-center justify-between pt-3 border-t border-white/5">
+                <div id="step-1-status-hint" class="text-xs <?= $diag['is_ready'] && $diag['vendor_ready'] ? 'text-emerald-400 font-bold' : 'text-amber-400' ?>">
+                    <?= $diag['is_ready'] && $diag['vendor_ready'] ? '✓ Seluruh persyaratan sistem telah siap.' : '⚠️ Selesaikan checklist di atas untuk mengaktifkan langkah berikutnya.' ?>
+                </div>
+                <button type="button" id="btn-next-step-1" onclick="goToStep(2)" class="px-6 py-2.5 rounded-xl <?= $diag['is_ready'] && $diag['vendor_ready'] ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-lg shadow-indigo-600/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60' ?> font-bold text-xs transition flex items-center gap-2" <?= $diag['is_ready'] && $diag['vendor_ready'] ? '' : 'disabled' ?>>
                     <span>Lanjut ke Pengaturan Database</span>
                     <span>→</span>
                 </button>
@@ -971,68 +1140,262 @@ function goToStep(step) {
     }
 }
 
-async function runAutoFix() {
+let serverDiagnosticsCache = <?= json_encode($diag, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+let logHistory = [];
+
+function appendLog(msg, type = 'info') {
+    const box = document.getElementById('execution-log-box');
+    const time = new Date().toLocaleTimeString();
+    const line = `[${time}] ${msg}`;
+    logHistory.push(line);
+
+    if (box) {
+        const div = document.createElement('div');
+        div.className = type === 'error' ? 'text-rose-400' : (type === 'success' ? 'text-emerald-300' : (type === 'warn' ? 'text-amber-300' : 'text-slate-300'));
+        div.textContent = line;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+}
+
+function updateDiagnosticsUI(d) {
+    if (!d) return;
+    serverDiagnosticsCache = d;
+
+    // 1. Metric counters
+    const elOs = document.getElementById('metric-os');
+    if (elOs) elOs.textContent = d.os;
+    const elPhp = document.getElementById('metric-php');
+    if (elPhp) {
+        elPhp.textContent = 'PHP ' + d.php_version;
+        elPhp.className = 'font-bold ' + (d.php_ok ? 'text-emerald-400' : 'text-rose-400') + ' mt-1 truncate';
+    }
+    const elRam = document.getElementById('metric-ram');
+    if (elRam) {
+        elRam.innerHTML = `${d.ram_total_mb} MB <span class="text-[10px] text-slate-400">(Swap: ${d.swap_mb}M)</span>`;
+    }
+    const elDisk = document.getElementById('metric-disk');
+    if (elDisk) {
+        elDisk.textContent = `${d.disk_free_gb} GB / ${d.disk_total_gb} GB`;
+    }
+
+    // 2. Step checkpoint statuses
+    const setStatus = (id, ready, okText, pendingText) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.className = 'text-[10px] font-bold ' + (ready ? 'text-emerald-400' : 'text-amber-400');
+            el.textContent = ready ? '✓ ' + okText : '○ ' + pendingText;
+        }
+    };
+    setStatus('status-step-dirs', d.permissions?.storage && d.permissions?.cache, 'Siap', 'Belum Siap');
+    setStatus('status-step-extensions', d.extensions_ok, 'Lengkap', 'Perlu Dicek');
+    setStatus('status-step-composer', d.tools?.composer, 'Siap', 'Belum Ada');
+    setStatus('status-step-vendor', d.vendor_ready, 'Terpasang', 'Belum Lengkap');
+    setStatus('status-step-swap', d.swap_mb > 0 || d.ram_total_mb > 1500, 'Aman', 'Disarankan');
+
+    // 3. Permissions
+    const setPerm = (id, ok) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.className = ok ? 'text-emerald-400' : 'text-rose-400';
+            el.textContent = ok ? '✓ Writable' : '✕ Tidak Writable';
+        }
+    };
+    setPerm('status-perm-storage', d.permissions?.storage);
+    setPerm('status-perm-cache', d.permissions?.cache);
+    const elVendor = document.getElementById('status-vendor-ready');
+    if (elVendor) {
+        elVendor.className = d.vendor_ready ? 'text-emerald-400' : 'text-amber-400';
+        elVendor.textContent = d.vendor_ready ? '✓ Lengkap' : '⚡ Belum Lengkap';
+    }
+
+    // 4. Extensions Grid
+    const extGrid = document.getElementById('extensions-grid');
+    if (extGrid && d.extensions) {
+        extGrid.innerHTML = '';
+        Object.entries(d.extensions).forEach(([extName, ext]) => {
+            const card = document.createElement('div');
+            card.className = 'p-2.5 rounded-xl border flex items-center justify-between ' + 
+                (ext.loaded ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 
+                (ext.required ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' : 'bg-slate-800/40 border-white/5 text-slate-400'));
+            card.innerHTML = `<span>${extName}</span><span>${ext.loaded ? '✓ Ada' : (ext.required ? '✕ Wajib' : '- Opsional')}</span>`;
+            extGrid.appendChild(card);
+        });
+    }
+
+    // 5. Manual Action Callout Box
+    const manualCard = document.getElementById('manual-action-card');
+    if (manualCard) {
+        if (d.missing_extensions && d.missing_extensions.length > 0) {
+            manualCard.classList.remove('hidden');
+            const codeEl = document.getElementById('manual-action-code');
+            if (codeEl) codeEl.textContent = d.recommended_cmd || '';
+        } else {
+            manualCard.classList.add('hidden');
+        }
+    }
+
+    // 6. Server Ready Pill & Next Button
+    const isReady = d.is_ready && d.vendor_ready;
+    const pill = document.getElementById('server-status-pill');
+    if (pill) {
+        pill.innerHTML = isReady 
+            ? '<span class="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5"><span>✓</span> <span>Server Siap Go-Live</span></span>'
+            : '<span class="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30 flex items-center gap-1.5"><span>⚠️</span> <span>Perlu Penyiapan Dependensi</span></span>';
+    }
+
+    const hint = document.getElementById('step-1-status-hint');
+    if (hint) {
+        hint.className = 'text-xs ' + (isReady ? 'text-emerald-400 font-bold' : 'text-amber-400');
+        hint.textContent = isReady 
+            ? '✓ Seluruh persyaratan sistem telah siap.' 
+            : '⚠️ Selesaikan checklist di atas untuk mengaktifkan langkah berikutnya.';
+    }
+
+    const btnNext = document.getElementById('btn-next-step-1');
+    if (btnNext) {
+        btnNext.disabled = !isReady;
+        btnNext.className = 'px-6 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 ' +
+            (isReady ? 'bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shadow-lg shadow-indigo-600/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60');
+    }
+}
+
+async function refreshDiagnostics() {
+    appendLog('Memeriksa ulang kondisi diagnostik server...', 'info');
+    try {
+        const formData = new FormData();
+        formData.append('action', 'get_diagnostics');
+        const res = await fetch('install.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success && data.diagnostics) {
+            updateDiagnosticsUI(data.diagnostics);
+            appendLog('Diagnostik berhasil diperbarui.', 'success');
+        }
+    } catch (e) {
+        appendLog('Gagal memperbarui diagnostik: ' + e.message, 'error');
+    }
+}
+
+async function runSequentialAutoFix() {
     const btn = document.getElementById('btn-autofix');
     const spinner = document.getElementById('autofix-spinner');
     const btnText = document.getElementById('autofix-btn-text');
-    const logBox = document.getElementById('autofix-log-container');
-    const logItems = document.getElementById('autofix-log-items');
-    const statusBadge = document.getElementById('autofix-status-badge');
 
     btn.disabled = true;
     btn.classList.add('opacity-75', 'cursor-not-allowed');
     spinner.classList.remove('hidden');
-    btnText.textContent = 'Menyiapkan sistem otomatis...';
-    logBox.classList.remove('hidden');
-    logItems.innerHTML = '<div class="text-indigo-300">⏳ Sedang memeriksa dan memperbaiki lingkungan sistem otomatis...</div>';
+    btnText.textContent = 'Menjalankan auto-fix...';
 
-    const formData = new FormData();
-    formData.append('action', 'auto_fix');
+    const steps = [
+        { id: 'dirs', name: '1. Izin & Struktur Folder Direktori' },
+        { id: 'extensions', name: '2. Aktivasi & Instalasi Ekstensi PHP' },
+        { id: 'composer', name: '3. Unduh & Siapkan Binary Composer' },
+        { id: 'vendor', name: '4. Pasang Dependensi Vendor Composer' },
+        { id: 'swap', name: '5. Proteksi Swap Memory Server' }
+    ];
 
-    try {
-        const res = await fetch('install.php', { method: 'POST', body: formData });
-        const data = await res.json();
+    appendLog('=== MEMULAI RUNNER AUTO-FIX STEP-BY-STEP ===', 'info');
 
-        logItems.innerHTML = '';
-        if (data.logs && Array.isArray(data.logs)) {
-            data.logs.forEach(msg => {
-                const item = document.createElement('div');
-                item.className = 'text-emerald-300 flex items-center gap-1.5';
-                item.innerHTML = '<span>✓</span> <span>' + msg + '</span>';
-                logItems.appendChild(item);
-            });
+    let allCompleted = true;
+    let restartRequired = false;
+
+    for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        btnText.textContent = `Memproses (${i + 1}/${steps.length}): ${step.name}...`;
+        appendLog(`[Step ${i + 1}/${steps.length}] Memulai ${step.name}...`, 'info');
+
+        try {
+            const formData = new FormData();
+            formData.append('action', 'autofix_step');
+            formData.append('step_id', step.id);
+
+            const res = await fetch('install.php', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.logs && Array.isArray(data.logs)) {
+                data.logs.forEach(l => appendLog(`  -> ${l}`, 'info'));
+            }
+
+            if (data.diagnostics) {
+                updateDiagnosticsUI(data.diagnostics);
+            }
+
+            if (data.restart_needed) {
+                restartRequired = true;
+            }
+
+            if (data.manual_cmd) {
+                appendLog(`  [PERINTAH TERMINAL]: ${data.manual_cmd}`, 'warn');
+            }
+
+            appendLog(`[Step ${i + 1}/${steps.length}] Selesai diproses.`, 'success');
+        } catch (e) {
+            allCompleted = false;
+            appendLog(`[Step ${i + 1}/${steps.length}] Kendala eksekusi: ${e.message}`, 'error');
+            break;
         }
+    }
 
-        if (data.success) {
-            btnText.textContent = '✓ Sistem Siap Digunakan!';
-            btn.className = 'px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shrink-0 flex items-center gap-1.5 cursor-default';
-            statusBadge.textContent = '● Status: Siap';
-            statusBadge.className = 'text-[10px] text-emerald-400 font-bold';
+    spinner.classList.add('hidden');
+    btn.disabled = false;
+    btn.classList.remove('opacity-75', 'cursor-not-allowed');
 
-            setTimeout(() => {
-                window.location.reload();
-            }, 1200);
-        } else {
-            btnText.textContent = '⚡ Coba Lagi Auto-Fix';
-            btn.disabled = false;
-            btn.classList.remove('opacity-75', 'cursor-not-allowed');
-            statusBadge.textContent = '● Status: Perlu Perhatian';
-            statusBadge.className = 'text-[10px] text-rose-400 font-bold';
-        }
-    } catch (e) {
-        logItems.innerHTML += '<div class="text-rose-400">✕ Terjadi kendala request: ' + e.message + '</div>';
-        btnText.textContent = '⚡ Coba Lagi Auto-Fix';
-        btn.disabled = false;
-        btn.classList.remove('opacity-75', 'cursor-not-allowed');
-    } finally {
-        spinner.classList.add('hidden');
+    if (restartRequired) {
+        btnText.textContent = '⚠️ Restart Server PHP Diperlukan';
+        appendLog('PENTING: Konfigurasi php.ini atau paket sistem telah diperbarui. Silakan restart PHP server (Ctrl+C di terminal lalu jalankan ./start-install.sh atau start-install.bat lagi), kemudian klik tombol "Segarkan".', 'warn');
+    } else if (serverDiagnosticsCache && serverDiagnosticsCache.is_ready && serverDiagnosticsCache.vendor_ready) {
+        btnText.textContent = '✓ Sistem Siap Digunakan!';
+        btn.className = 'px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shrink-0 flex items-center gap-1.5 cursor-default';
+        appendLog('Selamat! Seluruh prasyarat lingkungan sistem telah hijau dan siap dilanjutkan.', 'success');
+    } else {
+        btnText.textContent = '⚡ Jalankan Ulang Auto-Fix';
+        appendLog('Beberapa modul masih memerlukan perhatian (lihat checklist & perintah terminal di atas).', 'warn');
     }
 }
 
+function copyManualCmd() {
+    const code = document.getElementById('manual-action-code')?.textContent || '';
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+        appendLog('Perintah terminal berhasil disalin ke clipboard!', 'success');
+        alert('Perintah terminal berhasil disalin! Silakan tempel (paste) di terminal server Anda.');
+    }).catch(() => {
+        prompt('Salin perintah manual berikut:', code);
+    });
+}
+
+function copyFullDiagnosticReport() {
+    const btn = document.getElementById('copy-report-text');
+    const diagStr = JSON.stringify(serverDiagnosticsCache, null, 2);
+    const report = [
+        '=== LAPORAN DIAGNOSTIK & LOG INSTALLER UTE PARTS ===',
+        `Waktu Laporan: ${new Date().toISOString()}`,
+        '',
+        '--- DATA DIAGNOSTIK SISTEM ---',
+        diagStr,
+        '',
+        '--- RIWAYAT LOG EKSEKUSI ---',
+        logHistory.length > 0 ? logHistory.join('\n') : '(Belum ada log tercatat)',
+        '====================================================='
+    ].join('\n');
+
+    navigator.clipboard.writeText(report).then(() => {
+        if (btn) btn.textContent = '✓ Log Tersalin!';
+        setTimeout(() => {
+            if (btn) btn.textContent = 'Salin Log Diagnostik Lengkap';
+        }, 2000);
+        appendLog('Seluruh laporan diagnostik & log berhasil disalin ke clipboard.', 'success');
+    }).catch(() => {
+        prompt('Salin seluruh laporan berikut:', report);
+    });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
+    // Jalankan auto-fix bertahap otomatis hanya satu kali jika belum siap
     <?php if (! $diag['is_ready'] || ! $diag['vendor_ready']) { ?>
-    // Otomatis picu penyiapan lingkungan saat awal diagnosa jika ada kebutuhan yang belum siap
-    runAutoFix();
+    runSequentialAutoFix();
+    <?php } else { ?>
+    appendLog('Kondisi server memenuhi seluruh syarat awal.', 'success');
     <?php } ?>
 });
 
