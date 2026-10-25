@@ -496,6 +496,10 @@ $detectedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https'
                         <span>bootstrap/cache/</span>
                         <span class="<?= $diag['permissions']['cache'] ? 'text-emerald-400' : 'text-rose-400' ?>"><?= $diag['permissions']['cache'] ? '✓ Writable' : '✕ Tidak Writable' ?></span>
                     </div>
+                    <div class="flex items-center justify-between font-mono text-[11px]">
+                        <span>vendor/autoload.php</span>
+                        <span class="<?= $diag['vendor_ready'] ? 'text-emerald-400' : 'text-amber-400' ?>"><?= $diag['vendor_ready'] ? '✓ Lengkap' : '⚡ Diinstal otomatis' ?></span>
+                    </div>
                 </div>
                 <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
                     <div class="font-bold text-slate-200">Tools Sistem Terdeteksi:</div>
