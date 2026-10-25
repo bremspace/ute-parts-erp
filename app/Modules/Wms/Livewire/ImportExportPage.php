@@ -2,14 +2,17 @@
 
 namespace App\Modules\Wms\Livewire;
 
+use App\Modules\Wms\Exports\BulkFotoSkippedExport;
 use App\Modules\Wms\Exports\ImportProdukTemplateExport;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
+use App\Modules\Wms\Services\BulkProductImageImportService;
 use App\Modules\Wms\Services\ExportMasterProdukService;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\ImportSidRetailService;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -48,9 +51,37 @@ class ImportExportPage extends Component
 
     public array $resolusiDuplikat = []; // [baris => ['aksi' => 'ganti_sku|timpa_update|skip', 'sku_baru' => '...']]
 
+    // --- TAB 3: IMPORT FOTO BULK ---
+    public $fotoUploads = [];
+
+    public $fotoZip = null;
+
+    public string $fotoSourceType = 'files'; // 'files' | 'zip'
+
+    public string $fotoMode = 'append'; // 'append' | 'replace' | 'skip_existing'
+
+    public string $fotoStep = 'upload'; // 'upload' | 'preview' | 'processing' | 'completed'
+
+    public array $fotoScanResult = [];
+
+    public string $fotoFilterTab = 'all'; // 'all' | 'matched' | 'skipped'
+
+    public int $fotoBatchChunkSize = 8;
+
+    public int $fotoProcessedCount = 0;
+
+    public int $fotoSuccessCount = 0;
+
+    public int $fotoErrorCount = 0;
+
+    public ?string $fotoTempDir = null;
+
+    public array $fotoCompletedSummary = [];
+
     public function mount(): void
     {
-        $this->activeTab = request('tab', 'import') === 'export' ? 'export' : 'import';
+        $reqTab = request('tab', 'import');
+        $this->activeTab = in_array($reqTab, ['import', 'export', 'foto'], true) ? $reqTab : 'import';
 
         $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
         $gudangPertama = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->first();
@@ -356,6 +387,225 @@ class ImportExportPage extends Component
         ]);
 
         return app(ExportMasterProdukService::class)->export($format, $cabangId);
+    }
+
+    // =========================================================================
+    // AKSI FOTO PRODUK BULK (TAB 3)
+    // =========================================================================
+
+    public function setFotoFilterTab(string $tab): void
+    {
+        $this->fotoFilterTab = in_array($tab, ['all', 'matched', 'skipped'], true) ? $tab : 'all';
+    }
+
+    public function scanUploadedFoto(): void
+    {
+        $bulkService = app(BulkProductImageImportService::class);
+
+        if ($this->fotoSourceType === 'zip') {
+            $this->validate([
+                'fotoZip' => 'required|file|mimes:zip|max:51200',
+            ], [
+                'fotoZip.required' => 'Pilih berkas ZIP foto terlebih dahulu.',
+                'fotoZip.mimes' => 'Berkas harus berupa arsip ZIP (.zip).',
+                'fotoZip.max' => 'Ukuran berkas ZIP maksimal 50MB.',
+            ]);
+
+            $tempDir = storage_path('app/tmp_foto_'.auth()->id().'_'.time());
+            $this->fotoTempDir = $tempDir;
+            $zipRealPath = $this->fotoZip->getRealPath();
+
+            try {
+                $extracted = $bulkService->extractZipArchive($zipRealPath, $tempDir);
+                if (empty($extracted)) {
+                    $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak ditemukan file gambar yang didukung di dalam berkas ZIP.']);
+
+                    return;
+                }
+                $scan = $bulkService->preScanFiles($extracted);
+                $this->fotoScanResult = $scan;
+                $this->fotoStep = 'preview';
+            } catch (\Throwable $e) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal mengekstrak ZIP: '.$e->getMessage()]);
+
+                return;
+            }
+        } else {
+            $this->validate([
+                'fotoUploads' => 'required|array|min:1',
+                'fotoUploads.*' => 'file|max:15360',
+            ], [
+                'fotoUploads.required' => 'Pilih satu atau beberapa file foto terlebih dahulu.',
+                'fotoUploads.min' => 'Minimal pilih 1 file foto.',
+                'fotoUploads.*.max' => 'Ukuran file foto maksimal 15MB.',
+            ]);
+
+            $items = [];
+            $tempDir = storage_path('app/tmp_foto_'.auth()->id().'_'.time());
+            if (! is_dir($tempDir)) {
+                @mkdir($tempDir, 0775, true);
+            }
+            $this->fotoTempDir = $tempDir;
+
+            foreach ($this->fotoUploads as $idx => $file) {
+                $origName = $file->getClientOriginalName();
+                $tempStored = $file->storeAs('tmp_foto_'.auth()->id().'_'.time(), 'f_'.$idx.'_'.Str::slug(pathinfo($origName, PATHINFO_FILENAME)).'.'.$file->getClientOriginalExtension());
+                $absStored = Storage::disk('local')->path($tempStored);
+
+                $items[] = [
+                    'name' => $origName,
+                    'relative_path' => null,
+                    'size' => $file->getSize(),
+                    'temp_path' => $absStored,
+                ];
+            }
+
+            $scan = $bulkService->preScanFiles($items);
+            $this->fotoScanResult = $scan;
+            $this->fotoStep = 'preview';
+        }
+    }
+
+    public function startFotoProcessing(): void
+    {
+        if (empty($this->fotoScanResult['matched'])) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tidak ada foto yang cocok untuk diproses.']);
+
+            return;
+        }
+
+        $this->fotoStep = 'processing';
+        $this->fotoProcessedCount = 0;
+        $this->fotoSuccessCount = 0;
+        $this->fotoErrorCount = 0;
+
+        $this->processNextFotoChunk();
+    }
+
+    public function processNextFotoChunk(): void
+    {
+        if ($this->fotoStep !== 'processing') {
+            return;
+        }
+
+        $matchedList = $this->fotoScanResult['matched'] ?? [];
+        $totalMatched = count($matchedList);
+
+        if ($this->fotoProcessedCount >= $totalMatched) {
+            $this->finishFotoProcessing();
+
+            return;
+        }
+
+        $bulkService = app(BulkProductImageImportService::class);
+        $chunk = array_slice($matchedList, $this->fotoProcessedCount, $this->fotoBatchChunkSize);
+
+        foreach ($chunk as $item) {
+            $tempPath = $item['temp_path'] ?? null;
+            $produkId = $item['produk_id'] ?? null;
+            $isPrimary = ! empty($item['is_primary']);
+
+            if ($tempPath && file_exists($tempPath) && $produkId) {
+                try {
+                    $res = $bulkService->processAndAttach(
+                        $tempPath,
+                        $produkId,
+                        $this->fotoMode,
+                        $isPrimary
+                    );
+                    if ($res['success']) {
+                        $this->fotoSuccessCount++;
+                    } else {
+                        $this->fotoErrorCount++;
+                    }
+                } catch (\Throwable $e) {
+                    $this->fotoErrorCount++;
+                }
+            } else {
+                $this->fotoErrorCount++;
+            }
+
+            $this->fotoProcessedCount++;
+        }
+
+        if (function_exists('gc_collect_cycles')) {
+            gc_collect_cycles();
+        }
+
+        if ($this->fotoProcessedCount >= $totalMatched) {
+            $this->finishFotoProcessing();
+        }
+    }
+
+    public function finishFotoProcessing(): void
+    {
+        $this->fotoStep = 'completed';
+        $this->fotoCompletedSummary = [
+            'total' => $this->fotoScanResult['total'] ?? 0,
+            'processed' => $this->fotoProcessedCount,
+            'success' => $this->fotoSuccessCount,
+            'error' => $this->fotoErrorCount,
+            'skipped' => $this->fotoScanResult['skipped_count'] ?? 0,
+        ];
+
+        // Bersihkan direktori temp
+        if ($this->fotoTempDir && is_dir($this->fotoTempDir)) {
+            $files = glob($this->fotoTempDir.'/*');
+            if (is_array($files)) {
+                foreach ($files as $f) {
+                    if (is_file($f)) {
+                        @unlink($f);
+                    }
+                }
+            }
+            @rmdir($this->fotoTempDir);
+            $this->fotoTempDir = null;
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Proses import foto produk selesai diproses!',
+        ]);
+    }
+
+    public function downloadFotoSkippedExcel(): mixed
+    {
+        $skipped = $this->fotoScanResult['skipped'] ?? [];
+        if (empty($skipped)) {
+            $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tidak ada data file yang dilewati.']);
+
+            return null;
+        }
+
+        return Excel::download(
+            new BulkFotoSkippedExport($skipped),
+            'laporan_foto_dilewati_'.date('Ymd_His').'.xlsx'
+        );
+    }
+
+    public function resetFotoUpload(): void
+    {
+        if ($this->fotoTempDir && is_dir($this->fotoTempDir)) {
+            $files = glob($this->fotoTempDir.'/*');
+            if (is_array($files)) {
+                foreach ($files as $f) {
+                    if (is_file($f)) {
+                        @unlink($f);
+                    }
+                }
+            }
+            @rmdir($this->fotoTempDir);
+            $this->fotoTempDir = null;
+        }
+
+        $this->fotoUploads = [];
+        $this->fotoZip = null;
+        $this->fotoScanResult = [];
+        $this->fotoStep = 'upload';
+        $this->fotoProcessedCount = 0;
+        $this->fotoSuccessCount = 0;
+        $this->fotoErrorCount = 0;
+        $this->fotoCompletedSummary = [];
     }
 
     public function render()

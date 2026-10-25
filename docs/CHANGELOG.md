@@ -3,6 +3,58 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-25 — Deployment & DevOps: Universal GUI Installer, Git CI/CD Webhook & AI Dev Maintenance Stack ✅
+
+- **Universal Web GUI Installer (`public/install.php`)**:
+  - Wizard antarmuka modern design system Ute Prism:
+    - **Step 1 (Diagnostik Kesehatan Server)**: Deteksi otomatis OS & kernel, memori RAM & status Swap (proteksi OOM), sisa disk storage, versi PHP (8.3+ / 8.4+), ekstensi wajib & opsional (GD, Imagick multi-format), izin tulis direktori (`storage`, `bootstrap/cache`), dan alat sistem (Composer, Node.js, Git, Supervisor, Nginx).
+    - **Step 2 (Koneksi Database MySQL)**: Uji koneksi interaktif via AJAX dengan tombol *Tes Koneksi* dan opsi *Auto-Create Database*.
+    - **Step 3 (Konfigurasi Bisnis & Integrasi)**: Form konfigurasi kredensial `.env` tanpa koding (App Name, URL, Duitku payment sandbox/live, Biteship kurir, WA Gateway Fonnte, dan rahasia webhook Git).
+    - **Step 4 (AI Development Node & Finalisasi)**: Pilihan integrasi AI development stack (OpenCode CLI, 9router port 20128, codebase-memory-mcp, serta AGENTS.md & skills) sebagai node pemeliharaan mandiri jika diperlukan di server baru.
+    - **Step 5 (Eksekusi Real-time)**: Progress bar interaktif eksekusi penulisan `.env`, `key:generate`, migrasi tabel & seeder akun bawaan, `storage:link`, optimasi cache produksi, dan redirect otomatis ke dashboard.
+- **Git CI/CD Auto-Deploy Webhook (`POST /webhook/git-deploy`)**:
+  - Controller `GitDeployWebhookController` menangani pembaruan otomatis saat `git push` ke repository GitHub / GitLab.
+  - Keamanan berlapis: verifikasi HMAC-SHA256 (`X-Hub-Signature-256`) atau token `GIT_DEPLOY_SECRET`.
+  - Eksekusi otomatis `git pull origin main`, `php artisan migrate --force`, dan `php artisan optimize`.
+- **AI Development & Maintenance Node Setup (`deploy/setup-ai-dev-stack.sh`)**:
+  - Otomatisasi instalasi OpenCode CLI, paket global `9router`, `codebase-memory-mcp`, dan `oh-my-opencode`.
+  - Konfigurasi service auto-start `9router` via systemd di port 20128.
+  - Pemulihan file konfigurasi `opencode.json`, `mcp-settings.json`, serta seluruh custom agents & skills.
+- **Standalone One-Click Script (`install-standalone.sh`)**:
+  - Otomasi instalasi headless 1 baris untuk server Ubuntu (Nginx, PHP 8.4-FPM, MySQL, Supervisor queue worker, Cron scheduler, Git CI/CD, SSL Let's Encrypt, dan AI Dev Node).
+- **Pengujian & Verifikasi**:
+  - Feature test `GitDeployWebhookTest` (3 tests, 4 assertions) lulus 100%.
+  - `./vendor/bin/pint` lulus PSR-12 dan `npm run build` sukses 100%.
+
+
+## 2026-10-25 — WMS: Bulk Import & Auto-Mapping Foto Produk Berdasarkan SKU ✅
+
+- **Service Ekstraksi & Bulk Image Processing (`BulkProductImageImportService`)**:
+  - Engine regex parser SKU adaptif: mengenali format exact (`{SKU}.jpg`), urutan underscore/dash/bracket (`{SKU}_1`, `{SKU}-1`, `{SKU} (1)`), suffix cover/main (`-main`, `_cover`), dan penamaan subfolder (`{SKU}/foto.jpg`).
+  - Pre-scanning & matching efisien ke database `sku_variants` (case-insensitive query terindeks).
+  - Eksekusi kompresi WebP otomatis (Full max 1200x1200px @ 82% quality, Thumbnail 250x250px @ 75% quality via PHP GD) menghemat ruang disk hingga 70%.
+  - Dukungan decoding multi-format universal & cerdas (`ProductImageService::loadAnyImageToGd`): GD native + Imagick fallback (`php8.4-imagick`) mendukung JPG, PNG, WebP, GIF, BMP, AVIF, HEIC/HEIF Apple, TIFF, PSD, SVG, TGA, dan file RAW kamera.
+  - Validasi cerdas format gambar: deteksi ekstensi + verifikasi MIME biner (`isImageFile`).
+  - Mendukung 3 strategi penggabungan: `append` (tambahkan ke galeri), `replace` (ganti total & bersihkan foto lama), dan `skip_existing` (isi hanya jika belum punya foto).
+- **Arsip ZIP & Folder Upload Streaming**:
+  - Dukungan upload folder langsung via HTML5 `webkitdirectory`, multi-file gambar, atau satu berkas arsip `.zip`.
+  - Ekstraksi streaming zip dengan sanitasi file sistem (`.DS_Store`, `Thumbs.db` diabaikan otomatis).
+- **Workspace UI & 4-Step Wizard di `/app/wms/import-export?tab=foto`**:
+  - Tab ke-3 interaktif "📸 Import Foto Massal (Auto SKU)" dengan design system Ute Prism.
+  - Step 1 (Upload & Opsi), Step 2 (Pre-Scan Review: badge statistik cocok vs dilewati, tabel interaktif filter), Step 3 (Progress Bar Real-Time dengan chunk 5-10 foto per request), Step 4 (Ringkasan Selesai).
+  - Shortcut tombol navigasi cepat "📸 Import Foto" di header WMS desktop dan mobile.
+- **Graceful Skip & Export Laporan Excel (`BulkFotoSkippedExport`)**:
+  - File foto tanpa SKU dilewati aman tanpa crash sistem.
+  - Pengguna dapat mengunduh laporan file yang di-skip dalam format Excel `.xlsx` dengan rincian nama file, tebakan SKU, alasan, dan saran perbaikan.
+- **Proteksi Memori RAM VPS & Kesiapan Migrasi**:
+  - Eksekusi batch chunked dengan pelepasan memori GD (`imagedestroy`, `gc_collect_cycles`) per request AJAX/Livewire mencegah Out of Memory (OOM) ramah VPS 1GB/2GB.
+  - Dokumentasi migrasi server (VPS baru Nginx & On-Premise IP Publik/Tunnel) disinkronkan di `README.md`, `docs/DEPLOY.md`, dan `docs/MIGRASI-VPS-KE-LOKAL.md`.
+- **Pengujian & Verifikasi**:
+  - Unit tests: `BulkProductImageImportTest` (5 tests, 41 assertions) lulus 100%.
+  - Feature tests: `BulkFotoProdukFeatureTest` (6 tests, 31 assertions) lulus 100%.
+  - Formatting `./vendor/bin/pint` lulus (PSR-12) dan `npm run build` sukses 100%.
+
+
 ## 2026-10-25 — CRM & POS: Buku Besar Mutasi Poin Loyalty & Proteksi Siklus Hidup Komisi Anti-Double Claim/Payout ✅
 
 - **Buku Besar Mutasi Poin Loyalty (`PelangganPoinLog`)**:

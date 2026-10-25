@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
+use App\Http\Controllers\GitDeployWebhookController;
 use App\Models\User;
 use App\Modules\Akunting\Controllers\AkuntingController;
 use App\Modules\Akunting\Livewire\AkuntingDashboard;
@@ -291,6 +292,11 @@ Route::post('/api/payment/check-status', [PaymentController::class, 'checkStatus
 // ===== [API: OMNI-05] Webhook channel marketplace (publik) =====
 Route::post('/webhook/channel/{channelId}', [OmnichannelController::class, 'webhook'])
     ->middleware('throttle:120,1')
+    ->withoutMiddleware([ValidateCsrfToken::class, PreventRequestForgery::class]);
+
+// ===== Webhook Otomatis Git CI/CD Deploy =====
+Route::post('/webhook/git-deploy', [GitDeployWebhookController::class, 'handle'])
+    ->middleware('throttle:30,1')
     ->withoutMiddleware([ValidateCsrfToken::class, PreventRequestForgery::class]);
 
 // Auth + akun pelanggan

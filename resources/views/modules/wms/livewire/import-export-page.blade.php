@@ -1,4 +1,6 @@
-<div class="space-y-6 max-w-7xl mx-auto pb-12" @if($importStep === 'selesai' || ($activeImportLog && $activeImportLog['status'] === 'proses')) wire:poll.2s="cekStatusImport" @endif>
+<div class="space-y-6 max-w-7xl mx-auto pb-12"
+     @if($importStep === 'selesai' || ($activeImportLog && $activeImportLog['status'] === 'proses')) wire:poll.2s="cekStatusImport" @endif
+     @if($activeTab === 'foto' && $fotoStep === 'processing') wire:poll.500ms="processNextFotoChunk" @endif>
     <!-- Top Bar Navigation & Back to WMS -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/10 dark:border-white/5 pb-4">
         <div>
@@ -29,13 +31,19 @@
         </div>
     </div>
 
-    <!-- Main Navigation Tabs: Import vs Export -->
+    <!-- Main Navigation Tabs: Import vs Foto vs Export -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1.5 bg-black/5 dark:bg-white/[0.03] rounded-2xl border border-black/10 dark:border-white/5 w-full sm:w-fit">
         <button type="button"
                 wire:click="setTab('import')"
                 class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'import' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
             <span>📥</span>
             <span>Import Produk &amp; Penyesuaian</span>
+        </button>
+        <button type="button"
+                wire:click="setTab('foto')"
+                class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'foto' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
+            <span>📸</span>
+            <span>Import Foto Massal (Auto SKU)</span>
         </button>
         <button type="button"
                 wire:click="setTab('export')"
@@ -696,6 +704,456 @@
                     <a href="/app/wms" wire:navigate class="w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer shadow-md shadow-up-primary/20 transition flex items-center justify-center">
                         Buka Daftar Produk WMS →
                     </a>
+                </div>
+            </div>
+        @endif
+    @elseif($activeTab === 'foto')
+        <!-- TAB 3: IMPORT FOTO BULK WORKSPACE -->
+        @if($fotoStep === 'upload')
+            <!-- Step 1: Upload Form & Options -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left: Upload Box -->
+                <div class="lg:col-span-2 p-6 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-6">
+                    <div class="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                        <h2 class="font-bold text-sm text-ink-900 dark:text-white flex items-center gap-2">
+                            <span>1.</span>
+                            <span>Pilih Sumber Foto &amp; Opsi Penggabungan</span>
+                        </h2>
+                        <span class="text-[10px] text-ink-400">WebP Auto-Compress (1200px &amp; 250px)</span>
+                    </div>
+
+                    <!-- Pilihan Sumber Upload (Folder / Multi-File vs ZIP) -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Metode Pengunggahan:</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $fotoSourceType === 'files' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                                <input type="radio" wire:model.live="fotoSourceType" value="files" class="mt-0.5 text-up-primary">
+                                <div class="space-y-0.5">
+                                    <div class="font-bold text-xs text-ink-900 dark:text-white">📁 Folder Lokal / Multi-File</div>
+                                    <div class="text-[11px] text-ink-500 dark:text-ink-400">Pilih satu folder langsung dari PC atau seleksi puluhan foto</div>
+                                </div>
+                            </label>
+                            <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $fotoSourceType === 'zip' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                                <input type="radio" wire:model.live="fotoSourceType" value="zip" class="mt-0.5 text-up-primary">
+                                <div class="space-y-0.5">
+                                    <div class="font-bold text-xs text-ink-900 dark:text-white">🗜️ Berkas Arsip (.ZIP)</div>
+                                    <div class="text-[11px] text-ink-500 dark:text-ink-400">Unggah satu file .zip (diekstrak otomatis di server)</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Opsi Mode Penggabungan Foto -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Strategi Terhadap Foto Produk Eksisting:</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'append' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                                <input type="radio" wire:model.live="fotoMode" value="append" class="mt-0.5 text-up-primary">
+                                <div class="space-y-0.5">
+                                    <div class="font-bold text-[11px] text-ink-900 dark:text-white">Tambahkan ke Galeri</div>
+                                    <div class="text-[10px] text-ink-500 dark:text-ink-400 leading-tight">Foto baru ditambahkan ke galeri produk (rekomendasi)</div>
+                                </div>
+                            </label>
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'replace' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                                <input type="radio" wire:model.live="fotoMode" value="replace" class="mt-0.5 text-up-primary">
+                                <div class="space-y-0.5">
+                                    <div class="font-bold text-[11px] text-ink-900 dark:text-white">Ganti Total (Replace)</div>
+                                    <div class="text-[10px] text-ink-500 dark:text-ink-400 leading-tight">Hapus foto lama dari disk &amp; ganti dengan foto baru</div>
+                                </div>
+                            </label>
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'skip_existing' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                                <input type="radio" wire:model.live="fotoMode" value="skip_existing" class="mt-0.5 text-up-primary">
+                                <div class="space-y-0.5">
+                                    <div class="font-bold text-[11px] text-ink-900 dark:text-white">Hanya Jika Kosong</div>
+                                    <div class="text-[10px] text-ink-500 dark:text-ink-400 leading-tight">Lewati jika produk sudah punya foto di sistem</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Input Dropzone -->
+                    @if($fotoSourceType === 'files')
+                        <div class="space-y-3">
+                            <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Pilih Berkas Foto:</label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <!-- Option 1: Folder Upload -->
+                                <div class="p-4 rounded-xl border-2 border-dashed border-black/15 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-black/5 dark:bg-white/[0.01] transition text-center space-y-2">
+                                    <div class="text-2xl">📁</div>
+                                    <div class="font-bold text-xs text-ink-900 dark:text-white">Unggah Satu Folder</div>
+                                    <p class="text-[11px] text-ink-400">Pilih folder lokal yang berisi seluruh foto produk</p>
+                                    <label class="inline-block mt-2 px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs cursor-pointer border border-up-primary/40 transition">
+                                        Pilih Folder...
+                                        <input type="file" wire:model="fotoUploads" multiple webkitdirectory directory class="hidden">
+                                    </label>
+                                </div>
+
+                                <!-- Option 2: Multi-File Selection -->
+                                <div class="p-4 rounded-xl border-2 border-dashed border-black/15 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-black/5 dark:bg-white/[0.01] transition text-center space-y-2">
+                                    <div class="text-2xl">🖼️</div>
+                                    <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Multi-File Gambar</div>
+                                    <p class="text-[11px] text-ink-400">Format gambar apapun (JPG, PNG, WebP, AVIF, HEIC, TIFF, BMP, dll.)</p>
+                                    <label class="inline-block mt-2 px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs cursor-pointer border border-up-primary/40 transition">
+                                        Pilih File...
+                                        <input type="file" wire:model="fotoUploads" multiple accept="image/*,.heic,.heif,.avif,.tiff,.tif,.psd,.bmp" class="hidden">
+                                    </label>
+                                </div>
+                            </div>
+
+                            @if(! empty($fotoUploads))
+                                <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30 flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-2 text-up-mint font-bold">
+                                        <span>✓</span>
+                                        <span>{{ count($fotoUploads) }} file foto berhasil dipilih dan siap di-scan</span>
+                                    </div>
+                                    <button type="button" wire:click="$set('fotoUploads', [])" class="text-[11px] text-ink-400 hover:text-up-red underline cursor-pointer">
+                                        Hapus Pilihan
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @else
+                        <!-- ZIP File Upload -->
+                        <div class="space-y-3">
+                            <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Pilih Berkas ZIP (Maks. 50MB):</label>
+                            <div class="p-6 rounded-xl border-2 border-dashed border-black/15 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-black/5 dark:bg-white/[0.01] transition text-center space-y-2">
+                                <div class="text-3xl">🗜️</div>
+                                <div class="font-bold text-xs text-ink-900 dark:text-white">Unggah Arsip ZIP Foto Produk</div>
+                                <p class="text-[11px] text-ink-400">File foto di dalam ZIP akan diekstrak otomatis dan dipetakan ke SKU</p>
+                                <label class="inline-block mt-2 px-4 py-2 rounded-lg bg-up-primary text-white font-bold text-xs cursor-pointer shadow-md shadow-up-primary/20 hover:bg-up-primary/90 transition">
+                                    Pilih Berkas .ZIP...
+                                    <input type="file" wire:model="fotoZip" accept=".zip" class="hidden">
+                                </label>
+                            </div>
+
+                            @if($fotoZip)
+                                <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30 flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-2 text-up-mint font-bold">
+                                        <span>✓</span>
+                                        <span>{{ $fotoZip->getClientOriginalName() }} ({{ round($fotoZip->getSize() / (1024 * 1024), 2) }} MB)</span>
+                                    </div>
+                                    <button type="button" wire:click="$set('fotoZip', null)" class="text-[11px] text-ink-400 hover:text-up-red underline cursor-pointer">
+                                        Batalkan
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <!-- Loading Indicator Saat Uploading -->
+                    <div wire:loading wire:target="fotoUploads, fotoZip" class="w-full p-3 rounded-xl bg-up-primary/10 border border-up-primary/30 text-center text-xs text-up-primary font-bold animate-pulse">
+                        ⏳ Mengunggah file ke server... Mohon tunggu sebentar.
+                    </div>
+
+                    <!-- Tombol Aksi Scan & Match -->
+                    <div class="pt-2 flex items-center justify-end gap-3 border-t border-black/5 dark:border-white/5">
+                        <button type="button"
+                                wire:click="scanUploadedFoto"
+                                wire:loading.attr="disabled"
+                                @if(($fotoSourceType === 'files' && empty($fotoUploads)) || ($fotoSourceType === 'zip' && empty($fotoZip))) disabled @endif
+                                class="min-h-[44px] px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span wire:loading.remove wire:target="scanUploadedFoto">🔍 Scan &amp; Cocokkan SKU Otomatis</span>
+                            <span wire:loading wire:target="scanUploadedFoto" class="flex items-center gap-2">
+                                <span class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
+                                <span>Sedang Membaca &amp; Memetakan SKU...</span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right: Rules & Info Box -->
+                <div class="p-6 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-4">
+                    <h3 class="font-bold text-sm text-ink-900 dark:text-white flex items-center gap-2">
+                        <span>💡</span>
+                        <span>Aturan Penamaan &amp; Kompresi</span>
+                    </h3>
+
+                    <div class="space-y-3 text-xs text-ink-600 dark:text-ink-400 leading-relaxed">
+                        <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                            <div class="font-bold text-ink-900 dark:text-white flex items-center gap-1.5">
+                                <span>🎯</span>
+                                <span>Format Nama File yang Dikenali:</span>
+                            </div>
+                            <ul class="space-y-1 font-mono text-[11px] text-ink-800 dark:text-ink-200">
+                                <li>• <strong class="text-up-primary">[SKU].jpg</strong> (Foto Utama)</li>
+                                <li>• <strong class="text-up-primary">[SKU]_1.png</strong>, <strong class="text-up-primary">[SKU]_2.png</strong> (Galeri)</li>
+                                <li>• <strong class="text-up-primary">[SKU]-1.jpeg</strong>, <strong class="text-up-primary">[SKU]-2.jpeg</strong></li>
+                                <li>• <strong class="text-up-primary">[SKU] (1).webp</strong>, <strong class="text-up-primary">[SKU]-main.jpg</strong></li>
+                                <li>• <strong class="text-up-primary">[SKU]/depan.jpg</strong> (Nama Subfolder)</li>
+                            </ul>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-up-mint/5 border border-up-mint/20 space-y-1">
+                            <div class="font-bold text-up-mint flex items-center gap-1.5">
+                                <span>⚡</span>
+                                <span>Kompresi WebP Otomatis:</span>
+                            </div>
+                            <p class="text-[11px]">
+                                Semua gambar otomatis dikonversi ke format WebP (Full max 1200x1200px @ 82% &amp; Thumbnail 250x250px @ 75%). Hemat ruang simpan hingga 70% dan mempercepat loading kasir POS &amp; marketplace.
+                            </p>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-up-amber/5 border border-up-amber/20 space-y-1">
+                            <div class="font-bold text-up-amber flex items-center gap-1.5">
+                                <span>🛡️</span>
+                                <span>Jika SKU Tidak Ditemukan:</span>
+                            </div>
+                            <p class="text-[11px]">
+                                File tidak membatalkan proses, melainkan dilewati secara aman (skip). Anda dapat mengunduh daftar file yang dilewati dalam format Excel (.xlsx) untuk perbaikan nama.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        @elseif($fotoStep === 'preview')
+            <!-- Step 2: Preview & Mapping Verification -->
+            <div class="space-y-5">
+                <!-- Top Summary Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="p-4 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-1">
+                        <div class="text-[10px] uppercase font-bold text-ink-400">Total File Terbaca</div>
+                        <div class="text-2xl font-black text-ink-950 dark:text-white">{{ $fotoScanResult['total'] ?? 0 }} File</div>
+                        <div class="text-[11px] text-ink-400">Total berkas gambar dianalisis</div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-up-mint/10 border border-up-mint/30 space-y-1">
+                        <div class="text-[10px] uppercase font-bold text-up-mint">SKU Cocok &amp; Siap Diproses</div>
+                        <div class="text-2xl font-black text-up-mint">{{ $fotoScanResult['matched_count'] ?? 0 }} Foto</div>
+                        <div class="text-[11px] text-up-mint/80">Terhubung langsung ke master produk</div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-up-red/10 border border-up-red/30 space-y-1">
+                        <div class="text-[10px] uppercase font-bold text-up-red">Dilewati / SKU Tidak Ada</div>
+                        <div class="text-2xl font-black text-up-red">{{ $fotoScanResult['skipped_count'] ?? 0 }} File</div>
+                        <div class="text-[11px] text-up-red/80">Tidak merusak proses, dapat diunduh laporannya</div>
+                    </div>
+                </div>
+
+                <!-- Table Preview with Filter Tabs -->
+                <div class="p-5 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/5 dark:border-white/5 pb-3">
+                        <div class="flex items-center gap-2">
+                            <button type="button"
+                                    wire:click="setFotoFilterTab('all')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer {{ $fotoFilterTab === 'all' ? 'bg-up-primary text-white' : 'bg-black/5 dark:bg-white/5 text-ink-400 hover:text-white' }}">
+                                Semua ({{ $fotoScanResult['total'] ?? 0 }})
+                            </button>
+                            <button type="button"
+                                    wire:click="setFotoFilterTab('matched')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer {{ $fotoFilterTab === 'matched' ? 'bg-up-mint text-ink-950 font-black' : 'bg-black/5 dark:bg-white/5 text-up-mint hover:bg-up-mint/20' }}">
+                                Cocok ({{ $fotoScanResult['matched_count'] ?? 0 }})
+                            </button>
+                            <button type="button"
+                                    wire:click="setFotoFilterTab('skipped')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer {{ $fotoFilterTab === 'skipped' ? 'bg-up-red text-white' : 'bg-black/5 dark:bg-white/5 text-up-red hover:bg-up-red/20' }}">
+                                Dilewati ({{ $fotoScanResult['skipped_count'] ?? 0 }})
+                            </button>
+                        </div>
+
+                        @if(($fotoScanResult['skipped_count'] ?? 0) > 0)
+                            <button type="button"
+                                    wire:click="downloadFotoSkippedExcel"
+                                    class="px-3.5 py-1.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+                                <span>📥</span>
+                                <span>Unduh Daftar Dilewati (.xlsx)</span>
+                            </button>
+                        @endif
+                    </div>
+
+                    <!-- List Table -->
+                    <div class="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border border-black/10 dark:border-white/5">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-black/10 dark:bg-white/5 sticky top-0 backdrop-blur z-10 text-[10px] uppercase font-bold text-ink-400">
+                                <tr>
+                                    <th class="py-2.5 px-3">No</th>
+                                    <th class="py-2.5 px-3">Nama File Asli</th>
+                                    <th class="py-2.5 px-3">SKU Terdeteksi</th>
+                                    <th class="py-2.5 px-3">Produk Sistem</th>
+                                    <th class="py-2.5 px-3">Ukuran</th>
+                                    <th class="py-2.5 px-3">Status Pemetaan</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-black/5 dark:divide-white/5 font-mono">
+                                @php
+                                    $matchedList = $fotoScanResult['matched'] ?? [];
+                                    $skippedList = $fotoScanResult['skipped'] ?? [];
+                                    $displayList = match($fotoFilterTab) {
+                                        'matched' => $matchedList,
+                                        'skipped' => $skippedList,
+                                        default => array_merge($matchedList, $skippedList),
+                                    };
+                                @endphp
+
+                                @forelse($displayList as $idx => $row)
+                                    @php $isMatched = isset($row['produk_id']); @endphp
+                                    <tr class="hover:bg-black/5 dark:hover:bg-white/[0.02] transition">
+                                        <td class="py-2 px-3 text-ink-400">{{ $idx + 1 }}</td>
+                                        <td class="py-2 px-3 font-semibold text-ink-900 dark:text-white truncate max-w-xs" title="{{ $row['filename'] }}">
+                                            {{ $row['filename'] }}
+                                        </td>
+                                        <td class="py-2 px-3">
+                                            @if(! empty($row['sku']))
+                                                <span class="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 font-bold text-up-primary">
+                                                    {{ $row['sku'] }}
+                                                </span>
+                                            @else
+                                                <span class="text-ink-400 italic">(kosong)</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-2 px-3 font-sans">
+                                            @if($isMatched)
+                                                <span class="text-ink-800 dark:text-ink-200">{{ $row['produk_nama'] }}</span>
+                                                @if(! empty($row['is_primary']))
+                                                    <span class="ml-1 text-[9px] px-1.5 py-0.2 rounded bg-up-primary/20 text-up-primary font-bold">Cover</span>
+                                                @endif
+                                            @else
+                                                <span class="text-up-red text-[11px]">{{ $row['reason'] ?? 'Dilewati' }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-2 px-3 text-ink-400 text-[11px]">
+                                            {{ ! empty($row['size']) ? round($row['size'] / 1024, 1).' KB' : '-' }}
+                                        </td>
+                                        <td class="py-2 px-3">
+                                            @if($isMatched)
+                                                <span class="inline-flex items-center gap-1 text-[11px] text-up-mint font-bold">
+                                                    <span>●</span>
+                                                    <span>Siap Dimetakan</span>
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1 text-[11px] text-up-red font-semibold">
+                                                    <span>✕</span>
+                                                    <span>Dilewati (Skip)</span>
+                                                </span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="py-6 text-center text-ink-400">Tidak ada file dalam filter ini.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Bottom Action Controls -->
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-black/5 dark:border-white/5">
+                        <button type="button"
+                                wire:click="resetFotoUpload"
+                                class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-400 hover:text-white font-bold text-xs transition cursor-pointer">
+                            ← Batal &amp; Pilih Ulang
+                        </button>
+
+                        <div class="flex items-center gap-3 w-full sm:w-auto">
+                            <button type="button"
+                                    wire:click="startFotoProcessing"
+                                    @if(($fotoScanResult['matched_count'] ?? 0) === 0) disabled @endif
+                                    class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span>🚀 Mulai Proses Kompresi &amp; Simpan ({{ $fotoScanResult['matched_count'] ?? 0 }} Foto)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        @elseif($fotoStep === 'processing')
+            <!-- Step 3: Real-Time Processing with Progress Bar -->
+            @php
+                $totalToProcess = count($fotoScanResult['matched'] ?? []);
+                $percent = $totalToProcess > 0 ? (int) min(100, round(($fotoProcessedCount / $totalToProcess) * 100)) : 0;
+            @endphp
+
+            <div class="max-w-xl mx-auto p-8 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-6 text-center">
+                <div class="space-y-2">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-up-primary/20 text-up-primary text-xl animate-spin">
+                        ⏳
+                    </div>
+                    <h3 class="text-lg font-black text-ink-950 dark:text-white">
+                        Mengompresi &amp; Memetakan Foto Produk...
+                    </h3>
+                    <p class="text-xs text-ink-500 dark:text-ink-400">
+                        Mengonversi gambar ke format WebP (1200px &amp; 250px thumb), mengoptimalkan penyimpanan server.
+                    </p>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-xs font-mono font-bold">
+                        <span class="text-ink-400">Kemajuan:</span>
+                        <span class="text-up-primary">{{ $fotoProcessedCount }} / {{ $totalToProcess }} Foto ({{ $percent }}%)</span>
+                    </div>
+                    <div class="w-full h-3 rounded-full bg-black/40 overflow-hidden p-0.5 border border-white/10">
+                        <div class="h-full rounded-full bg-gradient-to-r from-up-primary via-up-mint to-up-mint transition-all duration-300 animate-pulse"
+                             style="width: {{ $percent }}%"></div>
+                    </div>
+                </div>
+
+                <!-- Real-time Stats -->
+                <div class="grid grid-cols-2 gap-3 pt-2 font-mono">
+                    <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/20 text-center">
+                        <div class="text-[10px] uppercase text-up-mint">Berhasil Disimpan</div>
+                        <div class="text-lg font-black text-up-mint mt-0.5">{{ $fotoSuccessCount }}</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/20 text-center">
+                        <div class="text-[10px] uppercase text-up-red">Gagal Diproses</div>
+                        <div class="text-lg font-black text-up-red mt-0.5">{{ $fotoErrorCount }}</div>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 text-[11px] text-ink-400">
+                    🛡️ <strong>Proteksi Memori Server:</strong> Pemrosesan dilakukan bertahap per batch kecil untuk menjaga stabilitas RAM VPS 1GB/2GB.
+                </div>
+            </div>
+
+        @elseif($fotoStep === 'completed')
+            <!-- Step 4: Completed Summary & Next Actions -->
+            <div class="max-w-xl mx-auto p-8 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-6 text-center">
+                <div class="space-y-2">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-up-mint/20 text-up-mint text-2xl">
+                        ✓
+                    </div>
+                    <h3 class="text-xl font-black text-ink-950 dark:text-white">
+                        Import Foto Produk Selesai!
+                    </h3>
+                    <p class="text-xs text-ink-500 dark:text-ink-400">
+                        Seluruh foto berhasil dikompresi ke WebP dan disinkronkan ke master produk WMS, POS Kasir, dan Marketplace.
+                    </p>
+                </div>
+
+                <!-- Metric Cards -->
+                <div class="grid grid-cols-3 gap-3 font-mono text-center">
+                    <div class="p-3 rounded-xl bg-white/5 border border-white/10">
+                        <div class="text-[10px] uppercase text-ink-400">Total File</div>
+                        <div class="text-lg font-black text-white mt-0.5">{{ $fotoCompletedSummary['total'] ?? 0 }}</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30">
+                        <div class="text-[10px] uppercase text-up-mint">Sukses Sync</div>
+                        <div class="text-lg font-black text-up-mint mt-0.5">{{ $fotoCompletedSummary['success'] ?? 0 }}</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-up-amber/10 border border-up-amber/30">
+                        <div class="text-[10px] uppercase text-up-amber">Dilewati</div>
+                        <div class="text-lg font-black text-up-amber mt-0.5">{{ $fotoCompletedSummary['skipped'] ?? 0 }}</div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                    @if(($fotoCompletedSummary['skipped'] ?? 0) > 0)
+                        <button type="button"
+                                wire:click="downloadFotoSkippedExcel"
+                                class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <span>📥 Unduh Laporan File Dilewati (.xlsx)</span>
+                        </button>
+                    @endif
+
+                    <a href="/app/wms" wire:navigate
+                       class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20">
+                        <span>📦 Lihat Katalog Produk WMS →</span>
+                    </a>
+
+                    <button type="button"
+                            wire:click="resetFotoUpload"
+                            class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 text-ink-400 hover:text-white font-bold text-xs transition cursor-pointer">
+                        Import Folder Lain
+                    </button>
                 </div>
             </div>
         @endif

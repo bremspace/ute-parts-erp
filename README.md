@@ -41,7 +41,7 @@ Aplikasi terdiri dari 15 modul domain terisolasi di `app/Modules/`:
 |---|---|---|
 | **POS Kasir** | `app/Modules/Pos` | Kasir sentuh & scanner barcode kamera, hold/park transaksi, split payment (tunai, transfer, QRIS, piutang), sesi buka/tutup kas, printer thermal ESC/POS, dan toggle Screen Wake Lock. |
 | **Servis** | `app/Modules/Servis` | Work order, tracking tiket servis konsumen via token/QR, state machine status pengerjaan, manajemen teknisi & pemakaian sparepart, approval token estimasi biaya. |
-| **Gudang (WMS)** | `app/Modules/Wms` | Manajemen produk & varian SKU, mutasi stok antar cabang, cycle count/opname, penerimaan barang PO (GRN) dengan scanner barcode, tracking nomor seri (SN), dan ekspor pricelist per tier harga. |
+| **Gudang (WMS)** | `app/Modules/Wms` | Manajemen produk & varian SKU, mutasi stok antar cabang, cycle count/opname, penerimaan barang PO (GRN) dengan scanner barcode, tracking nomor seri (SN), ekspor pricelist per tier harga, serta **Bulk Import & Auto-Mapping Foto Produk** (ekstraksi nama file/folder/ZIP ke SKU, kompresi WebP otomatis, dual-engine GD/Imagick). |
 | **Marketplace** | `app/Modules/Marketplace` | Katalog toko publik mobile-first, keranjang belanja, checkout Duitku payment gateway, kurir ongkir otomatis Biteship, tracking pesanan. |
 | **Reseller & Komisi** | `app/Modules/Reseller` | Portal reseller, perhitungan komisi otomatis multi-aktor (reseller, sales internal, teknisi), riwayat pencairan saldo. |
 | **Akunting** | `app/Modules/Akunting` | Chart of Accounts (COA), auto-jurnal transaksi kasir/servis/pembelian, buku besar, neraca, laba-rugi, depresiasi aset otomatis. |
@@ -70,10 +70,11 @@ Ute Parts mendukung arsitektur **Multi-Scope Progressive Web App**:
 
 - **PHP:** Versi 8.3 atau 8.4
   - Ekstensi wajib: `bcmath`, `curl`, `dom`, `fileinfo`, `gd`, `intl`, `mbstring`, `openssl`, `pdo_mysql`, `pdo_sqlite`, `tokenizer`, `xml`, `zip`.
+  - Ekstensi pemrosesan gambar mutakhir (disarankan): `imagick` & paket sistem `imagemagick libheif-examples` (untuk decoding foto HEIC Apple iOS, AVIF, TIFF, BMP, PSD, SVG, dan RAW).
 - **Database:** MySQL 8.0+, MariaDB 10.6+, atau PostgreSQL 15+ (SQLite didukung untuk testing).
 - **Composer:** Versi 2.x
 - **Node.js:** Versi 20.x LTS atau lebih baru, beserta **npm**.
-- **Memory (RAM):** Minimal 1 GB (server/VPS), disarankan 2–4 GB untuk lingkungan pengembangan.
+- **Memory (RAM):** Minimal 1 GB (server/VPS dengan swap 2GB), disarankan 2–4 GB untuk lingkungan produksi optimal.
 
 ---
 
@@ -90,10 +91,11 @@ sudo apt install -y software-properties-common curl git unzip ca-certificates ls
 sudo add-apt-repository ppa:ondrej/php -y
 sudo apt update
 
-# Install PHP 8.3 dan ekstensi yang dibutuhkan
-sudo apt install -y php8.3-cli php8.3-fpm php8.3-mysql php8.3-sqlite3 \
-    php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-gd \
-    php8.3-bcmath php8.3-intl php8.3-opcache
+# Install PHP 8.4 dan ekstensi yang dibutuhkan
+sudo apt install -y php8.4-cli php8.4-fpm php8.4-mysql php8.4-sqlite3 \
+    php8.4-mbstring php8.4-xml php8.4-curl php8.4-zip php8.4-gd \
+    php8.4-bcmath php8.4-intl php8.4-opcache php8.4-imagick \
+    imagemagick libheif-examples supervisor logrotate
 
 # Install MySQL Server
 sudo apt install -y mysql-server
@@ -251,12 +253,79 @@ php artisan test --filter=SerialNumberTest
 
 ---
 
+## Opsi One-Click Installer (Instalasi Cepat)
+
+Untuk mempercepat deployment di server atau komputer baru tanpa konfigurasi manual, tersedia metode One-Click Installer:
+
+### 1. One-Click Launcher Ekstraksi ZIP (Windows / Linux / macOS)
+Cukup ekstrak file ZIP proyek, lalu klik file launcher sesuai sistem operasi Anda:
+- **Windows:** Klik 2x file `start-install.bat`
+- **Linux / macOS:** Jalankan `./start-install.sh` (atau klik kanan -> *Run*)
+
+*Skrip launcher otomatis mendeteksi PHP lokal (PATH, Laragon, XAMPP), memastikan dependensi vendor lengkap, memilih port lokal bebas (8000+), langsung meluncurkan web browser ke GUI installer `http://localhost:PORT/install.php`, dan menjalankan server.*
+
+---
+
+### 2. Standalone VPS / Server Ubuntu (Nginx + PHP 8.4 + Supervisor)
+Jalankan satu baris perintah sebagai `root` di VPS / server lokal Ubuntu 22.04 / 24.04:
+```bash
+sudo bash install-standalone.sh yourdomain.com
+# atau menggunakan IP Publik langsung:
+# sudo bash install-standalone.sh 103.xxx.xxx.xxx
+```
+*Skrip otomatis mengonfigurasi swap 2GB, Nginx, PHP 8.4-FPM, MySQL, Supervisor queue worker, cron, build asset, dan SSL Let's Encrypt.*
+
+---
+
+### 3. VPS dengan CyberPanel / OpenLiteSpeed
+Jika server menggunakan CyberPanel:
+```bash
+sudo bash install-ute.sh yourdomain.com
+```
+
+---
+
+### 4. Web-based Graphical Installer (Via Browser)
+Buka browser dan akses URL installer visual:
+```
+https://yourdomain.com/install.php
+```
+*GUI installer Ute Prism menyediakan 4 langkah interaktif ramah pengguna:*
+1. **Diagnostik Kesehatan Server:** Deteksi otomatis OS, RAM, Swap, Disk, ekstensi PHP (termasuk Imagick/GD untuk gambar multi-format), izin folder, dan tools sistem.
+2. **Koneksi Database MySQL:** Uji koneksi realtime dengan 1 tombol dan opsi pembuatan database otomatis.
+3. **Bisnis & Git CI/CD:** Form kredensial `.env` tanpa koding (Duitku, Biteship, WA Gateway, serta webhook auto-deploy `POST /webhook/git-deploy`).
+4. **AI Development Node:** Pilihan instalasi otomatis OpenCode CLI, service 9router di port 20128, codebase-memory-mcp, serta AGENTS.md & skills sebagai node maintenance mandiri di server baru.
+
+---
+
+## Otomasi Git CI/CD (Webhook Auto-Deploy)
+
+Aplikasi telah dilengkapi endpoint webhook aman untuk auto-deploy saat Anda push ke branch `main`:
+- **Endpoint:** `POST /webhook/git-deploy`
+- **Keamanan:** Verifikasi tanda tangan GitHub HMAC-SHA256 (`X-Hub-Signature-256`) atau token `GIT_DEPLOY_SECRET`.
+- **Aksi Otomatis:** Saat menerima webhook valid, server otomatis menjalankan `git pull`, `php artisan migrate --force`, dan `php artisan optimize`.
+
+---
+
 ## Panduan Migrasi Server
 
-Ingin memindahkan sistem dari server VPS kembali ke komputer/server lokal (kantor/toko) lalu meng-onlinekannya kembali?
-Panduan teknis lengkap dari tahap backup database, transfer file media, restore di lokal, hingga tunneling online via Cloudflare Tunnel / Ngrok tersedia di:
+Aplikasi ini 100% cloud-ready dan portable, siap dipindahkan ke **VPS baru yang lebih proper** maupun **Server Fisik Lokal (On-Premise) yang memiliki IP Publik**:
 
-📖 **[Panduan Lengkap Migrasi VPS ke Lokal Hingga Online](docs/MIGRASI-VPS-KE-LOKAL.md)**
+### 1. Migrasi ke VPS Baru (Ubuntu + Nginx + PHP-FPM 8.4 + SSL)
+Gunakan panduan deploy produksi tanpa panel (standalone VPS dengan supervisord & OPcache):
+📖 **[Panduan Lengkap Deploy Production ke VPS Baru](docs/DEPLOY.md)**
+
+### 2. Migrasi ke Server Lokal (Kantor / Toko) dengan IP Publik atau Cloudflare Tunnel
+Gunakan panduan pemindahan data lengkap dari backup database, transfer media, restore, hingga konfigurasi IP publik / tunneling:
+📖 **[Panduan Lengkap Migrasi ke Server Lokal Hingga Online](docs/MIGRASI-VPS-KE-LOKAL.md)**
+
+### Checklist Kesiapan Migrasi (Quick Checklist)
+1. **Database Dump:** `mysqldump -u root -p uteparts_db --single-transaction --quick > backup.sql`
+2. **Media Storage:** Arsipkan folder fisik `storage/app/public/` (`tar -czvf storage_media.tar.gz -C storage/app public`).
+3. **Konfigurasi Target:** Salin `.env`, sesuaikan `APP_URL`, `DB_*`, dan kredensial Duitku/Biteship.
+4. **Symlink Storage:** Jalankan `php artisan storage:link` di server baru.
+5. **Worker & Scheduler:** Pasang daemon Supervisor untuk queue (`php artisan queue:work --tries=3`) dan cron scheduler (`* * * * * php /path-to-app/artisan schedule:run >> /dev/null 2>&1`).
+6. **Optimasi Produksi:** `php artisan config:cache && php artisan route:cache && php artisan view:cache`
 
 ---
 

@@ -14,11 +14,11 @@ use Illuminate\Support\Str;
  */
 class ProductImageService
 {
-    public const MAX_FULL_WIDTH = 800;
+    public const MAX_FULL_WIDTH = 1200;
 
-    public const MAX_FULL_HEIGHT = 800;
+    public const MAX_FULL_HEIGHT = 1200;
 
-    public const FULL_QUALITY = 80;
+    public const FULL_QUALITY = 82;
 
     public const MAX_THUMB_WIDTH = 250;
 
@@ -40,40 +40,9 @@ class ProductImageService
             throw new \InvalidArgumentException('File gambar tidak ditemukan atau tidak dapat dibaca');
         }
 
-        $imageInfo = @getimagesize($realPath);
-        if ($imageInfo === false) {
-            throw new \InvalidArgumentException('File bukan format gambar yang valid');
-        }
-
-        $mime = $imageInfo['mime'];
-        $srcImage = match ($mime) {
-            'image/jpeg', 'image/jpg' => @imagecreatefromjpeg($realPath),
-            'image/png' => @imagecreatefrompng($realPath),
-            'image/webp' => @imagecreatefromwebp($realPath),
-            'image/gif' => @imagecreatefromgif($realPath),
-            default => null,
-        };
-
+        $srcImage = $this->loadAnyImageToGd($realPath);
         if (! $srcImage) {
-            throw new \RuntimeException('Gagal memuat gambar: format tidak didukung oleh GD');
-        }
-
-        // Auto-orientasi foto dari kamera smartphone berdasarkan EXIF
-        if (($mime === 'image/jpeg' || $mime === 'image/jpg') && function_exists('exif_read_data')) {
-            $exif = @exif_read_data($realPath);
-            $orientation = $exif['Orientation'] ?? null;
-            if ($orientation) {
-                $rotated = match ((int) $orientation) {
-                    3 => imagerotate($srcImage, 180, 0),
-                    6 => imagerotate($srcImage, -90, 0),
-                    8 => imagerotate($srcImage, 90, 0),
-                    default => null,
-                };
-                if ($rotated) {
-                    imagedestroy($srcImage);
-                    $srcImage = $rotated;
-                }
-            }
+            throw new \RuntimeException('Gagal memuat gambar: format tidak dikenali atau file rusak');
         }
 
         $origWidth = imagesx($srcImage);
@@ -130,6 +99,79 @@ class ProductImageService
             'thumb_size' => (int) $thumbSize,
             'is_primary' => false,
         ];
+    }
+
+    /**
+     * Memuat file gambar dari berbagai format (JPEG, PNG, WebP, GIF, BMP, AVIF, HEIC, TIFF, PSD, SVG, dll.)
+     * menjadi resource GD Image yang siap diproses dan dikompresi ke WebP.
+     *
+     * @return \GdImage|null
+     */
+    public function loadAnyImageToGd(string $realPath)
+    {
+        $imageInfo = @getimagesize($realPath);
+        $mime = $imageInfo ? ($imageInfo['mime'] ?? null) : null;
+        $srcImage = null;
+
+        // 1. Coba loader GD spesifik sesuai MIME
+        if ($mime) {
+            $srcImage = match ($mime) {
+                'image/jpeg', 'image/jpg' => @imagecreatefromjpeg($realPath),
+                'image/png' => @imagecreatefrompng($realPath),
+                'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($realPath) : null,
+                'image/gif' => @imagecreatefromgif($realPath),
+                'image/bmp', 'image/x-ms-bmp' => function_exists('imagecreatefrombmp') ? @imagecreatefrombmp($realPath) : null,
+                'image/avif' => function_exists('imagecreatefromavif') ? @imagecreatefromavif($realPath) : null,
+                default => null,
+            };
+        }
+
+        // 2. Coba loader biner otomatis GD imagecreatefromstring
+        if (! $srcImage) {
+            $rawBytes = @file_get_contents($realPath);
+            if ($rawBytes !== false && $rawBytes !== '') {
+                $srcImage = @imagecreatefromstring($rawBytes);
+            }
+        }
+
+        // 3. Jika belum berhasil dan Imagick tersedia (mendukung HEIC, TIFF, PSD, SVG, RAW dll.)
+        if (! $srcImage && class_exists(\Imagick::class)) {
+            try {
+                $im = new \Imagick;
+                $im->readImage($realPath);
+                $im->autoOrient();
+                $im->setImageFormat('png');
+                $pngBlob = $im->getImageBlob();
+                $im->clear();
+                $im->destroy();
+
+                if ($pngBlob !== '') {
+                    $srcImage = @imagecreatefromstring($pngBlob);
+                }
+            } catch (\Throwable $e) {
+                // Fallback graceful
+            }
+        }
+
+        // 4. Auto-orientasi EXIF jika dimuat via GD JPEG
+        if ($srcImage && ($mime === 'image/jpeg' || $mime === 'image/jpg') && function_exists('exif_read_data')) {
+            $exif = @exif_read_data($realPath);
+            $orientation = $exif['Orientation'] ?? null;
+            if ($orientation) {
+                $rotated = match ((int) $orientation) {
+                    3 => imagerotate($srcImage, 180, 0),
+                    6 => imagerotate($srcImage, -90, 0),
+                    8 => imagerotate($srcImage, 90, 0),
+                    default => null,
+                };
+                if ($rotated) {
+                    imagedestroy($srcImage);
+                    $srcImage = $rotated;
+                }
+            }
+        }
+
+        return $srcImage ?: null;
     }
 
     /**

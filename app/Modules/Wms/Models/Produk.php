@@ -77,6 +77,14 @@ class Produk extends Model
         return $this->hasMany(SkuVariant::class)->orderBy('is_active', 'desc');
     }
 
+    /**
+     * SKU Produk utama (diambil dari varian aktif pertama).
+     */
+    public function getSkuAttribute(): ?string
+    {
+        return $this->skuVariants->first()?->sku;
+    }
+
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
