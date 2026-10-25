@@ -5,13 +5,16 @@
         $showQrRetur = $strukConfig['show_qr_retur'] ?? true;
         $qrSize = (int) ($strukConfig['qr_size'] ?? 80);
         $qrCaption = $strukConfig['qr_caption'] ?? 'Scan QR ini untuk retur & klaim garansi';
+        $defaultPaperSize = str_contains($strukConfig['default_width'] ?? '', '80') ? '80' : '58';
+        $autoPrint = !empty($strukConfig['auto_print']);
     @endphp
     <script id="pos-receipt-data" type="application/json">
         {!! json_encode($receiptData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}
     </script>
     <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
-        x-data="{ ...thermalPrinter({{ \Illuminate\Support\Js::from($receiptData) }}), paperSize: '58' }"
+        x-data="{ ...thermalPrinter({{ \Illuminate\Support\Js::from($receiptData) }}), paperSize: '{{ $defaultPaperSize }}', autoPrint: {{ $autoPrint ? 'true' : 'false' }} }"
+        x-init="if (autoPrint) { setTimeout(() => { paperSize === '58' ? webPrint58() : webPrint80(); }, 400); }"
     >
         <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl relative my-auto max-h-[95vh] flex flex-col"> 
             <!-- Header Modal -->

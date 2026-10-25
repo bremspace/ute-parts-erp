@@ -424,7 +424,13 @@ class ImportSidRetailService
                 'data' => $row,
             ];
 
-            if (count($chunk) >= 100) {
+            if (count($chunk) >= 50) {
+                $lastItem = end($chunk);
+                $lastRow = $lastItem ? $lastItem['data'] : null;
+                $currentSku = trim((string) ($lastRow['KODE_BARANG'] ?? ''));
+                $currentNama = Str::limit(trim((string) ($lastRow['NAMA_BARANG'] ?? '')), 70);
+                $currentBaris = $lastItem['nomor_baris'] ?? $totalBaris;
+
                 $res = $this->prosesChunk($chunk, $chunkIndex, $importLogId, $cabangId, $gudangTokoId, $gudangPusatId, $userId);
                 $sukses += $res['sukses'];
                 $gagal += $res['gagal'];
@@ -437,11 +443,23 @@ class ImportSidRetailService
                     'total_baris' => $totalBaris,
                     'sukses' => $sukses,
                     'gagal' => $gagal,
+                    'detail' => [
+                        'current_sku' => $currentSku ?: null,
+                        'current_nama' => $currentNama ?: null,
+                        'current_baris' => $currentBaris,
+                        'total_baris' => $totalBaris,
+                    ],
                 ]);
             }
         }
 
         if (! empty($chunk)) {
+            $lastItem = end($chunk);
+            $lastRow = $lastItem ? $lastItem['data'] : null;
+            $currentSku = trim((string) ($lastRow['KODE_BARANG'] ?? ''));
+            $currentNama = Str::limit(trim((string) ($lastRow['NAMA_BARANG'] ?? '')), 70);
+            $currentBaris = $lastItem['nomor_baris'] ?? $totalBaris;
+
             $res = $this->prosesChunk($chunk, $chunkIndex, $importLogId, $cabangId, $gudangTokoId, $gudangPusatId, $userId);
             $sukses += $res['sukses'];
             $gagal += $res['gagal'];
@@ -452,6 +470,12 @@ class ImportSidRetailService
                 'total_baris' => $totalBaris,
                 'sukses' => $sukses,
                 'gagal' => $gagal,
+                'detail' => [
+                    'current_sku' => $currentSku ?: null,
+                    'current_nama' => $currentNama ?: null,
+                    'current_baris' => $currentBaris,
+                    'total_baris' => $totalBaris,
+                ],
             ]);
         }
 

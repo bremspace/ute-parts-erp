@@ -278,7 +278,7 @@
                     $kode = $p->barcode ?: ($p->skuVariants->first()?->sku ?: ('UTP-' . str_pad((string)$p->id, 5, '0', STR_PAD_LEFT)));
                     $qrSvg = $qrService->generateSvg($kode, 100, 0);
                     $hargaJual = $p->harga_jual_retail ?: ($p->harga_jual ?: 0);
-                    $brandNama = $p->brand?->nama ?: 'UTE PARTS';
+                    $brandNama = $p->brand?->nama ?: (app(\App\Modules\Crm\Services\KonfigurasiService::class)->getPrintHeader()['nama_toko'] ?? 'UTE PARTS');
                     $copies = (int) ($cfg['copies'] ?? 1);
                 @endphp
 

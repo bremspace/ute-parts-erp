@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Excel as ExcelReader;
 use Maatwebsite\Excel\Facades\Excel;
+use XMLReader;
+use ZipArchive;
 
 /**
  * [T-43] Import master produk dari Excel/CSV (Request #16).
@@ -64,6 +66,12 @@ class ImportProdukService
     protected array $rakCache = [];
 
     protected array $satuanCache = [];
+
+    protected array $gudangCache = [];
+
+    protected array $defaultGudangCache = [];
+
+    protected array $cabangCache = [];
 
     protected ?array $existingProductCache = null;
 
@@ -429,10 +437,14 @@ class ImportProdukService
             return null;
         }
 
+        if (isset($this->gudangCache["id_raw|{$raw}"])) {
+            return $this->gudangCache["id_raw|{$raw}"];
+        }
+
         if (is_numeric($raw)) {
             $g = Gudang::find((int) $raw);
             if ($g) {
-                return $g->id;
+                return $this->gudangCache["id_raw|{$raw}"] = $g->id;
             }
         }
 
@@ -441,12 +453,12 @@ class ImportProdukService
             ->first();
 
         if ($g) {
-            return $g->id;
+            return $this->gudangCache["id_raw|{$raw}"] = $g->id;
         }
 
         // Jika menyebut "Gudang Utama", "Gudang Pusat", atau variasi nama utama
         if (strcasecmp($raw, 'Gudang Utama') === 0 || strcasecmp($raw, 'Gudang Pusat') === 0) {
-            $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+            $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
             $gDefault = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
                 ->where('is_active', true)
                 ->where(fn ($q) => $q->where('nama', 'like', '%Utama%')->orWhere('nama', 'like', '%Pusat%')->orWhere('kode', 'like', '%UTAMA%'))
@@ -455,13 +467,13 @@ class ImportProdukService
                 ?? Gudang::where('is_active', true)->first();
 
             if ($gDefault) {
-                return $gDefault->id;
+                return $this->gudangCache["id_raw|{$raw}"] = $gDefault->id;
             }
 
             return null;
         }
 
-        return null;
+        return $this->gudangCache["id_raw|{$raw}"] = null;
     }
 
     /**
@@ -539,34 +551,57 @@ class ImportProdukService
     }
 
     /**
+     * Resolusi ID cabang default dengan in-memory cache untuk performa job antrian.
+     */
+    public function resolveCabangDefault(): int
+    {
+        if (isset($this->cabangCache['default'])) {
+            return $this->cabangCache['default'];
+        }
+
+        return $this->cabangCache['default'] = (int) (Cabang::value('id') ?? 1);
+    }
+
+    /**
      * Resolusi gudang dari input import (ID numerik, kode, atau nama) atau buat baru jika belum ada.
      */
     public function resolveOrCreateGudang(?string $gudangRaw, ?int $cabangId = null): int
     {
         $raw = trim((string) $gudangRaw);
-        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
 
         if ($raw === '' || in_array(strtolower($raw), ['-', '0', 'none', 'null', 'kosong'], true)) {
             return $this->resolveOrCreateGudangDefault($cabangId);
         }
 
+        $cacheKey = "{$cabangId}|{$raw}";
+        if (isset($this->gudangCache[$cacheKey])) {
+            return $this->gudangCache[$cacheKey];
+        }
+
         if (is_numeric($raw)) {
             $g = Gudang::find((int) $raw);
             if ($g) {
-                return $g->id;
+                return $this->gudangCache[$cacheKey] = $g->id;
             }
         }
 
-        $g = Gudang::whereRaw('LOWER(kode) = ?', [strtolower($raw)])
-            ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)])
-            ->first();
+        $g = Gudang::where('cabang_id', $cabangId)
+            ->where(function ($q) use ($raw) {
+                $q->whereRaw('LOWER(kode) = ?', [strtolower($raw)])
+                    ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)]);
+            })
+            ->first()
+            ?? Gudang::whereRaw('LOWER(kode) = ?', [strtolower($raw)])
+                ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)])
+                ->first();
 
         if ($g) {
-            return $g->id;
+            return $this->gudangCache[$cacheKey] = $g->id;
         }
 
         if (strcasecmp($raw, 'Gudang Utama') === 0 || strcasecmp($raw, 'Gudang Pusat') === 0) {
-            return $this->resolveOrCreateGudangDefault($cabangId);
+            return $this->gudangCache[$cacheKey] = $this->resolveOrCreateGudangDefault($cabangId);
         }
 
         // Buat gudang baru jika belum terdaftar
@@ -598,7 +633,7 @@ class ImportProdukService
             'is_active' => true,
         ]);
 
-        return $newGudang->id;
+        return $this->gudangCache[$cacheKey] = $newGudang->id;
     }
 
     /**
@@ -606,7 +641,11 @@ class ImportProdukService
      */
     public function resolveOrCreateGudangDefault(?int $cabangId = null): int
     {
-        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
+
+        if (isset($this->defaultGudangCache[$cabangId])) {
+            return $this->defaultGudangCache[$cabangId];
+        }
 
         $gudang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)
             ->where(fn ($q) => $q->where('nama', 'like', '%Utama%')->orWhere('nama', 'like', '%Pusat%')->orWhere('kode', 'like', '%UTAMA%'))
@@ -634,7 +673,7 @@ class ImportProdukService
             ]);
         }
 
-        return $gudang->id;
+        return $this->defaultGudangCache[$cabangId] = $gudang->id;
     }
 
     /**
@@ -829,10 +868,16 @@ class ImportProdukService
         $filePath = $this->resolveFilePath($filePath);
 
         // CSV → fgetcsv langsung (TANPA PhpSpreadsheet — krusial utk RAM 1GB / server ringan).
-        // xlsx/xls → PhpSpreadsheet (reader type XLSX).
+        // xlsx/xls → Fast streaming XMLReader dahulu, fallback ke PhpSpreadsheet jika format tidak standar.
         $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
         if (in_array($ext, ['csv', 'txt'], true)) {
             return $this->parseRowsCsv($filePath);
+        }
+
+        try {
+            return $this->parseRowsXlsxFast($filePath);
+        } catch (\Throwable $fastErr) {
+            Log::info('Fast XLSX parser fallback to PhpSpreadsheet: '.$fastErr->getMessage());
         }
 
         $sheets = Excel::toCollection(null, $filePath, null, ExcelReader::XLSX);
@@ -878,6 +923,186 @@ class ImportProdukService
         }
 
         return $rows;
+    }
+
+    /**
+     * Parsing XLSX secara streaming dengan XMLReader & ZipArchive (sangat cepat & hemat RAM 1GB).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function parseRowsXlsxFast(string $filePath): array
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($filePath) !== true) {
+            throw new \RuntimeException("Gagal membuka file XLSX: {$filePath}");
+        }
+
+        // 1. Baca sharedStrings.xml
+        $sharedStrings = [];
+        $sharedContent = $zip->getFromName('xl/sharedStrings.xml');
+        if ($sharedContent !== false) {
+            $sReader = new XMLReader;
+            $sReader->XML($sharedContent);
+            while ($sReader->read()) {
+                if ($sReader->nodeType === XMLReader::ELEMENT && $sReader->name === 'si') {
+                    $outer = $sReader->readOuterXml();
+                    $xml = simplexml_load_string($outer);
+                    if ($xml !== false) {
+                        if (isset($xml->t)) {
+                            $sharedStrings[] = (string) $xml->t;
+                        } elseif (isset($xml->r)) {
+                            $text = '';
+                            foreach ($xml->r as $r) {
+                                $text .= (string) $r->t;
+                            }
+                            $sharedStrings[] = $text;
+                        } else {
+                            $sharedStrings[] = '';
+                        }
+                    } else {
+                        $sharedStrings[] = '';
+                    }
+                }
+            }
+            $sReader->close();
+        }
+
+        // 2. Cari sheet data yang memiliki kolom wajib
+        $sheetCandidates = ['xl/worksheets/sheet1.xml'];
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $stat = $zip->statIndex($i);
+            if (preg_match('#^xl/worksheets/sheet\d+\.xml$#', $stat['name']) && ! in_array($stat['name'], $sheetCandidates, true)) {
+                $sheetCandidates[] = $stat['name'];
+            }
+        }
+
+        $wajib = ['sku', 'nama', 'harga_jual'];
+        $selectedHeaders = null;
+        $selectedSheetContent = null;
+
+        foreach ($sheetCandidates as $candidateName) {
+            $content = $zip->getFromName($candidateName);
+            if ($content === false) {
+                continue;
+            }
+
+            // Cek baris pertama untuk headers
+            $testReader = new XMLReader;
+            $testReader->XML($content);
+            $candidateHeaders = [];
+            while ($testReader->read()) {
+                if ($testReader->nodeType === XMLReader::ELEMENT && $testReader->name === 'row') {
+                    $rowXml = $testReader->readOuterXml();
+                    $cells = $this->parseRowCells($rowXml, $sharedStrings);
+                    foreach ($cells as $colLetter => $val) {
+                        $candidateHeaders[$colLetter] = $this->normalizeImportHeading((string) $val);
+                    }
+                    break;
+                }
+            }
+            $testReader->close();
+
+            $ada = array_intersect(array_values($candidateHeaders), $wajib);
+            if (count($ada) >= count($wajib)) {
+                $selectedHeaders = $candidateHeaders;
+                $selectedSheetContent = $content;
+                break;
+            }
+        }
+
+        $zip->close();
+
+        if (! $selectedSheetContent || ! $selectedHeaders) {
+            throw new \RuntimeException('Sheet data dengan header wajib (sku, nama, harga_jual) tidak ditemukan');
+        }
+
+        // 3. Baca baris data
+        $rows = [];
+        $reader = new XMLReader;
+        $reader->XML($selectedSheetContent);
+        $isFirstRow = true;
+
+        while ($reader->read()) {
+            if ($reader->nodeType === XMLReader::ELEMENT && $reader->name === 'row') {
+                if ($isFirstRow) {
+                    $isFirstRow = false;
+
+                    continue;
+                }
+
+                $rowXml = $reader->readOuterXml();
+                $cells = $this->parseRowCells($rowXml, $sharedStrings);
+                if (empty($cells)) {
+                    continue;
+                }
+
+                $normalized = [];
+                $hasVal = false;
+                foreach ($selectedHeaders as $colLetter => $heading) {
+                    if ($heading === '') {
+                        continue;
+                    }
+                    $val = $cells[$colLetter] ?? null;
+                    if ($val !== null && $val !== '') {
+                        $hasVal = true;
+                    }
+                    $normalized[$heading] = is_scalar($val) ? trim((string) $val) : $val;
+                }
+
+                if ($hasVal) {
+                    $rows[] = $normalized;
+                }
+            }
+        }
+        $reader->close();
+
+        if (count($rows) > self::MAKS_BARIS) {
+            throw new \Exception('File terlalu besar: maksimal '.self::MAKS_BARIS.' baris per import (RAM 1GB).');
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Parse row element XML menjadi array [column_letters => cell_value]
+     */
+    protected function parseRowCells(string $rowXml, array &$sharedStrings): array
+    {
+        $cells = [];
+        $reader = new XMLReader;
+        $reader->XML($rowXml);
+
+        while ($reader->read()) {
+            if ($reader->nodeType === XMLReader::ELEMENT && $reader->name === 'c') {
+                $ref = $reader->getAttribute('r') ?? '';
+                $type = $reader->getAttribute('t') ?? '';
+                preg_match('/^([A-Z]+)/', $ref, $matches);
+                $col = $matches[1] ?? '';
+
+                $cellOuter = $reader->readOuterXml();
+                $val = '';
+                if ($cellOuter !== '') {
+                    $xml = simplexml_load_string($cellOuter);
+                    if ($xml !== false) {
+                        if ($type === 's') {
+                            $idx = (int) $xml->v;
+                            $val = $sharedStrings[$idx] ?? '';
+                        } elseif ($type === 'inlineStr') {
+                            $val = (string) ($xml->is->t ?? '');
+                        } else {
+                            $val = (string) ($xml->v ?? '');
+                        }
+                    }
+                }
+
+                if ($col !== '') {
+                    $cells[$col] = trim($val);
+                }
+            }
+        }
+        $reader->close();
+
+        return $cells;
     }
 
     /**
@@ -1102,9 +1327,13 @@ class ImportProdukService
 
         $targetBaris = null;
         if ($lokasi === 'intra_file') {
-            if ($sku !== '' && isset($konteks['skuBarisMap'][$sku])) {
+            if ($tipe === 'sku' && $sku !== '' && isset($konteks['skuBarisMap'][$sku])) {
                 $targetBaris = $konteks['skuBarisMap'][$sku]['baris'];
                 $targetProdukNama = $konteks['skuBarisMap'][$sku]['nama'];
+            } elseif ($tipe === 'barcode' && $barcode !== '' && isset($konteks['barcodeBarisMap'][$barcode])) {
+                $targetBaris = $konteks['barcodeBarisMap'][$barcode]['baris'];
+                $targetProdukNama = $konteks['barcodeBarisMap'][$barcode]['nama'];
+                $targetProdukSku = $konteks['barcodeBarisMap'][$barcode]['sku'];
             } elseif (! empty($konteks['namaDalamFile'])) {
                 foreach ($konteks['namaDalamFile'] as $prev) {
                     if ($sku !== '' && strcasecmp($prev['sku'], $sku) === 0) {
@@ -1118,9 +1347,10 @@ class ImportProdukService
 
         $skuRekomendasi = $this->generateUniqueSkuSuffix($sku, $konteks);
 
+        $duplikatValue = $tipe === 'sku' ? $sku : $barcode;
         $ket = match ($lokasi) {
-            'database' => "{$tipe} '{$sku}' sudah terdaftar di master produk database ({$targetProdukNama}).",
-            default => "{$tipe} '{$sku}' duplikat dengan baris {$targetBaris} pada file import ini.",
+            'database' => "{$tipe} '{$duplikatValue}' sudah terdaftar di master produk database".($targetProdukNama ? " ({$targetProdukNama})" : '').'.',
+            default => "{$tipe} '{$duplikatValue}' duplikat dengan baris ".($targetBaris ?? '-').' pada file import ini.',
         };
 
         return [
@@ -1131,12 +1361,14 @@ class ImportProdukService
             'barcode' => $barcode,
             'nama' => $nama,
             'tipe' => $tipe,
+            'is_sku_duplikat' => ($isSkuDb || $isSkuFile),
+            'is_barcode_duplikat' => ($isBarcodeDb || $isBarcodeFile),
             'lokasi' => $lokasi,
             'target_produk_id' => $targetProdukId,
             'target_produk_nama' => $targetProdukNama,
             'target_produk_sku' => $targetProdukSku,
             'target_baris' => $targetBaris,
-            'default_aksi' => 'ganti_sku',
+            'default_aksi' => $tipe === 'barcode' ? 'kosongkan_barcode' : 'ganti_sku',
             'keterangan' => $ket,
         ];
     }
@@ -1289,7 +1521,7 @@ class ImportProdukService
      * [B-10f/P1-5] Validasi lintas cabang dijalankan di preview (fail fast)
      * supaya user tahu SEBELUM commit.
      */
-    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiDuplikat = []): array
+    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiDuplikat = [], array $resolusiBarcode = [], array $resolusiErrorBaris = []): array
     {
         $rows = $this->parseRows($filePath);
         // [B-10f] File lintas cabang ditolak (tidak ada mutasi stok/jurnal yg bisa dicocokkan)
@@ -1301,6 +1533,7 @@ class ImportProdukService
             'barcodeDalamFile' => [],
             'namaDalamFile' => [],
             'skuBarisMap' => [],
+            'barcodeBarisMap' => [],
             'existingSkuDb' => $existingSkuDb,
             'existingBarcodeDb' => $existingBarcodeDb,
             'skipFuzzy' => count($rows) > 300,
@@ -1329,6 +1562,14 @@ class ImportProdukService
         foreach ($rows as $i => $row) {
             $nomorBaris = $i + 2; // +1 heading
             $skuRaw = trim((string) ($row['sku'] ?? ''));
+            $barcodeRaw = $this->normalizeBarcode($row['barcode'] ?? null);
+
+            $resErr = $resolusiErrorBaris[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiErrorBaris[$skuRaw] ?? null) : null);
+            $isErrorSkipped = $resErr === 'skip';
+
+            $resBc = $resolusiBarcode[$nomorBaris] ?? ($barcodeRaw !== '' ? ($resolusiBarcode[$barcodeRaw] ?? null) : null);
+            $aksiBc = is_array($resBc) ? ($resBc['aksi'] ?? null) : $resBc;
+            $barcodeBaru = is_array($resBc) ? trim((string) ($resBc['barcode_baru'] ?? '')) : '';
 
             $resDup = $resolusiDuplikat[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiDuplikat[$skuRaw] ?? null) : null);
             $aksiDup = is_array($resDup) ? ($resDup['aksi'] ?? null) : $resDup;
@@ -1338,10 +1579,23 @@ class ImportProdukService
             if ($aksiDup === 'ganti_sku' && $skuBaru !== '') {
                 $rowValidasi['sku'] = $skuBaru;
             }
+            if ($aksiBc === 'kosongkan_barcode' || $aksiDup === 'kosongkan_barcode') {
+                $rowValidasi['barcode'] = null;
+            } elseif ($aksiBc === 'ganti_barcode' && $barcodeBaru !== '') {
+                $rowValidasi['barcode'] = $barcodeBaru;
+            }
 
             $errors = $this->validateRow($rowValidasi, $konteks);
-            if (in_array($aksiDup, ['ganti_sku', 'timpa_update', 'skip'], true)) {
+            if ($aksiDup === 'timpa_update') {
                 $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat')));
+            } elseif (in_array($aksiDup, ['ganti_sku', 'skip'], true)) {
+                $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat') || ! str_contains($err, 'SKU')));
+            }
+            if ($aksiBc === 'kosongkan_barcode' || $aksiDup === 'kosongkan_barcode') {
+                $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'Barcode')));
+            }
+            if ($isErrorSkipped) {
+                $errors = [];
             }
 
             $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks, $threshold);
@@ -1369,6 +1623,7 @@ class ImportProdukService
                 'valid' => empty($errors),
                 'errors' => $errors,
                 'warnings' => $warnings,
+                'is_skipped' => $isErrorSkipped,
             ];
 
             // Collect reference values
@@ -1626,7 +1881,7 @@ class ImportProdukService
      * - branches:chunk dipakai karena RAM 1GB — satu file besar tidak boleh jadi
      *   satu transaksi raksasa yang menahan lock (/tmp) lama.
      */
-    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN): array
+    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiBarcode = [], array $resolusiErrorBaris = []): array
     {
         $rows = $this->parseRows($filePath);
         $totalBaris = count($rows);
@@ -1646,6 +1901,7 @@ class ImportProdukService
             'barcodeDalamFile' => [],
             'namaDalamFile' => [],
             'skuBarisMap' => [],
+            'barcodeBarisMap' => [],
             'existingSkuDb' => $existingSkuDb,
             'existingBarcodeDb' => $existingBarcodeDb,
             'skipFuzzy' => count($rows) > 300,
@@ -1658,15 +1914,61 @@ class ImportProdukService
         $totalStokNilai = 0.0;
         $importedSkuToId = [];
 
-        foreach (array_chunk($rows, 100) as $indexChunk => $chunk) {
-            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId, $aksiKemiripan, $resolusiDuplikat, $threshold) {
+        $chunkSize = 50;
+        foreach (array_chunk($rows, $chunkSize) as $indexChunk => $chunk) {
+            $lastItemChunk = ['sku' => null, 'nama' => null, 'baris' => null];
+
+            DB::transaction(function () use ($chunk, &$konteks, $importLogId, &$sukses, &$gagal, &$totalPeringatan, &$detail, &$totalStokNilai, $cabangId, $userId, $indexChunk, &$importedSkuToId, $aksiKemiripan, $resolusiDuplikat, $threshold, $chunkSize, &$lastItemChunk, $resolusiBarcode, $resolusiErrorBaris) {
                 // Akumulator NILAI per chunk: jurnal di-post dalam transaksi yang
                 // SAMA dengan mutasi stok baris-baris chunk ini.
                 $nilaiChunk = 0.0;
 
                 foreach ($chunk as $i => $row) {
-                    $nomorBaris = $indexChunk * 100 + $i + 2;
+                    $nomorBaris = $indexChunk * $chunkSize + $i + 2;
                     $skuRaw = trim((string) ($row['sku'] ?? ''));
+                    $namaRaw = trim((string) ($row['nama'] ?? ''));
+                    $barcodeRaw = $this->normalizeBarcode($row['barcode'] ?? null);
+
+                    $lastItemChunk = [
+                        'sku' => $skuRaw,
+                        'nama' => $namaRaw,
+                        'baris' => $nomorBaris,
+                    ];
+
+                    // Resolusi Error Baris (Abaikan / Skip)
+                    $resErr = $resolusiErrorBaris[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiErrorBaris[$skuRaw] ?? null) : null);
+                    if ($resErr === 'skip') {
+                        $detail[] = [
+                            'baris' => $nomorBaris,
+                            'sku' => $skuRaw,
+                            'nama' => $row['nama'] ?? '',
+                            'status' => 'skip',
+                            'catatan' => 'Dilewati oleh pengguna (baris error diabaikan)',
+                        ];
+
+                        continue;
+                    }
+
+                    // Resolusi Barcode Duplikat
+                    $resBc = $resolusiBarcode[$nomorBaris] ?? ($barcodeRaw !== '' ? ($resolusiBarcode[$barcodeRaw] ?? null) : null);
+                    $aksiBc = is_array($resBc) ? ($resBc['aksi'] ?? null) : $resBc;
+                    $barcodeBaru = is_array($resBc) ? trim((string) ($resBc['barcode_baru'] ?? '')) : '';
+
+                    if ($aksiBc === 'skip') {
+                        $detail[] = [
+                            'baris' => $nomorBaris,
+                            'sku' => $skuRaw,
+                            'nama' => $row['nama'] ?? '',
+                            'status' => 'skip',
+                            'catatan' => 'Dilewati oleh pengguna (resolusi barcode duplikat: lewati)',
+                        ];
+
+                        continue;
+                    } elseif ($aksiBc === 'kosongkan_barcode') {
+                        $row['barcode'] = null;
+                    } elseif ($aksiBc === 'ganti_barcode' && $barcodeBaru !== '') {
+                        $row['barcode'] = $barcodeBaru;
+                    }
 
                     // Resolusi Duplikat SKU / Barcode dari input pengguna
                     $resDup = $resolusiDuplikat[$nomorBaris] ?? ($skuRaw !== '' ? ($resolusiDuplikat[$skuRaw] ?? null) : null);
@@ -1683,11 +1985,14 @@ class ImportProdukService
                         ];
 
                         continue;
+                    } elseif ($aksiDup === 'kosongkan_barcode') {
+                        $row['barcode'] = null;
                     }
 
                     if ($aksiDup === 'ganti_sku' && $skuBaru !== '') {
                         $row['sku'] = $skuBaru;
                         $skuRaw = $skuBaru;
+                        $lastItemChunk['sku'] = $skuBaru;
                     }
 
                     // Aksi Kemiripan Produk
@@ -1706,8 +2011,13 @@ class ImportProdukService
                     }
 
                     $errors = $this->validateRow($row, $konteks);
-                    if ($aksi === 'gabung' || in_array($aksiDup, ['timpa_update', 'ganti_sku', 'skip'], true)) {
+                    if ($aksi === 'gabung' || $aksiDup === 'timpa_update') {
                         $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat')));
+                    } elseif (in_array($aksiDup, ['ganti_sku', 'skip'], true)) {
+                        $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'duplikat') || ! str_contains($err, 'SKU')));
+                    }
+                    if ($aksiBc === 'kosongkan_barcode' || $aksiDup === 'kosongkan_barcode') {
+                        $errors = array_values(array_filter($errors, fn ($err) => ! str_contains($err, 'Barcode')));
                     }
                     $warnings = $this->checkRowWarnings($row, $nomorBaris, $konteks, $threshold);
                     $this->catatKonteks($row, $nomorBaris, $konteks);
@@ -1719,16 +2029,16 @@ class ImportProdukService
                         // [B-10f] Savepoint per baris (nested transaction): baris gagal
                         // tidak boleh meninggalkan produk/sku setengah tertulis di dalam
                         // chunk yang sama — nilai jurnal chunk tetap = mutasi utuh.
-                        $result = DB::transaction(function () use ($row, $importLogId, $userId, $aksi, $aksiDup, &$importedSkuToId, $nomorBaris, $konteks, $threshold) {
+                        $result = DB::transaction(function () use ($row, $importLogId, $userId, $aksi, $aksiDup, &$importedSkuToId, $nomorBaris, $konteks, $threshold, $cabangId) {
                             if ($aksiDup === 'timpa_update') {
-                                return $this->prosesTimpaUpdateBaris($row, $importLogId, $userId, $nomorBaris);
+                                return $this->prosesTimpaUpdateBaris($row, $importLogId, $userId, $nomorBaris, $cabangId);
                             }
 
                             if ($aksi === 'gabung') {
-                                return $this->prosesGabungBaris($row, $importLogId, $userId, $importedSkuToId, $nomorBaris, $konteks, $threshold);
+                                return $this->prosesGabungBaris($row, $importLogId, $userId, $importedSkuToId, $nomorBaris, $konteks, $threshold, $cabangId);
                             }
 
-                            return $this->prosesSatuBaris($row, $importLogId, $userId);
+                            return $this->prosesSatuBaris($row, $importLogId, $userId, $cabangId);
                         });
 
                         $sukses++;
@@ -1783,19 +2093,33 @@ class ImportProdukService
                 }
             });
 
+            // Update kemajuan real-time ke ImportLog (beserta produk yang baru selesai diproses)
             ImportLog::where('id', $importLogId)->update([
+                'total_baris' => $totalBaris,
                 'sukses' => $sukses,
                 'gagal' => $gagal,
+                'detail' => [
+                    'current_sku' => $lastItemChunk['sku'] ?? null,
+                    'current_nama' => Str::limit($lastItemChunk['nama'] ?? '', 70),
+                    'current_baris' => $lastItemChunk['baris'] ?? ($sukses + $gagal),
+                    'total_baris' => $totalBaris,
+                ],
             ]);
         }
 
         // Pass 2: Resolusi kompatibilitas antar produk (substitusi) via SKU
         $this->resolveProdukKompatibelAntarSku($rows, $importedSkuToId);
 
-        // Baris number di detail diisi pasca-transaksi (nomor baris = index + 2)
+        // Baris number di detail dipertahankan sesuai nomor baris asli spreadsheet
         foreach ($detail as $d => $item) {
-            $detail[$d]['baris'] = $d + 2;
+            if (! isset($detail[$d]['baris'])) {
+                $detail[$d]['baris'] = $d + 2;
+            }
         }
+
+        ImportLog::where('id', $importLogId)->update([
+            'detail' => $detail,
+        ]);
 
         $statusKeseluruhan = $gagal === 0 ? 'sukses_penuh' : ($sukses > 0 ? 'sukses_sebagian' : 'gagal_total');
         $labelStatus = match ($statusKeseluruhan) {
@@ -1888,6 +2212,7 @@ class ImportProdukService
         $b = $this->normalizeBarcode($row['barcode'] ?? null);
         if ($b !== '') {
             $konteks['barcodeDalamFile'][$b] = true;
+            $konteks['barcodeBarisMap'][$b] = ['baris' => $nomorBaris, 'nama' => $n, 'sku' => $s];
         }
         $n = trim((string) ($row['nama'] ?? ''));
         if ($n !== '') {
@@ -1904,7 +2229,7 @@ class ImportProdukService
     /**
      * Proses penggabungan baris ke master produk yang sudah ada (merge varian, tipe HP, dan stok).
      */
-    protected function prosesGabungBaris(array $row, int $importLogId, ?int $userId, array &$importedSkuToId, int $nomorBaris, array $konteks, int $threshold = self::THRESHOLD_PENCOCOKAN): array
+    protected function prosesGabungBaris(array $row, int $importLogId, ?int $userId, array &$importedSkuToId, int $nomorBaris, array $konteks, int $threshold = self::THRESHOLD_PENCOCOKAN, ?int $cabangId = null): array
     {
         $nama = trim((string) ($row['nama'] ?? ''));
         $sku = trim((string) ($row['sku'] ?? ''));
@@ -1942,7 +2267,7 @@ class ImportProdukService
         }
 
         if (! $targetProduk) {
-            return $this->prosesSatuBaris($row, $importLogId, $userId);
+            return $this->prosesSatuBaris($row, $importLogId, $userId, $cabangId);
         }
 
         // 1. Merge Tipe HP & Kompatibilitas
@@ -1994,15 +2319,15 @@ class ImportProdukService
         }
 
         // 3. Stok awal & Lokasi
-        $cabangIdSession = session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
         $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
         $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
         $rakKosong = $rakRaw === '' || in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true);
 
         $targetGudangId = $gudangKosong
-            ? $this->resolveOrCreateGudangDefault($cabangIdSession)
-            : $this->resolveOrCreateGudang($gudangRaw, $cabangIdSession);
+            ? $this->resolveOrCreateGudangDefault($cabangId)
+            : $this->resolveOrCreateGudang($gudangRaw, $cabangId);
 
         $rakId = $this->resolveOrCreateRak($rakRaw, $targetGudangId);
         $gudangId = ($stokAwal > 0 || ! $gudangKosong || ! $rakKosong) ? $targetGudangId : null;
@@ -2066,7 +2391,7 @@ class ImportProdukService
     /**
      * Proses timpa/update produk eksisting ketika user memilih opsi timpa untuk duplikat database.
      */
-    protected function prosesTimpaUpdateBaris(array $row, int $importLogId, ?int $userId, int $nomorBaris): array
+    protected function prosesTimpaUpdateBaris(array $row, int $importLogId, ?int $userId, int $nomorBaris, ?int $cabangId = null): array
     {
         $sku = trim((string) ($row['sku'] ?? ''));
         $barcode = $this->normalizeBarcode($row['barcode'] ?? null);
@@ -2083,7 +2408,7 @@ class ImportProdukService
         }
 
         if (! $variant) {
-            return $this->prosesSatuBaris($row, $importLogId, $userId);
+            return $this->prosesSatuBaris($row, $importLogId, $userId, $cabangId);
         }
 
         $produk = $variant->produk;
@@ -2122,15 +2447,15 @@ class ImportProdukService
         }
 
         // Tambah stok awal jika diisi
-        $cabangIdSession = session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
         $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
         $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
         $rakKosong = $rakRaw === '' || in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true);
 
         $targetGudangId = $gudangKosong
-            ? $this->resolveOrCreateGudangDefault($cabangIdSession)
-            : $this->resolveOrCreateGudang($gudangRaw, $cabangIdSession);
+            ? $this->resolveOrCreateGudangDefault($cabangId)
+            : $this->resolveOrCreateGudang($gudangRaw, $cabangId);
 
         $rakId = $this->resolveOrCreateRak($rakRaw, $targetGudangId);
         $gudangId = ($stokAwal > 0 || ! $gudangKosong || ! $rakKosong) ? $targetGudangId : null;
@@ -2193,7 +2518,7 @@ class ImportProdukService
     /**
      * Proses satu baris valid: produk + sku_variant + harga_tier + tipe_hp + stok awal.
      */
-    protected function prosesSatuBaris(array $row, int $importLogId, ?int $userId): array
+    protected function prosesSatuBaris(array $row, int $importLogId, ?int $userId, ?int $cabangId = null): array
     {
         $nama = trim((string) ($row['nama'] ?? ''));
         $sku = trim((string) ($row['sku'] ?? ''));
@@ -2214,15 +2539,15 @@ class ImportProdukService
         $hargaJual = round((float) ($row['harga_jual'] ?? 0), 2);
         $stokAwal = (int) ($row['stok_awal'] ?? 0);
 
-        $cabangIdSession = session('cabang_id') ?? auth()->user()?->cabang_id ?? Cabang::value('id') ?? 1;
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
         $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
         $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
         $rakKosong = $rakRaw === '' || in_array(strtolower($rakRaw), ['-', '0', 'none', 'null', 'kosong'], true);
 
         $targetGudangId = $gudangKosong
-            ? $this->resolveOrCreateGudangDefault($cabangIdSession)
-            : $this->resolveOrCreateGudang($gudangRaw, $cabangIdSession);
+            ? $this->resolveOrCreateGudangDefault($cabangId)
+            : $this->resolveOrCreateGudang($gudangRaw, $cabangId);
 
         $rakId = $this->resolveOrCreateRak($rakRaw, $targetGudangId);
         $gudangId = ($stokAwal > 0 || ! $gudangKosong || ! $rakKosong) ? $targetGudangId : null;

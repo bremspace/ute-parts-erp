@@ -322,10 +322,21 @@
                                         type="button"
                                         wire:click="cetakLabel({{ $o->id }})"
                                         class="p-1.5 rounded-lg text-ink-500 hover:text-ink-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                                        title="Cetak Label / Struk"
+                                        title="Cetak Struk Kasir"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                                     </button>
+
+                                    @if(!$isPickup)
+                                        <a
+                                            href="{{ route('pesanan-online.print-label', $o->id) }}"
+                                            target="_blank"
+                                            class="p-1.5 rounded-lg text-ink-500 hover:text-up-primary dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                                            title="Cetak Label Ekspedisi / Resi"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                                        </a>
+                                    @endif
 
                                     <!-- KASUS A: METODE AMBIL DI TOKO (PICKUP) -->
                                     @if($isPickup)
@@ -745,65 +756,6 @@
         </div>
     @endif
 
-    <!-- MODAL CETAK LABEL / STRUK KASIR -->
-    @if($showReceiptModal && $receiptData)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/70 backdrop-blur-xs">
-            <div class="bg-white rounded-3xl border border-ink-200 shadow-2xl w-full max-w-sm p-6 text-ink-900 text-xs font-mono space-y-4 animate-scale-in">
-                <div class="text-center pb-3 border-b border-dashed border-ink-300">
-                    <h2 class="text-base font-black tracking-tight">UTE PARTS STORE</h2>
-                    <p class="text-[10px] text-ink-500">{{ $receiptData['cabang'] }}</p>
-                    <p class="text-[10px] text-ink-500 mt-1 uppercase">{{ $receiptData['is_pickup'] ? 'BUKTI SERAH TERIMA PICKUP TOKO' : 'SLIP PACKING & PENGIRIMAN' }}</p>
-                    <p class="text-xs font-black text-up-primary mt-1">{{ $receiptData['no_transaksi'] }}</p>
-                </div>
-
-                <div class="space-y-1 text-[11px] pb-3 border-b border-dashed border-ink-300">
-                    <div class="flex justify-between"><span>Pelanggan:</span><span class="font-bold">{{ $receiptData['pelanggan'] }}</span></div>
-                    <div class="flex justify-between"><span>Kontak:</span><span>{{ $receiptData['telepon'] }}</span></div>
-                    <div class="flex justify-between"><span>Metode:</span><span class="font-bold">{{ $receiptData['kurir'] }}</span></div>
-                    @if($receiptData['resi'] !== '-')
-                        <div class="flex justify-between"><span>No. Resi:</span><span class="font-bold text-up-primary">{{ $receiptData['resi'] }}</span></div>
-                    @endif
-                    <div class="flex justify-between"><span>Bayar:</span><span class="font-bold">{{ $receiptData['metode_bayar'] }}</span></div>
-                </div>
-
-                <div class="space-y-1.5 pb-3 border-b border-dashed border-ink-300 text-[11px]">
-                    <div class="font-bold text-[10px] text-ink-500 uppercase tracking-wider mb-1">Daftar Suku Cadang:</div>
-                    @foreach($receiptData['items'] as $it)
-                        <div class="flex items-start justify-between gap-2">
-                            <span>[✓] {{ $it['nama'] }}</span>
-                            <span class="font-bold">×{{ $it['qty'] }}</span>
-                        </div>
-                    @endforeach
-                </div>
-
-                <div class="space-y-1 text-xs font-black pt-1">
-                    <div class="flex justify-between">
-                        <span>Total Tagihan:</span>
-                        <span>Rp {{ number_format($receiptData['total'], 0, ',', '.') }}</span>
-                    </div>
-                    @if($receiptData['is_pickup'])
-                        <div class="flex justify-between text-[11px] font-normal text-ink-600">
-                            <span>Bayar:</span>
-                            <span>Rp {{ number_format($receiptData['bayar'], 0, ',', '.') }}</span>
-                        </div>
-                        @if($receiptData['kembalian'] > 0)
-                            <div class="flex justify-between text-[11px] font-normal text-ink-600">
-                                <span>Kembalian:</span>
-                                <span>Rp {{ number_format($receiptData['kembalian'], 0, ',', '.') }}</span>
-                            </div>
-                        @endif
-                    @endif
-                </div>
-
-                <div class="flex gap-2 pt-3">
-                    <button type="button" wire:click="$set('showReceiptModal', false)" class="flex-1 py-2 rounded-xl border border-ink-300 text-xs font-bold font-sans text-ink-700 cursor-pointer">
-                        Tutup
-                    </button>
-                    <button type="button" onclick="window.print()" class="flex-1 py-2 rounded-xl bg-ink-900 text-white text-xs font-bold font-sans hover:bg-black cursor-pointer">
-                        Cetak Struk
-                    </button>
-                </div>
-            </div>
-        </div>
-    @endif
+    <!-- MODAL CETAK STRUK KASIR & SERAH TERIMA TERSTANDAR (SOT PRINTER) -->
+    @include('partials.thermal-receipt-modal')
 </div>

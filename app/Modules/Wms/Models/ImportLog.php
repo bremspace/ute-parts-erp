@@ -56,6 +56,21 @@ class ImportLog extends Model
         return 'bg-up-mint/20 text-up-mint border-up-mint/40';
     }
 
+    public function getCurrentSkuAttribute(): ?string
+    {
+        return is_array($this->detail) ? ($this->detail['current_sku'] ?? null) : null;
+    }
+
+    public function getCurrentNamaAttribute(): ?string
+    {
+        return is_array($this->detail) ? ($this->detail['current_nama'] ?? null) : null;
+    }
+
+    public function getCurrentBarisAttribute(): ?int
+    {
+        return is_array($this->detail) ? ($this->detail['current_baris'] ?? null) : null;
+    }
+
     public function getPeringatanListAttribute(): array
     {
         if (! is_array($this->detail)) {
@@ -71,6 +86,34 @@ class ImportLog extends Model
             return [];
         }
 
-        return array_values(array_filter($this->detail, fn ($d) => ($d['status'] ?? '') === 'gagal'));
+        return array_values(array_filter($this->detail, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
+    }
+
+    public function getSkipListAttribute(): array
+    {
+        if (! is_array($this->detail)) {
+            return [];
+        }
+
+        return array_values(array_filter($this->detail, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
+    }
+
+    public function getBermasalahListAttribute(): array
+    {
+        if (! is_array($this->detail)) {
+            return [];
+        }
+
+        return array_values(array_filter($this->detail, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true)));
+    }
+
+    public function getGagalCountAttribute(): int
+    {
+        return count($this->gagal_list);
+    }
+
+    public function getSkipCountAttribute(): int
+    {
+        return count($this->skip_list);
     }
 }

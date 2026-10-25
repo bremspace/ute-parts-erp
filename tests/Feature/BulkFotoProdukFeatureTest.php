@@ -225,4 +225,43 @@ class BulkFotoProdukFeatureTest extends TestCase
         $this->assertEquals($produk->foto_utama, $produk->galeri_foto[0]['url']);
         $this->assertTrue($produk->galeri_foto[0]['is_primary']);
     }
+
+    public function test_abaikan_semua_foto_error_and_batal(): void
+    {
+        $fileUnknown1 = UploadedFile::fake()->image('UNKNOWN-A.jpg', 400, 400);
+        $fileUnknown2 = UploadedFile::fake()->image('UNKNOWN-B.jpg', 400, 400);
+
+        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+            ->set('activeTab', 'foto')
+            ->set('fotoUploads', [$fileUnknown1, $fileUnknown2])
+            ->call('scanUploadedFoto')
+            ->assertSet('fotoScanResult.skipped_count', 2)
+            ->call('abaikanSemuaFotoError')
+            ->assertCount('resolusiErrorFoto', 2)
+            ->call('batalAbaikanSemuaFotoError')
+            ->assertSet('resolusiErrorFoto', []);
+    }
+
+    public function test_export_foto_error_rows_csv_download(): void
+    {
+        $fileUnknown = UploadedFile::fake()->image('ERROR-TEST-SKU.jpg', 400, 400);
+
+        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+            ->set('activeTab', 'foto')
+            ->set('fotoUploads', [$fileUnknown])
+            ->call('scanUploadedFoto')
+            ->call('exportFotoErrorRows')
+            ->assertFileDownloaded();
+    }
+
+    public function test_foto_error_filtering_and_load_more(): void
+    {
+        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+            ->set('activeTab', 'foto')
+            ->call('setFotoErrorFilterTab', 'gagal')
+            ->assertSet('fotoErrorFilterTab', 'gagal')
+            ->assertSet('fotoErrorDisplayLimit', 50)
+            ->call('loadMoreFotoErrors')
+            ->assertSet('fotoErrorDisplayLimit', 100);
+    }
 }

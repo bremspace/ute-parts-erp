@@ -11,6 +11,10 @@
             <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
             <span class="text-ink-400 text-xs">—</span>
             <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
+            <a href="{{ route('laporan.pajak.print', ['dari' => $periodeDari, 'sampai' => $periodeSampai]) }}" target="_blank" class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white font-bold text-xs inline-flex items-center gap-1.5 transition whitespace-nowrap min-h-[44px]">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                <span>Cetak Laporan</span>
+            </a>
             <x-prism.prism-button variant="accent" size="sm" wire:click="exportPajak" class="whitespace-nowrap min-h-[44px]">
                 Export Excel (Queue)
             </x-prism.prism-button>

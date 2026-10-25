@@ -2,6 +2,7 @@
 
 namespace App\Modules\Pos\Jobs;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\EscPosWriter;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -54,8 +55,21 @@ class PrintThermalJob implements ShouldQueue
             }
         }
 
+        $strukConfig = app(KonfigurasiService::class)->getStrukConfig();
+        $headerLines = array_values(array_filter([
+            $strukConfig['nama_toko'] ?? ($transaksi->cabang?->nama ?? 'UTE PARTS'),
+            $strukConfig['slogan'] ?? null,
+            $strukConfig['alamat'] ?? null,
+            ! empty($strukConfig['telepon']) ? 'Telp: '.$strukConfig['telepon'] : null,
+        ]));
+        $footerLines = array_values(array_filter([
+            $strukConfig['footer_text'] ?? 'Terima kasih atas kunjungan Anda',
+            $strukConfig['kebijakan_retur'] ?? null,
+            $strukConfig['catatan_kaki'] ?? null,
+        ]));
+
         $data = [
-            'headerLines' => [$transaksi->cabang?->nama ?? 'UTE PARTS', 'Jln. Contoh No. 1, Kota'],
+            'headerLines' => ! empty($headerLines) ? $headerLines : [$transaksi->cabang?->nama ?? 'UTE PARTS'],
             'items' => $items,
             'total' => (float) $transaksi->total_akhir,
             'bayar' => (float) $transaksi->jumlah_bayar,
@@ -64,7 +78,7 @@ class PrintThermalJob implements ShouldQueue
             'no_tiket' => $transaksi->tiketServis?->no_tiket,
             'jenis_hp' => $transaksi->tiketServis?->jenis_hp,
             'metode_bayar' => $transaksi->metode_bayar,
-            'footerLines' => ['Terima kasih atas kunjungan Anda', 'Barang yang sudah dibeli tidak dapat dikembalikan'],
+            'footerLines' => ! empty($footerLines) ? $footerLines : ['Terima kasih atas kunjungan Anda'],
             'tanggal' => $transaksi->created_at?->format('d-m-Y H:i'),
             'kasir' => $transaksi->kasir?->name ?? (string) $transaksi->kasir_id,
             'cabang' => $transaksi->cabang?->nama ?? (string) $transaksi->cabang_id,

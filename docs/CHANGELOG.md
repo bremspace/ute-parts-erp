@@ -3,6 +3,59 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-25 — Core: Unifikasi & Sentralisasi Fitur Cetak Sistem (Single Source of Truth di Pengaturan Printer) ✅
+
+- **Single Source of Truth (SOT) Konfigurasi Cetak (`KonfigurasiService`, `/app/pengaturan?tab=printer`)**:
+  - `KonfigurasiService::getPrintHeader()`: Standardisasi universal kop surat & identitas perusahaan (Nama Toko, Slogan, Alamat, Telp/WA, Website/Medsos) yang dipakai konsisten oleh seluruh dokumen cetak.
+  - Penambahan getter & persilangan setelan printer: `getStrukConfig()`, `getLabelQrConfig()`, `getWmsDocConfig()`, `getSlipGajiConfig()`, `getLaporanDocConfig()`, dan `getLabelPengirimanConfig()`.
+  - Halaman Setelan Printer (`SettingsRbac` & `settings-rbac.blade.php`) diperluas menjadi 6 sub-tab komprehensif:
+    1. 🧾 **Template Struk & Faktur**: KOP toko, footer, QR retur, lebar kertas 58mm/80mm, auto-print.
+    2. 🏷️ **Label Barcode & QR SKU**: Preset stiker rak 33x15mm, margin, visibilitas brand, SKU, harga.
+    3. 📦 **Dokumen WMS (PO & GRN)**: Ukuran kertas A5/A4, orientasi, margin presisi, KOP dan tanda tangan.
+    4. 💼 **Slip Gaji HR & Payroll**: Kertas A5/A4/80mm thermal, rincian komisi tiket servis teknisi, potongan disiplin, disclaimer rahasia, otorisasi penerima & keuangan.
+    5. 📊 **Laporan Keuangan & Pajak**: Kertas A4/F4 lanskap, KOP, 3 kolom tanda tangan otorisasi (Pembuat, Pemeriksa, Penyetuju), audit trail user pencetak & timestamp.
+    6. 🚚 **Label Pengiriman Ekspedisi**: Stiker thermal 100x150mm / 80x100mm, barcode/QR resi, data pengirim, rincian produk paket, peringatan Fragile.
+- **Standarisasi Seluruh Format & Template Cetak**:
+  - `PrintThermalJob`: Mengintegrasikan identitas toko dan footer dari `KonfigurasiService::getStrukConfig()`.
+  - `partials/thermal-receipt-modal.blade.php`: Auto-print dan lebar kertas dinamis (58mm/80mm) membaca `strukConfig`.
+  - `PesananOnlineIndex`: Menghapus modal cetak inline duplikat; beralih ke modal thermal terstandar dan menambahkan tombol cetak label ekspedisi thermal.
+  - Template dokumen WMS (`po-print`, `po-print-penolakan`, `grn-print`, `barcode-label`): Diperbarui mengonsumsi `getPrintHeader()` seragam.
+  - Template cetak baru terstandar: `slip-gaji-print.blade.php` (HR Payroll), `label-pengiriman-print.blade.php` (POS/Ekspedisi), `laporan-pajak-print.blade.php` (Akunting).
+  - Integrasi aksi cetak langsung pada modul: Tombol "Cetak Laporan" di Laporan Pajak dan tombol "Cetak Slip" di HR Payroll & HR Saya.
+- **Verifikasi & Pengujian**:
+  - Penambahan unit & feature test di `SettingsRbacRakAndStokScopingTest`: 6 tests, 35 assertions passed (100% green).
+  - Code standard formatting via Laravel Pint verified.
+
+
+## 2026-10-25 — WMS: Unifikasi Arsitektur Upload Masal Foto Produk & Decluttering Dashboard ✅
+
+- **Penyelarasan Arsitektur Upload Masal Foto (`ImportFotoMasalJob`, `ImportExportPage.php`)**:
+  - Unifikasi backend upload masal foto produk mengikuti arsitektur impor master produk: pencatatan di `ImportLog` (`tipe: 'produk_foto'`), eksekusi asinkron latar belakang via worker queue dengan batching aman memori (`gc_collect_cycles`), serta pembersihan berkas temporary otomatis.
+  - Ticker live progress real-time per item (`current_sku`, `current_nama`, `current_baris`) dan update berkala persentase kompresi WebP & penyimpanan gambar.
+- **Error Management & Pelaporan Komprehensif (`import-export-page.blade.php`)**:
+  - Banner peringatan foto error / SKU tidak ditemukan pada tahap preview dengan opsi *Abaikan & Lewati Semua Error (Skip)* serta *Batal Abaikan*.
+  - Tabel rincian interaktif berkas bermasalah pasca-impor dengan filter tab (*Semua*, *Gagal*, *Dilewati / Skip*) dan pagination dinamis *Muat Lebih Banyak*.
+  - Ekspor laporan error streaming CSV berstandar UTF-8 BOM (`exportFotoErrorRows`) dan unduhan Excel file yang dilewati (`BulkFotoSkippedExport`).
+- **Pembersihan & Optimalisasi UI Header WMS (`wms-dashboard.blade.php`)**:
+  - Tombol standalone "Import Foto" / "Foto" pada desktop bar dan mobile bar WMS dihilangkan untuk menghemat ruang dan menghindari redundansi navigasi.
+  - Tombol "Import Master" diarahkan ke workspace terpadu `/app/wms/import-export` yang menyatukan tab Impor Excel, Ekspor Data, dan Upload Foto Masal.
+
+## 2026-10-25 — WMS: Optimasi Streaming Import Produk Skala Besar & Error Management Interaktif ✅
+
+- **Streaming XLSX Parser & Memory Protection (`ImportProdukService::parseRowsXlsxFast`)**:
+  - Implementasi parser streaming berbasis `XMLReader` untuk file XLSX standar besar (~7000 baris) menggantikan pembacaan full DOM buffer yang boros memori pada server RAM 1GB.
+  - In-memory runtime caching untuk `Gudang`, `Cabang`, `Kategori`, `Kualitas`, dan `TipeHp` guna mencegah N+1 query selama preview dan commit.
+  - Penurunan ukuran chunk commit menjadi 50 baris per transaksi dengan interval polling Livewire 1.2s untuk pergerakan progress bar yang halus dan responsif.
+  - Penyesuaian Supervisor timeout antrian worker (`ute-parts-queue.conf`) ke 1800 detik (`stopwaitsecs=1800`) agar terhindar dari kill sinyal timeout saat batch commit besar.
+- **Real-Time Live Processing Ticker (`ImportLog`, `ImportExportPage.php`, `import-export-page.blade.php`)**:
+  - Tracking nama produk, SKU, dan nomor baris aktual yang sedang diproses secara live (`current_sku`, `current_nama`, `current_baris`) pada `ImportLog`.
+  - Ticker visual dinamis pada UI Livewire dengan animasi detak pemrosesan, persentase kemajuan aktual, dan ringkasan metrik (Total, Sukses, Dilewati, Gagal).
+- **Manajemen Error & Resolusi Duplikasi Komprehensif**:
+  - Penambahan resolusi barcode duplikat: opsi `kosongkan_barcode` massal maupun per baris sehingga master produk baru tetap dapat diimpor tanpa memicu constraint violation database.
+  - Penanganan baris error format: opsi `skip` / abaikan baris error agar baris yang tidak valid dapat dilewati tanpa membatalkan impor baris valid lainnya.
+  - Tabel rincian interaktif baris bermasalah pasca-impor dengan filter tab (*Semua*, *Gagal*, *Dilewati / Skip*) dan pagination *Muat Lebih Banyak*.
+  - Ekspor laporan error streaming CSV berstandar UTF-8 BOM (`exportErrorRows`) baik pada tahap preview maupun riwayat log hasil impor.
+
 ## 2026-10-25 — Deployment & DevOps: Universal GUI Installer, Auto-Fix System Engine, Git CI/CD & AI Stack ✅
 
 - **Auto-Fix & Universal Self-Healing Engine (`public/install.php`, `start-install.sh`, `start-install.bat`)**:

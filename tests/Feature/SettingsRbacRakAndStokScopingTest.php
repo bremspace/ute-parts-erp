@@ -226,4 +226,66 @@ class SettingsRbacRakAndStokScopingTest extends TestCase
         $this->assertEquals('portrait', $config['orientation']);
         $this->assertEquals(8, $config['margin_mm']);
     }
+
+    public function test_pengaturan_format_cetak_universal_sot_tersimpan(): void
+    {
+        $this->actingAs($this->superAdmin, 'web');
+        session(['cabang_id' => $this->cabangA->id]);
+
+        // 1. Simpan Slip Gaji Config
+        Livewire::test(SettingsRbac::class, ['activeTab' => 'printer'])
+            ->set('printerSubTab', 'hr_slip')
+            ->set('hrSlipForm.paper_size', 'a5')
+            ->set('hrSlipForm.margin_mm', 10)
+            ->set('hrSlipForm.show_komisi_detail', true)
+            ->set('hrSlipForm.catatan_kaki', 'Slip Gaji Rahasia UTE')
+            ->call('simpanPengaturanHrSlip')
+            ->assertDispatched('alert', fn ($event, $params) => (($params[0] ?? $params)['type'] ?? '') === 'success');
+
+        $slipCfg = app(KonfigurasiService::class)->getSlipGajiConfig();
+        $this->assertEquals('a5', $slipCfg['paper_size']);
+        $this->assertEquals(10, $slipCfg['margin_mm']);
+        $this->assertEquals('Slip Gaji Rahasia UTE', $slipCfg['catatan_kaki']);
+
+        // 2. Simpan Laporan Keuangan Config
+        Livewire::test(SettingsRbac::class, ['activeTab' => 'printer'])
+            ->set('printerSubTab', 'laporan')
+            ->set('laporanDocForm.paper_size', 'a4')
+            ->set('laporanDocForm.orientation', 'landscape')
+            ->set('laporanDocForm.jabatan_pembuat', 'Staff Finance')
+            ->call('simpanPengaturanLaporanDoc')
+            ->assertDispatched('alert', fn ($event, $params) => (($params[0] ?? $params)['type'] ?? '') === 'success');
+
+        $laporanCfg = app(KonfigurasiService::class)->getLaporanDocConfig();
+        $this->assertEquals('a4', $laporanCfg['paper_size']);
+        $this->assertEquals('landscape', $laporanCfg['orientation']);
+        $this->assertEquals('Staff Finance', $laporanCfg['jabatan_pembuat']);
+
+        // 3. Simpan Label Pengiriman Config
+        Livewire::test(SettingsRbac::class, ['activeTab' => 'printer'])
+            ->set('printerSubTab', 'pengiriman')
+            ->set('labelPengirimanForm.paper_size', '100x150')
+            ->set('labelPengirimanForm.show_fragile_warning', true)
+            ->set('labelPengirimanForm.catatan_pengiriman', 'FRAGILE JANGAN DIBANTING!')
+            ->call('simpanPengaturanLabelPengiriman')
+            ->assertDispatched('alert', fn ($event, $params) => (($params[0] ?? $params)['type'] ?? '') === 'success');
+
+        $labelPengirimanCfg = app(KonfigurasiService::class)->getLabelPengirimanConfig();
+        $this->assertEquals('100x150', $labelPengirimanCfg['paper_size']);
+        $this->assertEquals('FRAGILE JANGAN DIBANTING!', $labelPengirimanCfg['catatan_pengiriman']);
+
+        // 4. Verifikasi universal getPrintHeader
+        $printHeader = app(KonfigurasiService::class)->getPrintHeader();
+        $this->assertArrayHasKey('nama_toko', $printHeader);
+        $this->assertArrayHasKey('alamat', $printHeader);
+        $this->assertArrayHasKey('telepon', $printHeader);
+
+        // 5. Verifikasi Route Cetak Laporan Pajak
+        $respLaporan = $this->get(route('laporan.pajak.print', [
+            'dari' => now()->startOfMonth()->toDateString(),
+            'sampai' => now()->toDateString(),
+        ]));
+        $respLaporan->assertOk();
+        $respLaporan->assertSee('Laporan Pajak Bulanan');
+    }
 }

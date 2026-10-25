@@ -3,6 +3,8 @@
 namespace Tests\Unit;
 
 use App\Modules\Wms\Exports\BulkFotoSkippedExport;
+use App\Modules\Wms\Jobs\ImportFotoMasalJob;
+use App\Modules\Wms\Models\ImportLog;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Services\BulkProductImageImportService;
@@ -195,5 +197,74 @@ class BulkProductImageImportTest extends TestCase
         $this->assertCount(1, $collection);
         $this->assertEquals('UNKNOWN-SKU.jpg', $collection[0]['filename']);
         $this->assertEquals('UNKNOWN-SKU', $collection[0]['sku']);
+    }
+
+    public function test_import_foto_masal_job_execution_and_skip(): void
+    {
+        $produk = Produk::create([
+            'nama' => 'Produk Job Test',
+            'slug' => 'produk-job-test-'.uniqid(),
+            'kategori' => 'Sparepart',
+            'kondisi' => 'baru',
+            'satuan' => 'pcs',
+            'harga_beli' => 10000,
+            'harga_jual_retail' => 20000,
+            'is_active' => true,
+        ]);
+        SkuVariant::create([
+            'produk_id' => $produk->id,
+            'sku' => 'JOB-TEST-SKU',
+            'nama_varian' => 'Standar',
+            'is_active' => true,
+        ]);
+
+        $fakeImage = UploadedFile::fake()->image('JOB-TEST-SKU.jpg', 400, 400);
+        $tempPath = $fakeImage->getRealPath();
+
+        $log = ImportLog::create([
+            'tipe' => 'produk_foto',
+            'nama_file' => 'test-job.zip',
+            'status' => 'proses',
+            'total_baris' => 2,
+        ]);
+
+        $items = [
+            [
+                'filename' => 'JOB-TEST-SKU.jpg',
+                'sku' => 'JOB-TEST-SKU',
+                'produk_id' => $produk->id,
+                'produk_nama' => $produk->nama,
+                'temp_path' => $tempPath,
+                'is_primary' => true,
+            ],
+            [
+                'filename' => 'JOB-TEST-SKU-2.jpg',
+                'sku' => 'JOB-TEST-SKU',
+                'produk_id' => $produk->id,
+                'produk_nama' => $produk->nama,
+                'temp_path' => $tempPath,
+                'is_primary' => false,
+            ],
+        ];
+
+        // Resolusi error: skip baris ke-2
+        $resolusi = [2 => 'skip'];
+
+        ImportFotoMasalJob::dispatchSync(
+            $log->id,
+            $items,
+            null,
+            'append',
+            null,
+            $resolusi
+        );
+
+        $log->refresh();
+        $this->assertEquals('selesai', $log->status);
+        $this->assertEquals(1, $log->sukses);
+        $this->assertEquals(0, $log->gagal);
+        $this->assertIsArray($log->detail);
+        $this->assertCount(2, $log->detail);
+        $this->assertEquals('skip', $log->detail[1]['status']);
     }
 }

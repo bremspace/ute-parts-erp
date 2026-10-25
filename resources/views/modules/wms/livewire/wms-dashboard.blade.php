@@ -68,19 +68,10 @@
                             href="/app/wms/import-export"
                             wire:navigate
                             class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                            title="Import & Penyesuaian Master Produk dari Excel"
+                            title="Import & Penyesuaian Master Produk & Foto"
                         >
                             <span>📥</span>
-                            <span>Import Excel</span>
-                        </a>
-                        <a
-                            href="/app/wms/import-export?tab=foto"
-                            wire:navigate
-                            class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                            title="Import &amp; Auto-Mapping Foto Produk Bulk"
-                        >
-                            <span>📸</span>
-                            <span>Import Foto</span>
+                            <span>Import Master</span>
                         </a>
                         <!-- Dropdown Export (Semua atau Terpilih) -->
                         <div class="relative" x-data="{ openExport: false }" @click.outside="openExport = false">
@@ -256,19 +247,10 @@
                             href="/app/wms/import-export"
                             wire:navigate
                             class="flex-1 px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                            title="Import & Penyesuaian Master Produk dari Excel"
+                            title="Import & Penyesuaian Master Produk & Foto"
                         >
                             <span>📥</span>
                             <span>Import</span>
-                        </a>
-                        <a
-                            href="/app/wms/import-export?tab=foto"
-                            wire:navigate
-                            class="px-3 py-2.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                            title="Import Foto Bulk"
-                        >
-                            <span>📸</span>
-                            <span>Foto</span>
                         </a>
                         <!-- Mobile Dropdown Export -->
                         <div class="flex-1 relative" x-data="{ openExportM: false }" @click.outside="openExportM = false">

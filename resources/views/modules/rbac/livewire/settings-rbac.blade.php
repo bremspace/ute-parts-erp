@@ -23,6 +23,9 @@
             { id: 'struk', label: 'Template Struk & Faktur POS', subModul: 'operasional', tab: 'printer', subTab: 'struk', icon: '🧾', group: 'Operasional & Periferal', desc: 'Kustomisasi header/footer struk thermal, QR retur, kertas 58/80mm', keywords: 'struk printer thermal nota faktur kasir thermal print kertas retur' },
             { id: 'label', label: 'Format Label Barcode & QR SKU', subModul: 'operasional', tab: 'printer', subTab: 'label', icon: '🏷️', group: 'Operasional & Periferal', desc: 'Tata letak cetak stiker barcode produk untuk scanner gudang', keywords: 'label barcode qr code stiker cetak scanner printer bluetooth label' },
             { id: 'wms_doc', label: 'Format Cetak Dokumen WMS (PO & GRN)', subModul: 'operasional', tab: 'printer', subTab: 'wms_doc', icon: '📦', group: 'Operasional & Periferal', desc: 'Ukuran kertas A5/A4 dan margin cetak Purchase Order serta Bukti Penerimaan Barang', keywords: 'po wms grn print cetak kertas a5 a4 margin nota logistik penerimaan' },
+            { id: 'hr_slip', label: 'Format Cetak Slip Gaji HR', subModul: 'operasional', tab: 'printer', subTab: 'hr_slip', icon: '💼', group: 'Operasional & Periferal', desc: 'Format kertas A5/A4/80mm, rincian komisi, potongan, dan tanda tangan slip gaji', keywords: 'slip gaji payroll hr komisi potongan cetak print karyawan' },
+            { id: 'laporan_doc', label: 'Format Cetak Laporan Keuangan', subModul: 'operasional', tab: 'printer', subTab: 'laporan', icon: '📊', group: 'Operasional & Periferal', desc: 'Ukuran kertas A4/F4 lanskap, kop surat, 3 kolom tanda tangan laporan', keywords: 'laporan cetak print keuangan pajak neraca audit kertas tanda tangan' },
+            { id: 'label_pengiriman', label: 'Format Label Pengiriman Ekspedisi', subModul: 'operasional', tab: 'printer', subTab: 'pengiriman', icon: '🚚', group: 'Operasional & Periferal', desc: 'Ukuran stiker thermal 100x150 / 80x100, barcode resi, peringatan fragile', keywords: 'label pengiriman ekspedisi resi kurir paket pesanan online thermal fragile' },
 
             { id: 'wa', label: 'WhatsApp Gateway & Notifikasi', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '💬', group: 'Gateway & Integrasi', desc: 'Konfigurasi Fonnte / Wablas, token API, dan pengujian kirim WA', keywords: 'whatsapp wa fonnte wablas gateway notifikasi pesan chat token phone' },
             { id: 'duitku', label: 'Payment Gateway Duitku', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '💳', group: 'Gateway & Integrasi', desc: 'Atur Merchant Code, API Key, Sandbox vs Production, dan callback URL', keywords: 'payment pembayaran duitku gateway qris va virtual account kartu kredit sandbox' },
@@ -833,28 +836,49 @@
     <!-- TAB: PRINTER, STRUK & LABEL QR -->
     @if($activeTab === 'printer')
         <div class="space-y-6">
-            <!-- Sub-tab Navigasi Printer & Template Struk -->
-            <div class="flex items-center gap-2 border-b border-black/10 dark:border-white/10 pb-3">
+            <!-- Sub-tab Navigasi Single Source of Truth Printer & Formats -->
+            <div class="flex items-center gap-2 border-b border-black/10 dark:border-white/10 pb-3 overflow-x-auto scrollbar-none flex-nowrap -mx-1 px-1 sm:mx-0 sm:px-0">
                 <button
                     type="button"
                     wire:click="$set('printerSubTab', 'struk')"
-                    class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'struk' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    class="flex-shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'struk' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                 >
-                    <span>🧾 Kustomisasi Template Struk & Faktur</span>
+                    <span>🧾 Template Struk & Faktur</span>
                 </button>
                 <button
                     type="button"
                     wire:click="$set('printerSubTab', 'label')"
-                    class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'label' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    class="flex-shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'label' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                 >
-                    <span>🏷️ Label Barcode & QR Master Produk</span>
+                    <span>🏷️ Label Barcode & QR SKU</span>
                 </button>
                 <button
                     type="button"
                     wire:click="$set('printerSubTab', 'wms_doc')"
-                    class="px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'wms_doc' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    class="flex-shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'wms_doc' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                 >
-                    <span>📦 Format Cetak Dokumen WMS (PO & GRN)</span>
+                    <span>📦 Dokumen WMS (PO & GRN)</span>
+                </button>
+                <button
+                    type="button"
+                    wire:click="$set('printerSubTab', 'hr_slip')"
+                    class="flex-shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'hr_slip' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    <span>💼 Slip Gaji HR & Payroll</span>
+                </button>
+                <button
+                    type="button"
+                    wire:click="$set('printerSubTab', 'laporan')"
+                    class="flex-shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'laporan' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    <span>📊 Laporan Keuangan & Pajak</span>
+                </button>
+                <button
+                    type="button"
+                    wire:click="$set('printerSubTab', 'pengiriman')"
+                    class="flex-shrink-0 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer {{ $printerSubTab === 'pengiriman' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                >
+                    <span>🚚 Label Pengiriman Ekspedisi</span>
                 </button>
             </div>
 
@@ -1373,26 +1397,101 @@
                         </x-prism.glass-card>
                     </div>
 
-                    <!-- Panduan & Pratinjau Kertas A5 -->
+                    <!-- Panduan & Pratinjau Dokumen WMS -->
                     <div class="lg:col-span-5 space-y-6">
-                        <x-prism.glass-card title="Panduan Cetak Setengah A4 (A5)" subtitle="Standar operasional nota gudang & dokumen PO">
-                            <div class="p-4 rounded-2xl bg-ink-950/40 border border-white/5 space-y-3 text-xs text-ink-300">
-                                <div class="flex items-center gap-2 text-white font-bold">
-                                    <span class="text-base">📄</span>
-                                    <span>Mengapa Ukuran A5 (Setengah A4)?</span>
-                                </div>
-                                <p class="leading-relaxed text-[11px]">
-                                    Format <strong>A5 (148 × 210 mm)</strong> adalah ukuran ideal untuk dokumen internal logistik, Purchase Order, dan Berita Acara Penerimaan Barang. Selain menghemat 50% penggunaan kertas fisik kantor, format ini pas dipegang oleh staf gudang saat proses penghitungan fisik barang.
-                                </p>
+                        <x-prism.glass-card title="Pratinjau Dokumen WMS (PO & GRN)" subtitle="Simulasi visual cetak dokumen operasional gudang sesuai setelan aktif">
+                            <!-- Visual Preview Box -->
+                            <div class="p-4 rounded-xl bg-white text-ink-900 border border-ink-200 text-[9.5px] space-y-2.5 font-sans shadow-md">
+                                @if(!empty($wmsDocForm['show_kop']))
+                                    <div class="flex justify-between items-start border-b border-ink-200 pb-2">
+                                        <div>
+                                            <div class="font-black text-xs text-up-primary">{{ $strukForm['nama_toko'] ?? 'UTE PARTS' }}</div>
+                                            <div class="text-[8.5px] text-ink-500">{{ $strukForm['slogan'] ?? 'Pusat Sparepart & Servis HP' }}</div>
+                                            <div class="text-[8px] text-ink-400 mt-0.5">{{ $strukForm['alamat'] ?? 'Kantor Pusat & Gudang Utama' }} · Telp: {{ $strukForm['telepon'] ?? '-' }}</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="font-black text-[10px] text-ink-900 uppercase tracking-tight">PURCHASE ORDER</div>
+                                            <div class="font-mono font-bold text-[9px] text-up-primary">PO-20261025-001</div>
+                                            <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 text-[7.5px] font-bold">APPROVED</span>
+                                        </div>
+                                    </div>
+                                @else
+                                    <div class="flex justify-between items-center border-b border-ink-200 pb-2">
+                                        <div class="font-black text-xs uppercase text-ink-900">PURCHASE ORDER</div>
+                                        <div class="font-mono font-bold text-[9px] text-up-primary">PO-20261025-001</div>
+                                    </div>
+                                @endif
 
-                                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-2 text-[11px]">
-                                    <div class="text-white font-semibold">Petunjuk Setelan Printer Browser (Chrome / Edge / Firefox):</div>
-                                    <ol class="list-decimal list-inside space-y-1 text-ink-400">
-                                        <li>Di jendela Print browser, pilih <strong>Destination: Printer Anda</strong>.</li>
-                                        <li>Pilih <strong>Paper size: A5</strong> (atau A4 jika mencetak 2 dokumen sekaligus).</li>
-                                        <li>Pilih <strong>Margins: Default / Minimum</strong> (agar CSS margin 8mm diterapkan presisi).</li>
-                                        <li>Centang <strong>Background graphics</strong> agar border dan badge tampil tajam.</li>
-                                    </ol>
+                                <div class="grid grid-cols-2 gap-2 bg-ink-50 p-2 rounded text-[8.5px]">
+                                    <div>
+                                        <span class="text-ink-400 block text-[7.5px] uppercase font-bold">Supplier:</span>
+                                        <strong class="text-ink-900">PT Sinar Maju Parts</strong>
+                                        <div class="text-[8px] text-ink-500">Jakarta Barat (PIC: David)</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-ink-400 block text-[7.5px] uppercase font-bold">Gudang Tujuan:</span>
+                                        <strong class="text-ink-900">Gudang Utama Pusat</strong>
+                                        <div class="text-[8px] text-ink-500">Target Kirim: 27/10/2026</div>
+                                    </div>
+                                </div>
+
+                                <table class="w-full border-collapse text-[8px]">
+                                    <thead>
+                                        <tr class="bg-ink-100 text-ink-800">
+                                            <th class="p-1 border border-ink-200 text-left">Item / SKU</th>
+                                            <th class="p-1 border border-ink-200 text-center">Qty</th>
+                                            <th class="p-1 border border-ink-200 text-right">Harga</th>
+                                            <th class="p-1 border border-ink-200 text-right">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="p-1 border border-ink-200">
+                                                <div class="font-semibold text-ink-900">LCD iPhone 11 Original</div>
+                                                <div class="text-[7px] text-ink-400 font-mono">LCD-IP11-ORI</div>
+                                            </td>
+                                            <td class="p-1 border border-ink-200 text-center font-mono font-bold">10 pcs</td>
+                                            <td class="p-1 border border-ink-200 text-right font-mono">250.000</td>
+                                            <td class="p-1 border border-ink-200 text-right font-mono font-bold">2.500.000</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="p-1 border border-ink-200">
+                                                <div class="font-semibold text-ink-900">Baterai IP 12 Pro Max</div>
+                                                <div class="text-[7px] text-ink-400 font-mono">BAT-IP12PM</div>
+                                            </td>
+                                            <td class="p-1 border border-ink-200 text-center font-mono font-bold">5 pcs</td>
+                                            <td class="p-1 border border-ink-200 text-right font-mono">180.000</td>
+                                            <td class="p-1 border border-ink-200 text-right font-mono font-bold">900.000</td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="bg-ink-50 font-bold">
+                                            <td colspan="3" class="p-1 text-right border border-ink-200 text-[8px]">Total Nilai PO:</td>
+                                            <td class="p-1 text-right border border-ink-200 font-mono text-up-primary text-[8.5px]">Rp 3.400.000</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+
+                                @if(!empty($wmsDocForm['show_ttd']))
+                                    <div class="grid grid-cols-3 gap-2 text-center text-[7.5px] pt-2 text-ink-700 border-t border-ink-200">
+                                        <div>
+                                            <div>Dibuat:</div>
+                                            <div class="mt-4 pt-1 border-t border-ink-400 font-semibold">( Admin WMS )</div>
+                                        </div>
+                                        <div>
+                                            <div>Disetujui:</div>
+                                            <div class="mt-4 pt-1 border-t border-ink-400 font-semibold">( Kepala Logistik )</div>
+                                        </div>
+                                        <div>
+                                            <div>Supplier:</div>
+                                            <div class="mt-4 pt-1 border-t border-ink-400 font-semibold">( Pengirim )</div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <div class="text-[7.5px] text-ink-400 flex justify-between border-t border-dashed border-ink-200 pt-1">
+                                    <span>Kertas: <strong>{{ strtoupper($wmsDocForm['paper_size'] ?? 'A5') }} ({{ ucfirst($wmsDocForm['orientation'] ?? 'portrait') }})</strong></span>
+                                    <span>Margin: <strong>{{ $wmsDocForm['margin_mm'] ?? 8 }}mm</strong></span>
                                 </div>
                             </div>
 
@@ -1401,6 +1500,420 @@
                                 <p class="text-[11px] text-ink-400 leading-relaxed">
                                     Semua dokumen cetak WMS seperti <strong>Purchase Order Fisik</strong>, <strong>Berita Acara Penolakan PO</strong>, dan <strong>Bukti Penerimaan Barang (GRN)</strong> akan otomatis mengacu pada pengaturan ini.
                                 </p>
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-2 text-[11px]">
+                                <div class="text-white font-semibold">Petunjuk Setelan Printer Browser (Chrome / Edge / Firefox):</div>
+                                <ol class="list-decimal list-inside space-y-1 text-ink-400">
+                                    <li>Pilih <strong>Destination: Printer Anda</strong>.</li>
+                                    <li>Pilih <strong>Paper size: A5</strong> (atau A4 jika mencetak 2 dokumen sekaligus).</li>
+                                    <li>Pilih <strong>Margins: Default / Minimum</strong> (agar CSS margin {{ $wmsDocForm['margin_mm'] ?? 8 }}mm diterapkan presisi).</li>
+                                    <li>Centang <strong>Background graphics</strong> agar border dan badge tampil tajam.</li>
+                                </ol>
+                            </div>
+                        </x-prism.glass-card>
+                    </div>
+                </div>
+            @elseif($printerSubTab === 'hr_slip')
+                <!-- SUB-TAB 4: FORMAT CETAK SLIP GAJI HR & PAYROLL -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-7 space-y-6">
+                        <x-prism.glass-card title="Format Cetak Slip Gaji HR & Payroll" subtitle="Atur ukuran kertas (A5, A4, atau Thermal 80mm), margin, rincian komisi teknisi, potongan kedisiplinan, dan tanda tangan">
+                            <form wire:submit.prevent="simpanPengaturanHrSlip" class="space-y-5">
+                                <div class="space-y-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Ukuran Kertas Default *</label>
+                                            <select wire:model="hrSlipForm.paper_size" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                                                <option value="a5">A5 (148 × 210 mm) — Standar</option>
+                                                <option value="a4">A4 (210 × 297 mm) — Dokumen Formal</option>
+                                                <option value="80mm">Thermal 80mm — Slip Ringkas Kasir</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Orientasi Kertas *</label>
+                                            <select wire:model="hrSlipForm.orientation" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                                                <option value="portrait">Potret (Portrait)</option>
+                                                <option value="landscape">Lanskap (Landscape)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Margin Kertas (mm) *</label>
+                                            <input type="number" step="1" min="1" max="30" wire:model="hrSlipForm.margin_mm" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Ukuran Huruf Dokumen *</label>
+                                            <select wire:model="hrSlipForm.font_size" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                                                <option value="8.5pt">8.5 pt (Kompak)</option>
+                                                <option value="9.5pt">9.5 pt (Standar)</option>
+                                                <option value="10pt">10 pt (Jelas & Nyaman)</option>
+                                                <option value="11pt">11 pt (Besar)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+                                        <div class="text-xs font-bold text-white uppercase tracking-wider mb-2">Visibilitas &amp; Elemen Slip</div>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="hrSlipForm.show_kop" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan KOP &amp; Identitas Toko (Nama, Slogan, Alamat, Telp)</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="hrSlipForm.show_komisi_detail" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan Rincian Komisi Tiket Servis Teknisi</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="hrSlipForm.show_potongan" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan Rincian Potongan (Disiplin, Terlambat, Kasbon)</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="hrSlipForm.show_ttd" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan Kolom Tanda Tangan Penerima &amp; Keuangan</span>
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Catatan Kaki Dokumen (Disclaimer / Footer)</label>
+                                        <textarea wire:model="hrSlipForm.catatan_kaki" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs resize-none"></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end pt-3 border-t border-white/5">
+                                    <x-prism.prism-button type="submit" variant="primary" size="sm">
+                                        💾 Simpan Format Slip Gaji
+                                    </x-prism.prism-button>
+                                </div>
+                            </form>
+                        </x-prism.glass-card>
+                    </div>
+
+                    <!-- Live Preview Slip Gaji -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <x-prism.glass-card title="Pratinjau Slip Gaji" subtitle="Visual dokumen cetak slip gaji sesuai konfigurasi aktif">
+                            <div class="p-4 rounded-xl bg-white text-ink-900 border border-ink-200 text-[10px] space-y-3 font-sans shadow-md">
+                                @if(!empty($hrSlipForm['show_kop']))
+                                    <div class="flex justify-between items-start border-b border-ink-200 pb-2">
+                                        <div>
+                                            <div class="font-black text-xs text-up-primary">{{ $strukForm['nama_toko'] ?? 'UTE PARTS' }}</div>
+                                            <div class="text-[9px] text-ink-500">{{ $strukForm['slogan'] ?? 'Pusat Sparepart & Servis HP' }}</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="font-black text-[10px] uppercase">SLIP GAJI</div>
+                                            <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[8px] font-bold">DIBAYAR</span>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <div class="grid grid-cols-2 gap-1 bg-ink-50 p-2 rounded text-[9px]">
+                                    <div>Karyawan: <strong>Budi Teknisi</strong></div>
+                                    <div>NIK: <span class="font-mono">EMP-0012</span></div>
+                                    <div>Jabatan: <strong>Senior Teknisi</strong></div>
+                                    <div>Cabang: <strong>Pusat Veteran</strong></div>
+                                </div>
+
+                                <div class="space-y-1 text-[9px] border-b border-ink-200 pb-2">
+                                    <div class="flex justify-between"><span>Gaji Pokok:</span><span class="font-mono font-semibold">Rp 3.500.000</span></div>
+                                    <div class="flex justify-between text-emerald-700"><span>Tunjangan Kehadiran:</span><span class="font-mono">+Rp 400.000</span></div>
+                                    @if(!empty($hrSlipForm['show_komisi_detail']))
+                                        <div class="flex justify-between text-emerald-700"><span>Komisi Teknisi (8 Tiket):</span><span class="font-mono">+Rp 640.000</span></div>
+                                    @endif
+                                    @if(!empty($hrSlipForm['show_potongan']))
+                                        <div class="flex justify-between text-red-600"><span>Potongan Kasbon / Terlambat:</span><span class="font-mono">-Rp 100.000</span></div>
+                                    @endif
+                                </div>
+
+                                <div class="flex justify-between items-center p-2 rounded bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold">
+                                    <span class="text-[9px] uppercase">Gaji Bersih (THP):</span>
+                                    <span class="text-xs font-mono font-black">Rp 4.440.000</span>
+                                </div>
+
+                                @if(!empty($hrSlipForm['show_ttd']) && $hrSlipForm['paper_size'] !== '80mm')
+                                    <div class="grid grid-cols-2 gap-4 text-center text-[8px] pt-2 text-ink-600">
+                                        <div>
+                                            <div>Penerima,</div>
+                                            <div class="mt-6 pt-1 border-t border-ink-300 font-semibold">Budi Teknisi</div>
+                                        </div>
+                                        <div>
+                                            <div>Bagian Keuangan,</div>
+                                            <div class="mt-6 pt-1 border-t border-ink-300 font-semibold">{{ $strukForm['nama_toko'] ?? 'UTE PARTS' }}</div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if(!empty($hrSlipForm['catatan_kaki']))
+                                    <div class="text-[8px] text-ink-400 italic text-center border-t border-dashed border-ink-200 pt-1.5">
+                                        {{ $hrSlipForm['catatan_kaki'] }}
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-up-mint/5 border border-up-mint/20 text-xs space-y-1">
+                                <span class="text-up-mint font-bold block">✨ Sinkronisasi Menu HR</span>
+                                <p class="text-[11px] text-ink-400 leading-relaxed">
+                                    Format ini diterapkan langsung saat staf atau teknisi menekan tombol <strong>Cetak Slip</strong> pada menu <em>HR & Payroll</em> maupun dashboard <em>HR Saya</em>.
+                                </p>
+                            </div>
+                        </x-prism.glass-card>
+                    </div>
+                </div>
+            @elseif($printerSubTab === 'laporan')
+                <!-- SUB-TAB 5: FORMAT CETAK LAPORAN KEUANGAN & AUDIT -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-7 space-y-6">
+                        <x-prism.glass-card title="Format Cetak Laporan Keuangan & Operasional" subtitle="Atur ukuran kertas (A4, F4, Letter), orientasi lanskap, margin, dan 3 kolom tanda tangan otorisasi akuntansi">
+                            <form wire:submit.prevent="simpanPengaturanLaporanDoc" class="space-y-5">
+                                <div class="space-y-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Ukuran Kertas Laporan *</label>
+                                            <select wire:model="laporanDocForm.paper_size" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                                                <option value="a4">A4 (210 × 297 mm) — Standar Akuntansi</option>
+                                                <option value="f4">F4 / Folio (215 × 330 mm)</option>
+                                                <option value="letter">Letter (8.5 × 11 in)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Orientasi Kertas *</label>
+                                            <select wire:model="laporanDocForm.orientation" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                                                <option value="landscape">Lanskap (Landscape) — Direkomendasikan untuk Tabel</option>
+                                                <option value="portrait">Potret (Portrait)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Margin Kertas (mm) *</label>
+                                            <input type="number" step="1" min="2" max="30" wire:model="laporanDocForm.margin_mm" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Ukuran Huruf *</label>
+                                            <select wire:model="laporanDocForm.font_size" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                                                <option value="8pt">8 pt (Kompak)</option>
+                                                <option value="9pt">9 pt (Standar Laporan)</option>
+                                                <option value="10pt">10 pt (Besar)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+                                        <div class="text-xs font-bold text-white uppercase tracking-wider mb-2">Visibilitas &amp; Audit Trail Laporan</div>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="laporanDocForm.show_kop" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan KOP &amp; Identitas Entitas Perusahaan</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="laporanDocForm.show_ttd" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan 3 Kolom Tanda Tangan Otorisasi (Pembuat, Pemeriksa, Penyetuju)</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="laporanDocForm.show_audit_footer" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan Catatan Kaki Audit Trail (User pencetak &amp; Timestamp cetak)</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jabatan Pembuat</label>
+                                            <input type="text" wire:model="laporanDocForm.jabatan_pembuat" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jabatan Pemeriksa</label>
+                                            <input type="text" wire:model="laporanDocForm.jabatan_pemeriksa" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jabatan Penyetuju</label>
+                                            <input type="text" wire:model="laporanDocForm.jabatan_penyetuju" class="w-full px-3 py-2 rounded-xl glass-input text-xs" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end pt-3 border-t border-white/5">
+                                    <x-prism.prism-button type="submit" variant="primary" size="sm">
+                                        💾 Simpan Format Laporan
+                                    </x-prism.prism-button>
+                                </div>
+                            </form>
+                        </x-prism.glass-card>
+                    </div>
+
+                    <!-- Live Preview Laporan -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <x-prism.glass-card title="Pratinjau Format Laporan" subtitle="Simulasi tata letak dokumen laporan keuangan cetak">
+                            <div class="p-4 rounded-xl bg-white text-ink-900 border border-ink-200 text-[10px] space-y-3 font-sans shadow-md">
+                                @if(!empty($laporanDocForm['show_kop']))
+                                    <div class="flex justify-between items-start border-b-2 border-ink-900 pb-2">
+                                        <div>
+                                            <div class="font-black text-xs text-ink-900">{{ $strukForm['nama_toko'] ?? 'UTE PARTS' }}</div>
+                                            <div class="text-[9px] text-ink-500">{{ $strukForm['alamat'] ?? 'Kantor Pusat' }}</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="font-black text-[10px] uppercase">LAPORAN PAJAK BULANAN</div>
+                                            <div class="text-[8px] text-ink-500">Periode: 01/10/2026 s/d 31/10/2026</div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <div class="grid grid-cols-3 gap-2 bg-ink-50 p-2 rounded text-[9px] text-center">
+                                    <div>PPN Keluaran: <strong class="block text-ink-900">Rp 12.450.000</strong></div>
+                                    <div>PPN Masukan: <strong class="block text-amber-700">Rp 4.200.000</strong></div>
+                                    <div>Terutang: <strong class="block text-emerald-700">Rp 8.250.000</strong></div>
+                                </div>
+
+                                <table class="w-full border-collapse text-[8px]">
+                                    <thead>
+                                        <tr class="bg-ink-100 text-ink-800">
+                                            <th class="p-1 border border-ink-300 text-left">No. Transaksi</th>
+                                            <th class="p-1 border border-ink-300 text-right">DPP (Rp)</th>
+                                            <th class="p-1 border border-ink-300 text-right">PPN (Rp)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="p-1 border border-ink-200 font-mono">TRX-20261025-001</td>
+                                            <td class="p-1 border border-ink-200 text-right font-mono">1.200.000</td>
+                                            <td class="p-1 border border-ink-200 text-right font-mono font-bold">132.000</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                @if(!empty($laporanDocForm['show_ttd']))
+                                    <div class="grid grid-cols-3 gap-2 text-center text-[7.5px] pt-3 text-ink-700 border-t border-ink-200">
+                                        <div>
+                                            <div>Dibuat:</div>
+                                            <div class="text-[6.5px] text-ink-400">{{ $laporanDocForm['jabatan_pembuat'] ?? 'Staf Kasir' }}</div>
+                                            <div class="mt-4 pt-1 border-t border-ink-400 font-semibold">( Admin )</div>
+                                        </div>
+                                        <div>
+                                            <div>Diperiksa:</div>
+                                            <div class="text-[6.5px] text-ink-400">{{ $laporanDocForm['jabatan_pemeriksa'] ?? 'Kepala Cabang' }}</div>
+                                            <div class="mt-4 pt-1 border-t border-ink-400 font-semibold">( Spv )</div>
+                                        </div>
+                                        <div>
+                                            <div>Disetujui:</div>
+                                            <div class="text-[6.5px] text-ink-400">{{ $laporanDocForm['jabatan_penyetuju'] ?? 'Direktur' }}</div>
+                                            <div class="mt-4 pt-1 border-t border-ink-400 font-semibold">( Owner )</div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if(!empty($laporanDocForm['show_audit_footer']))
+                                    <div class="text-[7px] text-ink-400 flex justify-between border-t border-dashed border-ink-200 pt-1">
+                                        <span>Dicetak: {{ auth()->user()?->name ?? 'User' }}</span>
+                                        <span>Dokumen ERP Ute Parts</span>
+                                    </div>
+                                @endif
+                            </div>
+                        </x-prism.glass-card>
+                    </div>
+                </div>
+            @elseif($printerSubTab === 'pengiriman')
+                <!-- SUB-TAB 6: FORMAT LABEL PENGIRIMAN EKSPEDISI -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-7 space-y-6">
+                        <x-prism.glass-card title="Format Label Pengiriman Ekspedisi (Pesanan Online)" subtitle="Atur ukuran stiker thermal pengiriman (100x150, 80x100), informasi pengirim, QR nomor resi, dan stiker peringatan fragile">
+                            <form wire:submit.prevent="simpanPengaturanLabelPengiriman" class="space-y-5">
+                                <div class="space-y-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Ukuran Stiker Label *</label>
+                                            <select wire:model="labelPengirimanForm.paper_size" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs">
+                                                <option value="100x150">100 × 150 mm (Standar Thermal Ekspedisi JNE/J&T/SiCepat)</option>
+                                                <option value="80x100">80 × 100 mm (Label Box Sedang)</option>
+                                                <option value="80mm">80 mm Continuous (Roll Kasir Thermal)</option>
+                                                <option value="a6">A6 (105 × 148 mm)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Margin Label (mm) *</label>
+                                            <input type="number" step="1" min="0" max="20" wire:model="labelPengirimanForm.margin_mm" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs" />
+                                        </div>
+                                    </div>
+
+                                    <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+                                        <div class="text-xs font-bold text-white uppercase tracking-wider mb-2">Komponen Informasi Label</div>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="labelPengirimanForm.show_sender" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan Kotak Identitas Pengirim (Cabang / Toko)</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="labelPengirimanForm.show_item_list" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan Rincian Isi Paket Produk (SKU &amp; Qty)</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="labelPengirimanForm.show_qr_resi" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan Barcode / QR Code No. Resi Otomatis</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer">
+                                            <input type="checkbox" wire:model="labelPengirimanForm.show_fragile_warning" class="rounded text-up-primary focus:ring-up-primary" />
+                                            <span class="text-xs text-ink-300">Tampilkan Peringatan Khusus FRAGILE / Pecah Belah</span>
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Teks Peringatan Fragile / Catatan Kurir</label>
+                                        <textarea wire:model="labelPengirimanForm.catatan_pengiriman" rows="2" class="w-full px-3 py-2 rounded-xl glass-input text-xs resize-none"></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end pt-3 border-t border-white/5">
+                                    <x-prism.prism-button type="submit" variant="primary" size="sm">
+                                        💾 Simpan Format Label Pengiriman
+                                    </x-prism.prism-button>
+                                </div>
+                            </form>
+                        </x-prism.glass-card>
+                    </div>
+
+                    <!-- Live Preview Label Pengiriman -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <x-prism.glass-card title="Pratinjau Label Pengiriman" subtitle="Simulasi stiker thermal 100x150 mm untuk paket ekspedisi">
+                            <div class="p-4 rounded-xl bg-white text-black border-2 border-black text-[10px] space-y-2.5 font-sans shadow-md max-w-xs mx-auto">
+                                <div class="flex justify-between items-center border-b-2 border-black pb-1.5">
+                                    <span class="font-black text-sm uppercase">J&amp;T REG</span>
+                                    <span class="bg-black text-white px-2 py-0.5 rounded text-[8px] font-bold">STANDARD</span>
+                                </div>
+
+                                @if(!empty($labelPengirimanForm['show_qr_resi']))
+                                    <div class="text-center border-b-2 border-dashed border-black pb-2">
+                                        <div class="w-16 h-16 bg-black/10 mx-auto flex items-center justify-center font-mono text-[8px] border border-black/30">
+                                            [ QR RESI ]
+                                        </div>
+                                        <div class="font-mono font-black text-xs mt-1">JX1234567890</div>
+                                    </div>
+                                @endif
+
+                                <div class="border-b border-black pb-1.5 space-y-0.5">
+                                    <div class="text-[7.5px] font-bold uppercase text-ink-600">Penerima (Tujuan):</div>
+                                    <div class="font-bold text-xs">Agus Supriyanto</div>
+                                    <div>0813-9876-5432</div>
+                                    <div class="text-[8.5px]">Jl. Cempaka Putih No. 45, RT 02/05, Jakarta Pusat</div>
+                                </div>
+
+                                @if(!empty($labelPengirimanForm['show_sender']))
+                                    <div class="border-b border-black pb-1.5 space-y-0.5 text-[8.5px]">
+                                        <div class="text-[7.5px] font-bold uppercase text-ink-600">Pengirim:</div>
+                                        <div class="font-bold">{{ $strukForm['nama_toko'] ?? 'UTE PARTS STORE' }}</div>
+                                        <div>Telp: {{ $strukForm['telepon'] ?? '0812-3456-7890' }}</div>
+                                    </div>
+                                @endif
+
+                                @if(!empty($labelPengirimanForm['show_item_list']))
+                                    <div class="border-b border-black pb-1.5 text-[8px]">
+                                        <div class="font-bold text-[7.5px] uppercase text-ink-600 mb-0.5">Isi Paket (2 items):</div>
+                                        <div>• LCD Touchscreen iPhone 11 <strong>×1</strong></div>
+                                        <div>• Lem B7000 15ml <strong>×1</strong></div>
+                                    </div>
+                                @endif
+
+                                @if(!empty($labelPengirimanForm['show_fragile_warning']))
+                                    <div class="bg-black text-white p-1 text-center font-bold text-[7.5px] uppercase tracking-wider">
+                                        ⚠️ {{ $labelPengirimanForm['catatan_pengiriman'] ?? 'FRAGILE — JANGAN DIBANTING' }}
+                                    </div>
+                                @endif
                             </div>
                         </x-prism.glass-card>
                     </div>

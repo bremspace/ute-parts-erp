@@ -1,5 +1,6 @@
 @php
     $wmsConfig = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getWmsDocConfig();
+    $printHeader = app(\App\Modules\Crm\Services\KonfigurasiService::class)->getPrintHeader();
     $paperSize = request('paper', $wmsConfig['paper_size'] ?? 'a5');
     $orientation = request('orient', $wmsConfig['orientation'] ?? 'portrait');
     $marginMm = (int) request('margin', $wmsConfig['margin_mm'] ?? 8);
@@ -276,11 +277,11 @@
         <!-- Header -->
         <div class="header">
             <div>
-                <div class="brand-title">{{ $po->gudangTujuan?->cabang?->nama ?? 'UTE PARTS ERP' }}</div>
+                <div class="brand-title">{{ $po->gudangTujuan?->cabang?->nama ?? ($printHeader['nama_toko'] ?? 'UTE PARTS') }}</div>
                 <p class="brand-subtitle">
-                    Gudang &amp; Distribusi Sparepart Ponsel<br>
-                    {{ $po->gudangTujuan?->cabang?->alamat ?? 'Kantor Pusat & Gudang Utama' }}<br>
-                    Telp: {{ $po->gudangTujuan?->cabang?->telepon ?? '-' }}
+                    {{ $printHeader['slogan'] ?? 'Gudang & Distribusi Sparepart Ponsel' }}<br>
+                    {{ $po->gudangTujuan?->cabang?->alamat ?? ($printHeader['alamat'] ?? 'Kantor Pusat & Gudang Utama') }}<br>
+                    Telp/WA: {{ $po->gudangTujuan?->cabang?->telepon ?? ($printHeader['telepon'] ?? '-') }}
                 </p>
             </div>
             <div class="doc-title-box">

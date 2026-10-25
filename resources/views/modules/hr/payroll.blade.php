@@ -347,9 +347,16 @@
                         <h3 class="text-lg font-bold text-ink-900 dark:text-white">Rincian Slip Gaji Karyawan</h3>
                         <p class="text-xs text-ink-500">Periode: {{ $detailSlip['periode'] }}</p>
                     </div>
-                    <button wire:click="tutupDetailSlip" class="text-ink-400 hover:text-ink-600 dark:hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('hr.slip.print', $detailSlip['id']) }}" target="_blank"
+                            class="px-3 py-1.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            <span>Cetak</span>
+                        </a>
+                        <button wire:click="tutupDetailSlip" class="text-ink-400 hover:text-ink-600 dark:hover:text-white">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 text-xs bg-black/5 dark:bg-white/5 p-3 rounded-xl">

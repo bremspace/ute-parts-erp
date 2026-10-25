@@ -2,6 +2,9 @@
 
 namespace App\Modules\Akunting\Services;
 
+use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Akunting\Models\JurnalAkuntansi;
+use App\Modules\Pos\Models\Transaksi;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -269,6 +272,82 @@ class PajakService
         return [
             ['akun_kode' => '220-01', 'debit' => 0, 'kredit' => $nominal],
         ];
+    }
+
+    /**
+     * Rekapitulasi pajak keluaran, masukan, dan terutang periode tertentu.
+     */
+    public function rekapPeriode(?int $cabangId, string $dari, string $sampai): array
+    {
+        $dpp = 0.0;
+        $ppn = 0.0;
+        $count = 0;
+
+        $q = Transaksi::whereDate('created_at', '>=', $dari)
+            ->whereDate('created_at', '<=', $sampai);
+        if ($cabangId) {
+            $q->where('cabang_id', $cabangId);
+        }
+
+        foreach ($q->get() as $t) {
+            $nilai = (float) ($t->ppn_nominal ?? 0) > 0 ? (float) $t->ppn_nominal : (float) $t->pajak_nominal;
+            if ($nilai > 0) {
+                $dpp += (float) ($t->dpp ?? 0) > 0 ? (float) $t->dpp : max(0, (float) $t->subtotal - (float) $t->diskon_nominal);
+                $ppn += $nilai;
+                $count++;
+            }
+        }
+
+        $masukan = 0.0;
+        $akunMasukan = AkunCOA::where('kode', '110-03')->first();
+        if ($akunMasukan) {
+            $j = JurnalAkuntansi::where('akun_coa_id', $akunMasukan->id)
+                ->whereDate('tanggal', '>=', $dari)
+                ->whereDate('tanggal', '<=', $sampai);
+            if ($cabangId) {
+                $j->where('cabang_id', $cabangId);
+            }
+            $masukan = round((float) $j->sum('debit') - (float) $j->sum('kredit'), 2);
+        }
+
+        return [
+            'keluaran_dpp' => round($dpp, 2),
+            'keluaran_ppn' => round($ppn, 2),
+            'masukan' => $masukan,
+            'terutang' => round($ppn - $masukan, 2),
+            'jumlah_transaksi' => $count,
+        ];
+    }
+
+    /**
+     * Rincian baris transaksi keluaran kena pajak periode tertentu.
+     */
+    public function rincianKeluaran(?int $cabangId, string $dari, string $sampai): array
+    {
+        $q = Transaksi::whereDate('created_at', '>=', $dari)
+            ->whereDate('created_at', '<=', $sampai)
+            ->orderBy('created_at');
+        if ($cabangId) {
+            $q->where('cabang_id', $cabangId);
+        }
+
+        $rows = [];
+        foreach ($q->get() as $t) {
+            $ppn = (float) ($t->ppn_nominal ?? 0) > 0 ? (float) $t->ppn_nominal : (float) $t->pajak_nominal;
+            if ($ppn <= 0) {
+                continue;
+            }
+            $dpp = (float) ($t->dpp ?? 0) > 0 ? (float) $t->dpp : max(0, (float) $t->subtotal - (float) $t->diskon_nominal);
+            $rows[] = [
+                'tanggal' => $t->created_at?->format('d/m/Y') ?? '-',
+                'no_transaksi' => $t->no_transaksi,
+                'dpp' => $dpp,
+                'percent' => $dpp > 0 ? round(($ppn / $dpp) * 100, 2) : 0,
+                'ppn' => $ppn,
+            ];
+        }
+
+        return $rows;
     }
 
     /**

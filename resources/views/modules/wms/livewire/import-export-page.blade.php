@@ -1,6 +1,6 @@
 <div class="space-y-6 max-w-7xl mx-auto pb-12"
-     @if($importStep === 'selesai' || ($activeImportLog && $activeImportLog['status'] === 'proses')) wire:poll.2s="cekStatusImport" @endif
-     @if($activeTab === 'foto' && $fotoStep === 'processing') wire:poll.500ms="processNextFotoChunk" @endif>
+     @if($importStep === 'selesai' || ($activeImportLog && $activeImportLog['status'] === 'proses')) wire:poll.1200ms="cekStatusImport" @endif
+     @if($activeTab === 'foto' && ($fotoStep === 'processing' || ($activeFotoImportLog && $activeFotoImportLog['status'] === 'proses'))) wire:poll.1200ms="cekStatusFotoImport" @endif>
     <!-- Top Bar Navigation & Back to WMS -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/10 dark:border-white/5 pb-4">
         <div>
@@ -294,6 +294,12 @@
                                     <span>🔄</span> Timpa Semua Data DB
                                 </button>
                                 <button type="button"
+                                        wire:click="kosongkanSemuaBarcodeDuplikat"
+                                        class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-up-amber hover:bg-up-amber/80 text-ink-950 font-black cursor-pointer transition shadow flex items-center gap-1.5"
+                                        title="Kosongkan barcode yang duplikat agar produk tetap diimpor">
+                                    <span>🚫</span> Kosongkan Semua Barcode Duplikat
+                                </button>
+                                <button type="button"
                                         wire:click="setAksiDuplikatSemua('skip')"
                                         class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-up-red/80 hover:bg-up-red text-white cursor-pointer transition shadow flex items-center gap-1.5">
                                     <span>⏭️</span> Lewati Semua Duplikat
@@ -357,6 +363,14 @@
                                                             🔄 Timpa/Update
                                                         </button>
                                                     @endif
+                                                    @if(($dr['tipe'] ?? '') === 'barcode' || ! empty($dr['barcode']))
+                                                        <button type="button"
+                                                                wire:click="setBarcodeAction({{ $dr['baris'] }}, 'kosongkan_barcode')"
+                                                                class="min-h-[32px] px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition {{ $currentAksi === 'kosongkan_barcode' ? 'bg-up-amber text-ink-950 font-black ring-1 ring-up-amber/50' : 'bg-white/5 hover:bg-white/10 text-ink-300' }}"
+                                                                title="Kosongkan nilai barcode agar produk baru tetap diimpor">
+                                                            🚫 Kosongkan Barcode
+                                                        </button>
+                                                    @endif
                                                     <button type="button"
                                                             wire:click="setAksiDuplikat({{ $dr['baris'] }}, 'skip')"
                                                             class="min-h-[32px] px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition {{ $currentAksi === 'skip' ? 'bg-up-red text-white ring-1 ring-up-red/50' : 'bg-white/5 hover:bg-white/10 text-ink-300' }}">
@@ -373,6 +387,8 @@
                                                            class="w-full text-xs font-mono font-bold rounded-lg bg-black/60 border border-up-primary/50 px-2.5 py-1.5 text-white focus:ring-1 focus:ring-up-primary">
                                                 @elseif($currentAksi === 'timpa_update')
                                                     <span class="text-[10px] text-up-mint font-semibold">Akan memperbarui data &amp; stok produk ID: {{ $dr['target_produk_id'] }}</span>
+                                                @elseif($currentAksi === 'kosongkan_barcode')
+                                                    <span class="text-[10px] text-up-amber font-semibold">Barcode akan dikosongkan (produk baru tetap diimpor)</span>
                                                 @else
                                                     <span class="text-[10px] text-ink-500 italic">Baris ini akan dilewati</span>
                                                 @endif
@@ -415,11 +431,11 @@
                                     <!-- Tombol Pilihan Aksi Mobile: Touch Target min-h-[40px] -->
                                     <div class="space-y-1.5 pt-1 border-t border-white/5">
                                         <div class="text-[10px] text-ink-400 font-bold uppercase tracking-wider">Aksi Penyelesaian:</div>
-                                        <div class="grid grid-cols-3 gap-1.5">
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                                             <button type="button"
                                                     wire:click="setAksiDuplikat({{ $dr['baris'] }}, 'ganti_sku')"
                                                     class="min-h-[40px] px-2 py-2 rounded-xl text-xs font-bold cursor-pointer transition flex items-center justify-center text-center {{ $currentAksi === 'ganti_sku' ? 'bg-up-primary text-white ring-2 ring-up-primary/60 shadow-sm' : 'bg-white/5 hover:bg-white/10 text-ink-300' }}">
-                                                ✏️ Ganti
+                                                ✏️ Ganti SKU
                                             </button>
                                             @if($dr['lokasi'] === 'database')
                                                 <button type="button"
@@ -427,8 +443,13 @@
                                                         class="min-h-[40px] px-2 py-2 rounded-xl text-xs font-black cursor-pointer transition flex items-center justify-center text-center {{ $currentAksi === 'timpa_update' ? 'bg-up-mint text-ink-950 ring-2 ring-up-mint/60 shadow-sm' : 'bg-white/5 hover:bg-white/10 text-ink-300' }}">
                                                     🔄 Timpa
                                                 </button>
-                                            @else
-                                                <div class="hidden"></div>
+                                            @endif
+                                            @if(($dr['tipe'] ?? '') === 'barcode' || ! empty($dr['barcode']))
+                                                <button type="button"
+                                                        wire:click="setBarcodeAction({{ $dr['baris'] }}, 'kosongkan_barcode')"
+                                                        class="min-h-[40px] px-2 py-2 rounded-xl text-xs font-black cursor-pointer transition flex items-center justify-center text-center {{ $currentAksi === 'kosongkan_barcode' ? 'bg-up-amber text-ink-950 ring-2 ring-up-amber/60 shadow-sm' : 'bg-white/5 hover:bg-white/10 text-ink-300' }}">
+                                                    🚫 Kosongkan
+                                                </button>
                                             @endif
                                             <button type="button"
                                                     wire:click="setAksiDuplikat({{ $dr['baris'] }}, 'skip')"
@@ -451,6 +472,10 @@
                                     @elseif($currentAksi === 'timpa_update')
                                         <div class="text-[11px] text-up-mint font-semibold bg-up-mint/10 p-2 rounded-lg border border-up-mint/20">
                                             ✓ Data &amp; stok akan ditambahkan ke produk eksisting (ID: {{ $dr['target_produk_id'] }}).
+                                        </div>
+                                    @elseif($currentAksi === 'kosongkan_barcode')
+                                        <div class="text-[11px] text-up-amber font-semibold bg-up-amber/10 p-2 rounded-lg border border-up-amber/20">
+                                            ✓ Barcode akan dikosongkan (produk baru tetap diimpor).
                                         </div>
                                     @else
                                         <div class="text-[11px] text-ink-500 italic bg-white/5 p-2 rounded-lg">
@@ -539,16 +564,25 @@
                 <!-- PANEL 3: RINCIAN SELURUH BARIS ERROR -->
                 @php
                     $allErrorRows = $importPreview['error_rows'] ?? [];
-                    $activeErrorRows = array_values(array_filter($allErrorRows, function ($errRow) use ($resolusiDuplikat) {
+                    $activeErrorRows = array_values(array_filter($allErrorRows, function ($errRow) use ($resolusiDuplikat, $resolusiBarcode) {
                         $baris = $errRow['baris'];
                         $sku = $errRow['sku'];
                         $res = $resolusiDuplikat[$baris] ?? ($sku !== '' ? ($resolusiDuplikat[$sku] ?? null) : null);
                         $aksi = is_array($res) ? ($res['aksi'] ?? null) : $res;
-                        if (in_array($aksi, ['ganti_sku', 'timpa_update', 'skip'], true)) {
-                            $nonDup = array_filter($errRow['errors'] ?? [], fn ($e) => ! str_contains($e, 'duplikat'));
-                            return ! empty($nonDup);
-                        }
-                        return true;
+                        $resBc = $resolusiBarcode[$baris] ?? null;
+                        $aksiBc = is_array($resBc) ? ($resBc['aksi'] ?? null) : $resBc;
+
+                        $nonDup = array_filter($errRow['errors'] ?? [], function ($e) use ($aksi, $aksiBc) {
+                            if (in_array($aksi, ['ganti_sku', 'timpa_update', 'skip'], true) && str_contains($e, 'SKU') && str_contains($e, 'duplikat')) {
+                                return false;
+                            }
+                            if (($aksiBc === 'kosongkan_barcode' || $aksi === 'kosongkan_barcode') && str_contains($e, 'Barcode') && str_contains($e, 'duplikat')) {
+                                return false;
+                            }
+                            return true;
+                        });
+
+                        return ! empty($nonDup);
                     }));
                     $totalErrorCount = count($activeErrorRows);
                     $displayedErrorRows = array_slice($activeErrorRows, 0, 100);
@@ -556,32 +590,82 @@
                 @if($totalErrorCount > 0)
                     <div class="p-5 rounded-2xl bg-up-red/10 border border-up-red/30 space-y-4">
                         <div class="flex items-center justify-between flex-wrap gap-2">
-                            <h3 class="text-sm font-bold text-up-red flex items-center gap-2">
-                                <span>⛔</span>
-                                <span>Rincian Seluruh Baris Error ({{ $totalErrorCount }} Baris)</span>
-                            </h3>
-                            <span class="text-[10px] text-ink-400">Rincian error lengkap agar Anda dapat memperbaiki data pada file</span>
+                            <div>
+                                <h3 class="text-sm font-bold text-up-red flex items-center gap-2">
+                                    <span>⛔</span>
+                                    <span>Rincian Seluruh Baris Error ({{ $totalErrorCount }} Baris)</span>
+                                </h3>
+                                <p class="text-[10px] text-ink-400 mt-0.5">Rincian error lengkap — Anda dapat memilih untuk mengabaikan (skip) baris error ini atau memperbaikinya.</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button type="button"
+                                        wire:click="exportErrorRows"
+                                        class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-white/10 hover:bg-white/20 text-white cursor-pointer transition shadow flex items-center gap-1.5"
+                                        title="Unduh daftar baris error dalam format CSV">
+                                    <span>📥</span> Unduh CSV Error
+                                </button>
+                                <button type="button"
+                                        wire:click="abaikanSemuaBarisError"
+                                        class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-up-red/80 hover:bg-up-red text-white cursor-pointer transition shadow flex items-center gap-1.5"
+                                        title="Lewati semua baris yang memiliki error agar proses import tetap dapat berjalan">
+                                    <span>⏭️</span> Abaikan Semua Error (Skip)
+                                </button>
+                                @if(! empty($resolusiErrorBaris))
+                                    <button type="button"
+                                            wire:click="batalAbaikanSemuaBarisError"
+                                            class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-ink-300 cursor-pointer transition">
+                                        Batal Abaikan
+                                    </button>
+                                @endif
+                            </div>
                         </div>
 
                         @if($totalErrorCount > 100)
                             <div class="p-2.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-ink-300">
-                                Menampilkan 100 dari {{ $totalErrorCount }} baris error pertama.
+                                Menampilkan 100 dari {{ $totalErrorCount }} baris error pertama. Gunakan tombol 'Abaikan Semua Error' di atas untuk mengabaikan seluruh baris error secara massal.
                             </div>
                         @endif
 
                         <div class="max-h-80 overflow-y-auto space-y-2.5 pr-1 divide-y divide-white/5">
                             @foreach($displayedErrorRows as $errRow)
-                                <div class="pt-2.5 first:pt-0 p-3 rounded-xl bg-black/40 border border-up-red/20 space-y-1.5">
-                                    <div class="flex items-center justify-between text-xs font-mono flex-wrap gap-1">
-                                        <span class="font-bold px-2 py-0.5 rounded bg-up-red/20 text-up-red border border-up-red/30">Baris #{{ $errRow['baris'] }}</span>
-                                        <span class="text-ink-400 text-[11px]">SKU: <strong class="text-white">{{ $errRow['sku'] ?: '(kosong)' }}</strong></span>
+                                @php
+                                    $isSkipped = ($resolusiErrorBaris[$errRow['baris']] ?? '') === 'skip';
+                                @endphp
+                                <div class="pt-2.5 first:pt-0 p-3 rounded-xl bg-black/40 border {{ $isSkipped ? 'border-up-amber/40 bg-up-amber/5' : 'border-up-red/20' }} space-y-1.5 transition">
+                                    <div class="flex items-center justify-between text-xs font-mono flex-wrap gap-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-bold px-2 py-0.5 rounded {{ $isSkipped ? 'bg-up-amber/20 text-up-amber border border-up-amber/30' : 'bg-up-red/20 text-up-red border border-up-red/30' }}">
+                                                Baris #{{ $errRow['baris'] }}
+                                            </span>
+                                            <span class="text-ink-400 text-[11px]">SKU: <strong class="text-white">{{ $errRow['sku'] ?: '(kosong)' }}</strong></span>
+                                        </div>
+                                        <div>
+                                            @if($isSkipped)
+                                                <div class="flex items-center gap-2">
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-up-amber/20 text-up-amber border border-up-amber/40">
+                                                        ⏭️ Akan Dilewati (Skip)
+                                                    </span>
+                                                    <button type="button"
+                                                            wire:click="setErrorAction({{ $errRow['baris'] }}, 'none')"
+                                                            class="text-[10px] text-ink-400 hover:text-white underline cursor-pointer">
+                                                        Batal
+                                                    </button>
+                                                </div>
+                                            @else
+                                                <button type="button"
+                                                        wire:click="setErrorAction({{ $errRow['baris'] }}, 'skip')"
+                                                        class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/15 text-ink-200 hover:text-white cursor-pointer transition border border-white/10 flex items-center gap-1">
+                                                    <span>⏭️</span> Abaikan Baris Ini (Skip)
+                                                </button>
+                                            @endif
+                                        </div>
                                     </div>
                                     @if(! empty($errRow['nama']))
                                         <div class="text-white text-xs font-semibold">{{ $errRow['nama'] }}</div>
                                     @endif
                                     <ul class="space-y-1 mt-1 pt-1 border-t border-white/5">
                                         @foreach($errRow['errors'] as $errMsg)
-                                            <li class="text-up-red text-[11px] flex items-start gap-1.5 leading-snug">
+                                            <li class="{{ $isSkipped ? 'text-up-amber' : 'text-up-red' }} text-[11px] flex items-start gap-1.5 leading-snug">
                                                 <span class="font-bold shrink-0">•</span>
                                                 <span>{{ $errMsg }}</span>
                                             </li>
@@ -723,7 +807,7 @@
                         </div>
 
                         <!-- Metrik Grid -->
-                        <div class="grid grid-cols-3 gap-2 pt-1 text-center font-mono">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-center font-mono">
                             <div class="p-2 rounded-xl bg-white/5 border border-white/5">
                                 <div class="text-[9px] uppercase text-ink-400">Total</div>
                                 <div class="text-sm font-black text-white mt-0.5">{{ $totalBaris }}</div>
@@ -732,23 +816,136 @@
                                 <div class="text-[9px] uppercase text-up-mint">Sukses</div>
                                 <div class="text-sm font-black text-up-mint mt-0.5">{{ $sukses }}</div>
                             </div>
+                            <div class="p-2 rounded-xl bg-up-amber/10 border border-up-amber/20">
+                                <div class="text-[9px] uppercase text-up-amber">Dilewati</div>
+                                <div class="text-sm font-black text-up-amber mt-0.5">{{ $activeImportLog['skip'] ?? 0 }}</div>
+                            </div>
                             <div class="p-2 rounded-xl bg-up-red/10 border border-up-red/20">
                                 <div class="text-[9px] uppercase text-up-red">Gagal</div>
                                 <div class="text-sm font-black text-up-red mt-0.5">{{ $gagal }}</div>
                             </div>
                         </div>
 
-                        <!-- Catatan Ringkasan / Detail Error bila ada -->
-                        @if(! empty($activeImportLog['detail']['gagal_rows']) || ! empty($activeImportLog['detail']['errors']))
-                            <div class="pt-2 border-t border-white/5 space-y-1">
-                                <div class="text-[10px] text-up-red font-bold uppercase tracking-wider">Catatan Baris Gagal:</div>
-                                <div class="max-h-32 overflow-y-auto space-y-1 pr-1 text-[11px]">
-                                    @foreach($activeImportLog['detail']['gagal_rows'] ?? $activeImportLog['detail']['errors'] ?? [] as $err)
-                                        <div class="text-up-red/90 p-1.5 rounded bg-up-red/5 border border-up-red/10">
-                                            {{ is_array($err) ? json_encode($err) : $err }}
-                                        </div>
-                                    @endforeach
+                        <!-- Real-time Processing Item Ticker -->
+                        @if($isProses && (! empty($activeImportLog['current_sku']) || ! empty($activeImportLog['current_nama'])))
+                            <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/20 space-y-1">
+                                <div class="flex items-center justify-between text-[10px] text-ink-400">
+                                    <span class="flex items-center gap-1.5 font-bold text-up-primary">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-up-primary animate-ping"></span>
+                                        Sedang Memproses Baris {{ $activeImportLog['current_baris'] ?? '-' }}...
+                                    </span>
+                                    <span class="font-mono text-ink-400">SKU: {{ $activeImportLog['current_sku'] ?? '-' }}</span>
                                 </div>
+                                <div class="text-xs font-semibold text-white truncate" title="{{ $activeImportLog['current_nama'] ?? '' }}">
+                                    {{ $activeImportLog['current_nama'] ?? '-' }}
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                @php
+                    $detailList = $activeImportLog['detail'] ?? [];
+                    $gagalItems = $activeImportLog['gagal_rows'] ?? array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
+                    $skipItems = $activeImportLog['skip_rows'] ?? array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
+                    $bermasalahItems = match ($errorFilterTab) {
+                        'gagal' => $gagalItems,
+                        'skip' => $skipItems,
+                        default => array_values(array_filter($detailList, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true))),
+                    };
+                    $totalBermasalah = count($gagalItems) + count($skipItems);
+                @endphp
+
+                <!-- Interaktif: Rincian Seluruh Baris Bermasalah (Gagal & Dilewati) -->
+                @if($totalBermasalah > 0)
+                    <div class="max-w-4xl mx-auto p-5 sm:p-6 rounded-2xl bg-black/40 border border-white/10 text-left space-y-4 shadow-xl">
+                        <div class="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-white/10">
+                            <div>
+                                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                    <span>📋</span>
+                                    <span>Rincian Baris Bermasalah ({{ $totalBermasalah }} Baris)</span>
+                                </h3>
+                                <p class="text-[11px] text-ink-400 mt-0.5">Daftar baris data yang mengalami error atau dilewati saat proses import.</p>
+                            </div>
+                            <button type="button"
+                                    wire:click="exportErrorRows"
+                                    class="px-3 py-2 rounded-xl text-xs font-bold bg-up-primary hover:bg-up-primary/80 text-white cursor-pointer transition shadow flex items-center gap-1.5">
+                                <span>📥</span> Unduh Laporan Error (.CSV)
+                            </button>
+                        </div>
+
+                        <!-- Filter Tabs -->
+                        <div class="flex items-center gap-2 border-b border-white/10 pb-2">
+                            <button type="button"
+                                    wire:click="setErrorFilterTab('semua')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition {{ $errorFilterTab === 'semua' ? 'bg-white/15 text-white ring-1 ring-white/30' : 'text-ink-400 hover:text-white' }}">
+                                Semua ({{ $totalBermasalah }})
+                            </button>
+                            <button type="button"
+                                    wire:click="setErrorFilterTab('gagal')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition {{ $errorFilterTab === 'gagal' ? 'bg-up-red/20 text-up-red ring-1 ring-up-red/40' : 'text-ink-400 hover:text-up-red' }}">
+                                Gagal ({{ count($gagalItems) }})
+                            </button>
+                            <button type="button"
+                                    wire:click="setErrorFilterTab('skip')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition {{ $errorFilterTab === 'skip' ? 'bg-up-amber/20 text-up-amber ring-1 ring-up-amber/40' : 'text-ink-400 hover:text-up-amber' }}">
+                                Dilewati / Skip ({{ count($skipItems) }})
+                            </button>
+                        </div>
+
+                        <!-- Table Bermasalah -->
+                        <div class="overflow-x-auto rounded-xl border border-white/10 bg-black/30">
+                            <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="text-ink-400 border-b border-white/10 bg-white/5 text-[10px] uppercase tracking-wider font-mono">
+                                        <th class="py-2.5 px-3">Baris</th>
+                                        <th class="py-2.5 px-3">SKU</th>
+                                        <th class="py-2.5 px-3">Nama Produk</th>
+                                        <th class="py-2.5 px-3">Status</th>
+                                        <th class="py-2.5 px-3">Keterangan / Alasan Error</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5 text-[11px]">
+                                    @forelse(array_slice($bermasalahItems, 0, $errorDisplayLimit) as $item)
+                                        <tr class="hover:bg-white/[0.02] transition">
+                                            <td class="py-2.5 px-3 font-mono font-bold text-ink-300">#{{ $item['baris'] ?? '-' }}</td>
+                                            <td class="py-2.5 px-3 font-mono text-white font-bold">{{ $item['sku'] ?? ($item['kode'] ?? '-') }}</td>
+                                            <td class="py-2.5 px-3 text-ink-200 max-w-[200px] truncate" title="{{ $item['nama'] ?? '' }}">{{ $item['nama'] ?? '-' }}</td>
+                                            <td class="py-2.5 px-3">
+                                                @if(($item['status'] ?? '') === 'skip')
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/20 text-up-amber border border-up-amber/30">
+                                                        Dilewati
+                                                    </span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-red/20 text-up-red border border-up-red/30">
+                                                        Gagal
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3">
+                                                <div class="text-[11px] {{ ($item['status'] ?? '') === 'gagal' ? 'text-up-red' : 'text-ink-300' }}">
+                                                    {{ $item['error'] ?? ($item['catatan'] ?? 'Terjadi kendala pada baris ini') }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="py-4 text-center text-ink-500 italic">
+                                                Tidak ada baris data pada kategori ini.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if(count($bermasalahItems) > $errorDisplayLimit)
+                            <div class="text-center pt-2">
+                                <button type="button"
+                                        wire:click="loadMoreErrors"
+                                        class="px-4 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-ink-200 border border-white/10 cursor-pointer transition">
+                                    Muat 50 Baris Lainnya (Menampilkan {{ $errorDisplayLimit }} dari {{ count($bermasalahItems) }})
+                                </button>
                             </div>
                         @endif
                     </div>
@@ -984,6 +1181,46 @@
                     </div>
                 </div>
 
+                @if(($fotoScanResult['skipped_count'] ?? 0) > 0)
+                    <!-- Error & Skip Management Banner -->
+                    <div class="p-4 sm:p-5 rounded-2xl bg-up-red/10 border border-up-red/30 space-y-3">
+                        <div class="flex items-center justify-between flex-wrap gap-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">⚠️</span>
+                                <div>
+                                    <h3 class="text-sm font-bold text-up-red">
+                                        Terdeteksi {{ $fotoScanResult['skipped_count'] ?? 0 }} Berkas Foto Tidak Cocok / SKU Tidak Ada
+                                    </h3>
+                                    <p class="text-[11px] text-ink-400">
+                                        Berkas yang tidak memiliki SKU di katalog sistem akan dilewati secara aman tanpa menghentikan import. Anda dapat mengabaikan/melewati seluruh foto error ini atau mengunduh daftarnya.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button type="button"
+                                        wire:click="exportFotoErrorRows"
+                                        class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-white/10 hover:bg-white/20 text-white cursor-pointer transition shadow flex items-center gap-1.5"
+                                        title="Unduh daftar baris foto error dalam format CSV">
+                                    <span>📥</span> Unduh CSV Error
+                                </button>
+                                <button type="button"
+                                        wire:click="abaikanSemuaFotoError"
+                                        class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-up-red/80 hover:bg-up-red text-white cursor-pointer transition shadow flex items-center gap-1.5"
+                                        title="Lewati semua foto yang tidak cocok agar proses import tetap berjalan">
+                                    <span>⏭️</span> Abaikan Semua Error (Skip)
+                                </button>
+                                @if(! empty($resolusiErrorFoto))
+                                    <button type="button"
+                                            wire:click="batalAbaikanSemuaFotoError"
+                                            class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-ink-300 cursor-pointer transition">
+                                        Batal Abaikan
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <!-- Table Preview with Filter Tabs -->
                 <div class="p-5 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-4">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-black/5 dark:border-white/5 pb-3">
@@ -1111,106 +1348,278 @@
                 </div>
             </div>
 
-        @elseif($fotoStep === 'processing')
-            <!-- Step 3: Real-Time Processing with Progress Bar -->
+        @elseif($fotoStep === 'processing' || $fotoStep === 'completed')
+            <!-- Step 3 & 4: Live Processing Ticker & Completed Error Breakdown -->
             @php
-                $totalToProcess = count($fotoScanResult['matched'] ?? []);
-                $percent = $totalToProcess > 0 ? (int) min(100, round(($fotoProcessedCount / $totalToProcess) * 100)) : 0;
+                $log = $activeFotoImportLog;
+                $isProses = ($log['status'] ?? '') === 'proses' || $fotoStep === 'processing';
+                $isGagal = ($log['status'] ?? '') === 'gagal';
+                $isSelesai = ($log['status'] ?? '') === 'selesai' || $fotoStep === 'completed';
+                $totalItems = $log['total_baris'] ?? ($fotoScanResult['matched_count'] ?? ($fotoCompletedSummary['total'] ?? 0));
+                $suksesCount = $log['sukses'] ?? ($fotoSuccessCount ?: ($fotoCompletedSummary['success'] ?? 0));
+                $gagalCount = $log['gagal'] ?? ($fotoErrorCount ?: ($fotoCompletedSummary['error'] ?? 0));
+                $selesaiCount = $suksesCount + $gagalCount;
+                $persen = $log['persen'] ?? ($totalItems > 0 ? (int) min(100, round(($selesaiCount / $totalItems) * 100)) : 0);
+
+                $detailList = $log['detail'] ?? [];
+                $gagalItems = $log['gagal_rows'] ?? array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
+                $skipItems = $log['skip_rows'] ?? array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
+                $bermasalahItems = match ($fotoErrorFilterTab) {
+                    'gagal' => $gagalItems,
+                    'skip' => $skipItems,
+                    default => array_values(array_filter($detailList, fn ($d) => is_array($d) && (in_array($d['status'] ?? '', ['gagal', 'skip'], true) || ! empty($d['error'])))),
+                };
+                $totalBermasalah = count($gagalItems) + count($skipItems);
+                if ($totalBermasalah === 0 && ! empty($fotoScanResult['skipped'])) {
+                    $totalBermasalah = count($fotoScanResult['skipped']);
+                }
             @endphp
 
-            <div class="max-w-xl mx-auto p-8 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-6 text-center">
-                <div class="space-y-2">
-                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-up-primary/20 text-up-primary text-xl animate-spin">
-                        ⏳
-                    </div>
-                    <h3 class="text-lg font-black text-ink-950 dark:text-white">
-                        Mengompresi &amp; Memetakan Foto Produk...
-                    </h3>
-                    <p class="text-xs text-ink-500 dark:text-ink-400">
-                        Mengonversi gambar ke format WebP (1200px &amp; 250px thumb), mengoptimalkan penyimpanan server.
+            <div class="space-y-6 text-center">
+                <!-- Status Icon -->
+                <div class="flex items-center justify-center">
+                    @if($isProses)
+                        <div class="w-16 h-16 rounded-full bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary text-2xl animate-pulse">
+                            <span class="animate-spin inline-block">⏳</span>
+                        </div>
+                    @elseif($isGagal)
+                        <div class="w-16 h-16 rounded-full bg-up-red/10 border border-up-red/20 flex items-center justify-center text-up-red text-2xl">
+                            ⚠️
+                        </div>
+                    @else
+                        <div class="w-16 h-16 rounded-full bg-up-mint/10 border border-up-mint/20 flex items-center justify-center text-up-mint text-2xl shadow-lg shadow-up-mint/10">
+                            ✓
+                        </div>
+                    @endif
+                </div>
+
+                <div class="space-y-1">
+                    <h2 class="text-xl sm:text-2xl font-black text-ink-950 dark:text-white">
+                        @if($isProses)
+                            Import Foto Sedang Berjalan...
+                        @elseif($isGagal)
+                            Import Foto Mengalami Kendala
+                        @else
+                            Import Foto Produk Selesai!
+                        @endif
+                    </h2>
+                    <p class="text-xs text-ink-400 max-w-lg mx-auto">
+                        @if($isProses)
+                            Sistem sedang mengompresi gambar ke WebP (1200px &amp; thumbnail 250px) dan menyinkronkan ke katalog produk. Halaman ini diperbarui otomatis secara real-time.
+                        @elseif($isGagal)
+                            Proses import foto terhenti karena kendala teknis. Silakan periksa detail rincian di bawah.
+                        @else
+                            Seluruh foto berhasil diproses, dikompresi ke WebP, dan disinkronkan ke katalog master produk WMS, POS Kasir, serta Marketplace.
+                        @endif
                     </p>
                 </div>
 
-                <!-- Progress Bar -->
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between text-xs font-mono font-bold">
-                        <span class="text-ink-400">Kemajuan:</span>
-                        <span class="text-up-primary">{{ $fotoProcessedCount }} / {{ $totalToProcess }} Foto ({{ $percent }}%)</span>
+                <!-- Main Status & Metrics Card -->
+                <div class="max-w-lg mx-auto p-5 rounded-2xl bg-black/40 border border-white/10 text-left text-xs space-y-4 shadow-xl">
+                    <!-- Header Status Log -->
+                    <div class="flex items-center justify-between font-mono pb-3 border-b border-white/10">
+                        <span class="text-ink-400 font-bold">Import Foto Log #{{ $log['id'] ?? ($fotoImportLogId ?? '-') }}</span>
+                        @if($isProses)
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-up-primary/20 text-up-primary border border-up-primary/30 flex items-center gap-1.5 animate-pulse">
+                                <span class="w-1.5 h-1.5 rounded-full bg-up-primary animate-ping"></span>
+                                <span>Sedang Memproses</span>
+                            </span>
+                        @elseif($isGagal)
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-up-red/20 text-up-red border border-up-red/30">
+                                Gagal
+                            </span>
+                        @else
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-up-mint/20 text-up-mint border border-up-mint/30">
+                                Selesai
+                            </span>
+                        @endif
                     </div>
-                    <div class="w-full h-3 rounded-full bg-black/40 overflow-hidden p-0.5 border border-white/10">
-                        <div class="h-full rounded-full bg-gradient-to-r from-up-primary via-up-mint to-up-mint transition-all duration-300 animate-pulse"
-                             style="width: {{ $percent }}%"></div>
-                    </div>
-                </div>
 
-                <!-- Real-time Stats -->
-                <div class="grid grid-cols-2 gap-3 pt-2 font-mono">
-                    <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/20 text-center">
-                        <div class="text-[10px] uppercase text-up-mint">Berhasil Disimpan</div>
-                        <div class="text-lg font-black text-up-mint mt-0.5">{{ $fotoSuccessCount }}</div>
+                    <!-- Live Progress Bar -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between text-[11px] font-mono">
+                            <span class="text-ink-400 font-semibold">Kemajuan Proses:</span>
+                            @if($totalItems > 0)
+                                <span class="text-up-mint font-black">{{ $persen }}% ({{ $selesaiCount }} dari {{ $totalItems }} foto)</span>
+                            @else
+                                <span class="text-up-mint font-black">{{ $persen }}%</span>
+                            @endif
+                        </div>
+                        <div class="w-full h-3 rounded-full bg-black/60 overflow-hidden p-0.5 border border-white/10">
+                            <div class="h-full rounded-full bg-gradient-to-r from-up-primary via-up-mint to-up-mint transition-all duration-300 {{ $isProses ? 'animate-pulse' : '' }}"
+                                 style="width: {{ $persen }}%"></div>
+                        </div>
                     </div>
-                    <div class="p-3 rounded-xl bg-up-red/10 border border-up-red/20 text-center">
-                        <div class="text-[10px] uppercase text-up-red">Gagal Diproses</div>
-                        <div class="text-lg font-black text-up-red mt-0.5">{{ $fotoErrorCount }}</div>
-                    </div>
-                </div>
 
-                <div class="p-3 rounded-xl bg-white/5 border border-white/5 text-[11px] text-ink-400">
-                    🛡️ <strong>Proteksi Memori Server:</strong> Pemrosesan dilakukan bertahap per batch kecil untuk menjaga stabilitas RAM VPS 1GB/2GB.
-                </div>
-            </div>
+                    <!-- Metrik Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-center font-mono">
+                        <div class="p-2 rounded-xl bg-white/5 border border-white/5">
+                            <div class="text-[9px] uppercase text-ink-400">Total</div>
+                            <div class="text-sm font-black text-white mt-0.5">{{ $totalItems }}</div>
+                        </div>
+                        <div class="p-2 rounded-xl bg-up-mint/10 border border-up-mint/20">
+                            <div class="text-[9px] uppercase text-up-mint">Sukses</div>
+                            <div class="text-sm font-black text-up-mint mt-0.5">{{ $suksesCount }}</div>
+                        </div>
+                        <div class="p-2 rounded-xl bg-up-amber/10 border border-up-amber/20">
+                            <div class="text-[9px] uppercase text-up-amber">Dilewati</div>
+                            <div class="text-sm font-black text-up-amber mt-0.5">{{ $log['skip'] ?? ($fotoCompletedSummary['skipped'] ?? 0) }}</div>
+                        </div>
+                        <div class="p-2 rounded-xl bg-up-red/10 border border-up-red/20">
+                            <div class="text-[9px] uppercase text-up-red">Gagal</div>
+                            <div class="text-sm font-black text-up-red mt-0.5">{{ $gagalCount }}</div>
+                        </div>
+                    </div>
 
-        @elseif($fotoStep === 'completed')
-            <!-- Step 4: Completed Summary & Next Actions -->
-            <div class="max-w-xl mx-auto p-8 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-6 text-center">
-                <div class="space-y-2">
-                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-up-mint/20 text-up-mint text-2xl">
-                        ✓
-                    </div>
-                    <h3 class="text-xl font-black text-ink-950 dark:text-white">
-                        Import Foto Produk Selesai!
-                    </h3>
-                    <p class="text-xs text-ink-500 dark:text-ink-400">
-                        Seluruh foto berhasil dikompresi ke WebP dan disinkronkan ke master produk WMS, POS Kasir, dan Marketplace.
-                    </p>
-                </div>
-
-                <!-- Metric Cards -->
-                <div class="grid grid-cols-3 gap-3 font-mono text-center">
-                    <div class="p-3 rounded-xl bg-white/5 border border-white/10">
-                        <div class="text-[10px] uppercase text-ink-400">Total File</div>
-                        <div class="text-lg font-black text-white mt-0.5">{{ $fotoCompletedSummary['total'] ?? 0 }}</div>
-                    </div>
-                    <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30">
-                        <div class="text-[10px] uppercase text-up-mint">Sukses Sync</div>
-                        <div class="text-lg font-black text-up-mint mt-0.5">{{ $fotoCompletedSummary['success'] ?? 0 }}</div>
-                    </div>
-                    <div class="p-3 rounded-xl bg-up-amber/10 border border-up-amber/30">
-                        <div class="text-[10px] uppercase text-up-amber">Dilewati</div>
-                        <div class="text-lg font-black text-up-amber mt-0.5">{{ $fotoCompletedSummary['skipped'] ?? 0 }}</div>
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                    @if(($fotoCompletedSummary['skipped'] ?? 0) > 0)
-                        <button type="button"
-                                wire:click="downloadFotoSkippedExcel"
-                                class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
-                            <span>📥 Unduh Laporan File Dilewati (.xlsx)</span>
-                        </button>
+                    <!-- Real-time Processing Item Ticker -->
+                    @if($isProses && (! empty($log['current_sku']) || ! empty($log['current_nama'])))
+                        <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/20 space-y-1">
+                            <div class="flex items-center justify-between text-[10px] text-ink-400">
+                                <span class="flex items-center gap-1.5 font-bold text-up-primary">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-up-primary animate-ping"></span>
+                                    Sedang Memproses Foto #{{ $log['current_baris'] ?? '-' }}...
+                                </span>
+                                <span class="font-mono text-ink-400">SKU: {{ $log['current_sku'] ?? '-' }}</span>
+                            </div>
+                            <div class="text-xs font-semibold text-white truncate" title="{{ $log['current_nama'] ?? '' }}">
+                                {{ $log['current_nama'] ?? '-' }}
+                            </div>
+                        </div>
                     @endif
 
-                    <a href="/app/wms" wire:navigate
-                       class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20">
-                        <span>📦 Lihat Katalog Produk WMS →</span>
-                    </a>
+                    <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 text-[10px] text-ink-400 text-center">
+                        🛡️ <strong>Proteksi Memori Server:</strong> Dijalankan di queue background dengan WebP compression &amp; pembersihan RAM bertahap untuk menjaga stabilitas VPS.
+                    </div>
+                </div>
 
+                <!-- Interaktif: Rincian Seluruh File Bermasalah (Gagal & Dilewati) -->
+                @if($totalBermasalah > 0)
+                    <div class="max-w-4xl mx-auto p-5 sm:p-6 rounded-2xl bg-black/40 border border-white/10 text-left space-y-4 shadow-xl">
+                        <div class="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-white/10">
+                            <div>
+                                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                    <span>📋</span>
+                                    <span>Rincian Berkas Bermasalah ({{ $totalBermasalah }} Berkas)</span>
+                                </h3>
+                                <p class="text-[11px] text-ink-400 mt-0.5">Daftar foto yang mengalami kegagalan proses atau dilewati karena SKU tidak cocok.</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button type="button"
+                                        wire:click="exportFotoErrorRows"
+                                        class="px-3 py-2 rounded-xl text-xs font-bold bg-up-primary hover:bg-up-primary/80 text-white cursor-pointer transition shadow flex items-center gap-1.5">
+                                    <span>📥</span> Unduh Laporan Error (.CSV)
+                                </button>
+                                @if(! empty($fotoScanResult['skipped']))
+                                    <button type="button"
+                                            wire:click="downloadFotoSkippedExcel"
+                                            class="px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white cursor-pointer transition shadow flex items-center gap-1.5">
+                                        <span>📊</span> Unduh Excel Dilewati (.xlsx)
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+
+                        <!-- Filter Tabs -->
+                        <div class="flex items-center gap-2 border-b border-white/10 pb-2">
+                            <button type="button"
+                                    wire:click="setFotoErrorFilterTab('semua')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition {{ $fotoErrorFilterTab === 'semua' ? 'bg-white/15 text-white ring-1 ring-white/30' : 'text-ink-400 hover:text-white' }}">
+                                Semua ({{ $totalBermasalah }})
+                            </button>
+                            <button type="button"
+                                    wire:click="setFotoErrorFilterTab('gagal')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition {{ $fotoErrorFilterTab === 'gagal' ? 'bg-up-red/20 text-up-red ring-1 ring-up-red/40' : 'text-ink-400 hover:text-up-red' }}">
+                                Gagal ({{ count($gagalItems) }})
+                            </button>
+                            <button type="button"
+                                    wire:click="setFotoErrorFilterTab('skip')"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition {{ $fotoErrorFilterTab === 'skip' ? 'bg-up-amber/20 text-up-amber ring-1 ring-up-amber/40' : 'text-ink-400 hover:text-up-amber' }}">
+                                Dilewati / Skip ({{ count($skipItems) ?: (count($fotoScanResult['skipped'] ?? [])) }})
+                            </button>
+                        </div>
+
+                        <!-- Table Bermasalah -->
+                        <div class="overflow-x-auto rounded-xl border border-white/10 bg-black/30">
+                            <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="text-ink-400 border-b border-white/10 bg-white/5 text-[10px] uppercase tracking-wider font-mono">
+                                        <th class="py-2.5 px-3">No</th>
+                                        <th class="py-2.5 px-3">Nama Berkas</th>
+                                        <th class="py-2.5 px-3">SKU Terdeteksi</th>
+                                        <th class="py-2.5 px-3">Nama Produk</th>
+                                        <th class="py-2.5 px-3">Status</th>
+                                        <th class="py-2.5 px-3">Keterangan / Alasan Error</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5 text-[11px]">
+                                    @php
+                                        $displayRows = ! empty($bermasalahItems)
+                                            ? array_slice($bermasalahItems, 0, $fotoErrorDisplayLimit)
+                                            : (! empty($fotoScanResult['skipped']) ? array_slice($fotoScanResult['skipped'], 0, $fotoErrorDisplayLimit) : []);
+                                    @endphp
+                                    @forelse($displayRows as $idx => $item)
+                                        @php
+                                            $isSkipped = ($item['status'] ?? '') === 'skip' || ! empty($item['reason']);
+                                            $filename = $item['file'] ?? ($item['filename'] ?? ($item['name'] ?? '-'));
+                                            $sku = $item['sku'] ?? '-';
+                                            $nama = $item['nama'] ?? '-';
+                                            $ket = $item['error'] ?? ($item['catatan'] ?? ($item['reason'] ?? 'Terjadi kendala pada berkas ini'));
+                                        @endphp
+                                        <tr class="hover:bg-white/[0.02] transition">
+                                            <td class="py-2.5 px-3 font-mono font-bold text-ink-300">#{{ $item['baris'] ?? ($idx + 1) }}</td>
+                                            <td class="py-2.5 px-3 font-mono text-white font-semibold truncate max-w-xs" title="{{ $filename }}">{{ $filename }}</td>
+                                            <td class="py-2.5 px-3 font-mono text-up-primary font-bold">{{ $sku }}</td>
+                                            <td class="py-2.5 px-3 text-ink-200 max-w-[200px] truncate" title="{{ $nama }}">{{ $nama }}</td>
+                                            <td class="py-2.5 px-3">
+                                                @if($isSkipped)
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-amber/20 text-up-amber border border-up-amber/30">
+                                                        Dilewati
+                                                    </span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-red/20 text-up-red border border-up-red/30">
+                                                        Gagal
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2.5 px-3">
+                                                <div class="text-[11px] {{ ! $isSkipped ? 'text-up-red' : 'text-ink-300' }}">
+                                                    {{ $ket }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="py-4 text-center text-ink-500 italic">
+                                                Tidak ada berkas data pada kategori ini.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if($totalBermasalah > $fotoErrorDisplayLimit)
+                            <div class="text-center pt-2">
+                                <button type="button"
+                                        wire:click="loadMoreFotoErrors"
+                                        class="px-4 py-2 rounded-xl text-xs font-bold bg-white/5 hover:bg-white/10 text-ink-200 border border-white/10 cursor-pointer transition">
+                                    Muat 50 Berkas Lainnya (Menampilkan {{ $fotoErrorDisplayLimit }} dari {{ $totalBermasalah }})
+                                </button>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                <!-- Bottom Action Controls -->
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
                     <button type="button"
                             wire:click="resetFotoUpload"
-                            class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 text-ink-400 hover:text-white font-bold text-xs transition cursor-pointer">
-                        Import Folder Lain
+                            class="w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-300 font-bold text-xs cursor-pointer hover:bg-black/10 transition flex items-center justify-center">
+                        Import Foto Lainnya
                     </button>
+                    <a href="/app/wms" wire:navigate class="w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer shadow-md shadow-up-primary/20 transition flex items-center justify-center">
+                        Buka Daftar Produk WMS →
+                    </a>
                 </div>
             </div>
         @endif

@@ -9,6 +9,7 @@ use App\Modules\Akunting\Controllers\AkuntingController;
 use App\Modules\Akunting\Livewire\AkuntingDashboard;
 use App\Modules\Akunting\Livewire\AsetRegister;
 use App\Modules\Akunting\Livewire\LaporanPajak;
+use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Livewire\CrmDashboard;
 use App\Modules\Crm\Livewire\LeadKanban;
 use App\Modules\Crm\Models\Pelanggan;
@@ -18,6 +19,7 @@ use App\Modules\Hr\Livewire\HrAbsensiKpiPage;
 use App\Modules\Hr\Livewire\HrSayaPage;
 use App\Modules\Hr\Livewire\KomisiSkemaPage;
 use App\Modules\Hr\Livewire\PayrollPage;
+use App\Modules\Hr\Models\PayrollSlip;
 use App\Modules\Marketplace\Controllers\PaymentController;
 use App\Modules\Marketplace\Livewire\BookingServis;
 use App\Modules\Marketplace\Livewire\CartCheckout;
@@ -29,6 +31,7 @@ use App\Modules\Pos\Livewire\PesananOnlineIndex;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Livewire\ReturPenjualanIndex;
 use App\Modules\Pos\Livewire\RiwayatTransaksiIndex;
+use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use App\Modules\Rbac\Livewire\SessionManagementPage;
 use App\Modules\Rbac\Livewire\SettingsRbac;
@@ -644,6 +647,49 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
 
         return view('wms.grn-print', ['grn' => $grn]);
     })->name('wms.grn.print')->middleware('permission:wms.view');
+
+    // Cetak Label Pengiriman Ekspedisi Pesanan Online (SOT Printer)
+    Route::get('/pos/pesanan-online/{id}/print-label', function ($id) {
+        $transaksi = Transaksi::with(['items.produk', 'pelanggan', 'cabang', 'pengiriman'])->findOrFail($id);
+
+        return view('modules.pos.label-pengiriman-print', ['transaksi' => $transaksi]);
+    })->name('pesanan-online.print-label')->middleware('permission:pos.view');
+
+    // Cetak Dokumen Slip Gaji Karyawan (SOT Printer)
+    Route::get('/hr/slip/{id}/print', function ($id) {
+        $slip = PayrollSlip::with(['karyawan.cabang', 'komisiDetails.tiketServis', 'periode'])->findOrFail($id);
+        $user = auth()->user();
+        $isManager = $user && ($user->can('kelola-payroll') || $user->can('kelola-hr'));
+        $isOwner = $user && (int) $slip->karyawan?->user_id === (int) $user->id;
+
+        abort_unless($isManager || $isOwner, 403, 'Anda tidak memiliki hak akses untuk mencetak slip gaji ini.');
+
+        return view('modules.hr.slip-gaji-print', ['slip' => $slip]);
+    })->name('hr.slip.print');
+
+    // Cetak Dokumen Laporan Pajak Bulanan (SOT Printer)
+    Route::get('/laporan-pajak/print', function (Request $request) {
+        $cabangId = session('cabang_id');
+        $periodeDari = $request->query('dari', now()->startOfMonth()->toDateString());
+        $periodeSampai = $request->query('sampai', now()->toDateString());
+
+        $svc = app(PajakService::class);
+        $pajakConfig = [
+            'enabled' => $cabangId ? $svc->enabled($cabangId) : false,
+            'percent' => $svc->getPercent($cabangId),
+        ];
+
+        $rekap = $svc->rekapPeriode($cabangId, $periodeDari, $periodeSampai);
+        $rows = $svc->rincianKeluaran($cabangId, $periodeDari, $periodeSampai);
+
+        return view('modules.akunting.laporan-pajak-print', [
+            'periodeDari' => $periodeDari,
+            'periodeSampai' => $periodeSampai,
+            'pajakConfig' => $pajakConfig,
+            'rekap' => $rekap,
+            'rows' => $rows,
+        ]);
+    })->name('laporan.pajak.print')->middleware('permission:laporan.cabang');
 
     // [F3-7] Cycle Count Otomatis (G-18) — jadwal CRUD + daftar task count
     // RBAC: permission wms.view utk lihat; mutasi (jadwal/count) di-gate wms.opname di komponen

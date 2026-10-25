@@ -80,7 +80,7 @@ class SettingsRbac extends Component
     ];
 
     // Konfigurasi Printer Label QR Produk & Struk Kasir
-    public string $printerSubTab = 'struk'; // 'struk' | 'label' | 'wms_doc'
+    public string $printerSubTab = 'struk'; // 'struk' | 'label' | 'wms_doc' | 'hr_slip' | 'laporan' | 'pengiriman'
 
     public array $printerForm = [
         'label_preset' => '33x15',
@@ -104,6 +104,41 @@ class SettingsRbac extends Component
         'font_size' => '10pt',
         'show_kop' => true,
         'show_ttd' => true,
+    ];
+
+    public array $hrSlipForm = [
+        'paper_size' => 'a5',
+        'orientation' => 'portrait',
+        'margin_mm' => 8,
+        'font_size' => '10pt',
+        'show_kop' => true,
+        'show_komisi_detail' => true,
+        'show_potongan' => true,
+        'show_ttd' => true,
+        'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP Ute Parts.',
+    ];
+
+    public array $laporanDocForm = [
+        'paper_size' => 'a4',
+        'orientation' => 'landscape',
+        'margin_mm' => 10,
+        'font_size' => '9pt',
+        'show_kop' => true,
+        'show_ttd' => true,
+        'show_audit_footer' => true,
+        'jabatan_pembuat' => 'Staf Akuntansi / Kasir',
+        'jabatan_pemeriksa' => 'Kepala Cabang / Spv',
+        'jabatan_penyetuju' => 'Owner / Direktur',
+    ];
+
+    public array $labelPengirimanForm = [
+        'paper_size' => '100x150',
+        'margin_mm' => 5,
+        'show_sender' => true,
+        'show_item_list' => true,
+        'show_qr_resi' => true,
+        'show_fragile_warning' => true,
+        'catatan_pengiriman' => 'FRAGILE: Barang Elektronik & Sparepart HP. Jangan dibanting / ditindih beban berat.',
     ];
 
     public array $strukForm = [
@@ -165,7 +200,7 @@ class SettingsRbac extends Component
             $sub = (string) request('sub');
             if (in_array($sub, ['kategori', 'brand', 'kualitas', 'satuan', 'kondisi', 'tipe_hp'], true)) {
                 $this->masterProdukSubTab = $sub;
-            } elseif (in_array($sub, ['struk', 'label'], true)) {
+            } elseif (in_array($sub, ['struk', 'label', 'wms_doc', 'hr_slip', 'laporan', 'pengiriman'], true)) {
                 $this->printerSubTab = $sub;
             }
         }
@@ -247,7 +282,10 @@ class SettingsRbac extends Component
         $strukCfg = $config->getStrukConfig();
 
         $this->strukForm = array_merge($this->strukForm, $strukCfg);
-        $this->wmsDocForm = $config->getWmsDocConfig();
+        $this->wmsDocForm = array_merge($this->wmsDocForm, $config->getWmsDocConfig());
+        $this->hrSlipForm = array_merge($this->hrSlipForm, $config->getSlipGajiConfig());
+        $this->laporanDocForm = array_merge($this->laporanDocForm, $config->getLaporanDocConfig());
+        $this->labelPengirimanForm = array_merge($this->labelPengirimanForm, $config->getLabelPengirimanConfig());
 
         $this->printerForm = [
             'label_preset' => (string) ($labelCfg['preset'] ?? '33x15'),
@@ -428,6 +466,107 @@ class SettingsRbac extends Component
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => 'Kustomisasi template struk & faktur kasir berhasil disimpan.',
+        ]);
+    }
+
+    public function simpanPengaturanHrSlip(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi cetak slip gaji HR.')) {
+            return;
+        }
+
+        $this->validate([
+            'hrSlipForm.paper_size' => 'required|in:a5,a4,80mm',
+            'hrSlipForm.orientation' => 'required|in:portrait,landscape',
+            'hrSlipForm.margin_mm' => 'required|numeric|min:1|max:30',
+            'hrSlipForm.font_size' => 'required|string',
+            'hrSlipForm.show_kop' => 'boolean',
+            'hrSlipForm.show_komisi_detail' => 'boolean',
+            'hrSlipForm.show_potongan' => 'boolean',
+            'hrSlipForm.show_ttd' => 'boolean',
+            'hrSlipForm.catatan_kaki' => 'nullable|string|max:300',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+        $config->set('slip_gaji_config', $this->hrSlipForm, 'Pengaturan format kertas dan layout slip gaji HR & Payroll');
+
+        app(AuditService::class)->catat(
+            'Konfigurasi',
+            'update',
+            null,
+            "Format cetak slip gaji HR diperbarui (Kertas: {$this->hrSlipForm['paper_size']}, Margin: {$this->hrSlipForm['margin_mm']}mm)"
+        );
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Pengaturan format cetak slip gaji HR berhasil disimpan.',
+        ]);
+    }
+
+    public function simpanPengaturanLaporanDoc(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi cetak laporan.')) {
+            return;
+        }
+
+        $this->validate([
+            'laporanDocForm.paper_size' => 'required|in:a4,f4,letter',
+            'laporanDocForm.orientation' => 'required|in:landscape,portrait',
+            'laporanDocForm.margin_mm' => 'required|numeric|min:2|max:30',
+            'laporanDocForm.font_size' => 'required|string',
+            'laporanDocForm.show_kop' => 'boolean',
+            'laporanDocForm.show_ttd' => 'boolean',
+            'laporanDocForm.show_audit_footer' => 'boolean',
+            'laporanDocForm.jabatan_pembuat' => 'nullable|string|max:100',
+            'laporanDocForm.jabatan_pemeriksa' => 'nullable|string|max:100',
+            'laporanDocForm.jabatan_penyetuju' => 'nullable|string|max:100',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+        $config->set('laporan_doc_config', $this->laporanDocForm, 'Pengaturan format kertas, orientasi, dan tanda tangan laporan keuangan/operasional');
+
+        app(AuditService::class)->catat(
+            'Konfigurasi',
+            'update',
+            null,
+            "Format cetak laporan diperbarui (Kertas: {$this->laporanDocForm['paper_size']}, Orientasi: {$this->laporanDocForm['orientation']})"
+        );
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Pengaturan format cetak laporan keuangan berhasil disimpan.',
+        ]);
+    }
+
+    public function simpanPengaturanLabelPengiriman(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi label pengiriman.')) {
+            return;
+        }
+
+        $this->validate([
+            'labelPengirimanForm.paper_size' => 'required|in:100x150,80x100,80mm,a6',
+            'labelPengirimanForm.margin_mm' => 'required|numeric|min:0|max:20',
+            'labelPengirimanForm.show_sender' => 'boolean',
+            'labelPengirimanForm.show_item_list' => 'boolean',
+            'labelPengirimanForm.show_qr_resi' => 'boolean',
+            'labelPengirimanForm.show_fragile_warning' => 'boolean',
+            'labelPengirimanForm.catatan_pengiriman' => 'nullable|string|max:250',
+        ]);
+
+        $config = app(KonfigurasiService::class);
+        $config->set('label_pengiriman_config', $this->labelPengirimanForm, 'Pengaturan ukuran dan atribut label pengiriman ekspedisi');
+
+        app(AuditService::class)->catat(
+            'Konfigurasi',
+            'update',
+            null,
+            "Format label pengiriman ekspedisi diperbarui (Ukuran: {$this->labelPengirimanForm['paper_size']})"
+        );
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Pengaturan format label pengiriman ekspedisi berhasil disimpan.',
         ]);
     }
 

@@ -311,4 +311,86 @@ class KonfigurasiService
 
         return is_array($cfg) ? array_merge($default, $cfg) : $default;
     }
+
+    /**
+     * SOT Identitas & Kop Surat Cetak Universal.
+     * Digunakan bersama oleh Struk, Label, Dokumen WMS, Slip Gaji, dan Laporan.
+     */
+    public function getPrintHeader(): array
+    {
+        $struk = $this->getStrukConfig();
+
+        return [
+            'nama_toko' => $struk['nama_toko'] ?? 'UTE PARTS',
+            'slogan' => $struk['slogan'] ?? 'Pusat Sparepart & Servis HP',
+            'alamat' => $struk['alamat'] ?? 'Jl. Veteran No. 12',
+            'telepon' => $struk['telepon'] ?? '0812-3456-7890',
+            'website_medsos' => $struk['website_medsos'] ?? 'www.uteparts.id',
+        ];
+    }
+
+    /**
+     * Konfigurasi format cetak Slip Gaji HR & Payroll.
+     */
+    public function getSlipGajiConfig(): array
+    {
+        $default = [
+            'paper_size' => 'a5', // a5, a4, 80mm
+            'orientation' => 'portrait', // portrait, landscape
+            'margin_mm' => 8,
+            'font_size' => '10pt',
+            'show_kop' => true,
+            'show_komisi_detail' => true,
+            'show_potongan' => true,
+            'show_ttd' => true,
+            'catatan_kaki' => 'Dokumen ini bersifat rahasia dan diterbitkan secara elektronik oleh sistem ERP Ute Parts.',
+        ];
+
+        $cfg = $this->get('slip_gaji_config');
+
+        return is_array($cfg) ? array_merge($default, $cfg) : $default;
+    }
+
+    /**
+     * Konfigurasi format cetak Laporan Keuangan & Operasional.
+     */
+    public function getLaporanDocConfig(): array
+    {
+        $default = [
+            'paper_size' => 'a4', // a4, f4, letter
+            'orientation' => 'landscape', // landscape, portrait
+            'margin_mm' => 10,
+            'font_size' => '9pt',
+            'show_kop' => true,
+            'show_ttd' => true,
+            'show_audit_footer' => true,
+            'jabatan_pembuat' => 'Staf Akuntansi / Kasir',
+            'jabatan_pemeriksa' => 'Kepala Cabang / Spv',
+            'jabatan_penyetuju' => 'Owner / Direktur',
+        ];
+
+        $cfg = $this->get('laporan_doc_config');
+
+        return is_array($cfg) ? array_merge($default, $cfg) : $default;
+    }
+
+    /**
+     * Konfigurasi format cetak Label Pengiriman Ekspedisi (Pesanan Online).
+     */
+    public function getLabelPengirimanConfig(): array
+    {
+        $default = [
+            'paper_size' => '100x150', // 100x150, 80x100, 80mm, a6
+            'margin_mm' => 5,
+            'show_sender' => true,
+            'show_item_list' => true,
+            'show_qr_resi' => true,
+            'show_fragile_warning' => true,
+            'catatan_pengiriman' => 'FRAGILE: Barang Elektronik & Sparepart HP. Jangan dibanting / ditindih beban berat.',
+        ];
+
+        $cfg = $this->get('label_pengiriman_config');
+
+        return is_array($cfg) ? array_merge($default, $cfg) : $default;
+    }
 }

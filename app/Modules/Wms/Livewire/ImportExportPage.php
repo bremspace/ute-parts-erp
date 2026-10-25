@@ -4,6 +4,7 @@ namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Wms\Exports\BulkFotoSkippedExport;
 use App\Modules\Wms\Exports\ImportProdukTemplateExport;
+use App\Modules\Wms\Jobs\ImportFotoMasalJob;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\ImportLog;
@@ -51,6 +52,14 @@ class ImportExportPage extends Component
 
     public array $resolusiDuplikat = []; // [baris => ['aksi' => 'ganti_sku|timpa_update|skip', 'sku_baru' => '...']]
 
+    public array $resolusiBarcode = []; // [baris => ['aksi' => 'kosongkan_barcode|skip|ganti_barcode', 'barcode_baru' => '...']]
+
+    public array $resolusiErrorBaris = []; // [baris => 'skip']
+
+    public string $errorFilterTab = 'semua'; // 'semua' | 'gagal' | 'skip'
+
+    public int $errorDisplayLimit = 50;
+
     // --- TAB 3: IMPORT FOTO BULK ---
     public $fotoUploads = [];
 
@@ -78,6 +87,16 @@ class ImportExportPage extends Component
 
     public array $fotoCompletedSummary = [];
 
+    public ?int $fotoImportLogId = null;
+
+    public ?array $activeFotoImportLog = null;
+
+    public array $resolusiErrorFoto = []; // [nomor|filename => 'skip']
+
+    public string $fotoErrorFilterTab = 'semua'; // 'semua' | 'gagal' | 'skip'
+
+    public int $fotoErrorDisplayLimit = 50;
+
     public function mount(): void
     {
         $reqTab = request('tab', 'import');
@@ -90,14 +109,26 @@ class ImportExportPage extends Component
             $this->gudangPusatId = $gudangPertama->id;
         }
 
-        $runningLog = ImportLog::where('user_id', auth()->id())
+        $runningFotoLog = ImportLog::where('user_id', auth()->id())
+            ->where('tipe', 'produk_foto')
             ->where('status', 'proses')
             ->latest()
             ->first();
-        if ($runningLog) {
-            $this->importLogId = $runningLog->id;
-            $this->importStep = 'selesai';
-            $this->cekStatusImport();
+        if ($runningFotoLog) {
+            $this->activeTab = 'foto';
+            $this->fotoImportLogId = $runningFotoLog->id;
+            $this->fotoStep = 'processing';
+            $this->cekStatusFotoImport();
+        } else {
+            $runningLog = ImportLog::where('user_id', auth()->id())
+                ->where('status', 'proses')
+                ->latest()
+                ->first();
+            if ($runningLog) {
+                $this->importLogId = $runningLog->id;
+                $this->importStep = 'selesai';
+                $this->cekStatusImport();
+            }
         }
     }
 
@@ -126,6 +157,10 @@ class ImportExportPage extends Component
         $this->importPreview = [];
         $this->aksiKemiripan = [];
         $this->resolusiDuplikat = [];
+        $this->resolusiBarcode = [];
+        $this->resolusiErrorBaris = [];
+        $this->errorFilterTab = 'semua';
+        $this->errorDisplayLimit = 50;
         $this->importFilePath = '';
         $this->importStep = 'upload';
         $this->activeImportLog = null;
@@ -169,12 +204,21 @@ class ImportExportPage extends Component
                 }
             }
 
-            // Inisialisasi default resolusi duplikat SKU / Barcode
+            // Inisialisasi default resolusi duplikat SKU & Barcode
             $this->resolusiDuplikat = [];
+            $this->resolusiBarcode = [];
+            $this->resolusiErrorBaris = [];
             if (! empty($hasil['duplikat_rows'])) {
                 foreach ($hasil['duplikat_rows'] as $dr) {
+                    $isBarcode = ($dr['tipe'] ?? '') === 'barcode';
+                    if ($isBarcode) {
+                        $this->resolusiBarcode[$dr['baris']] = [
+                            'aksi' => 'kosongkan_barcode',
+                            'barcode_baru' => '',
+                        ];
+                    }
                     $this->resolusiDuplikat[$dr['baris']] = [
-                        'aksi' => $dr['lokasi'] === 'database' ? 'timpa_update' : 'ganti_sku',
+                        'aksi' => $isBarcode ? 'kosongkan_barcode' : ($dr['lokasi'] === 'database' ? 'timpa_update' : 'ganti_sku'),
                         'sku_baru' => $dr['sku_rekomendasi'] ?? '',
                     ];
                 }
@@ -289,6 +333,166 @@ class ImportExportPage extends Component
         }
     }
 
+    public function setBarcodeAction(int $baris, string $aksi, ?string $barcodeBaru = null): void
+    {
+        $this->resolusiBarcode[$baris] = [
+            'aksi' => $aksi,
+            'barcode_baru' => $barcodeBaru ?? '',
+        ];
+        if (isset($this->resolusiDuplikat[$baris])) {
+            $this->resolusiDuplikat[$baris]['aksi'] = $aksi;
+        }
+    }
+
+    public function kosongkanSemuaBarcodeDuplikat(): void
+    {
+        if (empty($this->importPreview['duplikat_rows'])) {
+            return;
+        }
+
+        $count = 0;
+        foreach ($this->importPreview['duplikat_rows'] as $dr) {
+            if (($dr['tipe'] ?? '') === 'barcode' || ! empty($dr['barcode'])) {
+                $this->resolusiBarcode[$dr['baris']] = [
+                    'aksi' => 'kosongkan_barcode',
+                    'barcode_baru' => '',
+                ];
+                if (isset($this->resolusiDuplikat[$dr['baris']])) {
+                    $this->resolusiDuplikat[$dr['baris']]['aksi'] = 'kosongkan_barcode';
+                }
+                $count++;
+            }
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => "{$count} barcode duplikat ditandai untuk dikosongkan (produk tetap diimpor).",
+        ]);
+    }
+
+    public function lewatiSemuaBarcodeDuplikat(): void
+    {
+        if (empty($this->importPreview['duplikat_rows'])) {
+            return;
+        }
+
+        $count = 0;
+        foreach ($this->importPreview['duplikat_rows'] as $dr) {
+            if (($dr['tipe'] ?? '') === 'barcode' || ! empty($dr['barcode'])) {
+                $this->resolusiBarcode[$dr['baris']] = [
+                    'aksi' => 'skip',
+                    'barcode_baru' => '',
+                ];
+                if (isset($this->resolusiDuplikat[$dr['baris']])) {
+                    $this->resolusiDuplikat[$dr['baris']]['aksi'] = 'skip';
+                }
+                $count++;
+            }
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => "{$count} baris barcode duplikat ditandai untuk dilewati (skip).",
+        ]);
+    }
+
+    public function setErrorAction(int $baris, string $aksi): void
+    {
+        if ($aksi === 'skip') {
+            $this->resolusiErrorBaris[$baris] = 'skip';
+        } else {
+            unset($this->resolusiErrorBaris[$baris]);
+        }
+    }
+
+    public function abaikanSemuaBarisError(): void
+    {
+        if (empty($this->importPreview['error_rows'])) {
+            return;
+        }
+
+        foreach ($this->importPreview['error_rows'] as $er) {
+            $this->resolusiErrorBaris[$er['baris']] = 'skip';
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => count($this->importPreview['error_rows']).' baris error ditandai untuk dilewati (skip).',
+        ]);
+    }
+
+    public function batalAbaikanSemuaBarisError(): void
+    {
+        $this->resolusiErrorBaris = [];
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Status abaikan baris error telah dibatalkan.',
+        ]);
+    }
+
+    public function setErrorFilterTab(string $tab): void
+    {
+        $this->errorFilterTab = in_array($tab, ['semua', 'gagal', 'skip'], true) ? $tab : 'semua';
+        $this->errorDisplayLimit = 50;
+    }
+
+    public function loadMoreErrors(): void
+    {
+        $this->errorDisplayLimit += 50;
+    }
+
+    public function exportErrorRows(?int $logId = null): mixed
+    {
+        $id = $logId ?: ($this->importLogId ?: ($this->activeImportLog['id'] ?? null));
+        $log = $id ? ImportLog::find($id) : null;
+
+        $rows = [];
+        if ($log && is_array($log->detail)) {
+            foreach ($log->detail as $d) {
+                if (is_array($d) && (in_array($d['status'] ?? '', ['gagal', 'skip'], true) || ! empty($d['error']))) {
+                    $rows[] = [
+                        'baris' => $d['baris'] ?? '-',
+                        'sku' => $d['sku'] ?? ($d['kode'] ?? '-'),
+                        'nama' => $d['nama'] ?? '-',
+                        'status' => ($d['status'] ?? '') === 'skip' ? 'Dilewati (Skip)' : 'Gagal (Error)',
+                        'error' => $d['error'] ?? ($d['catatan'] ?? 'Terjadi kendala pada baris ini'),
+                    ];
+                }
+            }
+        } elseif (! empty($this->importPreview['error_rows'])) {
+            foreach ($this->importPreview['error_rows'] as $er) {
+                $isSkip = ($this->resolusiErrorBaris[$er['baris']] ?? '') === 'skip';
+                $rows[] = [
+                    'baris' => $er['baris'] ?? '-',
+                    'sku' => $er['sku'] ?? '-',
+                    'nama' => $er['nama'] ?? '-',
+                    'status' => $isSkip ? 'Dilewati (Skip)' : 'Format Invalid',
+                    'error' => is_array($er['errors'] ?? null) ? implode('; ', $er['errors']) : ($er['errors'] ?? ''),
+                ];
+            }
+        }
+
+        if (empty($rows)) {
+            $this->dispatch('alert', ['type' => 'info', 'message' => 'Tidak ada data error atau baris yang dilewati untuk diekspor.']);
+
+            return null;
+        }
+
+        $filename = 'laporan-error-import-'.($id ?: date('Ymd-His')).'.csv';
+
+        return response()->streamDownload(function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['No. Baris', 'SKU', 'Nama Produk', 'Status', 'Alasan / Pesan Error']);
+            foreach ($rows as $r) {
+                fputcsv($handle, [$r['baris'], $r['sku'], $r['nama'], $r['status'], $r['error']]);
+            }
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     public function commitImport(): void
     {
         if ($this->importStep === 'selesai') {
@@ -361,7 +565,9 @@ class ImportExportPage extends Component
                         null,
                         $this->aksiKemiripan,
                         $this->resolusiDuplikat,
-                        $this->thresholdKemiripan
+                        $this->thresholdKemiripan,
+                        $this->resolusiBarcode,
+                        $this->resolusiErrorBaris
                     );
                 } else {
                     ImportProdukExcelJob::dispatch(
@@ -374,7 +580,9 @@ class ImportExportPage extends Component
                         null,
                         $this->aksiKemiripan,
                         $this->resolusiDuplikat,
-                        $this->thresholdKemiripan
+                        $this->thresholdKemiripan,
+                        $this->resolusiBarcode,
+                        $this->resolusiErrorBaris
                     );
                 }
             }
@@ -404,14 +612,24 @@ class ImportExportPage extends Component
             $selesai = $sukses + $gagal;
             $persen = $totalBaris > 0 ? (int) min(100, round(($selesai / $totalBaris) * 100)) : 0;
 
+            $detailList = is_array($log->detail) ? $log->detail : [];
+            $gagalRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
+            $skipRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
+
             $this->activeImportLog = [
                 'id' => $log->id,
                 'status' => $log->status,
                 'total_baris' => $totalBaris,
                 'sukses' => $sukses,
                 'gagal' => $gagal,
+                'skip' => count($skipRows),
                 'persen' => $persen,
-                'detail' => is_array($log->detail) ? $log->detail : [],
+                'current_sku' => $log->current_sku,
+                'current_nama' => $log->current_nama,
+                'current_baris' => $log->current_baris ?? $selesai,
+                'detail' => $detailList,
+                'gagal_rows' => $gagalRows,
+                'skip_rows' => $skipRows,
                 'created_at' => $log->created_at?->format('d/m/Y H:i'),
             ];
         }
@@ -515,103 +733,195 @@ class ImportExportPage extends Component
 
     public function startFotoProcessing(): void
     {
-        if (empty($this->fotoScanResult['matched'])) {
+        $matched = $this->fotoScanResult['matched'] ?? [];
+        if (empty($matched)) {
             $this->dispatch('alert', ['type' => 'warning', 'message' => 'Tidak ada foto yang cocok untuk diproses.']);
 
             return;
         }
 
+        $totalItems = count($matched);
+        $fileName = $this->fotoSourceType === 'zip'
+            ? ($this->fotoZip?->getClientOriginalName() ?? 'foto-archive.zip')
+            : ($totalItems.' berkas foto');
+
+        $log = ImportLog::create([
+            'tipe' => 'produk_foto',
+            'nama_file' => $fileName,
+            'status' => 'proses',
+            'user_id' => auth()->id(),
+            'total_baris' => $totalItems,
+        ]);
+
+        $this->fotoImportLogId = $log->id;
         $this->fotoStep = 'processing';
-        $this->fotoProcessedCount = 0;
-        $this->fotoSuccessCount = 0;
-        $this->fotoErrorCount = 0;
 
-        $this->processNextFotoChunk();
-    }
-
-    public function processNextFotoChunk(): void
-    {
-        if ($this->fotoStep !== 'processing') {
-            return;
+        if ($totalItems <= 10) {
+            ImportFotoMasalJob::dispatchSync(
+                $log->id,
+                $matched,
+                auth()->id(),
+                $this->fotoMode,
+                $this->fotoTempDir,
+                $this->resolusiErrorFoto
+            );
+        } else {
+            ImportFotoMasalJob::dispatch(
+                $log->id,
+                $matched,
+                auth()->id(),
+                $this->fotoMode,
+                $this->fotoTempDir,
+                $this->resolusiErrorFoto
+            );
         }
 
-        $matchedList = $this->fotoScanResult['matched'] ?? [];
-        $totalMatched = count($matchedList);
-
-        if ($this->fotoProcessedCount >= $totalMatched) {
-            $this->finishFotoProcessing();
-
-            return;
-        }
-
-        $bulkService = app(BulkProductImageImportService::class);
-        $chunk = array_slice($matchedList, $this->fotoProcessedCount, $this->fotoBatchChunkSize);
-
-        foreach ($chunk as $item) {
-            $tempPath = $item['temp_path'] ?? null;
-            $produkId = $item['produk_id'] ?? null;
-            $isPrimary = ! empty($item['is_primary']);
-
-            if ($tempPath && file_exists($tempPath) && $produkId) {
-                try {
-                    $res = $bulkService->processAndAttach(
-                        $tempPath,
-                        $produkId,
-                        $this->fotoMode,
-                        $isPrimary
-                    );
-                    if ($res['success']) {
-                        $this->fotoSuccessCount++;
-                    } else {
-                        $this->fotoErrorCount++;
-                    }
-                } catch (\Throwable $e) {
-                    $this->fotoErrorCount++;
-                }
-            } else {
-                $this->fotoErrorCount++;
-            }
-
-            $this->fotoProcessedCount++;
-        }
-
-        if (function_exists('gc_collect_cycles')) {
-            gc_collect_cycles();
-        }
-
-        if ($this->fotoProcessedCount >= $totalMatched) {
-            $this->finishFotoProcessing();
-        }
-    }
-
-    public function finishFotoProcessing(): void
-    {
-        $this->fotoStep = 'completed';
-        $this->fotoCompletedSummary = [
-            'total' => $this->fotoScanResult['total'] ?? 0,
-            'processed' => $this->fotoProcessedCount,
-            'success' => $this->fotoSuccessCount,
-            'error' => $this->fotoErrorCount,
-            'skipped' => $this->fotoScanResult['skipped_count'] ?? 0,
-        ];
-
-        // Bersihkan direktori temp
-        if ($this->fotoTempDir && is_dir($this->fotoTempDir)) {
-            $files = glob($this->fotoTempDir.'/*');
-            if (is_array($files)) {
-                foreach ($files as $f) {
-                    if (is_file($f)) {
-                        @unlink($f);
-                    }
-                }
-            }
-            @rmdir($this->fotoTempDir);
-            $this->fotoTempDir = null;
-        }
+        $this->cekStatusFotoImport();
 
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Proses import foto produk selesai diproses!',
+            'message' => $totalItems <= 10 ? 'Import foto produk selesai diproses!' : 'Import foto sedang diproses oleh sistem di latar belakang.',
+        ]);
+    }
+
+    public function cekStatusFotoImport(): void
+    {
+        if (! $this->fotoImportLogId) {
+            return;
+        }
+
+        $log = ImportLog::find($this->fotoImportLogId);
+        if ($log) {
+            $totalBaris = (int) $log->total_baris;
+            $sukses = (int) $log->sukses;
+            $gagal = (int) $log->gagal;
+            $selesai = $sukses + $gagal;
+            $persen = $totalBaris > 0 ? (int) min(100, round(($selesai / $totalBaris) * 100)) : 0;
+
+            $detailList = is_array($log->detail) ? $log->detail : [];
+            $gagalRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
+            $skipRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
+
+            $this->activeFotoImportLog = [
+                'id' => $log->id,
+                'status' => $log->status,
+                'total_baris' => $totalBaris,
+                'sukses' => $sukses,
+                'gagal' => $gagal,
+                'skip' => count($skipRows),
+                'persen' => $persen,
+                'current_sku' => $log->current_sku,
+                'current_nama' => $log->current_nama,
+                'current_baris' => $log->current_baris ?? $selesai,
+                'detail' => $detailList,
+                'gagal_rows' => $gagalRows,
+                'skip_rows' => $skipRows,
+                'created_at' => $log->created_at?->format('d/m/Y H:i'),
+            ];
+
+            $this->fotoSuccessCount = $sukses;
+            $this->fotoErrorCount = $gagal;
+            $this->fotoProcessedCount = $selesai;
+
+            if ($log->status === 'selesai' || $log->status === 'gagal') {
+                $this->fotoStep = 'completed';
+            }
+        }
+    }
+
+    public function setFotoErrorAction(int|string $key, string $aksi): void
+    {
+        if ($aksi === 'skip') {
+            $this->resolusiErrorFoto[$key] = 'skip';
+        } else {
+            unset($this->resolusiErrorFoto[$key]);
+        }
+    }
+
+    public function abaikanSemuaFotoError(): void
+    {
+        $skipped = $this->fotoScanResult['skipped'] ?? [];
+        foreach ($skipped as $idx => $sk) {
+            $key = $sk['filename'] ?? ($idx + 1);
+            $this->resolusiErrorFoto[$key] = 'skip';
+        }
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => count($skipped).' berkas foto yang tidak cocok ditandai untuk dilewati (skip).',
+        ]);
+    }
+
+    public function batalAbaikanSemuaFotoError(): void
+    {
+        $this->resolusiErrorFoto = [];
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Penandaan abaikan foto telah dibatalkan.',
+        ]);
+    }
+
+    public function setFotoErrorFilterTab(string $tab): void
+    {
+        $this->fotoErrorFilterTab = in_array($tab, ['semua', 'gagal', 'skip'], true) ? $tab : 'semua';
+        $this->fotoErrorDisplayLimit = 50;
+    }
+
+    public function loadMoreFotoErrors(): void
+    {
+        $this->fotoErrorDisplayLimit += 50;
+    }
+
+    public function exportFotoErrorRows(?int $logId = null): mixed
+    {
+        $id = $logId ?: ($this->fotoImportLogId ?: ($this->activeFotoImportLog['id'] ?? null));
+        $log = $id ? ImportLog::find($id) : null;
+
+        $rows = [];
+        if ($log && is_array($log->detail)) {
+            foreach ($log->detail as $d) {
+                if (is_array($d) && (in_array($d['status'] ?? '', ['gagal', 'skip'], true) || ! empty($d['error']))) {
+                    $rows[] = [
+                        'baris' => $d['baris'] ?? '-',
+                        'file' => $d['file'] ?? '-',
+                        'sku' => $d['sku'] ?? '-',
+                        'nama' => $d['nama'] ?? '-',
+                        'status' => ($d['status'] ?? '') === 'skip' ? 'Dilewati (Skip)' : 'Gagal (Error)',
+                        'error' => $d['error'] ?? ($d['catatan'] ?? 'Terjadi kendala pada file ini'),
+                    ];
+                }
+            }
+        } elseif (! empty($this->fotoScanResult['skipped'])) {
+            foreach ($this->fotoScanResult['skipped'] as $idx => $sk) {
+                $rows[] = [
+                    'baris' => $idx + 1,
+                    'file' => $sk['filename'] ?? ($sk['name'] ?? '-'),
+                    'sku' => $sk['sku'] ?? '-',
+                    'nama' => '-',
+                    'status' => 'Tidak Cocok / Dilewati',
+                    'error' => $sk['reason'] ?? 'SKU tidak ditemukan di database produk',
+                ];
+            }
+        }
+
+        if (empty($rows)) {
+            $this->dispatch('alert', ['type' => 'info', 'message' => 'Tidak ada data file foto bermasalah untuk diekspor.']);
+
+            return null;
+        }
+
+        $filename = 'laporan-error-foto-'.($id ?: date('Ymd-His')).'.csv';
+
+        return response()->streamDownload(function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['No', 'Nama File', 'SKU Terdeteksi', 'Nama Produk', 'Status', 'Alasan / Keterangan']);
+            foreach ($rows as $r) {
+                fputcsv($handle, [$r['baris'], $r['file'], $r['sku'], $r['nama'], $r['status'], $r['error']]);
+            }
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
@@ -648,6 +958,11 @@ class ImportExportPage extends Component
         $this->fotoUploads = [];
         $this->fotoZip = null;
         $this->fotoScanResult = [];
+        $this->resolusiErrorFoto = [];
+        $this->fotoErrorFilterTab = 'semua';
+        $this->fotoErrorDisplayLimit = 50;
+        $this->activeFotoImportLog = null;
+        $this->fotoImportLogId = null;
         $this->fotoStep = 'upload';
         $this->fotoProcessedCount = 0;
         $this->fotoSuccessCount = 0;
