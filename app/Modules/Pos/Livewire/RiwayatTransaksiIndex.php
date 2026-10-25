@@ -3,9 +3,14 @@
 namespace App\Modules\Pos\Livewire;
 
 use App\Modules\Crm\Services\PelangganService;
+use App\Modules\Marketplace\Services\DuitkuPaymentProcessor;
+use App\Modules\Marketplace\Services\DuitkuService;
+use App\Modules\Omnichannel\Services\ChannelSyncService;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Services\PembayaranPesananOnlineService;
 use App\Modules\Pos\Services\TransaksiVoidService;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Servis\Models\TiketServis;
 use Illuminate\Support\Carbon;
@@ -34,6 +39,10 @@ class RiwayatTransaksiIndex extends Component
     public string $filterMetode = '';
 
     public string $filterStatus = '';
+
+    public string $filterPlatform = ''; // '' | 'marketplace' | 'shopee' | 'tokopedia'
+
+    public string $filterMetodePengiriman = ''; // '' | 'pickup' | 'kurir'
 
     // Modal otorisasi void transaksi
     public bool $showVoidModal = false;
@@ -70,6 +79,8 @@ class RiwayatTransaksiIndex extends Component
         'filterTanggalSampai' => ['except' => ''],
         'filterMetode' => ['except' => ''],
         'filterStatus' => ['except' => ''],
+        'filterPlatform' => ['except' => ''],
+        'filterMetodePengiriman' => ['except' => ''],
     ];
 
     public function mount(?string $activeTab = null): void
@@ -181,12 +192,36 @@ class RiwayatTransaksiIndex extends Component
         $startLocal = Carbon::parse($dari.' 00:00:00', $tz);
         $endLocal = Carbon::parse($sampai.' 23:59:59', $tz);
 
-        return [$startLocal->copy()->utc(), $endLocal->copy()->utc()];
+        return [$startLocal, $endLocal];
+    }
+
+    protected function getActiveCabangId(): ?int
+    {
+        $id = session('cabang_id');
+        if ($id) {
+            return (int) $id;
+        }
+
+        $userCabang = auth()->user()?->cabangs()->first()?->id;
+        if ($userCabang) {
+            session(['cabang_id' => $userCabang]);
+
+            return (int) $userCabang;
+        }
+
+        $firstCabang = Cabang::value('id');
+        if ($firstCabang) {
+            session(['cabang_id' => $firstCabang]);
+
+            return (int) $firstCabang;
+        }
+
+        return null;
     }
 
     public function bukaVoidModal(int $id): void
     {
-        $cabangId = session('cabang_id');
+        $cabangId = $this->getActiveCabangId();
         $transaksi = Transaksi::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->where('id', $id)
             ->first();
@@ -241,7 +276,7 @@ class RiwayatTransaksiIndex extends Component
             return;
         }
 
-        $cabangId = session('cabang_id');
+        $cabangId = $this->getActiveCabangId();
         $transaksi = Transaksi::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->where('id', $this->voidTransaksiId)
             ->first();
@@ -282,6 +317,18 @@ class RiwayatTransaksiIndex extends Component
         $this->resetValidation();
         $this->filterStatus = '';
         $this->filterMetode = '';
+        $this->filterPlatform = '';
+        $this->filterMetodePengiriman = '';
+    }
+
+    public function updatedFilterPlatform(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterMetodePengiriman(): void
+    {
+        $this->resetPage();
     }
 
     public function updatedSearch(): void
@@ -299,7 +346,7 @@ class RiwayatTransaksiIndex extends Component
 
     public function resetFilter(): void
     {
-        $this->reset(['search', 'filterMetode', 'filterStatus']);
+        $this->reset(['search', 'filterMetode', 'filterStatus', 'filterPlatform', 'filterMetodePengiriman']);
         $this->filterTanggalPreset = 'today';
         $this->applyPresetDates('today');
         $this->syncLegacyFilterTanggal();
@@ -308,8 +355,8 @@ class RiwayatTransaksiIndex extends Component
 
     public function lihatDetailTransaksi(int $id): void
     {
-        $cabangId = session('cabang_id');
-        $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'voidBy', 'tiketServis', 'pengiriman', 'channelOrder.channel', 'returnPenjualan.items.produk'])
+        $cabangId = $this->getActiveCabangId();
+        $trx = Transaksi::with(['items.produk', 'pelanggan', 'kasir', 'voidBy', 'tiketServis', 'pengiriman', 'channelOrder.channel', 'returnPenjualan.items.produk', 'piutang'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
 
@@ -372,6 +419,15 @@ class RiwayatTransaksiIndex extends Component
             'channel' => $trx->channelOrder?->channel?->nama,
             'channel_platform' => $trx->channelOrder?->channel?->platform,
             'channel_order_id' => $trx->channelOrder?->channel_order_id,
+            'piutang' => $trx->piutang ? [
+                'id' => $trx->piutang->id,
+                'no_piutang' => $trx->piutang->no_piutang,
+                'status' => $trx->piutang->status,
+                'jumlah' => (float) $trx->piutang->jumlah,
+                'jumlah_dibayar' => (float) $trx->piutang->jumlah_dibayar,
+                'sisa' => (float) $trx->piutang->sisa,
+                'jatuh_tempo' => $trx->piutang->jatuh_tempo?->format('d/m/Y'),
+            ] : null,
         ];
 
         $this->showDetailModal = true;
@@ -379,7 +435,7 @@ class RiwayatTransaksiIndex extends Component
 
     public function lihatDetailServis(int $id): void
     {
-        $cabangId = session('cabang_id');
+        $cabangId = $this->getActiveCabangId();
         $tiket = TiketServis::with(['pelanggan', 'teknisi', 'items', 'spareparts.produk', 'transaksi.kasir', 'cabang'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
@@ -416,7 +472,7 @@ class RiwayatTransaksiIndex extends Component
 
     public function lihatDetailMutasi(int $id): void
     {
-        $cabangId = session('cabang_id');
+        $cabangId = $this->getActiveCabangId();
         $mutasi = DB::table('kas_mutasi_laci')
             ->leftJoin('users', 'kas_mutasi_laci.user_id', '=', 'users.id')
             ->leftJoin('akun_coa', 'kas_mutasi_laci.akun_lawan_kode', '=', 'akun_coa.kode')
@@ -451,7 +507,7 @@ class RiwayatTransaksiIndex extends Component
 
     public function lihatDetailRetur(int $id): void
     {
-        $cabangId = session('cabang_id');
+        $cabangId = $this->getActiveCabangId();
         $retur = ReturnPenjualan::with(['transaksi.items.produk', 'pelanggan', 'user', 'items.produk', 'tukarTransaksi', 'cabang'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
@@ -493,7 +549,7 @@ class RiwayatTransaksiIndex extends Component
 
     public function cetakUlangStruk(string $tipe, int $id): void
     {
-        $cabangId = session('cabang_id');
+        $cabangId = $this->getActiveCabangId();
 
         if ($tipe === 'pos' || $tipe === 'online') {
             $trx = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang'])
@@ -665,7 +721,7 @@ class RiwayatTransaksiIndex extends Component
 
     public function render()
     {
-        $cabangId = session('cabang_id');
+        $cabangId = $this->getActiveCabangId();
         [$startUtc, $endUtc] = $this->getDateBoundaries();
 
         // Ringkasan metrik periode / tanggal terpilih
@@ -1012,7 +1068,7 @@ class RiwayatTransaksiIndex extends Component
     {
         [$startUtc, $endUtc] = $this->getDateBoundaries();
 
-        $query = Transaksi::with(['kasir', 'pelanggan', 'returnPenjualan'])
+        $query = Transaksi::with(['kasir', 'pelanggan', 'returnPenjualan', 'piutang'])
             ->where('cabang_id', $cabangId)
             ->where(function ($q) {
                 $q->whereNull('sumber')->orWhere('sumber', 'pos');
@@ -1049,6 +1105,26 @@ class RiwayatTransaksiIndex extends Component
                     ->orWhere('sumber', 'like', 'channel:%');
             })
             ->whereBetween('created_at', [$startUtc, $endUtc])
+            ->when($this->filterPlatform, function ($q) {
+                if ($this->filterPlatform === 'marketplace') {
+                    $q->where('sumber', 'marketplace');
+                } else {
+                    $platform = $this->filterPlatform;
+                    $q->where(function ($sub) use ($platform) {
+                        $sub->where('sumber', 'channel:'.$platform)
+                            ->orWhereHas('channelOrder.channel', fn ($ch) => $ch->where('platform', $platform));
+                    });
+                }
+            })
+            ->when($this->filterMetodePengiriman, function ($q) {
+                if ($this->filterMetodePengiriman === 'pickup') {
+                    $q->where('catatan', 'like', '%ambil_ke_toko%');
+                } elseif ($this->filterMetodePengiriman === 'kurir') {
+                    $q->where(function ($sub) {
+                        $sub->whereNull('catatan')->orWhere('catatan', 'not like', '%ambil_ke_toko%');
+                    });
+                }
+            })
             ->when($this->filterMetode, fn ($q) => $q->where('metode_bayar', $this->filterMetode))
             ->when($this->filterStatus, fn ($q) => $q->where('status', $this->filterStatus))
             ->when($this->search, function ($q) {
@@ -1150,5 +1226,150 @@ class RiwayatTransaksiIndex extends Component
             ->latest('kas_mutasi_laci.id');
 
         return $query->paginate(15);
+    }
+
+    public function sinkronkanStatusOnline(int $id): void
+    {
+        $cabangId = $this->getActiveCabangId();
+        $transaksi = Transaksi::with(['channelOrder.channel', 'pelanggan', 'items'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->find($id);
+
+        if (! $transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pesanan online tidak ditemukan']);
+
+            return;
+        }
+
+        try {
+            if ($transaksi->sumber === 'marketplace') {
+                $duitku = app(DuitkuService::class);
+                $res = $duitku->transactionStatus($transaksi->no_transaksi);
+                $statusDuitku = $res['status'] ?? 'unknown';
+
+                if ($statusDuitku === 'sukses') {
+                    if (! in_array($transaksi->status, ['lunas', 'diproses', 'dikirim', 'siap_diambil', 'selesai'], true)) {
+                        $processor = app(DuitkuPaymentProcessor::class);
+                        $processor->prosesLunas($transaksi->no_transaksi, (int) round((float) $transaksi->total_akhir), $res['reference'] ?? null);
+                        $this->dispatch('alert', ['type' => 'success', 'message' => "Pesanan {$transaksi->no_transaksi} berhasil disinkronkan: LUNAS"]);
+                    } else {
+                        $this->dispatch('alert', ['type' => 'info', 'message' => "Pesanan {$transaksi->no_transaksi} status Duitku: Sukses (Status ERP: {$transaksi->status})"]);
+                    }
+                } elseif ($statusDuitku === 'batal') {
+                    if (! in_array($transaksi->status, ['batal', 'dibatalkan', 'kadaluarsa', 'gagal', 'selesai', 'lunas'], true)) {
+                        $processor = app(DuitkuPaymentProcessor::class);
+                        $processor->prosesGagal($transaksi->no_transaksi, $res['status_code'] ?? '02');
+                        $this->dispatch('alert', ['type' => 'warning', 'message' => "Pesanan {$transaksi->no_transaksi} disinkronkan: BATAL di Duitku"]);
+                    } else {
+                        $this->dispatch('alert', ['type' => 'info', 'message' => "Pesanan {$transaksi->no_transaksi} status Duitku: BATAL"]);
+                    }
+                } elseif ($statusDuitku === 'pending') {
+                    $this->dispatch('alert', ['type' => 'info', 'message' => "Pesanan {$transaksi->no_transaksi} masih menunggu pembayaran di Duitku"]);
+                } else {
+                    $this->dispatch('alert', ['type' => 'warning', 'message' => "Respon Duitku untuk {$transaksi->no_transaksi}: {$statusDuitku}"]);
+                }
+            } elseif ($transaksi->channelOrder) {
+                $channel = $transaksi->channelOrder->channel;
+                if ($channel) {
+                    $channelSync = app(ChannelSyncService::class);
+                    $adapter = $channelSync->adapterFor($channel->platform);
+                    if ($adapter) {
+                        $statusOnline = $adapter->getOrderStatus($channel, $transaksi->channelOrder->channel_order_id);
+                        if (! empty($statusOnline)) {
+                            $mappedStatus = match (strtolower((string) $statusOnline)) {
+                                'unpaid', 'pending' => 'menunggu_pembayaran',
+                                'ready_to_ship', 'processed', 'processing' => 'diproses',
+                                'shipped' => 'dikirim',
+                                'completed', 'delivered' => 'selesai',
+                                'cancelled', 'canceled' => 'batal',
+                                default => $transaksi->status,
+                            };
+                            if ($mappedStatus !== $transaksi->status && ! in_array($transaksi->status, ['selesai', 'void'], true)) {
+                                $transaksi->update(['status' => $mappedStatus]);
+                                $transaksi->channelOrder->update(['status_order' => $mappedStatus]);
+                                $this->dispatch('alert', ['type' => 'success', 'message' => "Status pesanan channel {$channel->nama} disinkronkan: {$mappedStatus}"]);
+                            } else {
+                                $this->dispatch('alert', ['type' => 'info', 'message' => "Status pesanan channel {$channel->nama}: {$statusOnline} (mutakhir)"]);
+                            }
+                        } else {
+                            $this->dispatch('alert', ['type' => 'info', 'message' => 'Status channel terkini tidak berubah']);
+                        }
+                    } else {
+                        $this->dispatch('alert', ['type' => 'info', 'message' => "Adapter channel {$channel->platform} tidak aktif"]);
+                    }
+                }
+            } else {
+                $this->dispatch('alert', ['type' => 'info', 'message' => "Transaksi {$transaksi->no_transaksi} tidak terhubung gateway online"]);
+            }
+
+            if ($this->selectedDetail && ($this->selectedDetail['id'] ?? null) === $id) {
+                $fresh = Transaksi::find($id);
+                if ($fresh) {
+                    $this->selectedDetail['status'] = $fresh->status;
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gagal sinkronisasi: '.$e->getMessage()]);
+        }
+    }
+
+    public function sinkronkanSemuaOnline(): void
+    {
+        $cabangId = $this->getActiveCabangId();
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
+
+        $pendingOrders = Transaksi::where('cabang_id', $cabangId)
+            ->where(function ($q) {
+                $q->where('sumber', 'marketplace')
+                    ->orWhere('sumber', 'like', 'channel:%');
+            })
+            ->whereBetween('created_at', [$startUtc, $endUtc])
+            ->whereIn('status', ['menunggu_pembayaran', 'diproses'])
+            ->limit(20)
+            ->get();
+
+        if ($pendingOrders->isEmpty()) {
+            $this->dispatch('alert', ['type' => 'info', 'message' => 'Semua pesanan online pada periode ini sudah termutakhirkan atau berstatus final.']);
+
+            return;
+        }
+
+        $synced = 0;
+        foreach ($pendingOrders as $order) {
+            $this->sinkronkanStatusOnline($order->id);
+            $synced++;
+        }
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => "{$synced} pesanan online telah diproses sinkronisasi status."]);
+    }
+
+    public function serahkanPesananPickup(int $id): void
+    {
+        $cabangId = $this->getActiveCabangId();
+        $transaksi = Transaksi::with(['items', 'pelanggan'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->find($id);
+
+        if (! $transaksi) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pesanan tidak ditemukan']);
+
+            return;
+        }
+
+        try {
+            $onlineService = app(PembayaranPesananOnlineService::class);
+            $onlineService->serahkanDiToko($transaksi);
+
+            if ($this->selectedDetail && ($this->selectedDetail['id'] ?? null) === $id) {
+                $this->selectedDetail['status'] = 'selesai';
+            }
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Pesanan {$transaksi->no_transaksi} berhasil diserahkan ke konsumen di toko.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 }

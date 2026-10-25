@@ -32,7 +32,7 @@
             print-color-adjust: exact;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: "Instrument Sans", system-ui, sans-serif;
             font-size: {{ $isThermal ? '9pt' : $fontSize }};
             color: #111827;
             background: #f3f4f6;
@@ -185,7 +185,7 @@
             background: #1f2937;
             color: #fff;
             padding: 8px 14px;
-            border-radius: 8px;
+            border-radius: 10px;
             margin-bottom: 14px;
             display: flex;
             align-items: center;

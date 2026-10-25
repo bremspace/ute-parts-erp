@@ -7,6 +7,7 @@ use App\Modules\Pos\Models\ReturnPenjualanItem;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Services\ReturnPenjualanService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
 use Livewire\Component;
@@ -164,6 +165,21 @@ class ReturPenjualanIndex extends Component
             return;
         }
 
+        // Pastikan transaksi memiliki gudang_id valid untuk referensi stok tukar dan karantina
+        if (! $transaksi->gudang_id || ! Gudang::where('id', $transaksi->gudang_id)->exists()) {
+            $cabangRef = (int) ($transaksi->cabang_id ?: ($cabangId ?: 1));
+            $resolvedGudangId = Gudang::where('cabang_id', $cabangRef)->where('is_active', true)->value('id')
+                ?? Gudang::where('cabang_id', $cabangRef)->value('id')
+                ?? (int) session('gudang_id')
+                ?? Gudang::where('is_active', true)->value('id')
+                ?? Gudang::value('id');
+
+            if ($resolvedGudangId) {
+                $transaksi->update(['gudang_id' => $resolvedGudangId]);
+                $transaksi->gudang_id = $resolvedGudangId;
+            }
+        }
+
         $this->selectedTransaksi = $transaksi;
         $this->showCreateModal = true;
         $this->transaksiItemData = [];
@@ -244,8 +260,13 @@ class ReturPenjualanIndex extends Component
             }
         }
 
-        $cabangId = session('cabang_id');
+        $cabangId = session('cabang_id') ?: ($this->selectedTransaksi?->cabang_id ?: 1);
         $gudangId = $this->selectedTransaksi?->gudang_id;
+        if (! $gudangId || ! Gudang::where('id', $gudangId)->exists()) {
+            $gudangId = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
+                ?? Gudang::where('cabang_id', $cabangId)->value('id')
+                ?? Gudang::value('id');
+        }
 
         $stokTersedia = (int) StokItem::where('produk_id', $produkId)
             ->when($gudangId, fn ($q) => $q->where('gudang_id', $gudangId))
@@ -317,7 +338,13 @@ class ReturPenjualanIndex extends Component
             return collect();
         }
 
+        $cabangId = session('cabang_id') ?: ($this->selectedTransaksi?->cabang_id ?: 1);
         $gudangId = $this->selectedTransaksi?->gudang_id;
+        if (! $gudangId || ! Gudang::where('id', $gudangId)->exists()) {
+            $gudangId = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
+                ?? Gudang::where('cabang_id', $cabangId)->value('id')
+                ?? Gudang::value('id');
+        }
 
         return Produk::where('is_active', true)
             ->where(function ($q) use ($term) {

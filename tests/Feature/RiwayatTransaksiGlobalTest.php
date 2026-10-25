@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Marketplace\Models\Pengiriman;
+use App\Modules\Marketplace\Services\DuitkuService;
 use App\Modules\Pos\Livewire\RiwayatTransaksiIndex;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
@@ -271,5 +273,125 @@ class RiwayatTransaksiGlobalTest extends TestCase
             ->call('cetakUlangStruk', 'online', $orderWeb->id)
             ->assertSet('showReceiptModal', true)
             ->assertSee('TRX-MKT-888');
+    }
+
+    public function test_transaksi_piutang_relasi_dan_detail_riwayat(): void
+    {
+        $this->authed();
+
+        $trxPiutang = Transaksi::create([
+            'no_transaksi' => 'TRX-KASBON-001',
+            'cabang_id' => $this->cabang->id,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $this->pelanggan->id,
+            'sumber' => 'pos',
+            'subtotal' => 200000,
+            'total_akhir' => 200000,
+            'metode_bayar' => 'piutang',
+            'status' => 'selesai',
+        ]);
+
+        $piutang = Piutang::create([
+            'no_piutang' => 'PIU-2026-0001',
+            'pelanggan_id' => $this->pelanggan->id,
+            'transaksi_id' => $trxPiutang->id,
+            'cabang_id' => $this->cabang->id,
+            'jumlah' => 200000,
+            'jumlah_dibayar' => 50000,
+            'jatuh_tempo' => now()->addDays(14)->toDateString(),
+            'status' => 'sebagian',
+            'keterangan' => 'Kasbon Bengkel',
+        ]);
+
+        // Verifikasi relasi Eloquent
+        $this->assertInstanceOf(Piutang::class, $trxPiutang->piutang);
+        $this->assertEquals('PIU-2026-0001', $trxPiutang->piutang->no_piutang);
+
+        // Verifikasi di Livewire RiwayatTransaksi
+        Livewire::test(RiwayatTransaksiIndex::class)
+            ->set('activeTab', 'pos')
+            ->assertSee('TRX-KASBON-001')
+            ->assertSee('piutang')
+            ->assertSee('(SEBAGIAN)')
+            ->call('lihatDetailTransaksi', $trxPiutang->id)
+            ->assertSet('showDetailModal', true)
+            ->assertSee('Subledger Piutang / Kasbon: PIU-2026-0001')
+            ->assertSee('SEBAGIAN')
+            ->assertSee('Rp 150.000'); // Sisa
+    }
+
+    public function test_online_sync_dan_pickup_handover(): void
+    {
+        $this->authed();
+
+        // 1. Pesanan Online Web Ambil di Toko (Pickup)
+        $orderPickup = Transaksi::create([
+            'no_transaksi' => 'TRX-ONLINE-PCK-01',
+            'cabang_id' => $this->cabang->id,
+            'pelanggan_id' => $this->pelanggan->id,
+            'sumber' => 'marketplace',
+            'subtotal' => 100000,
+            'total_akhir' => 100000,
+            'metode_bayar' => 'duitku',
+            'status' => 'lunas',
+            'catatan' => 'Pesanan ambil_ke_toko cabang',
+        ]);
+
+        // 2. Pesanan Online Menunggu Pembayaran
+        $orderMenunggu = Transaksi::create([
+            'no_transaksi' => 'TRX-ONLINE-UNPAID-01',
+            'cabang_id' => $this->cabang->id,
+            'pelanggan_id' => $this->pelanggan->id,
+            'sumber' => 'marketplace',
+            'subtotal' => 75000,
+            'total_akhir' => 75000,
+            'metode_bayar' => 'duitku',
+            'status' => 'menunggu_pembayaran',
+            'catatan' => 'Kirim JNE',
+        ]);
+
+        // Mock DuitkuService
+        $mockDuitku = \Mockery::mock(DuitkuService::class);
+        $mockDuitku->shouldReceive('transactionStatus')
+            ->with('TRX-ONLINE-UNPAID-01')
+            ->andReturn([
+                'status' => 'sukses',
+                'status_code' => '00',
+                'reference' => 'DUITKU-REF-999',
+                'amount' => 75000,
+                'fee' => 0,
+            ]);
+        $this->app->instance(DuitkuService::class, $mockDuitku);
+
+        // Eksekusi Livewire
+        Livewire::test(RiwayatTransaksiIndex::class)
+            ->set('activeTab', 'online')
+            ->assertSee('TRX-ONLINE-PCK-01')
+            ->assertSee('TRX-ONLINE-UNPAID-01')
+            ->assertSee('Ambil di Toko')
+            // Filter platform
+            ->set('filterPlatform', 'marketplace')
+            ->assertSee('TRX-ONLINE-PCK-01')
+            // Filter pengiriman: pickup
+            ->set('filterMetodePengiriman', 'pickup')
+            ->assertSee('TRX-ONLINE-PCK-01')
+            ->assertDontSee('TRX-ONLINE-UNPAID-01')
+            ->set('filterMetodePengiriman', 'kurir')
+            ->assertSee('TRX-ONLINE-UNPAID-01')
+            ->assertDontSee('TRX-ONLINE-PCK-01')
+            ->set('filterMetodePengiriman', '')
+            // Sinkronkan status online Duitku
+            ->call('sinkronkanStatusOnline', $orderMenunggu->id)
+            ->assertDispatched('alert');
+
+        $this->assertEquals('lunas', $orderMenunggu->fresh()->status);
+
+        // Serahkan pesanan pickup
+        Livewire::test(RiwayatTransaksiIndex::class)
+            ->call('serahkanPesananPickup', $orderPickup->id)
+            ->assertDispatched('alert');
+
+        $this->assertEquals('selesai', $orderPickup->fresh()->status);
+        $this->assertStringContainsString('Diserahkan ke Konsumen di Toko', $orderPickup->fresh()->catatan);
     }
 }

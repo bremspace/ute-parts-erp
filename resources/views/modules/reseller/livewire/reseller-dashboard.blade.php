@@ -269,11 +269,11 @@
                     <div class="flex items-center gap-1.5 w-full sm:w-auto">
                         <button type="button" wire:click="exportLaporan('xlsx')" class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white font-semibold text-xs whitespace-nowrap cursor-pointer transition active:scale-95 min-h-[44px] flex items-center justify-center gap-1.5" title="Export Laporan Excel">
                             <span>📊</span>
-                            <span>Excel</span>
+                            <span>Export Excel</span>
                         </button>
                         <button type="button" wire:click="exportLaporan('csv')" class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white font-semibold text-xs whitespace-nowrap cursor-pointer transition active:scale-95 min-h-[44px] flex items-center justify-center gap-1.5" title="Export Laporan CSV">
                             <span>📄</span>
-                            <span>CSV</span>
+                            <span>Export CSV</span>
                         </button>
                     </div>
                 @endcan

@@ -160,7 +160,9 @@ class HrAbsensiKpiPage extends Component
 
     public function autoAbsen(): void
     {
-        $dibuat = app(AbsensiService::class)->autoTandaiAbsen(now()->format('Y-m'));
+        $cabangId = session('cabang_id');
+        $periode = $this->kpiPeriode ?: now()->format('Y-m');
+        $dibuat = app(AbsensiService::class)->autoTandaiAbsen($periode, $cabangId);
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Auto absen selesai ('.$dibuat.' log dibuat)']);
     }
 
@@ -185,23 +187,30 @@ class HrAbsensiKpiPage extends Component
         }
         $shifts = $shift->orderBy('jam_mulai')->get();
 
-        $roster = ShiftJadwal::with('karyawan', 'shift')
+        $roster = ShiftJadwal::with('karyawan.cabang', 'shift')
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->whereBetween('tanggal', [$this->kpiPeriode.'-01', date('Y-m-t', strtotime($this->kpiPeriode.'-01'))])
             ->orderByDesc('tanggal')
             ->limit(100)
             ->get();
 
-        $absensi = AbsensiLog::with('karyawan', 'shift')
+        $absensi = AbsensiLog::with('karyawan.cabang', 'shift')
+            ->when($cabangId, fn ($q) => $q->whereHas('karyawan', fn ($k) => $k->where('cabang_id', $cabangId)))
             ->when($this->absensiFilter !== 'semua', fn ($q) => $q->where('status', $this->absensiFilter))
             ->whereBetween('tanggal', [$this->kpiPeriode.'-01', date('Y-m-t', strtotime($this->kpiPeriode.'-01'))])
             ->orderByDesc('tanggal')
             ->limit(100)
             ->get();
 
-        $kpiHasil = KpiHasil::with('karyawan', 'metric')
+        $kpiHasil = KpiHasil::with('karyawan.cabang', 'metric')
+            ->when($cabangId, fn ($q) => $q->whereHas('karyawan', fn ($k) => $k->where('cabang_id', $cabangId)))
             ->where('periode', $this->kpiPeriode)
             ->orderBy('karyawan_id')
+            ->get();
+
+        $karyawans = Karyawan::where('status_aktif', true)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->orderBy('nama')
             ->get();
 
         return view('modules.hr.absensi', [
@@ -209,7 +218,7 @@ class HrAbsensiKpiPage extends Component
             'roster' => $roster,
             'absensi' => $absensi,
             'kpiHasil' => $kpiHasil,
-            'karyawans' => Karyawan::where('status_aktif', true)->orderBy('nama')->get(),
+            'karyawans' => $karyawans,
             'metrics' => KpiMetric::where('is_aktif', true)->orderBy('kode')->get(),
         ])->layout('layouts.backoffice', ['header' => 'HR & Absensi', 'title' => 'Absensi, Shift & KPI']);
     }

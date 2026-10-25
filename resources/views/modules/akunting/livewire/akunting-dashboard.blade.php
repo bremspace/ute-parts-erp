@@ -414,7 +414,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="py-12 text-center text-ink-400">Belum ada piutang. Transaksi POS metode "Kasbon" otomatis membuat piutang.</td></tr>
+                <tr><td colspan="8" class="py-12 text-center text-ink-400">Belum ada piutang. Transaksi POS metode "Kasbon" otomatis membuat piutang.</td></tr>
             @endforelse
         </x-prism.data-table>
     @endif

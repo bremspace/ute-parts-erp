@@ -22,14 +22,14 @@
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Nama Skema</label>
                         <input type="text" wire:model="nama" placeholder="mis. Reseller umum 3%"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                         @error('nama') <span class="text-xs text-up-red font-medium mt-1 block">{{ $message }}</span> @enderror
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Tipe Aktor</label>
-                            <select wire:model="aktorTipe" class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            <select wire:model="aktorTipe" class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                                 <option value="karyawan">Karyawan</option>
                                 <option value="reseller">Reseller</option>
                                 <option value="agen">Agen</option>
@@ -37,7 +37,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Trigger</label>
-                            <select wire:model="triggerTipe" class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            <select wire:model="triggerTipe" class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                                 <option value="penjualan">Penjualan</option>
                                 <option value="lead_won">Lead Won</option>
                                 <option value="tiket_servis">Tiket Servis</option>
@@ -51,13 +51,13 @@
                             Aktor ID <span class="text-ink-400 dark:text-ink-500 font-normal">(opsional — kosong = semua)</span>
                         </label>
                         <input type="number" wire:model="aktorId" placeholder="mis. 3"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Tipe Nilai</label>
-                            <select wire:model="tipe" class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            <select wire:model="tipe" class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                                 <option value="persen">Persen (%)</option>
                                 <option value="nominal">Nominal (Rp)</option>
                             </select>
@@ -65,7 +65,7 @@
                         <div>
                             <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Nilai</label>
                             <input type="text" inputmode="numeric" x-format-number wire:model="nilai" placeholder="mis. 5"
-                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2 tabular-nums">
+                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2 tabular-nums">
                             @error('nilai') <span class="text-xs text-up-red font-medium mt-1 block">{{ $message }}</span> @enderror
                         </div>
                     </div>
@@ -74,12 +74,12 @@
                         <div>
                             <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Min. Amount (Rp)</label>
                             <input type="text" inputmode="numeric" x-format-number wire:model="minAmount" placeholder="0 = tanpa ambang"
-                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2 tabular-nums">
+                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2 tabular-nums">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Kategori <span class="text-ink-400 dark:text-ink-500 font-normal">(opsional)</span></label>
                             <input type="text" wire:model="kategori" placeholder="mis. LCD"
-                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                         </div>
                     </div>
 
@@ -108,13 +108,13 @@
         <div class="lg:col-span-2">
             <div class="glass-card p-5">
                 <div class="flex items-center gap-2 mb-4 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
-                    <select wire:model.live="filterAktor" class="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm text-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 min-h-[44px] px-3 py-2">
+                    <select wire:model.live="filterAktor" class="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm text-base sm:text-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 min-h-[44px] px-3 py-2">
                         <option value="semua">Semua Aktor</option>
                         <option value="karyawan">Karyawan</option>
                         <option value="reseller">Reseller</option>
                         <option value="agen">Agen</option>
                     </select>
-                    <select wire:model.live="filterTrigger" class="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm text-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 min-h-[44px] px-3 py-2">
+                    <select wire:model.live="filterTrigger" class="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm text-base sm:text-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 min-h-[44px] px-3 py-2">
                         <option value="semua">Semua Trigger</option>
                         <option value="penjualan">Penjualan</option>
                         <option value="lead_won">Lead Won</option>

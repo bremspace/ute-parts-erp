@@ -39,50 +39,70 @@
                 <label class="text-xs font-bold text-ink-400 uppercase tracking-wider">Filter</label>
                 <div wire:key="filters" class="space-y-2 mt-1">
                     @foreach($filters as $i => $f)
-                        <div class="flex gap-2">
+                        <div class="flex flex-col sm:flex-row gap-2 p-2 sm:p-0 rounded-xl bg-white/[0.02] sm:bg-transparent border sm:border-0 border-white/5">
                             <select wire:model="filters.{{ $i }}.field"
-                                class="flex-1 p-1.5 rounded bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none">
+                                class="flex-1 p-2 sm:p-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none min-h-[38px]">
                                 <option value="">-- Pilih Kolom --</option>
                                 @foreach($availableColumns as $field => $label)
                                     <option value="{{ $field }}">{{ $label }}</option>
                                 @endforeach
                             </select>
                             <select wire:model="filters.{{ $i }}.op"
-                                class="p-1.5 rounded bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none">
+                                class="w-full sm:w-28 p-2 sm:p-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none min-h-[38px]">
                                 @foreach(\App\Modules\Report\Services\ReportBuilderService::FILTER_OPERATORS as $op)
                                     <option value="{{ $op }}">{{ $op }}</option>
                                 @endforeach
                             </select>
-                            <input type="text" wire:model="filters.{{ $i }}.value" placeholder="Nilai"
-                                class="flex-1 p-1.5 rounded bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none">
-                            <button type="button" wire:click="removeFilter({{ $i }})" class="text-up-red text-xs px-2">×</button>
+                            <div class="flex items-center gap-2 flex-1">
+                                <input type="text" wire:model="filters.{{ $i }}.value" placeholder="Nilai filter..."
+                                    class="flex-1 p-2 sm:p-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none min-h-[38px]">
+                                <button type="button" wire:click="removeFilter({{ $i }})" title="Hapus Filter" class="text-up-red hover:bg-up-red/10 p-2 rounded-lg text-sm transition min-h-[38px] min-w-[38px] flex items-center justify-center">✕</button>
+                            </div>
                         </div>
                     @endforeach
                 </div>
-                <button type="button" wire:click="addFilter" class="text-xs text-up-primary hover:underline mt-1">+ Tambah Filter</button>
+                <button type="button" wire:click="addFilter" class="inline-flex items-center gap-1 text-xs text-up-primary hover:underline mt-1 font-semibold cursor-pointer">
+                    <span>+</span>
+                    <span>Tambah Filter</span>
+                </button>
             </div>
 
             <!-- Group By -->
             <div>
-                <label class="text-xs font-bold text-ink-400 uppercase tracking-wider">Group By</label>
-                <select wire:model="groupBy" multiple class="w-full mt-1 p-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:border-up-primary outline-none h-20">
+                <label class="text-xs font-bold text-ink-400 uppercase tracking-wider">Group By (Pengelompokan)</label>
+                <select wire:model="groupBy" multiple class="w-full mt-1 p-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-up-primary outline-none h-24">
                     @foreach($availableColumns as $field => $label)
-                        <option value="{{ $field }}">{{ $label }}</option>
+                        <option value="{{ $field }}" class="p-1">{{ $label }}</option>
                     @endforeach
                 </select>
-                <p class="text-[10px] text-ink-500 mt-0.5">Ctrl+Click untuk multi-select</p>
+                <p class="text-[10px] text-ink-500 mt-1">Tahan tombol Ctrl (Windows) atau Cmd (Mac) untuk memilih lebih dari satu pengelompokan.</p>
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
-                <x-prism.prism-button variant="primary" size="sm" wire:click="buildAndShow" class="whitespace-nowrap min-h-[44px]">
-                    Tampilkan Data
+            <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-wrap sm:flex-nowrap">
+                <x-prism.prism-button variant="primary" size="sm" wire:click="buildAndShow" wire:loading.attr="disabled" class="whitespace-nowrap min-h-[44px]">
+                    <span wire:loading.remove wire:target="buildAndShow">Tampilkan Data</span>
+                    <span wire:loading wire:target="buildAndShow">Memuat...</span>
                 </x-prism.prism-button>
                 <x-prism.prism-button variant="accent" size="sm" wire:click="saveReport" class="whitespace-nowrap min-h-[44px]">
                     Simpan Laporan
                 </x-prism.prism-button>
+
+                @can('laporan.cabang')
+                    <div class="flex items-center gap-1 bg-white/[0.03] border border-white/10 rounded-xl p-0.5 min-h-[44px]">
+                        <select wire:model="exportFormat" class="px-2.5 py-1.5 rounded-lg bg-transparent text-white text-xs focus:outline-none">
+                            <option value="xlsx" class="bg-ink-900">Excel (.xlsx)</option>
+                            <option value="csv" class="bg-ink-900">CSV (.csv)</option>
+                        </select>
+                        <button type="button" wire:click="export" wire:loading.attr="disabled" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white font-semibold text-xs whitespace-nowrap cursor-pointer transition active:scale-95 flex items-center gap-1.5">
+                            <span wire:loading.remove wire:target="export">📥 Export</span>
+                            <span wire:loading wire:target="export">Mengunduh...</span>
+                        </button>
+                    </div>
+                @endcan
+
                 <!-- [P2-4] Bagikan laporan tersimpan ke cabang aktif (default aktif) -->
-                <label class="flex items-center gap-1.5 text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 cursor-pointer hover:border-up-primary transition whitespace-nowrap min-h-[44px]">
+                <label class="flex items-center gap-1.5 text-xs bg-white/5 border border-white/10 rounded-xl px-3 py-2 cursor-pointer hover:border-up-primary transition whitespace-nowrap min-h-[44px]">
                     <input type="checkbox" wire:model="shared" class="accent-up-primary">
                     <span class="text-ink-300">Bagikan ke cabang</span>
                 </label>
@@ -144,31 +164,68 @@
                     return $v ?? '-';
                 };
             @endphp
-            <x-prism.dual-scroll class="mt-4">
-                <table class="w-full text-xs text-left border-collapse">
-                    <thead>
-                        <tr class="bg-white/5">
-                            @foreach($resultColumns as $col)
-                                <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ $availableColumns[$col] ?? \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$col] ?? str_replace('_', ' ', $col) }}</th>
-                            @endforeach
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-white/5">
-                        @foreach($queryResults as $row)
-                            <tr class="hover:bg-white/5 transition">
-                                @foreach($resultColumns as $col)
-                                    <td class="py-1.5 px-3 tabular-nums">{{ $fmtCell($row[$col] ?? null, $col) }}</td>
+            <div class="mt-4 space-y-3">
+                <div class="flex items-center justify-between text-xs text-ink-400 pb-1 border-b border-white/5">
+                    <span>Menampilkan <strong>{{ count($queryResults) }}</strong> baris data (maks. 500)</span>
+                    <span class="text-[11px] font-mono text-ink-500">{{ count($resultColumns) }} kolom</span>
+                </div>
+
+                {{-- Desktop & Tablet: Wide Dual-Scroll Table --}}
+                <div class="hidden sm:block">
+                    <x-prism.dual-scroll>
+                        <table class="w-full text-xs text-left border-collapse">
+                            <thead>
+                                <tr class="bg-white/5">
+                                    @foreach($resultColumns as $col)
+                                        <th class="py-2.5 px-3 font-semibold text-ink-400 uppercase text-[10px] whitespace-nowrap">{{ $availableColumns[$col] ?? \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$col] ?? str_replace('_', ' ', $col) }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach($queryResults as $row)
+                                    <tr class="hover:bg-white/5 transition">
+                                        @foreach($resultColumns as $col)
+                                            <td class="py-2 px-3 tabular-nums whitespace-nowrap">{{ $fmtCell($row[$col] ?? null, $col) }}</td>
+                                        @endforeach
+                                    </tr>
                                 @endforeach
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </x-prism.dual-scroll>
+                            </tbody>
+                        </table>
+                    </x-prism.dual-scroll>
+                </div>
+
+                {{-- Mobile Phone: Responsive Card Fallback --}}
+                <div class="block sm:hidden space-y-2.5">
+                    @foreach($queryResults as $rIdx => $row)
+                        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5 text-xs">
+                            <div class="flex items-center justify-between pb-1 border-b border-white/5 font-mono text-[10px] text-ink-400">
+                                <span>#{{ $rIdx + 1 }}</span>
+                                @if(isset($row['id']))
+                                    <span>ID: {{ $row['id'] }}</span>
+                                @endif
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                                @foreach($resultColumns as $col)
+                                    @if($col !== 'id')
+                                        <div>
+                                            <div class="text-[9px] uppercase font-bold text-ink-500 truncate">{{ $availableColumns[$col] ?? \App\Modules\Report\Services\ReportBuilderService::COLUMN_LABELS[$col] ?? str_replace('_', ' ', $col) }}</div>
+                                            <div class="text-white font-medium tabular-nums truncate">{{ $fmtCell($row[$col] ?? null, $col) }}</div>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
         @endif
 
         @if($showResults && count($queryResults) === 0)
-            <div class="text-center py-8 text-ink-500 text-sm">
-                Tidak ada data ditemukan untuk parameter yang dipilih.
+            <div class="text-center py-10 text-ink-500 text-xs space-y-2">
+                <svg class="w-8 h-8 mx-auto opacity-30 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p>Tidak ada data ditemukan untuk kriteria dan filter yang dipilih.</p>
             </div>
         @endif
     </div>

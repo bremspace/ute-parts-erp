@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Livewire;
 use App\Models\User;
 use App\Modules\Crm\Models\Lead;
 use App\Modules\Crm\Services\LeadService;
+use App\Modules\Rbac\Models\Cabang;
 use App\Traits\ParsesNominal;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -178,6 +179,16 @@ class LeadKanban extends Component
     {
         $this->createForm['nilai_estimasi'] = $this->parseNominal($this->createForm['nilai_estimasi'] ?? 0);
 
+        if (empty($this->createForm['telepon'])) {
+            $this->createForm['telepon'] = null;
+        }
+        if (empty($this->createForm['email'])) {
+            $this->createForm['email'] = null;
+        }
+        if (empty($this->createForm['assigned_to'])) {
+            $this->createForm['assigned_to'] = null;
+        }
+
         $this->validate([
             'createForm.nama' => 'required|string|max:255',
             'createForm.telepon' => 'nullable|string|max:20|unique:leads,telepon',
@@ -187,7 +198,7 @@ class LeadKanban extends Component
         ]);
 
         $data = $this->createForm;
-        $data['cabang_id'] = session('cabang_id');
+        $data['cabang_id'] = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? Cabang::value('id');
 
         app(LeadService::class)->create($data);
 
@@ -205,6 +216,19 @@ class LeadKanban extends Component
     public function updateLead(): void
     {
         $this->editForm['nilai_estimasi'] = $this->parseNominal($this->editForm['nilai_estimasi'] ?? 0);
+
+        if (empty($this->editForm['telepon'])) {
+            $this->editForm['telepon'] = null;
+        }
+        if (empty($this->editForm['email'])) {
+            $this->editForm['email'] = null;
+        }
+        if (empty($this->editForm['assigned_to'])) {
+            $this->editForm['assigned_to'] = null;
+        }
+        if (empty($this->editForm['lost_reason'])) {
+            $this->editForm['lost_reason'] = null;
+        }
 
         $this->validate([
             'editForm.nama' => 'required|string|max:255',

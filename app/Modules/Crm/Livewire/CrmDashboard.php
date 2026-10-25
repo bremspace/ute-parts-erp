@@ -13,6 +13,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Traits\ParsesNominal;
 use Database\Seeders\TierMembershipSeeder;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -29,7 +30,7 @@ class CrmDashboard extends Component
 
     public string $filterTipeKonsumen = ''; // '', 'retail', 'reseller', 'agen'
 
-    public string $activeTab = 'pelanggan'; // 'pelanggan' | 'tier'
+    public string $activeTab = 'pelanggan'; // 'pelanggan' | 'tier' | 'broadcast'
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -39,9 +40,38 @@ class CrmDashboard extends Component
         'activeTab' => ['except' => 'pelanggan'],
     ];
 
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterTierId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterTipeKonsumen(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterReseller(): void
+    {
+        $this->resetPage();
+    }
+
     public function switchTab(string $tab): void
     {
-        $this->activeTab = in_array($tab, ['pelanggan', 'tier']) ? $tab : 'pelanggan';
+        $this->activeTab = in_array($tab, ['pelanggan', 'tier', 'broadcast']) ? $tab : 'pelanggan';
+    }
+
+    public function resetFilter(): void
+    {
+        $this->search = '';
+        $this->filterTierId = null;
+        $this->filterReseller = false;
+        $this->filterTipeKonsumen = '';
+        $this->resetPage();
     }
 
     // Detail customer modal
@@ -101,9 +131,15 @@ class CrmDashboard extends Component
 
     public string $broadcastChannel = 'inapp';
 
+    public string $broadcastSegmentType = 'semua'; // 'semua', 'tier', 'reseller', 'belum_belanja', 'birthday'
+
     public ?int $broadcastTierId = null;
 
     public bool $broadcastReseller = false;
+
+    public int $broadcastHariBelanja = 30;
+
+    public int $broadcastBulanLahir = 1;
 
     // [T-04] Tambah pelanggan dari CRM (CRM-06)
     public bool $showPelangganBaruModal = false;
@@ -128,6 +164,22 @@ class CrmDashboard extends Component
     {
         if (! $this->boleh('crm.create', 'Anda tidak memiliki izin menambah pelanggan.')) {
             return;
+        }
+
+        if (empty($this->pelangganBaruForm['email'])) {
+            $this->pelangganBaruForm['email'] = null;
+        }
+        if (empty($this->pelangganBaruForm['kode_agen'])) {
+            $this->pelangganBaruForm['kode_agen'] = null;
+        }
+        if (empty($this->pelangganBaruForm['referral_kode'])) {
+            $this->pelangganBaruForm['referral_kode'] = null;
+        }
+        if (empty($this->pelangganBaruForm['tanggal_lahir'])) {
+            $this->pelangganBaruForm['tanggal_lahir'] = null;
+        }
+        if (empty($this->pelangganBaruForm['alamat'])) {
+            $this->pelangganBaruForm['alamat'] = null;
         }
 
         $this->validate([
@@ -162,8 +214,8 @@ class CrmDashboard extends Component
     public function openEditPelangganModal(int $id): void
     {
         $user = auth()->user();
-        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('admin-toko') || $user->hasRole('marketing') || $user->can('crm.create')))) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, Admin Toko, atau Marketing yang berhak mengedit data pelanggan.']);
+        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('admin-toko') || $user->hasRole('marketing') || $user->can('crm.edit') || $user->can('crm.create')))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, Admin Toko, atau staf berwenang yang berhak mengedit data pelanggan.']);
 
             return;
         }
@@ -196,8 +248,8 @@ class CrmDashboard extends Component
     public function simpanEditPelanggan(): void
     {
         $user = auth()->user();
-        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('admin-toko') || $user->hasRole('marketing') || $user->can('crm.create')))) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, Admin Toko, atau Marketing yang berhak mengedit data pelanggan.']);
+        if (! isSuperAdminOrOwner($user) && ! ($user && ($user->hasRole('admin-toko') || $user->hasRole('marketing') || $user->can('crm.edit') || $user->can('crm.create')))) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Hanya Super Admin, Owner, Admin Toko, atau staf berwenang yang berhak mengedit data pelanggan.']);
 
             return;
         }
@@ -210,6 +262,22 @@ class CrmDashboard extends Component
             $this->editPelangganForm['kode_agen'] = null;
         } elseif ($this->editPelangganForm['tipe_konsumen'] === 'agen') {
             $this->editPelangganForm['is_reseller'] = true;
+        }
+
+        if (empty($this->editPelangganForm['email'])) {
+            $this->editPelangganForm['email'] = null;
+        }
+        if (empty($this->editPelangganForm['kode_agen'])) {
+            $this->editPelangganForm['kode_agen'] = null;
+        }
+        if (empty($this->editPelangganForm['referral_kode'])) {
+            $this->editPelangganForm['referral_kode'] = null;
+        }
+        if (empty($this->editPelangganForm['tanggal_lahir'])) {
+            $this->editPelangganForm['tanggal_lahir'] = null;
+        }
+        if (empty($this->editPelangganForm['alamat'])) {
+            $this->editPelangganForm['alamat'] = null;
         }
 
         $this->validate([
@@ -345,6 +413,8 @@ class CrmDashboard extends Component
             $uplineAgen = Pelanggan::where('kode_agen', $pelanggan->referral_kode)->first();
         }
 
+        $poinLogs = $pelanggan->poinLogs()->take(10)->get();
+
         return [
             'pelanggan' => $pelanggan,
             'transaksi' => $transaksi,
@@ -357,6 +427,7 @@ class CrmDashboard extends Component
             'downline_count' => $downlineCount,
             'downline_omzet' => $downlineOmzet,
             'upline_agen' => $uplineAgen,
+            'poin_logs' => $poinLogs,
         ];
     }
 
@@ -390,9 +461,21 @@ class CrmDashboard extends Component
             ? (float) $this->parseNominal($this->tierForm['poin_redeem_rupiah'])
             : null;
 
+        $tierId = $this->tierForm['id'] ?? null;
+
         $this->validate([
-            'tierForm.nama' => 'required|string|max:255',
-            'tierForm.kode' => 'required|string|max:50',
+            'tierForm.nama' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('tier_memberships', 'nama')->ignore($tierId),
+            ],
+            'tierForm.kode' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('tier_memberships', 'kode')->ignore($tierId),
+            ],
             'tierForm.min_belanja_12bulan' => 'required|numeric|min:0',
             'tierForm.diskon_persen' => 'required|numeric|min:0|max:100',
             'tierForm.poin_multiplier' => 'required|numeric|min:0',
@@ -528,11 +611,21 @@ class CrmDashboard extends Component
         ]);
 
         $segment = [];
-        if ($this->broadcastTierId) {
+        if ($this->broadcastSegmentType === 'tier' && $this->broadcastTierId) {
             $segment[] = ['tipe' => 'tier', 'nilai' => $this->broadcastTierId];
-        }
-        if ($this->broadcastReseller) {
-            $segment[] = ['tipe' => 'reseller'];
+        } elseif ($this->broadcastSegmentType === 'reseller') {
+            $segment[] = ['tipe' => 'reseller', 'nilai' => true];
+        } elseif ($this->broadcastSegmentType === 'belum_belanja') {
+            $segment[] = ['tipe' => 'belum_belanja_hari', 'nilai' => max(1, (int) $this->broadcastHariBelanja)];
+        } elseif ($this->broadcastSegmentType === 'birthday') {
+            $segment[] = ['tipe' => 'birthday_month', 'nilai' => max(1, min(12, (int) $this->broadcastBulanLahir))];
+        } else {
+            if ($this->broadcastTierId) {
+                $segment[] = ['tipe' => 'tier', 'nilai' => $this->broadcastTierId];
+            }
+            if ($this->broadcastReseller) {
+                $segment[] = ['tipe' => 'reseller', 'nilai' => true];
+            }
         }
 
         $kampanye = KampanyeBroadcast::create([
@@ -547,6 +640,8 @@ class CrmDashboard extends Component
         $kampanye = app(BroadcastService::class)->kirimSekarang($kampanye);
 
         $this->showBroadcastModal = false;
+        $this->broadcastJudul = '';
+        $this->broadcastPesan = '';
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => "Broadcast dikirim ke {$kampanye->total_target} pelanggan via antrian",
@@ -571,6 +666,7 @@ class CrmDashboard extends Component
             'customers' => $this->customers,
             'selectedCustomer' => $this->selectedCustomer,
             'totalPelanggan' => Pelanggan::count(),
+            'riwayatKampanye' => KampanyeBroadcast::with('user')->latest()->take(15)->get(),
             'activeTab' => $this->activeTab,
         ])->layout('layouts.backoffice', ['header' => 'CRM & Membership']);
     }

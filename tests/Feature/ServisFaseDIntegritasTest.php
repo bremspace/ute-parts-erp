@@ -115,12 +115,12 @@ class ServisFaseDIntegritasTest extends TestCase
         $this->servisService->updateStatus($tiket, 'selesai', $this->admin, '');
     }
 
-    public function test_input_pekerjaan_saat_tiket_berstatus_qc_ditolak(): void
+    public function test_input_pekerjaan_saat_tiket_berstatus_diagnosa_ditolak(): void
     {
-        $tiket = $this->buatTiket('qc');
+        $tiket = $this->buatTiket('diagnosa');
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Input pekerjaan hanya saat status disetujui / dikerjakan');
+        $this->expectExceptionMessage('Input pekerjaan hanya saat status disetujui / dikerjakan / qc');
 
         $this->servisService->inputPekerjaan($tiket, [
             [

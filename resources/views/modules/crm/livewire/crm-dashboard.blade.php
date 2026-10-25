@@ -33,6 +33,21 @@
                 </span>
             </button>
 
+            <button
+                type="button"
+                @click="activeTab = 'broadcast'"
+                wire:click="switchTab('broadcast')"
+                class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] whitespace-nowrap flex-shrink-0"
+                :class="activeTab === 'broadcast' ? 'bg-up-primary text-white shadow-lg shadow-up-primary/25' : 'text-ink-400 hover:text-white hover:bg-white/5'"
+            >
+                <span>📢</span>
+                <span>Riwayat Broadcast</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono"
+                      :class="activeTab === 'broadcast' ? 'bg-white/20 text-white' : 'bg-white/10 text-ink-300'">
+                    {{ count($riwayatKampanye ?? []) }}
+                </span>
+            </button>
+
             <a
                 href="/app/crm/leads"
                 class="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer min-h-[38px] text-ink-400 hover:text-white hover:bg-white/5 whitespace-nowrap flex-shrink-0"
@@ -86,6 +101,13 @@
                         <input type="checkbox" wire:model.live="filterReseller" class="accent-up-accent w-4 h-4 rounded cursor-pointer" />
                         <span class="whitespace-nowrap">Mitra Aktif</span>
                     </label>
+
+                    @if($search !== '' || $filterTierId !== null || $filterReseller || $filterTipeKonsumen !== '')
+                    <button type="button" wire:click="resetFilter" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer min-h-[44px]" title="Reset semua filter pencarian">
+                        <span>✕</span>
+                        <span>Reset</span>
+                    </button>
+                    @endif
                 </div>
             </div>
 
@@ -577,6 +599,77 @@
     </div>
 
     <!-- ========================================== -->
+    <!-- TAB 3: RIWAYAT BROADCAST KAMPANYE -->
+    <!-- ========================================== -->
+    <div x-show="activeTab === 'broadcast'" x-cloak class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02] border border-white/5 p-3.5 rounded-2xl">
+            <div>
+                <h3 class="text-sm font-bold text-white">Riwayat Kampanye Broadcast</h3>
+                <p class="text-xs text-ink-400">Daftar siaran promo dan pengumuman massal yang dikirimkan via antrian sistem.</p>
+            </div>
+            @can('crm.broadcast')
+            <button
+                type="button"
+                wire:click="$set('showBroadcastModal', true)"
+                class="px-4 py-2.5 rounded-xl bg-up-accent hover:bg-up-accent/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-up-accent/20 transition active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+                <span>📢</span>
+                <span>Buat Broadcast Baru</span>
+            </button>
+            @endcan
+        </div>
+
+        <x-prism.data-table :headers="['Waktu', 'Judul & Pesan', 'Saluran', 'Target Segmen', 'Terkirim / Target', 'Status']">
+            @forelse($riwayatKampanye ?? [] as $k)
+                <tr class="hover:bg-white/[0.02] transition-colors">
+                    <td class="py-3.5 px-4 text-xs font-mono text-ink-300 whitespace-nowrap">
+                        {{ $k->created_at->format('d/m/Y H:i') }}
+                    </td>
+                    <td class="py-3.5 px-4 max-w-xs sm:max-w-md">
+                        <p class="font-semibold text-white text-xs">{{ $k->judul }}</p>
+                        <p class="text-[11px] text-ink-400 line-clamp-1 mt-0.5">{{ \Illuminate\Support\Str::limit($k->pesan, 80) }}</p>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        @if($k->channel === 'wa')
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">WhatsApp</span>
+                        @elseif($k->channel === 'email')
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">Email</span>
+                        @else
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30">In-App</span>
+                        @endif
+                    </td>
+                    <td class="py-3.5 px-4 text-xs text-ink-300">
+                        @if(!empty($k->segment))
+                            <span class="text-[11px] text-ink-200">
+                                {{ count($k->segment) }} Filter
+                            </span>
+                        @else
+                            <span class="text-[11px] text-ink-400">Semua Pelanggan</span>
+                        @endif
+                    </td>
+                    <td class="py-3.5 px-4 text-xs font-mono tabular-nums whitespace-nowrap">
+                        <span class="text-up-mint font-bold">{{ number_format($k->total_terkirim ?? 0) }}</span>
+                        <span class="text-ink-500">/</span>
+                        <span class="text-white">{{ number_format($k->total_target ?? 0) }}</span>
+                        @if($k->total_gagal > 0)
+                            <span class="text-up-red text-[10px] ml-1">({{ $k->total_gagal }} gagal)</span>
+                        @endif
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <x-prism.status-pill :status="$k->status" />
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="6" class="py-12 text-center text-ink-400 text-xs">
+                        Belum ada riwayat kampanye broadcast yang dikirim.
+                    </td>
+                </tr>
+            @endforelse
+        </x-prism.data-table>
+    </div>
+
+    <!-- ========================================== -->
     <!-- MODAL: TIER (TAMBAH / EDIT) -->
     <!-- ========================================== -->
     @if($showTierModal)
@@ -666,31 +759,56 @@
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Isi Pesan *</label>
                         <textarea wire:model="broadcastPesan" rows="3" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Dapatkan diskon sparepart 10% khusus member minggu ini..."></textarea>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Saluran / Channel *</label>
-                            <select wire:model="broadcastChannel" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                                <option value="inapp" class="bg-ink-900">In-App Notifikasi</option>
-                                <option value="wa" class="bg-ink-900">WhatsApp Gateway</option>
-                                <option value="email" class="bg-ink-900">Email Broadcast</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Target Tier</label>
-                            <select wire:model="broadcastTierId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
-                                <option value="" class="bg-ink-900">Semua Tier Pelanggan</option>
-                                @foreach($tiers as $t)
-                                    <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
                     <div>
-                        <label class="flex items-center gap-2 text-xs text-ink-300 cursor-pointer select-none">
-                            <input type="checkbox" wire:model="broadcastReseller" class="accent-up-accent w-4 h-4 rounded cursor-pointer" />
-                            <span>Khusus Mitra Reseller Saja</span>
-                        </label>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Saluran / Channel *</label>
+                        <select wire:model="broadcastChannel" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="inapp" class="bg-ink-900">In-App Notifikasi</option>
+                            <option value="wa" class="bg-ink-900">WhatsApp Gateway</option>
+                            <option value="email" class="bg-ink-900">Email Broadcast</option>
+                        </select>
                     </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Segmentasi Target Pelanggan</label>
+                        <select wire:model.live="broadcastSegmentType" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="semua" class="bg-ink-900">Semua Pelanggan</option>
+                            <option value="tier" class="bg-ink-900">Berdasarkan Tier Membership</option>
+                            <option value="reseller" class="bg-ink-900">Khusus Mitra Reseller / Agen</option>
+                            <option value="belum_belanja" class="bg-ink-900">Pelanggan Tidak Belanja > X Hari</option>
+                            <option value="birthday" class="bg-ink-900">Pelanggan Ulang Tahun Bulan Ini</option>
+                        </select>
+                    </div>
+
+                    @if($broadcastSegmentType === 'tier')
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Pilih Tier Pelanggan</label>
+                        <select wire:model="broadcastTierId" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="" class="bg-ink-900">Pilih Tier</option>
+                            @foreach($tiers as $t)
+                                <option value="{{ $t->id }}" class="bg-ink-900">{{ $t->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+
+                    @if($broadcastSegmentType === 'belum_belanja')
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Berapa Hari Belum Belanja?</label>
+                        <input type="number" wire:model="broadcastHariBelanja" min="1" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="30" />
+                    </div>
+                    @endif
+
+                    @if($broadcastSegmentType === 'birthday')
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Bulan Ulang Tahun</label>
+                        <select wire:model="broadcastBulanLahir" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            @for($m = 1; $m <= 12; $m++)
+                                <option value="{{ $m }}" class="bg-ink-900">{{ \Carbon\Carbon::create(2026, $m, 1)->translatedFormat('F') }}</option>
+                            @endfor
+                        </select>
+                    </div>
+                    @endif
+
                     <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/30 text-[11px] text-ink-200">
                         ⚡ Pesan otomatis didistribusikan secara asinkron <strong>melalui sistem antrian (database queue)</strong> agar performa server tetap cepat dan stabil.
                     </div>
@@ -854,6 +972,30 @@
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500 py-2">Belum ada riwayat tiket servis.</p>
+                        @endforelse
+                    </div>
+
+                    <!-- Mutasi Poin Loyalty Terakhir -->
+                    <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/5">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-[10px] text-ink-400 uppercase font-bold">Mutasi Poin Loyalty Terakhir</p>
+                            <span class="text-[10px] font-mono text-up-mint font-bold tabular-nums">Total: {{ number_format($p->poin_loyalty) }} Poin</span>
+                        </div>
+                        @forelse($selectedCustomer['poin_logs'] ?? [] as $plog)
+                            <div class="flex items-center justify-between text-xs py-2 border-b border-white/5 last:border-0 gap-2">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded {{ $plog->poin > 0 ? 'bg-up-mint/15 text-up-mint' : 'bg-up-red/15 text-up-red' }}">
+                                            {{ $plog->poin > 0 ? '+'.$plog->poin : $plog->poin }}
+                                        </span>
+                                        <span class="text-ink-200 text-xs truncate">{{ $plog->keterangan ?: ucfirst($plog->tipe) }}</span>
+                                    </div>
+                                    <span class="text-ink-500 text-[10px]">{{ $plog->created_at->format('d/m/Y H:i') }}</span>
+                                </div>
+                                <span class="font-mono text-ink-400 text-[11px] tabular-nums">Sisa: {{ number_format($plog->saldo_akhir) }}</span>
+                            </div>
+                        @empty
+                            <p class="text-[11px] text-ink-500 py-2">Belum ada riwayat mutasi poin loyalty.</p>
                         @endforelse
                     </div>
 

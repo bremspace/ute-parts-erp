@@ -6,8 +6,8 @@
         </div>
     </div>
 
-    {{-- Tabs --}}
-    <div class="glass-card p-2 sm:p-2.5">
+    {{-- Tabs & Period Picker --}}
+    <div class="glass-card p-2 sm:p-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
             @foreach(['shift' => 'Shift', 'roster' => 'Roster', 'absensi' => 'Absensi', 'kpi' => 'KPI'] as $key => $label)
                 <button wire:click="pilihTab('{{ $key }}')"
@@ -17,6 +17,13 @@
                 </button>
             @endforeach
         </div>
+        @if($tab !== 'shift')
+            <div class="flex items-center gap-2 px-1">
+                <label class="text-xs font-semibold text-ink-500 dark:text-ink-400 uppercase tracking-wider whitespace-nowrap">Periode:</label>
+                <input type="month" wire:model.live="kpiPeriode"
+                    class="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-1.5">
+            </div>
+        @endif
     </div>
 
     {{-- Tab: Shift --}}
@@ -29,18 +36,18 @@
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Nama Shift</label>
                         <input type="text" wire:model="shiftNama" placeholder="mis. Pagi"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Jam Mulai</label>
                             <input type="time" wire:model="shiftMulai"
-                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Jam Selesai</label>
                             <input type="time" wire:model="shiftSelesai"
-                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                                class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                         </div>
                     </div>
                     <label class="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-300 cursor-pointer">
@@ -111,7 +118,7 @@
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Karyawan</label>
                         <select wire:model="rosterKaryawanId"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                             <option value="">-- Pilih Karyawan --</option>
                             @foreach($karyawans as $k)
                                 <option value="{{ $k->id }}">{{ $k->nama }} ({{ $k->jabatan }})</option>
@@ -121,12 +128,12 @@
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Tanggal</label>
                         <input type="date" wire:model="rosterTanggal"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Shift</label>
                         <select wire:model="rosterShiftId"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                             <option value="">-- Pilih Shift --</option>
                             @foreach($shifts->where('is_aktif', true) as $s)
                                 <option value="{{ $s->id }}">{{ $s->nama }} ({{ substr($s->jam_mulai, 0, 5) }}-{{ substr($s->jam_selesai, 0, 5) }})</option>
@@ -185,7 +192,7 @@
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Karyawan</label>
                         <select wire:model="absensiKaryawanId"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                             <option value="">-- Pilih Karyawan --</option>
                             @foreach($karyawans as $k)
                                 <option value="{{ $k->id }}">{{ $k->nama }} ({{ $k->jabatan }})</option>
@@ -195,12 +202,12 @@
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Tanggal</label>
                         <input type="date" wire:model="absensiTanggal"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Status</label>
                         <select wire:model="absensiStatus"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                             <option value="izin">Izin</option>
                             <option value="cuti">Cuti</option>
                             <option value="absen">Absen</option>
@@ -209,7 +216,7 @@
                     <div>
                         <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Catatan</label>
                         <textarea wire:model="absensiCatatan" rows="2"
-                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm px-3 py-2"></textarea>
+                            class="block w-full rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm px-3 py-2"></textarea>
                     </div>
                     <button type="submit"
                         class="w-full inline-flex justify-center items-center px-4 py-2.5 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-up-primary hover:bg-up-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-up-primary active:scale-[0.97] transition min-h-[44px]">
@@ -227,8 +234,8 @@
             <div class="glass-card p-5">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
                     <h2 class="text-lg font-bold text-ink-900 dark:text-white">Log Absensi {{ $kpiPeriode }}</h2>
-                    <select wire:model="absensiFilter"
-                        class="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                    <select wire:model.live="absensiFilter"
+                        class="rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
                         <option value="semua">Semua Status</option>
                         <option value="hadir">Hadir</option>
                         <option value="terlambat">Terlambat</option>
@@ -287,8 +294,8 @@
         <div class="flex flex-col sm:flex-row gap-4 items-end">
             <div>
                 <label class="block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1">Periode (YYYY-MM)</label>
-                <input type="text" wire:model="kpiPeriode" placeholder="2026-09"
-                    class="block w-40 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-sm min-h-[44px] px-3 py-2">
+                <input type="month" wire:model.live="kpiPeriode"
+                    class="block w-44 rounded-xl border border-ink-200 dark:border-white/10 bg-white dark:bg-ink-900 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 text-base sm:text-sm min-h-[44px] px-3 py-2">
             </div>
             <button wire:click="hitungKpi"
                 class="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-bold rounded-xl shadow-sm text-white bg-up-primary hover:bg-up-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-up-primary active:scale-[0.97] transition min-h-[44px]">

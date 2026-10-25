@@ -664,6 +664,13 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
 
         abort_unless($isManager || $isOwner, 403, 'Anda tidak memiliki hak akses untuk mencetak slip gaji ini.');
 
+        if ($isManager && ! $user->hasRole('super-admin')) {
+            $cabangId = session('cabang_id');
+            if ($cabangId && $slip->karyawan?->cabang_id && (int) $slip->karyawan->cabang_id !== (int) $cabangId) {
+                abort(403, 'Slip gaji bukan milik cabang aktif Anda.');
+            }
+        }
+
         return view('modules.hr.slip-gaji-print', ['slip' => $slip]);
     })->name('hr.slip.print');
 

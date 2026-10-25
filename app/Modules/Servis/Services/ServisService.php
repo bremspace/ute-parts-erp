@@ -1378,7 +1378,10 @@ class ServisService
             || $tiket->estimasiItems()->where('tipe', 'part')->exists();
 
         // Aturan garansi servis: jika pengerjaan HANYA jasa tanpa part/sparepart, tidak ada kartu garansi (durasi 0 / skip garansi)
-        if ($hasPart) {
+        // Kecuali jika ada durasi garansi custom eksplisit (> 0)
+        $adaGaransiCustom = $tiket->durasi_garansi_custom !== null && (int) $tiket->durasi_garansi_custom > 0;
+
+        if ($hasPart || $adaGaransiCustom) {
             $durasiHari = 30; // default
             if ($tiket->durasi_garansi_custom !== null && (int) $tiket->durasi_garansi_custom >= 0) {
                 $durasiHari = (int) $tiket->durasi_garansi_custom;
@@ -1400,7 +1403,7 @@ class ServisService
                 Garansi::where('tiket_servis_id', $tiket->id)->delete();
             }
         } else {
-            // Hanya pengerjaan jasa: tidak terbit garansi
+            // Hanya pengerjaan jasa tanpa part & tanpa custom: tidak terbit garansi
             Garansi::where('tiket_servis_id', $tiket->id)->delete();
         }
 

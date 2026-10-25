@@ -3,6 +3,66 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-25 — HR & Payroll: Audit Komprehensif, Multi-Branch Security, Perbaikan Logika & UI/UX Responsif ✅
+
+- **Backend & Multi-Branch Security**:
+  - `karyawan`: Penambahan nilai enum jabatan (`manager` dan `staff`) via migration `2026_10_25_020000_update_karyawan_jabatan_enum_options.php` untuk mencegah truncation error saat pembuatan karyawan.
+  - `PayrollPage`: Penerapan multi-branch scoping dengan `cabangFilter` — super-admin dapat memilih semua atau cabang tertentu, staf/manager cabang terkunci pada `session('cabang_id')`.
+  - `PayrollPage`: Auto-generasi NIK berbasis sequence (`EMP-0001`, dsb.) untuk mencegah duplicate key exception saat NIK tidak diisi.
+  - `AbsensiService`: Pengecekan otomatis shift pada `ShiftJadwal` (roster) dan fallback shift aktif cabang saat karyawan clock-in mandiri untuk penentuan status `terlambat` vs `hadir` yang akurat.
+  - `AbsensiService`: Dukungan parameter opsional `$cabangId` pada `autoTandaiAbsen` agar penandaan absen harian dapat diisolasi per cabang.
+  - `routes/web.php`: Pengamanan route cetak slip gaji (`/app/hr/slip/{id}/print`) dengan otorisasi kepemilikan karyawan atau role HR/Finance/Admin cabang yang berwenang.
+  - `HrAbsensiKpiPage`: Isolasi multi-cabang menyeluruh pada query shift, roster, log absensi, KPI hasil, dan master karyawan.
+- **Frontend & UI/UX Impeccable Polish**:
+  - `payroll.blade.php`: Penambahan UI dropdown `Filter Cabang` pada bar filter payroll; penyesuaian semua input, select, dan modal ke ukuran `text-base sm:text-sm` (mencegah iOS Safari auto-zoom) dan target sentuh minimal `min-h-[44px]`.
+  - `absensi.blade.php`: Penambahan pemilih bulan/periode persisten di tab bar atas (aktif pada tab Roster, Absensi, dan KPI); penyesuaian filter status absensi menjadi reactive `wire:model.live`; standardisasi ukuran input dan target sentuh mobile.
+  - `saya.blade.php`: Peningkatan kontrol periode presensi pribadi, tombol Clock-In / Clock-Out adaptif mobile dengan `min-h-[44px]`, dan dialog slip gaji modal yang ramah sentuhan.
+  - `komisi-skema.blade.php`: Pengoptimalan form penambahan skema komisi multi-aktor dan filter reaktif dengan input `text-base sm:text-sm` serta tombol aksi `min-h-[44px]`.
+  - `slip-gaji-print.blade.php`: Perapihan cetak thermal dan A4 slip gaji dengan token tipografi dan border Ute Prism.
+- **Verifikasi**:
+  - `Payroll` test suite (30 tests, 122 assertions) lulus 100%.
+  - `Hr` test suite (44 tests, 170 assertions) lulus 100%.
+  - Laravel Pint PSR-12: PASS (0 issues).
+
+## 2026-10-25 — Akunting & Report: Audit Komprehensif, Perbaikan Bug, Integritas Sistem & UI/UX Responsif ✅
+
+- **Backend & Integrasi Modul**:
+  - `ReportBuilder`: Import `Illuminate\Database\Eloquent\Model` untuk casting Eloquent yang benar pada query export.
+  - `ReportBuilder`: Fallback nama laporan dinamis menggunakan whitelist model (`$this->whitelist[$this->sourceModel]` menggantikan properti undefined).
+  - `ReportBuilder` & `DrillDownViewer`: Normalisasi event dispatch toast/alert menjadi format konsisten Livewire 3 (`dispatch('alert', ['type' => ..., 'message' => ...])`).
+  - `ExportLaporanService` & `ServisBoard` / `ResellerDashboard`: Pemulihan tombol aksi unduh "Export Excel" & "Export CSV" dengan dukungan responsive icon/text (`hidden sm:inline`).
+  - `AkuntingDashboard`: Perbaikan `colspan="8"` pada empty state tabel piutang agar sejajar sempurna dengan 8 kolom header.
+  - `ServisService`: Penyesuaian aturan garansi otomatis saat status selesai (memperhitungkan part & custom warranty duration), serta toleransi status input pekerjaan disetujui/dikerjakan/qc.
+- **Frontend & UI/UX Impeccable Polish**:
+  - `ReportBuilder`: Penambahan dropdown format export (Excel .xlsx / CSV .csv) dan tombol unduh instan terintegrasi dengan status loading.
+  - `ReportBuilder`: Tampilan responsif ganda pada hasil query laporan (dual-scroll untuk layar desktop/tablet, dan card layout ringkas untuk ponsel).
+  - `ReportBuilder`: Input filter adaptif multi-device dengan tata letak flex-wrap dan target sentuh minimal 38px/44px.
+  - `DrillDownViewer`: Tampilan dual-scroll table + mobile card list pada hasil pencarian model dan rincian child items, lengkap dengan indikator detail interaktif (`↗`).
+  - `AkuntingDashboard`, `AsetRegister`, `LaporanPajak`: Tampilan tabel dan tombol aksi mobile-friendly dengan standardisasi token Ute Prism, format angka Indonesia (`ADR 0011`), dan empty state informatif.
+- **Verifikasi**:
+  - `ExportLaporanTest` (10 tests, 72 assertions) lulus 100%.
+  - `LaporanKonsolidasiTest`, `AkuntingNplus1Test`, `AkuntingIntegritasTest` (30 tests, 177 assertions) lulus 100%.
+  - Seluruh test servis (`tests/Feature/Servis*`, 125 tests, 597 assertions) lulus 100%.
+  - Test jurnal dan integrasi modul (`JurnalServiceTest`, `IntegrasiModulTest`, dll., 37 tests, 204 assertions) lulus 100%.
+  - Format kode sesuai standar PSR-12 via Laravel Pint: PASS (0 issues).
+
+## 2026-10-25 — CRM: Optimasi Komprehensif Backend & Frontend, Loyalty Points, Broadcast & Leads Pipeline ✅
+
+- **Backend & Model Hardening**:
+  - `Lead::scopeForCabang`: Penanganan fallback aman saat `cabang_id` di sesi bernilai null (Super Admin/Owner) tanpa filter zero/unmatched rows.
+  - `LeadKanban` & `CrmController`: Sanitasi string kosong pada field unik/nullable (`telepon`, `email`, `kode_agen`, `referral_kode`) menjadi `null` sebelum validasi agar terhindar dari unique constraint violation.
+  - `KampanyeBroadcast`: Penambahan relasi `user(): BelongsTo` untuk pelaporan audit author kampanye.
+  - `CrmDashboard`: Validasi unik nama & kode tier membership (`Rule::unique()->ignore($tierId)`), pembatasan otorisasi `crm.edit` pada update pelanggan.
+- **Frontend & UI/UX Impeccable Polish**:
+  - `CrmDashboard` Livewire: Pagination reset hooks saat filter berganti (`updatingSearch`, `updatingFilterTierId`, etc.), implementasi metode `resetFilter()`.
+  - Drawer Profil Pelanggan 360°: Integrasi tabel riwayat mutasi poin loyalty (`poin_logs`) dengan status perolehan/penukaran poin real-time.
+  - Tab Baru "Riwayat Broadcast": Menampilkan riwayat kampanye, metrik terkirim vs target, status antrian, dan channel yang digunakan.
+  - Modal Broadcast Promo: Segmentasi cerdas (Semua, Berdasarkan Tier, Mitra Reseller/Agen, Pelanggan Belum Belanja > X Hari, Ulang Tahun Bulan Ini) terhubung ke `BroadcastService`.
+  - Kanban Leads: Tautan langsung lead berstatus *Won* ke profil pelanggan di CRM (`/app/crm?search=...`).
+- **Verifikasi**:
+  - Seluruh pengujian CRM (`tests/Feature/Crm*`, `tests/Feature/Lead*`, `tests/Unit/PricingServiceTest`) lulus 100% (42+ tests, 195+ assertions).
+  - Aset Vite terkompilasi bersih tanpa error.
+
 ## 2026-10-25 — Core: Unifikasi & Sentralisasi Fitur Cetak Sistem (Single Source of Truth di Pengaturan Printer) ✅
 
 - **Single Source of Truth (SOT) Konfigurasi Cetak (`KonfigurasiService`, `/app/pengaturan?tab=printer`)**:

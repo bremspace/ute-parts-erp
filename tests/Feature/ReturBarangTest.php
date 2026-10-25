@@ -754,4 +754,67 @@ class ReturBarangTest extends TestCase
         $returJual->items()->first()->refresh();
         $this->assertEquals('sudah_diretur_supplier', $returJual->items()->first()->status_karantina);
     }
+
+    public function test_retur_konsumen_berhasil_ketika_transaksi_tanpa_gudang_id_atau_null(): void
+    {
+        $pelanggan = Pelanggan::create([
+            'nama' => 'Pelanggan Marketplace Tanpa Gudang',
+            'tipe' => 'retail',
+        ]);
+
+        // Simulasikan transaksi marketplace dengan gudang_id = null
+        $transaksi = Transaksi::create([
+            'no_transaksi' => 'MP-TEST-0001',
+            'cabang_id' => $this->cabang->id,
+            'gudang_id' => null,
+            'kasir_id' => $this->user->id,
+            'pelanggan_id' => $pelanggan->id,
+            'sumber' => 'marketplace',
+            'total_barang' => 1,
+            'subtotal' => 150000,
+            'total_akhir' => 150000,
+            'status' => 'selesai',
+        ]);
+
+        $trxItem = TransaksiItem::create([
+            'transaksi_id' => $transaksi->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_satuan' => 150000,
+            'subtotal' => 150000,
+            'hpp' => 100000,
+        ]);
+
+        $service = app(ReturnPenjualanService::class);
+        $retur = $service->buatRetur(
+            $transaksi,
+            [
+                [
+                    'transaksi_item_id' => $trxItem->id,
+                    'jumlah' => 1,
+                    'kondisi_barang' => 'rusak',
+                ],
+            ],
+            'Layar retak barang rusak karantina',
+            'kas',
+            $this->user->id
+        );
+
+        $this->assertEquals('selesai', $retur->status);
+        $this->assertEquals($this->gudang->id, $retur->gudang_id);
+
+        // Transaksi asal ter-backfill dengan gudang yang valid
+        $transaksi->refresh();
+        $this->assertEquals($this->gudang->id, $transaksi->gudang_id);
+
+        // Stock mutation log retur_karantina terbentuk dengan gudang_id valid (bukan 0)
+        $mutation = StockMutationLog::where('referensi_tipe', ReturnPenjualan::class)
+            ->where('referensi_id', $retur->id)
+            ->where('sumber', 'retur_karantina')
+            ->first();
+
+        $this->assertNotNull($mutation);
+        $this->assertEquals($this->gudang->id, $mutation->gudang_id);
+        $this->assertEquals(0, (int) $mutation->delta);
+    }
 }

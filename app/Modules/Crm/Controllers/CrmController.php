@@ -12,6 +12,7 @@ use App\Modules\Crm\Services\LeadService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\TiketServis;
@@ -477,7 +478,7 @@ class CrmController extends Controller
         ]);
 
         $data = $request->all();
-        $data['cabang_id'] = session('cabang_id');
+        $data['cabang_id'] = $request->input('cabang_id') ?? session('cabang_id') ?? $request->user()?->cabangs()->first()?->id ?? Cabang::value('id');
 
         $lead = $this->leadService->create($data);
 

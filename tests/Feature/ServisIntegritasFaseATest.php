@@ -195,8 +195,8 @@ class ServisIntegritasFaseATest extends TestCase
                 ->where('referensi_id', $tiket->id)->value('idempotency_key')
         );
 
-        // Garansi tetap 1 (updateOrCreate idempoten)
-        $this->assertSame(1, (int) $tiket->garansi()->count());
+        // Garansi untuk tiket khusus jasa tanpa part: 0 (aturan garansi servis)
+        $this->assertSame(0, (int) $tiket->garansi()->count());
     }
 
     public function test_t01_key_idempotensi_menylangga_posting_ganda_tiket_sama(): void

@@ -10,7 +10,7 @@
             <div class="flex items-center gap-2">
                 <label class="text-xs font-semibold text-ink-500 uppercase">Periode:</label>
                 <input type="month" wire:model.live="periode"
-                    class="rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-sm font-semibold text-ink-900 dark:text-white focus:border-up-primary focus:ring-up-primary py-1.5 px-3">
+                    class="rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-base sm:text-sm font-semibold text-ink-900 dark:text-white focus:border-up-primary focus:ring-up-primary min-h-[44px] py-1.5 px-3">
             </div>
         @endif
     </div>
@@ -41,18 +41,18 @@
             <div class="flex flex-wrap items-center gap-2">
                 @if(! $logHariIni?->jam_masuk)
                     <button wire:click="clockIn"
-                        class="inline-flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 active:scale-95 transition">
+                        class="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 min-h-[44px] shadow-md shadow-emerald-600/20 active:scale-95 transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>
                         <span>Clock-In Sekarang</span>
                     </button>
                 @elseif(! $logHariIni?->jam_keluar)
                     <button wire:click="clockOut"
-                        class="inline-flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 active:scale-95 transition">
+                        class="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 min-h-[44px] shadow-md shadow-blue-600/20 active:scale-95 transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                         <span>Clock-Out (Pulang)</span>
                     </button>
                 @else
-                    <span class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <span class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 min-h-[44px]">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                         <span>Presensi Hari Ini Selesai</span>
                     </span>
@@ -114,7 +114,7 @@
 
                 @if($slip)
                     <button wire:click="bukaDetailSlip"
-                        class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 shadow-md shadow-up-primary/20 transition active:scale-98">
+                        class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 shadow-md shadow-up-primary/20 transition active:scale-98 min-h-[44px]">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         <span>Lihat &amp; Cetak Slip Gaji</span>
                     </button>
@@ -278,7 +278,7 @@
 
                     <div class="flex items-center justify-between text-xs text-ink-500 pt-2 border-t border-ink-100 dark:border-white/10 print:hidden">
                         <div>Status: <span class="font-bold uppercase text-ink-800 dark:text-ink-200">{{ $detailSlip['status'] }}</span></div>
-                        <button wire:click="tutupDetailSlip" class="px-4 py-2 text-xs font-semibold rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5">Tutup</button>
+                        <button wire:click="tutupDetailSlip" class="px-4 py-2 text-xs font-semibold rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 min-h-[44px] inline-flex items-center justify-center">Tutup</button>
                     </div>
                 </div>
             </div>

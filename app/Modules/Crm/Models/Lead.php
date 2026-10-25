@@ -61,6 +61,14 @@ class Lead extends Model
         // Kunci kanonik session cabang (routes/web.php switchCabang menulis 'cabang_id').
         $cabangId = $cabangId ?? session('cabang_id');
 
+        if (! $cabangId) {
+            // Jika Super Admin / Owner tanpa session cabang aktif, jangan sembunyikan semua data
+            if (function_exists('isSuperAdminOrOwner') && isSuperAdminOrOwner()) {
+                return $query;
+            }
+            $cabangId = auth()->user()?->cabangs()->first()?->id ?? Cabang::value('id');
+        }
+
         return $query->where('cabang_id', $cabangId);
     }
 

@@ -66,7 +66,7 @@ class DrillDownViewer extends Component
         try {
             $service->validateModel($model);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatch('toast', type: 'error', message: $e->getMessage());
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
 
             return;
         }

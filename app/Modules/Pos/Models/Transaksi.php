@@ -3,6 +3,7 @@
 namespace App\Modules\Pos\Models;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Marketplace\Models\Pengiriman;
 use App\Modules\Omnichannel\Models\ChannelOrder;
@@ -123,5 +124,10 @@ class Transaksi extends Model
     public function returnPenjualan(): HasMany
     {
         return $this->hasMany(ReturnPenjualan::class, 'transaksi_id');
+    }
+
+    public function piutang(): HasOne
+    {
+        return $this->hasOne(Piutang::class, 'transaksi_id');
     }
 }

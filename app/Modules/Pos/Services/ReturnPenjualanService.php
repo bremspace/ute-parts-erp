@@ -8,6 +8,8 @@ use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\ReturnPenjualanItem;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
+use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\NomorSeri;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrderItem;
@@ -27,6 +29,33 @@ class ReturnPenjualanService
         protected NomorSeriService $nomorSeriService,
         protected ApprovalService $approvalService
     ) {}
+
+    /**
+     * Resolusi ID gudang yang valid dan terdaftar di database untuk cabang terkait.
+     */
+    public function resolveGudangId(?int $gudangId, int $cabangId): int
+    {
+        if ($gudangId && $gudangId > 0 && Gudang::where('id', $gudangId)->exists()) {
+            return $gudangId;
+        }
+
+        $resolved = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
+            ?? Gudang::where('cabang_id', $cabangId)->value('id')
+            ?? (session('gudang_id') && Gudang::where('id', session('gudang_id'))->exists() ? (int) session('gudang_id') : null)
+            ?? Gudang::where('is_active', true)->value('id')
+            ?? Gudang::value('id');
+
+        if ($resolved) {
+            return (int) $resolved;
+        }
+
+        $gudang = Gudang::firstOrCreate(
+            ['cabang_id' => $cabangId > 0 ? $cabangId : 1, 'nama' => 'Gudang Utama'],
+            ['kode' => 'GDG-'.($cabangId > 0 ? $cabangId : 1).'-DEF', 'is_active' => true]
+        );
+
+        return (int) $gudang->id;
+    }
 
     /**
      * Buat transaksi retur penjualan dari transaksi yang valid.
@@ -57,8 +86,8 @@ class ReturnPenjualanService
         array $fotoBukti = [],
         ?string $catatanQc = null
     ): ReturnPenjualan {
-        $cabangId = (int) $transaksi->cabang_id;
-        $gudangId = (int) $transaksi->gudang_id;
+        $cabangId = (int) ($transaksi->cabang_id ?: (session('cabang_id') ?: Cabang::value('id') ?: 1));
+        $gudangId = $this->resolveGudangId($transaksi->gudang_id ? (int) $transaksi->gudang_id : null, $cabangId);
 
         if (empty($items)) {
             throw ValidationException::withMessages(['items' => 'Item retur tidak boleh kosong']);
@@ -70,6 +99,13 @@ class ReturnPenjualanService
             $fotoBukti, $catatanQc
         ) {
             $transaksiLocked = Transaksi::whereKey($transaksi->id)->lockForUpdate()->firstOrFail();
+
+            if (! $transaksiLocked->gudang_id || ! Gudang::where('id', $transaksiLocked->gudang_id)->exists() || ! $transaksiLocked->cabang_id) {
+                $transaksiLocked->update([
+                    'cabang_id' => $transaksiLocked->cabang_id ?: $cabangId,
+                    'gudang_id' => $gudangId,
+                ]);
+            }
 
             $totalRetur = 0;
             $totalHpp = 0;
@@ -300,8 +336,15 @@ class ReturnPenjualanService
      */
     protected function prosesTukarProduk(ReturnPenjualan $retur, array $tukarItems, ?int $userId = null): void
     {
-        $cabangId = (int) $retur->cabang_id;
-        $gudangId = (int) $retur->gudang_id;
+        $cabangId = (int) ($retur->cabang_id ?: ($retur->transaksi?->cabang_id ?: (session('cabang_id') ?: Cabang::value('id') ?: 1)));
+        $gudangId = $this->resolveGudangId($retur->gudang_id ? (int) $retur->gudang_id : null, $cabangId);
+
+        if ($retur->gudang_id !== $gudangId || ! $retur->cabang_id) {
+            $retur->update([
+                'cabang_id' => $cabangId,
+                'gudang_id' => $gudangId,
+            ]);
+        }
         $pelangganId = $retur->pelanggan_id;
 
         $totalTukar = 0;
@@ -407,8 +450,17 @@ class ReturnPenjualanService
         }
 
         DB::transaction(function () use ($retur, $totalHpp, $userId) {
-            $cabangId = (int) $retur->cabang_id;
-            $gudangId = (int) $retur->gudang_id;
+            $cabangId = (int) ($retur->cabang_id ?: ($retur->transaksi?->cabang_id ?: (session('cabang_id') ?: Cabang::value('id') ?: 1)));
+            $gudangId = $this->resolveGudangId($retur->gudang_id ? (int) $retur->gudang_id : null, $cabangId);
+
+            if ($retur->gudang_id !== $gudangId || ! $retur->cabang_id) {
+                $retur->update([
+                    'cabang_id' => $cabangId,
+                    'gudang_id' => $gudangId,
+                ]);
+            }
+
+            $userId = $userId ?: ($retur->user_id ?: auth()->id());
             $totalNilaiRetur = (float) $retur->jumlah;
             $stokDeductionService = app(StokDeductionService::class);
 

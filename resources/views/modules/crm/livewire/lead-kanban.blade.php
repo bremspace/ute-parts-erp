@@ -249,9 +249,12 @@
                                     </p>
                                 @endif
                                 @if($lead->pelanggan_id)
-                                    <p class="mt-2 text-[9px] font-semibold text-up-mint bg-up-mint/10 border border-up-mint/30 px-1.5 py-0.5 rounded-full inline-block">
-                                        ✓ Terhubung Pelanggan #{{ $lead->pelanggan_id }}
-                                    </p>
+                                    <a href="/app/crm?search={{ urlencode($lead->kontak_nama) }}"
+                                       class="mt-2 text-[9px] font-semibold text-up-mint hover:text-white bg-up-mint/10 hover:bg-up-mint/20 border border-up-mint/30 px-2 py-0.5 rounded-full inline-flex items-center gap-1 transition"
+                                       title="Buka profil pelanggan 360° di CRM">
+                                        <span>✓ Terhubung Pelanggan #{{ $lead->pelanggan_id }}</span>
+                                        <span>&rarr;</span>
+                                    </a>
                                 @endif
 
                                 <!-- Konversi (won, belum punya pelanggan) -->

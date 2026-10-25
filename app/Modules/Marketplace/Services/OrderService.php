@@ -10,6 +10,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Services\StockReservationService;
@@ -93,9 +94,14 @@ class OrderService
             $diskon = 0.0; // marketplace belum mendukung diskon header
             $pajak = $this->pajakService->hitungPenjualan($cabangId, $subtotal, $diskon);
 
+            $gudangId = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
+                ?? Gudang::where('cabang_id', $cabangId)->value('id')
+                ?? Gudang::value('id');
+
             $transaksi = Transaksi::create([
                 'no_transaksi' => $noTransaksi,
                 'cabang_id' => $cabangId,
+                'gudang_id' => $gudangId,
                 'kasir_id' => null, // bukan staf kasir
                 'pelanggan_id' => $pelanggan->id,
                 'sumber' => 'marketplace',

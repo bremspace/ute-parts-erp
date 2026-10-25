@@ -5,6 +5,7 @@ namespace App\Modules\Hr\Services;
 use App\Modules\Hr\Models\AbsensiLog;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\Shift;
+use App\Modules\Hr\Models\ShiftJadwal;
 use Illuminate\Support\Carbon;
 
 /**
@@ -38,6 +39,26 @@ class AbsensiService
         }
 
         $shift = $shiftId ? Shift::find($shiftId) : null;
+        if (! $shift) {
+            // [F3-8b] Roster lookup: ambil shift yang ditugaskan hari ini bila tidak dioper manual
+            $rosterShiftId = ShiftJadwal::where('karyawan_id', $karyawanId)
+                ->where('tanggal', $tanggal)
+                ->value('shift_id');
+            if ($rosterShiftId) {
+                $shift = Shift::find($rosterShiftId);
+            }
+        }
+        if (! $shift) {
+            // Fallback ke shift aktif cabang karyawan
+            $karyawan = Karyawan::find($karyawanId);
+            if ($karyawan && $karyawan->cabang_id) {
+                $shift = Shift::where('is_aktif', true)
+                    ->where(fn ($q) => $q->where('cabang_id', $karyawan->cabang_id)->orWhereNull('cabang_id'))
+                    ->orderBy('jam_mulai')
+                    ->first();
+            }
+        }
+
         $log->jam_masuk = $jamMasuk;
         $log->shift_id = $shift?->id;
         $log->lokasi = $lokasi;
@@ -175,16 +196,18 @@ class AbsensiService
     /**
      * Auto-tandai 'absen' utk hari kerja (Sen-Jum, non-future) tanpa log.
      * Basis potongan disiplin payroll (komponen 'potongan', threshold opt-in cabang).
-     * Idempotent.
+     * Idempotent & dapat diskop per cabang.
      *
      * @return int jumlah log absen yang dibuat
      */
-    public function autoTandaiAbsen(string $periode): int
+    public function autoTandaiAbsen(string $periode, ?int $cabangId = null): int
     {
         ['mulai' => $mulai, 'selesai' => $selesai] = $this->rentangPeriode($periode);
         $sampai = min($selesai, now()->toDateString());
 
-        $karyawanIds = Karyawan::where('status_aktif', true)->pluck('id');
+        $karyawanIds = Karyawan::where('status_aktif', true)
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->pluck('id');
         $dibuat = 0;
 
         foreach ($karyawanIds as $karyawanId) {

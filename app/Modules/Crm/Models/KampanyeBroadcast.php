@@ -2,10 +2,12 @@
 
 namespace App\Modules\Crm\Models;
 
+use App\Models\User;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -53,6 +55,11 @@ class KampanyeBroadcast extends Model
     public function notifikasi(): HasMany
     {
         return $this->hasMany(NotifikasiKeluar::class, 'kampanye_broadcast_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function getLogGagalAttribute(): int

@@ -223,6 +223,58 @@
                         <option value="dibatalkan">Dibatalkan</option>
                     </select>
                 </div>
+            @elseif($activeTab === 'online')
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterPlatform" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
+                        <option value="">Semua Platform</option>
+                        <option value="marketplace">Web Store Ute</option>
+                        <option value="shopee">Shopee</option>
+                        <option value="tokopedia">Tokopedia</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
+                        <option value="">Semua Status Order</option>
+                        <option value="menunggu_pembayaran">Menunggu Bayar</option>
+                        <option value="lunas">Lunas</option>
+                        <option value="diproses">Diproses</option>
+                        <option value="dikirim">Dikirim</option>
+                        <option value="siap_diambil">Siap Diambil (Pickup)</option>
+                        <option value="selesai">Selesai</option>
+                        <option value="batal">Batal</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterMetodePengiriman" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
+                        <option value="">Semua Pengiriman</option>
+                        <option value="pickup">Ambil di Toko (Pickup)</option>
+                        <option value="kurir">Kurir Ekspedisi</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterMetode" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
+                        <option value="">Semua Metode</option>
+                        <option value="duitku">Duitku</option>
+                        <option value="transfer">Transfer Bank</option>
+                        <option value="qris">QRIS</option>
+                        <option value="tunai">Tunai</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <button
+                        type="button"
+                        wire:click="sinkronkanSemuaOnline"
+                        wire:loading.attr="disabled"
+                        class="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer"
+                        title="Sinkronkan status transaksi online Duitku & Omnichannel"
+                    >
+                        <span wire:loading.remove wire:target="sinkronkanSemuaOnline">🔄 Sync Online</span>
+                        <span wire:loading wire:target="sinkronkanSemuaOnline" class="flex items-center gap-1.5">
+                            <svg class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                            Sinkronisasi...
+                        </span>
+                    </button>
+                </div>
             @elseif($activeTab === 'servis')
                 <div class="w-full sm:w-auto">
                     <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
@@ -380,7 +432,7 @@
                                         {{ $row->operator }}
                                     </td>
                                     <td class="py-3.5 px-4">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ in_array(strtolower($row->metode), ['tunai', 'kas laci']) ? 'bg-up-mint/10 text-up-mint' : 'bg-white/10 text-ink-200' }}">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ in_array(strtolower($row->metode), ['tunai', 'kas laci']) ? 'bg-up-mint/10 text-up-mint' : (strtolower($row->metode) === 'piutang' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-white/10 text-ink-200') }}">
                                             {{ $row->metode }}
                                         </span>
                                     </td>
@@ -715,9 +767,14 @@
                                     <td class="py-3.5 px-4 text-ink-200">{{ $row->pelanggan?->nama ?? 'Pelanggan Umum' }}</td>
                                     <td class="py-3.5 px-4 text-right font-bold tabular-nums {{ $row->status === 'void' ? 'text-up-red line-through decoration-up-red/70' : 'text-white' }}">Rp {{ number_format($row->total_akhir, 0, ',', '.') }}</td>
                                     <td class="py-3.5 px-4">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $row->metode_bayar === 'tunai' ? 'bg-up-mint/10 text-up-mint' : 'bg-up-primary/10 text-up-primary' }}">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $row->metode_bayar === 'tunai' ? 'bg-up-mint/10 text-up-mint' : ($row->metode_bayar === 'piutang' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-up-primary/10 text-up-primary') }}">
                                             {{ $row->metode_bayar }}
                                         </span>
+                                        @if($row->piutang)
+                                            <span class="block text-[9px] mt-0.5 font-mono {{ $row->piutang->status === 'lunas' ? 'text-up-mint' : 'text-amber-400' }}">
+                                                ({{ strtoupper($row->piutang->status) }})
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="py-3.5 px-4">
                                         <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $row->status === 'selesai' ? 'bg-up-mint/10 text-up-mint' : ($row->status === 'void' ? 'bg-up-red/15 text-up-red border border-up-red/30' : 'bg-up-red/10 text-up-red') }}">
@@ -823,9 +880,14 @@
                                         <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $row->status === 'selesai' ? 'bg-up-mint/15 text-up-mint border border-up-mint/25' : ($row->status === 'void' ? 'bg-up-red/20 text-up-red border border-up-red/30' : 'bg-up-red/10 text-up-red') }}">
                                             {{ ucfirst($row->status) }}
                                         </span>
-                                        <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase {{ $row->metode_bayar === 'tunai' ? 'bg-up-mint/10 text-up-mint' : 'bg-up-primary/10 text-up-primary' }}">
+                                        <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase {{ $row->metode_bayar === 'tunai' ? 'bg-up-mint/10 text-up-mint' : ($row->metode_bayar === 'piutang' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-up-primary/10 text-up-primary') }}">
                                             {{ $row->metode_bayar }}
                                         </span>
+                                        @if($row->piutang)
+                                            <span class="block text-[9px] font-mono {{ $row->piutang->status === 'lunas' ? 'text-up-mint' : 'text-amber-400' }}">
+                                                ({{ strtoupper($row->piutang->status) }})
+                                            </span>
+                                        @endif
                                     </div>
                                 </div>
 
@@ -989,6 +1051,26 @@
                                     </td>
                                     <td class="py-3.5 px-4 text-right">
                                         <div class="flex items-center justify-end gap-1.5">
+                                            @if($isPickup && in_array($row->status, ['lunas', 'diproses', 'siap_diambil'], true))
+                                                <button
+                                                    wire:click="serahkanPesananPickup({{ $row->id }})"
+                                                    wire:confirm="Serahkan pesanan pickup ini ke konsumen di toko?"
+                                                    class="px-2 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 transition cursor-pointer"
+                                                    title="Serahkan Barang Pickup di Toko"
+                                                >
+                                                    Serahkan
+                                                </button>
+                                            @endif
+                                            @if(!in_array($row->status, ['selesai', 'void', 'batal', 'dibatalkan'], true))
+                                                <button
+                                                    wire:click="sinkronkanStatusOnline({{ $row->id }})"
+                                                    wire:loading.attr="disabled"
+                                                    class="p-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-white border border-indigo-500/30 transition cursor-pointer"
+                                                    title="Sinkronkan status Duitku / Channel sekarang"
+                                                >
+                                                    🔄
+                                                </button>
+                                            @endif
                                             <button
                                                 wire:click="lihatDetailTransaksi({{ $row->id }})"
                                                 class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-200 hover:text-white text-[11px] font-semibold transition cursor-pointer"
@@ -1092,6 +1174,26 @@
 
                             {{-- Action Bar --}}
                             <div class="flex items-center gap-1.5 pt-2 border-t border-white/5 flex-wrap">
+                                @if($isPickup && in_array($row->status, ['lunas', 'diproses', 'siap_diambil'], true))
+                                    <button
+                                        wire:click="serahkanPesananPickup({{ $row->id }})"
+                                        wire:confirm="Serahkan pesanan pickup ini ke konsumen di toko?"
+                                        class="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                        title="Serahkan Barang Pickup di Toko"
+                                    >
+                                        Serahkan
+                                    </button>
+                                @endif
+                                @if(!in_array($row->status, ['selesai', 'void', 'batal', 'dibatalkan'], true))
+                                    <button
+                                        wire:click="sinkronkanStatusOnline({{ $row->id }})"
+                                        wire:loading.attr="disabled"
+                                        class="px-2.5 py-2 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                        title="Sinkronkan status Duitku / Channel sekarang"
+                                    >
+                                        🔄 Sync
+                                    </button>
+                                @endif
                                 <button
                                     wire:click="lihatDetailTransaksi({{ $row->id }})"
                                     class="flex-1 min-w-[70px] py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
@@ -1541,6 +1643,25 @@
                             </div>
                         </div>
 
+                        @if(!empty($selectedDetail['piutang']))
+                            <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1">
+                                <div class="font-bold text-amber-300 flex items-center justify-between">
+                                    <span>📋 Subledger Piutang / Kasbon: {{ $selectedDetail['piutang']['no_piutang'] }}</span>
+                                    <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded {{ $selectedDetail['piutang']['status'] === 'lunas' ? 'bg-up-mint/20 text-up-mint' : 'bg-amber-500/20 text-amber-300' }}">
+                                        {{ strtoupper(str_replace('_', ' ', $selectedDetail['piutang']['status'])) }}
+                                    </span>
+                                </div>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-ink-300 pt-1">
+                                    <div>Total Piutang: <span class="font-bold text-white tabular-nums">Rp {{ number_format($selectedDetail['piutang']['jumlah'], 0, ',', '.') }}</span></div>
+                                    <div>Sudah Dibayar: <span class="font-bold text-up-mint tabular-nums">Rp {{ number_format($selectedDetail['piutang']['jumlah_dibayar'], 0, ',', '.') }}</span></div>
+                                    <div>Sisa Tagihan: <span class="font-bold text-up-accent tabular-nums">Rp {{ number_format($selectedDetail['piutang']['sisa'], 0, ',', '.') }}</span></div>
+                                </div>
+                                @if(!empty($selectedDetail['piutang']['jatuh_tempo']))
+                                    <div class="text-[11px] text-ink-400">Jatuh Tempo: <span class="font-semibold text-white">{{ $selectedDetail['piutang']['jatuh_tempo'] }}</span></div>
+                                @endif
+                            </div>
+                        @endif
+
                         @if(!empty($selectedDetail['pengiriman']))
                             <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs space-y-1">
                                 <div class="font-bold text-indigo-300 flex items-center justify-between">
@@ -1847,6 +1968,24 @@
                                     🖨️ Cetak Struk POS
                                 </button>
                             @else
+                                @if(str_contains(strtolower($selectedDetail['catatan'] ?? ''), 'ambil_ke_toko') && in_array($selectedDetail['status'], ['lunas', 'diproses', 'siap_diambil'], true))
+                                    <button
+                                        wire:click="serahkanPesananPickup({{ $selectedDetail['id'] }})"
+                                        wire:confirm="Serahkan pesanan pickup ini ke konsumen di toko?"
+                                        class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] transition active:scale-95"
+                                    >
+                                        Serahkan Barang Pickup
+                                    </button>
+                                @endif
+                                @if(!in_array($selectedDetail['status'], ['selesai', 'void', 'batal', 'dibatalkan'], true))
+                                    <button
+                                        wire:click="sinkronkanStatusOnline({{ $selectedDetail['id'] }})"
+                                        wire:loading.attr="disabled"
+                                        class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 hover:text-white border border-indigo-500/30 font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 min-h-[44px] transition active:scale-95"
+                                    >
+                                        🔄 Sync Status
+                                    </button>
+                                @endif
                                 <button
                                     wire:click="cetakUlangStruk('online', {{ $selectedDetail['id'] }})"
                                     class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] transition active:scale-95"

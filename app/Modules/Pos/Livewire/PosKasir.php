@@ -2448,7 +2448,7 @@ class PosKasir extends Component
 
     public function getRiwayatTransaksiHariIniProperty()
     {
-        $cabangId = session('cabang_id');
+        $cabangId = session('cabang_id') ?: auth()->user()?->cabangs()->first()?->id ?: Cabang::value('id');
         $search = trim($this->riwayatSearch);
 
         return Transaksi::with(['pelanggan', 'kasir'])

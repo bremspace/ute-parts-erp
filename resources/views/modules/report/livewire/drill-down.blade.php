@@ -119,30 +119,52 @@
                     <h4 class="text-sm font-bold text-white mb-3">
                         Rincian {{ \App\Modules\Report\Services\ReportBuilderService::MODEL_WHITELIST[$childModel] ?? $childModel }} ({{ count($childItems) }})
                     </h4>
-                    <x-prism.dual-scroll>
-                        <table class="w-full text-xs text-left border-collapse">
-                            <thead>
-                                <tr class="bg-white/5">
-                                    @foreach($childItems[0] ?? [] as $cKey => $cVal)
-                                        @if(!in_array($cKey, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
-                                            <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $cKey, $childModel) }}</th>
-                                        @endif
-                                    @endforeach
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                @foreach($childItems as $cRow)
-                                    <tr class="hover:bg-white/5 transition">
-                                        @foreach($cRow as $cKey => $cVal)
+                    <div class="hidden sm:block">
+                        <x-prism.dual-scroll>
+                            <table class="w-full text-xs text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-white/5">
+                                        @foreach($childItems[0] ?? [] as $cKey => $cVal)
                                             @if(!in_array($cKey, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
-                                                <td class="py-1.5 px-3 tabular-nums">{{ is_array($cVal) || is_object($cVal) ? '-' : $fmtVal($cVal, $cKey) }}</td>
+                                                <th class="py-2.5 px-3 font-semibold text-ink-400 uppercase text-[10px] whitespace-nowrap">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $cKey, $childModel) }}</th>
                                             @endif
                                         @endforeach
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </x-prism.dual-scroll>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @foreach($childItems as $cRow)
+                                        <tr class="hover:bg-white/5 transition">
+                                            @foreach($cRow as $cKey => $cVal)
+                                                @if(!in_array($cKey, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
+                                                    <td class="py-2 px-3 tabular-nums whitespace-nowrap">{{ is_array($cVal) || is_object($cVal) ? '-' : $fmtVal($cVal, $cKey) }}</td>
+                                                @endif
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </x-prism.dual-scroll>
+                    </div>
+
+                    <div class="block sm:hidden space-y-2">
+                        @foreach($childItems as $cIdx => $cRow)
+                            <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5 text-xs">
+                                <div class="text-[10px] font-mono text-ink-400 pb-1 border-b border-white/5">
+                                    Item #{{ $cIdx + 1 }}
+                                </div>
+                                <div class="grid grid-cols-2 gap-x-2 gap-y-1">
+                                    @foreach($cRow as $cKey => $cVal)
+                                        @if(!in_array($cKey, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
+                                            <div>
+                                                <div class="text-[9px] uppercase font-bold text-ink-500 truncate">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $cKey, $childModel) }}</div>
+                                                <div class="text-white font-medium tabular-nums truncate">{{ is_array($cVal) || is_object($cVal) ? '-' : $fmtVal($cVal, $cKey) }}</div>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
             @endif
 
@@ -160,33 +182,67 @@
                 @endcan
             </div>
             @if(count($items) > 0)
-                <x-prism.dual-scroll>
-                    <table class="w-full text-xs text-left border-collapse">
-                        <thead>
-                            <tr class="bg-white/5">
-                                @foreach($items[0] ?? [] as $key => $val)
-                                    @if(!in_array($key, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
-                                        <th class="py-2 px-3 font-semibold text-ink-400 uppercase text-[10px]">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $key, $currentModel) }}</th>
-                                    @endif
-                                @endforeach
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5">
-                            @foreach($items as $item)
-                                <tr class="hover:bg-white/5 cursor-pointer transition" wire:click="drillDown('{{ $currentModel }}', {{ $item['id'] ?? 0 }})">
-                                    @foreach($item as $key => $val)
+                {{-- Desktop & Tablet View --}}
+                <div class="hidden sm:block">
+                    <x-prism.dual-scroll>
+                        <table class="w-full text-xs text-left border-collapse">
+                            <thead>
+                                <tr class="bg-white/5">
+                                    @foreach($items[0] ?? [] as $key => $val)
                                         @if(!in_array($key, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
-                                            <td class="py-1.5 px-3 tabular-nums">{{ is_array($val) || is_object($val) ? '-' : $fmtVal($val, $key) }}</td>
+                                            <th class="py-2.5 px-3 font-semibold text-ink-400 uppercase text-[10px] whitespace-nowrap">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $key, $currentModel) }}</th>
                                         @endif
                                     @endforeach
+                                    <th class="py-2.5 px-3 text-right font-semibold text-ink-400 uppercase text-[10px]">Aksi</th>
                                 </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </x-prism.dual-scroll>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach($items as $item)
+                                    <tr class="hover:bg-white/5 cursor-pointer transition" wire:click="drillDown('{{ $currentModel }}', {{ $item['id'] ?? 0 }})">
+                                        @foreach($item as $key => $val)
+                                            @if(!in_array($key, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true))
+                                                <td class="py-2 px-3 tabular-nums whitespace-nowrap">{{ is_array($val) || is_object($val) ? '-' : $fmtVal($val, $key) }}</td>
+                                            @endif
+                                        @endforeach
+                                        <td class="py-2 px-3 text-right">
+                                            <span class="text-xs text-up-primary hover:underline font-bold">Detail ↗</span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </x-prism.dual-scroll>
+                </div>
+
+                {{-- Mobile Phone Card View --}}
+                <div class="block sm:hidden space-y-2.5">
+                    @foreach($items as $mIdx => $item)
+                        <div wire:click="drillDown('{{ $currentModel }}', {{ $item['id'] ?? 0 }})" class="p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 cursor-pointer transition active:scale-[0.99] space-y-2">
+                            <div class="flex items-center justify-between pb-1.5 border-b border-white/5">
+                                <span class="font-mono text-xs font-bold text-up-primary">#{{ $item['id'] ?? ($mIdx + 1) }}</span>
+                                <span class="text-xs text-ink-400 flex items-center gap-1 font-semibold">
+                                    Lihat Detail <span class="text-up-primary">↗</span>
+                                </span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                                @foreach($item as $key => $val)
+                                    @if(!in_array($key, \App\Modules\Report\Services\ReportBuilderService::SENSITIVE_EXPORT_COLUMNS, true) && $key !== 'id')
+                                        <div>
+                                            <div class="text-[9px] uppercase font-bold text-ink-500 truncate">{{ \App\Modules\Report\Services\ReportBuilderService::getColumnLabel((string) $key, $currentModel) }}</div>
+                                            <div class="text-white font-medium tabular-nums truncate">{{ is_array($val) || is_object($val) ? '-' : $fmtVal($val, $key) }}</div>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             @else
-                <div class="text-center py-8 text-ink-500 text-sm">
-                    Tidak ada data. Pilih sumber data dari atas.
+                <div class="text-center py-12 text-ink-500 text-xs space-y-2">
+                    <svg class="w-8 h-8 mx-auto opacity-30 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <p>Tidak ada data. Silakan pilih sumber data atau ubah rentang tanggal periode di atas.</p>
                 </div>
             @endif
         </x-prism.glass-card>

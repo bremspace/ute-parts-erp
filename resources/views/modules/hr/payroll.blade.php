@@ -72,11 +72,11 @@
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 mb-1.5">Pilih Periode Penggajian</label>
                     <select wire:model.live="periode"
-                        class="block w-full rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary text-sm min-h-[44px]">
+                        class="block w-full rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary text-base sm:text-sm min-h-[44px]">
                         <option value="">-- Pilih Periode --</option>
                         @foreach($periodeList as $id => $label)
                             <option value="{{ $label }}">{{ $label }}</option>
@@ -84,33 +84,43 @@
                     </select>
                 </div>
                 <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 mb-1.5">Filter Cabang</label>
+                    <select wire:model.live="cabangFilter"
+                        class="block w-full rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary text-base sm:text-sm min-h-[44px]">
+                        <option value="semua">Semua Cabang</option>
+                        @foreach($cabangList as $cab)
+                            <option value="{{ $cab->id }}">{{ $cab->nama }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400 mb-1.5">Filter Status Slip</label>
                     <select wire:model.live="statusFilter"
-                        class="block w-full rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary text-sm min-h-[44px]">
+                        class="block w-full rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary text-base sm:text-sm min-h-[44px]">
                         <option value="semua">Semua Status</option>
                         <option value="draft">Draft</option>
                         <option value="approved">Approved / Disetujui</option>
                         <option value="dibayar">Dibayar</option>
                     </select>
                 </div>
-                <div class="flex items-center gap-2 pt-2 sm:pt-0">
+                <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-2 sm:pt-0">
                     <button wire:click="hitungDraft"
                         @if(($periodeRecord?->status ?? '') === 'dibayar') disabled @endif
-                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm transition active:scale-[0.98]">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                        <span>Hitung Draft</span>
+                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm transition active:scale-[0.98]">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                        <span class="truncate">Draft</span>
                     </button>
                     <button wire:click="bukaApproveModal"
                         @if(($periodeRecord?->status ?? '') === 'dibayar') disabled @endif
-                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm transition active:scale-[0.98]">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <span>Approval / Jurnal</span>
+                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm transition active:scale-[0.98]">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span class="truncate">Approve</span>
                     </button>
                     <button wire:click="bukaBayarModal"
                         @if(($periodeRecord?->status ?? '') === 'dibayar') disabled @endif
-                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm transition active:scale-[0.98]">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        <span>Bayar Payroll</span>
+                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-xl text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm transition active:scale-[0.98]">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        <span class="truncate">Bayar</span>
                     </button>
                 </div>
             </div>
@@ -219,12 +229,12 @@
                         <div class="relative">
                             <input type="text" wire:model.live.debounce.300ms="searchKaryawan"
                                 placeholder="Cari nama, NIK, jabatan..."
-                                class="block w-full pl-9 pr-3 py-2 text-sm rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
-                            <svg class="w-4 h-4 text-ink-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                class="block w-full pl-9 pr-3 py-2 text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            <svg class="w-4 h-4 text-ink-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                         </div>
                     </div>
                     <button wire:click="bukaTambahKaryawan"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 shadow-sm transition active:scale-[0.98]">
+                        class="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 min-h-[44px] shadow-sm transition active:scale-[0.98]">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                         <span>Tambah Karyawan</span>
                     </button>
@@ -319,18 +329,18 @@
                     <div>
                         <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 uppercase mb-1">Format Periode (YYYY-MM)</label>
                         <input type="text" wire:model="inputPeriodeBaru" placeholder="Contoh: 2026-04"
-                            class="block w-full rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary text-sm min-h-[44px]">
+                            class="block w-full rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary text-base sm:text-sm min-h-[44px]">
                         @error('inputPeriodeBaru') <span class="text-xs text-red-500 mt-1 block">{{ $message }}</span> @enderror
                     </div>
                     <p class="text-xs text-ink-500 dark:text-ink-400">Periode akan mengunci tanggal awal bulan sampai tanggal akhir bulan untuk seluruh kalkulasi slip dan komisi servis.</p>
                 </div>
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-ink-100 dark:border-white/10">
                     <button wire:click="tutupBuatPeriode"
-                        class="px-4 py-2 text-xs font-medium rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 transition">
+                        class="px-4 py-2 text-xs font-medium rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 transition min-h-[44px] inline-flex items-center justify-center">
                         Batal
                     </button>
                     <button wire:click="buatPeriode"
-                        class="px-4 py-2 text-xs font-semibold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 transition shadow-sm">
+                        class="px-4 py-2 text-xs font-semibold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 transition shadow-sm min-h-[44px] inline-flex items-center justify-center">
                         Simpan &amp; Buka Periode
                     </button>
                 </div>
@@ -463,12 +473,12 @@
                     <label class="block text-xs font-semibold uppercase tracking-wider text-ink-600 dark:text-ink-300">Gaji Pokok Bulanan (IDR)</label>
                     <div class="flex gap-2">
                         <div class="relative flex-1">
-                            <span class="absolute left-3 top-2.5 text-sm font-semibold text-ink-400">Rp</span>
+                            <span class="absolute left-3 top-3 text-sm font-semibold text-ink-400">Rp</span>
                             <input type="text" wire:model="inputGajiPokok"
-                                class="block w-full pl-10 pr-3 py-2 text-sm font-semibold rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                                class="block w-full pl-10 pr-3 py-2 text-base sm:text-sm font-semibold min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                         </div>
                         <button wire:click="simpanGajiPokok"
-                            class="px-4 py-2 text-xs font-semibold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 transition shadow-sm active:scale-[0.98]">
+                            class="px-4 py-2 text-xs font-semibold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 transition shadow-sm active:scale-[0.98] min-h-[44px] inline-flex items-center justify-center">
                             Simpan Pokok
                         </button>
                     </div>
@@ -527,7 +537,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <div>
                                 <select wire:model="newKomponenTipe"
-                                    class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                                    class="block w-full text-base sm:text-xs min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                                     <option value="tunjangan">Tunjangan (+)</option>
                                     <option value="bonus">Bonus / Insentif (+)</option>
                                     <option value="potongan">Potongan (-)</option>
@@ -535,16 +545,16 @@
                             </div>
                             <div>
                                 <input type="text" wire:model="newKomponenNama" placeholder="Nama (e.g. Uang Makan, BPJS)"
-                                    class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                                    class="block w-full text-base sm:text-xs min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                             </div>
                             <div>
                                 <input type="text" wire:model="newKomponenNominal" placeholder="Nominal Rp"
-                                    class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                                    class="block w-full text-base sm:text-xs min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                             </div>
                         </div>
                         <div class="flex justify-end">
                             <button wire:click="tambahKomponen"
-                                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 transition shadow-sm active:scale-[0.98]">
+                                class="inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 min-h-[44px] transition shadow-sm active:scale-[0.98]">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                 <span>Tambah Komponen</span>
                             </button>
@@ -554,7 +564,7 @@
 
                 <div class="flex justify-end pt-3 border-t border-ink-100 dark:border-white/10">
                     <button wire:click="tutupKompensasi"
-                        class="px-4 py-2 text-xs font-semibold rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 transition">
+                        class="px-4 py-2 text-xs font-semibold rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 min-h-[44px] inline-flex items-center justify-center transition">
                         Selesai
                     </button>
                 </div>
@@ -638,7 +648,7 @@
                     <div>
                         <label class="block font-semibold uppercase tracking-wider text-ink-700 dark:text-ink-300 mb-1">Pilih Akun Sumber Dana (Kas / Bank)</label>
                         <select wire:model="akunBayarKode"
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                             @foreach($akunKasBankList as $akun)
                                 <option value="{{ $akun->kode }}">{{ $akun->kode }} - {{ $akun->nama }} ({{ ucfirst($akun->kelompok) }})</option>
                             @endforeach
@@ -655,11 +665,11 @@
 
                 <div class="flex items-center justify-end gap-2 pt-3 border-t border-ink-100 dark:border-white/10">
                     <button wire:click="tutupBayarModal"
-                        class="px-4 py-2 text-xs font-semibold rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 transition">
+                        class="px-4 py-2 text-xs font-semibold rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 min-h-[44px] inline-flex items-center justify-center transition">
                         Batal
                     </button>
                     <button wire:click="bayarPayroll"
-                        class="px-5 py-2 text-xs font-bold rounded-xl text-white bg-purple-600 hover:bg-purple-700 transition shadow-sm active:scale-[0.98]">
+                        class="px-5 py-2 text-xs font-bold rounded-xl text-white bg-purple-600 hover:bg-purple-700 transition shadow-sm active:scale-[0.98] min-h-[44px] inline-flex items-center justify-center">
                         Konfirmasi Pembayaran
                     </button>
                 </div>
@@ -684,21 +694,21 @@
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Nama Lengkap *</label>
                         <input type="text" wire:model="inputNama" placeholder="Nama Karyawan"
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                         @error('inputNama') <span class="text-red-500 text-[11px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">NIK *</label>
                         <input type="text" wire:model="inputNik" placeholder="EMP-0001"
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                         @error('inputNik') <span class="text-red-500 text-[11px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Jabatan *</label>
                         <select wire:model="inputJabatan"
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                             <option value="teknisi">Teknisi Servis</option>
                             <option value="kasir">Kasir POS</option>
                             <option value="admin">Admin Toko / Gudang</option>
@@ -712,7 +722,7 @@
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Cabang Penempatan</label>
                         <select wire:model="inputCabangId"
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                             <option value="">Kantor Pusat</option>
                             @foreach($cabangList as $cab)
                                 <option value="{{ $cab->id }}">{{ $cab->nama }}</option>
@@ -723,7 +733,7 @@
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Hubungkan Akun User Login</label>
                         <select wire:model="inputUserId"
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                             <option value="">-- Tidak Terhubung Akun --</option>
                             @foreach($userList as $u)
                                 <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
@@ -735,26 +745,26 @@
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Tanggal Mulai Masuk *</label>
                         <input type="date" wire:model="inputTglMasuk"
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                         @error('inputTglMasuk') <span class="text-red-500 text-[11px] mt-0.5 block">{{ $message }}</span> @enderror
                     </div>
 
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Gaji Pokok Default (IDR)</label>
                         <input type="text" wire:model="inputKaryawanGajiPokok" placeholder="Contoh: 3500000"
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                     </div>
 
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Nomor Rekening Bank</label>
                         <input type="text" wire:model="inputRekeningBank" placeholder="BCA 1234567890 a/n..."
-                            class="block w-full text-xs rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                            class="block w-full text-base sm:text-sm min-h-[44px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
                     </div>
 
                     <div class="sm:col-span-2 flex items-center gap-2 pt-2">
                         <input type="checkbox" wire:model="inputStatusAktif" id="inputStatusAktif"
-                            class="rounded border-ink-300 dark:border-white/10 text-up-primary focus:ring-up-primary">
-                        <label for="inputStatusAktif" class="text-xs text-ink-800 dark:text-ink-200 font-medium">
+                            class="rounded border-ink-300 dark:border-white/10 text-up-primary focus:ring-up-primary w-4 h-4">
+                        <label for="inputStatusAktif" class="text-xs text-ink-800 dark:text-ink-200 font-medium cursor-pointer">
                             Karyawan Aktif (diikutsertakan dalam payroll &amp; absensi)
                         </label>
                     </div>
@@ -762,11 +772,11 @@
 
                 <div class="flex items-center justify-end gap-2 pt-3 border-t border-ink-100 dark:border-white/10">
                     <button wire:click="tutupTambahKaryawan"
-                        class="px-4 py-2 text-xs font-semibold rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 transition">
+                        class="px-4 py-2 text-xs font-semibold rounded-xl text-ink-700 dark:text-ink-300 hover:bg-black/5 dark:hover:bg-white/5 min-h-[44px] inline-flex items-center justify-center transition">
                         Batal
                     </button>
                     <button wire:click="simpanKaryawan"
-                        class="px-5 py-2 text-xs font-bold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 transition shadow-sm active:scale-[0.98]">
+                        class="px-5 py-2 text-xs font-bold rounded-xl text-white bg-up-primary hover:bg-up-primary/90 transition shadow-sm active:scale-[0.98] min-h-[44px] inline-flex items-center justify-center">
                         Simpan Karyawan
                     </button>
                 </div>

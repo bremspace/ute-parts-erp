@@ -5,6 +5,7 @@ namespace App\Modules\Report\Livewire;
 use App\Modules\Report\Jobs\ReportExportJob;
 use App\Modules\Report\Models\SavedReport;
 use App\Modules\Report\Services\ReportBuilderService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -183,7 +184,7 @@ class ReportBuilder extends Component
 
         $reportName = trim($this->reportName);
         if ($reportName === '') {
-            $label = $this->availableModels[$this->sourceModel]['label'] ?? class_basename($this->sourceModel);
+            $label = $this->whitelist[$this->sourceModel] ?? class_basename($this->sourceModel);
             $reportName = 'Laporan '.$label.' '.now()->format('d-m-Y');
             $this->reportName = $reportName;
         }
@@ -323,7 +324,7 @@ class ReportBuilder extends Component
         }
 
         $report->delete();
-        $this->dispatch('toast', type: 'success', message: 'Laporan berhasil dihapus');
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Laporan berhasil dihapus']);
     }
 
     public function render()

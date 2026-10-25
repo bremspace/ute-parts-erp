@@ -61,6 +61,7 @@
                             <thead>
                                 <tr class="border-b border-ink-200/80 dark:border-white/10 bg-ink-50/80 dark:bg-white/[0.02] text-ink-600 dark:text-ink-400 uppercase text-[10px] font-bold tracking-wider">
                                     <th class="py-3 px-3.5">No Transaksi</th>
+                                    <th class="py-3 px-3.5">Sumber</th>
                                     <th class="py-3 px-3.5">Waktu</th>
                                     <th class="py-3 px-3.5">Kasir</th>
                                     <th class="py-3 px-3.5">Pelanggan</th>
@@ -72,8 +73,22 @@
                             </thead>
                             <tbody class="divide-y divide-ink-200/60 dark:divide-white/5">
                                 @foreach($riwayatTransaksiHariIni as $trx)
+                                    @php
+                                        $sumber = $trx->sumber;
+                                        $sumberBadge = match(true) {
+                                            $sumber === 'marketplace' => ['label' => 'Web Ute', 'class' => 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'],
+                                            str_starts_with((string) $sumber, 'channel:') => ['label' => strtoupper(str_replace('channel:', '', $sumber)), 'class' => 'bg-up-accent/15 text-up-accent border border-up-accent/30'],
+                                            $sumber === 'servis' => ['label' => 'Servis', 'class' => 'bg-teal-500/15 text-teal-400 border border-teal-500/30'],
+                                            default => ['label' => 'POS', 'class' => 'bg-white/10 text-ink-300 border border-white/10'],
+                                        };
+                                    @endphp
                                     <tr class="hover:bg-ink-50 dark:hover:bg-white/[0.02] transition-colors">
                                         <td class="py-3 px-3.5 font-mono font-bold text-ink-900 dark:text-white">{{ $trx->no_transaksi }}</td>
+                                        <td class="py-3 px-3.5">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $sumberBadge['class'] }}">
+                                                {{ $sumberBadge['label'] }}
+                                            </span>
+                                        </td>
                                         <td class="py-3 px-3.5 text-ink-600 dark:text-ink-300 tabular-nums">{{ $trx->created_at?->format('H:i:s') }}</td>
                                         <td class="py-3 px-3.5 text-ink-700 dark:text-ink-200">{{ $trx->kasir?->name ?? '-' }}</td>
                                         <td class="py-3 px-3.5 text-ink-700 dark:text-ink-200 font-medium">{{ $trx->pelanggan?->nama ?? 'Umum' }}</td>
@@ -133,10 +148,22 @@
                     {{-- Mobile Cards View --}}
                     <div class="block sm:hidden divide-y divide-ink-200/60 dark:divide-white/5">
                         @foreach($riwayatTransaksiHariIni as $trx)
+                            @php
+                                $sumber = $trx->sumber;
+                                $sumberBadge = match(true) {
+                                    $sumber === 'marketplace' => ['label' => 'Web Ute', 'class' => 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'],
+                                    str_starts_with((string) $sumber, 'channel:') => ['label' => strtoupper(str_replace('channel:', '', $sumber)), 'class' => 'bg-up-accent/15 text-up-accent border border-up-accent/30'],
+                                    $sumber === 'servis' => ['label' => 'Servis', 'class' => 'bg-teal-500/15 text-teal-400 border border-teal-500/30'],
+                                    default => ['label' => 'POS', 'class' => 'bg-white/10 text-ink-300 border border-white/10'],
+                                };
+                            @endphp
                             <div class="py-3.5 space-y-2.5">
                                 <div class="flex items-start justify-between gap-2">
                                     <div>
-                                        <span class="font-mono font-bold text-ink-900 dark:text-white text-xs block">{{ $trx->no_transaksi }}</span>
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-mono font-bold text-ink-900 dark:text-white text-xs block">{{ $trx->no_transaksi }}</span>
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase {{ $sumberBadge['class'] }}">{{ $sumberBadge['label'] }}</span>
+                                        </div>
                                         <span class="text-[10px] text-ink-500 dark:text-ink-400 tabular-nums">{{ $trx->created_at?->format('H:i:s') }}</span>
                                     </div>
                                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 {{ $trx->status === 'selesai' ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : ($trx->status === 'void' ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30' : ($trx->status === 'dibatalkan' ? 'bg-up-red/15 text-up-red border border-up-red/30' : 'bg-up-amber/15 text-up-amber border border-up-amber/30')) }}">

@@ -23,6 +23,20 @@
                 <option value="semua" class="bg-ink-900">Histori: Semua Transaksi</option>
             </select>
 
+            <!-- [F2-5] Export laporan servis (queue) -->
+            @can('laporan.cabang')
+                <div class="flex items-center gap-1.5">
+                    <button type="button" wire:click="exportLaporan('xlsx')" title="Export Excel" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">
+                        <span class="hidden sm:inline">Export Excel</span>
+                        <span class="sm:hidden">XLS</span>
+                    </button>
+                    <button type="button" wire:click="exportLaporan('csv')" title="Export CSV" class="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-xs whitespace-nowrap cursor-pointer transition-[transform,background-color] active:scale-[0.97] min-h-[44px]">
+                        <span class="hidden sm:inline">Export CSV</span>
+                        <span class="sm:hidden">CSV</span>
+                    </button>
+                </div>
+            @endcan
+
             @can('servis.create')
                 <button
                     type="button"

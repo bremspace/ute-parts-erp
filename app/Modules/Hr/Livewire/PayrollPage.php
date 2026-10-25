@@ -42,6 +42,8 @@ class PayrollPage extends Component
 
     public string $statusFilter = 'semua';
 
+    public string $cabangFilter = 'semua';
+
     // Detail Slip Modal
     public bool $showDetailSlipModal = false;
 
@@ -108,6 +110,11 @@ class PayrollPage extends Component
         $this->loadSlips();
     }
 
+    public function updatedCabangFilter(): void
+    {
+        $this->loadSlips();
+    }
+
     public function setTab(string $tab): void
     {
         $this->activeTab = in_array($tab, ['payroll', 'karyawan']) ? $tab : 'payroll';
@@ -124,6 +131,13 @@ class PayrollPage extends Component
 
         $query = PayrollSlip::with(['karyawan.cabang'])
             ->whereHas('periode', fn ($q) => $q->where('periode', $this->periode));
+
+        $cabangId = session('cabang_id');
+        if ($this->cabangFilter !== 'semua') {
+            $query->whereHas('karyawan', fn ($q) => $q->where('cabang_id', (int) $this->cabangFilter));
+        } elseif ($cabangId && ! (auth()->user() && auth()->user()->hasRole('super-admin'))) {
+            $query->whereHas('karyawan', fn ($q) => $q->where('cabang_id', (int) $cabangId));
+        }
 
         if ($this->statusFilter !== 'semua') {
             $query->where('status', $this->statusFilter);
@@ -342,7 +356,8 @@ class PayrollPage extends Component
     {
         $this->karyawanEditId = null;
         $this->inputUserId = null;
-        $this->inputNik = 'EMP-'.str_pad((string) (Karyawan::count() + 1), 4, '0', STR_PAD_LEFT);
+        $maxId = Karyawan::max('id') ?? 0;
+        $this->inputNik = 'EMP-'.str_pad((string) ($maxId + 1), 4, '0', STR_PAD_LEFT);
         $this->inputNama = '';
         $this->inputJabatan = 'teknisi';
         $this->inputCabangId = session('cabang_id') ?: Cabang::value('id');
@@ -534,7 +549,14 @@ class PayrollPage extends Component
                 ->first();
         }
 
+        $cabangId = session('cabang_id');
         $karyawanQuery = Karyawan::with(['cabang', 'komponenGaji']);
+
+        if ($this->cabangFilter !== 'semua') {
+            $karyawanQuery->where('cabang_id', (int) $this->cabangFilter);
+        } elseif ($cabangId && ! (auth()->user() && auth()->user()->hasRole('super-admin'))) {
+            $karyawanQuery->where('cabang_id', (int) $cabangId);
+        }
 
         if ($this->searchKaryawan !== '') {
             $search = '%'.$this->searchKaryawan.'%';
@@ -577,6 +599,7 @@ class PayrollPage extends Component
             'periodeRecord' => $periodeRecord,
             'approvalRequest' => $approvalRequest,
             'statusFilter' => $this->statusFilter,
+            'cabangFilter' => $this->cabangFilter,
             'karyawans' => $karyawans,
             'cabangList' => $cabangList,
             'userList' => $userList,
