@@ -42,6 +42,11 @@
                                     {{ $item['varian'] }}
                                 </span>
                             @endif
+                            @if(!empty($item['catatan']))
+                                <span class="px-2 py-0.5 rounded-md bg-up-primary/10 border border-up-primary/20 text-up-primary dark:text-white text-[10px] font-bold">
+                                    📱 {{ $item['catatan'] }}
+                                </span>
+                            @endif
                             @if(count($item['daftar_satuan'] ?? []) > 1)
                                 <div class="inline-flex items-center">
                                     <select

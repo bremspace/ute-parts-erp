@@ -111,7 +111,7 @@ class MemberApprovalWorkflowTest extends TestCase
             'password' => 'secret123',
         ]);
 
-        $response->assertRedirect('/checkout');
+        $response->assertRedirect('/shop');
         $this->assertAuthenticatedAs($pelanggan, 'customer');
     }
 

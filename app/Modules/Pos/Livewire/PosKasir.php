@@ -1344,6 +1344,14 @@ class PosKasir extends Component
         $this->recalcPajak();
     }
 
+    /** Ubah catatan item keranjang (Model Gadget / Info Tambahan). */
+    public function setCatatanItem(string $itemKey, string $catatan): void
+    {
+        if (isset($this->cart[$itemKey])) {
+            $this->cart[$itemKey]['catatan'] = trim($catatan);
+        }
+    }
+
     /** Ubah satuan item keranjang (Multi-Satuan POS). */
     public function ubahSatuanItem(string $itemKey, string $newSatuanKode): void
     {
@@ -2016,6 +2024,7 @@ class PosKasir extends Component
                         'diskon_nominal' => $item['diskon'] ?? 0,
                         'subtotal' => $item['subtotal'],
                         'hpp' => $hppPerSatuan,
+                        'catatan' => $item['catatan'] ?? null,
                     ]);
 
                     // [F2-3] Klaim SN → status terjual + tautan transaksi_item
@@ -2297,6 +2306,7 @@ class PosKasir extends Component
                 'diskon_total' => $diskonPerUnit * $qty,
                 'subtotal_retail' => $retailPerUnit * $qty,
                 'subtotal' => (float) $item->subtotal,
+                'catatan' => $item->catatan,
             ];
         })->toArray();
 
@@ -3566,6 +3576,7 @@ class PosKasir extends Component
                 'qty' => (int) $it->jumlah,
                 'harga' => (float) $it->harga_satuan,
                 'subtotal' => (float) $it->subtotal,
+                'catatan' => $it->catatan,
             ])->values()->all(),
             'subtotal' => (float) ($transaksi->subtotal ?: $transaksi->total_akhir),
             'diskon' => (float) ($transaksi->diskon_nominal ?? 0),

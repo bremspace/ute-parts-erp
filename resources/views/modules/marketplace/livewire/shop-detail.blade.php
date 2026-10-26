@@ -178,14 +178,38 @@
                         </div>
                     </div>
 
+                    @php
+                        $stockDetailInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($stokTotal);
+                    @endphp
                     <div class="pt-5">
-                        <div class="flex items-center gap-1.5 text-xs font-semibold {{ $stokTotal > 0 ? 'text-up-mint' : 'text-up-red' }}">
-                            <span class="w-2 h-2 rounded-full {{ $stokTotal > 0 ? 'bg-up-mint' : 'bg-up-red' }}"></span>
-                            <span>{{ $stokTotal > 0 ? $stokTotal . ' unit tersedia' : 'Stok habis' }}</span>
+                        <div class="flex items-center gap-1.5 text-xs font-semibold {{ $stockDetailInfo['is_available'] ? ($stockDetailInfo['is_low'] ? 'text-amber-500 font-bold' : 'text-up-mint') : 'text-up-red' }}">
+                            <span class="w-2 h-2 rounded-full {{ $stockDetailInfo['is_available'] ? ($stockDetailInfo['is_low'] ? 'bg-amber-500 animate-pulse' : 'bg-up-mint') : 'bg-up-red' }}"></span>
+                            <span>{{ $stockDetailInfo['label'] }}</span>
                         </div>
-                        <p class="text-[11px] text-ink-400">Siap diproses hari ini</p>
+                        <p class="text-[11px] text-ink-400">{{ $stockDetailInfo['sublabel'] }}</p>
                     </div>
                 </div>
+
+                <!-- Selected Gadget Model Indicator -->
+                @if($selectedGadgetModel)
+                    <div class="p-3.5 rounded-2xl bg-up-primary/10 border border-up-primary/25 flex items-center justify-between gap-2 transition-all">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="text-base flex-shrink-0">📱</span>
+                            <div class="min-w-0">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-up-primary block">Model Terpilih (Masuk Catatan)</span>
+                                <span class="text-xs font-bold text-ink-900 dark:text-white truncate block">{{ $selectedGadgetModel }}</span>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="$set('selectedGadgetModel', null)"
+                            class="px-2.5 py-1 rounded-xl bg-white dark:bg-ink-800 text-ink-500 hover:text-up-red text-[11px] font-bold border border-ink-200/80 dark:border-white/10 transition-colors flex-shrink-0 cursor-pointer"
+                            title="Batalkan pilihan model"
+                        >
+                            ✕ Hapus
+                        </button>
+                    </div>
+                @endif
 
                 <!-- Call to action buttons -->
                 <div class="flex flex-col sm:flex-row gap-3 pt-2">
@@ -229,18 +253,32 @@
                     </div>
                 @endif
 
-                <!-- Device Compatibility List -->
+                <!-- Device Compatibility List (Interactive & Auto-Select) -->
                 @if($produk->tipeHps && $produk->tipeHps->count() > 0)
                     <div class="pt-6 border-t border-ink-100/80 dark:border-white/10 space-y-3">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Model Gadget Terverifikasi</h3>
-                            <span class="text-[11px] font-semibold text-up-mint">{{ $produk->tipeHps->count() }} Model Cocok</span>
+                            <div>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Model Gadget Terverifikasi</h3>
+                                <p class="text-[11px] text-ink-400 mt-0.5">Klik model gadget Anda untuk otomatis terpilih ke varian / catatan belanja:</p>
+                            </div>
+                            <span class="text-[11px] font-semibold text-up-mint flex-shrink-0">{{ $produk->tipeHps->count() }} Cocok</span>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             @foreach($produk->tipeHps as $thp)
-                                <span class="px-3 py-1.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200/70 dark:border-white/10 text-xs font-medium text-ink-800 dark:text-ink-200">
-                                    {{ $thp->merk }} {{ $thp->model }}
-                                </span>
+                                @php
+                                    $thpNama = trim("{$thp->merk} {$thp->model}");
+                                    $isSelected = ($selectedGadgetModel === $thpNama);
+                                @endphp
+                                <button
+                                    type="button"
+                                    wire:click="selectGadgetModel('{{ addslashes($thpNama) }}')"
+                                    class="px-3.5 py-2 rounded-2xl text-xs font-semibold border transition-[background-color,border-color,color,transform] duration-140 cursor-pointer active:scale-95 flex items-center gap-1.5 {{ $isSelected ? 'border-up-primary bg-up-primary text-white shadow-sm shadow-up-primary/30 ring-2 ring-up-primary/20' : 'bg-ink-50 dark:bg-white/5 border-ink-200/70 dark:border-white/10 text-ink-800 dark:text-ink-200 hover:border-up-primary/60 hover:bg-up-primary/5' }}"
+                                >
+                                    @if($isSelected)
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    @endif
+                                    <span>{{ $thpNama }}</span>
+                                </button>
                             @endforeach
                         </div>
                     </div>
@@ -274,12 +312,16 @@
                     </div>
                 @endif
 
-                <!-- Stock across branches -->
-                @if(count($stokPerCabang) > 0)
+                <!-- Stock across branches (CMS Policy) -->
+                @if(($webConfig['show_branch_breakdown'] ?? true) && count($stokPerCabang) > 0)
                     <div class="pt-6 border-t border-ink-100/80 dark:border-white/10 space-y-3">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-ink-700 dark:text-ink-300">Ketersediaan Stok Fisik di Cabang</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             @foreach($stokPerCabang as $sc)
+                                @php
+                                    $scStock = (int) ($sc['stok'] ?? 0);
+                                    $scInfo = app(\App\Modules\Marketplace\Services\WebKonsumenService::class)->formatStockDisplay($scStock);
+                                @endphp
                                 <div class="flex items-center justify-between bg-white dark:bg-ink-900 border border-ink-100/80 dark:border-white/10 rounded-2xl p-3 sm:p-3.5 min-w-0 gap-2">
                                     <div class="min-w-0 flex-1">
                                         <p class="text-xs font-bold text-ink-900 dark:text-white truncate">{{ $sc['cabang'] }}</p>
@@ -287,8 +329,8 @@
                                             <p class="text-[10px] text-ink-400 truncate max-w-full">{{ $sc['alamat'] }}</p>
                                         @endif
                                     </div>
-                                    <span class="text-xs font-bold tabular-nums flex-shrink-0 {{ $sc['stok'] > 0 ? 'text-up-mint' : 'text-up-red' }}">
-                                        {{ $sc['stok'] }} unit
+                                    <span class="text-xs font-bold tabular-nums flex-shrink-0 {{ $scInfo['is_available'] ? ($scInfo['is_low'] ? 'text-amber-500' : 'text-up-mint') : 'text-up-red' }}">
+                                        {{ $scInfo['label'] }}
                                     </span>
                                 </div>
                             @endforeach
@@ -302,7 +344,11 @@
         <div class="md:hidden fixed bottom-20 inset-x-3 max-w-xs sm:max-w-sm mx-auto bg-white/95 dark:bg-ink-950/95 backdrop-blur-2xl border border-ink-200/90 dark:border-white/15 rounded-2xl p-2.5 z-30 flex items-center justify-between gap-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)]"
              style="bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));">
             <div class="pl-2 min-w-0 flex-1">
-                <span class="text-[10px] text-ink-500 dark:text-ink-400 uppercase font-semibold block tracking-tight truncate">Total ({{ $qty }})</span>
+                @if($selectedGadgetModel)
+                    <span class="text-[9px] text-up-primary font-bold uppercase block tracking-tight truncate">📱 {{ $selectedGadgetModel }}</span>
+                @else
+                    <span class="text-[10px] text-ink-500 dark:text-ink-400 uppercase font-semibold block tracking-tight truncate">Total ({{ $qty }})</span>
+                @endif
                 <span class="text-xs sm:text-base font-black text-ink-900 dark:text-white tabular-nums block truncate">
                     Rp {{ number_format($hargaInfo['harga'] * $qty, 0, ',', '.') }}
                 </span>

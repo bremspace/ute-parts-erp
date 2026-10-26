@@ -133,6 +133,11 @@
                                         <span class="break-words whitespace-normal text-left">{{ $it['nama'] }}</span>
                                     </div>
                                 </div>
+                                @if(!empty($it['catatan']))
+                                    <div class="text-[9px] text-gray-600 dark:text-gray-400 font-medium italic leading-tight mt-0.5 pl-0.5">
+                                        * {{ $it['catatan'] }}
+                                    </div>
+                                @endif
                                 <div class="receipt-row flex justify-between text-[10px] text-gray-600 mt-0.5">
                                     <span>
                                         {{ $it['qty'] }}{{ !empty($it['satuan']) ? ' ' . strtoupper($it['satuan']) : '' }} x

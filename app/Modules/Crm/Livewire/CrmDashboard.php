@@ -11,8 +11,11 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Crm\Services\TierService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ParsesNominal;
 use Database\Seeders\TierMembershipSeeder;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -158,6 +161,19 @@ class CrmDashboard extends Component
         'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
         'tanggal_lahir' => '', 'tier_membership_id' => null, 'is_reseller' => false,
         'tipe_konsumen' => 'retail', 'kode_agen' => '', 'referral_kode' => '',
+    ];
+
+    // Reset Password Konsumen Modal
+    public bool $showResetPasswordModal = false;
+
+    public ?int $resetPasswordPelangganId = null;
+
+    public array $resetPasswordForm = [
+        'nama' => '',
+        'telepon' => '',
+        'username' => '',
+        'new_password' => '',
+        'alasan' => '',
     ];
 
     public function simpanPelangganBaruCrm()
@@ -329,6 +345,87 @@ class CrmDashboard extends Component
             $this->selectedCustomerId = null;
         }
         $this->dispatch('alert', ['type' => 'success', 'message' => "Pelanggan '{$nama}' berhasil dihapus."]);
+    }
+
+    public function openResetPasswordModal(int $pelangganId): void
+    {
+        $pelanggan = Pelanggan::findOrFail($pelangganId);
+        $this->resetPasswordPelangganId = $pelanggan->id;
+        $this->resetPasswordForm = [
+            'nama' => $pelanggan->nama,
+            'telepon' => $pelanggan->telepon ?? '-',
+            'username' => $pelanggan->username ?? '',
+            'new_password' => Str::random(8),
+            'alasan' => 'Konsumen menghubungi CS via WhatsApp / datang langsung ke toko.',
+        ];
+        $this->showResetPasswordModal = true;
+    }
+
+    public function closeResetPasswordModal(): void
+    {
+        $this->showResetPasswordModal = false;
+        $this->resetPasswordPelangganId = null;
+        $this->reset(['resetPasswordForm']);
+    }
+
+    public function ajukanResetPassword(ApprovalService $approvalService): void
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return;
+        }
+
+        $this->validate([
+            'resetPasswordForm.new_password' => 'required|string|min:6',
+            'resetPasswordForm.alasan' => 'required|string|max:255',
+        ], [
+            'resetPasswordForm.new_password.required' => 'Kata sandi baru wajib diisi.',
+            'resetPasswordForm.new_password.min' => 'Kata sandi baru minimal 6 karakter.',
+            'resetPasswordForm.alasan.required' => 'Alasan reset kata sandi wajib diisi.',
+        ]);
+
+        $pelanggan = Pelanggan::findOrFail($this->resetPasswordPelangganId);
+
+        // Cegah permohonan ganda bila sudah ada approval pending
+        if ($approvalService->adaPending('reset_password_pelanggan', $pelanggan->id)) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Permohonan reset password untuk {$pelanggan->nama} sedang dalam antrean approval.",
+            ]);
+            $this->closeResetPasswordModal();
+
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+
+        $payload = [
+            'nama' => $pelanggan->nama,
+            'telepon' => $pelanggan->telepon,
+            'username' => $pelanggan->username,
+            'new_password' => $this->resetPasswordForm['new_password'],
+            'alasan' => $this->resetPasswordForm['alasan'],
+            'requested_by_name' => $user->name,
+            'amount' => 0,
+        ];
+
+        $approvalService->ajukan(
+            'reset_password_pelanggan',
+            $pelanggan->id,
+            $cabangId,
+            $payload,
+            $user->id
+        );
+
+        Cache::forget('backoffice-approval-badge-'.($cabangId ?? 'all'));
+        Cache::forget('backoffice-approval-badge-all');
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Permohonan reset kata sandi untuk '{$pelanggan->nama}' berhasil diajukan ke Approval Inbox.",
+        ]);
+
+        $this->closeResetPasswordModal();
     }
 
     public function getTiersProperty()

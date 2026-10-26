@@ -6,21 +6,53 @@ use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Servis\Models\TiketServis;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /**
  * Dashboard pelanggan marketplace (ACCOUNT-01..05):
- * riwayat order, tracking servis, komisi reseller, status membership & poin loyalty.
+ * riwayat order, tracking servis, komisi reseller, status membership, poin loyalty,
+ * serta manajemen profil konsumen (ganti username, profil picture, & password).
  */
 class CustomerAccount extends Component
 {
-    public string $activeTab = 'orders'; // orders, servis, notifikasi, komisi, membership
+    use WithFileUploads;
+
+    public string $activeTab = 'orders'; // orders, servis, notifikasi, komisi, membership, profil
+
+    // Profil Form State
+    public string $nama = '';
+
+    public string $username = '';
+
+    public string $email = '';
+
+    public string $alamat = '';
+
+    public $avatarUpload = null;
+
+    // Ganti Password Form State
+    public string $currentPassword = '';
+
+    public string $newPassword = '';
+
+    public string $newPassword_confirmation = '';
 
     public function mount(): void
     {
         $tab = request()->query('tab');
-        if ($tab && in_array($tab, ['orders', 'servis', 'notifikasi', 'komisi', 'membership'], true)) {
+        if ($tab && in_array($tab, ['orders', 'servis', 'notifikasi', 'komisi', 'membership', 'profil'], true)) {
             $this->activeTab = $tab;
+        }
+
+        $customer = auth('customer')->user();
+        if ($customer) {
+            $this->nama = $customer->nama ?? '';
+            $this->username = $customer->username ?? '';
+            $this->email = $customer->email ?? '';
+            $this->alamat = $customer->alamat ?? '';
         }
     }
 
@@ -196,6 +228,88 @@ class CustomerAccount extends Component
             'progress' => $progress,
             'allTiers' => $tiers,
         ];
+    }
+
+    public function simpanProfil(): void
+    {
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return;
+        }
+
+        $this->validate([
+            'nama' => 'required|string|max:255',
+            'username' => 'nullable|string|min:3|max:40|regex:/^[a-zA-Z0-9._-]+$/|unique:pelanggan,username,'.$customer->id,
+            'email' => 'nullable|email|max:255|unique:pelanggan,email,'.$customer->id,
+            'alamat' => 'nullable|string|max:500',
+            'avatarUpload' => 'nullable|image|max:2048',
+        ], [
+            'username.regex' => 'Username hanya boleh huruf, angka, titik, dash, dan garis bawah.',
+            'username.unique' => 'Username tersebut sudah digunakan pelanggan lain.',
+            'avatarUpload.max' => 'Ukuran foto profil maksimal 2MB.',
+        ]);
+
+        $updateData = [
+            'nama' => trim($this->nama),
+            'username' => ! empty($this->username) ? trim($this->username) : null,
+            'email' => ! empty($this->email) ? trim($this->email) : null,
+            'alamat' => ! empty($this->alamat) ? trim($this->alamat) : null,
+        ];
+
+        if ($this->avatarUpload) {
+            $path = $this->avatarUpload->store('avatars/customers', 'public');
+            $updateData['avatar'] = '/storage/'.$path;
+            $this->avatarUpload = null;
+        }
+
+        $customer->update($updateData);
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Profil akun Anda berhasil diperbarui.']);
+    }
+
+    public function hapusAvatar(): void
+    {
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return;
+        }
+
+        $customer->update(['avatar' => null]);
+        $this->avatarUpload = null;
+
+        $this->dispatch('alert', ['type' => 'info', 'message' => 'Foto profil telah dihapus.']);
+    }
+
+    public function updatePassword(): void
+    {
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return;
+        }
+
+        $this->validate([
+            'currentPassword' => 'required|string',
+            'newPassword' => 'required|string|min:6|confirmed',
+        ], [
+            'currentPassword.required' => 'Kata sandi saat ini wajib diisi.',
+            'newPassword.required' => 'Kata sandi baru wajib diisi.',
+            'newPassword.min' => 'Kata sandi baru minimal 6 karakter.',
+            'newPassword.confirmed' => 'Konfirmasi kata sandi baru tidak cocok.',
+        ]);
+
+        if (! Hash::check($this->currentPassword, $customer->password)) {
+            throw ValidationException::withMessages([
+                'currentPassword' => 'Kata sandi saat ini tidak cocok.',
+            ]);
+        }
+
+        $customer->update([
+            'password' => Hash::make($this->newPassword),
+        ]);
+
+        $this->reset(['currentPassword', 'newPassword', 'newPassword_confirmation']);
+
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Kata sandi akun Anda berhasil diperbarui.']);
     }
 
     public function render()

@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Marketplace\Services\CartService;
+use App\Modules\Marketplace\Services\OrderService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
@@ -165,5 +167,68 @@ class MarketplaceCartTest extends TestCase
         $this->assertArrayHasKey('p'.$p->id.'_v'.$v2->id, $items);
         $this->assertEquals(1, $items['p'.$p->id.'_v'.$v1->id]['qty']);
         $this->assertEquals(3, $items['p'.$p->id.'_v'.$v2->id]['qty']);
+    }
+
+    public function test_produk_dengan_catatan_model_gadget_memiliki_key_unik_dan_tersimpan_di_cart(): void
+    {
+        $cart = app(CartService::class);
+        $cart->kosongkan();
+
+        $p = $this->buatProduk('LCD Touchscreen Universal', 350000, 20);
+
+        // Tambah dengan model Redmi Note 10
+        $cart->isi($p->id, null, 1, 'Model: Xiaomi Redmi Note 10');
+        // Tambah dengan model Realme 8
+        $cart->isi($p->id, null, 2, 'Model: Realme 8');
+
+        $items = $cart->all();
+        $this->assertCount(2, $items);
+
+        $keys = array_keys($items);
+        $this->assertStringContainsString('p'.$p->id.'_c', $keys[0]);
+        $this->assertStringContainsString('p'.$p->id.'_c', $keys[1]);
+
+        $itemRedmi = collect($items)->firstWhere('catatan', 'Model: Xiaomi Redmi Note 10');
+        $itemRealme = collect($items)->firstWhere('catatan', 'Model: Realme 8');
+
+        $this->assertNotNull($itemRedmi);
+        $this->assertEquals(1, $itemRedmi['qty']);
+        $this->assertNotNull($itemRealme);
+        $this->assertEquals(2, $itemRealme['qty']);
+    }
+
+    public function test_order_service_menyimpan_catatan_model_gadget_ke_transaksi_item(): void
+    {
+        $p = $this->buatProduk('Baterai Li-ion Pro', 150000, 10);
+        $pelanggan = Pelanggan::create([
+            'cabang_id' => $this->cabang->id,
+            'nama' => 'Budi Tester',
+            'telepon' => '081299998888',
+            'alamat' => 'Jl. Mawar No. 12',
+            'is_active' => true,
+        ]);
+
+        $items = [
+            [
+                'produk_id' => $p->id,
+                'sku_variant_id' => null,
+                'jumlah' => 1,
+                'catatan' => 'Model: Samsung Galaxy A52',
+            ],
+        ];
+
+        $order = app(OrderService::class)->buatOrder(
+            $pelanggan,
+            $items,
+            $this->cabang->id,
+            'ambil_ke_toko',
+            'Tolong siapkan rapi'
+        );
+
+        $this->assertDatabaseHas('transaksi_item', [
+            'transaksi_id' => $order->id,
+            'produk_id' => $p->id,
+            'catatan' => 'Model: Samsung Galaxy A52',
+        ]);
     }
 }

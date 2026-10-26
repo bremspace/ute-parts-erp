@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Wms\Models\PurchaseOrder;
@@ -54,6 +55,25 @@ class AppServiceProvider extends ServiceProvider
         });
         Blade::directive('endcansee', function () {
             return '<?php endif; ?>';
+        });
+
+        // View composer untuk konfigurasi CMS Web Konsumen (Marketplace)
+        view()->composer(['layouts.marketplace', 'modules.marketplace.livewire.shop-catalog', 'modules.marketplace.livewire.shop-detail'], function ($view) {
+            try {
+                $service = app(WebKonsumenService::class);
+                $view->with('webConfig', $service->getAll());
+            } catch (\Throwable $e) {
+                $view->with('webConfig', []);
+            }
+        });
+
+        view()->composer('modules.marketplace.livewire.shop-catalog', function ($view) {
+            try {
+                $service = app(WebKonsumenService::class);
+                $view->with('webBanners', $service->getActiveBanners());
+            } catch (\Throwable $e) {
+                $view->with('webBanners', collect());
+            }
         });
 
         // [SEC-1] Wajib persistent: middleware permission harus jalan lagi di

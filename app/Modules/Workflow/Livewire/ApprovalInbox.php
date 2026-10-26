@@ -25,6 +25,19 @@ class ApprovalInbox extends Component
 
     public $showApproveMemberModal = false;
 
+    public $showApproveResetPasswordModal = false;
+
+    public $resetPasswordApprovalForm = [
+        'request_id' => null,
+        'pelanggan_id' => null,
+        'nama' => '',
+        'telepon' => '',
+        'username' => '',
+        'new_password' => '',
+        'alasan' => '',
+        'catatan' => '',
+    ];
+
     public $memberApprovalForm = [
         'request_id' => null,
         'pelanggan_id' => null,
@@ -53,6 +66,12 @@ class ApprovalInbox extends Component
         $request = ApprovalRequest::find($requestId);
         if ($request && $request->entity_type === 'member') {
             $this->openApproveMemberModal($requestId);
+
+            return;
+        }
+
+        if ($request && $request->entity_type === 'reset_password_pelanggan') {
+            $this->openApproveResetPasswordModal($requestId);
 
             return;
         }
@@ -100,6 +119,70 @@ class ApprovalInbox extends Component
     {
         $this->showApproveMemberModal = false;
         $this->reset('memberApprovalForm');
+    }
+
+    public function openApproveResetPasswordModal($requestId)
+    {
+        $request = ApprovalRequest::findOrFail($requestId);
+        $pelanggan = Pelanggan::find($request->entity_id);
+
+        $this->resetPasswordApprovalForm = [
+            'request_id' => $request->id,
+            'pelanggan_id' => $pelanggan?->id,
+            'nama' => $pelanggan?->nama ?? ($request->payload_json['nama'] ?? '-'),
+            'telepon' => $pelanggan?->telepon ?? ($request->payload_json['telepon'] ?? '-'),
+            'username' => $pelanggan?->username ?? ($request->payload_json['username'] ?? '-'),
+            'new_password' => $request->payload_json['new_password'] ?? '',
+            'alasan' => $request->payload_json['alasan'] ?? ($request->catatan ?? 'Lupa password via CS/Toko'),
+            'catatan' => '',
+        ];
+        $this->showApproveResetPasswordModal = true;
+    }
+
+    public function closeApproveResetPasswordModal()
+    {
+        $this->showApproveResetPasswordModal = false;
+        $this->reset('resetPasswordApprovalForm');
+    }
+
+    public function approveResetPasswordSubmit()
+    {
+        $this->validate([
+            'resetPasswordApprovalForm.new_password' => 'required|string|min:6',
+            'resetPasswordApprovalForm.catatan' => 'nullable|string|max:255',
+        ], [
+            'resetPasswordApprovalForm.new_password.required' => 'Kata sandi baru wajib diisi.',
+            'resetPasswordApprovalForm.new_password.min' => 'Kata sandi baru minimal 6 karakter.',
+        ]);
+
+        $this->processing = true;
+
+        try {
+            app(ApprovalService::class)->proses(
+                $this->resetPasswordApprovalForm['request_id'],
+                'disetujui',
+                auth()->id(),
+                $this->resetPasswordApprovalForm['catatan'] ?: 'Reset password disetujui',
+                ['new_password' => $this->resetPasswordApprovalForm['new_password']]
+            );
+
+            Cache::forget('backoffice-approval-badge-'.(session('cabang_id') ?? 'all'));
+            Cache::forget('backoffice-approval-badge-all');
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Reset kata sandi pelanggan '{$this->resetPasswordApprovalForm['nama']}' berhasil disetujui.",
+            ]);
+
+            $this->closeApproveResetPasswordModal();
+        } catch (ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+            $this->dispatch('alert', ['type' => 'error', 'message' => $msg]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        } finally {
+            $this->processing = false;
+        }
     }
 
     public function confirmApproveMember()

@@ -16,6 +16,7 @@ use App\Modules\Wms\Services\ReturnPembelianService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Models\ApprovalRule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 
@@ -280,6 +281,21 @@ class ApprovalService
                         'catatan_approval' => $catatan,
                         'approved_at' => now(),
                         'approved_by' => $actionedBy,
+                    ]);
+                }
+            }
+
+            return;
+        }
+
+        // [RESET PASSWORD PELANGGAN] Permohonan reset password konsumen toko/online
+        if ($request->entity_type === 'reset_password_pelanggan') {
+            $pelanggan = Pelanggan::find($request->entity_id);
+            if ($pelanggan && $status === 'disetujui') {
+                $newPassword = $options['new_password'] ?? ($request->payload_json['new_password'] ?? null);
+                if (! empty($newPassword)) {
+                    $pelanggan->update([
+                        'password' => Hash::make($newPassword),
                     ]);
                 }
             }

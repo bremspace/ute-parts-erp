@@ -589,6 +589,7 @@ class RiwayatTransaksiIndex extends Component
                     'diskon_total' => $diskonPerUnit * $qty,
                     'subtotal_retail' => $retailPerUnit * $qty,
                     'subtotal' => (float) $it->subtotal,
+                    'catatan' => $it->catatan,
                 ];
             })->toArray();
 

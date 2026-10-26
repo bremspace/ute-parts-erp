@@ -18,9 +18,14 @@ class CartService
         protected PricingService $pricingService
     ) {}
 
-    public function cartKey(int $produkId, ?int $variantId = null): string
+    public function cartKey(int $produkId, ?int $variantId = null, ?string $catatan = null): string
     {
-        return $variantId ? 'p'.$produkId.'_v'.$variantId : 'p'.$produkId;
+        $base = $variantId ? 'p'.$produkId.'_v'.$variantId : 'p'.$produkId;
+        if ($catatan) {
+            $base .= '_c'.substr(md5(trim($catatan)), 0, 8);
+        }
+
+        return $base;
     }
 
     public function all(): array
@@ -61,10 +66,11 @@ class CartService
         return $cart;
     }
 
-    public function isi(int $produkId, ?int $variantId = null, int $qty = 1): array
+    public function isi(int $produkId, ?int $variantId = null, int $qty = 1, ?string $catatan = null): array
     {
         $produk = Produk::findOrFail($produkId);
-        $key = $this->cartKey($produkId, $variantId);
+        $cleanCatatan = $catatan ? trim($catatan) : null;
+        $key = $this->cartKey($produkId, $variantId, $cleanCatatan);
 
         // Cek stok total tersedia
         $stokTotal = StokItem::where('produk_id', $produkId)
@@ -99,6 +105,7 @@ class CartService
             'key' => $key,
             'product_id' => $produkId,
             'variant_id' => $variantId,
+            'catatan' => $cleanCatatan,
             'name' => $produk->nama,
             'variant_name' => $variant?->nama_varian,
             'harga' => (float) $pricing['harga'],

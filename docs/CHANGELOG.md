@@ -3,6 +3,101 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-26 — Model Gadget Terverifikasi Klikabel, Auto-Select Varian/Catatan, Sinkronisasi Checkout & Struk Thermal ✅
+
+- **Katalog Detail Web Konsumen (`/shop/{slug}`)**:
+  - Badge model gadget terverifikasi diubah menjadi tombol interaktif klikabel dengan visual feedback state terpilih (Ute Prism active ring + primary pill).
+  - Ketika konsumen mengklik model gadget (misal: "Xiaomi Redmi Note 10"), sistem secara otomatis:
+    - Memilih model tersebut sebagai target kompatibilitas unit.
+    - Mencari dan meng-auto-select `skuVariant` yang bersesuaian jika produk memiliki varian terkait.
+    - Menyediakan tombol pembatalan/reset pilihan model gadget.
+    - Menampilkan indikator model terpilih pada desktop dan mobile floating sticky bar.
+- **Keranjang Belanja Session (`CartService`)**:
+  - Menambahkan dukungan atribut `catatan` pada payload item session keranjang.
+  - Memperbarui mekanisme hashing `cartKey($produkId, $variantId, $catatan)` sehingga produk yang sama dengan pilihan model gadget/catatan berbeda tidak saling menimpa atau merusak kuantitas.
+- **Database & Model Penjualan**:
+  - Migrasi `2026_10_26_101500_add_catatan_to_transaksi_item_table.php` (menambahkan kolom `catatan` VARCHAR(255) nullable pada tabel `transaksi_item`).
+  - Menambahkan `catatan` ke fillable model `app/Modules/Pos/Models/TransaksiItem.php`.
+- **Checkout Pesanan Online (`/checkout` & `OrderService`)**:
+  - Komponen `CartCheckout`: menampilkan badge keterangan model gadget terpilih pada ringkasan keranjang dan formulir checkout pesanan.
+  - `OrderService::buatOrder()`: menyimpan catatan model gadget ke setiap baris `TransaksiItem`.
+- **Kasir POS & Manajemen Pesanan Backoffice (`PosKasir` & `PesananOnlineIndex`)**:
+  - Tampilan keranjang POS kasir (`cart-content.blade.php`) menampilkan badge model gadget `📱 [Catatan Model]` di bawah nama produk.
+  - Method `setCatatanItem` pada `PosKasir` untuk fleksibilitas penyesuaian catatan per item langsung di layar kasir.
+  - Penyimpanan transaksi kasir dan pesanan online pickup membawa catatan item secara persisten.
+- **Cetak Struk Thermal Web & ESC/POS**:
+  - Modal cetak struk web preview (`partials/thermal-receipt-modal.blade.php`): menampilkan baris catatan keterangan pilihan model tepat di bawah nama produk.
+  - Driver cetak fisik ESC/POS (`EscPosWriter.php`): mencetak baris keterangan pilihan `* [Catatan Model]` dengan line-wrapping otomatis pada struk 58mm/80mm.
+  - Handler riwayat transaksi (`RiwayatTransaksiIndex`), pesanan online (`PesananOnlineIndex`), dan antrean cetak (`PrintThermalJob`): memetakan kolom `catatan` item ke data struk.
+- **Verifikasi & Quality Gate**:
+  - `tests/Feature/ShopPageDetailGadgetSelectTest.php`: 1 passed test, 6 assertions.
+  - `tests/Feature/MarketplaceCartTest.php`: 5 passed tests, 28 assertions.
+  - `tests/Unit/EscPosWriterItemNoteTest.php`: 1 passed test, 2 assertions.
+  - `tests/Feature/OnlineOrderWorkflowTest.php`: 5 passed tests, 31 assertions.
+  - Formatter Pint: `./vendor/bin/pint --test` PASS (0 errors).
+
+## 2026-10-26 — Login Konsumen (Custom Background & WhatsApp Help), Profil Konsumen (Username, Avatar, Password), & Workflow Approval Reset Password Backoffice ✅
+
+- **Halaman Login Konsumen (`/login-pelanggan`)**:
+  - Dukungan foto background kustom melalui pengaturan CMS Web Konsumen (`customer_login_bg_image`) dengan pilihan efek scrim: `scrim_dark` (gradien halus seimbang), `scrim_heavy` (gelap 85%), dan `frosted_glass` (kaca blur tinggi).
+  - Tautan "Lupa kata sandi?" langsung terhubung ke WhatsApp CS Toko dengan pesan template terformat.
+  - Multi-identifier authentication: konsumen dapat login menggunakan nomor HP (dengan auto-normalisasi `628`→`08`) atau username akun.
+- **Pengaturan CMS Web Konsumen Backoffice (`/app/pengaturan/web-konsumen`)**:
+  - Tab Branding: Penambahan form upload foto background login konsumen, tombol hapus, dan pilihan efek scrim overlay.
+- **Manajemen Profil & Kata Sandi Konsumen (`/account`)**:
+  - Migrasi `2026_10_26_093606_add_avatar_and_username_to_pelanggan_table.php` (menambahkan `username` unik dan `avatar` ke tabel `pelanggan`).
+  - Tab baru "Profil & Keamanan": Konsumen dapat mengunggah/mengganti foto profil (avatar), mengatur username unik, memperbarui data diri, dan mengganti kata sandi secara mandiri dengan verifikasi kata sandi saat ini.
+- **Workflow Approval Reset Password di Backoffice (`/app/approvals` & `/app/crm`)**:
+  - Migrasi `2026_10_26_094103_add_reset_password_pelanggan_approval_rule.php`: Menambahkan approval rule untuk entitas `reset_password_pelanggan`.
+  - Di CRM Dashboard (`/app/crm`): Staf kasir atau CS dapat mengajukan permohonan reset password ketika konsumen datang ke toko atau menghubungi via WhatsApp dengan mengisi kata sandi baru (atau generator acak) dan alasan pengajuan.
+  - Di Approval Inbox (`/app/approvals`): Owner, Super Admin, atau Admin Toko dapat memverifikasi dan menyetujui permohonan reset password via modal khusus `openApproveResetPasswordModal`.
+  - Setelah disetujui, kata sandi baru langsung terenkripsi dan aktif di database, memungkinkan konsumen langsung login menggunakan akun yang sama dan kata sandi baru tersimpan permanen.
+- **Verifikasi & Quality Gate**:
+  - `tests/Feature/CustomerLoginTest.php`: 6 passed tests, 27 assertions lulus.
+  - `tests/Feature/MemberApprovalWorkflowTest.php`: 8 passed tests, 43 assertions lulus.
+  - `tests/Feature/WebKonsumenSettingsTest.php`: 10 passed tests, 41 assertions lulus.
+  - Formatter Pint: `./vendor/bin/pint --test` PASS (0 errors).
+  - Frontend Assets: `npm run build` sukses.
+
+
+
+- **Hero Background Foto & Proteksi Kontras Teks Dinamis**:
+  - Dukungan upload file gambar background hero (`$uploadHeroBg`) yang disimpan ke storage publik `/storage/web-konsumen/` dengan tombol hapus (`removeHeroBg()`).
+  - 3 preset kontras dinamis: `scrim_dark` (gradien halus dari kiri ke kanan), `scrim_heavy` (lapisan gelap 85% untuk foto ramai/terang), dan `glass_card` (container frosted glass ber-blur tinggi membalut teks).
+  - Teks headline, subheadline, badge pill, trust highlight, dan stat counter diberi text-shadow dan kontras warna berstandar WCAG AAA agar selalu tajam terbaca di atas foto apapun.
+- **Hero Replacement & Layout Modes**:
+  - Konfigurasi `hero_display_mode` 3 opsi: `hero_standard` (hero editorial default), `carousel_replace` (banner carousel layar penuh menggantikan section hero di paling atas), dan `hero_and_carousel` (hero editorial di atas disusul carousel penuh di bawahnya).
+  - Sinkronisasi instan pada CMS Backoffice (Tab 1 selector, Quick Preview Widget, dan Tab 6 Live Simulator Desktop/Mobile).
+- **Banner Carousel Modern Beranimasi Smooth (`@emil-design-eng`)**:
+  - Transisi CSS hardware-accelerated dengan kurva custom `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` dan durasi 450ms.
+  - Dukungan gestur sentuh (touch swipe drag velocity) pada perangkat mobile/tablet.
+  - Navigasi taktil chevron dengan backdrop blur dan feedback mikro-skala (`active:scale-90`), pause on hover, auto-resume, serta indikator pill dot dinamis.
+- **Verifikasi & Kualitas**:
+  - `tests/Feature/WebKonsumenSettingsTest.php`: 10 passed tests, 41 assertions lulus.
+  - `tests/Feature/MarketplaceNplus1Test.php`: 25 passed tests, 121 assertions lulus.
+  - Code style `./vendor/bin/pint --test`: PASS.
+  - Build frontend `npm run build`: Berhasil tanpa error.
+
+## 2026-10-25 — Manajemen Web Konsumen (CMS Storefront) & Integrasi Ute Prism ✅
+
+- **Modul CMS Backoffice (`/app/pengaturan/web-konsumen`, RBAC: `pengaturan.manage`)**:
+  - Migrasi `2026_10_25_030000_create_web_konsumen_tables.php`: tabel `web_konsumen_settings` (key-value konfigurasi bertipe data) dan `web_banners` (banner promosi posisi hero slider, hero side, mid-catalog, dan popup modal).
+  - Models: `WebKonsumenSetting` dan `WebBanner` lengkap dengan cast enum, scope active/posisi, dan helper parsing value.
+  - `WebKonsumenSeeder`: Seed default konfigurasi branding, hero section, privasi stok, katalog filter, kontak WhatsApp floating, dan sample banner banner promosi.
+  - `WebKonsumenService`: Layanan sentral konfigurasi CMS dengan static in-memory memoization dan cache TTL 24 jam (`web_konsumen_config_v1`) & 1 jam banner untuk guardrail VPS 1GB RAM.
+  - Livewire `WebKonsumenSettings`: Interface 5 tab (Branding & Header, Hero & Banner Promosi, Kebijakan Stok & Privasi, Katalog & Filter, Kontak & Pop-up Promo) dilengkapi live interactive device simulator (Desktop/Mobile preview).
+  - Menu Navigasi: Tautan "Web Konsumen" di sidebar backoffice di bawah grup Pengaturan.
+- **Integrasi Storefront Marketplace (`/shop` & `/shop/{slug}`)**:
+  - `layouts/marketplace.blade.php`: Topbar announcement bar terkelola dinamis, floating WhatsApp customer service button dengan pesan otomatis kustom, dan modal pop-up promo dengan frekuensi persisten via `localStorage`.
+  - `shop-catalog.blade.php`: Hero section dinamis, trust badges, highlight stats, mid-catalog promo banner, reseller/teknisi teaser card, serta stock status badges terintegrasi kebijakan privasi.
+  - `shop-detail.blade.php`: Implementasi kebijakan privasi stok 3 mode (`exact_number`, `badge_only`, `threshold_only`) dan toggle ketersediaan per cabang fisik.
+  - Optimasi N+1 & Query Budget B-15a: Eager loading `skuVariants` pada `ShopPage.php` dan view composer spesifik di `AppServiceProvider.php`. Query budget `MarketplaceNplus1Test` terjaga (katalog guest ≤ 11, katalog login ≤ 12, detail ≤ 6) dan duplikat bentuk SQL nol.
+- **Verifikasi**:
+  - `WebKonsumenSettingsTest`: 7 tests, 29 assertions lulus 100%.
+  - `MarketplaceNplus1Test`: 25 tests, 121 assertions lulus 100%.
+  - Code formatting: `./vendor/bin/pint` PASS (0 errors).
+  - Asset build: `npm run build` sukses (Vite v8.3.0).
+
 ## 2026-10-25 — HR & Payroll: Audit Komprehensif, Multi-Branch Security, Perbaikan Logika & UI/UX Responsif ✅
 
 - **Backend & Multi-Branch Security**:

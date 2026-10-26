@@ -243,11 +243,24 @@
         <!-- Profil header -->
         <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 mb-6 shadow-sm">
             <div class="flex items-center gap-4">
-                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-up-primary to-up-accent flex items-center justify-center text-white font-black text-xl shadow-md">
-                    {{ substr($customer->nama, 0, 1) }}
+                <div class="relative group">
+                    @if($customer->avatar)
+                        <img src="{{ $customer->avatar }}" alt="{{ $customer->nama }}" class="w-14 h-14 rounded-2xl object-cover border border-slate-200 dark:border-white/10 shadow-md">
+                    @else
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-up-primary to-up-accent flex items-center justify-center text-white font-black text-xl shadow-md">
+                            {{ substr($customer->nama, 0, 1) }}
+                        </div>
+                    @endif
                 </div>
                 <div class="flex-1 min-w-0">
-                    <h1 class="font-black text-ink-900 dark:text-white text-lg truncate">{{ $customer->nama }}</h1>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-black text-ink-900 dark:text-white text-lg truncate">{{ $customer->nama }}</h1>
+                        @if($customer->username)
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-mono font-semibold">
+                                &#64;{{ $customer->username }}
+                            </span>
+                        @endif
+                    </div>
                     <p class="text-sm text-ink-500 dark:text-ink-400 font-mono">{{ $customer->telepon }}</p>
                 </div>
                 <div class="text-right flex-shrink-0">
@@ -287,6 +300,7 @@
                     'servis' => 'Tracking Servis',
                     'notifikasi' => 'Pemberitahuan',
                     'membership' => 'Status Membership & Poin',
+                    'profil' => 'Profil & Keamanan',
                 ];
                 if ($customer->is_reseller) {
                     $tabList['komisi'] = 'Komisi Saya';
@@ -909,6 +923,155 @@
                             </div>
                         @endforeach
                     </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- PROFIL & KEAMANAN AKUN -->
+        @if($activeTab === 'profil')
+            <div class="space-y-6">
+                <!-- Card 1: Data Profil & Foto Profil -->
+                <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 sm:p-8 shadow-sm">
+                    <div class="border-b border-ink-100 dark:border-white/10 pb-4 mb-6">
+                        <h2 class="text-base sm:text-lg font-black text-ink-900 dark:text-white">Profil Konsumen</h2>
+                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Kelola informasi identitas akun, username, dan foto profil Anda.</p>
+                    </div>
+
+                    <form wire:submit.prevent="simpanProfil" class="space-y-5">
+                        <!-- Foto Profil Avatar -->
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 uppercase tracking-wider mb-2">Foto Profil (Avatar)</label>
+                            <div class="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+                                <div class="relative w-16 h-16 rounded-2xl bg-ink-100 dark:bg-white/5 border border-ink-200 dark:border-white/10 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                    @if($avatarUpload)
+                                        <img src="{{ $avatarUpload->temporaryUrl() }}" alt="Preview" class="w-full h-full object-cover">
+                                    @elseif($customer->avatar)
+                                        <img src="{{ $customer->avatar }}" alt="{{ $customer->nama }}" class="w-full h-full object-cover">
+                                    @else
+                                        <div class="w-full h-full bg-gradient-to-tr from-up-primary to-up-accent flex items-center justify-center text-white font-black text-xl">
+                                            {{ substr($customer->nama, 0, 1) }}
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div class="space-y-2 flex-1 min-w-[200px]">
+                                    <input type="file" wire:model="avatarUpload" accept="image/*"
+                                           class="text-xs text-ink-500 dark:text-ink-400 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-up-primary/10 file:text-up-primary hover:file:bg-up-primary/20 cursor-pointer">
+                                    <div class="flex items-center gap-3">
+                                        <p class="text-[11px] text-ink-400">Format JPG/PNG/WebP, maksimal 2MB.</p>
+                                        @if($customer->avatar || $avatarUpload)
+                                            <button type="button" wire:click="hapusAvatar" wire:confirm="Yakin ingin menghapus foto profil ini?"
+                                                    class="text-[11px] text-up-red hover:underline font-semibold cursor-pointer">
+                                                Hapus Foto
+                                            </button>
+                                        @endif
+                                    </div>
+                                    @error('avatarUpload') <p class="text-xs text-up-red font-medium">{{ $message }}</p> @enderror
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Nama Lengkap -->
+                            <div>
+                                <label for="nama" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Nama Lengkap</label>
+                                <input type="text" id="nama" wire:model="nama" required
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                @error('nama') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                            </div>
+
+                            <!-- Username Unik -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <label for="username" class="block text-xs font-semibold text-ink-700 dark:text-ink-300">Username (Opsional)</label>
+                                    <span class="text-[10px] text-ink-400 font-mono">Bisa digunakan untuk login</span>
+                                </div>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-ink-400 font-mono text-sm">@</span>
+                                    <input type="text" id="username" wire:model="username" placeholder="budi_parts"
+                                           class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400 font-mono" />
+                                </div>
+                                @error('username') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                            </div>
+
+                            <!-- Nomor Telepon (Readonly) -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300">Nomor WhatsApp / HP</label>
+                                    <span class="text-[10px] text-ink-400">Terdaftar</span>
+                                </div>
+                                <input type="text" value="{{ $customer->telepon }}" readonly disabled
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-100 dark:bg-white/5 border border-ink-200 dark:border-white/5 text-ink-500 font-mono text-sm cursor-not-allowed" />
+                                <p class="text-[10px] text-ink-400 mt-1">Untuk ubah nomor HP, silakan hubungi Customer Service toko.</p>
+                            </div>
+
+                            <!-- Email -->
+                            <div>
+                                <label for="email" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Email (Opsional)</label>
+                                <input type="email" id="email" wire:model="email" placeholder="budi@contoh.com"
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400" />
+                                @error('email') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+
+                        <!-- Alamat Pengiriman Utama -->
+                        <div>
+                            <label for="alamat" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Alamat Lengkap</label>
+                            <textarea id="alamat" wire:model="alamat" rows="2" placeholder="Nama jalan, nomor rumah, RT/RW, kelurahan, kecamatan, kota..."
+                                      class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white placeholder:text-ink-400"></textarea>
+                            @error('alamat') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button type="submit" wire:loading.attr="disabled"
+                                    class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs sm:text-sm shadow-md shadow-up-primary/20 transition active:scale-[0.98] min-h-[44px] cursor-pointer flex items-center gap-2">
+                                <span wire:loading.remove wire:target="simpanProfil">Simpan Perubahan Profil</span>
+                                <span wire:loading wire:target="simpanProfil">Menyimpan...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Card 2: Ubah Kata Sandi Akun -->
+                <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-6 sm:p-8 shadow-sm">
+                    <div class="border-b border-ink-100 dark:border-white/10 pb-4 mb-6">
+                        <h2 class="text-base sm:text-lg font-black text-ink-900 dark:text-white">Ubah Kata Sandi</h2>
+                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Pastikan kata sandi Anda kuat untuk mengamankan riwayat transaksi dan poin loyalty.</p>
+                    </div>
+
+                    <form wire:submit.prevent="updatePassword" class="space-y-4 max-w-xl">
+                        <div>
+                            <label for="currentPassword" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Kata Sandi Saat Ini</label>
+                            <input type="password" id="currentPassword" wire:model="currentPassword" required placeholder="••••••••"
+                                   class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                            @error('currentPassword') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="newPassword" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Kata Sandi Baru</label>
+                                <input type="password" id="newPassword" wire:model="newPassword" required placeholder="Minimal 6 karakter"
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                                @error('newPassword') <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label for="newPassword_confirmation" class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Konfirmasi Kata Sandi Baru</label>
+                                <input type="password" id="newPassword_confirmation" wire:model="newPassword_confirmation" required placeholder="Ulangi kata sandi baru"
+                                       class="w-full px-4 py-2.5 rounded-xl bg-ink-50 dark:bg-white/5 border border-ink-200 dark:border-white/10 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium text-ink-900 dark:text-white" />
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex items-center justify-between flex-wrap gap-3">
+                            <button type="submit" wire:loading.attr="disabled"
+                                    class="px-5 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs sm:text-sm shadow-md shadow-up-primary/20 transition active:scale-[0.98] min-h-[44px] cursor-pointer flex items-center gap-2">
+                                <span wire:loading.remove wire:target="updatePassword">Perbarui Kata Sandi</span>
+                                <span wire:loading wire:target="updatePassword">Memproses...</span>
+                            </button>
+
+                            <p class="text-[11px] text-ink-400">Lupa kata sandi saat ini? Hubungi CS Toko untuk verifikasi dan reset akun.</p>
+                        </div>
+                    </form>
                 </div>
             </div>
         @endif

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'transaksi_id', 'produk_id', 'sku_variant_id', 'jumlah',
     'satuan', 'konversi', 'harga_satuan', 'diskon_nominal', 'subtotal', 'hpp',
+    'catatan',
 ])]
 class TransaksiItem extends Model
 {

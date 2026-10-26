@@ -166,6 +166,11 @@
                                     <div class="flex items-center justify-between gap-3 py-2 border-b border-ink-100/60 dark:border-white/[0.06] last:border-0">
                                         <div class="min-w-0 space-y-0.5">
                                             <p class="text-xs font-bold text-ink-900 dark:text-white truncate">{{ $item['name'] }}</p>
+                                            @if(!empty($item['catatan']))
+                                                <p class="text-[10px] font-semibold text-up-primary truncate flex items-center gap-1">
+                                                    <span>📱 {{ $item['catatan'] }}</span>
+                                                </p>
+                                            @endif
                                             <div class="flex items-center gap-1.5 flex-wrap text-[11px]">
                                                 <span class="text-ink-400 font-semibold">{{ $item['qty'] }} × Rp {{ number_format($item['harga'], 0, ',', '.') }}</span>
                                                 @if(!empty($item['diskon_tier']) && (float) $item['diskon_tier'] > 0)
@@ -311,12 +316,19 @@
                                     </button>
                                     <div class="min-w-0 flex-1 space-y-0.5">
                                         <h4 class="text-xs sm:text-sm font-bold text-ink-900 dark:text-white truncate">{{ $item['name'] }}</h4>
-                                        <p class="text-[11px] text-ink-500 dark:text-ink-400 truncate">
-                                            {{ $item['variant_name'] ?? 'Standar' }}
-                                            @if($item['alasan_harga'] !== 'Harga Retail Standar')
-                                                <span class="text-up-mint font-medium">• {{ $item['alasan_harga'] }}</span>
+                                        <div class="flex items-center gap-2 flex-wrap text-[11px]">
+                                            <span class="text-ink-500 dark:text-ink-400">
+                                                {{ $item['variant_name'] ?? 'Standar' }}
+                                                @if($item['alasan_harga'] !== 'Harga Retail Standar')
+                                                    <span class="text-up-mint font-medium">• {{ $item['alasan_harga'] }}</span>
+                                                @endif
+                                            </span>
+                                            @if(!empty($item['catatan']))
+                                                <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-up-primary/10 text-up-primary dark:bg-up-primary/20 dark:text-white border border-up-primary/20">
+                                                    <span>📱 {{ $item['catatan'] }}</span>
+                                                </span>
                                             @endif
-                                        </p>
+                                        </div>
                                     </div>
                                 </div>
 

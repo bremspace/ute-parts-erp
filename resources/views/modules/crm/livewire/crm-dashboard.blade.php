@@ -194,6 +194,14 @@
                             @can('crm.edit')
                             <button
                                 type="button"
+                                wire:click="openResetPasswordModal({{ $c->id }})"
+                                class="p-1.5 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 transition text-xs cursor-pointer active:scale-95"
+                                title="Ajukan Reset Password Pelanggan"
+                            >
+                                🔑
+                            </button>
+                            <button
+                                type="button"
                                 wire:click="openEditPelangganModal({{ $c->id }})"
                                 class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-up-mint hover:text-white transition text-xs cursor-pointer active:scale-95"
                                 title="Edit Data Pelanggan"
@@ -279,6 +287,14 @@
                                 <span>Detail 360°</span>
                             </button>
                             @can('crm.edit')
+                            <button
+                                type="button"
+                                wire:click="openResetPasswordModal({{ $c->id }})"
+                                class="p-2.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 transition text-xs cursor-pointer active:scale-95 min-h-[40px] min-w-[40px] flex items-center justify-center"
+                                title="Ajukan Reset Password Pelanggan"
+                            >
+                                🔑
+                            </button>
                             <button
                                 type="button"
                                 wire:click="openEditPelangganModal({{ $c->id }})"
@@ -835,9 +851,16 @@
                     </div>
                     <div class="flex items-center gap-2">
                         @if(!empty($selectedCustomer['pelanggan']))
+                            <button wire:click="openResetPasswordModal({{ $selectedCustomer['pelanggan']->id }})" 
+                                    type="button"
+                                    class="px-2.5 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                                    title="Ajukan reset kata sandi pelanggan">
+                                <span>🔑</span>
+                                <span>Reset Password</span>
+                            </button>
                             <button wire:click="openEditPelangganModal({{ $selectedCustomer['pelanggan']->id }})" 
                                     type="button"
-                                    class="px-2.5 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary border border-up-primary/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+                                    class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-up-mint border border-up-mint/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
                                 <span>✏️</span>
                                 <span>Ubah Kategori / Status</span>
                             </button>
@@ -1209,6 +1232,96 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
                     <button type="button" wire:click="$set('showEditPelangganModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
                     <button type="button" wire:click="simpanEditPelanggan" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer min-h-[44px]">Simpan Perubahan</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- ========================================== -->
+    <!-- MODAL: AJUKAN RESET PASSWORD PELANGGAN     -->
+    <!-- ========================================== -->
+    @if($showResetPasswordModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4">
+            <div class="w-full max-w-lg glass-panel p-5 sm:p-6 rounded-2xl sm:rounded-3xl relative max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10 flex-shrink-0">
+                    <div>
+                        <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                            <span>🔑</span>
+                            <span>Ajukan Reset Kata Sandi Pelanggan</span>
+                        </h3>
+                        <p class="text-xs text-ink-400 mt-0.5">Alur lupa password CS WhatsApp &amp; Kasir Toko</p>
+                    </div>
+                    <button wire:click="closeResetPasswordModal" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-ink-400 hover:text-white flex items-center justify-center transition cursor-pointer text-sm">✕</button>
+                </div>
+
+                <div class="overflow-y-auto pr-1 flex-1 space-y-4">
+                    <!-- Ringkasan Pelanggan -->
+                    <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-ink-400 block text-[10px] uppercase font-semibold">Nama Konsumen</span>
+                                <span class="font-bold text-white text-sm">{{ $resetPasswordForm['nama'] }}</span>
+                            </div>
+                            <div>
+                                <span class="text-ink-400 block text-[10px] uppercase font-semibold">No. HP / WhatsApp</span>
+                                <span class="font-bold font-mono text-white text-sm">{{ $resetPasswordForm['telepon'] }}</span>
+                            </div>
+                        </div>
+                        @if(!empty($resetPasswordForm['username']))
+                            <div class="pt-2 border-t border-white/5 text-xs">
+                                <span class="text-ink-400 text-[10px] uppercase font-semibold">Username:</span>
+                                <span class="font-mono font-semibold text-up-primary">&#64;{{ $resetPasswordForm['username'] }}</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- Input Kata Sandi Baru -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold text-ink-300">
+                                Kata Sandi Baru yang Diajukan *
+                            </label>
+                            <button type="button" wire:click="$set('resetPasswordForm.new_password', '{{ Str::random(8) }}')"
+                                    class="text-[11px] text-up-primary hover:underline font-mono">
+                                Acak Password Baru
+                            </button>
+                        </div>
+                        <input type="text"
+                               wire:model="resetPasswordForm.new_password"
+                               placeholder="Minimal 6 karakter"
+                               class="w-full px-3.5 py-2.5 rounded-xl bg-black/30 border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-up-primary" />
+                        <p class="text-[11px] text-ink-400 mt-1">
+                            Setelah di-approve Owner/Admin, konsumen langsung dapat login dengan password ini.
+                        </p>
+                        @error('resetPasswordForm.new_password') <span class="text-red-400 text-xs block mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    <!-- Alasan / Catatan Pengajuan -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">
+                            Alasan Permohonan / Catatan CS *
+                        </label>
+                        <textarea wire:model="resetPasswordForm.alasan"
+                                  rows="2"
+                                  placeholder="Contoh: Konsumen chat WA lupa sandi, no HP sudah dicocokkan."
+                                  class="w-full px-3.5 py-2 rounded-xl bg-black/30 border border-white/10 text-white text-xs focus:outline-none focus:border-up-primary"></textarea>
+                        @error('resetPasswordForm.alasan') <span class="text-red-400 text-xs block mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-up-primary/10 border border-up-primary/20 text-xs text-ink-300 space-y-1">
+                        <p class="font-bold text-white flex items-center gap-1.5">
+                            <span>🛡️</span>
+                            <span>Kontrol Keamanan Approval</span>
+                        </p>
+                        <p class="text-[11px] leading-relaxed text-ink-300">
+                            Pengajuan akan masuk ke antrean <strong>Approval Inbox</strong> backoffice. Kata sandi akun konsumen hanya akan aktif setelah diverifikasi &amp; disetujui oleh Owner, Super Admin, atau Admin Toko.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-4 flex-shrink-0">
+                    <button type="button" wire:click="closeResetPasswordModal" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
+                    <button type="button" wire:click="ajukanResetPassword" class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs cursor-pointer min-h-[44px]">Kirim Pengajuan Reset</button>
                 </div>
             </div>
         </div>

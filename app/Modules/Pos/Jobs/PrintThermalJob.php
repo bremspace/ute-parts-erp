@@ -40,6 +40,7 @@ class PrintThermalJob implements ShouldQueue
             'qty' => $item->jumlah,
             'harga' => (float) $item->harga_satuan,
             'subtotal' => (float) $item->subtotal,
+            'catatan' => $item->catatan,
         ])->all();
 
         if (empty($items) && $transaksi->tiketServis) {

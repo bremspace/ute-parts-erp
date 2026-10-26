@@ -3,6 +3,7 @@
 namespace App\Modules\Marketplace\Livewire;
 
 use App\Modules\Marketplace\Services\CartService;
+use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
@@ -55,6 +56,8 @@ class ShopPage extends Component
 
     // Detail: pilihan varian & qty
     public ?int $selectedVariantId = null;
+
+    public ?string $selectedGadgetModel = null;
 
     public int $qty = 1;
 
@@ -215,7 +218,7 @@ class ShopPage extends Component
         // Diurutkan dari ketersediaan stok (tersedia > habis) dan produk terlaris.
         $query = Produk::where('is_active', true)
             ->withSum('stokItems', 'jumlah')
-            ->with('hargaTier')
+            ->with(['hargaTier', 'skuVariants'])
             ->urutKetersediaanDanTerlaris();
 
         if ($this->search) {
@@ -412,6 +415,32 @@ class ShopPage extends Component
         return app(PricingService::class)->resolve($produk, $customer, $variant);
     }
 
+    public function selectGadgetModel(string $gadgetModel): void
+    {
+        $gadgetModel = trim($gadgetModel);
+        if ($this->selectedGadgetModel === $gadgetModel) {
+            $this->selectedGadgetModel = null;
+
+            return;
+        }
+
+        $this->selectedGadgetModel = $gadgetModel;
+
+        // Auto-match SKU Variant jika ada varian yang namanya relevan dengan model gadget
+        if ($this->productDetail && $this->productDetail->skuVariants->isNotEmpty()) {
+            $matchedVariant = $this->productDetail->skuVariants->first(function ($v) use ($gadgetModel) {
+                $vNama = strtolower($v->nama_varian);
+                $gNama = strtolower($gadgetModel);
+
+                return str_contains($vNama, $gNama) || str_contains($gNama, $vNama);
+            });
+
+            if ($matchedVariant) {
+                $this->selectedVariantId = $matchedVariant->id;
+            }
+        }
+    }
+
     public function addToCart(?int $produkId = null)
     {
         $produk = $produkId ? Produk::find($produkId) : $this->productDetail;
@@ -419,11 +448,16 @@ class ShopPage extends Component
             return;
         }
 
+        $catatan = (! $produkId || ($this->productDetail && $produkId === $this->productDetail->id)) && $this->selectedGadgetModel
+            ? "Model: {$this->selectedGadgetModel}"
+            : null;
+
         try {
             app(CartService::class)->isi(
                 $produk->id,
                 $this->selectedVariantId,
-                max(1, $this->qty)
+                max(1, $this->qty),
+                $catatan
             );
             $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
             $this->dispatch('alert', ['type' => 'success', 'message' => "{$produk->nama} masuk keranjang"]);
@@ -435,14 +469,20 @@ class ShopPage extends Component
     public function render()
     {
         if ($this->slug) {
+            $webService = app(WebKonsumenService::class);
+
             return view('modules.marketplace.livewire.shop-detail', [
                 'produk' => $this->productDetail,
                 'hargaInfo' => $this->hargaInfo,
                 'stokPerCabang' => $this->stokPerCabang,
                 'stokPerVariant' => $this->stokPerVariant,
                 'stokTotal' => $this->stokTotal,
+                'selectedGadgetModel' => $this->selectedGadgetModel,
+                'webConfig' => $webService->getAll(),
             ])->layout('layouts.marketplace', ['title' => $this->productDetail?->nama ?? 'Produk']);
         }
+
+        $webService = app(WebKonsumenService::class);
 
         return view('modules.marketplace.livewire.shop-catalog', [
             'categories' => $this->categories,
@@ -451,6 +491,8 @@ class ShopPage extends Component
             'hpModelList' => $this->hpModelList,
             'kualitasList' => $this->kualitasList,
             'products' => $this->products,
+            'webConfig' => $webService->getAll(),
+            'webBanners' => $webService->getActiveBanners(),
         ])->layout('layouts.marketplace', ['title' => 'Katalog Sparepart']);
     }
 }

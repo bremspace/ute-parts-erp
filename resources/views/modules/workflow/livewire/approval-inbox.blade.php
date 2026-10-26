@@ -63,6 +63,8 @@
                                             <div class="text-sm font-medium text-gray-900 dark:text-white">
                                                 @if($request->entity_type === 'member')
                                                     Member: {{ $request->payload_json['nama'] ?? ('#' . $request->entity_id) }}
+                                                @elseif($request->entity_type === 'reset_password_pelanggan')
+                                                    Reset Password: {{ $request->payload_json['nama'] ?? ('Pelanggan #' . $request->entity_id) }}
                                                 @else
                                                     {{ $request->entity_type }} #{{ $request->entity_id }}
                                                 @endif
@@ -70,6 +72,8 @@
                                             <div class="text-xs text-gray-500 dark:text-gray-400">
                                                 @if($request->entity_type === 'member')
                                                     HP: {{ $request->payload_json['telepon'] ?? '-' }} • Rule: {{ $request->rule?->approver_role }} (Lv{{ $request->rule?->level }})
+                                                @elseif($request->entity_type === 'reset_password_pelanggan')
+                                                    HP: {{ $request->payload_json['telepon'] ?? '-' }} • CS/Staf: {{ $request->requestedBy?->name ?? '-' }}
                                                 @else
                                                     Rule: {{ $request->rule?->approver_role }} (Lv{{ $request->rule?->level }})
                                                 @endif
@@ -131,6 +135,13 @@
                                                         :disabled="$processing">
                                                     <span>✓</span>
                                                     <span>Setujui & Kategori</span>
+                                                </button>
+                                            @elseif($request->entity_type === 'reset_password_pelanggan')
+                                                <button wire:click="openApproveResetPasswordModal({{ $request->id }})" 
+                                                        class="px-3.5 py-1.5 bg-up-primary hover:bg-up-primary-dark text-white text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer flex items-center gap-1.5"
+                                                        :disabled="$processing">
+                                                    <span>🔑</span>
+                                                    <span>Setujui Reset</span>
                                                 </button>
                                             @else
                                                 <button wire:click="approveRequest({{ $request->id }})" 
@@ -360,6 +371,97 @@
                             class="px-5 py-2.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5">
                         <span>✓</span>
                         <span>Setujui & Aktifkan Member</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Approve Reset Password Modal -->
+    @if($showApproveResetPasswordModal)
+        <div class="fixed inset-0 bg-black/75 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-3 sm:p-4">
+            <div class="relative mx-auto p-5 sm:p-6 border border-gray-200 dark:border-white/10 w-full max-w-lg shadow-2xl rounded-2xl sm:rounded-3xl bg-white dark:bg-gray-800 text-left max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
+                    <div>
+                        <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span>🔑</span>
+                            <span>Persetujuan Reset Kata Sandi Pelanggan</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Permohonan reset password via CS WhatsApp atau Toko
+                        </p>
+                    </div>
+                    <button wire:click="closeApproveResetPasswordModal" 
+                            type="button" 
+                            class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition cursor-pointer text-sm">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="overflow-y-auto pr-1 flex-1 space-y-4">
+                    <!-- Ringkasan Pelanggan -->
+                    <div class="p-3.5 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/5 space-y-2">
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400 block text-[10px] uppercase font-semibold">Nama Konsumen</span>
+                                <span class="font-bold text-gray-900 dark:text-white text-sm">{{ $resetPasswordApprovalForm['nama'] }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400 block text-[10px] uppercase font-semibold">No. HP / WhatsApp</span>
+                                <span class="font-bold font-mono text-gray-900 dark:text-white text-sm">{{ $resetPasswordApprovalForm['telepon'] }}</span>
+                            </div>
+                        </div>
+                        @if(!empty($resetPasswordApprovalForm['username']) && $resetPasswordApprovalForm['username'] !== '-')
+                            <div class="pt-2 border-t border-gray-200 dark:border-white/5 text-xs">
+                                <span class="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-semibold">Username:</span>
+                                <span class="font-mono font-semibold text-up-primary">&#64;{{ $resetPasswordApprovalForm['username'] }}</span>
+                            </div>
+                        @endif
+                        <div class="pt-2 border-t border-gray-200 dark:border-white/5 text-xs">
+                            <span class="text-gray-500 dark:text-gray-400 block text-[10px] uppercase font-semibold">Alasan / Catatan Pengajuan</span>
+                            <span class="text-gray-700 dark:text-gray-300 font-medium">{{ $resetPasswordApprovalForm['alasan'] }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Password Baru yang Ditetapkan -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Kata Sandi Baru untuk Konsumen *
+                        </label>
+                        <input type="text" 
+                               wire:model="resetPasswordApprovalForm.new_password" 
+                               placeholder="Minimal 6 karakter" 
+                               class="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-up-primary focus:outline-none" />
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                            Kata sandi ini akan dienkripsi dan disimpan permanen. Konsumen dapat langsung login menggunakan password ini.
+                        </p>
+                        @error('resetPasswordApprovalForm.new_password') <span class="text-red-500 text-xs block mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    <!-- Catatan Approval -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            Catatan Persetujuan (Opsional)
+                        </label>
+                        <textarea wire:model="resetPasswordApprovalForm.catatan" 
+                                  rows="2" 
+                                  placeholder="Contoh: Terverifikasi via WhatsApp resmi atau KTP di toko..."
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 text-xs"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-4 border-t border-gray-200 dark:border-white/10 mt-4 flex-shrink-0">
+                    <button wire:click="closeApproveResetPasswordModal"
+                            type="button"
+                            class="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 text-xs font-semibold rounded-xl cursor-pointer">
+                        Batal
+                    </button>
+                    <button wire:click="approveResetPasswordSubmit"
+                            type="button"
+                            :disabled="$processing"
+                            class="px-5 py-2.5 bg-up-primary hover:bg-up-primary-dark text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5">
+                        <span>✓</span>
+                        <span>Setujui & Perbarui Password</span>
                     </button>
                 </div>
             </div>

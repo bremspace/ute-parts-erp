@@ -54,6 +54,31 @@
         Lewati ke konten utama
     </a>
 
+    <!-- Top Announcement Bar (CMS Dinamis Running Text) -->
+    @if (($webConfig['topbar_active'] ?? true) && !empty($webConfig['topbar_text']))
+        <div class="bg-gradient-to-r from-up-primary via-indigo-600 to-up-primary text-white text-[11px] sm:text-xs font-semibold py-1.5 border-b border-white/10 z-50 relative overflow-hidden select-none">
+            <div class="animate-marquee flex items-center gap-12 whitespace-nowrap">
+                @for ($i = 0; $i < 2; $i++)
+                    <div class="flex items-center gap-12 shrink-0">
+                        @for ($j = 0; $j < 3; $j++)
+                            <div class="flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-up-mint animate-pulse flex-shrink-0"></span>
+                                @if (!empty($webConfig['topbar_url']))
+                                    <a href="{{ $webConfig['topbar_url'] }}" class="hover:underline flex items-center gap-1 text-white">
+                                        <span>{{ $webConfig['topbar_text'] }}</span>
+                                        <svg class="w-3 h-3 opacity-75 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                                    </a>
+                                @else
+                                    <span>{{ $webConfig['topbar_text'] }}</span>
+                                @endif
+                            </div>
+                        @endfor
+                    </div>
+                @endfor
+            </div>
+        </div>
+    @endif
+
     <!-- Top Bar: Apple-inspired frosted glass chrome with optical typography -->
     <header class="bg-white/85 dark:bg-[#090D16]/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08] sticky top-0 z-40 transition-colors duration-200 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]"
         style="padding-top: env(safe-area-inset-top, 0);">
@@ -483,9 +508,138 @@
                 <a href="{{ url('/tracking') }}" class="hover:text-up-primary transition-colors">Lacak Servis</a>
                 <a href="{{ route('customer.account') }}" class="hover:text-up-primary transition-colors">Akun & Membership</a>
             </div>
-            <p class="text-xs text-ink-400 dark:text-ink-500">© {{ date('Y') }} Ute Parts Ecosystem. All rights reserved.</p>
+            <div class="space-y-1">
+                <p class="text-xs text-ink-400 dark:text-ink-500">© {{ date('Y') }} Ute Parts Ecosystem. All rights reserved.</p>
+                @if (!empty($webConfig['operating_hours']))
+                    <p class="text-[11px] text-ink-400 dark:text-ink-500">Jam Buka: {{ $webConfig['operating_hours'] }}</p>
+                @endif
+                @if (!empty($webConfig['social_links']) && is_array($webConfig['social_links']))
+                    <div class="flex items-center gap-3 pt-1 text-[11px]">
+                        @if (!empty($webConfig['social_links']['instagram']))
+                            <a href="{{ $webConfig['social_links']['instagram'] }}" target="_blank" rel="noopener noreferrer" class="text-ink-400 hover:text-up-primary transition-colors">Instagram</a>
+                        @endif
+                        @if (!empty($webConfig['social_links']['tiktok']))
+                            <a href="{{ $webConfig['social_links']['tiktok'] }}" target="_blank" rel="noopener noreferrer" class="text-ink-400 hover:text-up-primary transition-colors">TikTok</a>
+                        @endif
+                        @if (!empty($webConfig['social_links']['shopee']))
+                            <a href="{{ $webConfig['social_links']['shopee'] }}" target="_blank" rel="noopener noreferrer" class="text-ink-400 hover:text-up-primary transition-colors">Shopee</a>
+                        @endif
+                        @if (!empty($webConfig['social_links']['tokopedia']))
+                            <a href="{{ $webConfig['social_links']['tokopedia'] }}" target="_blank" rel="noopener noreferrer" class="text-ink-400 hover:text-up-primary transition-colors">Tokopedia</a>
+                        @endif
+                    </div>
+                @endif
+            </div>
         </div>
     </footer>
+
+    <!-- Floating WhatsApp Action (@emil-design-eng tactile) -->
+    @if ($webConfig['wa_floating_active'] ?? true)
+        @php
+            $waNum = preg_replace('/[^0-9]/', '', $webConfig['wa_number'] ?? '6281234567890');
+            $waMsg = urlencode($webConfig['wa_default_msg'] ?? 'Halo Admin Ute Parts, saya ingin tanya sparepart...');
+            $waUrl = "https://wa.me/{$waNum}?text={$waMsg}";
+        @endphp
+        <div class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 group"
+             x-data="{ showTooltip: false }">
+            <a href="{{ $waUrl }}" target="_blank" rel="noopener noreferrer"
+               @mouseenter="showTooltip = true"
+               @mouseleave="showTooltip = false"
+               class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#25D366] text-white shadow-lg shadow-[#25D366]/40 hover:scale-105 active:scale-95 transition-all duration-150 cursor-pointer"
+               aria-label="Konsultasi WhatsApp">
+                <svg class="w-6 h-6 sm:w-7 sm:h-7 fill-current" viewBox="0 0 24 24">
+                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.584 1.761.88 2.791.88 3.181 0 5.767-2.586 5.767-5.766.001-3.182-2.585-5.766-5.767-5.766zm10.009 5.766c0 5.514-4.486 10-10.009 10-1.684 0-3.32-.423-4.787-1.229l-5.244 1.372 1.399-5.114c-.876-1.507-1.368-3.238-1.368-5.029 0-5.514 4.486-10 10.009-10 5.522 0 10 4.486 10 10zm-5.039 4.398c-.279-.14-.649-.319-1.042-.511-.393-.193-.68-.289-.968.14-.288.43-.889 1.118-1.089 1.348-.2.23-.4.26-.679.12-.279-.14-1.179-.434-2.246-1.385-.829-.739-1.389-1.652-1.552-1.932-.163-.279-.017-.43.123-.569.126-.125.279-.328.419-.492.139-.164.186-.279.279-.465.093-.186.047-.349-.023-.489-.07-.14-.628-1.512-.86-2.07-.226-.544-.455-.47-.628-.479-.163-.008-.349-.01-.535-.01-.186 0-.488.07-.744.349-.256.279-.977.954-.977 2.326 0 1.372 1 2.698 1.14 2.884.14.186 1.968 3.005 4.767 4.213.666.287 1.187.459 1.593.588.669.213 1.278.183 1.759.111.536-.08 1.651-.675 1.884-1.326.233-.651.233-1.21.163-1.326-.07-.116-.256-.186-.535-.326z"/>
+                </svg>
+            </a>
+            <!-- Tooltip origin-aware -->
+            <div x-show="showTooltip" x-cloak
+                 x-transition:enter="transition ease-out duration-150"
+                 x-transition:enter-start="opacity-0 scale-95 translate-y-1"
+                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                 class="hidden sm:block absolute right-16 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-xl bg-ink-900 text-white text-xs font-semibold whitespace-nowrap shadow-xl border border-white/10 pointer-events-none">
+                Konsultasi WhatsApp CS
+            </div>
+        </div>
+    @endif
+
+    <!-- Pop-up Promosi Modal (CMS) -->
+    @if (($webConfig['popup_active'] ?? false) && !empty($webConfig['popup_banner_id']))
+        @php
+            $popupBanner = \App\Modules\Marketplace\Models\WebBanner::find($webConfig['popup_banner_id']);
+            $freq = $webConfig['popup_frequency'] ?? 'once_per_day';
+        @endphp
+        @if ($popupBanner && $popupBanner->is_active)
+        <div x-data="{
+                open: false,
+                init() {
+                    const freq = '{{ $freq }}';
+                    const key = 'ute_popup_closed_{{ $popupBanner->id }}';
+                    const lastClosed = localStorage.getItem(key);
+                    const now = new Date().getTime();
+
+                    if (freq === 'always') {
+                        setTimeout(() => this.open = true, 1000);
+                        return;
+                    }
+
+                    if (freq === 'once_per_day' && lastClosed) {
+                        const oneDay = 24 * 60 * 60 * 1000;
+                        if (now - parseInt(lastClosed, 10) < oneDay) return;
+                    }
+
+                    if (freq === 'once_per_session' && sessionStorage.getItem(key)) {
+                        return;
+                    }
+
+                    setTimeout(() => this.open = true, 1000);
+                },
+                close() {
+                    this.open = false;
+                    const key = 'ute_popup_closed_{{ $popupBanner->id }}';
+                    try {
+                        localStorage.setItem(key, new Date().getTime().toString());
+                        sessionStorage.setItem(key, 'true');
+                    } catch(e) {}
+                }
+             }"
+             x-show="open" x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0">
+            <div class="relative max-w-md w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10"
+                 @click.away="close()"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100">
+                <button type="button" @click="close()"
+                        class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black transition-colors"
+                        aria-label="Tutup promo">
+                    ✕
+                </button>
+                <a href="{{ $popupBanner->target_url ?: '#' }}" @click="close()" class="block group">
+                    <img src="{{ $popupBanner->gambar_desktop }}" alt="{{ $popupBanner->judul }}" class="w-full h-auto object-cover max-h-[420px]">
+                    @if ($popupBanner->judul)
+                        <div class="p-4 bg-[#0F172A] text-white flex items-center justify-between">
+                            <div>
+                                @if ($popupBanner->badge_label)
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-up-primary/20 text-up-primary uppercase tracking-wider">{{ $popupBanner->badge_label }}</span>
+                                @endif
+                                <h4 class="text-xs sm:text-sm font-bold text-white mt-1">{{ $popupBanner->judul }}</h4>
+                            </div>
+                            <span class="text-xs font-semibold text-up-mint flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                                Lihat Promo &rarr;
+                            </span>
+                        </div>
+                    @endif
+                </a>
+            </div>
+        </div>
+        @endif
+    @endif
 
     @livewireScripts
 </body>

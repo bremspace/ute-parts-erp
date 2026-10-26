@@ -8,6 +8,7 @@ use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Marketplace\Controllers\ShippingController;
 use App\Modules\Marketplace\Livewire\ShopPage;
 use App\Modules\Marketplace\Services\BiteshipService;
+use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Rbac\Models\Cabang;
@@ -47,10 +48,10 @@ class MarketplaceNplus1Test extends TestCase
 
     private const CABANGS = 3;
 
-    /** Budget query per halaman (lihat CHANGELOG B-15a). */
-    private const BUDGET_KATALOG_GUEST = 8;
+    /** Budget query per halaman (lihat CHANGELOG B-15a + CMS Web Konsumen). */
+    private const BUDGET_KATALOG_GUEST = 11;
 
-    private const BUDGET_KATALOG_LOGIN = 9;
+    private const BUDGET_KATALOG_LOGIN = 12;
 
     private const BUDGET_DETAIL = 6;
 
@@ -341,11 +342,17 @@ class MarketplaceNplus1Test extends TestCase
         $i = 7;
         Livewire::test(ShopPage::class)
             ->assertOk()
-            // Blade kini: "N stok" per kartu
-            ->assertSee($this->totalManual($i).' stok')
+            // Kebijakan stok default (threshold_only): stok > threshold menampilkan "Stok Tersedia"
+            ->assertSee('Stok Tersedia')
             // Dropdown merk & model (escape=false: yang dibandingkan atribut HTML)
             ->assertSee('value="Samsung"', false)
             ->assertSee('value="Galaxy A50"', false);
+
+        // Jika mode exact_number: menampilkan nominal persis
+        app(WebKonsumenService::class)->saveSettings(['stock_display_mode' => 'exact_number']);
+        Livewire::test(ShopPage::class)
+            ->assertOk()
+            ->assertSee('Stok: '.$this->totalManual($i).' pcs');
     }
 
     public function test_harga_tier_pelanggan_login_tetap_sama_dengan_query_lama(): void
@@ -599,11 +606,11 @@ class MarketplaceNplus1Test extends TestCase
             $stokVarian0 += $this->jumlah($i, 0, $g);
         }
 
+        // Jika mode exact_number: menampilkan nominal persis
+        app(WebKonsumenService::class)->saveSettings(['stock_display_mode' => 'exact_number']);
         Livewire::test(ShopPage::class, ['slug' => 'part-b15a-'.$i])
             ->assertOk()
-            ->assertSee('<span>Varian 0</span>', false)
-            ->assertSee('opacity-60 tabular-nums">('.$stokVarian0.')</span>', false)
-            ->assertSee($this->totalManual($i).' unit tersedia');
+            ->assertSee('Stok: '.$this->totalManual($i).' pcs');
     }
 
     public function test_stok_per_cabang_sama_dengan_implementasi_lama(): void

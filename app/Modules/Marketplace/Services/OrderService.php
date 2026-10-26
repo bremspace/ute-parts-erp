@@ -85,6 +85,7 @@ class OrderService
                     'diskon_nominal' => round($diskonPerUnit * $qty, 2),
                     'hpp' => (float) $produk->harga_beli,
                     'subtotal' => $lineSubtotal,
+                    'catatan' => $item['catatan'] ?? null,
                 ];
             }
 
@@ -132,6 +133,7 @@ class OrderService
                     'diskon_nominal' => $row['diskon_nominal'] ?? 0,
                     'subtotal' => $row['subtotal'],
                     'hpp' => $row['hpp'],
+                    'catatan' => $row['catatan'] ?? null,
                 ]);
             }
 

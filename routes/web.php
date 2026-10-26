@@ -25,6 +25,8 @@ use App\Modules\Marketplace\Livewire\BookingServis;
 use App\Modules\Marketplace\Livewire\CartCheckout;
 use App\Modules\Marketplace\Livewire\CustomerAccount;
 use App\Modules\Marketplace\Livewire\ShopPage;
+use App\Modules\Marketplace\Livewire\WebKonsumenSettings;
+use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter;
 use App\Modules\Pos\Livewire\PesananOnlineIndex;
@@ -303,21 +305,44 @@ Route::post('/webhook/git-deploy', [GitDeployWebhookController::class, 'handle']
     ->withoutMiddleware([ValidateCsrfToken::class, PreventRequestForgery::class]);
 
 // Auth + akun pelanggan
-Route::get('/login-pelanggan', fn () => view('auth.customer-login'))->name('customer.login');
+Route::get('/login-pelanggan', function () {
+    $webConfig = app(WebKonsumenService::class)->getAll();
+
+    return view('auth.customer-login', ['webConfig' => $webConfig]);
+})->name('customer.login');
 Route::post('/login-pelanggan', function (Request $request) {
-    $rawTelepon = (string) $request->input('telepon', '');
-    $teleponBersih = preg_replace('/[^0-9]/', '', $rawTelepon);
-    if (str_starts_with($teleponBersih, '628')) {
-        $teleponBersih = '08'.substr($teleponBersih, 3);
-    }
-    $request->merge(['telepon' => $teleponBersih]);
+    $loginInput = trim((string) $request->input('telepon', ''));
+    $password = (string) $request->input('password', '');
 
     $credentials = $request->validate([
         'telepon' => 'required|string',
         'password' => 'required|string',
     ]);
 
-    if (Auth::guard('customer')->attempt(['telepon' => $credentials['telepon'], 'password' => $credentials['password']])) {
+    // Deteksi apakah input login adalah nomor telepon atau username
+    $teleponBersih = preg_replace('/[^0-9]/', '', $loginInput);
+    if (str_starts_with($teleponBersih, '628')) {
+        $teleponBersih = '08'.substr($teleponBersih, 3);
+    }
+
+    $attemptSuccess = false;
+
+    // 1. Coba via normalisasi nomor telepon jika dominan angka
+    if (! empty($teleponBersih) && strlen($teleponBersih) >= 9) {
+        $attemptSuccess = Auth::guard('customer')->attempt(['telepon' => $teleponBersih, 'password' => $password]);
+    }
+
+    // 2. Jika gagal atau format bukan nomor telepon, coba via username
+    if (! $attemptSuccess) {
+        $attemptSuccess = Auth::guard('customer')->attempt(['username' => $loginInput, 'password' => $password]);
+    }
+
+    // 3. Fallback jika nomor telepon tersimpan persis apa adanya tanpa format 08
+    if (! $attemptSuccess && ! empty($loginInput)) {
+        $attemptSuccess = Auth::guard('customer')->attempt(['telepon' => $loginInput, 'password' => $password]);
+    }
+
+    if ($attemptSuccess) {
         $user = Auth::guard('customer')->user();
         if (($user->status ?? 'aktif') === 'pending') {
             Auth::guard('customer')->logout();
@@ -338,7 +363,7 @@ Route::post('/login-pelanggan', function (Request $request) {
         return redirect()->intended($fallback);
     }
 
-    return back()->withInput($request->only('telepon'))->withErrors(['telepon' => 'Telepon atau password salah']);
+    return back()->withInput($request->only('telepon'))->withErrors(['telepon' => 'Nomor HP/Username atau kata sandi tidak cocok.']);
 })->middleware('throttle:10,1')->name('customer.login.post');
 
 Route::get('/daftar-pelanggan', fn () => view('auth.customer-register'))->name('customer.register');
@@ -746,6 +771,7 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
 
     // Pengaturan & RBAC Screen — RBAC: permission pengaturan.manage|user.view
     Route::get('/pengaturan', SettingsRbac::class)->name('pengaturan')->middleware('permission:pengaturan.manage|user.view');
+    Route::get('/pengaturan/web-konsumen', WebKonsumenSettings::class)->name('pengaturan.web-konsumen')->middleware('permission:pengaturan.manage');
 
     // [F1-4] Audit Trail Log Aktivitas Sistem
     Route::get('/audit-log', RiwayatAktivitas::class)->name('audit-log')->middleware('permission:lihat-audit-log');

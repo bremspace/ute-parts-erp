@@ -75,6 +75,11 @@ class EscPosWriter
             foreach ($this->wrap($item['nama']) as $namaLine) {
                 $this->text($namaLine);
             }
+            if (! empty($item['catatan'])) {
+                foreach ($this->wrap('  * '.$item['catatan']) as $catatanLine) {
+                    $this->text($catatanLine);
+                }
+            }
             $this->text($this->pad(
                 "{$item['qty']} x ".$this->money($item['harga']),
                 $this->money($item['subtotal'])

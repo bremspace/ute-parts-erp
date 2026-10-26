@@ -464,6 +464,10 @@
                         </a>
                         @endcan
                         @can('pengaturan.manage')
+                        <a href="{{ route('pengaturan.web-konsumen') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->routeIs('pengaturan.web-konsumen') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('pengaturan.web-konsumen') ? 'bg-white' : 'bg-pink-400' }}"></span>
+                            <span>Web Konsumen (CMS)</span>
+                        </a>
                         <a href="/app/pengaturan?tab=master_produk" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'master_produk' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'master_produk' ? 'bg-white' : 'bg-sky-400' }}"></span>
                             <span>Katalog &amp; Master Part</span>

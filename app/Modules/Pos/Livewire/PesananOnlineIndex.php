@@ -658,6 +658,7 @@ class PesananOnlineIndex extends Component
                     'harga' => (float) $it->harga_satuan,
                     'harga_retail' => $retail,
                     'subtotal' => (float) $it->subtotal,
+                    'catatan' => $it->catatan,
                 ];
             })->toArray(),
             'subtotal_retail' => $subtotalRetail,

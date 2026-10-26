@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             ReportSeeder::class,
             HrSeeder::class,
             IntegrationSeeder::class,
+            WebKonsumenSeeder::class,
         ]);
     }
 }
