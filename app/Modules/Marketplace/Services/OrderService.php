@@ -4,6 +4,7 @@ namespace App\Modules\Marketplace\Services;
 
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PartaiPricingService;
 use App\Modules\Marketplace\Models\Pengiriman;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
@@ -89,11 +90,16 @@ class OrderService
                 ];
             }
 
+            // Standarisasi diskon partai global untuk marketplace order
+            $partaiService = app(PartaiPricingService::class);
+            $partaiInfo = $partaiService->hitung($rows, $pelanggan);
+            $diskonPartai = (float) ($partaiInfo['diskon_nominal'] ?? 0.0);
+
             // [B-14] PPN per cabang — definisi identik POS: DPP = subtotal - diskon,
-            // PPN = DPP × persen, total_akhir = DPP + PPN. Nonaktif → PPN 0 dan
-            // total_akhir = subtotal (perilaku lama, tidak berubah).
-            $diskon = 0.0; // marketplace belum mendukung diskon header
-            $pajak = $this->pajakService->hitungPenjualan($cabangId, $subtotal, $diskon);
+            // PPN = DPP × persen, total_akhir = DPP + PPN.
+            $diskon = 0.0;
+            $diskonHeaderTotal = $diskon + $diskonPartai;
+            $pajak = $this->pajakService->hitungPenjualan($cabangId, $subtotal, $diskonHeaderTotal);
 
             $gudangId = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->value('id')
                 ?? Gudang::where('cabang_id', $cabangId)->value('id')
@@ -109,6 +115,7 @@ class OrderService
                 'subtotal' => $subtotal,
                 'diskon_persen' => 0,
                 'diskon_nominal' => $diskon,
+                'diskon_partai' => $diskonPartai,
                 'dpp' => $pajak['dpp'],
                 'pajak_nominal' => $pajak['ppn_nominal'],
                 'ppn_nominal' => $pajak['ppn_nominal'],
@@ -212,8 +219,8 @@ class OrderService
      *
      * @return array{dpp:float, ppn_nominal:float, ppn_percent:float, enabled:bool, total_akhir:float}
      */
-    public function previewPajak(int $cabangId, float $subtotal): array
+    public function previewPajak(int $cabangId, float $subtotal, float $diskon = 0.0): array
     {
-        return $this->pajakService->hitungPenjualan($cabangId, $subtotal);
+        return $this->pajakService->hitungPenjualan($cabangId, $subtotal, $diskon);
     }
 }

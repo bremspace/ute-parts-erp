@@ -2,6 +2,8 @@
 
 namespace App\Modules\Marketplace\Services;
 
+use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Services\PartaiPricingService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
@@ -182,6 +184,14 @@ class CartService
     public function hitungDiskonTier(): float
     {
         return max(0.0, $this->hitungSubtotalRetail() - $this->hitungSubtotal());
+    }
+
+    public function hitungDiskonPartai(?Pelanggan $customer = null): array
+    {
+        $pelanggan = $customer ?: auth('customer')->user();
+        $items = $this->all();
+
+        return app(PartaiPricingService::class)->hitung($items, $pelanggan);
     }
 
     public function jumlahItem(): int

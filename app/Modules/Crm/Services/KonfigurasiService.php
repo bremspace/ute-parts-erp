@@ -154,12 +154,19 @@ class KonfigurasiService
 
     public function hargaPartaiAktif(): bool
     {
-        return (bool) ($this->get('harga_partai_aktif') ?? true);
+        $val = $this->get('harga_partai_aktif');
+        if ($val === null) {
+            return true;
+        }
+
+        return filter_var($val, FILTER_VALIDATE_BOOLEAN);
     }
 
     public function hargaPartaiBerlakuUntuk(): string
     {
-        return (string) ($this->get('harga_partai_berlaku_untuk') ?? 'semua');
+        $val = $this->get('harga_partai_berlaku_untuk');
+
+        return ! empty($val) ? (string) $val : 'semua';
     }
 
     public function hargaPartaiMinQty(): int

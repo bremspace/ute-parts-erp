@@ -66,6 +66,16 @@ class CartCheckout extends Component
         return app(CartService::class)->hitungDiskonTier();
     }
 
+    public function getPartaiInfoProperty(): array
+    {
+        return app(CartService::class)->hitungDiskonPartai(auth('customer')->user());
+    }
+
+    public function getDiskonPartaiProperty(): float
+    {
+        return (float) ($this->partaiInfo['diskon_nominal'] ?? 0.0);
+    }
+
     public function getJumlahItemProperty(): int
     {
         return app(CartService::class)->jumlahItem();
@@ -165,16 +175,18 @@ class CartCheckout extends Component
     public function getPajakPreviewProperty(): array
     {
         if (! $this->selectedCabangId) {
+            $dpp = max(0.0, $this->subtotal - $this->diskonPartai);
+
             return [
                 'enabled' => false,
                 'ppn_nominal' => 0.0,
                 'ppn_percent' => 0.0,
-                'dpp' => $this->subtotal,
-                'total_akhir' => $this->subtotal,
+                'dpp' => $dpp,
+                'total_akhir' => $dpp,
             ];
         }
 
-        return app(OrderService::class)->previewPajak($this->selectedCabangId, $this->subtotal);
+        return app(OrderService::class)->previewPajak($this->selectedCabangId, $this->subtotal, $this->diskonPartai);
     }
 
     public function render()
@@ -183,6 +195,10 @@ class CartCheckout extends Component
             'pelanggan' => auth('customer')->user(),
             'cart' => $this->cart,
             'subtotal' => $this->subtotal,
+            'subtotalRetail' => $this->subtotalRetail,
+            'diskonTier' => $this->diskonTier,
+            'partaiInfo' => $this->partaiInfo,
+            'diskonPartai' => $this->diskonPartai,
             'pajakPreview' => $this->pajakPreview,
             'jumlahItem' => $this->jumlahItem,
             'cabangs' => $this->cabangs,

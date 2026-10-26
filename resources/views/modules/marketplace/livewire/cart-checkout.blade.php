@@ -209,6 +209,20 @@
                                     </div>
                                 @endif
 
+                                @if(($diskonPartai ?? 0) > 0)
+                                    <div class="flex justify-between items-center text-up-accent font-semibold">
+                                        <span class="flex items-center gap-1">
+                                            <span>📦</span>
+                                            <span>{{ $partaiInfo['alasan'] ?? 'Diskon Pembelian Partai' }}</span>
+                                        </span>
+                                        <span class="tabular-nums">- Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-ink-700 dark:text-ink-300 font-bold pt-1 border-t border-ink-100/60 dark:border-white/5">
+                                        <span>DPP (Dasar Pengenaan Pajak)</span>
+                                        <span class="tabular-nums text-ink-900 dark:text-white">Rp {{ number_format(max(0, $subtotal - $diskonPartai), 0, ',', '.') }}</span>
+                                    </div>
+                                @endif
+
                                 @if(!empty($pajakPreview['enabled']) && $pajakPreview['ppn_nominal'] > 0)
                                     <div class="flex justify-between items-center text-ink-500">
                                         <span>PPN ({{ $pajakPreview['ppn_percent'] }}%)</span>
@@ -226,6 +240,12 @@
                             @if(($diskonTier ?? 0) > 0)
                                 <div class="p-2.5 rounded-2xl bg-up-mint/10 border border-up-mint/20 text-center text-xs font-bold text-up-mint">
                                     🎉 Anda menghemat Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan harga khusus member!
+                                </div>
+                            @endif
+
+                            @if(($diskonPartai ?? 0) > 0)
+                                <div class="p-2.5 rounded-2xl bg-up-accent/10 border border-up-accent/20 text-center text-xs font-bold text-up-accent">
+                                    📦 Potongan Pembelian Partai hemat Rp {{ number_format($diskonPartai, 0, ',', '.') }} telah diterapkan!
                                 </div>
                             @endif
 
@@ -380,6 +400,12 @@
                                     🎉 Anda menghemat total Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan harga tier member
                                 </div>
                             @endif
+                            @if(($diskonPartai ?? 0) > 0)
+                                <div class="mt-1 text-up-accent font-bold text-[11px] flex items-center gap-1">
+                                    <span>📦</span>
+                                    <span>Potongan partai: {{ $partaiInfo['alasan'] ?? '' }} (-Rp {{ number_format($diskonPartai, 0, ',', '.') }})</span>
+                                </div>
+                            @endif
                         </div>
                         <div class="flex flex-col items-end gap-1">
                             @if(($diskonTier ?? 0) > 0)
@@ -392,12 +418,29 @@
                                     <span class="tabular-nums">- Rp {{ number_format($diskonTier, 0, ',', '.') }}</span>
                                 </div>
                             @endif
-                            <div class="flex items-baseline gap-2">
-                                <span class="text-xs font-semibold text-ink-400 uppercase tracking-wider">Subtotal:</span>
-                                <span class="text-2xl font-black text-up-primary tabular-nums">
-                                    Rp {{ number_format($subtotal, 0, ',', '.') }}
-                                </span>
-                            </div>
+                            @if(($diskonPartai ?? 0) > 0)
+                                <div class="flex items-center gap-2 text-xs text-ink-500">
+                                    <span>Subtotal:</span>
+                                    <span class="tabular-nums">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-up-accent font-semibold">
+                                    <span>Potongan Partai ({{ $partaiInfo['persen'] ?? 0 }}%):</span>
+                                    <span class="tabular-nums">- Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
+                                </div>
+                                <div class="flex items-baseline gap-2 pt-1 border-t border-ink-100/60 dark:border-white/5">
+                                    <span class="text-xs font-semibold text-ink-400 uppercase tracking-wider">Total Belanja:</span>
+                                    <span class="text-2xl font-black text-up-primary tabular-nums">
+                                        Rp {{ number_format(max(0, $subtotal - $diskonPartai), 0, ',', '.') }}
+                                    </span>
+                                </div>
+                            @else
+                                <div class="flex items-baseline gap-2">
+                                    <span class="text-xs font-semibold text-ink-400 uppercase tracking-wider">Subtotal:</span>
+                                    <span class="text-2xl font-black text-up-primary tabular-nums">
+                                        Rp {{ number_format($subtotal, 0, ',', '.') }}
+                                    </span>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>

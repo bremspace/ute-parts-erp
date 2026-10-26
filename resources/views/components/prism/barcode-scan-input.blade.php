@@ -1,8 +1,8 @@
 @props([
-    'placeholder' => 'Scan Barcode atau ketik nama/SKU (F2)...',
+    'placeholder' => 'Scan Barcode / QR atau ketik nama/SKU (F2)...',
     'model' => null,
     'continuous' => false,
-    'title' => 'Scan Barcode Produk',
+    'title' => 'Scan Barcode / QR Produk',
 ])
 
 <div

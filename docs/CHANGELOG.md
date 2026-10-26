@@ -3,7 +3,25 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-26 — Perbaikan Layering Modal Diskon Kasir, Standarisasi Barcode & QR Scanner, dan Kalkulasi Global Harga Partai ✅
+
+- **Perbaikan Layering Modal Diskon Kasir (`PosKasir`)**:
+  - Menaikkan z-index `diskon-modal.blade.php` ke `z-[60]` dan memindahkan posisinya setelah `payment-modal` (`z-50`) pada `pos-kasir.blade.php`, mencegah modal diskon tertutup/terblokir saat proses checkout kasir.
+  - Memperbaiki alur kalkulasi diskon partai pada kasir dengan pemanggilan `resetComputedTotals()` yang tepat agar nilai subtotal, DPP, dan total akhir selalu tersinkronisasi.
+- **Standarisasi Global Scanner Barcode 1D & QR Code 2D (`ScanResolverService` & `barcode-scanner.js`)**:
+  - Membuat `ScanResolverService` sebagai single source of truth resolusi scan multi-format: mendukung SKU standar (`UTP-XXXXX`), varian SKU, barcode kemasan multi-satuan, slug produk, QR URL Ute Parts (`.../shop/product/{id}` atau `.../katalog/{sku}`), payload JSON QR (`{"sku":"..."}` atau `{"id":...}`), dan ID numerik.
+  - Memperbarui `barcode-scanner.js` dengan konfigurasi `STANDARDIZED_SCAN_FORMATS` (QR_CODE, CODE_128, CODE_39, EAN_13, EAN_8, UPC_A, UPC_E, DATA_MATRIX), aspect ratio 1:1 (`qrbox`), dan pembersihan otomatis karakter kontrol/whitespace pada input scanner hardware maupun kamera.
+  - Mengintegrasikan `ScanResolverService` ke seluruh modul operasional: POS Kasir (`scanEnter`), `ProductSearchModal`, `TransferTab`, `OpnameTab`, `CycleCountPage`, dan `GrnTab`.
+- **Standarisasi Global Kalkulasi Harga / Diskon Pembelian Partai (`PartaiPricingService`)**:
+  - Membuat `PartaiPricingService` di bawah CRM/Pricing engine dengan validasi menyeluruh syarat min quantity, min nominal belanja, aturan target (`semua` vs `member`), dan reward mode.
+  - Mengintegrasikan harga partai ke Web Konsumen / Marketplace (`CartService`, `CartCheckout`, dan `OrderService`):
+    - Keranjang belanja dan halaman checkout otomatis menghitung dan menampilkan potongan harga partai, subtotal bersih, DPP, serta badge penghematan partai.
+    - `OrderService::buatOrder()` dan `previewPajak()` otomatis memotong DPP dengan `diskon_partai`, menyelaraskan DPP dan perhitungan PPN di transaksi order marketplace.
+  - Memverifikasi unit test `ScanResolverServiceTest` (4 passed) dan `PartaiPricingServiceTest` (6 passed), serta lulus `pint` dan build aset `npm run build`.
+
 ## 2026-10-26 — Standarisasi & Sinkronisasi Menyeluruh Seluruh Fitur Tambah / Create ✅
+
+- **Standarisasi Quick-Add Pelanggan Servis (`ServisBoard`)**:
 
 - **Standarisasi Quick-Add Pelanggan Servis (`ServisBoard`)**:
   - Penyeragaman `pelangganBaruForm` dan modal tambah pelanggan servis agar identik dengan POS Kasir & CRM Backoffice (`nama`, `telepon`, `alamat`, `email`, `tipe_konsumen`, `is_reseller`, `kode_agen`, `referral_kode`).

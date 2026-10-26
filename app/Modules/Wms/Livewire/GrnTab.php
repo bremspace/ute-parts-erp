@@ -12,6 +12,7 @@ use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\GrnService;
 use App\Modules\Wms\Services\NomorSeriService;
+use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Validation\ValidationException;
@@ -237,7 +238,8 @@ class GrnTab extends Component
 
     public function prosesBarcode(?string $code = null): void
     {
-        $barcode = trim($code ?: $this->barcodeInput);
+        $raw = $code ?: $this->barcodeInput;
+        $barcode = app(ScanResolverService::class)->cleanCode((string) $raw);
         $this->barcodeInput = '';
 
         if (empty($barcode) || empty($this->grnForm['item_qty'])) {

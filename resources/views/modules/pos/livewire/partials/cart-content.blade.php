@@ -213,6 +213,12 @@
                                     <span class="text-[9px] text-up-amber font-semibold mt-0.5">
                                         Komisi: +Rp {{ number_format($item['potensi_komisi'], 0, ',', '.') }}
                                     </span>
+                                @elseif(($diskonPartai ?? 0) > 0)
+                                    <div class="flex items-center gap-1 mt-0.5">
+                                        <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-black tabular-nums border border-up-mint/30">
+                                            Harga Partai
+                                        </span>
+                                    </div>
                                 @endif
                             </div>
                         @endif

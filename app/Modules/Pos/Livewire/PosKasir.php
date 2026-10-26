@@ -10,6 +10,7 @@ use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Crm\Services\PartaiPricingService;
 use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
@@ -29,12 +30,12 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
-use App\Modules\Wms\Models\ProdukSatuanKonversi;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\NomorSeriService;
+use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Wms\Services\StockReservationService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ParsesNominal;
@@ -796,6 +797,7 @@ class PosKasir extends Component
     {
         $this->modeRewardMitra = ($this->modeRewardMitra === 'diskon_langsung') ? 'komisi_akumulasi' : 'diskon_langsung';
         $this->recalculateCartPrices();
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
@@ -805,6 +807,7 @@ class PosKasir extends Component
     {
         $this->modeRewardMitra = in_array($mode, ['diskon_langsung', 'komisi_akumulasi'], true) ? $mode : 'diskon_langsung';
         $this->recalculateCartPrices();
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
@@ -962,64 +965,11 @@ class PosKasir extends Component
 
     public function hitungDiskonPartai(): void
     {
-        $this->diskonPartai = 0.0;
-        $this->alasanPartai = '';
+        $partaiService = app(PartaiPricingService::class);
+        $hasil = $partaiService->hitung($this->cart, $this->customer, $this->modeRewardMitra);
 
-        $config = app(KonfigurasiService::class);
-        if (! $config->hargaPartaiAktif()) {
-            return;
-        }
-
-        // Mode komisi akumulasi pada reseller/agen tidak menerapkan diskon langsung
-        if ($this->modeRewardMitra === 'komisi_akumulasi') {
-            return;
-        }
-
-        $berlakuUntuk = $config->hargaPartaiBerlakuUntuk();
-        if ($berlakuUntuk === 'member') {
-            if (! $this->customer) {
-                return;
-            }
-
-            $isMember = $this->customer->tier_membership_id !== null
-                || (bool) $this->customer->is_reseller
-                || in_array($this->customer->tipe_konsumen, ['reseller', 'agen'], true);
-
-            if (! $isMember) {
-                return;
-            }
-        }
-
-        $totalQty = array_reduce($this->cart, fn ($carry, $item) => $carry + (int) ($item['qty'] ?? 1), 0);
-        $subtotal = $this->subtotal;
-
-        $minQty = $config->hargaPartaiMinQty();
-        $diskonQtyPersen = $config->hargaPartaiQtyDiskonPersen();
-
-        $minNominal = $config->hargaPartaiMinNominal();
-        $diskonNominalPersen = $config->hargaPartaiNominalDiskonPersen();
-
-        $persenTerpilih = 0.0;
-        $alasan = '';
-
-        if ($minQty > 0 && $diskonQtyPersen > 0 && $totalQty >= $minQty) {
-            $persenTerpilih = $diskonQtyPersen;
-            $alasan = "Harga Partai (Qty >= {$minQty} pcs)";
-        }
-
-        if ($minNominal > 0 && $diskonNominalPersen > 0 && $subtotal >= $minNominal) {
-            if ($diskonNominalPersen > $persenTerpilih) {
-                $persenTerpilih = $diskonNominalPersen;
-                $alasan = 'Harga Partai (Belanja >= Rp '.number_format($minNominal, 0, ',', '.').')';
-            } elseif ($persenTerpilih > 0) {
-                $alasan .= ' + Belanja Besar';
-            }
-        }
-
-        if ($persenTerpilih > 0) {
-            $this->diskonPartai = round(($subtotal * $persenTerpilih) / 100, 2);
-            $this->alasanPartai = $alasan." ({$persenTerpilih}%)";
-        }
+        $this->diskonPartai = $hasil['diskon_nominal'];
+        $this->alasanPartai = $hasil['alasan'];
     }
 
     public function recalculateCartPrices(): void
@@ -1119,65 +1069,38 @@ class PosKasir extends Component
         return 0.0;
     }
 
-    /** [T-07] Enter = scan barcode/SKU exact-match → auto add ke keranjang. */
+    /** [T-07] Enter = scan barcode/QR code/SKU exact-match → auto add ke keranjang. */
     public function scanEnter(): void
     {
-        $q = trim($this->search);
-        if ($q === '') {
+        $raw = trim($this->search);
+        if ($raw === '') {
             return;
         }
 
-        // 1. Cek exact match barcode atau SKU pada varian aktif
-        $variant = SkuVariant::where('is_active', true)
-            ->where(function ($query) use ($q) {
-                $query->where('barcode', $q)->orWhere('sku', $q);
-            })
-            ->first();
+        $resolver = app(ScanResolverService::class);
+        $result = $resolver->resolveProduct($raw);
 
-        if ($variant) {
-            $this->addToCart($variant->produk_id, $variant->id);
-            $this->dispatch('alert', [
-                'type' => 'success',
-                'message' => "Item '{$variant->nama_varian}' ditambahkan ke keranjang.",
-            ]);
-            $this->search = '';
+        if ($result['found'] && $result['produk']) {
+            if ($result['type'] === 'variant' && $result['variant']) {
+                $this->addToCart($result['produk']->id, $result['variant']->id);
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => "Item '{$result['variant']->nama_varian}' ditambahkan ke keranjang.",
+                ]);
+            } elseif ($result['type'] === 'satuan_konversi' && $result['satuan_kode']) {
+                $this->addToCart($result['produk']->id, null, $result['satuan_kode']);
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => "Item '{$result['produk']->nama}' ({$result['satuan_kode']}) ditambahkan ke keranjang.",
+                ]);
+            } else {
+                $this->addToCart($result['produk']->id);
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => "Produk '{$result['produk']->nama}' ditambahkan ke keranjang.",
+                ]);
+            }
 
-            return;
-        }
-
-        // 2. Cek exact match barcode kemasan multi-satuan
-        $satuanKonversi = ProdukSatuanKonversi::where('barcode', $q)
-            ->whereNotNull('barcode')
-            ->where('barcode', '!=', '')
-            ->with('produk')
-            ->first();
-
-        if ($satuanKonversi && $satuanKonversi->produk && $satuanKonversi->produk->is_active) {
-            $this->addToCart($satuanKonversi->produk_id, null, $satuanKonversi->satuan_kode);
-            $this->dispatch('alert', [
-                'type' => 'success',
-                'message' => "Item '{$satuanKonversi->produk->nama}' ({$satuanKonversi->satuan_kode}) ditambahkan ke keranjang.",
-            ]);
-            $this->search = '';
-
-            return;
-        }
-
-        // 3. Cek exact match barcode produk, ID (aman non-overflow), atau nama produk
-        $produk = Produk::where('is_active', true)
-            ->where(function ($query) use ($q) {
-                $query->where('barcode', $q)
-                    ->when(is_numeric($q) && (float) $q <= 2147483647, fn ($sub) => $sub->orWhere('id', (int) $q))
-                    ->orWhere('nama', $q);
-            })
-            ->first();
-
-        if ($produk) {
-            $this->addToCart($produk->id);
-            $this->dispatch('alert', [
-                'type' => 'success',
-                'message' => "Produk '{$produk->nama}' ditambahkan ke keranjang.",
-            ]);
             $this->search = '';
 
             return;
@@ -1186,12 +1109,13 @@ class PosKasir extends Component
         // Jika tidak ditemukan: KOSONGKAN kembali search agar katalog kasir TIDAK hilang/freeze
         $this->search = '';
 
+        $clean = $result['search_term'] ?: $raw;
         $this->dispatch('alert', [
             'type' => 'warning',
-            'message' => "Barcode/SKU '{$q}' belum terdaftar di sistem.",
+            'message' => "Barcode/QR '{$clean}' belum terdaftar di sistem.",
         ]);
 
-        $this->dispatch('ute:barcode-not-found', ['code' => $q]);
+        $this->dispatch('ute:barcode-not-found', ['code' => $clean]);
     }
 
     /** Scan barcode langsung dari scanner kamera mobile / hardware keyboard wedge. */
@@ -1351,6 +1275,8 @@ class PosKasir extends Component
         }
 
         // Reset computed properties cache & recalc pajak SETELAH item masuk keranjang
+        $this->resetComputedTotals();
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
@@ -1441,6 +1367,7 @@ class PosKasir extends Component
             $this->cart[$itemKey] = $item;
         }
 
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
@@ -1643,6 +1570,7 @@ class PosKasir extends Component
             ]);
         }
 
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
@@ -1651,6 +1579,7 @@ class PosKasir extends Component
     public function removeFromCart(string $itemKey)
     {
         unset($this->cart[$itemKey]);
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
@@ -1719,6 +1648,7 @@ class PosKasir extends Component
 
         $this->cart[$itemKey]['harga'] = $harga;
         $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $harga;
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
@@ -1794,6 +1724,7 @@ class PosKasir extends Component
         }
 
         $this->recalculateCartPrices();
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
@@ -2623,6 +2554,7 @@ class PosKasir extends Component
         $this->poinDitukar = (int) ($detail['poin_ditukar'] ?? 0);
         $this->modeRewardMitra = (string) ($detail['mode_reward_mitra'] ?? 'diskon_langsung');
         $this->selectedCustomerId = $transaksi->pelanggan_id;
+        $this->resetComputedTotals();
         $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak(); // [F1-2] resume park → rehitung PPN dari diskon tersimpan

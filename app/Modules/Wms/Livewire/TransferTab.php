@@ -10,6 +10,7 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\StokTransferItem;
+use App\Modules\Wms\Services\ScanResolverService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -140,24 +141,32 @@ class TransferTab extends Component
             return;
         }
 
+        $resolver = app(ScanResolverService::class);
+        $result = $resolver->resolveProduct($term);
+
         $query = Produk::query()->where('is_active', true);
         $this->scopeStokCabangAktif($query);
 
-        $produk = $query->where(function ($q) use ($term) {
-            $q->where('barcode', $term)
-                ->orWhere('sku', $term)
-                ->orWhereHas('skuVariants', fn ($sv) => $sv->where('barcode', $term)->orWhere('sku', $term));
-        })->first();
+        if ($result['found'] && $result['produk']) {
+            $produk = $query->where('id', $result['produk']->id)->first();
+        } else {
+            $cleanTerm = $result['search_term'] ?: $term;
+            $produk = $query->where(function ($q) use ($cleanTerm) {
+                $q->where('barcode', $cleanTerm)
+                    ->orWhere('sku', $cleanTerm)
+                    ->orWhereHas('skuVariants', fn ($sv) => $sv->where('barcode', $cleanTerm)->orWhere('sku', $cleanTerm));
+            })->first();
 
-        if (! $produk) {
-            // Coba cari kata kunci pertama jika bukan exact barcode
-            $produk = $query->cariPintar($term)->first();
+            if (! $produk) {
+                // Coba cari kata kunci pertama jika bukan exact barcode
+                $produk = $query->cariPintar($cleanTerm)->first();
+            }
         }
 
         if (! $produk) {
             $this->dispatch('alert', [
                 'type' => 'error',
-                'message' => "Produk dengan barcode/kode '{$term}' tidak ditemukan.",
+                'message' => "Produk dengan barcode/QR '{$term}' tidak ditemukan.",
             ]);
 
             return;

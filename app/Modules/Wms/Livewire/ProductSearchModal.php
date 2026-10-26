@@ -11,6 +11,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
+use App\Modules\Wms\Services\ScanResolverService;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -270,28 +271,24 @@ class ProductSearchModal extends Component
             return;
         }
 
-        // Cari exact match barcode/sku
-        $product = Produk::where('is_active', true)
-            ->where(function ($q) use ($term) {
-                $q->where('barcode', $term)
-                    ->orWhere('sku', $term)
-                    ->orWhereHas('skuVariants', fn ($sv) => $sv->where('barcode', $term)->orWhere('sku', $term));
-            })
-            ->first();
+        // Resolusi Barcode / QR Code secara terstandarisasi
+        $resolver = app(ScanResolverService::class);
+        $result = $resolver->resolveProduct($term);
 
-        if ($product) {
-            $this->pilihProduk($product->id);
+        if ($result['found'] && $result['produk']) {
+            $this->pilihProduk($result['produk']->id);
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => "Produk ditemukan: {$product->nama}",
+                'message' => "Produk ditemukan: {$result['produk']->nama}",
             ]);
         } else {
             // Jika bukan exact match, masukkan ke search query agar menampilkan hasil pencarian mirip
-            $this->search = $term;
+            $cleanTerm = $result['search_term'] ?: $term;
+            $this->search = $cleanTerm;
             $this->resetPage();
             $this->dispatch('alert', [
                 'type' => 'info',
-                'message' => "Mencari '{$term}'...",
+                'message' => "Mencari '{$cleanTerm}'...",
             ]);
         }
     }

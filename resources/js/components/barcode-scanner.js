@@ -11,6 +11,59 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
  */
 
 // Web Audio API Synthesizer Beep
+export const STANDARDIZED_SCAN_FORMATS = [
+    Html5QrcodeSupportedFormats.QR_CODE,
+    Html5QrcodeSupportedFormats.DATA_MATRIX,
+    Html5QrcodeSupportedFormats.AZTEC,
+    Html5QrcodeSupportedFormats.PDF_417,
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.CODE_93,
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+    Html5QrcodeSupportedFormats.CODABAR,
+    Html5QrcodeSupportedFormats.ITF
+].filter(f => f !== undefined);
+
+export function cleanScannedCode(raw) {
+    if (!raw) return '';
+    let code = String(raw).trim();
+    // Hapus ASCII control characters
+    code = code.replace(/[\x00-\x1F\x7F]/g, '');
+
+    // Cek jika QR berupa JSON
+    if (code.startsWith('{') && code.endsWith('}')) {
+        try {
+            const parsed = JSON.parse(code);
+            if (parsed.sku) return String(parsed.sku).trim();
+            if (parsed.barcode) return String(parsed.barcode).trim();
+            if (parsed.code) return String(parsed.code).trim();
+            if (parsed.id) return String(parsed.id).trim();
+        } catch (_) {}
+    }
+
+    // Cek jika QR berupa URL
+    if (code.startsWith('http://') || code.startsWith('https://')) {
+        try {
+            const url = new URL(code);
+            if (url.searchParams.get('barcode')) return url.searchParams.get('barcode').trim();
+            if (url.searchParams.get('sku')) return url.searchParams.get('sku').trim();
+            if (url.searchParams.get('code')) return url.searchParams.get('code').trim();
+            if (url.searchParams.get('id')) return url.searchParams.get('id').trim();
+
+            const segments = url.pathname.split('/').filter(Boolean);
+            if (segments.length > 0) {
+                return decodeURIComponent(segments[segments.length - 1]);
+            }
+        } catch (_) {}
+    }
+
+    return code;
+}
+
 export function playBeep(success = true) {
     try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -262,8 +315,11 @@ class HardwareScannerListener {
     }
 
     dispatchScan(code) {
+        const clean = cleanScannedCode(code);
+        if (!clean) return;
+
         const event = new CustomEvent('ute:barcode-scanned', {
-            detail: { code },
+            detail: { code: clean },
             bubbles: true,
             cancelable: true
         });
@@ -271,7 +327,7 @@ class HardwareScannerListener {
 
         const activeBarcodeInput = document.querySelector('input[data-barcode-input="true"], input[x-ref="barcodeInput"]');
         if (activeBarcodeInput) {
-            activeBarcodeInput.value = code;
+            activeBarcodeInput.value = clean;
             activeBarcodeInput.dispatchEvent(new Event('input', { bubbles: true }));
             activeBarcodeInput.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -503,16 +559,6 @@ export class CameraScannerModal {
 
             try {
                 if (!this.html5QrCode) {
-                    const formats = [
-                        Html5QrcodeSupportedFormats.CODE_128,
-                        Html5QrcodeSupportedFormats.EAN_13,
-                        Html5QrcodeSupportedFormats.EAN_8,
-                        Html5QrcodeSupportedFormats.CODE_39,
-                        Html5QrcodeSupportedFormats.UPC_A,
-                        Html5QrcodeSupportedFormats.UPC_E,
-                        Html5QrcodeSupportedFormats.QR_CODE,
-                        Html5QrcodeSupportedFormats.DATA_MATRIX
-                    ];
                     let dummyReader = document.getElementById('ute-dummy-qr-reader');
                     if (!dummyReader) {
                         dummyReader = document.createElement('div');
@@ -521,20 +567,21 @@ export class CameraScannerModal {
                         document.body.appendChild(dummyReader);
                     }
                     this.html5QrCode = new Html5Qrcode('ute-dummy-qr-reader', {
-                        formatsToSupport: formats,
+                        formatsToSupport: STANDARDIZED_SCAN_FORMATS,
                         verbose: false
                     });
                 }
 
                 const decodedText = await this.html5QrCode.scanFile(file, true);
-                if (decodedText) {
+                const clean = cleanScannedCode(decodedText);
+                if (clean) {
                     playBeep(true);
                     triggerHaptic();
                     if (window.showToast) {
-                        window.showToast(`Berhasil Scan: ${decodedText}`, 'success');
+                        window.showToast(`Berhasil Scan: ${clean}`, 'success');
                     }
                     if (typeof this.onScanCallback === 'function') {
-                        this.onScanCallback(decodedText);
+                        this.onScanCallback(clean);
                     }
                 }
             } catch (err) {
@@ -567,31 +614,20 @@ export class CameraScannerModal {
             }
 
             if (!this.html5QrCode) {
-                const formats = [
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                    Html5QrcodeSupportedFormats.DATA_MATRIX
-                ];
-
                 this.html5QrCode = new Html5Qrcode('ute-camera-reader', {
-                    formatsToSupport: formats,
+                    formatsToSupport: STANDARDIZED_SCAN_FORMATS,
                     verbose: false
                 });
             }
 
             const qrConfig = {
-                fps: 15,
+                fps: 20,
                 qrbox: (viewfinderWidth, viewfinderHeight) => {
                     const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const qrboxSize = Math.floor(minEdge * 0.75);
-                    return { width: qrboxSize, height: Math.floor(qrboxSize * 0.65) };
+                    const qrboxSize = Math.floor(minEdge * 0.8);
+                    return { width: qrboxSize, height: qrboxSize };
                 },
-                aspectRatio: 1.333333
+                aspectRatio: 1.0
             };
 
             const cameraConstraint = { facingMode: this.facingMode };
@@ -644,18 +680,8 @@ export class CameraScannerModal {
 
         try {
             if (!this.html5QrCode) {
-                const formats = [
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.QR_CODE,
-                    Html5QrcodeSupportedFormats.DATA_MATRIX
-                ];
                 this.html5QrCode = new Html5Qrcode('ute-camera-reader', {
-                    formatsToSupport: formats,
+                    formatsToSupport: STANDARDIZED_SCAN_FORMATS,
                     verbose: false
                 });
             }
@@ -663,7 +689,7 @@ export class CameraScannerModal {
             const banner = document.getElementById('ute-scanner-result-banner');
             const text = document.getElementById('ute-scanner-result-text');
             if (banner && text) {
-                text.textContent = 'Menganalisis foto barcode...';
+                text.textContent = 'Menganalisis foto barcode / QR...';
                 banner.classList.remove('-translate-y-16', 'opacity-0');
                 banner.classList.add('translate-y-0', 'opacity-100');
             }
@@ -694,7 +720,7 @@ export class CameraScannerModal {
 
     handleDecodedText(decodedText) {
         const now = Date.now();
-        const code = (decodedText || '').trim();
+        const code = cleanScannedCode(decodedText);
         if (!code) return;
 
         if (code === this.lastScannedCode && (now - this.lastScanTime) < this.scanCooldownMs) {

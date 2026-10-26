@@ -1568,8 +1568,8 @@
     </div>
 
     <!-- MODALS SECTION -->
-    @include('modules.pos.livewire.modals.diskon-modal')
     @include('modules.pos.livewire.modals.payment-modal')
+    @include('modules.pos.livewire.modals.diskon-modal')
     @include('partials.thermal-receipt-modal')
     @include('modules.pos.livewire.modals.riwayat-transaksi-modal')
     @include('modules.pos.livewire.modals.pelanggan-baru-modal')

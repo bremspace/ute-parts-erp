@@ -1,6 +1,6 @@
 <!-- MODAL PENGATURAN DISKON & SKEMA REWARD TRANSAKSI -->
 @if($showDiskonModal)
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 backdrop-blur-md p-4 sm:p-6 overflow-y-auto"
+    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-ink-950/80 backdrop-blur-md p-4 sm:p-6 overflow-y-auto"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"

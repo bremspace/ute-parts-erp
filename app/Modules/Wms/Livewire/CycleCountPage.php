@@ -10,6 +10,7 @@ use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Services\CycleCountService;
+use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Support\Collection;
@@ -369,7 +370,7 @@ class CycleCountPage extends Component
 
     public function scanBarcodeDirect(string $code): void
     {
-        $clean = trim($code);
+        $clean = app(ScanResolverService::class)->cleanCode($code);
         if ($clean === '' || empty($this->selectedTaskId)) {
             return;
         }

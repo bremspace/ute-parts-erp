@@ -13,6 +13,7 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\StokOpnameItem;
+use App\Modules\Wms\Services\ScanResolverService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -257,7 +258,7 @@ class OpnameTab extends Component
 
     public function scanBarcodeDirect(string $code): void
     {
-        $clean = trim($code);
+        $clean = app(ScanResolverService::class)->cleanCode($code);
         if ($clean === '') {
             return;
         }
