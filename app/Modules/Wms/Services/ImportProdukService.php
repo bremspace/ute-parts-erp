@@ -430,50 +430,54 @@ class ImportProdukService
     /**
      * Resolusi gudang dari input import (ID numerik, kode, atau nama).
      */
-    public function resolveGudangId(?string $gudangRaw): ?int
+    public function resolveGudangId(?string $gudangRaw, ?int $cabangId = null): ?int
     {
         $raw = trim((string) $gudangRaw);
         if ($raw === '' || in_array(strtolower($raw), ['-', '0', 'none', 'null', 'kosong'], true)) {
             return null;
         }
 
-        if (isset($this->gudangCache["id_raw|{$raw}"])) {
-            return $this->gudangCache["id_raw|{$raw}"];
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id;
+        $cacheKey = "id_raw|{$cabangId}|{$raw}";
+        if (isset($this->gudangCache[$cacheKey])) {
+            return $this->gudangCache[$cacheKey];
         }
 
         if (is_numeric($raw)) {
-            $g = Gudang::find((int) $raw);
+            $g = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))->find((int) $raw);
             if ($g) {
-                return $this->gudangCache["id_raw|{$raw}"] = $g->id;
+                return $this->gudangCache[$cacheKey] = $g->id;
             }
         }
 
-        $g = Gudang::whereRaw('LOWER(kode) = ?', [strtolower($raw)])
-            ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)])
+        $g = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+            ->where(function ($q) use ($raw) {
+                $q->whereRaw('LOWER(kode) = ?', [strtolower($raw)])
+                    ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)]);
+            })
             ->first();
 
         if ($g) {
-            return $this->gudangCache["id_raw|{$raw}"] = $g->id;
+            return $this->gudangCache[$cacheKey] = $g->id;
         }
 
         // Jika menyebut "Gudang Utama", "Gudang Pusat", atau variasi nama utama
         if (strcasecmp($raw, 'Gudang Utama') === 0 || strcasecmp($raw, 'Gudang Pusat') === 0) {
-            $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
-            $gDefault = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+            $effectiveCabangId = $cabangId ?? $this->resolveCabangDefault();
+            $gDefault = Gudang::where('cabang_id', $effectiveCabangId)
                 ->where('is_active', true)
                 ->where(fn ($q) => $q->where('nama', 'like', '%Utama%')->orWhere('nama', 'like', '%Pusat%')->orWhere('kode', 'like', '%UTAMA%'))
                 ->first()
-                ?? Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))->where('is_active', true)->first()
-                ?? Gudang::where('is_active', true)->first();
+                ?? Gudang::where('cabang_id', $effectiveCabangId)->where('is_active', true)->first();
 
             if ($gDefault) {
-                return $this->gudangCache["id_raw|{$raw}"] = $gDefault->id;
+                return $this->gudangCache[$cacheKey] = $gDefault->id;
             }
 
             return null;
         }
 
-        return $this->gudangCache["id_raw|{$raw}"] = null;
+        return $this->gudangCache[$cacheKey] = null;
     }
 
     /**
@@ -591,10 +595,7 @@ class ImportProdukService
                 $q->whereRaw('LOWER(kode) = ?', [strtolower($raw)])
                     ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)]);
             })
-            ->first()
-            ?? Gudang::whereRaw('LOWER(kode) = ?', [strtolower($raw)])
-                ->orWhereRaw('LOWER(nama) = ?', [strtolower($raw)])
-                ->first();
+            ->first();
 
         if ($g) {
             return $this->gudangCache[$cacheKey] = $g->id;
@@ -650,9 +651,7 @@ class ImportProdukService
         $gudang = Gudang::where('cabang_id', $cabangId)->where('is_active', true)
             ->where(fn ($q) => $q->where('nama', 'like', '%Utama%')->orWhere('nama', 'like', '%Pusat%')->orWhere('kode', 'like', '%UTAMA%'))
             ->first()
-            ?? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first()
-            ?? Gudang::where('is_active', true)->first()
-            ?? Gudang::first();
+            ?? Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first();
 
         if (! $gudang) {
             $cabang = Cabang::find($cabangId) ?? Cabang::first();
@@ -665,10 +664,18 @@ class ImportProdukService
                 ]);
             }
 
+            $baseKode = $cabang->id > 1 ? "GDG-CBG{$cabang->id}-UTAMA" : 'GDG-UTAMA';
+            $kodeUnik = $baseKode;
+            $counter = 1;
+            while (Gudang::where('kode', $kodeUnik)->exists()) {
+                $kodeUnik = "{$baseKode}-{$counter}";
+                $counter++;
+            }
+
             $gudang = Gudang::create([
                 'cabang_id' => $cabang->id,
                 'nama' => 'Gudang Utama',
-                'kode' => 'GDG-UTAMA',
+                'kode' => $kodeUnik,
                 'is_active' => true,
             ]);
         }
@@ -1521,11 +1528,12 @@ class ImportProdukService
      * [B-10f/P1-5] Validasi lintas cabang dijalankan di preview (fail fast)
      * supaya user tahu SEBELUM commit.
      */
-    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiDuplikat = [], array $resolusiBarcode = [], array $resolusiErrorBaris = []): array
+    public function preview(string $filePath, int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiDuplikat = [], array $resolusiBarcode = [], array $resolusiErrorBaris = [], ?int $cabangId = null): array
     {
         $rows = $this->parseRows($filePath);
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id;
         // [B-10f] File lintas cabang ditolak (tidak ada mutasi stok/jurnal yg bisa dicocokkan)
-        $this->cabangTunggalDariRows($rows);
+        $this->cabangTunggalDariRows($rows, $cabangId);
 
         [$existingSkuDb, $existingBarcodeDb] = $this->preloadExistingDb($rows);
         $konteks = [
@@ -1881,7 +1889,7 @@ class ImportProdukService
      * - branches:chunk dipakai karena RAM 1GB — satu file besar tidak boleh jadi
      *   satu transaksi raksasa yang menahan lock (/tmp) lama.
      */
-    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiBarcode = [], array $resolusiErrorBaris = []): array
+    public function commit(string $filePath, int $importLogId, ?int $userId = null, array $aksiKemiripan = [], array $resolusiDuplikat = [], int $threshold = self::THRESHOLD_PENCOCOKAN, array $resolusiBarcode = [], array $resolusiErrorBaris = [], ?int $cabangId = null): array
     {
         $rows = $this->parseRows($filePath);
         $totalBaris = count($rows);
@@ -1894,7 +1902,8 @@ class ImportProdukService
         ]);
 
         // [B-10f] Validasi lintas cabang (fail fast, SEBELUM ada mutasi apa pun)
-        $cabangId = $this->cabangTunggalDariRows($rows);
+        $detectedCabangId = $this->cabangTunggalDariRows($rows, $cabangId);
+        $cabangId = $cabangId ?? $detectedCabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
         [$existingSkuDb, $existingBarcodeDb] = $this->preloadExistingDb($rows);
         $konteks = [
             'skuDalamFile' => [],
@@ -2152,21 +2161,76 @@ class ImportProdukService
      *
      * @throws \Exception pesan Indonesia bila file lintas cabang
      */
-    protected function cabangTunggalDariRows(array $rows): ?int
+    /**
+     * Resolusi ID cabang dari input raw (ID numerik, kode, atau nama).
+     */
+    public function resolveCabangId(?string $cabangRaw): ?int
+    {
+        $raw = trim((string) $cabangRaw);
+        if ($raw === '' || in_array(strtolower($raw), ['-', '0', 'none', 'null', 'kosong'], true)) {
+            return null;
+        }
+
+        if (isset($this->cabangCache["raw|{$raw}"])) {
+            return $this->cabangCache["raw|{$raw}"];
+        }
+
+        if (is_numeric($raw)) {
+            $c = Cabang::find((int) $raw);
+            if ($c) {
+                return $this->cabangCache["raw|{$raw}"] = $c->id;
+            }
+        }
+
+        $c = Cabang::whereRaw('LOWER(nama) = ?', [strtolower($raw)])
+            ->orWhereRaw('LOWER(kode) = ?', [strtolower($raw)])
+            ->first();
+
+        return $this->cabangCache["raw|{$raw}"] = $c?->id;
+    }
+
+    /**
+     * Validasi fail-fast bahwa seluruh baris file yang menyentuh stok mengarah
+     * ke SATU cabang yang sama.
+     *
+     * @return int|null cabang tunggal, atau null bila file tidak menyentuh stok
+     *
+     * @throws \Exception pesan Indonesia bila file lintas cabang
+     */
+    protected function cabangTunggalDariRows(array $rows, ?int $defaultCabangId = null): ?int
     {
         $gudangIds = [];
+        $cabangIdsDariRow = [];
+
         foreach ($rows as $row) {
+            $cRaw = trim((string) ($row['cabang'] ?? $row['nama_cabang'] ?? $row['cabang_id'] ?? ''));
+            if ($cRaw !== '') {
+                $cId = $this->resolveCabangId($cRaw);
+                if ($cId) {
+                    $cabangIdsDariRow[$cId] = true;
+                }
+            }
+
+            $currentCabangId = ! empty($cabangIdsDariRow) ? array_key_last($cabangIdsDariRow) : $defaultCabangId;
             $gRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
             if ($gRaw !== '' && ! in_array(strtolower($gRaw), ['-', '0', 'none', 'null', 'kosong'], true)) {
-                $resolvedId = $this->resolveGudangId($gRaw);
+                $resolvedId = $this->resolveGudangId($gRaw, $currentCabangId);
                 if ($resolvedId) {
                     $gudangIds[$resolvedId] = true;
                 }
             }
         }
 
+        if (count($cabangIdsDariRow) > 1) {
+            $namaCabangs = Cabang::whereIn('id', array_keys($cabangIdsDariRow))->pluck('nama')->implode(', ');
+            throw new \Exception(
+                'Import lintas cabang tidak didukung: file ini menyebutkan lebih dari satu cabang ('.$namaCabangs.'). '
+                .'Pisahkan file per cabang lalu import satu per satu agar jurnal stok awal ter-posting ke cabang yang benar.'
+            );
+        }
+
         if ($gudangIds === []) {
-            return null;
+            return ! empty($cabangIdsDariRow) ? (int) array_key_first($cabangIdsDariRow) : null;
         }
 
         // Satu query (bukan N) — RAM 1GB.
@@ -2180,13 +2244,16 @@ class ImportProdukService
                 $perCabang[(int) $g->cabang_id] = true;
             }
         }
+        foreach (array_keys($cabangIdsDariRow) as $cId) {
+            $perCabang[(int) $cId] = true;
+        }
 
         if (count($perCabang) <= 1) {
             return $perCabang ? (int) array_key_first($perCabang) : null;
         }
 
         $namaCabang = collect($perCabang)
-            ->map(fn ($_, $id) => optional($gudang->firstWhere('cabang_id', $id)?->cabang)->nama ?? "Cabang #{$id}")
+            ->map(fn ($_, $id) => optional($gudang->firstWhere('cabang_id', $id)?->cabang)->nama ?? Cabang::find($id)?->nama ?? "Cabang #{$id}")
             ->values()
             ->implode(', ');
 
@@ -2319,7 +2386,9 @@ class ImportProdukService
         }
 
         // 3. Stok awal & Lokasi
-        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
+        $rowCabangRaw = trim((string) ($row['cabang'] ?? $row['nama_cabang'] ?? $row['cabang_id'] ?? ''));
+        $cabangId = ($rowCabangRaw !== '' ? $this->resolveCabangId($rowCabangRaw) : null)
+            ?? $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
         $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
         $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
@@ -2447,7 +2516,9 @@ class ImportProdukService
         }
 
         // Tambah stok awal jika diisi
-        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
+        $rowCabangRaw = trim((string) ($row['cabang'] ?? $row['nama_cabang'] ?? $row['cabang_id'] ?? ''));
+        $cabangId = ($rowCabangRaw !== '' ? $this->resolveCabangId($rowCabangRaw) : null)
+            ?? $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
         $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
         $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));
@@ -2539,7 +2610,9 @@ class ImportProdukService
         $hargaJual = round((float) ($row['harga_jual'] ?? 0), 2);
         $stokAwal = (int) ($row['stok_awal'] ?? 0);
 
-        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
+        $rowCabangRaw = trim((string) ($row['cabang'] ?? $row['nama_cabang'] ?? $row['cabang_id'] ?? ''));
+        $cabangId = ($rowCabangRaw !== '' ? $this->resolveCabangId($rowCabangRaw) : null)
+            ?? $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id ?? $this->resolveCabangDefault();
         $gudangRaw = trim((string) ($row['gudang'] ?? $row['gudang_id'] ?? ''));
         $gudangKosong = $gudangRaw === '' || in_array(strtolower($gudangRaw), ['-', '0', 'none', 'null', 'kosong'], true);
         $rakRaw = trim((string) ($row['rak'] ?? $row['rak_id'] ?? ''));

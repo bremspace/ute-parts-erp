@@ -764,12 +764,20 @@ class ImportSidRetailService
         $targetGudangRak = $gudangTokoId ?? $gudangPusatId;
         if ($lokasiNama !== '') {
             if (! $targetGudangRak) {
-                $gudangDef = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first() ?? Gudang::first();
+                $gudangDef = Gudang::where('cabang_id', $cabangId)->where('is_active', true)->first();
                 if (! $gudangDef) {
+                    $baseKode = $cabangId > 1 ? "GDG-CBG{$cabangId}-UTAMA" : 'GDG-UTAMA';
+                    $kodeUnik = $baseKode;
+                    $counter = 1;
+                    while (Gudang::where('kode', $kodeUnik)->exists()) {
+                        $kodeUnik = "{$baseKode}-{$counter}";
+                        $counter++;
+                    }
+
                     $gudangDef = Gudang::create([
                         'cabang_id' => $cabangId,
                         'nama' => 'Gudang Utama',
-                        'kode' => 'GDG-UTAMA',
+                        'kode' => $kodeUnik,
                         'is_active' => true,
                     ]);
                 }

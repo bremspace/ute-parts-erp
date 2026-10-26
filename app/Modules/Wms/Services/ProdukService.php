@@ -527,10 +527,26 @@ class ProdukService
         return DB::transaction(function () use ($produkId, $variantId, $gudangId, $qty, $hargaBeli, $keterangan, $userId, $rakId, $snList) {
             $cabangId = Gudang::find($gudangId)?->cabang_id;
 
-            $stok = StokItem::firstOrCreate(
-                ['produk_id' => $produkId, 'sku_variant_id' => $variantId, 'gudang_id' => $gudangId],
-                ['jumlah' => 0, 'jumlah_minimum' => 0, 'rak_id' => $rakId]
-            );
+            $stok = StokItem::where('produk_id', $produkId)
+                ->where('gudang_id', $gudangId)
+                ->where(function ($q) use ($variantId) {
+                    $q->where('sku_variant_id', $variantId)
+                        ->orWhereNull('sku_variant_id');
+                })
+                ->first();
+
+            if (! $stok) {
+                $stok = StokItem::create([
+                    'produk_id' => $produkId,
+                    'sku_variant_id' => $variantId,
+                    'gudang_id' => $gudangId,
+                    'jumlah' => 0,
+                    'jumlah_minimum' => 0,
+                    'rak_id' => $rakId,
+                ]);
+            } elseif (is_null($stok->sku_variant_id) && $variantId) {
+                $stok->update(['sku_variant_id' => $variantId]);
+            }
 
             $sebelum = (int) $stok->jumlah;
             $setelah = $sebelum + $qty;

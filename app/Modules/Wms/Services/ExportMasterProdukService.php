@@ -59,7 +59,7 @@ class ExportMasterProdukService
             fclose($out);
             Storage::disk('local')->put($path, $csv);
         } else {
-            $referensiRows = $this->buatReferensiSistem();
+            $referensiRows = $this->buatReferensiSistem($cabangId);
             $petunjukRows = $this->buatPetunjukImport();
             $tambahTipeRows = $this->buatContohTambahTipeBaru();
 
@@ -305,13 +305,16 @@ class ExportMasterProdukService
             $gudangNama = '';
             $rakNama = '';
             if ($p->stokItems->isNotEmpty()) {
-                $firstStok = $p->stokItems->first();
-                $gudangNama = $firstStok->gudang?->nama ?? ($firstStok->gudang_id ? (string) $firstStok->gudang_id : '');
-                $rakNama = $firstStok->rak?->nama ?? ($firstStok->rak_id ? (string) $firstStok->rak_id : '');
+                $stokItem = $cabangId
+                    ? $p->stokItems->first(fn ($s) => (int) ($s->gudang?->cabang_id ?? 0) === (int) $cabangId)
+                    : $p->stokItems->first();
+                if ($stokItem) {
+                    $gudangNama = $stokItem->gudang?->nama ?? ($stokItem->gudang_id ? (string) $stokItem->gudang_id : '');
+                    $rakNama = $stokItem->rak?->nama ?? ($stokItem->rak_id ? (string) $stokItem->rak_id : '');
+                }
             }
             if ($gudangNama === '') {
                 $gudangNama = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->where('is_active', true)->value('nama')
-                    ?? Gudang::where('is_active', true)->value('nama')
                     ?? 'Gudang Utama';
             }
 
@@ -390,8 +393,9 @@ class ExportMasterProdukService
         return $rows;
     }
 
-    public function buatReferensiSistem(): array
+    public function buatReferensiSistem(?int $cabangId = null): array
     {
+        $cabangId = $cabangId ?? session('cabang_id') ?? auth()->user()?->cabang_id;
         $merks = TipeHp::where('is_active', true)->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all();
         if (empty($merks)) {
             $merks = ['Apple', 'Samsung', 'Xiaomi', 'Oppo', 'Vivo', 'Realme', 'Infinix', 'Tecno', 'Asus', 'Universal'];
@@ -433,14 +437,31 @@ class ExportMasterProdukService
             $suppliers = ['Supplier Utama', 'PT Sumber Sparepart', 'CV Mega Jaya', 'Global Parts Ltd'];
         }
 
-        $gudangList = Gudang::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+        $gudangList = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+            ->where('is_active', true)
+            ->orderBy('nama')
+            ->pluck('nama')
+            ->unique()
+            ->values()
+            ->all();
         if (empty($gudangList)) {
-            $gudangList = ['Gudang Utama', 'Gudang Display', 'Gudang Transit'];
+            $gudangList = Gudang::where('is_active', true)->orderBy('nama')->pluck('nama')->unique()->values()->all();
+            if (empty($gudangList)) {
+                $gudangList = ['Gudang Utama', 'Gudang Display', 'Gudang Transit'];
+            }
         }
 
-        $rakList = Rak::orderBy('nama')->pluck('nama')->all();
+        $rakList = Rak::when($cabangId, fn ($q, $c) => $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $c)))
+            ->orderBy('nama')
+            ->pluck('nama')
+            ->unique()
+            ->values()
+            ->all();
         if (empty($rakList)) {
-            $rakList = ['Rak A1', 'Rak A2', 'Rak B1', 'Rak B2', 'Rak C1', 'Rak Display'];
+            $rakList = Rak::orderBy('nama')->pluck('nama')->unique()->values()->all();
+            if (empty($rakList)) {
+                $rakList = ['Rak A1', 'Rak A2', 'Rak B1', 'Rak B2', 'Rak C1', 'Rak Display'];
+            }
         }
 
         $tipeHpPairs = TipeHp::where('is_active', true)->orderBy('merk')->orderBy('model')->take(100)->get(['merk', 'model']);
@@ -481,13 +502,14 @@ class ExportMasterProdukService
             ['PETUNJUK IMPORT MASTER PRODUK UTE PARTS ERP'],
             [''],
             ['1. Kolom Wajib Diisi: sku, nama, harga_jual'],
-            ['2. Kolom Opsional: barcode, satuan, konversi_satuan, kategori, sub_kategori, brand, kualitas, kondisi, supplier, merk_hp, tipe_hp, harga_beli, harga_reseller, harga_agen, min_stock, reorder_point, sn, stok_awal, gudang, rak, produk_kompatibel_sku, kompatibilitas_hp, deskripsi, foto_url'],
+            ['2. Kolom Opsional: barcode, satuan, konversi_satuan, kategori, sub_kategori, brand, kualitas, kondisi, supplier, merk_hp, tipe_hp, harga_beli, harga_reseller, harga_agen, min_stock, reorder_point, sn, stok_awal, gudang, rak, produk_kompatibel_sku, kompatibilitas_hp, deskripsi, foto_url, cabang'],
             ['3. Kolom satuan: gunakan kode satuan dari Sheet Referensi Sistem (cth: pcs, set, pack, box)'],
             ['4. Kolom konversi_satuan: format satuan:pengali:harga_jual dipisah titik koma (cth: box:10:120000;pack:5:62000)'],
             ['5. Kolom kondisi: hanya menerima: baru, oem, bekas, refurbished (default: baru)'],
             ['6. Kolom sn: ya / tidak (default: tidak)'],
-            ['7. Kolom gudang & rak: isi nama gudang dan nama rak penyimpanan'],
-            ['8. Round-trip: File hasil ekspor master produk memiliki struktur yang identik dan dapat langsung diimpor kembali ke sistem'],
+            ['7. Kolom gudang & rak: isi nama gudang dan rak sesuai cabang aktif (lihat Sheet Referensi Sistem). Jika dikosongkan, otomatis dialokasikan ke Gudang Utama dan Rak default cabang aktif.'],
+            ['8. Kolom cabang (opsional): jika diisi, sistem memvalidasi data untuk cabang tersebut. Jika tidak diisi, otomatis menggunakan cabang aktif saat sesi impor.'],
+            ['9. Round-trip: File hasil ekspor master produk memiliki struktur yang identik dan dapat langsung diimpor kembali ke sistem.'],
         ];
     }
 

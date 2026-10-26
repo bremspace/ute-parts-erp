@@ -84,7 +84,8 @@ class ImportProdukExcelJob implements ShouldQueue
                     $this->resolusiDuplikat,
                     $this->thresholdKemiripan,
                     $this->resolusiBarcode,
-                    $this->resolusiErrorBaris
+                    $this->resolusiErrorBaris,
+                    $this->cabangId
                 );
             }
 

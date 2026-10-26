@@ -1852,11 +1852,13 @@ class ServisBoard extends Component
 
     public function render()
     {
+        $cabangId = session('cabang_id');
+
         return view('modules.servis.livewire.servis-board', [
             'jenisServisList' => JenisServis::where('is_active', true)->get(),
             'pelangganList' => Pelanggan::with('tierMembership')->limit(10)->get(),
             'teknisiList' => User::role(['teknisi', 'admin-toko', 'super-admin'])->get(),
-            'gudangList' => Gudang::where('is_active', true)->get(),
+            'gudangList' => Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))->where('is_active', true)->get(),
             'produkList' => $this->produkEstimasiList,
             'produkEstimasiList' => $this->produkEstimasiList,
             'stateMachineColumns' => $this->stateMachineColumns,

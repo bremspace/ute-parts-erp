@@ -1447,9 +1447,17 @@
 
                         @if($visibleColumns['gudang'] ?? true)
                             <td class="py-2.5 px-3 text-xs min-w-[130px]">
-                                @if($p->stokItems->isNotEmpty())
+                                @php
+                                    $stokItemsTampil = $p->stokItems->filter(function ($si) use ($p) {
+                                        if ((int) $si->jumlah === 0 && is_null($si->sku_variant_id)) {
+                                            return ! $p->stokItems->contains(fn ($o) => $o->id !== $si->id && $o->gudang_id === $si->gudang_id);
+                                        }
+                                        return true;
+                                    });
+                                @endphp
+                                @if($stokItemsTampil->isNotEmpty())
                                     <div class="space-y-0.5">
-                                        @foreach($p->stokItems as $si)
+                                        @foreach($stokItemsTampil as $si)
                                             <div class="flex items-center gap-1.5 flex-wrap">
                                                 <span class="text-ink-300 font-medium">{{ $si->gudang?->nama ?? '-' }}</span>
                                                 <span class="text-ink-400 font-bold tabular-nums">({{ $si->jumlah }})</span>
@@ -1747,9 +1755,17 @@
                                 <span class="text-ink-500 font-semibold uppercase block text-[9px] flex items-center gap-1">
                                     <span>📍</span> Lokasi Rak &amp; Gudang:
                                 </span>
-                                @if($p->stokItems->isNotEmpty())
+                                @php
+                                    $stokItemsCardTampil = $p->stokItems->filter(function ($si) use ($p) {
+                                        if ((int) $si->jumlah === 0 && is_null($si->sku_variant_id)) {
+                                            return ! $p->stokItems->contains(fn ($o) => $o->id !== $si->id && $o->gudang_id === $si->gudang_id);
+                                        }
+                                        return true;
+                                    });
+                                @endphp
+                                @if($stokItemsCardTampil->isNotEmpty())
                                     <div class="space-y-0.5 max-h-24 overflow-y-auto">
-                                        @foreach($p->stokItems as $si)
+                                        @foreach($stokItemsCardTampil as $si)
                                             <div class="flex items-center justify-between gap-1 text-ink-300 text-[10px]">
                                                 <span class="truncate max-w-[120px]">{{ $si->gudang?->nama ?? '-' }} ({{ $si->jumlah }})</span>
                                                 @if($si->rak)

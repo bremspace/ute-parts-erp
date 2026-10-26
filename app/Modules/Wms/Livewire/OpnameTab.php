@@ -514,7 +514,10 @@ class OpnameTab extends Component
 
     public function render()
     {
-        $gudangs = Gudang::where('is_active', true)->get();
+        $cabangId = session('cabang_id');
+        $gudangs = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+            ->where('is_active', true)
+            ->get();
 
         // Opname Query
         // [B-15c] Blade hanya butuh JUMLAH item per opname → `withCount('items')`

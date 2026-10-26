@@ -560,7 +560,7 @@ class ImportExportPage extends Component
                         $filePath,
                         auth()->id(),
                         'standar',
-                        null,
+                        $cabangId,
                         null,
                         null,
                         $this->aksiKemiripan,
@@ -575,7 +575,7 @@ class ImportExportPage extends Component
                         $filePath,
                         auth()->id(),
                         'standar',
-                        null,
+                        $cabangId,
                         null,
                         null,
                         $this->aksiKemiripan,
@@ -972,7 +972,11 @@ class ImportExportPage extends Component
 
     public function render()
     {
-        $gudangList = Gudang::where('is_active', true)->orderBy('nama')->get();
+        $cabangId = session('cabang_id');
+        $gudangList = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+            ->where('is_active', true)
+            ->orderBy('nama')
+            ->get();
 
         return view('modules.wms.livewire.import-export-page', [
             'gudangList' => $gudangList,

@@ -148,6 +148,15 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                             $valGudang->setShowDropDown(true);
                             $valGudang->setFormula1("'Referensi Sistem'!\$M\$2:\$M\$100");
                             $valGudang->setSqref('V2:V1000');
+
+                            // 11. Dropdown Rak Penyimpanan (Kolom W) -> Referensi Sheet 3 (Kolom N)
+                            $valRak = $sheet->getCell('W2')->getDataValidation();
+                            $valRak->setType(DataValidation::TYPE_LIST);
+                            $valRak->setErrorStyle(DataValidation::STYLE_INFORMATION);
+                            $valRak->setAllowBlank(true);
+                            $valRak->setShowDropDown(true);
+                            $valRak->setFormula1("'Referensi Sistem'!\$N\$2:\$N\$100");
+                            $valRak->setSqref('W2:W1000');
                         },
                     ];
                 }
@@ -220,14 +229,33 @@ class ImportProdukTemplateExport implements Export, WithMultipleSheets
                         $suppliers = ['PT Supplier Jaya', 'Supplier Umum', 'Sumber Makmur'];
                     }
 
-                    $gudangs = Gudang::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    $cabangId = session('cabang_id') ?? auth()->user()?->cabang_id;
+                    $gudangs = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+                        ->where('is_active', true)
+                        ->orderBy('nama')
+                        ->pluck('nama')
+                        ->unique()
+                        ->values()
+                        ->all();
                     if (empty($gudangs)) {
-                        $gudangs = ['Gudang Utama'];
+                        $gudangs = Gudang::where('is_active', true)->orderBy('nama')->pluck('nama')->unique()->values()->all();
+                        if (empty($gudangs)) {
+                            $gudangs = ['Gudang Utama'];
+                        }
                     }
 
-                    $raks = Rak::where('is_active', true)->orderBy('nama')->pluck('nama')->all();
+                    $raks = Rak::when($cabangId, fn ($q, $c) => $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $c)))
+                        ->where('is_active', true)
+                        ->orderBy('nama')
+                        ->pluck('nama')
+                        ->unique()
+                        ->values()
+                        ->all();
                     if (empty($raks)) {
-                        $raks = ['Rak A1', 'Rak A2', 'Rak B1'];
+                        $raks = Rak::where('is_active', true)->orderBy('nama')->pluck('nama')->unique()->values()->all();
+                        if (empty($raks)) {
+                            $raks = ['Rak A1', 'Rak A2', 'Rak B1'];
+                        }
                     }
 
                     $subKategoris = KategoriProduk::with('parent')->where('is_active', true)->whereNotNull('parent_id')->orderBy('nama')->get();

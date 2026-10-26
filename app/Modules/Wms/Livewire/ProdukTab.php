@@ -1173,17 +1173,46 @@ class ProdukTab extends Component
         // Load lokasi rak & stok per gudang untuk produk ini (pastikan ada slot gudang cabang agar rak selalu bisa diatur/dikosongkan)
         $cabangId = session('cabang_id');
         $gudangsCabang = Gudang::when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))->where('is_active', true)->get();
+        $variantId = $p->skuVariants()->value('id');
+
         if ($gudangsCabang->isNotEmpty()) {
             foreach ($gudangsCabang as $gc) {
-                StokItem::firstOrCreate(
-                    ['produk_id' => $p->id, 'sku_variant_id' => null, 'gudang_id' => $gc->id],
-                    ['jumlah' => 0, 'jumlah_minimum' => $p->min_stock ?? 0, 'rak_id' => null]
-                );
+                $existingStok = StokItem::where('produk_id', $p->id)
+                    ->where('gudang_id', $gc->id)
+                    ->first();
+
+                if (! $existingStok) {
+                    StokItem::create([
+                        'produk_id' => $p->id,
+                        'sku_variant_id' => $variantId,
+                        'gudang_id' => $gc->id,
+                        'jumlah' => 0,
+                        'jumlah_minimum' => $p->min_stock ?? 0,
+                        'rak_id' => null,
+                    ]);
+                } elseif (is_null($existingStok->sku_variant_id) && $variantId) {
+                    $existingStok->update(['sku_variant_id' => $variantId]);
+                }
+            }
+        }
+
+        // Bersihkan duplikat dummy (jumlah 0 & tanpa varian) jika sudah ada stok item lain di gudang yang sama
+        $semuaStok = StokItem::where('produk_id', $p->id)->get();
+        foreach ($semuaStok->groupBy('gudang_id') as $gId => $items) {
+            if ($items->count() > 1) {
+                $hasActive = $items->first(fn ($item) => (int) $item->jumlah > 0 || ! is_null($item->sku_variant_id));
+                if ($hasActive) {
+                    $dummies = $items->filter(fn ($item) => $item->id !== $hasActive->id && (int) $item->jumlah === 0 && is_null($item->sku_variant_id));
+                    foreach ($dummies as $dummy) {
+                        $dummy->delete();
+                    }
+                }
             }
         }
 
         $stokList = StokItem::with(['gudang', 'rak'])
             ->where('produk_id', $p->id)
+            ->when($cabangId, fn ($q) => $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))
             ->get();
 
         $this->editStokItems = $stokList->map(function ($si) {
@@ -2293,9 +2322,9 @@ class ProdukTab extends Component
 
                 // Jika <= 100 baris, proses langsung secara sinkron agar hasil instan dan tidak stuck di antrian
                 if ($totalBaris <= 100) {
-                    ImportProdukExcelJob::dispatchSync($log->id, $filePath, auth()->id(), 'standar', null, null, null, $this->aksiKemiripan);
+                    ImportProdukExcelJob::dispatchSync($log->id, $filePath, auth()->id(), 'standar', $cabangId, null, null, $this->aksiKemiripan);
                 } else {
-                    ImportProdukExcelJob::dispatch($log->id, $filePath, auth()->id(), 'standar', null, null, null, $this->aksiKemiripan);
+                    ImportProdukExcelJob::dispatch($log->id, $filePath, auth()->id(), 'standar', $cabangId, null, null, $this->aksiKemiripan);
                 }
             }
 
@@ -3400,19 +3429,26 @@ class ProdukTab extends Component
 
                 if ($pindahRak) {
                     if ($targetRak) {
-                        $stok = StokItem::firstOrCreate(
-                            [
+                        $variantId = $p->skuVariants()->value('id');
+                        $stok = StokItem::where('produk_id', $p->id)
+                            ->where('gudang_id', $targetRak->gudang_id)
+                            ->first();
+
+                        if (! $stok) {
+                            $stok = StokItem::create([
                                 'produk_id' => $p->id,
                                 'gudang_id' => $targetRak->gudang_id,
-                                'sku_variant_id' => null,
-                            ],
-                            [
+                                'sku_variant_id' => $variantId,
                                 'jumlah' => 0,
                                 'jumlah_minimum' => $p->stok_minimum ?? 0,
                                 'rak_id' => $targetRak->id,
-                            ]
-                        );
-                        $stok->update(['rak_id' => $targetRak->id]);
+                            ]);
+                        } else {
+                            $stok->update(['rak_id' => $targetRak->id]);
+                            if (is_null($stok->sku_variant_id) && $variantId) {
+                                $stok->update(['sku_variant_id' => $variantId]);
+                            }
+                        }
                     } else {
                         StokItem::where('produk_id', $p->id)
                             ->when($cabangId, fn ($q) => $q->whereHas('gudang', fn ($g) => $g->where('cabang_id', $cabangId)))
@@ -4067,7 +4103,10 @@ class ProdukTab extends Component
         $produks = $this->getFilteredProdukQuery()
             ->paginate($this->perPage);
 
-        $gudangs = Gudang::where('is_active', true)->get();
+        $cabangId = session('cabang_id');
+        $gudangs = Gudang::when($cabangId, fn ($q, $c) => $q->where('cabang_id', $c))
+            ->where('is_active', true)
+            ->get();
 
         $config = app(KonfigurasiService::class);
         $savedKondisi = $config->get('master_produk_kondisi_list');

@@ -73,8 +73,11 @@ class User extends Authenticatable
      */
     public function bisaAksesCabang(int $cabangId): bool
     {
-        $cabangExists = Cabang::where('id', $cabangId)->where('is_active', true)->exists();
-        if (! $cabangExists) {
+        static $cabangExistsCache = [];
+        if (! array_key_exists($cabangId, $cabangExistsCache)) {
+            $cabangExistsCache[$cabangId] = Cabang::where('id', $cabangId)->where('is_active', true)->exists();
+        }
+        if (! $cabangExistsCache[$cabangId]) {
             return false;
         }
 
@@ -113,6 +116,7 @@ class User extends Authenticatable
 
         return $this->cabangs()
             ->where('cabang.is_active', true)
+            ->distinct()
             ->orderBy('cabang.id')
             ->get();
     }
