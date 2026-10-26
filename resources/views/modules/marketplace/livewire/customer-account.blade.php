@@ -291,31 +291,66 @@
             </div>
         </div>
 
-        <!-- Tabs -->
-        <div class="flex items-center gap-2 mb-5 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap">
-            @php
-                $unreadNotifCount = $notifikasi->whereNull('read_at')->count();
-                $tabList = [
-                    'orders' => 'Pesanan',
-                    'servis' => 'Tracking Servis',
-                    'notifikasi' => 'Pemberitahuan',
-                    'membership' => 'Status Membership & Poin',
-                    'profil' => 'Profil & Keamanan',
-                ];
-                if ($customer->is_reseller) {
-                    $tabList['komisi'] = 'Komisi Saya';
-                }
-            @endphp
-            @foreach($tabList as $kode => $label)
-                <button wire:click="$set('activeTab', '{{ $kode }}')" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center gap-1.5 {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/5' }}">
-                    <span>{{ $label }}</span>
-                    @if($kode === 'notifikasi' && $unreadNotifCount > 0)
-                        <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-up-red text-white">
-                            {{ $unreadNotifCount }}
-                        </span>
-                    @endif
-                </button>
-            @endforeach
+        <!-- Tabs Carousel Navigation -->
+        <div class="relative w-full max-w-full mb-6">
+            <nav class="flex items-center gap-2 overflow-x-auto max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x overscroll-x-contain -mx-4 px-4 sm:mx-0 sm:px-0 py-1" aria-label="Tab Menu Akun">
+                @php
+                    $unreadNotifCount = $notifikasi->whereNull('read_at')->count();
+                    $tabList = [
+                        'orders' => ['label' => 'Pesanan', 'icon' => 'bag'],
+                        'servis' => ['label' => 'Tracking Servis', 'icon' => 'wrench'],
+                        'notifikasi' => ['label' => 'Pemberitahuan', 'icon' => 'bell'],
+                        'membership' => ['label' => 'Status Membership & Poin', 'icon' => 'star'],
+                        'profil' => ['label' => 'Profil & Keamanan', 'icon' => 'user'],
+                    ];
+                    if ($customer->is_reseller) {
+                        $tabList['komisi'] = ['label' => 'Komisi Saya', 'icon' => 'wallet'];
+                    }
+                @endphp
+                @foreach($tabList as $kode => $item)
+                    @php $isActive = ($activeTab === $kode); @endphp
+                    <button
+                        type="button"
+                        wire:click="$set('activeTab', '{{ $kode }}')"
+                        class="shrink-0 inline-flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap cursor-pointer transition-[background-color,color,transform,box-shadow] duration-140 active:scale-[0.97] min-h-[44px] {{ $isActive ? 'bg-up-primary text-white shadow-md shadow-up-primary/25 ring-1 ring-up-primary/30' : 'bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:bg-ink-50 dark:hover:bg-white/5 hover:text-ink-900 dark:hover:text-white' }}"
+                    >
+                        @if($item['icon'] === 'bag')
+                            <svg class="w-4 h-4 shrink-0 {{ $isActive ? 'text-white' : 'text-ink-400 dark:text-ink-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            </svg>
+                        @elseif($item['icon'] === 'wrench')
+                            <svg class="w-4 h-4 shrink-0 {{ $isActive ? 'text-white' : 'text-ink-400 dark:text-ink-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        @elseif($item['icon'] === 'bell')
+                            <svg class="w-4 h-4 shrink-0 {{ $isActive ? 'text-white' : 'text-ink-400 dark:text-ink-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                        @elseif($item['icon'] === 'star')
+                            <svg class="w-4 h-4 shrink-0 {{ $isActive ? 'text-white' : 'text-ink-400 dark:text-ink-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                            </svg>
+                        @elseif($item['icon'] === 'user')
+                            <svg class="w-4 h-4 shrink-0 {{ $isActive ? 'text-white' : 'text-ink-400 dark:text-ink-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        @elseif($item['icon'] === 'wallet')
+                            <svg class="w-4 h-4 shrink-0 {{ $isActive ? 'text-white' : 'text-ink-400 dark:text-ink-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>
+                        @endif
+
+                        <span>{{ $item['label'] }}</span>
+
+                        @if($kode === 'notifikasi' && $unreadNotifCount > 0)
+                            <span class="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold {{ $isActive ? 'bg-white text-up-primary' : 'bg-up-red text-white' }}">
+                                {{ $unreadNotifCount }}
+                            </span>
+                        @endif
+                    </button>
+                @endforeach
+            </nav>
         </div>
 
         <!-- ORDERS -->
@@ -613,12 +648,12 @@
 
                             <div x-show="!loadingMetode" class="space-y-3">
                                 <!-- Segmented Category Tabs -->
-                                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-ink-100 dark:border-white/10 text-xs">
+                                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-ink-100 dark:border-white/10 text-xs w-full max-w-full flex-nowrap scroll-smooth touch-pan-x">
                                     <template x-for="cat in kategoriList" :key="cat.key">
                                         <button
                                             type="button"
                                             x-on:click="pilihKategori(cat.key)"
-                                            class="px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all duration-140 cursor-pointer flex items-center gap-1.5"
+                                            class="shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all duration-140 cursor-pointer flex items-center gap-1.5 min-h-[36px]"
                                             :class="kategoriDipilih === cat.key
                                                 ? 'bg-up-primary text-white shadow-sm shadow-up-primary/20'
                                                 : 'text-ink-600 dark:text-ink-400 hover:bg-ink-100 dark:hover:bg-white/5'"
