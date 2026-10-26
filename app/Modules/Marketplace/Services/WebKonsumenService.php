@@ -63,24 +63,36 @@ class WebKonsumenService
     public function saveSettings(array $data, ?int $userId = null): void
     {
         foreach ($data as $key => $value) {
+            $isJsonTarget = is_array($value) || in_array($key, ['hero_features', 'hero_stats', 'allowed_filters', 'social_links'], true);
+            $type = match (true) {
+                $isJsonTarget => 'json',
+                is_bool($value) => 'boolean',
+                is_int($value) => 'integer',
+                default => 'string',
+            };
+
+            $valStr = match ($type) {
+                'json' => is_array($value) ? json_encode($value) : (string) $value,
+                'boolean' => $value ? 'true' : 'false',
+                'integer' => (string) $value,
+                default => (string) $value,
+            };
+
             $setting = WebKonsumenSetting::where('setting_key', $key)->first();
             if ($setting) {
-                $valStr = match ($setting->value_type) {
-                    'boolean' => $value ? 'true' : 'false',
-                    'json' => is_array($value) ? json_encode($value) : (string) $value,
-                    default => (string) $value,
-                };
+                $finalType = ($setting->value_type === 'image' && $type === 'string') ? 'image' : $type;
 
                 $setting->update([
                     'setting_value' => $valStr,
+                    'value_type' => $finalType,
                     'updated_by' => $userId,
                 ]);
             } else {
                 WebKonsumenSetting::create([
                     'group_key' => 'general',
                     'setting_key' => $key,
-                    'setting_value' => is_array($value) ? json_encode($value) : (string) $value,
-                    'value_type' => is_bool($value) ? 'boolean' : (is_int($value) ? 'integer' : 'string'),
+                    'setting_value' => $valStr,
+                    'value_type' => $type,
                     'deskripsi' => $key,
                     'updated_by' => $userId,
                 ]);

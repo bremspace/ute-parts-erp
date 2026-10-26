@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Marketplace\Livewire\WebKonsumenSettings;
 use App\Modules\Marketplace\Models\WebBanner;
+use App\Modules\Marketplace\Models\WebKonsumenSetting;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use Database\Seeders\RoleUserSeeder;
 use Database\Seeders\WebKonsumenSeeder;
@@ -234,5 +235,43 @@ class WebKonsumenSettingsTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('/storage/web-konsumen/test-hero-bg.jpg');
         $response->assertSee('Headline Kontras Tinggi Toko');
+    }
+
+    public function test_parsed_value_handles_string_json_gracefully_and_prevents_500(): void
+    {
+        // Simulasikan kondisi database prod di mana hero_features tersimpan dengan value_type = 'string'
+        WebKonsumenSetting::where('setting_key', 'hero_features')->delete();
+        WebKonsumenSetting::create([
+            'group_key' => 'hero',
+            'setting_key' => 'hero_features',
+            'setting_value' => json_encode([
+                ['icon' => 'qc', 'text' => 'Fitur QC Spesial Prod'],
+            ]),
+            'value_type' => 'string',
+        ]);
+
+        $service = app(WebKonsumenService::class);
+        $service->clearCache();
+
+        $features = $service->get('hero_features');
+        $this->assertIsArray($features);
+        $this->assertEquals('Fitur QC Spesial Prod', $features[0]['text']);
+
+        // Pastikan halaman /shop tidak 500
+        $response = $this->get('/shop');
+        $response->assertStatus(200);
+        $response->assertSee('Fitur QC Spesial Prod');
+
+        // Pastikan saat diedit dan disave oleh Livewire, value_type otomatis menjadi 'json'
+        Livewire::actingAs($this->superAdmin)
+            ->test(WebKonsumenSettings::class)
+            ->set('heroForm.hero_features.0.text', 'Fitur QC Terupdate')
+            ->call('save')
+            ->assertDispatched('alert');
+
+        $this->assertDatabaseHas('web_konsumen_settings', [
+            'setting_key' => 'hero_features',
+            'value_type' => 'json',
+        ]);
     }
 }

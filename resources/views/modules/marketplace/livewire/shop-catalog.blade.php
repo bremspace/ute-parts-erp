@@ -144,11 +144,17 @@
 
                 <!-- Feature highlights pill list -->
                 @php
-                    $features = $webConfig['hero_features'] ?? [
-                        ['icon' => 'qc', 'text' => '100% Diagnostic QC Passed'],
-                        ['icon' => 'shield', 'text' => 'Garansi Ganti Unit'],
-                        ['icon' => 'clock', 'text' => 'Ambil Cepat di Cabang'],
-                    ];
+                    $features = $webConfig['hero_features'] ?? null;
+                    if (is_string($features)) {
+                        $features = json_decode($features, true);
+                    }
+                    if (!is_array($features)) {
+                        $features = [
+                            ['icon' => 'qc', 'text' => '100% Diagnostic QC Passed'],
+                            ['icon' => 'shield', 'text' => 'Garansi Ganti Unit'],
+                            ['icon' => 'clock', 'text' => 'Ambil Cepat di Cabang'],
+                        ];
+                    }
                 @endphp
                 <div class="flex flex-wrap gap-2 sm:gap-2.5 pt-1 text-xs">
                     @foreach($features as $feat)
@@ -163,11 +169,17 @@
 
                 <!-- Stats summary -->
                 @php
-                    $stats = $webConfig['hero_stats'] ?? [
-                        ['label' => 'Item Terkatalog', 'type' => 'dynamic_catalog', 'val' => ''],
-                        ['label' => 'Pick-up Center', 'type' => 'fixed', 'val' => '5 Cabang'],
-                        ['label' => 'Kepuasan', 'type' => 'fixed', 'val' => '99.4%'],
-                    ];
+                    $stats = $webConfig['hero_stats'] ?? null;
+                    if (is_string($stats)) {
+                        $stats = json_decode($stats, true);
+                    }
+                    if (!is_array($stats)) {
+                        $stats = [
+                            ['label' => 'Item Terkatalog', 'type' => 'dynamic_catalog', 'val' => ''],
+                            ['label' => 'Pick-up Center', 'type' => 'fixed', 'val' => '5 Cabang'],
+                            ['label' => 'Kepuasan', 'type' => 'fixed', 'val' => '99.4%'],
+                        ];
+                    }
                 @endphp
                 <div class="pt-4 border-t border-white/10 flex items-center gap-4 sm:gap-12 flex-wrap">
                     @foreach($stats as $st)

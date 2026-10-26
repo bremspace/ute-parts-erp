@@ -114,6 +114,21 @@ class WebKonsumenSettings extends Component
         $this->brandingForm['customer_login_bg_image'] = $settings['customer_login_bg_image'] ?? '';
         $this->brandingForm['customer_login_bg_overlay'] = $settings['customer_login_bg_overlay'] ?? 'scrim_dark';
 
+        // Helper defensive parsing array
+        $asArray = function ($val, array $default): array {
+            if (is_array($val)) {
+                return $val;
+            }
+            if (is_string($val) && $val !== '') {
+                $decoded = json_decode($val, true);
+                if (is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+
+            return $default;
+        };
+
         // Populate Hero
         $this->heroForm['hero_active'] = (bool) ($settings['hero_active'] ?? true);
         $this->heroForm['hero_display_mode'] = $settings['hero_display_mode'] ?? 'hero_standard';
@@ -123,16 +138,16 @@ class WebKonsumenSettings extends Component
         $this->heroForm['hero_headline'] = $settings['hero_headline'] ?? '';
         $this->heroForm['hero_subheadline'] = $settings['hero_subheadline'] ?? '';
         $this->heroForm['hero_right_widget'] = $settings['hero_right_widget'] ?? 'member_card';
-        $this->heroForm['hero_features'] = $settings['hero_features'] ?? [
+        $this->heroForm['hero_features'] = $asArray($settings['hero_features'] ?? null, [
             ['icon' => 'qc', 'text' => '100% Diagnostic QC Passed'],
             ['icon' => 'shield', 'text' => 'Garansi Ganti Unit'],
             ['icon' => 'clock', 'text' => 'Ambil Cepat di Cabang'],
-        ];
-        $this->heroForm['hero_stats'] = $settings['hero_stats'] ?? [
+        ]);
+        $this->heroForm['hero_stats'] = $asArray($settings['hero_stats'] ?? null, [
             ['label' => 'Item Terkatalog', 'type' => 'dynamic_catalog', 'val' => ''],
             ['label' => 'Pick-up Center', 'type' => 'fixed', 'val' => '5 Cabang'],
             ['label' => 'Kepuasan', 'type' => 'fixed', 'val' => '99.4%'],
-        ];
+        ]);
 
         // Populate Stock & Catalog
         $this->stockForm['stock_display_mode'] = $settings['stock_display_mode'] ?? 'threshold_only';
@@ -141,8 +156,9 @@ class WebKonsumenSettings extends Component
         $this->stockForm['show_sold_counter'] = (bool) ($settings['show_sold_counter'] ?? true);
         $this->stockForm['show_tier_teaser'] = (bool) ($settings['show_tier_teaser'] ?? true);
         $this->stockForm['catalog_per_page'] = (int) ($settings['catalog_per_page'] ?? 24);
-        if (isset($settings['allowed_filters']) && is_array($settings['allowed_filters'])) {
-            $this->stockForm['allowed_filters'] = array_merge($this->stockForm['allowed_filters'], $settings['allowed_filters']);
+        $allowedFilters = $asArray($settings['allowed_filters'] ?? null, []);
+        if (! empty($allowedFilters)) {
+            $this->stockForm['allowed_filters'] = array_merge($this->stockForm['allowed_filters'], $allowedFilters);
         }
 
         // Populate Contact & Popup
@@ -150,8 +166,9 @@ class WebKonsumenSettings extends Component
         $this->contactForm['wa_number'] = $settings['wa_number'] ?? '';
         $this->contactForm['wa_default_msg'] = $settings['wa_default_msg'] ?? '';
         $this->contactForm['operating_hours'] = $settings['operating_hours'] ?? '';
-        if (isset($settings['social_links']) && is_array($settings['social_links'])) {
-            $this->contactForm['social_links'] = array_merge($this->contactForm['social_links'], $settings['social_links']);
+        $socialLinks = $asArray($settings['social_links'] ?? null, []);
+        if (! empty($socialLinks)) {
+            $this->contactForm['social_links'] = array_merge($this->contactForm['social_links'], $socialLinks);
         }
         $this->contactForm['popup_active'] = (bool) ($settings['popup_active'] ?? false);
         $this->contactForm['popup_banner_id'] = (string) ($settings['popup_banner_id'] ?? '');

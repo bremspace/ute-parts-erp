@@ -29,11 +29,32 @@ class WebKonsumenSetting extends Model
      */
     public function getParsedValue(): mixed
     {
-        return match ($this->value_type) {
-            'boolean' => filter_var($this->setting_value, FILTER_VALIDATE_BOOLEAN),
-            'integer' => (int) $this->setting_value,
-            'json' => json_decode($this->setting_value ?: '[]', true),
-            default => $this->setting_value,
-        };
+        if ($this->value_type === 'json' || in_array($this->setting_key, ['hero_features', 'hero_stats', 'allowed_filters', 'social_links'], true)) {
+            if (is_array($this->setting_value)) {
+                return $this->setting_value;
+            }
+            $decoded = json_decode((string) $this->setting_value, true);
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        if ($this->value_type === 'boolean') {
+            return filter_var($this->setting_value, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($this->value_type === 'integer') {
+            return (int) $this->setting_value;
+        }
+
+        // Defensive: bila value diawali '[' atau '{', periksa apakah valid JSON array/object
+        $val = (string) $this->setting_value;
+        if ($val !== '' && ($val[0] === '[' || $val[0] === '{')) {
+            $decoded = json_decode($val, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return $this->setting_value;
     }
 }
