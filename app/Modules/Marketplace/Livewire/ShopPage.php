@@ -6,11 +6,9 @@ use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Wms\Models\KategoriProduk;
-use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use App\Modules\Wms\Services\SmartSearchService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -88,127 +86,90 @@ class ShopPage extends Component
         $this->resetPage();
     }
 
-    public function getKualitasListProperty()
+    public function updatedFilterKategori()
     {
-        return Cache::remember('shop.kualitas-list.v1', self::HP_LIST_CACHE_TTL, function (): array {
-            return KualitasProduk::where('is_active', true)
-                ->orderBy('nama')
-                ->get(['id', 'nama'])
-                ->map(fn ($k) => ['id' => (string) $k->id, 'nama' => (string) $k->nama])
-                ->all();
-        });
+        $this->resetPage();
+    }
+
+    public function updatedFilterBrand()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterKondisi()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterHpMerk()
+    {
+        // Reset model HP jika ganti merk agar tidak terjadi filter zonk
+        $this->filterHpModel = '';
+        $this->resetPage();
+    }
+
+    public function updatedFilterHpModel()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterKualitas()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterStok()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedHargaMax()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSort()
+    {
+        $this->resetPage();
+    }
+
+    public function getFacetedOptionsProperty(): array
+    {
+        return app(SmartSearchService::class)->getFacetedOptions([
+            'kategori' => $this->filterKategori,
+            'brand' => $this->filterBrand,
+            'kondisi' => $this->filterKondisi,
+            'hpMerk' => $this->filterHpMerk,
+            'hpModel' => $this->filterHpModel,
+            'kualitas' => $this->filterKualitas,
+            'stok' => $this->filterStok,
+            'hargaMax' => $this->hargaMax,
+        ], $this->search);
+    }
+
+    public function getKualitasListProperty(): array
+    {
+        return $this->facetedOptions['kualitasList'] ?? [];
     }
 
     public function getCategoriesProperty(): array
     {
-        return Cache::remember('shop.categories.tree.v2', self::HP_LIST_CACHE_TTL, function (): array {
-            $kat = KategoriProduk::where('is_active', true)
-                ->orderBy('urutan')
-                ->orderBy('nama')
-                ->get();
-
-            if ($kat->isNotEmpty()) {
-                $grouped = $kat->groupBy('parent_id');
-                $roots = $grouped->get(null, collect());
-                $result = [];
-                foreach ($roots as $r) {
-                    $children = $grouped->get($r->id, collect())->map(function ($c): array {
-                        return [
-                            'id' => (string) $c->id,
-                            'nama' => (string) $c->nama,
-                            'slug' => (string) $c->slug,
-                        ];
-                    })->values()->all();
-
-                    $result[] = [
-                        'id' => (string) $r->id,
-                        'nama' => (string) $r->nama,
-                        'slug' => (string) $r->slug,
-                        'children' => $children,
-                    ];
-                }
-
-                return $result;
-            }
-
-            return Produk::where('is_active', true)
-                ->distinct()
-                ->orderBy('kategori')
-                ->pluck('kategori')
-                ->filter()
-                ->map(fn ($k) => is_array($k) ? implode(', ', $k) : (string) $k)
-                ->values()
-                ->map(fn ($k) => ['id' => $k, 'nama' => $k, 'children' => []])
-                ->all();
-        });
+        return $this->facetedOptions['categories'] ?? [];
     }
 
     public function getHpMerkListProperty(): array
     {
-        // [T-11] Ekstrak merk unik dari kompatibilitas_hp JSON
-        // [B-15a] pluck() (bukan model penuh) + cache 1 jam — hasilnya & urutannya
-        // tetap sama, tapi tidak lagi menarik seluruh tabel produk tiap render.
-        return Cache::remember(
-            'shop.hp.merk-list.v1',
-            self::HP_LIST_CACHE_TTL,
-            fn (): array => $this->hpListValues('merk')
-        );
+        return $this->facetedOptions['hpMerkList'] ?? [];
     }
 
     public function getHpModelListProperty(): array
     {
-        // [T-11] Ekstrak model unik dari kompatibilitas_hp JSON (filtered by merk if selected)
-        // [B-15a] Cache per filter merk; hanya kolom JSON yang di-pluck.
-        return Cache::remember(
-            'shop.hp.model-list.v1'.($this->filterHpMerk ? ':'.$this->filterHpMerk : ''),
-            self::HP_LIST_CACHE_TTL,
-            function (): array {
-                $query = Produk::where('is_active', true)
-                    ->whereNotNull('kompatibilitas_hp')
-                    ->where('kompatibilitas_hp', '!=', '[]');
-
-                if ($this->filterHpMerk) {
-                    $query->whereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['merk' => $this->filterHpMerk])]);
-                }
-
-                return $this->hpListValues('model', $query);
-            }
-        );
+        return $this->facetedOptions['hpModelList'] ?? [];
     }
 
-    /**
-     * [B-15a] Ambil daftar unik nilai (merk|model) dari JSON kompatibilitas_hp.
-     *
-     * Mirip implementasi lama (model penuh + cast array), hanya sumber datanya
-     * `pluck('kompatibilitas_hp')` — 1 kolom, bukan seluruh row produk.
-     * Normalisasi `unique() → sort() → values()` dipertahankan agar hasil dan
-     * urutan dropdown identik dengan sebelumnya.
-     *
-     * @param  'merk'|'model'  $field
-     * @return array<int, mixed>
-     */
-    private function hpListValues(string $field, ?Builder $query = null): array
+    public function getBrandsProperty(): array
     {
-        $rows = ($query ?? Produk::where('is_active', true)
-            ->whereNotNull('kompatibilitas_hp')
-            ->where('kompatibilitas_hp', '!=', '[]'))
-            ->pluck('kompatibilitas_hp');
-
-        return collect($rows)
-            ->flatMap(function ($json) use ($field): Collection {
-                $decoded = is_array($json) ? $json : json_decode((string) $json, true);
-
-                return collect(is_array($decoded) ? $decoded : [])->pluck($field);
-            })
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-    }
-
-    public function getBrandsProperty()
-    {
-        return Produk::where('is_active', true)->distinct()->orderBy('brand_kompatibel')->pluck('brand_kompatibel')->filter()->values();
+        return $this->facetedOptions['brands'] ?? [];
     }
 
     public function getProductsProperty()
@@ -249,13 +210,15 @@ class ShopPage extends Component
         if ($this->filterHpMerk) {
             $query->where(function ($q) {
                 $q->whereHas('tipeHps', fn ($tq) => $tq->where('merk', $this->filterHpMerk))
-                    ->orWhereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['merk' => $this->filterHpMerk])]);
+                    ->orWhere('brand_kompatibel', $this->filterHpMerk)
+                    ->orWhere('kompatibilitas_hp', 'like', '%"merk":"'.$this->filterHpMerk.'"%');
             });
         }
         if ($this->filterHpModel) {
             $query->where(function ($q) {
                 $q->whereHas('tipeHps', fn ($tq) => $tq->where('model', $this->filterHpModel))
-                    ->orWhereRaw('JSON_CONTAINS(kompatibilitas_hp, ?)', [json_encode(['model' => $this->filterHpModel])]);
+                    ->orWhere('model_kompatibel', $this->filterHpModel)
+                    ->orWhere('kompatibilitas_hp', 'like', '%"model":"'.$this->filterHpModel.'"%');
             });
         }
         if ($this->hargaMax) {

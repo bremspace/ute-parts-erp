@@ -6,6 +6,7 @@ use App\Modules\Omnichannel\Models\ChannelProductMapping;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Rbac\Traits\CatatAktivitas;
+use App\Modules\Wms\Services\SmartSearchService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -408,219 +409,21 @@ class Produk extends Model
 
     /**
      * Scope query pencarian optimal untuk ratusan ribu item.
-     * Menggunakan subquery terindeks (uncorrelated) untuk menghindari N+1 subquery dan full scan per-row.
-     * Mencari berdasarkan nama, barcode, SKU, brand/tipe hp kompatibel.
+     * Menggunakan SmartSearchService terpusat: multi-word AND, sinonim sparepart HP,
+     * subquery terindeks (uncorrelated) untuk menghindari N+1 subquery dan full scan per-row.
      */
     public function scopeCariPintar($query, ?string $q)
     {
-        if (empty($q)) {
-            return $query;
-        }
-
-        $term = trim($q);
-        if ($term === '') {
-            return $query;
-        }
-
-        $words = array_values(array_filter(preg_split('/\s+/', $term), fn ($w) => strlen($w) > 0));
-
-        // Pre-fetch matching foreign keys dari master data agar pencarian instan tanpa correlated subquery per-row
-        $matchingBrandIds = Brand::query()
-            ->where(function ($bq) use ($term, $words) {
-                $bq->where('nama', 'like', "%{$term}%");
-                foreach ($words as $w) {
-                    $bq->orWhere('nama', 'like', "%{$w}%");
-                }
-            })
-            ->pluck('id')
-            ->all();
-
-        $matchingKualitasIds = KualitasProduk::query()
-            ->where(function ($kq) use ($term, $words) {
-                $kq->where('nama', 'like', "%{$term}%");
-                foreach ($words as $w) {
-                    $kq->orWhere('nama', 'like', "%{$w}%");
-                }
-            })
-            ->pluck('id')
-            ->all();
-
-        $matchingKategoriIds = KategoriProduk::query()
-            ->where(function ($cq) use ($term, $words) {
-                $cq->where('nama', 'like', "%{$term}%");
-                foreach ($words as $w) {
-                    $cq->orWhere('nama', 'like', "%{$w}%");
-                }
-            })
-            ->pluck('id')
-            ->all();
-
-        $matchingSupplierIds = Supplier::query()
-            ->where(function ($sq) use ($term, $words) {
-                $sq->where('nama', 'like', "%{$term}%");
-                foreach ($words as $w) {
-                    $sq->orWhere('nama', 'like', "%{$w}%");
-                }
-            })
-            ->pluck('id')
-            ->all();
-
-        return $query->where(function ($sub) use ($term, $words, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingSupplierIds) {
-            // 1. Exact match barcode produk (B-Tree index unik)
-            $sub->where('barcode', $term)
-                // 2. Barcode & SKU varian produk (subquery terindeks, 1x eksekusi)
-                ->orWhereIn('id', SkuVariant::query()
-                    ->where('is_active', true)
-                    ->where(function ($sq) use ($term) {
-                        $sq->where('barcode', $term)
-                            ->orWhere('sku', $term)
-                            ->orWhere('sku', 'like', "%{$term}%");
-                    })
-                    ->select('produk_id')
-                )
-                // 3. Tipe HP kompatibel via tabel pivot terindeks
-                ->orWhereIn('id', function ($pivotQuery) use ($term) {
-                    $pivotQuery->select('kompatibilitas_produk_tipe_hp.produk_id')
-                        ->from('kompatibilitas_produk_tipe_hp')
-                        ->join('tipe_hp', 'tipe_hp.id', '=', 'kompatibilitas_produk_tipe_hp.tipe_hp_id')
-                        ->where(function ($tq) use ($term) {
-                            $tq->where('tipe_hp.merk', 'like', "%{$term}%")
-                                ->orWhere('tipe_hp.model', 'like', "%{$term}%");
-                        });
-                });
-
-            // 4. Pencarian teks nama, brand, model kompatibel, kategori, kondisi, satuan, supplier
-            if (count($words) > 1) {
-                $sub->orWhere(function ($multiQ) use ($words, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingSupplierIds) {
-                    foreach ($words as $word) {
-                        $multiQ->where(function ($wordQ) use ($word, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingSupplierIds) {
-                            $wordQ->where('nama', 'like', "%{$word}%")
-                                ->orWhere('brand_kompatibel', 'like', "%{$word}%")
-                                ->orWhere('model_kompatibel', 'like', "%{$word}%")
-                                ->orWhere('kompatibilitas_hp', 'like', "%{$word}%")
-                                ->orWhere('kategori', 'like', "%{$word}%")
-                                ->orWhere('kondisi', 'like', "%{$word}%")
-                                ->orWhere('satuan', 'like', "%{$word}%")
-                                ->orWhere('deskripsi', 'like', "%{$word}%");
-
-                            if (! empty($matchingBrandIds)) {
-                                $wordQ->orWhereIn('brand_id', $matchingBrandIds);
-                            }
-                            if (! empty($matchingKualitasIds)) {
-                                $wordQ->orWhereIn('kualitas_id', $matchingKualitasIds);
-                            }
-                            if (! empty($matchingKategoriIds)) {
-                                $wordQ->orWhereIn('kategori_id', $matchingKategoriIds);
-                            }
-                            if (! empty($matchingSupplierIds)) {
-                                $wordQ->orWhereIn('supplier_id', $matchingSupplierIds);
-                            }
-                        });
-                    }
-                });
-            } else {
-                $sub->orWhere('nama', 'like', "%{$term}%")
-                    ->orWhere('brand_kompatibel', 'like', "%{$term}%")
-                    ->orWhere('model_kompatibel', 'like', "%{$term}%")
-                    ->orWhere('kompatibilitas_hp', 'like', "%{$term}%")
-                    ->orWhere('kategori', 'like', "%{$term}%")
-                    ->orWhere('kondisi', 'like', "%{$term}%")
-                    ->orWhere('satuan', 'like', "%{$term}%")
-                    ->orWhere('deskripsi', 'like', "%{$term}%");
-
-                if (! empty($matchingBrandIds)) {
-                    $sub->orWhereIn('brand_id', $matchingBrandIds);
-                }
-                if (! empty($matchingKualitasIds)) {
-                    $sub->orWhereIn('kualitas_id', $matchingKualitasIds);
-                }
-                if (! empty($matchingKategoriIds)) {
-                    $sub->orWhereIn('kategori_id', $matchingKategoriIds);
-                }
-                if (! empty($matchingSupplierIds)) {
-                    $sub->orWhereIn('supplier_id', $matchingSupplierIds);
-                }
-            }
-        });
+        return app(SmartSearchService::class)->applySmartSearch($query, $q);
     }
 
     /**
      * Urutkan hasil pencarian berdasarkan skor kecocokan tertinggi (relevance-based ranking).
-     * Exact barcode (250) > Exact SKU (220) > Exact nama (200) > Prefix nama (150)
-     * > Frasa penuh nama (100) > Brand/Model exact (80) > Brand/Model like (50)
-     * > Word matches (30/15 per kata) > Ready stock boost (+10).
+     * Dikelola oleh SmartSearchService terpusat.
      */
     public function scopeUrutkanRelevansi($query, ?string $q)
     {
-        if (empty($q)) {
-            return $query;
-        }
-
-        $term = trim($q);
-        if ($term === '') {
-            return $query;
-        }
-
-        $words = array_values(array_filter(preg_split('/\s+/', $term), fn ($w) => strlen($w) > 0));
-
-        $cases = [];
-        $bindings = [];
-
-        // 1. Exact Barcode Match (+250)
-        $cases[] = 'CASE WHEN produk.barcode = ? THEN 250 ELSE 0 END';
-        $bindings[] = $term;
-
-        // 2. Exact SKU Varian Match (+220)
-        $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM sku_variants WHERE sku_variants.produk_id = produk.id AND sku_variants.sku = ?) THEN 220 ELSE 0 END';
-        $bindings[] = $term;
-
-        // 3. Exact Nama Match (+200)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) = LOWER(?) THEN 200 ELSE 0 END';
-        $bindings[] = $term;
-
-        // 4. Nama Awalan Sama Persis (+150)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 150 ELSE 0 END';
-        $bindings[] = $term.'%';
-
-        // 5. Nama Mengandung Seluruh Frasa (+100)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 100 ELSE 0 END';
-        $bindings[] = '%'.$term.'%';
-
-        // 6. Brand atau Model Kompatibel Cocok Persis (+80)
-        $cases[] = 'CASE WHEN LOWER(produk.brand_kompatibel) = LOWER(?) OR LOWER(produk.model_kompatibel) = LOWER(?) THEN 80 ELSE 0 END';
-        $bindings[] = $term;
-        $bindings[] = $term;
-
-        // 7. Brand atau Model Kompatibel Mengandung Frasa (+50)
-        $cases[] = 'CASE WHEN LOWER(produk.brand_kompatibel) LIKE LOWER(?) OR LOWER(produk.model_kompatibel) LIKE LOWER(?) THEN 50 ELSE 0 END';
-        $bindings[] = '%'.$term.'%';
-        $bindings[] = '%'.$term.'%';
-
-        // 7b. Presisi Kombinasi Merk HP & Model HP pada relasi Tipe HP (+110)
-        if (count($words) > 1) {
-            $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM tipe_hp JOIN kompatibilitas_produk_tipe_hp ON kompatibilitas_produk_tipe_hp.tipe_hp_id = tipe_hp.id WHERE kompatibilitas_produk_tipe_hp.produk_id = produk.id AND LOWER(tipe_hp.merk) LIKE LOWER(?) AND LOWER(tipe_hp.model) LIKE LOWER(?)) THEN 110 ELSE 0 END';
-            $bindings[] = '%'.$words[0].'%';
-            $bindings[] = '%'.$words[count($words) - 1].'%';
-        }
-
-        // 8. Kecocokan Kata Per Kata (Nama +30 per kata, Model/Brand +15 per kata)
-        if (count($words) > 1) {
-            foreach ($words as $w) {
-                $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 30 ELSE 0 END';
-                $bindings[] = '%'.$w.'%';
-
-                $cases[] = 'CASE WHEN LOWER(produk.brand_kompatibel) LIKE LOWER(?) OR LOWER(produk.model_kompatibel) LIKE LOWER(?) THEN 15 ELSE 0 END';
-                $bindings[] = '%'.$w.'%';
-                $bindings[] = '%'.$w.'%';
-            }
-        }
-
-        // 9. Prioritas Produk yang Memiliki Stok Fisik (+10)
-        $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM stok_items WHERE stok_items.produk_id = produk.id AND stok_items.jumlah > 0) THEN 10 ELSE 0 END';
-
-        $sql = '('.implode(' + ', $cases).')';
-
-        return $query->orderByRaw($sql.' DESC', $bindings);
+        return app(SmartSearchService::class)->applyRelevanceRanking($query, $q);
     }
 
     /**

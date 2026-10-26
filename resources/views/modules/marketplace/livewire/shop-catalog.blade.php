@@ -425,22 +425,24 @@
                         @php
                             $catId = is_array($cat) ? ($cat['id'] ?? '') : ($cat->id ?? (is_scalar($cat) ? (string) $cat : ''));
                             $catNama = is_array($cat) ? ($cat['nama'] ?? '') : ($cat->nama ?? (is_scalar($cat) ? (string) $cat : ''));
+                            $catCount = is_array($cat) ? ($cat['count'] ?? null) : ($cat->count ?? null);
                             $children = is_array($cat) ? ($cat['children'] ?? []) : ($cat->children ?? []);
                             $hasChildren = !empty($children) && (is_countable($children) ? count($children) : 0) > 0;
                         @endphp
                         @if($hasChildren)
                             <optgroup label="{{ $catNama }}">
-                                <option value="{{ $catId }}">— Semua {{ $catNama }} —</option>
+                                <option value="{{ $catId }}">— Semua {{ $catNama }}{{ $catCount !== null ? ' (' . $catCount . ')' : '' }} —</option>
                                 @foreach($children as $child)
                                     @php
                                         $childId = is_array($child) ? ($child['id'] ?? '') : ($child->id ?? (is_scalar($child) ? (string) $child : ''));
                                         $childNama = is_array($child) ? ($child['nama'] ?? '') : ($child->nama ?? (is_scalar($child) ? (string) $child : ''));
+                                        $childCount = is_array($child) ? ($child['count'] ?? null) : ($child->count ?? null);
                                     @endphp
-                                    <option value="{{ $childId }}">{{ $childNama }}</option>
+                                    <option value="{{ $childId }}">{{ $childNama }}{{ $childCount !== null ? ' (' . $childCount . ')' : '' }}</option>
                                 @endforeach
                             </optgroup>
                         @elseif(!empty($catNama))
-                            <option value="{{ $catId }}">{{ $catNama }}</option>
+                            <option value="{{ $catId }}">{{ $catNama }}{{ $catCount !== null ? ' (' . $catCount . ')' : '' }}</option>
                         @endif
                     @endforeach
                 </select>
@@ -472,8 +474,12 @@
                 <select wire:model.live="filterHpMerk"
                         class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
                     <option value="">Merk Gadget</option>
-                    @foreach($hpMerkList as $m)
-                        <option value="{{ $m }}">{{ $m }}</option>
+                    @foreach($hpMerkList as $key => $val)
+                        @php
+                            $m = is_numeric($key) ? $val : $key;
+                            $count = is_numeric($key) ? null : $val;
+                        @endphp
+                        <option value="{{ $m }}">{{ $m }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                     @endforeach
                 </select>
                 <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
@@ -488,8 +494,12 @@
                 <select wire:model.live="filterHpModel"
                         class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
                     <option value="">Model Gadget</option>
-                    @foreach($hpModelList as $m)
-                        <option value="{{ $m }}">{{ $m }}</option>
+                    @foreach($hpModelList as $key => $val)
+                        @php
+                            $m = is_numeric($key) ? $val : $key;
+                            $count = is_numeric($key) ? null : $val;
+                        @endphp
+                        <option value="{{ $m }}">{{ $m }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                     @endforeach
                 </select>
                 <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
@@ -504,8 +514,12 @@
                 <select wire:model.live="filterBrand"
                         class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
                     <option value="">Semua Brand</option>
-                    @foreach($brands as $b)
-                        <option value="{{ $b }}">{{ $b }}</option>
+                    @foreach($brands as $key => $val)
+                        @php
+                            $b = is_numeric($key) ? $val : $key;
+                            $count = is_numeric($key) ? null : $val;
+                        @endphp
+                        <option value="{{ $b }}">{{ $b }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                     @endforeach
                 </select>
                 <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
@@ -537,7 +551,12 @@
                         class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
                     <option value="">Semua Kualitas</option>
                     @foreach($kualitasList as $k)
-                        <option value="{{ $k['id'] }}">{{ $k['nama'] }}</option>
+                        @php
+                            $kId = $k['id'] ?? '';
+                            $kNama = $k['nama'] ?? '';
+                            $kCount = $k['count'] ?? null;
+                        @endphp
+                        <option value="{{ $kId }}">{{ $kNama }}{{ $kCount !== null ? ' (' . $kCount . ')' : '' }}</option>
                     @endforeach
                 </select>
                 <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
