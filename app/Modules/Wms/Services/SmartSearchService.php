@@ -335,7 +335,7 @@ class SmartSearchService
             ->pluck('aggregate', 'kategori_id')
             ->all();
 
-        // Bangun pohon kategori terfilter
+        // Bangun pohon kategori terfilter secara rekursif
         $allCategories = KategoriProduk::where('is_active', true)
             ->orderBy('urutan')
             ->orderBy('nama')
@@ -344,11 +344,22 @@ class SmartSearchService
         $categoriesResult = [];
         if ($allCategories->isNotEmpty()) {
             $grouped = $allCategories->groupBy('parent_id');
+
+            $calcSubtreeCount = function ($catId) use (&$calcSubtreeCount, $grouped, $catCounts): int {
+                $count = $catCounts[$catId] ?? 0;
+                $children = $grouped->get($catId, collect());
+                foreach ($children as $child) {
+                    $count += $calcSubtreeCount($child->id);
+                }
+
+                return $count;
+            };
+
             $roots = $grouped->get(null, collect());
 
             foreach ($roots as $r) {
-                $children = $grouped->get($r->id, collect())->map(function ($c) use ($catCounts) {
-                    $count = $catCounts[$c->id] ?? 0;
+                $children = $grouped->get($r->id, collect())->map(function ($c) use ($calcSubtreeCount) {
+                    $count = $calcSubtreeCount($c->id);
 
                     return [
                         'id' => (string) $c->id,
@@ -358,8 +369,7 @@ class SmartSearchService
                     ];
                 })->filter(fn ($c) => $c['count'] > 0)->values()->all();
 
-                $rootCount = $catCounts[$r->id] ?? 0;
-                $totalCount = $rootCount + array_sum(array_column($children, 'count'));
+                $totalCount = $calcSubtreeCount($r->id);
 
                 if ($totalCount > 0 || empty($activeFilters['brand'] ?? null)) {
                     $categoriesResult[] = [
@@ -442,15 +452,18 @@ class SmartSearchService
             ->all();
 
         foreach ($tipeHpModels as $mdl => $cnt) {
-            $hpModelResult[$mdl] = $cnt;
+            $hpModelResult[$mdl] = (int) $cnt;
         }
 
-        // Fallback dari kolom model_kompatibel dan JSON
+        // Fallback untuk produk yang kompatibilitasnya tersimpan di JSON/model_kompatibel tanpa pivot
         if (! empty($selectedHpMerk)) {
             $jsonRows = (clone $hpModelFilteredQuery)
                 ->where(function ($q) use ($selectedHpMerk) {
                     $q->where('brand_kompatibel', $selectedHpMerk)
                         ->orWhere('kompatibilitas_hp', 'like', '%"merk":"'.$selectedHpMerk.'"%');
+                })
+                ->whereNotIn('produk.id', function ($pQ) {
+                    $pQ->select('produk_id')->from('kompatibilitas_produk_tipe_hp');
                 })
                 ->get(['model_kompatibel', 'kompatibilitas_hp']);
 

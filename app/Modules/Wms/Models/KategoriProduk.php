@@ -92,7 +92,7 @@ class KategoriProduk extends Model
     }
 
     /**
-     * Ambil seluruh ID kategori ini beserta seluruh sub-kategorinya.
+     * Ambil seluruh ID kategori ini beserta seluruh sub-kategorinya secara rekursif.
      * Sangat berguna untuk query produk (misal user pilih kategori utama 'Sparepart HP',
      * semua produk di subkategori LCD, Baterai, dll ikut tersaring secara efisien).
      *
@@ -101,9 +101,13 @@ class KategoriProduk extends Model
     public function semuaKeturunanIds(): array
     {
         $ids = [$this->id];
-        $children = $this->children()->pluck('id')->all();
+        $children = $this->children()->get();
 
-        return array_values(array_unique(array_merge($ids, $children)));
+        foreach ($children as $child) {
+            $ids = array_merge($ids, $child->semuaKeturunanIds());
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**
