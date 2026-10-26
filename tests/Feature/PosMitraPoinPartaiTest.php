@@ -606,4 +606,58 @@ class PosMitraPoinPartaiTest extends TestCase
             ->assertSet('diskonPoin', 0.0)
             ->assertSet('totalAkhir', 95000.0);
     }
+
+    public function test_harga_partai_otomatis_untuk_pelanggan_umum_walk_in_dan_input_set_qty(): void
+    {
+        $this->actingAs($this->kasir);
+
+        // Pelanggan umum/walk-in (tanpa member)
+        // Min Qty partai = 5 pcs, diskon 3%
+        // Beli 5 pcs LCD @ Rp 100.000 (retail) = Subtotal 500.000
+        // Diskon partai 3% dari 500.000 = Rp 15.000
+        $test = Livewire::test(PosKasir::class)
+            ->call('addToCart', $this->produk->id);
+
+        $cartKey = array_key_first($test->get('cart'));
+
+        // Input kuantitas partai secara langsung lewat setQty
+        $test->call('setQty', $cartKey, 5)
+            ->assertSet('diskonPartai', 15000.0)
+            ->assertSet('totalAkhir', 485000.0)
+            ->call('openPaymentModal')
+            ->set('metodeBayar', 'tunai')
+            ->set('jumlahBayar', 500000)
+            ->call('processTransaction');
+
+        $trx = Transaksi::latest('id')->first();
+        $this->assertNotNull($trx);
+        $this->assertEquals(15000.0, (float) $trx->diskon_partai);
+        $this->assertEquals(485000.0, (float) $trx->total_akhir);
+    }
+
+    public function test_harga_partai_bisa_dibatasi_khusus_member_saja_lewat_konfigurasi(): void
+    {
+        $this->actingAs($this->kasir);
+
+        // Set konfigurasi harga partai hanya berlaku untuk member
+        app(KonfigurasiService::class)->set('harga_partai_berlaku_untuk', 'member');
+
+        // 1. Pelanggan umum (walk-in) beli 5 pcs -> TIDAK dapat diskon partai
+        $testUmum = Livewire::test(PosKasir::class)
+            ->call('addToCart', $this->produk->id);
+
+        $cartKeyUmum = array_key_first($testUmum->get('cart'));
+        $testUmum->call('setQty', $cartKeyUmum, 5)
+            ->assertSet('diskonPartai', 0.0)
+            ->assertSet('totalAkhir', 500000.0);
+
+        // 2. Member beli 5 pcs -> DAPAT diskon partai
+        $testMember = Livewire::test(PosKasir::class)
+            ->call('addToCart', $this->produk->id)
+            ->call('setPelanggan', $this->member->id);
+
+        $cartKeyMember = array_key_first($testMember->get('cart'));
+        $testMember->call('setQty', $cartKeyMember, 5)
+            ->assertSet('diskonPartai', 14250.0);
+    }
 }

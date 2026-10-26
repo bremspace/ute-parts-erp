@@ -395,8 +395,24 @@
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                <!-- 1. Nilai Tukar Poin Global -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                <!-- 1. Rasio Earn Poin Global -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                    <label class="block font-semibold text-ink-300 text-[11px]">Rasio Earn Poin (%)</label>
+                    <div class="flex items-center gap-1.5">
+                        <input
+                            type="number"
+                            wire:model="poinEarnPersenGlobal"
+                            min="0"
+                            step="0.01"
+                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white"
+                        />
+                        <span class="text-ink-400 font-bold">%</span>
+                    </div>
+                    <span class="text-[10px] text-ink-400 block">% transaksi dikonversi jadi reward poin belanja</span>
+                </div>
+
+                <!-- 2. Nilai Tukar Poin Global -->
                 <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
                     <label class="block font-semibold text-ink-300 text-[11px]">Nilai Tukar Poin Default (Rp)</label>
                     <div class="flex items-center gap-1.5">
@@ -412,10 +428,10 @@
                     <span class="text-[10px] text-ink-400 block">Default diskon saat penukaran poin di POS kasir</span>
                 </div>
 
-                <!-- 2. Status Diskon Partai -->
+                <!-- 3. Status Diskon Partai -->
                 <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
-                    <label class="block font-semibold text-ink-300 text-[11px]">Harga Partai Member</label>
-                    <label class="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                    <label class="block font-semibold text-ink-300 text-[11px]">Harga Pembelian Partai</label>
+                    <label class="flex items-center gap-2 mt-1 cursor-pointer select-none">
                         <input
                             type="checkbox"
                             wire:model.live="hargaPartaiAktif"
@@ -425,6 +441,18 @@
                             {{ $hargaPartaiAktif ? 'Aktif Otomatis' : 'Nonaktif' }}
                         </span>
                     </label>
+                    @if($hargaPartaiAktif)
+                        <div class="pt-1.5 border-t border-white/5 space-y-1">
+                            <span class="text-[10px] text-ink-400 block font-medium">Sasaran Pembeli:</span>
+                            <select
+                                wire:model.live="hargaPartaiBerlakuUntuk"
+                                class="w-full px-2 py-1 bg-ink-950/80 border border-white/10 rounded-lg text-xs text-ink-200 focus:outline-none focus:border-up-primary"
+                            >
+                                <option value="semua">Semua Pembeli (Umum & Member)</option>
+                                <option value="member">Khusus Member / Mitra</option>
+                            </select>
+                        </div>
+                    @endif
                     <span class="text-[10px] text-ink-400 block">Pilih metode Qty, Nominal, atau keduanya di samping</span>
                 </div>
 

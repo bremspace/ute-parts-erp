@@ -3,6 +3,80 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-26 — Standarisasi & Sinkronisasi Menyeluruh Seluruh Fitur Tambah / Create ✅
+
+- **Standarisasi Quick-Add Pelanggan Servis (`ServisBoard`)**:
+  - Penyeragaman `pelangganBaruForm` dan modal tambah pelanggan servis agar identik dengan POS Kasir & CRM Backoffice (`nama`, `telepon`, `alamat`, `email`, `tipe_konsumen`, `is_reseller`, `kode_agen`, `referral_kode`).
+  - Menghapus validasi raw phone string langsung ke database dan mendelegasikan validasi nomor telepon serta normalisasi format internasional/lokal (`+62` / `62` -> `08`) ke `PelangganService::create()`.
+  - Integrasi pesan feedback transparan bila pelanggan baru yang didaftarkan berstatus `pending` (antre approval member).
+- **Normalisasi Data Telepon & Deduplikasi Pelanggan Servis & CRM Leads**:
+  - `ServisService::terimaUnit` & `bookingOnline`: normalisasi nomor telepon dan otomatis melengkapi `nama_pelanggan` serta `telepon_pelanggan` dari relasi `Pelanggan` jika `pelanggan_id` disediakan.
+  - `LeadService`: normalisasi nomor telepon pada pembuatan lead (`create`), pembaruan (`update`), serta konversi lead menjadi pelanggan (`convertToPelanggan`).
+- **Sinkronisasi Retur Penjualan (`ReturnPenjualanController::store`)**:
+  - Menyelaraskan endpoint REST API retur penjualan dengan parameter lengkap yang didukung oleh `ReturnPenjualanService::buatRetur` (`tipe_penyelesaian`, `tukar_items`, `channel`, `foto_bukti`, `catatan_qc`, `kondisi_barang`, `supplier_id`).
+- **Sinkronisasi Transaksi POS API & Kasir (`PosController::store`)**:
+  - Dukungan multi-satuan item transaksi (`satuan`, `konversi`), perhitungan pengurangan stok fisik berdasarkan satuan dasar (`qty_dasar`), serta perhitungan HPP jurnal proporsional terhadap konversi satuan.
+  - Penyelarasan penjurnalan pembayaran POS: metode non-tunai (transfer/qris) mendebit akun Bank (`110-02`), metode split mendebit Kas Laci (`110-04`) & Bank (`110-02`) secara proporsional sesuai data split.
+  - Penegakan scoping cabang aktif pada `gudang_id` transaksi dan penanganan default nilai `durasi_garansi_hari = 0`.
+- **Sinkronisasi Retur Pembelian Supplier Pool (`ReturnPembelianController::store`)**:
+  - Dukungan retur pembelian langsung dari pool karantina barang rusak per supplier (`buatReturDariPoolSupplier`) selain retur berbasis PO spesifik, serta pilihan metode pengembalian `saldo`, `utang`, dan `kas`.
+- **Penegakan Scoping Cabang pada Livewire Transfer & Opname**:
+  - `TransferTab::saveTransfer()`: validasi gudang asal transfer harus milik cabang aktif.
+  - `OpnameTab::saveOpname()`: validasi gudang stock opname harus milik cabang aktif.
+- **Normalisasi Nomor Telepon Sebelum Validasi Lead**:
+  - `LeadKanban` dan `CrmController`: normalisasi nomor telepon (`+62`/`62` -> `08`) dijalankan sebelum rule validasi `unique:leads,telepon` dievaluasi untuk mencegah lolosnya nomor duplikat berformat beda.
+- **Sinkronisasi Master Katalog & Quick-Add Produk (`ProdukTab`)**:
+  - Menyelaraskan list default `kondisi` pada `ProdukTab::simpanQuickAdd` agar mencakup metadata lengkap (`warna`, `hex`, `keterangan`, dan opsi `rusak`) sesuai definisi di `SettingsRbac::getKondisiList()`.
+  - Normalisasi nomor telepon dan pencatatan audit log saat supplier baru ditambahkan lewat quick-add di modal produk.
+- **Standarisasi Pembuatan Supplier (WMS Controller & PoTab)**:
+  - Penyelarasan kolom `termin_hari` (dan alias kompatibilitas `termin_hutang_hari`), `kontak`, `telepon`, `alamat` antara Livewire PO Tab dan API `WmsController::storeSupplier`.
+  - Normalisasi nomor telepon berformat internasional (`+62` / `62` -> `08`) secara konsisten.
+  - Penambahan audit trail pencatatan aktivitas (`AuditService::catat`) saat supplier baru dibuat via Livewire maupun REST API.
+- **Perbaikan Feedback Aset Tetap (`AsetRegister`)**:
+  - Menjaga nama aset sebelum `resetForm()` pada `AsetRegister::simpan()` sehingga pesan alert sukses menampilkan nama aset yang baru didaftarkan secara akurat.
+- **Standarisasi & Sinkronisasi Pembuatan Purchase Order (`WmsController::storePo`)**:
+  - Penyelarasan perhitungan item PO: API `storePo` kini menghitung dan menyimpan atribut `satuan`, `konversi`, dan `jumlah_dasar` secara otomatis persis seperti `PoTab::simpanPo`, mencegah ketidaksinkronan data multi-satuan saat penerimaan barang (GRN).
+- **Penegakan Cabang Scoping pada Seluruh Endpoint Penambahan WMS**:
+  - Penambahan guardrail kepemilikan cabang aktif pada `WmsController::storeRak`, `updateRak`, `storeOpname`, `storeTransfer`, dan `storePo` untuk menjamin integritas multi-cabang (mencegah penambahan data ke gudang cabang lain).
+- **Sinkronisasi Pembuatan User RBAC & Tier Membership CRM**:
+  - `RbacController::store()`: menetapkan flag `is_default => true` pada cabang pertama user pada pivot `user_cabang`, menyelaraskan perilaku dengan `SettingsRbac::simpanUser()`.
+  - `AkuntingController::storeCoa()`: melengkapi pencatatan audit log `AuditService::catat` saat akun COA baru dibuat.
+  - `CrmController::storeTier()`: menyinkronkan field `poin_redeem_rupiah` dan sinkronisasi otomatis konfigurasi diskon (`diskon_{kode}`) ke `konfigurasi` saat tier baru dibuat/diubah.
+- **Testing & Quality Assurance**:
+  - Menambahkan test suite komprehensif `tests/Feature/StandarisasiFiturTambahTest.php` (10 test, 51 assertions) mencakup Servis quick-add, Supplier creation, PO items multi-satuan, branch scoping guards, RBAC default branch, CRM tier sync, Return Penjualan API extended attributes, Lead normalization & conversion, Servis fallback customer, dan Aset Register alert. Lulus 100%.
+
+## 2026-10-26 — Sentralisasi Pendaftaran Pelanggan & Rekonsiliasi Pengaturan Tier Loyalti ✅
+
+- **Sentralisasi Pendaftaran Pelanggan (`PelangganService::create`)**:
+  - Penyeragaman format validasi dan normalisasi nomor telepon internasional/lokal (`+62` / `62` otomatis menjadi `08`).
+  - Penyelarasan alur registrasi pelanggan baru di seluruh kanal (Web `/daftar-pelanggan`, POS Kasir, dan CRM Backoffice) agar melalui satu pintu `PelangganService::create()`.
+  - Integrasi workflow approval member: jika terdapat aturan approval aktif untuk entitas `member`, status pendaftaran diset `pending` dan antre di approval owner/admin. Jika tidak ada aturan aktif, pendaftaran otomatis aktif langsung (`aktif`).
+  - Penambahan field klasifikasi mitra/pelanggan (`tipe_konsumen`, `kode_agen`, `referral_kode`, `is_reseller`) pada form tambah pelanggan cepat di POS Kasir dan modal `pelanggan-baru-modal.blade.php`.
+- **Rekonsiliasi Tier Manfaat & Strategi Loyalti (CRM & RBAC Settings)**:
+  - Sinkronisasi bidirectional diskon tier membership (`diskon_persen`) dan konfigurasi diskon per tier (`diskon_{kode}`) antara CRM Dashboard dan Pengaturan Loyalitas RBAC (`SettingsRbac`).
+  - Penambahan kontrol input `poinEarnPersenGlobal` pada card pengaturan loyalitas global di CRM Dashboard.
+  - Pembaruan `TierService::hitungPoin()` untuk menghitung poin secara dinamis berdasarkan konfigurasi rasio earn poin transaksi (`poin_earn_persen`), rasio redeem poin, dan pengali tier (`poin_multiplier`), dengan fallback default 1 poin / Rp 1.000.
+- **Testing & Quality Assurance**:
+  - Penambahan suite test `tests/Feature/PelangganDanLoyaltiReconciliationTest.php` untuk verifikasi normalisasi nomor telepon, workflow approval member via `PelangganService`, pendaftaran kasir POS, kalkulasi dinamis poin tier loyalti, dan sinkronisasi diskon tier RBAC.
+  - Seluruh pengujian `MemberApprovalWorkflowTest`, `PosMitraPoinPartaiTest`, dan `PelangganDanLoyaltiReconciliationTest` lulus 100%.
+
+## 2026-10-26 — Otomasi Skema Pembelian Partai & Penetapan Lokasi Rak Default Input GRN ✅
+
+- **Harga Partai Otomatis (POS & CRM)**:
+  - Penambahan konfigurasi `harga_partai_berlaku_untuk` ('semua' | 'member', default 'semua') di `KonfigurasiService` dan form pengaturan CRM Dashboard.
+  - POS Kasir (`PosKasir::hitungDiskonPartai`) otomatis menghitung dan memberikan diskon partai saat belanja memenuhi batas minimum kuantitas atau nominal, baik untuk pelanggan umum/walk-in maupun member.
+  - Penambahan method `setQty` dan input kuantitas numerik langsung pada keranjang kasir (`cart-content.blade.php`) untuk mempermudah transaksi partai kuantitas besar.
+  - Pemicu otomatis `hitungDiskonPartai` saat kasir mengubah harga fleksibel.
+  - Penambahan label simulasi diskon partai otomatis pada modal diskon POS.
+- **Penetapan Lokasi Rak Default Penerimaan GRN**:
+  - `GrnTab::openGrnModal`: otomatis mendeteksi dan menetapkan rak default produk berdasarkan stok produk di gudang tujuan (prioritas varian sama), rak serupa di gudang lain, atau auto-assign bila gudang hanya memiliki 1 rak aktif.
+  - `GrnService::resolveDefaultRakId` & `inputGudang`: backend fallback untuk resolusi lokasi rak default saat input penerimaan barang dari PO tidak menyertakan rak secara eksplisit.
+  - Petugas tetap memiliki fleksibilitas penuh untuk memindahkan lokasi rak secara manual saat input GRN.
+- **Testing & Quality Assurance**:
+  - Menambahkan pengujian di `tests/Feature/PosMitraPoinPartaiTest.php` untuk verifikasi harga partai otomatis pelanggan umum, input `setQty`, dan pembatasan khusus member via konfigurasi.
+  - Menambahkan pengujian di `tests/Feature/GrnTest.php` untuk alur otomasi penetapan rak default dan override pemindahan rak secara manual.
+  - Semua 50 pengujian pada suite `PosMitraPoinPartaiTest` dan `GrnTest` lulus 100%.
+
 ## 2026-10-26 — Model Gadget Terverifikasi Klikabel, Auto-Select Varian/Catatan, Sinkronisasi Checkout & Struk Thermal ✅
 
 - **Katalog Detail Web Konsumen (`/shop/{slug}`)**:

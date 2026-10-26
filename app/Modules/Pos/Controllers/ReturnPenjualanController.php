@@ -59,9 +59,18 @@ class ReturnPenjualanController extends Controller
             'transaksi_id' => 'required|exists:transaksi,id',
             'alasan' => 'required|string|max:500',
             'metode_pengembalian' => 'nullable|in:kas,piutang,saldo',
+            'tipe_penyelesaian' => 'nullable|in:refund,tukar_produk',
+            'channel' => 'nullable|string|max:50',
+            'foto_bukti' => 'nullable|array',
+            'catatan_qc' => 'nullable|string|max:1000',
+            'tukar_items' => 'nullable|array',
+            'tukar_items.*.produk_id' => 'required_with:tukar_items|exists:produk,id',
+            'tukar_items.*.jumlah' => 'required_with:tukar_items|numeric|min:0.01',
             'items' => 'required|array|min:1',
             'items.*.transaksi_item_id' => 'required|exists:transaksi_item,id',
             'items.*.jumlah' => 'required|numeric|min:0.01',
+            'items.*.kondisi_barang' => 'nullable|in:bagus,rusak',
+            'items.*.supplier_id' => 'nullable|exists:supplier,id',
             'items.*.sn' => 'nullable|array',
         ]);
 
@@ -78,7 +87,12 @@ class ReturnPenjualanController extends Controller
                 $request->items,
                 $request->alasan,
                 $request->input('metode_pengembalian', 'kas'),
-                auth()->id()
+                auth()->id(),
+                $request->input('tipe_penyelesaian', 'refund'),
+                $request->input('tukar_items', []),
+                $request->input('channel', $transaksi->sumber ?? 'pos'),
+                $request->input('foto_bukti', []),
+                $request->input('catatan_qc')
             );
 
             return $this->success(

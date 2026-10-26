@@ -51,9 +51,12 @@ class RbacController extends Controller
 
         $user->assignRole($request->role);
 
-        foreach ($request->cabang_ids as $cabangId) {
-            $user->cabangs()->attach($cabangId);
+        $cabangIds = array_map('intval', $request->cabang_ids);
+        $syncData = [];
+        foreach ($cabangIds as $idx => $cabangId) {
+            $syncData[$cabangId] = ['is_default' => ($idx === 0)];
         }
+        $user->cabangs()->sync($syncData);
 
         app(AuditService::class)->catat(
             'User', 'create', $user->id,

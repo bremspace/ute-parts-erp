@@ -45,11 +45,27 @@ class LeadService
         ];
     }
 
+    protected function normalizeData(array $data): array
+    {
+        if (! empty($data['telepon'])) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $data['telepon']);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $data['telepon'] = $clean;
+        }
+
+        return $data;
+    }
+
     /**
      * Create a new lead.
      */
     public function create(array $data): Lead
     {
+        $data = $this->normalizeData($data);
         $validated = Validator::make($data, $this->rules())->validate();
 
         // Default stage is 'baru'
@@ -63,6 +79,7 @@ class LeadService
      */
     public function update(Lead $lead, array $data): Lead
     {
+        $data = $this->normalizeData($data);
         $validated = Validator::make($data, $this->rules(true, $lead->id))->validate();
 
         // Handle stage transitions
@@ -120,15 +137,23 @@ class LeadService
 
         return DB::transaction(function () use ($lead) {
             $pelanggan = null;
-            if ($lead->telepon) {
-                $pelanggan = Pelanggan::where('telepon', $lead->telepon)->first();
+            $leadPhone = $lead->telepon;
+            if ($leadPhone) {
+                $clean = preg_replace('/[^0-9+]/', '', (string) $leadPhone);
+                if (str_starts_with($clean, '+62')) {
+                    $clean = '0'.substr($clean, 3);
+                } elseif (str_starts_with($clean, '62')) {
+                    $clean = '0'.substr($clean, 2);
+                }
+                $leadPhone = $clean;
+                $pelanggan = Pelanggan::where('telepon', $leadPhone)->first();
             }
             if (! $pelanggan && $lead->email) {
                 $pelanggan = Pelanggan::where('email', $lead->email)->first();
             }
 
             if (! $pelanggan) {
-                $telepon = $lead->telepon ?: '08'.str_pad((string) random_int(10000000, 99999999), 10, '0', STR_PAD_LEFT);
+                $telepon = $leadPhone ?: '08'.str_pad((string) random_int(10000000, 99999999), 10, '0', STR_PAD_LEFT);
                 $pelanggan = $this->pelangganService->create([
                     'nama' => $lead->nama,
                     'telepon' => $telepon,

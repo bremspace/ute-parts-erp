@@ -129,9 +129,10 @@ class KonfigurasiService
             'agen_default_persen' => 2.0,     // default % harga agen dari retail
             'mitra_reward_mode' => 'diskon_langsung', // diskon_langsung | komisi_akumulasi
             'harga_partai_aktif' => true,
-            'harga_partai_min_qty' => 5,      // minimal qty 1 produk (atau akumulasi) untuk member
+            'harga_partai_berlaku_untuk' => 'semua', // semua | member
+            'harga_partai_min_qty' => 5,      // minimal qty 1 produk (atau akumulasi)
             'harga_partai_qty_diskon_persen' => 3.0, // diskon % harga partai berbasis qty
-            'harga_partai_min_nominal' => 1000000.0, // minimal belanja keranjang member
+            'harga_partai_min_nominal' => 1000000.0, // minimal belanja keranjang
             'harga_partai_nominal_diskon_persen' => 2.0, // diskon % harga partai berbasis nominal belanja
         ];
     }
@@ -154,6 +155,11 @@ class KonfigurasiService
     public function hargaPartaiAktif(): bool
     {
         return (bool) ($this->get('harga_partai_aktif') ?? true);
+    }
+
+    public function hargaPartaiBerlakuUntuk(): string
+    {
+        return (string) ($this->get('harga_partai_berlaku_untuk') ?? 'semua');
     }
 
     public function hargaPartaiMinQty(): int

@@ -188,12 +188,25 @@ class PosController extends Controller
             'items.*.jumlah' => 'required|integer|min:1',
             'items.*.harga_satuan' => 'required|numeric|min:0',
             'items.*.diskon_nominal' => 'nullable|numeric|min:0',
+            'items.*.satuan' => 'nullable|string|max:50',
+            'items.*.konversi' => 'nullable|numeric|min:0.0001',
             'metode_bayar' => 'required|in:tunai,transfer,qris,split,piutang',
             'jumlah_bayar' => 'required|numeric|min:0',
             'pelanggan_id' => 'nullable|exists:pelanggan,id',
             'gudang_id' => 'nullable|exists:gudang,id',
             'diskon_nominal' => 'nullable|numeric|min:0',
             'diskon_persen' => 'nullable|numeric|min:0',
+            'diskon_poin' => 'nullable|numeric|min:0',
+            'poin_ditukar' => 'nullable|integer|min:0',
+            'diskon_partai' => 'nullable|numeric|min:0',
+            'diskon_manual_alasan' => 'nullable|string',
+            'diskon_manual_authorized_by_id' => 'nullable|exists:users,id',
+            'durasi_garansi_hari' => 'nullable|integer|min:0',
+            'garansi_teks' => 'nullable|string|max:255',
+            'garansi_berakhir_pada' => 'nullable|date',
+            'catatan_garansi' => 'nullable|string|max:1000',
+            'mode_reward_mitra' => 'nullable|string|in:diskon_langsung,komisi,deposit',
+            'komisi_mitra_nominal' => 'nullable|numeric|min:0',
             'catatan' => 'nullable|string',
             'split_detail' => 'nullable|array',
         ]);
@@ -216,10 +229,18 @@ class PosController extends Controller
             return $this->error('Cabang aktif belum dipilih', 400);
         }
 
-        $gudangId = $request->gudang_id ?? session('gudang_id');
-        if (! $gudangId) {
-            $firstGudang = Gudang::where('cabang_id', $cabangId)->first();
-            $gudangId = $firstGudang?->id;
+        if ($request->filled('gudang_id')) {
+            $gudang = Gudang::where('id', $request->gudang_id)->where('cabang_id', $cabangId)->first();
+            if (! $gudang) {
+                return $this->error('Gudang bukan milik cabang aktif', 403);
+            }
+            $gudangId = $gudang->id;
+        } else {
+            $gudangId = session('gudang_id');
+            if (! $gudangId || ! Gudang::where('id', $gudangId)->where('cabang_id', $cabangId)->exists()) {
+                $firstGudang = Gudang::where('cabang_id', $cabangId)->first();
+                $gudangId = $firstGudang?->id;
+            }
         }
 
         try {
@@ -238,6 +259,9 @@ class PosController extends Controller
                 foreach ($request->items as $item) {
                     $produk = Produk::findOrFail($item['produk_id']);
                     $qty = (int) $item['jumlah'];
+                    $satuan = $item['satuan'] ?? ($produk->satuan_unit ?: 'pcs');
+                    $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+                    $qtyDasar = (int) round($qty * $konversi);
                     $hargaSatuan = (float) $item['harga_satuan'];
                     $diskonItem = (float) ($item['diskon_nominal'] ?? 0);
                     $lineSubtotal = max(0, ($hargaSatuan * $qty) - $diskonItem);
@@ -258,14 +282,14 @@ class PosController extends Controller
                         );
                         $stokBisaJual = max(0, $stokFisik - $reserved);
 
-                        if ($stokBisaJual < $qty) {
+                        if ($stokBisaJual < $qtyDasar) {
                             // [B-02 revisi] Exception domain → controller mengembalikan 422
                             // + pesan Indonesia (bukan 500 lewat \Exception generik).
                             throw new StokTidakCukupException(
-                                "Stok tidak mencukupi untuk {$produk->nama}. Tersedia: {$stokBisaJual}, diminta: {$qty}",
+                                "Stok tidak mencukupi untuk {$produk->nama}. Tersedia: {$stokBisaJual}, diminta: {$qtyDasar}",
                                 (int) $produk->id,
                                 (int) $stokBisaJual,
-                                (int) $qty,
+                                (int) $qtyDasar,
                             );
                         }
                     }
@@ -273,6 +297,9 @@ class PosController extends Controller
                     $itemsData[] = [
                         'produk' => $produk,
                         'sku_variant_id' => $item['sku_variant_id'] ?? null,
+                        'satuan' => $satuan,
+                        'konversi' => $konversi,
+                        'qty_dasar' => $qtyDasar,
                         'jumlah' => $qty,
                         'harga_satuan' => $hargaSatuan,
                         'diskon_nominal' => $diskonItem,
@@ -305,6 +332,17 @@ class PosController extends Controller
                     'subtotal' => $subtotal,
                     'diskon_persen' => (float) ($request->diskon_persen ?? 0),
                     'diskon_nominal' => $diskonHeader,
+                    'diskon_poin' => (float) ($request->diskon_poin ?? 0),
+                    'poin_ditukar' => (int) ($request->poin_ditukar ?? 0),
+                    'diskon_partai' => (float) ($request->diskon_partai ?? 0),
+                    'diskon_manual_alasan' => $request->diskon_manual_alasan ?: null,
+                    'diskon_manual_authorized_by_id' => $request->diskon_manual_authorized_by_id,
+                    'durasi_garansi_hari' => (int) ($request->durasi_garansi_hari ?? 0),
+                    'garansi_teks' => $request->garansi_teks,
+                    'garansi_berakhir_pada' => $request->garansi_berakhir_pada,
+                    'catatan_garansi' => $request->catatan_garansi,
+                    'mode_reward_mitra' => $request->mode_reward_mitra,
+                    'komisi_mitra_nominal' => (float) ($request->komisi_mitra_nominal ?? 0),
                     'dpp' => $dpp,
                     'pajak_nominal' => $ppnNominal,
                     'ppn_nominal' => $ppnNominal,
@@ -319,21 +357,17 @@ class PosController extends Controller
 
                 // Buat item transaksi & kurangi stok
                 foreach ($itemsData as $row) {
-                    $satuanItem = $row['satuan'] ?? ($row['produk']->satuan ?: 'pcs');
-                    $konversi = max(0.0001, (float) ($row['konversi'] ?? 1));
-                    $qtyDasar = (int) round($row['jumlah'] * $konversi);
-
                     TransaksiItem::create([
                         'transaksi_id' => $transaksi->id,
                         'produk_id' => $row['produk']->id,
                         'sku_variant_id' => $row['sku_variant_id'],
                         'jumlah' => $row['jumlah'],
-                        'satuan' => $satuanItem,
-                        'konversi' => $konversi,
+                        'satuan' => $row['satuan'],
+                        'konversi' => $row['konversi'],
                         'harga_satuan' => $row['harga_satuan'],
                         'diskon_nominal' => $row['diskon_nominal'],
                         'subtotal' => $row['subtotal'],
-                        'hpp' => (float) $row['hpp'] * $konversi,
+                        'hpp' => (float) $row['hpp'] * $row['konversi'],
                     ]);
 
                     if ($gudangId) {
@@ -348,12 +382,12 @@ class PosController extends Controller
                             produkId: (int) $row['produk']->id,
                             skuVariantId: $row['sku_variant_id'] ?: null,
                             gudangId: (int) $gudangId,
-                            qty: $qtyDasar,
+                            qty: $row['qty_dasar'],
                             jenis: 'penjualan',
                             referensiTipe: Transaksi::class,
                             referensiId: $transaksi->id,
                             userId: auth()->id(),
-                            catatan: "POS Penjualan {$transaksi->no_transaksi} ({$row['jumlah']} {$satuanItem})",
+                            catatan: "POS Penjualan {$transaksi->no_transaksi} ({$row['jumlah']} {$row['satuan']})",
                         );
                     }
                 }
@@ -367,18 +401,33 @@ class PosController extends Controller
                 $jurnalService = app(JurnalService::class);
                 $totalHpp = 0.0;
                 foreach ($itemsData as $row) {
-                    $totalHpp += (float) $row['hpp'] * $row['jumlah'];
+                    $totalHpp += (float) $row['hpp'] * (float) $row['qty_dasar'];
                 }
 
                 $noJurnal = $jurnalService->generateNoJurnal('pos', $cabangId);
                 $kasbon = $request->metode_bayar === 'piutang';
 
-                // Kasbon (piutang): debit Piutang Usaha 120-01, bukan Kas Laci 110-04
-                // [F1-2] Balance: debit totalAkhir = kredit (DPP 410-01 + PPN 220-01)
-                $lines = [
-                    ['akun_kode' => $kasbon ? '120-01' : '110-04', 'debit' => (float) $totalAkhir, 'kredit' => 0],
-                    ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? (float) $dpp : (float) $totalAkhir],  // Pendapatan = DPP
-                ];
+                $debitLines = [];
+                if ($kasbon) {
+                    $debitLines[] = ['akun_kode' => '120-01', 'debit' => (float) $totalAkhir, 'kredit' => 0];
+                } elseif ($request->metode_bayar === 'tunai') {
+                    $debitLines[] = ['akun_kode' => '110-04', 'debit' => (float) $totalAkhir, 'kredit' => 0];
+                } elseif ($request->metode_bayar === 'split' && is_array($request->split_detail)) {
+                    $splitTunai = (float) ($request->split_detail['tunai'] ?? 0);
+                    $splitNonTunai = (float) ($request->split_detail['non_tunai'] ?? 0);
+                    if ($splitTunai > 0) {
+                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $splitTunai, 'kredit' => 0];
+                    }
+                    if ($splitNonTunai > 0) {
+                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $splitNonTunai, 'kredit' => 0];
+                    }
+                } else {
+                    // transfer / qris langsung ke Bank
+                    $debitLines[] = ['akun_kode' => '110-02', 'debit' => (float) $totalAkhir, 'kredit' => 0];
+                }
+
+                $lines = $debitLines;
+                $lines[] = ['akun_kode' => '410-01', 'debit' => 0, 'kredit' => $ppnNominal > 0 ? (float) $dpp : (float) $totalAkhir];
                 // PPN Keluaran → akun 220-01 (kontrak AC F1-2)
                 foreach (app(PajakService::class)->jurnalLines($ppnNominal, $noJurnal, $cabangId, auth()->id() ?? 0) as $ppnLine) {
                     $lines[] = $ppnLine;

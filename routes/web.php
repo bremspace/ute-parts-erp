@@ -14,6 +14,7 @@ use App\Modules\Crm\Livewire\CrmDashboard;
 use App\Modules\Crm\Livewire\LeadKanban;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Dashboard\Livewire\DashboardIndex;
 use App\Modules\Hr\Livewire\HrAbsensiKpiPage;
 use App\Modules\Hr\Livewire\HrSayaPage;
@@ -53,11 +54,11 @@ use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Workflow\Livewire\ApprovalInbox;
-use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\ValidationException;
 
 // ===== Zona Marketplace (public storefront, light mode) =====
 Route::get('/', fn () => redirect('/shop'));
@@ -368,73 +369,17 @@ Route::post('/login-pelanggan', function (Request $request) {
 
 Route::get('/daftar-pelanggan', fn () => view('auth.customer-register'))->name('customer.register');
 Route::post('/daftar-pelanggan', function (Request $request) {
-    // Normalisasi nomor telepon: hapus karakter non-angka dan standardisasi format 62 -> 08
-    $rawTelepon = (string) $request->input('telepon', '');
-    $teleponBersih = preg_replace('/[^0-9]/', '', $rawTelepon);
-    if (str_starts_with($teleponBersih, '628')) {
-        $teleponBersih = '08'.substr($teleponBersih, 3);
-    }
-    $request->merge(['telepon' => $teleponBersih]);
+    try {
+        $pelanggan = app(PelangganService::class)->create($request->all());
 
-    $request->validate([
-        'nama' => 'required|string|max:255',
-        'telepon' => 'required|string|min:9|max:20|unique:pelanggan,telepon',
-        'password' => 'required|string|min:6',
-    ], [
-        'nama.required' => 'Nama lengkap wajib diisi.',
-        'telepon.required' => 'Nomor HP / WhatsApp wajib diisi.',
-        'telepon.unique' => 'Nomor HP / WhatsApp sudah terdaftar. Silakan login ke akun Anda.',
-        'telepon.min' => 'Nomor HP tidak valid (minimal 9 digit).',
-        'password.required' => 'Kata sandi wajib diisi.',
-        'password.min' => 'Kata sandi minimal 6 karakter.',
-    ]);
-
-    $pelanggan = Pelanggan::create([
-        'nama' => trim($request->nama),
-        'telepon' => $teleponBersih,
-        'password' => $request->password,
-        'is_reseller' => false,
-        'status' => 'pending',
-    ]);
-
-    // Ajukan ke workflow approval inbox owner
-    $approvalService = app(ApprovalService::class);
-    $pemohon = ApprovalService::pemohon();
-
-    // Bila belum ada user di database (misal environment fresh test), buat fallback sistem user
-    if (! $pemohon) {
-        $systemUser = User::first() ?? User::factory()->create([
-            'email' => 'system@uteparts.id',
-            'name' => 'System Ute Parts',
-        ]);
-        $pemohon = $systemUser->id;
-    }
-
-    $approvalRequest = $approvalService->ajukan(
-        'member',
-        $pelanggan->id,
-        null,
-        [
-            'amount' => 0,
-            'nama' => $pelanggan->nama,
-            'telepon' => $pelanggan->telepon,
-            'keterangan' => 'Pendaftaran Member/Konsumen Baru',
-        ],
-        $pemohon
-    );
-
-    if (! $approvalRequest) {
-        // Fallback: bila tidak ada approval rule aktif, aktifkan akun member langsung
-        $pelanggan->update([
-            'status' => 'aktif',
-            'approved_at' => now(),
-            'approved_by' => $pemohon,
-        ]);
+        if ($pelanggan->status === 'pending') {
+            return redirect()->route('customer.login')->with('info', 'Pendaftaran berhasil dikirim. Akun member Anda sedang menunggu persetujuan (approval) dari owner sebelum dapat digunakan.');
+        }
 
         return redirect()->route('customer.login')->with('info', 'Pendaftaran berhasil! Akun member Anda sudah aktif dan siap digunakan.');
+    } catch (ValidationException $e) {
+        return back()->withInput($request->only('nama', 'telepon', 'email', 'alamat', 'referral_kode'))->withErrors($e->validator);
     }
-
-    return redirect()->route('customer.login')->with('info', 'Pendaftaran berhasil dikirim. Akun member Anda sedang menunggu persetujuan (approval) dari owner sebelum dapat digunakan.');
 })->middleware('throttle:10,1')->name('customer.register.post');
 
 Route::post('/logout-pelanggan', function () {

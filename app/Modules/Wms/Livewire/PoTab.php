@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Livewire;
 
 use App\Modules\Akunting\Models\AkunCOA;
+use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
@@ -549,6 +550,15 @@ class PoTab extends Component
             'poForm.items' => 'required|array|min:1',
         ]);
 
+        $gudang = Gudang::find($this->poForm['gudang_tujuan_id']);
+        $cabangId = session('cabang_id');
+        $user = auth()->user();
+        if ($cabangId && $gudang && ! isSuperAdminOrOwner($user) && (int) $gudang->cabang_id !== (int) $cabangId) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gudang tujuan PO bukan milik cabang aktif.']);
+
+            return;
+        }
+
         $today = now()->format('Ymd');
         $count = PurchaseOrder::whereDate('created_at', now()->toDateString())->count() + 1;
         $noPo = sprintf('PO-%s-%03d', $today, $count);
@@ -812,9 +822,26 @@ class PoTab extends Component
 
         $this->validate([
             'supplierForm.nama' => 'required|string|max:255',
+            'supplierForm.kontak' => 'nullable|string|max:255',
+            'supplierForm.telepon' => 'nullable|string|max:20',
+            'supplierForm.alamat' => 'nullable|string',
+            'supplierForm.termin_hari' => 'nullable|integer|min:0',
         ]);
 
-        $supplier = Supplier::create($this->supplierForm);
+        $data = $this->supplierForm;
+        if (! empty($data['telepon'])) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $data['telepon']);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $data['telepon'] = $clean;
+        }
+
+        $supplier = Supplier::create($data);
+        app(AuditService::class)->catat('Supplier', 'create', $supplier->id, "Supplier {$supplier->nama} ditambahkan via PO");
+
         if ($this->showPoModal) {
             $this->poForm['supplier_id'] = $supplier->id;
         }

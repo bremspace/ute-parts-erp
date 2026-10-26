@@ -138,10 +138,12 @@ class AsetRegister extends Component
             'form.catatan.max' => 'Catatan maksimal 1000 karakter.',
         ]);
 
+        $namaAset = $this->form['nama'];
+
         // $hargaPerolehan dijamin > 0 (dan sudah berupa float) oleh rule min:1 di atas.
         AsetTetap::create([
             'cabang_id' => $cabangId,
-            'nama' => $this->form['nama'],
+            'nama' => $namaAset,
             'kategori' => $this->form['kategori'],
             'harga_perolehan' => $hargaPerolehan,
             'tanggal_perolehan' => $this->form['tanggal_perolehan'],
@@ -158,7 +160,7 @@ class AsetRegister extends Component
 
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Aset tetap "'.$this->form['nama'].'" berhasil didaftarkan (Rp '.number_format($hargaPerolehan, 0, ',', '.').').',
+            'message' => 'Aset tetap "'.$namaAset.'" berhasil didaftarkan (Rp '.number_format($hargaPerolehan, 0, ',', '.').').',
         ]);
     }
 

@@ -17,6 +17,7 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\PurchaseOrderItem;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Wms\Models\RiwayatPerubahanHarga;
 use App\Modules\Wms\Models\StockMutationLog;
@@ -1223,5 +1224,100 @@ class GrnTest extends TestCase
         $responseGrn->assertSee('Bukti Terima Barang');
         $responseGrn->assertSee($grn->no_grn);
         $responseGrn->assertSee('A5 (Setengah A4)');
+    }
+
+    public function test_grn_otomatis_mengisi_rak_default_produk_dari_stok_atau_gudang(): void
+    {
+        Queue::fake();
+
+        $rakDefault = Rak::create([
+            'gudang_id' => $this->gudang->id,
+            'kode' => 'RAK-A1',
+            'nama' => 'Rak Sparepart Utama',
+            'is_active' => true,
+        ]);
+
+        // Simpan stok awal dengan rak_id
+        StokItem::create([
+            'gudang_id' => $this->gudang->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 5,
+            'cabang_id' => $this->cabang->id,
+            'rak_id' => $rakDefault->id,
+        ]);
+
+        $po = $this->buatPoDikirim(10, 50000);
+
+        // 1. Verifikasi modal Livewire GrnTab otomatis memuat rak default produk
+        $this->actingAs($this->user);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $lw = Livewire::test(GrnTab::class)
+            ->call('openGrnModal', $po->id)
+            ->assertSet('showGrnModal', true);
+
+        $form = $lw->get('grnForm');
+        $this->assertNotEmpty($form['item_qty']);
+        $this->assertEquals($rakDefault->id, $form['item_qty'][0]['rak_id']);
+
+        // 2. Verifikasi GrnService::inputGudang fallback ke rak default jika itemRakId kosong
+        $grn = $this->service()->inputGudang(
+            $po,
+            [$this->produk->id => 10],
+            $this->user->id
+        );
+
+        $this->assertEquals('terima', $grn->status);
+        $this->assertEquals($rakDefault->id, $grn->item_qty_received[0]['rak_id']);
+
+        $stokFresh = StokItem::where('produk_id', $this->produk->id)->where('gudang_id', $this->gudang->id)->first();
+        $this->assertEquals(15, (int) $stokFresh->jumlah);
+        $this->assertEquals($rakDefault->id, $stokFresh->rak_id);
+    }
+
+    public function test_grn_input_gudang_bisa_memindahkan_rak_secara_manual(): void
+    {
+        Queue::fake();
+
+        $rakLama = Rak::create([
+            'gudang_id' => $this->gudang->id,
+            'kode' => 'RAK-LAMA',
+            'nama' => 'Rak Lama',
+            'is_active' => true,
+        ]);
+
+        $rakBaru = Rak::create([
+            'gudang_id' => $this->gudang->id,
+            'kode' => 'RAK-BARU',
+            'nama' => 'Rak Baru',
+            'is_active' => true,
+        ]);
+
+        StokItem::create([
+            'gudang_id' => $this->gudang->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 2,
+            'cabang_id' => $this->cabang->id,
+            'rak_id' => $rakLama->id,
+        ]);
+
+        $po = $this->buatPoDikirim(5, 50000);
+
+        // Petugas secara manual memilih $rakBaru->id
+        $grn = $this->service()->inputGudang(
+            $po,
+            [$this->produk->id => 5],
+            $this->user->id,
+            [],
+            [],
+            [$this->produk->id => $rakBaru->id]
+        );
+
+        $this->assertEquals('terima', $grn->status);
+        $this->assertEquals($rakBaru->id, $grn->item_qty_received[0]['rak_id']);
+
+        $stokFresh = StokItem::where('produk_id', $this->produk->id)->where('gudang_id', $this->gudang->id)->first();
+        $this->assertEquals(7, (int) $stokFresh->jumlah);
+        $this->assertEquals($rakBaru->id, $stokFresh->rak_id);
     }
 }

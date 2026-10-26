@@ -293,10 +293,20 @@ class CrmController extends Controller
             'min_belanja_12bulan' => 'required|numeric|min:0',
             'diskon_persen' => 'required|numeric|min:0|max:100',
             'poin_multiplier' => 'required|numeric|min:0',
+            'poin_redeem_rupiah' => 'nullable|numeric|min:0',
             'urutan' => 'nullable|integer',
         ]);
 
         $tier = TierMembership::create($request->all());
+
+        if (in_array(strtolower($tier->kode), ['silver', 'gold', 'platinum'], true)) {
+            app(KonfigurasiService::class)->set('diskon_'.strtolower($tier->kode), (float) $tier->diskon_persen, 'Sinkron diskon tier '.$tier->nama);
+        }
+
+        app(AuditService::class)->catat(
+            'TierMembership', 'create', $tier->id,
+            "Tier {$tier->nama} dibuat (diskon {$tier->diskon_persen}%, min belanja {$tier->min_belanja_12bulan})"
+        );
 
         return $this->success($tier, 'Tier berhasil dibuat', 201);
     }
@@ -311,10 +321,15 @@ class CrmController extends Controller
             'min_belanja_12bulan' => 'sometimes|numeric|min:0',
             'diskon_persen' => 'sometimes|numeric|min:0|max:100',
             'poin_multiplier' => 'sometimes|numeric|min:0',
+            'poin_redeem_rupiah' => 'nullable|numeric|min:0',
             'is_active' => 'sometimes|boolean',
         ]);
 
         $tier->update($request->all());
+
+        if (in_array(strtolower($tier->kode), ['silver', 'gold', 'platinum'], true)) {
+            app(KonfigurasiService::class)->set('diskon_'.strtolower($tier->kode), (float) $tier->diskon_persen, 'Sinkron diskon tier '.$tier->nama);
+        }
 
         app(AuditService::class)->catat(
             'TierMembership', 'update', $tier->id,
@@ -466,6 +481,16 @@ class CrmController extends Controller
     // [API: CRM-12] Create lead
     public function storeLead(Request $request)
     {
+        if ($request->filled('telepon')) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $request->telepon);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $request->merge(['telepon' => $clean]);
+        }
+
         $request->validate([
             'sumber' => 'required|string|in:walkin,phone,website,referral,social_media,marketplace,lain',
             'stage' => 'sometimes|in:baru,kontak,kualifikasi,negosiasi,won,lost',
@@ -489,6 +514,16 @@ class CrmController extends Controller
     public function updateLead(Request $request, $id)
     {
         $lead = Lead::forCabang()->findOrFail($id);
+
+        if ($request->filled('telepon')) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $request->telepon);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $request->merge(['telepon' => $clean]);
+        }
 
         $request->validate([
             'sumber' => 'sometimes|string|in:walkin,phone,website,referral,social_media,marketplace,lain',

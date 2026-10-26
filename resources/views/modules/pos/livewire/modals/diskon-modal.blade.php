@@ -335,7 +335,7 @@
                     </div>
                     @if($diskonPartai > 0)
                         <div class="flex justify-between text-up-mint font-semibold">
-                            <span>- Diskon Partai (Member):</span>
+                            <span>- Diskon Partai ({{ $alasanPartai ?: 'Otomatis' }}):</span>
                             <span class="tabular-nums">-Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
                         </div>
                     @endif

@@ -106,6 +106,13 @@ class WmsController extends Controller
             'items.*.jumlah' => 'required|integer|min:1',
         ]);
 
+        $gudangAsal = Gudang::findOrFail($request->gudang_asal_id);
+        $cabangId = session('cabang_id');
+        $user = auth()->user();
+        if ($cabangId && ! isSuperAdminOrOwner($user) && (int) $gudangAsal->cabang_id !== (int) $cabangId) {
+            return $this->error('Gudang asal transfer bukan milik cabang aktif', 403);
+        }
+
         // [T-41] Validasi server: qty_transfer ≤ stok tersedia gudang sumber
         // (stok_fisik − stok_dikunci draft transfer pending) — per item, blokir submit.
         //
@@ -305,6 +312,13 @@ class WmsController extends Controller
             'rak_id' => 'nullable|exists:rak,id', // [T-14] scope sesi per rak/lokasi
             'catatan' => 'nullable|string',
         ]);
+
+        $gudang = Gudang::findOrFail($request->gudang_id);
+        $cabangId = session('cabang_id');
+        $user = auth()->user();
+        if ($cabangId && ! isSuperAdminOrOwner($user) && (int) $gudang->cabang_id !== (int) $cabangId) {
+            return $this->error('Gudang stock opname bukan milik cabang aktif', 403);
+        }
 
         $today = now()->format('Ymd');
         $count = StokOpname::whereDate('created_at', now()->toDateString())->count() + 1;
@@ -532,11 +546,28 @@ class WmsController extends Controller
     {
         $request->validate([
             'nama' => 'required|string|max:255',
+            'kontak' => 'nullable|string|max:255',
             'telepon' => 'nullable|string|max:20',
+            'alamat' => 'nullable|string',
             'termin_hari' => 'nullable|integer|min:0',
+            'termin_hutang_hari' => 'nullable|integer|min:0',
         ]);
 
-        $supplier = Supplier::create($request->all());
+        $data = $request->only(['nama', 'kontak', 'telepon', 'alamat', 'is_active']);
+        if (! empty($data['telepon'])) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $data['telepon']);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $data['telepon'] = $clean;
+        }
+        $data['termin_hari'] = (int) ($request->termin_hari ?? $request->termin_hutang_hari ?? 30);
+
+        $supplier = Supplier::create($data);
+
+        app(AuditService::class)->catat('Supplier', 'create', $supplier->id, "Supplier {$supplier->nama} berhasil dibuat");
 
         return $this->success($supplier, 'Supplier berhasil dibuat', 201);
     }
@@ -550,10 +581,27 @@ class WmsController extends Controller
             'telepon' => 'nullable|string|max:20',
             'alamat' => 'nullable|string',
             'termin_hari' => 'nullable|integer|min:0',
+            'termin_hutang_hari' => 'nullable|integer|min:0',
             'is_active' => 'nullable|boolean',
         ]);
 
-        $supplier->update($request->all());
+        $data = $request->only(['nama', 'kontak', 'telepon', 'alamat', 'is_active']);
+        if (! empty($data['telepon'])) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $data['telepon']);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $data['telepon'] = $clean;
+        }
+        if ($request->has('termin_hari') || $request->has('termin_hutang_hari')) {
+            $data['termin_hari'] = (int) ($request->termin_hari ?? $request->termin_hutang_hari);
+        }
+
+        $supplier->update($data);
+
+        app(AuditService::class)->catat('Supplier', 'update', $supplier->id, "Supplier {$supplier->nama} diperbarui");
 
         return $this->success($supplier, 'Supplier berhasil diperbarui');
     }
@@ -593,6 +641,13 @@ class WmsController extends Controller
             'zona' => 'nullable|string|max:50',
         ]);
 
+        $gudang = Gudang::findOrFail($request->gudang_id);
+        $cabangId = session('cabang_id');
+        $user = auth()->user();
+        if ($cabangId && ! isSuperAdminOrOwner($user) && (int) $gudang->cabang_id !== (int) $cabangId) {
+            return $this->error('Gudang rak bukan milik cabang aktif', 403);
+        }
+
         $rak = Rak::create($request->all());
 
         return $this->success($rak, 'Rak berhasil dibuat', 201);
@@ -600,7 +655,13 @@ class WmsController extends Controller
 
     public function updateRak(Request $request, $id)
     {
-        $rak = Rak::findOrFail($id);
+        $rak = Rak::with('gudang')->findOrFail($id);
+        $cabangId = session('cabang_id');
+        $user = auth()->user();
+        if ($cabangId && ! isSuperAdminOrOwner($user) && $rak->gudang && (int) $rak->gudang->cabang_id !== (int) $cabangId) {
+            return $this->error('Rak bukan milik cabang aktif', 403);
+        }
+
         $request->validate([
             'nama' => 'required|string|max:255',
             'kode' => 'required|string|max:20|unique:rak,kode,'.$id,
@@ -714,9 +775,18 @@ class WmsController extends Controller
             'items' => 'required|array|min:1',
             'items.*.produk_id' => 'required|exists:produk,id',
             'items.*.sku_variant_id' => 'nullable|exists:sku_variants,id',
+            'items.*.satuan' => 'nullable|string|max:50',
+            'items.*.konversi' => 'nullable|numeric|min:0.0001',
             'items.*.harga_beli' => 'required|numeric|min:0',
-            'items.*.jumlah' => 'required|integer|min:1',
+            'items.*.jumlah' => 'required|numeric|min:0.01',
         ]);
+
+        $gudangTujuan = Gudang::findOrFail($request->gudang_tujuan_id);
+        $cabangId = session('cabang_id');
+        $user = auth()->user();
+        if ($cabangId && ! isSuperAdminOrOwner($user) && (int) $gudangTujuan->cabang_id !== (int) $cabangId) {
+            return $this->error('Gudang tujuan PO bukan milik cabang aktif', 403);
+        }
 
         $today = now()->format('Ymd');
         $count = PurchaseOrder::whereDate('created_at', now()->toDateString())->count() + 1;
@@ -725,7 +795,7 @@ class WmsController extends Controller
         return DB::transaction(function () use ($request, $noPo) {
             $total = 0;
             foreach ($request->items as $i) {
-                $total += (float) $i['harga_beli'] * (int) $i['jumlah'];
+                $total += (float) $i['harga_beli'] * (float) $i['jumlah'];
             }
 
             $po = PurchaseOrder::create([
@@ -744,13 +814,20 @@ class WmsController extends Controller
             ]);
 
             foreach ($request->items as $i) {
+                $konversi = max(0.0001, (float) ($i['konversi'] ?? 1));
+                $jumlah = (float) $i['jumlah'];
+                $jumlahDasar = round($jumlah * $konversi, 2);
+
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $po->id,
                     'produk_id' => $i['produk_id'],
                     'sku_variant_id' => $i['sku_variant_id'] ?? null,
+                    'satuan' => $i['satuan'] ?? null,
+                    'konversi' => $konversi,
                     'harga_beli' => (float) $i['harga_beli'],
-                    'jumlah' => (int) $i['jumlah'],
-                    'subtotal' => (float) $i['harga_beli'] * (int) $i['jumlah'],
+                    'jumlah' => $jumlah,
+                    'jumlah_dasar' => $jumlahDasar,
+                    'subtotal' => (float) $i['harga_beli'] * $jumlah,
                 ]);
             }
 

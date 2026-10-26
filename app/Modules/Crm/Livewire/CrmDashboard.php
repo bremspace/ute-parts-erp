@@ -17,6 +17,7 @@ use Database\Seeders\TierMembershipSeeder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -89,9 +90,13 @@ class CrmDashboard extends Component
     ];
 
     // Konfigurasi Global Loyalty & Partai
+    public float $poinEarnPersenGlobal = 10.0;
+
     public float $poinRedeemRupiahGlobal = 100.0;
 
     public bool $hargaPartaiAktif = true;
+
+    public string $hargaPartaiBerlakuUntuk = 'semua';
 
     public bool $hargaPartaiOpsiQty = true;
 
@@ -108,8 +113,10 @@ class CrmDashboard extends Component
     public function mount(): void
     {
         $config = app(KonfigurasiService::class);
+        $this->poinEarnPersenGlobal = (float) ($config->get('poin_earn_persen') ?? $config->defaults()['poin_earn_persen'] ?? 10.0);
         $this->poinRedeemRupiahGlobal = $config->poinRedeemRupiah();
         $this->hargaPartaiAktif = $config->hargaPartaiAktif();
+        $this->hargaPartaiBerlakuUntuk = $config->hargaPartaiBerlakuUntuk();
 
         $minQty = $config->hargaPartaiMinQty();
         $qtyDiskon = $config->hargaPartaiQtyDiskonPersen();
@@ -182,49 +189,29 @@ class CrmDashboard extends Component
             return;
         }
 
-        if (empty($this->pelangganBaruForm['email'])) {
-            $this->pelangganBaruForm['email'] = null;
-        }
-        if (empty($this->pelangganBaruForm['kode_agen'])) {
-            $this->pelangganBaruForm['kode_agen'] = null;
-        }
-        if (empty($this->pelangganBaruForm['referral_kode'])) {
-            $this->pelangganBaruForm['referral_kode'] = null;
-        }
-        if (empty($this->pelangganBaruForm['tanggal_lahir'])) {
-            $this->pelangganBaruForm['tanggal_lahir'] = null;
-        }
-        if (empty($this->pelangganBaruForm['alamat'])) {
-            $this->pelangganBaruForm['alamat'] = null;
-        }
+        try {
+            $pelanggan = app(PelangganService::class)->create(
+                $this->pelangganBaruForm,
+                session('cabang_id'),
+                auth()->id()
+            );
 
-        $this->validate([
-            'pelangganBaruForm.nama' => 'required|string|max:255',
-            'pelangganBaruForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon',
-            'pelangganBaruForm.email' => 'nullable|email|unique:pelanggan,email',
-            'pelangganBaruForm.kode_agen' => 'nullable|string|max:40|unique:pelanggan,kode_agen',
-            'pelangganBaruForm.referral_kode' => 'nullable|string|max:40',
-        ]);
+            $this->showPelangganBaruModal = false;
+            $this->pelangganBaruForm = [
+                'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
+                'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail',
+                'kode_agen' => '', 'referral_kode' => '',
+            ];
 
-        $pelanggan = app(PelangganService::class)->create([
-            'nama' => $this->pelangganBaruForm['nama'],
-            'telepon' => $this->pelangganBaruForm['telepon'],
-            'email' => $this->pelangganBaruForm['email'] ?: null,
-            'alamat' => $this->pelangganBaruForm['alamat'] ?: null,
-            'tanggal_lahir' => $this->pelangganBaruForm['tanggal_lahir'] ?: null,
-            'is_reseller' => $this->pelangganBaruForm['is_reseller'] || $this->pelangganBaruForm['tipe_konsumen'] === 'agen' || $this->pelangganBaruForm['tipe_konsumen'] === 'reseller',
-            'tipe_konsumen' => $this->pelangganBaruForm['tipe_konsumen'] ?: 'retail',
-            'kode_agen' => $this->pelangganBaruForm['kode_agen'] ?: null,
-            'referral_kode' => $this->pelangganBaruForm['referral_kode'] ?: null,
-        ]);
-
-        $this->showPelangganBaruModal = false;
-        $this->pelangganBaruForm = [
-            'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
-            'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail',
-            'kode_agen' => '', 'referral_kode' => '',
-        ];
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan (tersedia di POS & Servis)']);
+            $pesan = $pelanggan->status === 'pending'
+                ? 'Pelanggan baru disimpan dan diajukan ke approval owner (status: pending)'
+                : 'Pelanggan baru disimpan (tersedia di POS & Servis)';
+            $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
+        } catch (ValidationException $e) {
+            $this->setErrorBag($e->validator->getMessageBag());
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     public function openEditPelangganModal(int $id): void
@@ -580,10 +567,15 @@ class CrmDashboard extends Component
         ]);
 
         if ($this->tierForm['id']) {
-            TierMembership::findOrFail($this->tierForm['id'])->update($this->tierForm);
+            $tier = TierMembership::findOrFail($this->tierForm['id']);
+            $tier->update($this->tierForm);
+            $kode = strtolower($tier->kode);
+            app(KonfigurasiService::class)->set("diskon_{$kode}", (float) $tier->diskon_persen, "Diskon tier {$tier->nama}");
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Tier diperbarui']);
         } else {
-            TierMembership::create($this->tierForm);
+            $tier = TierMembership::create($this->tierForm);
+            $kode = strtolower($tier->kode);
+            app(KonfigurasiService::class)->set("diskon_{$kode}", (float) $tier->diskon_persen, "Diskon tier {$tier->nama}");
             $this->dispatch('alert', ['type' => 'success', 'message' => 'Tier baru dibuat']);
         }
 
@@ -597,10 +589,13 @@ class CrmDashboard extends Component
         }
 
         $rules = [
+            'poinEarnPersenGlobal' => 'required|numeric|min:0|max:100',
             'poinRedeemRupiahGlobal' => 'required|numeric|min:0',
         ];
 
         if ($this->hargaPartaiAktif) {
+            $rules['hargaPartaiBerlakuUntuk'] = 'required|in:semua,member';
+
             if (! $this->hargaPartaiOpsiQty && ! $this->hargaPartaiOpsiNominal) {
                 $this->dispatch('alert', [
                     'type' => 'error',
@@ -624,8 +619,10 @@ class CrmDashboard extends Component
         $this->validate($rules);
 
         $config = app(KonfigurasiService::class);
+        $config->set('poin_earn_persen', (float) $this->poinEarnPersenGlobal, 'Rasio earn poin dari nominal transaksi (%)');
         $config->set('poin_redeem_rupiah', (float) $this->poinRedeemRupiahGlobal, 'Nilai tukar 1 poin loyalitas menjadi rupiah (diskon)');
         $config->set('harga_partai_aktif', (bool) $this->hargaPartaiAktif, 'Status aktif diskon harga partai member');
+        $config->set('harga_partai_berlaku_untuk', $this->hargaPartaiBerlakuUntuk, 'Cakupan pembeli harga partai (semua / member)');
 
         $finalMinQty = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiQty) ? max(1, (int) $this->hargaPartaiMinQty) : 0;
         $finalQtyDiskon = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiQty) ? (float) $this->hargaPartaiQtyDiskon : 0.0;

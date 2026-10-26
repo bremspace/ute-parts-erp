@@ -209,7 +209,11 @@ class PosKasir extends Component
 
     public bool $showPelangganBaruModal = false;
 
-    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => ''];
+    public array $pelangganBaruForm = [
+        'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
+        'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail',
+        'kode_agen' => '', 'referral_kode' => '',
+    ];
 
     // [T-09] Kas sesi modal
     public bool $showKasModal = false;
@@ -961,21 +965,29 @@ class PosKasir extends Component
         $this->diskonPartai = 0.0;
         $this->alasanPartai = '';
 
-        if (! $this->customer) {
-            return;
-        }
-
         $config = app(KonfigurasiService::class);
         if (! $config->hargaPartaiAktif()) {
             return;
         }
 
-        $isMember = $this->customer->tier_membership_id !== null
-            || (bool) $this->customer->is_reseller
-            || in_array($this->customer->tipe_konsumen, ['reseller', 'agen'], true);
-
-        if (! $isMember) {
+        // Mode komisi akumulasi pada reseller/agen tidak menerapkan diskon langsung
+        if ($this->modeRewardMitra === 'komisi_akumulasi') {
             return;
+        }
+
+        $berlakuUntuk = $config->hargaPartaiBerlakuUntuk();
+        if ($berlakuUntuk === 'member') {
+            if (! $this->customer) {
+                return;
+            }
+
+            $isMember = $this->customer->tier_membership_id !== null
+                || (bool) $this->customer->is_reseller
+                || in_array($this->customer->tipe_konsumen, ['reseller', 'agen'], true);
+
+            if (! $isMember) {
+                return;
+            }
         }
 
         $totalQty = array_reduce($this->cart, fn ($carry, $item) => $carry + (int) ($item['qty'] ?? 1), 0);
@@ -1707,9 +1719,32 @@ class PosKasir extends Component
 
         $this->cart[$itemKey]['harga'] = $harga;
         $this->cart[$itemKey]['subtotal'] = $this->cart[$itemKey]['qty'] * $harga;
+        $this->hitungDiskonPartai();
         $this->resetComputedTotals();
         $this->recalcPajak();
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Harga fleksibel diupdate']);
+    }
+
+    /**
+     * Set kuantitas item keranjang langsung secara numerik (mempermudah pembelian partai).
+     */
+    public function setQty(string $itemKey, int|string $qty): void
+    {
+        if (! isset($this->cart[$itemKey])) {
+            return;
+        }
+
+        $targetQty = (int) $qty;
+        if ($targetQty <= 0) {
+            $this->removeFromCart($itemKey);
+
+            return;
+        }
+
+        $delta = $targetQty - (int) $this->cart[$itemKey]['qty'];
+        if ($delta !== 0) {
+            $this->updateQty($itemKey, $delta);
+        }
     }
 
     /**
@@ -2644,7 +2679,11 @@ class PosKasir extends Component
     /** [T-18] Dipanggil komponen <x-customer-picker> → buka modal create pelanggan. */
     public function openPelangganBaru()
     {
-        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => ''];
+        $this->pelangganBaruForm = [
+            'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
+            'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail',
+            'kode_agen' => '', 'referral_kode' => '',
+        ];
         $this->showPelangganBaruModal = true;
     }
 
@@ -2667,26 +2706,30 @@ class PosKasir extends Component
 
     public function simpanPelangganBaru()
     {
-        $this->validate([
-            'pelangganBaruForm.nama' => 'required|string|max:255',
-            'pelangganBaruForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon',
-            'pelangganBaruForm.email' => 'nullable|email|unique:pelanggan,email',
-        ]);
+        try {
+            $pelanggan = app(PelangganService::class)->create(
+                $this->pelangganBaruForm,
+                session('cabang_id'),
+                auth()->id()
+            );
 
-        $pelanggan = app(PelangganService::class)->create([
-            'nama' => $this->pelangganBaruForm['nama'],
-            'telepon' => $this->pelangganBaruForm['telepon'],
-            'email' => $this->pelangganBaruForm['email'] ?: null,
-            'alamat' => $this->pelangganBaruForm['alamat'] ?: null,
-            'tanggal_lahir' => $this->pelangganBaruForm['tanggal_lahir'] ?: null,
-            'is_reseller' => false,
-        ]);
+            $this->setPelanggan($pelanggan->id);
+            $this->showPelangganBaruModal = false;
+            $this->pelangganBaruForm = [
+                'nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '',
+                'tanggal_lahir' => '', 'is_reseller' => false, 'tipe_konsumen' => 'retail',
+                'kode_agen' => '', 'referral_kode' => '',
+            ];
 
-        $this->setPelanggan($pelanggan->id);
-        $this->showPelangganBaruModal = false;
-        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'email' => '', 'alamat' => '', 'tanggal_lahir' => ''];
-
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan & dipilih (sinkron ke CRM)']);
+            $pesan = $pelanggan->status === 'pending'
+                ? 'Pelanggan baru disimpan dan diajukan ke approval owner (status: pending)'
+                : 'Pelanggan baru disimpan & dipilih (sinkron ke CRM)';
+            $this->dispatch('alert', ['type' => 'success', 'message' => $pesan]);
+        } catch (ValidationException $e) {
+            $this->setErrorBag($e->validator->getMessageBag());
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     // ==================== [T-09] KAS SESI ====================

@@ -1934,10 +1934,11 @@ class ProdukTab extends Component
                 }
                 $config = app(KonfigurasiService::class);
                 $list = $config->get('master_produk_kondisi_list') ?? [
-                    ['kode' => 'baru', 'nama' => 'Baru'],
-                    ['kode' => 'oem', 'nama' => 'OEM'],
-                    ['kode' => 'compatible', 'nama' => 'Compatible'],
-                    ['kode' => 'bekas', 'nama' => 'Bekas / Copotan'],
+                    ['kode' => 'baru', 'nama' => 'Baru', 'warna' => 'emerald', 'hex' => '#10b981', 'keterangan' => 'Baru (Segel Pabrik / Fresh Stock)', 'is_active' => true],
+                    ['kode' => 'oem', 'nama' => 'OEM', 'warna' => 'blue', 'hex' => '#3b82f6', 'keterangan' => 'OEM (Original Equipment Manufacturer)', 'is_active' => true],
+                    ['kode' => 'compatible', 'nama' => 'Compatible', 'warna' => 'cyan', 'hex' => '#06b6d4', 'keterangan' => 'Compatible (Part Pihak Ketiga Berkualitas)', 'is_active' => true],
+                    ['kode' => 'bekas', 'nama' => 'Bekas / Copotan', 'warna' => 'amber', 'hex' => '#f59e0b', 'keterangan' => 'Bekas / Copotan Unit Mesin Normal', 'is_active' => true],
+                    ['kode' => 'rusak', 'nama' => 'Rusak / Kanibal', 'warna' => 'rose', 'hex' => '#ef4444', 'keterangan' => 'Rusak / Bahan Kanibal Part Teknisi', 'is_active' => true],
                 ];
                 $ada = false;
                 foreach ($list as &$k) {
@@ -1948,7 +1949,14 @@ class ProdukTab extends Component
                     }
                 }
                 if (! $ada) {
-                    $list[] = ['kode' => $kode, 'nama' => $nama, 'is_active' => true];
+                    $list[] = [
+                        'kode' => $kode,
+                        'nama' => $nama,
+                        'warna' => 'emerald',
+                        'hex' => '#10b981',
+                        'keterangan' => $nama,
+                        'is_active' => true,
+                    ];
                 }
                 $config->set('master_produk_kondisi_list', $list);
                 if ($this->showEditProdukModal) {
@@ -1960,16 +1968,29 @@ class ProdukTab extends Component
                 break;
 
             case 'supplier':
+                $teleponSupplier = ! empty($this->quickAddForm['telepon']) ? trim($this->quickAddForm['telepon']) : null;
+                if ($teleponSupplier) {
+                    $clean = preg_replace('/[^0-9+]/', '', (string) $teleponSupplier);
+                    if (str_starts_with($clean, '+62')) {
+                        $clean = '0'.substr($clean, 3);
+                    } elseif (str_starts_with($clean, '62')) {
+                        $clean = '0'.substr($clean, 2);
+                    }
+                    $teleponSupplier = $clean;
+                }
                 $supplier = Supplier::firstOrCreate(
                     ['nama' => $nama],
                     [
-                        'telepon' => ! empty($this->quickAddForm['telepon']) ? trim($this->quickAddForm['telepon']) : null,
+                        'telepon' => $teleponSupplier,
                         'kontak' => ! empty($this->quickAddForm['kontak']) ? trim($this->quickAddForm['kontak']) : null,
                         'alamat' => ! empty($this->quickAddForm['alamat']) ? trim($this->quickAddForm['alamat']) : null,
                         'termin_hari' => 30,
                         'is_active' => true,
                     ]
                 );
+                if ($supplier->wasRecentlyCreated) {
+                    app(AuditService::class)->catat('Supplier', 'create', $supplier->id, "Supplier {$supplier->nama} ditambahkan via Quick Add Produk");
+                }
                 if ($this->showEditProdukModal) {
                     $this->editProdukForm['supplier_id'] = $supplier->id;
                 } else {

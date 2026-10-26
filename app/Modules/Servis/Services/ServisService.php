@@ -56,13 +56,27 @@ class ServisService
             ->count() + 1;
         $noTiket = sprintf('SRV-C%02d-%s-%04d', $cabangId, $today, $count);
 
+        $pelanggan = ! empty($data['pelanggan_id']) ? Pelanggan::find($data['pelanggan_id']) : null;
+        $namaPelanggan = $data['nama_pelanggan'] ?? $pelanggan?->nama;
+        $teleponPelanggan = $data['telepon_pelanggan'] ?? $pelanggan?->telepon;
+
+        if (! empty($teleponPelanggan)) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $teleponPelanggan);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $teleponPelanggan = $clean;
+        }
+
         $tiket = TiketServis::create([
             'no_tiket' => $noTiket,
             'cabang_id' => $cabangId,
             'jenis_servis_id' => $data['jenis_servis_id'] ?? null,
             'pelanggan_id' => $data['pelanggan_id'] ?? null,
-            'nama_pelanggan' => $data['nama_pelanggan'] ?? null,
-            'telepon_pelanggan' => $data['telepon_pelanggan'] ?? null,
+            'nama_pelanggan' => $namaPelanggan,
+            'telepon_pelanggan' => $teleponPelanggan,
             'jenis_hp' => $data['jenis_hp'],
             'seri_hp' => $data['seri_hp'] ?? null,
             // [T-19] kunci gadget: terenkripsi at-rest (cast encrypted)
@@ -125,13 +139,27 @@ class ServisService
         $count = TiketServis::whereDate('created_at', now()->toDateString())->count() + 1;
         $noTiket = sprintf('SRV-ONL-%s-%04d', $today, $count);
 
+        $pelanggan = ! empty($data['pelanggan_id']) ? Pelanggan::find($data['pelanggan_id']) : null;
+        $namaPelanggan = $data['nama'] ?? ($data['nama_pelanggan'] ?? $pelanggan?->nama);
+        $teleponPelanggan = $data['telepon'] ?? ($data['telepon_pelanggan'] ?? $pelanggan?->telepon);
+
+        if (! empty($teleponPelanggan)) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $teleponPelanggan);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $teleponPelanggan = $clean;
+        }
+
         $tiket = TiketServis::create([
             'no_tiket' => $noTiket,
             'cabang_id' => $cabangId,
             'jenis_servis_id' => $data['jenis_servis_id'] ?? null,
             'pelanggan_id' => $data['pelanggan_id'] ?? null,
-            'nama_pelanggan' => $data['nama'] ?? ($data['nama_pelanggan'] ?? null),
-            'telepon_pelanggan' => $data['telepon'] ?? ($data['telepon_pelanggan'] ?? null),
+            'nama_pelanggan' => $namaPelanggan,
+            'telepon_pelanggan' => $teleponPelanggan,
             'jenis_hp' => $data['jenis_hp'],
             'seri_hp' => $data['seri_hp'] ?? null,
             'tipe_kunci' => $data['tipe_kunci'] ?? null,

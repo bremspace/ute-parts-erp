@@ -344,6 +344,15 @@ class OpnameTab extends Component
             'opnameRows' => 'required|array|min:1',
         ]);
 
+        $gudang = Gudang::find($this->opnameGudangId);
+        $cabangId = session('cabang_id');
+        $user = auth()->user();
+        if ($cabangId && $gudang && ! isSuperAdminOrOwner($user) && (int) $gudang->cabang_id !== (int) $cabangId) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gudang opname bukan milik cabang aktif.']);
+
+            return;
+        }
+
         DB::transaction(function () {
             $today = now()->format('Ymd');
             $count = StokOpname::whereDate('created_at', now()->toDateString())->count() + 1;

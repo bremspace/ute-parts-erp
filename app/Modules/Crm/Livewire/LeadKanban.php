@@ -179,7 +179,15 @@ class LeadKanban extends Component
     {
         $this->createForm['nilai_estimasi'] = $this->parseNominal($this->createForm['nilai_estimasi'] ?? 0);
 
-        if (empty($this->createForm['telepon'])) {
+        if (! empty($this->createForm['telepon'])) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $this->createForm['telepon']);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $this->createForm['telepon'] = $clean;
+        } else {
             $this->createForm['telepon'] = null;
         }
         if (empty($this->createForm['email'])) {
@@ -217,7 +225,15 @@ class LeadKanban extends Component
     {
         $this->editForm['nilai_estimasi'] = $this->parseNominal($this->editForm['nilai_estimasi'] ?? 0);
 
-        if (empty($this->editForm['telepon'])) {
+        if (! empty($this->editForm['telepon'])) {
+            $clean = preg_replace('/[^0-9+]/', '', (string) $this->editForm['telepon']);
+            if (str_starts_with($clean, '+62')) {
+                $clean = '0'.substr($clean, 3);
+            } elseif (str_starts_with($clean, '62')) {
+                $clean = '0'.substr($clean, 2);
+            }
+            $this->editForm['telepon'] = $clean;
+        } else {
             $this->editForm['telepon'] = null;
         }
         if (empty($this->editForm['email'])) {

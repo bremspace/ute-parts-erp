@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Services;
 
+use App\Models\User;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\PelangganPoinLog;
 use App\Modules\Crm\Models\TierMembership;
@@ -11,6 +12,7 @@ use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -36,11 +38,41 @@ use Illuminate\Support\Facades\Validator;
  */
 class PelangganService
 {
+    public function normalizePhone(?string $telepon): string
+    {
+        if (empty($telepon)) {
+            return '';
+        }
+
+        $teleponBersih = preg_replace('/[^0-9]/', '', (string) $telepon);
+        if (str_starts_with($teleponBersih, '628')) {
+            $teleponBersih = '08'.substr($teleponBersih, 3);
+        } elseif (str_starts_with($teleponBersih, '62')) {
+            $teleponBersih = '0'.substr($teleponBersih, 2);
+        }
+
+        return $teleponBersih;
+    }
+
+    public function messages(): array
+    {
+        return [
+            'nama.required' => 'Nama lengkap wajib diisi.',
+            'telepon.required' => 'Nomor HP / WhatsApp wajib diisi.',
+            'telepon.min' => 'Nomor HP tidak valid (minimal 9 digit).',
+            'telepon.unique' => 'Nomor HP / WhatsApp sudah terdaftar. Silakan login ke akun Anda.',
+            'email.unique' => 'Email sudah terdaftar.',
+            'password.required' => 'Kata sandi wajib diisi.',
+            'password.min' => 'Kata sandi minimal 6 karakter.',
+            'kode_agen.unique' => 'Kode unik agen sudah terdaftar.',
+        ];
+    }
+
     public function rules(bool $isUpdate = false, ?int $pelangganId = null): array
     {
         $teleponRule = $isUpdate
-            ? 'sometimes|required|string|max:20|unique:pelanggan,telepon,'.$pelangganId
-            : 'required|string|max:20|unique:pelanggan,telepon';
+            ? 'sometimes|required|string|min:9|max:20|unique:pelanggan,telepon,'.$pelangganId
+            : 'required|string|min:9|max:20|unique:pelanggan,telepon';
 
         $emailRule = $isUpdate
             ? 'nullable|email|unique:pelanggan,email,'.$pelangganId
@@ -54,6 +86,7 @@ class PelangganService
             'nama' => $isUpdate ? 'sometimes|required|string|max:255' : 'required|string|max:255',
             'telepon' => $teleponRule,
             'email' => $emailRule,
+            'password' => 'sometimes|nullable|string|min:6',
             'alamat' => 'nullable|string',
             'tanggal_lahir' => 'nullable|date',
             'is_reseller' => 'sometimes|boolean',
@@ -73,9 +106,13 @@ class PelangganService
         return $kode;
     }
 
-    public function create(array $data): Pelanggan
+    public function create(array $data, ?int $cabangId = null, ?int $requestedBy = null): Pelanggan
     {
-        $validated = Validator::make($data, $this->rules())->validate();
+        if (isset($data['telepon'])) {
+            $data['telepon'] = $this->normalizePhone($data['telepon']);
+        }
+
+        $validated = Validator::make($data, $this->rules(), $this->messages())->validate();
 
         $tierTerendah = TierMembership::where('is_active', true)
             ->orderBy('min_belanja_12bulan')
@@ -95,9 +132,10 @@ class PelangganService
         $referralKode = ! empty($validated['referral_kode']) ? strtoupper(trim($validated['referral_kode'])) : null;
 
         $pelanggan = Pelanggan::create([
-            'nama' => $validated['nama'],
+            'nama' => trim($validated['nama']),
             'telepon' => $validated['telepon'],
             'email' => $validated['email'] ?? null,
+            'password' => $validated['password'] ?? null,
             'alamat' => $validated['alamat'] ?? null,
             'tanggal_lahir' => $validated['tanggal_lahir'] ?? null,
             'tier_membership_id' => $validated['tier_membership_id'] ?? $tierTerendah?->id,
@@ -107,14 +145,55 @@ class PelangganService
             'referral_kode' => $referralKode,
             'total_belanja_12bulan' => 0,
             'poin_loyalty' => 0,
+            'status' => 'pending',
         ]);
+
+        // Ajukan ke workflow approval inbox owner (ApprovalRule entity_type = 'member')
+        $approvalService = app(ApprovalService::class);
+        $pemohon = $requestedBy ?? auth()->id() ?? ApprovalService::pemohon();
+        if (! $pemohon) {
+            $systemUser = User::first() ?? User::factory()->create([
+                'email' => 'system@uteparts.id',
+                'name' => 'System Ute Parts',
+            ]);
+            $pemohon = $systemUser->id;
+        }
+
+        $effectiveCabang = $cabangId ?? session('cabang_id');
+
+        $approvalRequest = $approvalService->ajukan(
+            'member',
+            $pelanggan->id,
+            $effectiveCabang,
+            [
+                'amount' => 0,
+                'nama' => $pelanggan->nama,
+                'telepon' => $pelanggan->telepon,
+                'tipe_konsumen' => $tipeKonsumen,
+                'keterangan' => 'Pendaftaran Member/Konsumen Baru ('.ucfirst($tipeKonsumen).')',
+            ],
+            $pemohon
+        );
+
+        if (! $approvalRequest) {
+            // Bila tidak ada approval rule aktif untuk entity 'member', aktifkan akun member langsung
+            $pelanggan->update([
+                'status' => 'aktif',
+                'approved_at' => now(),
+                'approved_by' => $pemohon,
+            ]);
+        }
 
         return $pelanggan->load('tierMembership');
     }
 
     public function update(Pelanggan $pelanggan, array $data): Pelanggan
     {
-        $validated = Validator::make($data, $this->rules(true, $pelanggan->id))->validate();
+        if (isset($data['telepon'])) {
+            $data['telepon'] = $this->normalizePhone($data['telepon']);
+        }
+
+        $validated = Validator::make($data, $this->rules(true, $pelanggan->id), $this->messages())->validate();
 
         $updateData = [];
         if (array_key_exists('nama', $validated)) {

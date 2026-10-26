@@ -360,6 +360,15 @@ class TransferTab extends Component
             'transferItems.*.jumlah' => 'required|integer|min:1',
         ]);
 
+        $gudangAsal = Gudang::find($this->transferGudangAsalId);
+        $cabangId = session('cabang_id');
+        $user = auth()->user();
+        if ($cabangId && $gudangAsal && ! isSuperAdminOrOwner($user) && (int) $gudangAsal->cabang_id !== (int) $cabangId) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Gudang asal transfer bukan milik cabang aktif.']);
+
+            return;
+        }
+
         // [T-41] Validasi server per item: qty ≤ stok tersedia gudang sumber
         // (stok_fisik − stok_dikunci transfer draft pending).
         // [B-15c] 1 query batch (sebelumnya 1 query stok_items per item).

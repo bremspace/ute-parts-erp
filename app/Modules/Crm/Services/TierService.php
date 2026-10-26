@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Services;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Pos\Models\Transaksi;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Tier Membership logic (PRD §4.4):
@@ -98,12 +99,37 @@ class TierService
     }
 
     /**
-     * Hitung poin yang didapat dari transaksi (sesuai multiplier tier).
+     * Hitung poin yang didapat dari transaksi (sesuai multiplier tier & rasio earn/redeem loyalitas).
      */
     public function hitungPoin(float $nominalBelanja, ?TierMembership $tier = null): int
     {
-        $multiplier = $tier ? (float) $tier->poin_multiplier : 1.0;
+        if ($nominalBelanja <= 0) {
+            return 0;
+        }
 
+        $config = app(KonfigurasiService::class);
+        $hasCustomEarn = DB::table('konfigurasi')->where('kunci', 'poin_earn_persen')->exists();
+
+        $redeemRate = ($tier && (float) $tier->poin_redeem_rupiah > 0)
+            ? (float) $tier->poin_redeem_rupiah
+            : $config->poinRedeemRupiah();
+        if ($redeemRate <= 0) {
+            $redeemRate = 100.0;
+        }
+
+        $multiplier = $tier ? (float) $tier->poin_multiplier : 1.0;
+        if ($multiplier <= 0) {
+            $multiplier = 1.0;
+        }
+
+        if ($hasCustomEarn) {
+            $earnPersen = (float) $config->get('poin_earn_persen');
+            $poinRupiah = $nominalBelanja * ($earnPersen / 100.0);
+
+            return (int) floor(($poinRupiah / $redeemRate) * $multiplier);
+        }
+
+        // Default baseline: 1 poin per 1.000 belanja
         return (int) floor(($nominalBelanja / 1000) * $multiplier);
     }
 }

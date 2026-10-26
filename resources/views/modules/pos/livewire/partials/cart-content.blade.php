@@ -227,7 +227,14 @@
                                 class="w-7 h-7 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
                                 aria-label="Kurangi"
                             >-</button>
-                            <span class="w-7 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white">{{ $item['qty'] }}</span>
+                            <input
+                                type="number"
+                                min="1"
+                                max="{{ $item['stok_max'] ?? 9999 }}"
+                                value="{{ $item['qty'] }}"
+                                wire:change="setQty('{{ $key }}', $event.target.value)"
+                                class="w-9 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
                             <button
                                 type="button"
                                 wire:click="updateQty('{{ $key }}', 1)"
@@ -295,7 +302,7 @@
             @endif
             @if(($diskonPartai ?? 0) > 0)
                 <div class="flex justify-between text-[11px] text-up-mint">
-                    <span>- Diskon Partai (Member)</span>
+                    <span>- Diskon Partai ({{ $alasanPartai ?: 'Otomatis' }})</span>
                     <span class="font-semibold tabular-nums">-Rp {{ number_format($diskonPartai, 0, ',', '.') }}</span>
                 </div>
             @endif

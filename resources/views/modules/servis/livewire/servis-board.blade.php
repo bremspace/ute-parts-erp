@@ -802,27 +802,61 @@
 
     <!-- ===== MODAL: QUICK-ADD PELANGGAN BARU [T-18] ===== -->
     @if($showPelangganBaruModal)
-        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-md glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative">
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <div class="w-full max-w-lg glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative my-auto">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
-                    <h3 class="text-lg font-bold text-white">+ Pelanggan Baru</h3>
+                    <h3 class="text-lg font-bold text-white">+ Pelanggan Baru Servis</h3>
                     <button wire:click="$set('showPelangganBaruModal', false)" class="text-ink-400 hover:text-white">✕</button>
                 </div>
 
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama <span class="text-up-red">*</span></label>
-                        <input type="text" wire:model="pelangganBaruForm.nama" placeholder="Nama pelanggan" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                <div class="space-y-3.5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama <span class="text-up-red">*</span></label>
+                            <input type="text" wire:model="pelangganBaruForm.nama" placeholder="Nama pelanggan" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            @error('pelangganBaruForm.nama') <span class="text-[10px] text-up-red mt-1 block">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon <span class="text-up-red">*</span></label>
+                            <input type="text" wire:model="pelangganBaruForm.telepon" placeholder="08xx / +62xx" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            @error('pelangganBaruForm.telepon') <span class="text-[10px] text-up-red mt-1 block">{{ $message }}</span> @enderror
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon <span class="text-up-red">*</span></label>
-                        <input type="text" wire:model="pelangganBaruForm.telepon" placeholder="08xx-xxxx-xxxx" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email (opsional)</label>
+                            <input type="email" wire:model="pelangganBaruForm.email" placeholder="email@contoh.com" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                            @error('pelangganBaruForm.email') <span class="text-[10px] text-up-red mt-1 block">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Tipe Konsumen</label>
+                            <select wire:model.live="pelangganBaruForm.tipe_konsumen" class="w-full px-3 py-2.5 rounded-xl bg-ink-900 border border-white/10 text-xs text-white">
+                                <option value="retail">Retail / Konsumen Akhir</option>
+                                <option value="reseller">Reseller</option>
+                                <option value="agen">Mitra Agen B2B</option>
+                            </select>
+                        </div>
                     </div>
+
+                    @if(($pelangganBaruForm['tipe_konsumen'] ?? '') === 'agen')
+                        <div>
+                            <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Agen (Opsional)</label>
+                            <input type="text" wire:model="pelangganBaruForm.kode_agen" placeholder="Otomatis AGN-XXXX jika kosong" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium uppercase" />
+                        </div>
+                    @endif
+
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kode Referral (opsional)</label>
+                        <input type="text" wire:model="pelangganBaruForm.referral_kode" placeholder="Kode referral pengajak" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium uppercase" />
+                    </div>
+
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Alamat</label>
                         <textarea wire:model="pelangganBaruForm.alamat" rows="2" placeholder="Alamat (opsional)" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium"></textarea>
                     </div>
-                    <p class="text-[10px] text-ink-500">Disimpan via <strong class="text-up-primary">PelangganService</strong> (satu sumber dgn CRM-06 & POS) — langsung terpilih di tiket.</p>
+
+                    <p class="text-[10px] text-ink-400">Disimpan via <strong class="text-up-primary">PelangganService</strong> — tersinkronisasi otomatis dengan CRM & POS.</p>
                 </div>
 
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">

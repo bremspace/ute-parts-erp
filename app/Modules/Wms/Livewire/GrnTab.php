@@ -144,10 +144,49 @@ class GrnTab extends Component
             $prod = $poItem->produk;
             $var = $poItem->skuVariant;
 
-            // Cari rak default dari stok yang sudah ada di gudang tujuan
-            $stokExisting = StokItem::where('produk_id', $poItem->produk_id)
+            // Prioritas 1: Cari rak default produk dari stok item di gudang tujuan
+            $rakIdDefault = StokItem::where('produk_id', $poItem->produk_id)
                 ->where('gudang_id', $po->gudang_tujuan_id)
-                ->first();
+                ->when($poItem->sku_variant_id, fn ($q) => $q->orderByRaw('CASE WHEN sku_variant_id = ? THEN 0 ELSE 1 END', [$poItem->sku_variant_id]))
+                ->whereNotNull('rak_id')
+                ->value('rak_id');
+
+            // Prioritas 2: Jika belum ada rak di gudang tujuan, cari rak default produk dari gudang lain
+            if (! $rakIdDefault) {
+                $rakIdLain = StokItem::where('produk_id', $poItem->produk_id)
+                    ->when($poItem->sku_variant_id, fn ($q) => $q->orderByRaw('CASE WHEN sku_variant_id = ? THEN 0 ELSE 1 END', [$poItem->sku_variant_id]))
+                    ->whereNotNull('rak_id')
+                    ->value('rak_id');
+
+                if ($rakIdLain) {
+                    $rakLain = Rak::find($rakIdLain);
+                    if ($rakLain) {
+                        if ((int) $rakLain->gudang_id === (int) $po->gudang_tujuan_id) {
+                            $rakIdDefault = $rakLain->id;
+                        } else {
+                            $rakSama = Rak::where('gudang_id', $po->gudang_tujuan_id)
+                                ->where(function ($q) use ($rakLain) {
+                                    $q->where('kode', $rakLain->kode)
+                                        ->orWhere('nama', $rakLain->nama);
+                                })
+                                ->where('is_active', true)
+                                ->value('id');
+                            if ($rakSama) {
+                                $rakIdDefault = $rakSama;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Validasi: pastikan rak ada di dalam daftar $gudangRaks gudang tujuan
+            $rakIdFinal = null;
+            if ($rakIdDefault && collect($this->gudangRaks)->contains('id', (int) $rakIdDefault)) {
+                $rakIdFinal = (int) $rakIdDefault;
+            } elseif (! empty($this->gudangRaks) && count($this->gudangRaks) === 1) {
+                // Bila gudang tujuan hanya memiliki 1 rak aktif, otomatis jadikan default rak
+                $rakIdFinal = (int) $this->gudangRaks[0]['id'];
+            }
 
             $konversi = max(0.0001, (float) ($poItem->konversi ?? 1));
             $satuanNama = $poItem->satuan ?: ($prod?->satuan ?: 'pcs');
@@ -170,7 +209,7 @@ class GrnTab extends Component
                 'qty_po' => $qtyPoSatuan,
                 'qty_po_dasar' => $qtyPoDasar,
                 'qty_received' => 0,
-                'rak_id' => $stokExisting?->rak_id,
+                'rak_id' => $rakIdFinal,
                 // [F2-3] SN wajib utk produk sn=true
                 'sn_flag' => (bool) ($prod?->sn ?? false),
                 'sn' => '',

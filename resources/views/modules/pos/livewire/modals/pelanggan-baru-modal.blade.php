@@ -27,19 +27,21 @@
                     <input
                         type="text"
                         wire:model="pelangganBaruForm.nama"
-                        placeholder="Contoh: Budi Pratama"
+                        placeholder="Contoh: Budi Pratama / Toko Mitra"
                         class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white min-h-[42px]"
                         autofocus
                     />
+                    @error('pelangganBaruForm.nama') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
                 </div>
                 <div>
                     <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">No. WhatsApp / HP *</label>
                     <input
                         type="text"
                         wire:model="pelangganBaruForm.telepon"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white min-h-[42px]"
-                        placeholder="08xx-xxxx-xxxx"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold font-mono text-ink-900 dark:text-white min-h-[42px]"
+                        placeholder="08xxxxxxxxxx"
                     />
+                    @error('pelangganBaruForm.telepon') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
                 </div>
                 <div>
                     <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Email (opsional)</label>
@@ -49,6 +51,7 @@
                         placeholder="nama@email.com"
                         class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[42px]"
                     />
+                    @error('pelangganBaruForm.email') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
                 </div>
                 <div>
                     <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Alamat</label>
@@ -59,13 +62,54 @@
                         class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white"
                     ></textarea>
                 </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Tanggal Lahir (opsional)</label>
+                        <input
+                            type="date"
+                            wire:model="pelangganBaruForm.tanggal_lahir"
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[42px]"
+                        />
+                    </div>
+                    <div>
+                        <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Tipe Konsumen</label>
+                        <select wire:model.live="pelangganBaruForm.tipe_konsumen" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold text-ink-900 dark:text-white min-h-[42px]">
+                            <option value="retail">Retail (Umum)</option>
+                            <option value="reseller">Reseller</option>
+                            <option value="agen">Agen / Mitra B2B</option>
+                        </select>
+                    </div>
+                </div>
+
+                @if(($pelangganBaruForm['tipe_konsumen'] ?? '') === 'agen')
                 <div>
-                    <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Tanggal Lahir (opsional)</label>
+                    <label class="block font-bold text-amber-500 uppercase tracking-wider text-[11px] mb-1.5">Kode Unik Agen</label>
                     <input
-                        type="date"
-                        wire:model="pelangganBaruForm.tanggal_lahir"
-                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-white min-h-[42px]"
+                        type="text"
+                        wire:model="pelangganBaruForm.kode_agen"
+                        placeholder="Otomatis jika kosong"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono uppercase text-ink-900 dark:text-white min-h-[42px]"
                     />
+                    @error('pelangganBaruForm.kode_agen') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
+                </div>
+                @endif
+
+                <div>
+                    <label class="block font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider text-[11px] mb-1.5">Kode Referral Upline (Opsional)</label>
+                    <input
+                        type="text"
+                        wire:model="pelangganBaruForm.referral_kode"
+                        placeholder="Masukkan Kode Agen Upline jika ada (misal: AGN-XXXXXX)"
+                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono uppercase text-ink-900 dark:text-white min-h-[42px]"
+                    />
+                    @error('pelangganBaruForm.referral_kode') <span class="text-up-red text-[10px] mt-1 block">{{ $message }}</span> @enderror
+                </div>
+
+                <div class="pt-1">
+                    <label class="flex items-center gap-2 text-xs font-semibold text-ink-700 dark:text-ink-300 cursor-pointer select-none">
+                        <input type="checkbox" wire:model="pelangganBaruForm.is_reseller" class="accent-up-accent w-4 h-4 rounded cursor-pointer" />
+                        <span>Daftarkan Sebagai Mitra Reseller (Akses Komisi & Harga Khusus)</span>
+                    </label>
                 </div>
             </div>
 

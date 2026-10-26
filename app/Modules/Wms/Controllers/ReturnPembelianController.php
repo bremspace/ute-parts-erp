@@ -4,6 +4,7 @@ namespace App\Modules\Wms\Controllers;
 
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\ReturnPembelian;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\ReturnPembelianService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -56,30 +57,47 @@ class ReturnPembelianController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'purchase_order_id' => 'required|exists:purchase_order,id',
+            'purchase_order_id' => 'required_without:supplier_id|nullable|exists:purchase_order,id',
+            'supplier_id' => 'required_without:purchase_order_id|nullable|exists:supplier,id',
             'alasan' => 'required|string|max:500',
-            'metode_pengembalian' => 'nullable|in:utang,kas',
-            'items' => 'required|array|min:1',
-            'items.*.purchase_order_item_id' => 'required|exists:purchase_order_item,id',
-            'items.*.jumlah' => 'required|numeric|min:0.01',
+            'metode_pengembalian' => 'nullable|in:utang,kas,saldo',
+            'items' => 'required_with:purchase_order_id|array',
+            'items.*.purchase_order_item_id' => 'required_with:items|exists:purchase_order_item,id',
+            'items.*.jumlah' => 'required_with:items|numeric|min:0.01',
             'items.*.sn' => 'nullable|array',
+            'item_ids' => 'required_with:supplier_id|array',
+            'item_ids.*' => 'integer|exists:return_penjualan_item,id',
         ]);
 
-        $po = PurchaseOrder::with('gudangTujuan')->findOrFail($request->purchase_order_id);
         $cabangId = session('cabang_id');
 
-        if ($cabangId && $po->gudangTujuan && (int) $po->gudangTujuan->cabang_id !== (int) $cabangId) {
-            return $this->error('PO bukan milik cabang aktif', 403);
-        }
-
         try {
-            $retur = $this->returnService->buatRetur(
-                $po,
-                $request->items,
-                $request->alasan,
-                $request->input('metode_pengembalian', 'utang'),
-                auth()->id()
-            );
+            if ($request->filled('supplier_id')) {
+                $supplier = Supplier::findOrFail($request->supplier_id);
+                $retur = $this->returnService->buatReturDariPoolSupplier(
+                    $supplier,
+                    $request->item_ids,
+                    $request->alasan,
+                    $request->input('metode_pengembalian', 'saldo'),
+                    $cabangId,
+                    null,
+                    auth()->id()
+                );
+            } else {
+                $po = PurchaseOrder::with('gudangTujuan')->findOrFail($request->purchase_order_id);
+
+                if ($cabangId && $po->gudangTujuan && (int) $po->gudangTujuan->cabang_id !== (int) $cabangId) {
+                    return $this->error('PO bukan milik cabang aktif', 403);
+                }
+
+                $retur = $this->returnService->buatRetur(
+                    $po,
+                    $request->items,
+                    $request->alasan,
+                    $request->input('metode_pengembalian', 'utang'),
+                    auth()->id()
+                );
+            }
 
             return $this->success(
                 $retur,

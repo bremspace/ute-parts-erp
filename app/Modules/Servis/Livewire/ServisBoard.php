@@ -83,7 +83,16 @@ class ServisBoard extends Component
     // [T-18] quick-add pelanggan baru dari terima unit (CRM-06 path)
     public bool $showPelangganBaruModal = false;
 
-    public array $pelangganBaruForm = ['nama' => '', 'telepon' => '', 'alamat' => ''];
+    public array $pelangganBaruForm = [
+        'nama' => '',
+        'telepon' => '',
+        'alamat' => '',
+        'email' => '',
+        'tipe_konsumen' => 'retail',
+        'is_reseller' => false,
+        'kode_agen' => '',
+        'referral_kode' => '',
+    ];
 
     public array $terimaForm = [
         'pelanggan_id' => null,
@@ -874,7 +883,16 @@ class ServisBoard extends Component
     /** [T-18] buka modal quick-add pelanggan baru dari terima unit — satu sumber (CRM-06 path) */
     public function openPelangganBaruServis()
     {
-        $this->pelangganBaruForm = ['nama' => '', 'telepon' => '', 'alamat' => ''];
+        $this->pelangganBaruForm = [
+            'nama' => '',
+            'telepon' => '',
+            'alamat' => '',
+            'email' => '',
+            'tipe_konsumen' => 'retail',
+            'is_reseller' => false,
+            'kode_agen' => '',
+            'referral_kode' => '',
+        ];
         $this->showPelangganBaruModal = true;
     }
 
@@ -883,7 +901,11 @@ class ServisBoard extends Component
     {
         $this->validate([
             'pelangganBaruForm.nama' => 'required|string|max:255',
-            'pelangganBaruForm.telepon' => 'required|string|max:20|unique:pelanggan,telepon',
+            'pelangganBaruForm.telepon' => 'required|string|max:20',
+            'pelangganBaruForm.email' => 'nullable|email|max:255',
+            'pelangganBaruForm.tipe_konsumen' => 'nullable|in:retail,reseller,agen',
+            'pelangganBaruForm.kode_agen' => 'nullable|string|max:50',
+            'pelangganBaruForm.referral_kode' => 'nullable|string|max:50',
         ]);
 
         try {
@@ -891,10 +913,16 @@ class ServisBoard extends Component
                 'nama' => $this->pelangganBaruForm['nama'],
                 'telepon' => $this->pelangganBaruForm['telepon'],
                 'alamat' => $this->pelangganBaruForm['alamat'] ?: null,
+                'email' => $this->pelangganBaruForm['email'] ?: null,
+                'tipe_konsumen' => $this->pelangganBaruForm['tipe_konsumen'] ?: 'retail',
+                'is_reseller' => (bool) ($this->pelangganBaruForm['is_reseller'] ?? false),
+                'kode_agen' => $this->pelangganBaruForm['kode_agen'] ?: null,
+                'referral_kode' => $this->pelangganBaruForm['referral_kode'] ?: null,
             ]);
             $this->setPelangganServis($pelanggan->id);
             $this->showPelangganBaruModal = false;
-            $this->dispatch('alert', ['type' => 'success', 'message' => 'Pelanggan baru disimpan & dipilih (sinkron CRM)']);
+            $statusInfo = $pelanggan->status === 'pending' ? ' (antre approval member)' : '';
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Pelanggan {$pelanggan->nama} berhasil disimpan & dipilih{$statusInfo}"]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }

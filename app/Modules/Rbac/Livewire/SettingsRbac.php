@@ -212,6 +212,15 @@ class SettingsRbac extends Component
             $this->loyalitasForm[$kunci] = (float) ($config->get($kunci) ?? $config->defaults()[$kunci]);
         }
 
+        // Sinkronkan diskon langsung dari master TierMembership agar identik dengan CRM
+        $tiers = TierMembership::all();
+        foreach ($tiers as $t) {
+            $k = 'diskon_'.strtolower($t->kode);
+            if (array_key_exists($k, $this->loyalitasForm)) {
+                $this->loyalitasForm[$k] = (float) $t->diskon_persen;
+            }
+        }
+
         // Skema komisi default (tabel skema_komisi)
         $this->skemaKomisiForm = SkemaKomisi::orderBy('id')
             ->get(['id', 'nama', 'kategori', 'tipe', 'nilai', 'is_active'])

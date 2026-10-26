@@ -104,6 +104,11 @@ class AkuntingController extends Controller
 
         $akun = AkunCOA::create($request->all());
 
+        app(AuditService::class)->catat(
+            'AkunCOA', 'create', $akun->id,
+            "Akun COA {$akun->kode} — {$akun->nama} dibuat"
+        );
+
         return $this->success($akun, 'Akun COA berhasil dibuat', 201);
     }
 

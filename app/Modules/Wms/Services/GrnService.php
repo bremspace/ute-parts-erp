@@ -9,6 +9,7 @@ use App\Modules\Akunting\Services\JurnalService;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\RiwayatPerubahanHarga;
 use App\Modules\Wms\Models\StockMutationLog;
 use App\Modules\Wms\Models\StokItem;
@@ -177,6 +178,10 @@ class GrnService
                 $rakId = isset($itemRakId[$kunci])
                     ? ($itemRakId[$kunci] ? (int) $itemRakId[$kunci] : null)
                     : (isset($itemRakId[$kodeProduk]) ? ($itemRakId[$kodeProduk] ? (int) $itemRakId[$kodeProduk] : null) : null);
+
+                if (! $rakId && $po->gudang_tujuan_id) {
+                    $rakId = $this->resolveDefaultRakId((int) $kodeProduk, (int) $po->gudang_tujuan_id, $poItem->sku_variant_id);
+                }
 
                 $itemData[] = [
                     'produk_id' => $kodeProduk,
@@ -625,6 +630,63 @@ class GrnService
         } while ($exists);
 
         return $candidate;
+    }
+
+    /**
+     * Resolusi lokasi rak default untuk produk di gudang tujuan penerimaan.
+     * Prioritas:
+     * 1. Rak yang sudah digunakan produk/varian di gudang tujuan.
+     * 2. Rak yang digunakan produk di gudang lain yang memiliki kode/nama sama di gudang tujuan.
+     * 3. Jika gudang tujuan hanya memiliki satu rak aktif, jadikan default otomatis.
+     */
+    public function resolveDefaultRakId(int $produkId, int $gudangId, ?int $skuVariantId = null): ?int
+    {
+        // 1. Cari dari stok item di gudang tujuan
+        $rakId = StokItem::where('produk_id', $produkId)
+            ->where('gudang_id', $gudangId)
+            ->when($skuVariantId, fn ($q) => $q->orderByRaw('CASE WHEN sku_variant_id = ? THEN 0 ELSE 1 END', [$skuVariantId]))
+            ->whereNotNull('rak_id')
+            ->value('rak_id');
+
+        if ($rakId) {
+            $isAktif = Rak::where('id', $rakId)->where('gudang_id', $gudangId)->where('is_active', true)->exists();
+            if ($isAktif) {
+                return (int) $rakId;
+            }
+        }
+
+        // 2. Cari dari gudang lain, cocokkan nama/kode di gudang tujuan
+        $rakIdLain = StokItem::where('produk_id', $produkId)
+            ->when($skuVariantId, fn ($q) => $q->orderByRaw('CASE WHEN sku_variant_id = ? THEN 0 ELSE 1 END', [$skuVariantId]))
+            ->whereNotNull('rak_id')
+            ->value('rak_id');
+
+        if ($rakIdLain) {
+            $rakLain = Rak::find($rakIdLain);
+            if ($rakLain) {
+                if ((int) $rakLain->gudang_id === $gudangId && $rakLain->is_active) {
+                    return (int) $rakLain->id;
+                }
+                $rakSama = Rak::where('gudang_id', $gudangId)
+                    ->where(function ($q) use ($rakLain) {
+                        $q->where('kode', $rakLain->kode)
+                            ->orWhere('nama', $rakLain->nama);
+                    })
+                    ->where('is_active', true)
+                    ->value('id');
+                if ($rakSama) {
+                    return (int) $rakSama;
+                }
+            }
+        }
+
+        // 3. Jika gudang tujuan hanya memiliki 1 rak aktif
+        $raks = Rak::where('gudang_id', $gudangId)->where('is_active', true)->limit(2)->pluck('id');
+        if ($raks->count() === 1) {
+            return (int) $raks->first();
+        }
+
+        return null;
     }
 
     /** Deteksi pelanggaran kunci unik/duplikat dari QueryException (MySQL 23000 / SQLite UNIQUE). */
