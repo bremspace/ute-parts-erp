@@ -89,23 +89,37 @@ class PartaiPricingService
             return $default;
         }
 
-        $diskonQtyPersen = $this->config->hargaPartaiQtyDiskonPersen();
-        $diskonNominalPersen = $this->config->hargaPartaiNominalDiskonPersen();
+        $tiersQty = $this->config->hargaPartaiTiersQty();
+        $tiersNominal = $this->config->hargaPartaiTiersNominal();
 
         $persenTerpilih = 0.0;
         $alasan = '';
 
-        if ($minQty > 0 && $diskonQtyPersen > 0 && $totalQty >= $minQty) {
-            $persenTerpilih = $diskonQtyPersen;
-            $alasan = "Harga Partai (Qty >= {$minQty} pcs)";
+        // 1. Evaluasi tier Kuantitas (sudah tersortir descending dari min_qty terbesar)
+        foreach ($tiersQty as $tier) {
+            $reqQty = (int) ($tier['min_qty'] ?? 0);
+            $diskon = (float) ($tier['diskon_persen'] ?? 0);
+            if ($reqQty > 0 && $diskon > 0 && $totalQty >= $reqQty) {
+                if ($diskon > $persenTerpilih) {
+                    $persenTerpilih = $diskon;
+                    $alasan = "Harga Partai (Qty >= {$reqQty} pcs)";
+                }
+                break; // Berhenti di tier Qty tertinggi yang terpenuhi
+            }
         }
 
-        if ($minNominal > 0 && $diskonNominalPersen > 0 && $subtotal >= $minNominal) {
-            if ($diskonNominalPersen > $persenTerpilih) {
-                $persenTerpilih = $diskonNominalPersen;
-                $alasan = 'Harga Partai (Belanja >= Rp '.number_format($minNominal, 0, ',', '.').')';
-            } elseif ($persenTerpilih > 0) {
-                $alasan .= ' + Belanja Besar';
+        // 2. Evaluasi tier Nominal Belanja (sudah tersortir descending dari min_nominal terbesar)
+        foreach ($tiersNominal as $tier) {
+            $reqNominal = (float) ($tier['min_nominal'] ?? 0);
+            $diskon = (float) ($tier['diskon_persen'] ?? 0);
+            if ($reqNominal > 0 && $diskon > 0 && $subtotal >= $reqNominal) {
+                if ($diskon > $persenTerpilih) {
+                    $persenTerpilih = $diskon;
+                    $alasan = 'Harga Partai (Belanja >= Rp '.number_format($reqNominal, 0, ',', '.').')';
+                } elseif ($persenTerpilih > 0) {
+                    $alasan .= ' + Belanja Rp '.number_format($reqNominal, 0, ',', '.');
+                }
+                break; // Berhenti di tier Nominal tertinggi yang terpenuhi
             }
         }
 

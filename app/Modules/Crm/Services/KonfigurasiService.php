@@ -184,7 +184,7 @@ class KonfigurasiService
         // 3. Diskon partai (jika diaktifkan)
         $diskonPartai = 0.0;
         if ($this->hargaPartaiAktif()) {
-            $diskonPartai = max($this->hargaPartaiQtyDiskonPersen(), $this->hargaPartaiNominalDiskonPersen());
+            $diskonPartai = $this->hargaPartaiMaxDiskonPersen();
         }
 
         // 4. Komisi penjualan tertinggi aktif
@@ -216,7 +216,8 @@ class KonfigurasiService
         $poinMaksPotongan = $this->poinMaksPotonganPersen();
 
         // Total akumulasi beban potongan maksimal yang wajib diantisipasi oleh harga retail
-        $totalPotonganPersen = min(60.0, round($maxMitraDiskon + $komisiPersen + $bufferPersen + $gatewayFeePersen, 2));
+        // [SSOT] Diskon partai diakumulasikan karena dapat dipicu saat pembelian partai (baik umum maupun member)
+        $totalPotonganPersen = min(60.0, round($maxMitraDiskon + $diskonPartai + $komisiPersen + $bufferPersen + $gatewayFeePersen, 2));
 
         // Minimum markup % yang dibutuhkan: (P / (100 - P)) * 100
         $faktorPembagi = max(0.1, (100 - $totalPotonganPersen) / 100);
@@ -297,6 +298,102 @@ class KonfigurasiService
     public function hargaPartaiNominalDiskonPersen(): float
     {
         return (float) ($this->get('harga_partai_nominal_diskon_persen') ?? 2.0);
+    }
+
+    /**
+     * Daftar tier kuantitas harga partai (diurutkan dari min_qty terbesar ke terkecil).
+     *
+     * @return array<int, array{min_qty: int, diskon_persen: float}>
+     */
+    public function hargaPartaiTiersQty(): array
+    {
+        $raw = $this->get('harga_partai_tiers_qty');
+        if (! empty($raw)) {
+            $decoded = is_string($raw) ? json_decode($raw, true) : $raw;
+            if (is_array($decoded) && count($decoded) > 0) {
+                $cleaned = [];
+                foreach ($decoded as $t) {
+                    $q = (int) ($t['min_qty'] ?? 0);
+                    $d = (float) ($t['diskon_persen'] ?? 0);
+                    if ($q > 0 && $d > 0) {
+                        $cleaned[] = ['min_qty' => $q, 'diskon_persen' => $d];
+                    }
+                }
+                if (count($cleaned) > 0) {
+                    usort($cleaned, fn ($a, $b) => ($b['min_qty'] <=> $a['min_qty']));
+
+                    return $cleaned;
+                }
+            }
+        }
+
+        // Fallback backward-compatible ke nilai tunggal
+        $minQty = $this->hargaPartaiMinQty();
+        $diskon = $this->hargaPartaiQtyDiskonPersen();
+        if ($minQty > 0 && $diskon > 0) {
+            return [['min_qty' => $minQty, 'diskon_persen' => $diskon]];
+        }
+
+        return [];
+    }
+
+    /**
+     * Daftar tier nominal belanja harga partai (diurutkan dari min_nominal terbesar ke terkecil).
+     *
+     * @return array<int, array{min_nominal: float, diskon_persen: float}>
+     */
+    public function hargaPartaiTiersNominal(): array
+    {
+        $raw = $this->get('harga_partai_tiers_nominal');
+        if (! empty($raw)) {
+            $decoded = is_string($raw) ? json_decode($raw, true) : $raw;
+            if (is_array($decoded) && count($decoded) > 0) {
+                $cleaned = [];
+                foreach ($decoded as $t) {
+                    $nom = (float) ($t['min_nominal'] ?? 0);
+                    $d = (float) ($t['diskon_persen'] ?? 0);
+                    if ($nom > 0 && $d > 0) {
+                        $cleaned[] = ['min_nominal' => $nom, 'diskon_persen' => $d];
+                    }
+                }
+                if (count($cleaned) > 0) {
+                    usort($cleaned, fn ($a, $b) => ($b['min_nominal'] <=> $a['min_nominal']));
+
+                    return $cleaned;
+                }
+            }
+        }
+
+        // Fallback backward-compatible ke nilai tunggal
+        $minNominal = $this->hargaPartaiMinNominal();
+        $diskon = $this->hargaPartaiNominalDiskonPersen();
+        if ($minNominal > 0 && $diskon > 0) {
+            return [['min_nominal' => $minNominal, 'diskon_persen' => $diskon]];
+        }
+
+        return [];
+    }
+
+    /**
+     * Ambil diskon partai maksimal dari seluruh skema tier yang aktif.
+     */
+    public function hargaPartaiMaxDiskonPersen(): float
+    {
+        if (! $this->hargaPartaiAktif()) {
+            return 0.0;
+        }
+
+        $maxQty = 0.0;
+        foreach ($this->hargaPartaiTiersQty() as $t) {
+            $maxQty = max($maxQty, (float) ($t['diskon_persen'] ?? 0));
+        }
+
+        $maxNominal = 0.0;
+        foreach ($this->hargaPartaiTiersNominal() as $t) {
+            $maxNominal = max($maxNominal, (float) ($t['diskon_persen'] ?? 0));
+        }
+
+        return max($maxQty, $maxNominal);
     }
 
     public function poinEarnPersen(): float

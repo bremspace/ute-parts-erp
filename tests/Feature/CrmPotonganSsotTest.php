@@ -63,25 +63,29 @@ class CrmPotonganSsotTest extends TestCase
         $konfig->set('margin_guard_buffer_persen', 6.0);
         $konfig->set('payment_gateway_fee_persen', 1.5);
         $konfig->set('komisi_agen_default_persen', 5.5);
+        $konfig->set('harga_partai_aktif', true);
+        $konfig->set('harga_partai_qty_diskon_persen', 3.0);
+        $konfig->set('harga_partai_nominal_diskon_persen', 2.0);
 
         $ringkasan = $konfig->getRingkasanPotonganSistem();
 
         // max_mitra_diskon = max(Tier Platinum 10%, agen 12%, reseller 5%) = 12%
         $this->assertEquals(12.0, $ringkasan['max_mitra_diskon']);
+        $this->assertEquals(3.0, $ringkasan['diskon_partai_max']);
         $this->assertEquals(6.0, $ringkasan['buffer_biaya_persen']);
         $this->assertEquals(1.5, $ringkasan['gateway_fee_persen']);
         $this->assertEquals(5.5, $ringkasan['komisi_persen']);
 
-        // Total potongan = 12 + 5.5 + 6 + 1.5 = 25%
-        $this->assertEquals(25.0, $ringkasan['total_potongan_persen']);
+        // Total potongan terakumulasi resmi = 12 + 3 (partai) + 5.5 + 6 + 1.5 = 28%
+        $this->assertEquals(28.0, $ringkasan['total_potongan_persen']);
 
         // Margin guard mengonsumsi SSOT ini
         $marginGuard = app(MarginGuardService::class);
         $params = $marginGuard->getParameterMargin();
-        $this->assertEquals(25.0, $params['total_potongan_persen']);
+        $this->assertEquals(28.0, $params['total_potongan_persen']);
 
-        // HPP 75.000 / (1 - 0.25) = 75.000 / 0.75 = Rp 100.000
-        $hargaAman = $marginGuard->hitungHargaAman(75000);
+        // HPP 72.000 / (1 - 0.28) = 72.000 / 0.72 = Rp 100.000
+        $hargaAman = $marginGuard->hitungHargaAman(72000);
         $this->assertEquals(100000.0, $hargaAman);
     }
 
@@ -110,6 +114,42 @@ class CrmPotonganSsotTest extends TestCase
         $this->assertEquals(40.0, $konfig->poinMaksPotonganPersen());
         $this->assertEquals(6.0, $konfig->komisiAgenDefaultPersen());
         $this->assertEquals('umum', $konfig->hargaPartaiBerlakuUntuk());
+    }
+
+    public function test_crm_dashboard_mengelola_dan_menyimpan_multi_tier_harga_partai(): void
+    {
+        Livewire::actingAs($this->admin)
+            ->test(CrmDashboard::class)
+            ->set('activeTab', 'tier')
+            ->set('hargaPartaiAktif', true)
+            ->set('hargaPartaiOpsiQty', true)
+            ->set('hargaPartaiOpsiNominal', true)
+            ->set('hargaPartaiTiersQty', [
+                ['min_qty' => 5, 'diskon_persen' => 2.0],
+                ['min_qty' => 10, 'diskon_persen' => 4.0],
+                ['min_qty' => 20, 'diskon_persen' => 7.0],
+            ])
+            ->set('hargaPartaiTiersNominal', [
+                ['min_nominal' => 500000.0, 'diskon_persen' => 1.5],
+                ['min_nominal' => 1000000.0, 'diskon_persen' => 3.0],
+            ])
+            ->call('simpanPengaturanLoyaltyGlobal')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
+
+        $konfig = app(KonfigurasiService::class);
+        $tiersQty = $konfig->hargaPartaiTiersQty();
+        $this->assertCount(3, $tiersQty);
+        // Sudah terurut descending
+        $this->assertEquals(20, $tiersQty[0]['min_qty']);
+        $this->assertEquals(7.0, $tiersQty[0]['diskon_persen']);
+
+        $tiersNominal = $konfig->hargaPartaiTiersNominal();
+        $this->assertCount(2, $tiersNominal);
+        $this->assertEquals(1000000.0, $tiersNominal[0]['min_nominal']);
+        $this->assertEquals(3.0, $tiersNominal[0]['diskon_persen']);
+
+        // Max diskon partai otomatis mengambil yang tertinggi (7%)
+        $this->assertEquals(7.0, $konfig->hargaPartaiMaxDiskonPersen());
     }
 
     public function test_pos_kasir_mematuhi_batas_maksimal_potongan_poin_ssot(): void

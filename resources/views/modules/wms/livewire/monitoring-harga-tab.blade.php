@@ -46,6 +46,11 @@
                 <span class="inline-flex items-center gap-1 bg-white/50 dark:bg-white/5 px-2 py-0.5 rounded-md">
                     <span class="text-ink-400">Diskon Member Max:</span> <strong class="text-up-primary">{{ $params['max_mitra_diskon'] }}%</strong>
                 </span>
+                @if(($params['diskon_partai_max'] ?? 0) > 0)
+                    <span class="inline-flex items-center gap-1 bg-white/50 dark:bg-white/5 px-2 py-0.5 rounded-md">
+                        <span class="text-ink-400">Diskon Partai Max:</span> <strong class="text-up-accent">{{ $params['diskon_partai_max'] }}%</strong>
+                    </span>
+                @endif
                 <span class="inline-flex items-center gap-1 bg-white/50 dark:bg-white/5 px-2 py-0.5 rounded-md">
                     <span class="text-ink-400">Komisi Agen:</span> <strong class="text-up-amber">{{ $params['komisi_persen'] }}%</strong>
                 </span>

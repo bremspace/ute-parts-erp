@@ -241,6 +241,7 @@
                         <option value="dikirim">Dikirim</option>
                         <option value="siap_diambil">Siap Diambil (Pickup)</option>
                         <option value="selesai">Selesai</option>
+                        <option value="kadaluarsa">Kadaluarsa</option>
                         <option value="batal">Batal</option>
                     </select>
                 </div>
@@ -1045,7 +1046,7 @@
                                     </td>
                                     <td class="py-3.5 px-4 text-right font-bold text-white tabular-nums">Rp {{ number_format($row->total_akhir, 0, ',', '.') }}</td>
                                     <td class="py-3.5 px-4 text-center">
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ in_array($row->status, ['lunas', 'selesai']) ? 'bg-up-mint/15 text-up-mint' : (in_array($row->status, ['diproses', 'dikirim', 'siap_diambil']) ? 'bg-sky-500/15 text-sky-400' : 'bg-up-amber/15 text-up-amber') }}">
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ in_array($row->status, ['lunas', 'selesai']) ? 'bg-up-mint/15 text-up-mint' : (in_array($row->status, ['diproses', 'dikirim', 'siap_diambil']) ? 'bg-sky-500/15 text-sky-400' : ($row->status === 'kadaluarsa' ? 'bg-rose-500/15 text-rose-400 border border-rose-500/25' : 'bg-up-amber/15 text-up-amber')) }}">
                                             {{ ucfirst(str_replace('_', ' ', $row->status)) }}
                                         </span>
                                     </td>
@@ -1061,7 +1062,7 @@
                                                     Serahkan
                                                 </button>
                                             @endif
-                                            @if(!in_array($row->status, ['selesai', 'void', 'batal', 'dibatalkan'], true))
+                                            @if(!in_array($row->status, ['selesai', 'void', 'batal', 'dibatalkan', 'kadaluarsa'], true))
                                                 <button
                                                     wire:click="sinkronkanStatusOnline({{ $row->id }})"
                                                     wire:loading.attr="disabled"
@@ -1126,7 +1127,7 @@
                                         <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $row->sumber === 'marketplace' ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/25' : 'bg-up-accent/15 text-up-accent border border-up-accent/25' }}">
                                             {{ $platformLabel }}
                                         </span>
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ in_array($row->status, ['lunas', 'selesai']) ? 'bg-up-mint/15 text-up-mint border border-up-mint/25' : (in_array($row->status, ['diproses', 'dikirim', 'siap_diambil']) ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25' : 'bg-up-amber/15 text-up-amber border border-up-amber/25') }}">
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ in_array($row->status, ['lunas', 'selesai']) ? 'bg-up-mint/15 text-up-mint border border-up-mint/25' : (in_array($row->status, ['diproses', 'dikirim', 'siap_diambil']) ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25' : ($row->status === 'kadaluarsa' ? 'bg-rose-500/15 text-rose-400 border border-rose-500/25' : 'bg-up-amber/15 text-up-amber border border-up-amber/25')) }}">
                                             {{ ucfirst(str_replace('_', ' ', $row->status)) }}
                                         </span>
                                     </div>
@@ -1184,7 +1185,7 @@
                                         Serahkan
                                     </button>
                                 @endif
-                                @if(!in_array($row->status, ['selesai', 'void', 'batal', 'dibatalkan'], true))
+                                @if(!in_array($row->status, ['selesai', 'void', 'batal', 'dibatalkan', 'kadaluarsa'], true))
                                     <button
                                         wire:click="sinkronkanStatusOnline({{ $row->id }})"
                                         wire:loading.attr="disabled"

@@ -110,6 +110,11 @@ class CrmDashboard extends Component
 
     public ?float $hargaPartaiNominalDiskon = 2.0;
 
+    // Multi-tier / Multi-level Diskon Partai
+    public array $hargaPartaiTiersQty = [];
+
+    public array $hargaPartaiTiersNominal = [];
+
     // Skema Default Mitra (Reseller & Agen) & Proteksi Poin
     public float $resellerDefaultPersen = 5.0;
 
@@ -154,6 +159,16 @@ class CrmDashboard extends Component
         $this->hargaPartaiOpsiNominal = ($minNominal > 0 && $nominalDiskon > 0);
         $this->hargaPartaiMinNominal = $minNominal > 0 ? $minNominal : 1000000.0;
         $this->hargaPartaiNominalDiskon = $nominalDiskon > 0 ? $nominalDiskon : 2.0;
+
+        $this->hargaPartaiTiersQty = $config->hargaPartaiTiersQty();
+        if (empty($this->hargaPartaiTiersQty) && $this->hargaPartaiMinQty > 0 && $this->hargaPartaiQtyDiskon > 0) {
+            $this->hargaPartaiTiersQty = [['min_qty' => $this->hargaPartaiMinQty, 'diskon_persen' => $this->hargaPartaiQtyDiskon]];
+        }
+
+        $this->hargaPartaiTiersNominal = $config->hargaPartaiTiersNominal();
+        if (empty($this->hargaPartaiTiersNominal) && $this->hargaPartaiMinNominal > 0 && $this->hargaPartaiNominalDiskon > 0) {
+            $this->hargaPartaiTiersNominal = [['min_nominal' => $this->hargaPartaiMinNominal, 'diskon_persen' => $this->hargaPartaiNominalDiskon]];
+        }
     }
 
     // Broadcast modal
@@ -606,6 +621,38 @@ class CrmDashboard extends Component
         $this->showTierModal = false;
     }
 
+    public function tambahTierQty(): void
+    {
+        $lastQty = count($this->hargaPartaiTiersQty) > 0 ? (int) end($this->hargaPartaiTiersQty)['min_qty'] : 5;
+        $lastDiskon = count($this->hargaPartaiTiersQty) > 0 ? (float) end($this->hargaPartaiTiersQty)['diskon_persen'] : 3.0;
+        $this->hargaPartaiTiersQty[] = [
+            'min_qty' => $lastQty + 5,
+            'diskon_persen' => $lastDiskon + 2.0,
+        ];
+    }
+
+    public function hapusTierQty(int $index): void
+    {
+        unset($this->hargaPartaiTiersQty[$index]);
+        $this->hargaPartaiTiersQty = array_values($this->hargaPartaiTiersQty);
+    }
+
+    public function tambahTierNominal(): void
+    {
+        $lastNominal = count($this->hargaPartaiTiersNominal) > 0 ? (float) end($this->hargaPartaiTiersNominal)['min_nominal'] : 1000000.0;
+        $lastDiskon = count($this->hargaPartaiTiersNominal) > 0 ? (float) end($this->hargaPartaiTiersNominal)['diskon_persen'] : 2.0;
+        $this->hargaPartaiTiersNominal[] = [
+            'min_nominal' => $lastNominal + 1000000.0,
+            'diskon_persen' => $lastDiskon + 1.0,
+        ];
+    }
+
+    public function hapusTierNominal(int $index): void
+    {
+        unset($this->hargaPartaiTiersNominal[$index]);
+        $this->hargaPartaiTiersNominal = array_values($this->hargaPartaiTiersNominal);
+    }
+
     public function simpanPengaturanLoyaltyGlobal(): void
     {
         if (! $this->boleh('tier.manage', 'Anda tidak memiliki izin mengelola konfigurasi loyalty.')) {
@@ -663,6 +710,46 @@ class CrmDashboard extends Component
 
         $finalMinNominal = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiNominal) ? max(0.0, (float) $this->hargaPartaiMinNominal) : 0.0;
         $finalNominalDiskon = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiNominal) ? (float) $this->hargaPartaiNominalDiskon : 0.0;
+
+        // Bersihkan dan susun array multi-tier
+        $cleanedTiersQty = [];
+        if ($this->hargaPartaiAktif && $this->hargaPartaiOpsiQty) {
+            foreach ($this->hargaPartaiTiersQty as $t) {
+                $q = (int) ($t['min_qty'] ?? 0);
+                $d = (float) ($t['diskon_persen'] ?? 0);
+                if ($q > 0 && $d > 0) {
+                    $cleanedTiersQty[] = ['min_qty' => $q, 'diskon_persen' => min(50.0, $d)];
+                }
+            }
+            if (empty($cleanedTiersQty) && $finalMinQty > 0 && $finalQtyDiskon > 0) {
+                $cleanedTiersQty[] = ['min_qty' => $finalMinQty, 'diskon_persen' => $finalQtyDiskon];
+            }
+            if (! empty($cleanedTiersQty)) {
+                $finalMinQty = $cleanedTiersQty[0]['min_qty'];
+                $finalQtyDiskon = $cleanedTiersQty[0]['diskon_persen'];
+            }
+        }
+
+        $cleanedTiersNominal = [];
+        if ($this->hargaPartaiAktif && $this->hargaPartaiOpsiNominal) {
+            foreach ($this->hargaPartaiTiersNominal as $t) {
+                $nom = (float) ($t['min_nominal'] ?? 0);
+                $d = (float) ($t['diskon_persen'] ?? 0);
+                if ($nom > 0 && $d > 0) {
+                    $cleanedTiersNominal[] = ['min_nominal' => $nom, 'diskon_persen' => min(50.0, $d)];
+                }
+            }
+            if (empty($cleanedTiersNominal) && $finalMinNominal > 0 && $finalNominalDiskon > 0) {
+                $cleanedTiersNominal[] = ['min_nominal' => $finalMinNominal, 'diskon_persen' => $finalNominalDiskon];
+            }
+            if (! empty($cleanedTiersNominal)) {
+                $finalMinNominal = $cleanedTiersNominal[0]['min_nominal'];
+                $finalNominalDiskon = $cleanedTiersNominal[0]['diskon_persen'];
+            }
+        }
+
+        $config->set('harga_partai_tiers_qty', json_encode($cleanedTiersQty), 'Daftar multi-tier diskon kuantitas partai');
+        $config->set('harga_partai_tiers_nominal', json_encode($cleanedTiersNominal), 'Daftar multi-tier diskon nominal partai');
 
         $config->set('harga_partai_min_qty', $finalMinQty, 'Minimal kuantitas barang untuk mendapatkan harga partai');
         $config->set('harga_partai_qty_diskon_persen', $finalQtyDiskon, 'Persentase diskon harga partai berbasis qty');

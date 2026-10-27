@@ -12,7 +12,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'no_piutang', 'pelanggan_id', 'transaksi_id', 'cabang_id', 'jumlah',
-    'jumlah_dibayar', 'jatuh_tempo', 'status', 'keterangan',
+    'jumlah_dibayar', 'sisa', 'jatuh_tempo', 'status', 'keterangan',
 ])]
 class Piutang extends Model
 {
@@ -29,6 +29,7 @@ class Piutang extends Model
     protected $casts = [
         'jumlah' => 'decimal:2',
         'jumlah_dibayar' => 'decimal:2',
+        'sisa' => 'decimal:2',
         'jatuh_tempo' => 'date',
     ];
 

@@ -1809,16 +1809,64 @@ class PosKasir extends Component
     public function setQuickCash(float $nominal)
     {
         $this->jumlahBayar = number_format($nominal, 0, ',', '.');
+        unset($this->kembalian);
+    }
+
+    public function updatedMetodeBayar(): void
+    {
+        unset($this->kembalian);
+        if ($this->metodeBayar === 'split') {
+            $tunaiVal = (float) $this->parseNominal($this->splitTunai);
+            $nonTunaiVal = (float) $this->parseNominal($this->splitNonTunai);
+            if ($tunaiVal <= 0 && $nonTunaiVal <= 0) {
+                $this->splitTunai = $this->totalAkhir > 0 ? number_format($this->totalAkhir, 0, ',', '.') : '0';
+                $this->splitNonTunai = '0';
+            }
+        }
     }
 
     public function updatedJumlahBayar($value): void
     {
-        // Biarkan teks input apa adanya agar format pemisah ribuan tidak ter-reset saat mengetik
+        unset($this->kembalian);
     }
 
-    public function updatedSplitTunai($value): void {}
+    public function updatedSplitTunai($value): void
+    {
+        unset($this->kembalian);
+    }
 
-    public function updatedSplitNonTunai($value): void {}
+    public function updatedSplitNonTunai($value): void
+    {
+        unset($this->kembalian);
+    }
+
+    public function updatedSplitMetodeNonTunai(): void
+    {
+        unset($this->kembalian);
+    }
+
+    public function quickSplitHalf(): void
+    {
+        $total = (float) $this->totalAkhir;
+        $half = round($total / 2);
+        $this->splitTunai = number_format($half, 0, ',', '.');
+        $this->splitNonTunai = number_format($total - $half, 0, ',', '.');
+        unset($this->kembalian);
+    }
+
+    public function quickSplitTunaiPas(): void
+    {
+        $this->splitTunai = number_format($this->totalAkhir, 0, ',', '.');
+        $this->splitNonTunai = '0';
+        unset($this->kembalian);
+    }
+
+    public function quickSplitNonTunaiPas(): void
+    {
+        $this->splitTunai = '0';
+        $this->splitNonTunai = number_format($this->totalAkhir, 0, ',', '.');
+        unset($this->kembalian);
+    }
 
     /**
      * [B-02/P0-1] Gate stok sebelum potong: seluruh item keranjang harus punya
@@ -1895,10 +1943,26 @@ class PosKasir extends Component
         }
 
         // Validasi kasbon / piutang wajib memilih pelanggan
-        if ($this->metodeBayar === 'piutang' && empty($this->selectedCustomerId)) {
-            $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih pelanggan terlebih dahulu untuk transaksi kasbon / piutang']);
+        if ($this->metodeBayar === 'piutang') {
+            if (empty($this->selectedCustomerId)) {
+                $this->dispatch('alert', ['type' => 'error', 'message' => 'Pilih pelanggan terlebih dahulu untuk transaksi kasbon / piutang']);
 
-            return;
+                return;
+            }
+
+            $cust = Pelanggan::find($this->selectedCustomerId);
+            if ($cust && (float) $cust->max_piutang > 0) {
+                $saldoSaatIni = (float) ($cust->saldo_piutang ?? 0);
+                if (($saldoSaatIni + (float) $this->totalAkhir) > (float) $cust->max_piutang) {
+                    $sisaPlafon = max(0.0, (float) $cust->max_piutang - $saldoSaatIni);
+                    $this->dispatch('alert', [
+                        'type' => 'error',
+                        'message' => 'Transaksi melebihi plafon kasbon pelanggan! Sisa plafon: Rp '.number_format($sisaPlafon, 0, ',', '.'),
+                    ]);
+
+                    return;
+                }
+            }
         }
 
         // [T-09] Validasi sesi kas utk pembayaran tunai (sama dgn API POS-01) — wajib buka kas dulu
@@ -1909,24 +1973,44 @@ class PosKasir extends Component
             return;
         }
 
-        $this->jumlahBayar = (float) $this->parseNominal($this->jumlahBayar);
-        $this->splitTunai = (float) $this->parseNominal($this->splitTunai);
-        $this->splitNonTunai = (float) $this->parseNominal($this->splitNonTunai);
+        $totalAkhir = (float) $this->totalAkhir;
+        $jumlahBayarInput = (float) $this->parseNominal($this->jumlahBayar);
+        $splitTunaiVal = (float) $this->parseNominal($this->splitTunai);
+        $splitNonTunaiVal = (float) $this->parseNominal($this->splitNonTunai);
 
-        if ($this->metodeBayar === 'tunai' && $this->jumlahBayar < $this->totalAkhir) {
+        if ($this->metodeBayar === 'tunai' && $jumlahBayarInput < $totalAkhir) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Jumlah bayar kurang dari total belanja']);
 
             return;
         }
 
-        if ($this->metodeBayar === 'split' && ($this->splitTunai + $this->splitNonTunai) < $this->totalAkhir) {
+        if ($this->metodeBayar === 'split' && ($splitTunaiVal + $splitNonTunaiVal) < $totalAkhir) {
             $this->dispatch('alert', ['type' => 'error', 'message' => 'Total pembayaran split kurang']);
 
             return;
         }
 
+        $this->jumlahBayar = $jumlahBayarInput;
+        $this->splitTunai = $splitTunaiVal;
+        $this->splitNonTunai = $splitNonTunaiVal;
+
+        if ($this->metodeBayar === 'tunai') {
+            $jumlahBayarFinal = $jumlahBayarInput;
+            $kembalianFinal = max(0.0, $jumlahBayarInput - $totalAkhir);
+        } elseif ($this->metodeBayar === 'split') {
+            $jumlahBayarFinal = $splitTunaiVal + $splitNonTunaiVal;
+            $kembalianFinal = max(0.0, $jumlahBayarFinal - $totalAkhir);
+        } elseif ($this->metodeBayar === 'piutang') {
+            $jumlahBayarFinal = 0.0;
+            $kembalianFinal = 0.0;
+        } else {
+            // transfer / qris
+            $jumlahBayarFinal = $totalAkhir;
+            $kembalianFinal = 0.0;
+        }
+
         try {
-            DB::transaction(function () use ($cabangId) {
+            DB::transaction(function () use ($cabangId, $totalAkhir, $jumlahBayarFinal, $kembalianFinal) {
                 $today = now()->format('Ymd');
                 $countToday = Transaksi::whereDate('created_at', now()->toDateString())
                     ->where('cabang_id', $cabangId)
@@ -1973,10 +2057,10 @@ class PosKasir extends Component
                     'dpp' => $this->dpp,
                     'pajak_nominal' => $this->pajakNominal,
                     'ppn_nominal' => $this->pajakNominal,
-                    'total_akhir' => $this->totalAkhir,
+                    'total_akhir' => $totalAkhir,
                     'metode_bayar' => $this->metodeBayar,
-                    'jumlah_bayar' => $this->metodeBayar === 'split' ? ($this->splitTunai + $this->splitNonTunai) : $this->jumlahBayar,
-                    'kembalian' => $this->kembalian,
+                    'jumlah_bayar' => $jumlahBayarFinal,
+                    'kembalian' => $kembalianFinal,
                     'split_detail' => $splitData,
                     'status' => 'selesai',
                     'catatan' => $this->catatan,
@@ -2095,11 +2179,15 @@ class PosKasir extends Component
                 } elseif ($this->metodeBayar === 'tunai') {
                     $debitLines[] = ['akun_kode' => '110-04', 'debit' => $this->totalAkhir, 'kredit' => 0];
                 } elseif ($this->metodeBayar === 'split') {
-                    if ((float) $this->splitTunai > 0) {
-                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => (float) $this->splitTunai, 'kredit' => 0];
+                    $nonTunai = (float) $this->splitNonTunai;
+                    $porsiBank = min($totalAkhir, $nonTunai);
+                    $porsiKas = max(0.0, $totalAkhir - $porsiBank);
+
+                    if ($porsiKas > 0) {
+                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $porsiKas, 'kredit' => 0];
                     }
-                    if ((float) $this->splitNonTunai > 0) {
-                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => (float) $this->splitNonTunai, 'kredit' => 0];
+                    if ($porsiBank > 0) {
+                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $porsiBank, 'kredit' => 0];
                     }
                 } else {
                     // transfer / qris langsung ke Bank
@@ -2167,12 +2255,14 @@ class PosKasir extends Component
                         'pelanggan_id' => $this->selectedCustomerId,
                         'transaksi_id' => $transaksi->id,
                         'cabang_id' => $cabangId,
-                        'jumlah' => $this->totalAkhir,
+                        'jumlah' => $totalAkhir,
                         'jumlah_dibayar' => 0,
+                        'sisa' => $totalAkhir,
                         'jatuh_tempo' => now()->addDays(30)->toDateString(),
                         'status' => 'belum_lunas',
                         'keterangan' => 'Kasbon POS '.$noTransaksi,
                     ]);
+                    Pelanggan::where('id', $this->selectedCustomerId)->increment('saldo_piutang', $totalAkhir);
                 }
 
                 $itemsReceipt = array_map(function ($it) {
@@ -2228,9 +2318,9 @@ class PosKasir extends Component
                     'dpp' => $this->dpp,
                     'pajak' => $this->pajakNominal,
                     'ppn_persen' => $this->ppnPersen,
-                    'total' => $this->totalAkhir,
-                    'bayar' => $transaksi->jumlah_bayar,
-                    'kembali' => $this->kembalian,
+                    'total' => $totalAkhir,
+                    'bayar' => $jumlahBayarFinal,
+                    'kembali' => $kembalianFinal,
                     'hemat_total' => $hematTotal,
                     'metode' => strtoupper($this->metodeBayar),
                     'garansi' => $garansiTeks,

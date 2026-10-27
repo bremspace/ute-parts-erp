@@ -738,4 +738,35 @@ class PosMitraPoinPartaiTest extends TestCase
         $downlines = Pelanggan::where('referral_kode', $agen->kode_agen)->get();
         $this->assertTrue($downlines->contains('id', $downline->id));
     }
+
+    public function test_harga_partai_multi_tier_bertingkat_otomatis_menyesuaikan_di_kasir(): void
+    {
+        $this->actingAs($this->kasir);
+
+        $konfig = app(KonfigurasiService::class);
+        $konfig->set('harga_partai_aktif', true);
+        $konfig->set('harga_partai_berlaku_untuk', 'semua');
+        $konfig->set('harga_partai_tiers_qty', json_encode([
+            ['min_qty' => 5, 'diskon_persen' => 2.0],
+            ['min_qty' => 10, 'diskon_persen' => 5.0],
+            ['min_qty' => 20, 'diskon_persen' => 8.0],
+        ]));
+
+        $test = Livewire::test(PosKasir::class)
+            ->call('addToCart', $this->produk->id);
+
+        $cartKey = array_key_first($test->get('cart'));
+
+        // Level 1: 5 pcs @ Rp 100.000 = Rp 500.000 -> Diskon 2% = Rp 10.000
+        $test->call('setQty', $cartKey, 5)
+            ->assertSet('diskonPartai', 10000.0);
+
+        // Level 2: 10 pcs @ Rp 100.000 = Rp 1.000.000 -> Diskon 5% = Rp 50.000
+        $test->call('setQty', $cartKey, 10)
+            ->assertSet('diskonPartai', 50000.0);
+
+        // Level 3: 20 pcs @ Rp 100.000 = Rp 2.000.000 -> Diskon 8% = Rp 160.000
+        $test->call('setQty', $cartKey, 20)
+            ->assertSet('diskonPartai', 160000.0);
+    }
 }

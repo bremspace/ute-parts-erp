@@ -90,6 +90,7 @@
                         'diproses' => 'Sedang Dikemas',
                         'dikirim' => 'Pengiriman / Pickup',
                         'selesai' => 'Selesai',
+                        'kadaluarsa' => 'Kadaluarsa',
                         'batal' => 'Dibatalkan',
                         'semua' => 'Semua',
                     ];
@@ -298,7 +299,12 @@
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-up-mint/15 text-up-mint border border-up-mint/30">
                                         <span>Selesai</span>
                                     </span>
-                                @elseif($o->status === 'batal')
+                                @elseif($o->status === 'kadaluarsa')
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                                        <span>Kadaluarsa</span>
+                                    </span>
+                                @elseif(in_array($o->status, ['batal', 'dibatalkan']))
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-up-red/15 text-up-red border border-up-red/30">
                                         <span>Dibatalkan</span>
                                     </span>
@@ -392,7 +398,7 @@
                                     @endif
 
                                     <!-- Batalkan Pesanan -->
-                                    @if(!in_array($o->status, ['selesai', 'batal']))
+                                    @if(!in_array($o->status, ['selesai', 'batal', 'dibatalkan', 'kadaluarsa']))
                                         <button
                                             type="button"
                                             wire:click="bukaModalBatal({{ $o->id }})"
@@ -467,6 +473,15 @@
                             <p class="font-bold text-up-primary mt-0.5 uppercase">{{ str_replace('_', ' ', $selectedOrder->status) }}</p>
                         </div>
                     </div>
+
+                    @if($selectedOrder->status === 'kadaluarsa')
+                        <div class="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 flex items-center gap-2.5 text-xs text-rose-400 font-medium">
+                            <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Pesanan ini telah <strong>Kadaluarsa</strong> karena pembayaran tidak diselesaikan sebelum batas waktu berakhir.</span>
+                        </div>
+                    @endif
 
                     @if($selectedOrder->channelOrder)
                         <div class="p-3.5 rounded-2xl bg-orange-500/5 border border-orange-500/20 space-y-1">

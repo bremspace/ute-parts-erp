@@ -153,6 +153,46 @@
                 </div>
             @elseif($metodeBayar === 'split')
                 <div class="space-y-3 mb-5">
+                    <!-- Quick Split Shortcut Buttons -->
+                    <div class="grid grid-cols-3 gap-2">
+                        <button
+                            type="button"
+                            wire:click="quickSplitTunaiPas"
+                            class="px-2.5 py-1.5 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-[11px] font-bold text-ink-800 dark:text-ink-200 border border-ink-200/80 dark:border-white/10 transition-transform active:scale-[0.96] flex items-center justify-center cursor-pointer"
+                        >
+                            Semua Tunai
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="quickSplitHalf"
+                            class="px-2.5 py-1.5 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-[11px] font-bold text-ink-800 dark:text-ink-200 border border-ink-200/80 dark:border-white/10 transition-transform active:scale-[0.96] flex items-center justify-center cursor-pointer"
+                        >
+                            50 : 50
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="quickSplitNonTunaiPas"
+                            class="px-2.5 py-1.5 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-[11px] font-bold text-ink-800 dark:text-ink-200 border border-ink-200/80 dark:border-white/10 transition-transform active:scale-[0.96] flex items-center justify-center cursor-pointer"
+                        >
+                            Semua Non-Tunai
+                        </button>
+                    </div>
+
+                    <!-- Pilihan Jalur Non-Tunai -->
+                    <div>
+                        <label class="block text-[11px] font-bold text-ink-600 dark:text-ink-400 uppercase tracking-wider mb-1.5">Metode Porsi Non-Tunai</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition {{ $splitMetodeNonTunai === 'qris' ? 'border-up-primary bg-up-primary/10 text-up-primary font-bold' : 'border-ink-200/80 dark:border-white/10 text-ink-600 dark:text-ink-300' }}">
+                                <input type="radio" value="qris" wire:model.live="splitMetodeNonTunai" class="text-up-primary focus:ring-0">
+                                <span class="text-xs">QRIS</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition {{ $splitMetodeNonTunai === 'transfer' ? 'border-up-primary bg-up-primary/10 text-up-primary font-bold' : 'border-ink-200/80 dark:border-white/10 text-ink-600 dark:text-ink-300' }}">
+                                <input type="radio" value="transfer" wire:model.live="splitMetodeNonTunai" class="text-up-primary focus:ring-0">
+                                <span class="text-xs">Transfer Bank</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-xs font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider mb-1">Nominal Tunai</label>
                         <input
@@ -165,7 +205,7 @@
                         />
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider mb-1">Nominal Non-Tunai (Transfer / QRIS)</label>
+                        <label class="block text-xs font-bold text-ink-700 dark:text-ink-300 uppercase tracking-wider mb-1">Nominal Non-Tunai ({{ strtoupper($splitMetodeNonTunai) }})</label>
                         <input
                             type="text"
                             inputmode="numeric"
@@ -174,6 +214,34 @@
                             class="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm font-bold tabular-nums min-h-[44px]"
                             placeholder="0"
                         />
+                    </div>
+
+                    @php
+                        $parsedTunai = (float) str_replace(['.', ','], '', (string) $splitTunai);
+                        $parsedNonTunai = (float) str_replace(['.', ','], '', (string) $splitNonTunai);
+                        $totalBayarSplit = $parsedTunai + $parsedNonTunai;
+                        $sisaTagihanSplit = max(0.0, (float) $totalAkhir - $totalBayarSplit);
+                    @endphp
+
+                    <!-- Summary & Kembalian Split -->
+                    <div class="p-3 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-200/80 dark:border-white/10 space-y-1.5 text-xs">
+                        <div class="flex justify-between items-center text-ink-500 dark:text-ink-400">
+                            <span>Total Diterima (Tunai + Non-Tunai)</span>
+                            <span class="font-bold tabular-nums text-ink-800 dark:text-ink-200">Rp {{ number_format($totalBayarSplit, 0, ',', '.') }}</span>
+                        </div>
+                        @if($sisaTagihanSplit > 0)
+                            <div class="flex justify-between items-center text-up-amber font-bold pt-1 border-t border-ink-200/50 dark:border-white/5">
+                                <span>Kurang Bayar</span>
+                                <span class="tabular-nums">-Rp {{ number_format($sisaTagihanSplit, 0, ',', '.') }}</span>
+                            </div>
+                        @else
+                            <div class="flex justify-between items-center pt-1 border-t border-ink-200/50 dark:border-white/5">
+                                <span class="text-ink-600 dark:text-ink-400 font-bold uppercase tracking-wider">Kembalian Tunai</span>
+                                <span class="font-black text-lg tabular-nums {{ $kembalian > 0 ? 'text-up-mint' : 'text-ink-900 dark:text-white' }}">
+                                    Rp {{ number_format($kembalian, 0, ',', '.') }}
+                                </span>
+                            </div>
+                        @endif
                     </div>
                 </div>
             @elseif($metodeBayar === 'piutang')
@@ -191,8 +259,36 @@
                             <span>Pelanggan belum dipilih! Pilih pelanggan sebelum kasbon.</span>
                         </div>
                     @else
-                        <div class="mt-3 p-2 rounded-xl bg-white/5 text-ink-800 dark:text-ink-200">
-                            Pelanggan Terpilih: <strong class="text-ink-900 dark:text-white">{{ $customer?->nama }}</strong>
+                        @php
+                            $saldoPiutang = (float) ($customer?->saldo_piutang ?? 0);
+                            $maxPiutang = (float) ($customer?->max_piutang ?? 0);
+                            $totalSetelahTrx = $saldoPiutang + (float) $totalAkhir;
+                            $overLimit = $maxPiutang > 0 && $totalSetelahTrx > $maxPiutang;
+                        @endphp
+                        <div class="mt-3 p-3 rounded-xl bg-white/5 border border-white/10 text-left space-y-1.5 text-xs text-ink-800 dark:text-ink-200">
+                            <div class="flex justify-between items-center">
+                                <span>Pelanggan:</span>
+                                <strong class="text-ink-900 dark:text-white">{{ $customer?->nama }}</strong>
+                            </div>
+                            <div class="flex justify-between items-center text-ink-600 dark:text-ink-300">
+                                <span>Saldo Piutang Saat Ini:</span>
+                                <span class="font-bold tabular-nums">Rp {{ number_format($saldoPiutang, 0, ',', '.') }}</span>
+                            </div>
+                            @if($maxPiutang > 0)
+                                <div class="flex justify-between items-center text-ink-600 dark:text-ink-300">
+                                    <span>Plafon Limit Piutang:</span>
+                                    <span class="font-bold tabular-nums">Rp {{ number_format($maxPiutang, 0, ',', '.') }}</span>
+                                </div>
+                                <div class="flex justify-between items-center font-bold pt-1 border-t border-white/10 {{ $overLimit ? 'text-up-red' : 'text-up-mint' }}">
+                                    <span>Estimasi Saldo Setelah Trx:</span>
+                                    <span class="tabular-nums">Rp {{ number_format($totalSetelahTrx, 0, ',', '.') }}</span>
+                                </div>
+                                @if($overLimit)
+                                    <div class="p-2 rounded-lg bg-up-red/15 text-up-red text-[11px] font-bold border border-up-red/25 mt-1">
+                                        ⚠️ Transaksi ini melebihi plafon limit kasbon pelanggan (Maks: Rp {{ number_format($maxPiutang, 0, ',', '.') }}).
+                                    </div>
+                                @endif
+                            @endif
                         </div>
                     @endif
                 </div>

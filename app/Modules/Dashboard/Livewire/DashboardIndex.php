@@ -453,7 +453,7 @@ class DashboardIndex extends Component
             $trxSelesai = (clone $baseQuery)->whereIn('status', self::STATUS_OMZET)->count();
             $omzetPending = (float) (clone $baseQuery)->where('status', 'pending')->sum('total_akhir');
             $trxPending = (clone $baseQuery)->where('status', 'pending')->count();
-            $trxBatal = (clone $baseQuery)->where('status', 'dibatalkan')->count();
+            $trxBatal = (clone $baseQuery)->whereIn('status', ['dibatalkan', 'void', 'batal', 'kadaluarsa'])->count();
 
             $totalDiskon = (float) (clone $baseQuery)->whereIn('status', self::STATUS_OMZET)->sum('diskon_nominal');
             $totalPajak = (float) (clone $baseQuery)->whereIn('status', self::STATUS_OMZET)->sum('pajak_nominal');

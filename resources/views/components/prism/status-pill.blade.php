@@ -26,12 +26,19 @@ $config = match(strtolower($status)) {
         'dot' => 'bg-up-amber',
         'label' => str_replace('_', ' ', ucfirst($status)),
     ],
-    'batal', 'ditolak', 'void', 'gagal' => [
+    'batal', 'ditolak', 'void', 'gagal', 'dibatalkan' => [
         'bg' => 'bg-up-red/15',
         'text' => 'text-up-red',
         'border' => 'border-up-red/30',
         'dot' => 'bg-up-red',
         'label' => ucfirst($status),
+    ],
+    'kadaluarsa', 'expired' => [
+        'bg' => 'bg-rose-500/15',
+        'text' => 'text-rose-400',
+        'border' => 'border-rose-500/30',
+        'dot' => 'bg-rose-400',
+        'label' => 'Kadaluarsa',
     ],
     default => [
         'bg' => 'bg-black/5 dark:bg-white/10',

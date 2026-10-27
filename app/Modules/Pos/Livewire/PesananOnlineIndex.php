@@ -15,16 +15,18 @@ use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Wms\Services\StokDeductionService;
+use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class PesananOnlineIndex extends Component
 {
+    use ParsesNominal;
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
-    public string $statusFilter = 'lunas'; // 'semua' | 'lunas' | 'menunggu_pembayaran' | 'diproses' | 'dikirim' | 'selesai' | 'batal'
+    public string $statusFilter = 'lunas'; // 'semua' | 'lunas' | 'menunggu_pembayaran' | 'diproses' | 'dikirim' | 'selesai' | 'kadaluarsa' | 'batal'
 
     public string $sumberFilter = 'semua'; // 'semua' | 'marketplace' | 'shopee' | 'tokopedia' | 'omni_lain'
 
@@ -111,7 +113,8 @@ class PesananOnlineIndex extends Component
     public function updatedNominalBayarPickup(): void
     {
         if ($this->pickupOrder) {
-            $this->kembalianPickup = max(0.0, (float) $this->nominalBayarPickup - (float) $this->pickupOrder->total_akhir);
+            $nominal = (float) $this->parseNominal($this->nominalBayarPickup);
+            $this->kembalianPickup = max(0.0, round($nominal - (float) $this->pickupOrder->total_akhir, 2));
         }
     }
 
@@ -151,7 +154,8 @@ class PesananOnlineIndex extends Component
             COALESCE(SUM(CASE WHEN status = 'diproses' THEN 1 ELSE 0 END), 0) as total_diproses,
             COALESCE(SUM(CASE WHEN status IN ('dikirim', 'siap_diambil') THEN 1 ELSE 0 END), 0) as total_dikirim,
             COALESCE(SUM(CASE WHEN status = 'selesai' THEN 1 ELSE 0 END), 0) as total_selesai,
-            COALESCE(SUM(CASE WHEN status = 'batal' THEN 1 ELSE 0 END), 0) as total_batal
+            COALESCE(SUM(CASE WHEN status = 'kadaluarsa' THEN 1 ELSE 0 END), 0) as total_kadaluarsa,
+            COALESCE(SUM(CASE WHEN status IN ('batal', 'dibatalkan') THEN 1 ELSE 0 END), 0) as total_batal
         ")->first();
 
         return [
@@ -161,6 +165,7 @@ class PesananOnlineIndex extends Component
             'diproses' => (int) ($stats->total_diproses ?? 0),
             'dikirim' => (int) ($stats->total_dikirim ?? 0),
             'selesai' => (int) ($stats->total_selesai ?? 0),
+            'kadaluarsa' => (int) ($stats->total_kadaluarsa ?? 0),
             'batal' => (int) ($stats->total_batal ?? 0),
         ];
     }
@@ -343,7 +348,7 @@ class PesananOnlineIndex extends Component
                     $service->bayarDiToko(
                         $transaksi,
                         $this->metodeBayarPickup, // 'tunai' | 'qris' | 'edc' — diterima service apa adanya
-                        (float) $this->nominalBayarPickup
+                        (float) $this->parseNominal($this->nominalBayarPickup)
                     );
                     // Serah terima fisik setelah bayar: notifikasi konsumen (pindahan dari sini)
                     $service->kirimNotifikasiSerahTerima($transaksi);
@@ -721,8 +726,10 @@ class PesananOnlineIndex extends Component
             $query->whereIn('status', ['dikirim', 'siap_diambil']);
         } elseif ($this->statusFilter === 'selesai') {
             $query->where('status', 'selesai');
+        } elseif ($this->statusFilter === 'kadaluarsa') {
+            $query->where('status', 'kadaluarsa');
         } elseif ($this->statusFilter === 'batal') {
-            $query->where('status', 'batal');
+            $query->whereIn('status', ['batal', 'dibatalkan']);
         }
 
         if (! empty($this->search)) {

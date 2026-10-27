@@ -517,8 +517,8 @@
                     <span class="text-[10px] text-ink-400 block">Pilih metode Qty, Nominal, atau keduanya di samping</span>
                 </div>
 
-                <!-- 3. Aturan Partai Berbasis Qty (Opsional) -->
-                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5 transition {{ (!$hargaPartaiAktif || !$hargaPartaiOpsiQty) ? 'opacity-60' : '' }}">
+                <!-- 3. Aturan Partai Berbasis Qty (Multi-Tier) -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-2 transition {{ (!$hargaPartaiAktif || !$hargaPartaiOpsiQty) ? 'opacity-60' : '' }}">
                     <div class="flex items-center justify-between">
                         <label class="flex items-center gap-1.5 cursor-pointer select-none font-semibold text-ink-200 text-[11px]">
                             <input
@@ -527,42 +527,70 @@
                                 @disabled(!$hargaPartaiAktif)
                                 class="accent-up-mint w-3.5 h-3.5 rounded cursor-pointer"
                             />
-                            <span>Metode Qty</span>
+                            <span>Metode Qty (Tingkat / Multi-Tier)</span>
                         </label>
-                        <span class="text-[9px] px-1.5 py-0.5 rounded {{ $hargaPartaiOpsiQty && $hargaPartaiAktif ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : 'bg-white/5 text-ink-400 border border-white/10' }}">
-                            {{ $hargaPartaiOpsiQty && $hargaPartaiAktif ? 'Aktif' : 'Off' }}
-                        </span>
+                        <div class="flex items-center gap-1.5">
+                            @if($hargaPartaiAktif && $hargaPartaiOpsiQty)
+                                <button
+                                    type="button"
+                                    wire:click="tambahTierQty"
+                                    class="px-2 py-0.5 rounded text-[10px] font-bold bg-up-primary/20 text-up-primary hover:bg-up-primary/30 border border-up-primary/30 cursor-pointer"
+                                    title="Tambah level kuantitas"
+                                >
+                                    + Level
+                                </button>
+                            @endif
+                            <span class="text-[9px] px-1.5 py-0.5 rounded {{ $hargaPartaiOpsiQty && $hargaPartaiAktif ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : 'bg-white/5 text-ink-400 border border-white/10' }}">
+                                {{ $hargaPartaiOpsiQty && $hargaPartaiAktif ? 'Aktif' : 'Off' }}
+                            </span>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-2 pt-1">
-                        <div>
-                            <span class="text-[10px] text-ink-400 block">Min Qty</span>
-                            <input
-                                type="number"
-                                wire:model="hargaPartaiMinQty"
-                                min="1"
-                                @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiQty)
-                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                                placeholder="5"
-                            />
-                        </div>
-                        <div>
-                            <span class="text-[10px] text-ink-400 block">Diskon %</span>
-                            <input
-                                type="number"
-                                wire:model="hargaPartaiQtyDiskon"
-                                min="0"
-                                max="100"
-                                step="0.5"
-                                @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiQty)
-                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-up-mint disabled:opacity-40 disabled:cursor-not-allowed"
-                                placeholder="3"
-                            />
-                        </div>
+
+                    <div class="space-y-1.5 pt-1">
+                        @foreach($hargaPartaiTiersQty as $idx => $tierQty)
+                            <div class="flex items-center gap-2 bg-black/20 p-2 rounded-lg border border-white/5" wire:key="tier-qty-{{ $idx }}">
+                                <span class="text-[9px] font-bold text-ink-400 w-5">#{{ $idx + 1 }}</span>
+                                <div class="flex-1">
+                                    <span class="text-[9px] text-ink-400 block">Min Qty</span>
+                                    <input
+                                        type="number"
+                                        wire:model="hargaPartaiTiersQty.{{ $idx }}.min_qty"
+                                        min="1"
+                                        @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiQty)
+                                        class="w-full px-2 py-1 rounded glass-input text-xs font-bold tabular-nums text-white disabled:opacity-40"
+                                        placeholder="5"
+                                    />
+                                </div>
+                                <div class="flex-1">
+                                    <span class="text-[9px] text-ink-400 block">Diskon %</span>
+                                    <input
+                                        type="number"
+                                        wire:model="hargaPartaiTiersQty.{{ $idx }}.diskon_persen"
+                                        min="0.1"
+                                        max="50"
+                                        step="0.5"
+                                        @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiQty)
+                                        class="w-full px-2 py-1 rounded glass-input text-xs font-bold tabular-nums text-up-mint disabled:opacity-40"
+                                        placeholder="3"
+                                    />
+                                </div>
+                                @if(count($hargaPartaiTiersQty) > 1 && $hargaPartaiAktif && $hargaPartaiOpsiQty)
+                                    <button
+                                        type="button"
+                                        wire:click="hapusTierQty({{ $idx }})"
+                                        class="mt-3.5 text-up-red hover:text-red-400 text-xs px-1 cursor-pointer"
+                                        title="Hapus tingkat ini"
+                                    >
+                                        ✕
+                                    </button>
+                                @endif
+                            </div>
+                        @endforeach
                     </div>
                 </div>
 
-                <!-- 4. Aturan Partai Berbasis Nominal (Opsional) -->
-                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5 transition {{ (!$hargaPartaiAktif || !$hargaPartaiOpsiNominal) ? 'opacity-60' : '' }}">
+                <!-- 4. Aturan Partai Berbasis Nominal (Multi-Tier) -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-2 transition {{ (!$hargaPartaiAktif || !$hargaPartaiOpsiNominal) ? 'opacity-60' : '' }}">
                     <div class="flex items-center justify-between">
                         <label class="flex items-center gap-1.5 cursor-pointer select-none font-semibold text-ink-200 text-[11px]">
                             <input
@@ -571,38 +599,66 @@
                                 @disabled(!$hargaPartaiAktif)
                                 class="accent-up-mint w-3.5 h-3.5 rounded cursor-pointer"
                             />
-                            <span>Metode Nominal</span>
+                            <span>Metode Nominal (Tingkat / Multi-Tier)</span>
                         </label>
-                        <span class="text-[9px] px-1.5 py-0.5 rounded {{ $hargaPartaiOpsiNominal && $hargaPartaiAktif ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : 'bg-white/5 text-ink-400 border border-white/10' }}">
-                            {{ $hargaPartaiOpsiNominal && $hargaPartaiAktif ? 'Aktif' : 'Off' }}
-                        </span>
+                        <div class="flex items-center gap-1.5">
+                            @if($hargaPartaiAktif && $hargaPartaiOpsiNominal)
+                                <button
+                                    type="button"
+                                    wire:click="tambahTierNominal"
+                                    class="px-2 py-0.5 rounded text-[10px] font-bold bg-up-primary/20 text-up-primary hover:bg-up-primary/30 border border-up-primary/30 cursor-pointer"
+                                    title="Tambah level belanja nominal"
+                                >
+                                    + Level
+                                </button>
+                            @endif
+                            <span class="text-[9px] px-1.5 py-0.5 rounded {{ $hargaPartaiOpsiNominal && $hargaPartaiAktif ? 'bg-up-mint/10 text-up-mint border border-up-mint/20' : 'bg-white/5 text-ink-400 border border-white/10' }}">
+                                {{ $hargaPartaiOpsiNominal && $hargaPartaiAktif ? 'Aktif' : 'Off' }}
+                            </span>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-2 pt-1">
-                        <div>
-                            <span class="text-[10px] text-ink-400 block">Min Belanja Rp</span>
-                            <input
-                                type="number"
-                                wire:model="hargaPartaiMinNominal"
-                                min="0"
-                                step="50000"
-                                @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiNominal)
-                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                                placeholder="1000000"
-                            />
-                        </div>
-                        <div>
-                            <span class="text-[10px] text-ink-400 block">Diskon %</span>
-                            <input
-                                type="number"
-                                wire:model="hargaPartaiNominalDiskon"
-                                min="0"
-                                max="100"
-                                step="0.5"
-                                @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiNominal)
-                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-up-mint disabled:opacity-40 disabled:cursor-not-allowed"
-                                placeholder="2"
-                            />
-                        </div>
+
+                    <div class="space-y-1.5 pt-1">
+                        @foreach($hargaPartaiTiersNominal as $idx => $tierNom)
+                            <div class="flex items-center gap-2 bg-black/20 p-2 rounded-lg border border-white/5" wire:key="tier-nom-{{ $idx }}">
+                                <span class="text-[9px] font-bold text-ink-400 w-5">#{{ $idx + 1 }}</span>
+                                <div class="flex-1">
+                                    <span class="text-[9px] text-ink-400 block">Min Belanja Rp</span>
+                                    <input
+                                        type="number"
+                                        wire:model="hargaPartaiTiersNominal.{{ $idx }}.min_nominal"
+                                        min="10000"
+                                        step="50000"
+                                        @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiNominal)
+                                        class="w-full px-2 py-1 rounded glass-input text-xs font-bold tabular-nums text-white disabled:opacity-40"
+                                        placeholder="1000000"
+                                    />
+                                </div>
+                                <div class="flex-1">
+                                    <span class="text-[9px] text-ink-400 block">Diskon %</span>
+                                    <input
+                                        type="number"
+                                        wire:model="hargaPartaiTiersNominal.{{ $idx }}.diskon_persen"
+                                        min="0.1"
+                                        max="50"
+                                        step="0.5"
+                                        @disabled(!$hargaPartaiAktif || !$hargaPartaiOpsiNominal)
+                                        class="w-full px-2 py-1 rounded glass-input text-xs font-bold tabular-nums text-up-mint disabled:opacity-40"
+                                        placeholder="2"
+                                    />
+                                </div>
+                                @if(count($hargaPartaiTiersNominal) > 1 && $hargaPartaiAktif && $hargaPartaiOpsiNominal)
+                                    <button
+                                        type="button"
+                                        wire:click="hapusTierNominal({{ $idx }})"
+                                        class="mt-3.5 text-up-red hover:text-red-400 text-xs px-1 cursor-pointer"
+                                        title="Hapus tingkat ini"
+                                    >
+                                        ✕
+                                    </button>
+                                @endif
+                            </div>
+                        @endforeach
                     </div>
                 </div>
 

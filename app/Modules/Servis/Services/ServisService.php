@@ -943,13 +943,15 @@ class ServisService
                 if ($metodePembayaran === 'tunai') {
                     $debitLines[] = ['akun_kode' => '110-04', 'debit' => $totalTagihan, 'kredit' => 0]; // Kas Laci
                 } elseif ($metodePembayaran === 'split' && $splitDetail) {
-                    $tunai = (float) ($splitDetail['tunai'] ?? 0);
                     $nonTunai = (float) ($splitDetail['non_tunai'] ?? 0);
-                    if ($tunai > 0) {
-                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $tunai, 'kredit' => 0];
+                    $porsiBank = min((float) $totalTagihan, $nonTunai);
+                    $porsiKas = max(0.0, (float) $totalTagihan - $porsiBank);
+
+                    if ($porsiKas > 0) {
+                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $porsiKas, 'kredit' => 0];
                     }
-                    if ($nonTunai > 0) {
-                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $nonTunai, 'kredit' => 0];
+                    if ($porsiBank > 0) {
+                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $porsiBank, 'kredit' => 0];
                     }
                 } else {
                     // transfer, qris, kartu, online

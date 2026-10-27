@@ -320,8 +320,21 @@ class PosController extends Controller
                 $ppnNominal = (float) $pajak['ppn_nominal'];
 
                 $totalAkhir = $dpp + $ppnNominal;
-                $jumlahBayar = (float) $request->jumlah_bayar;
-                $kembalian = max(0, $jumlahBayar - $totalAkhir);
+                if ($request->metode_bayar === 'tunai') {
+                    $jumlahBayar = (float) $request->jumlah_bayar;
+                    $kembalian = max(0, $jumlahBayar - $totalAkhir);
+                } elseif ($request->metode_bayar === 'split' && is_array($request->split_detail)) {
+                    $tunai = (float) ($request->split_detail['tunai'] ?? 0);
+                    $nonTunai = (float) ($request->split_detail['non_tunai'] ?? 0);
+                    $jumlahBayar = $tunai + $nonTunai;
+                    $kembalian = max(0, $jumlahBayar - $totalAkhir);
+                } elseif ($request->metode_bayar === 'piutang') {
+                    $jumlahBayar = 0;
+                    $kembalian = 0;
+                } else {
+                    $jumlahBayar = (float) ($request->jumlah_bayar ?: $totalAkhir);
+                    $kembalian = 0;
+                }
 
                 $transaksi = Transaksi::create([
                     'no_transaksi' => $noTransaksi,
@@ -414,13 +427,15 @@ class PosController extends Controller
                 } elseif ($request->metode_bayar === 'tunai') {
                     $debitLines[] = ['akun_kode' => '110-04', 'debit' => (float) $totalAkhir, 'kredit' => 0];
                 } elseif ($request->metode_bayar === 'split' && is_array($request->split_detail)) {
-                    $splitTunai = (float) ($request->split_detail['tunai'] ?? 0);
                     $splitNonTunai = (float) ($request->split_detail['non_tunai'] ?? 0);
-                    if ($splitTunai > 0) {
-                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $splitTunai, 'kredit' => 0];
+                    $porsiBank = min((float) $totalAkhir, $splitNonTunai);
+                    $porsiKas = max(0.0, (float) $totalAkhir - $porsiBank);
+
+                    if ($porsiKas > 0) {
+                        $debitLines[] = ['akun_kode' => '110-04', 'debit' => $porsiKas, 'kredit' => 0];
                     }
-                    if ($splitNonTunai > 0) {
-                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $splitNonTunai, 'kredit' => 0];
+                    if ($porsiBank > 0) {
+                        $debitLines[] = ['akun_kode' => '110-02', 'debit' => $porsiBank, 'kredit' => 0];
                     }
                 } else {
                     // transfer / qris langsung ke Bank
@@ -462,10 +477,12 @@ class PosController extends Controller
                         'cabang_id' => $cabangId,
                         'jumlah' => $totalAkhir,
                         'jumlah_dibayar' => 0,
+                        'sisa' => $totalAkhir,
                         'jatuh_tempo' => now()->addDays(30)->toDateString(),
                         'status' => 'belum_lunas',
                         'keterangan' => 'Kasbon POS '.$noTransaksi,
                     ]);
+                    Pelanggan::where('id', $request->pelanggan_id)->increment('saldo_piutang', $totalAkhir);
                 }
 
                 // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif

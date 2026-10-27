@@ -747,6 +747,7 @@
                         <option value="selesai" class="bg-gray-900 text-white">Selesai</option>
                         <option value="pending" class="bg-gray-900 text-white">Pending</option>
                         <option value="dibatalkan" class="bg-gray-900 text-white">Dibatalkan</option>
+                        <option value="kadaluarsa" class="bg-gray-900 text-white">Kadaluarsa</option>
                     </select>
 
                     <!-- Search Input -->
