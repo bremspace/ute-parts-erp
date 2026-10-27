@@ -7,7 +7,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class BulkFotoUploadController extends Controller
 {
@@ -51,13 +50,15 @@ class BulkFotoUploadController extends Controller
                 $cleanRel = $origName;
             }
 
-            // Ganti separator path subfolder menjadi underscore atau simpan subfolder terstruktur
-            $safeRelative = str_replace(['/', '\\'], '__', $cleanRel);
-            $extension = $uploadedFile->getClientOriginalExtension() ?: pathinfo($origName, PATHINFO_EXTENSION);
-            $basename = pathinfo($safeRelative, PATHINFO_FILENAME);
-            $finalName = Str::slug($basename).'_'.Str::random(6).'.'.($extension ?: 'jpg');
+            // Simpan file dengan nama asli dan struktur subfolder asli jika ada
+            $subDir = dirname($cleanRel);
+            $destDir = $subDir !== '.' && $subDir !== '' ? $targetPath.'/'.$subDir : $targetPath;
+            if (! is_dir($destDir)) {
+                File::makeDirectory($destDir, 0775, true, true);
+            }
 
-            $uploadedFile->move($targetPath, $finalName);
+            $destFilename = basename($cleanRel);
+            $uploadedFile->move($destDir, $destFilename);
             $uploadedCount++;
         }
 

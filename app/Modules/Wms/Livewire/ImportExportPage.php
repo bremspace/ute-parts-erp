@@ -846,6 +846,10 @@ class ImportExportPage extends Component
                 ? array_slice(array_values(array_filter($detailList, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true))), 0, 50)
                 : $detailList;
 
+            $currentSku = is_array($log->detail) ? ($log->detail['current_sku'] ?? null) : null;
+            $currentNama = is_array($log->detail) ? ($log->detail['current_nama'] ?? null) : null;
+            $currentBaris = is_array($log->detail) ? ($log->detail['current_baris'] ?? $selesai) : $selesai;
+
             $this->activeFotoImportLog = [
                 'id' => $log->id,
                 'status' => $log->status,
@@ -854,9 +858,9 @@ class ImportExportPage extends Component
                 'gagal' => $gagal,
                 'skip' => count($skipRows),
                 'persen' => $persen,
-                'current_sku' => $log->current_sku,
-                'current_nama' => $log->current_nama,
-                'current_baris' => $log->current_baris ?? $selesai,
+                'current_sku' => $currentSku,
+                'current_nama' => $currentNama,
+                'current_baris' => $currentBaris,
                 'detail' => $trimmedDetail,
                 'gagal_rows' => $gagalRows,
                 'skip_rows' => $skipRows,

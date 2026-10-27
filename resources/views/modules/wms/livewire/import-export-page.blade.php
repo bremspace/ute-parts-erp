@@ -980,18 +980,30 @@
                     <div class="space-y-2">
                         <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Metode Pengunggahan:</label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $fotoSourceType === 'files' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                            <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $fotoSourceType === 'files' ? 'bg-up-primary/10 border-up-primary ring-1 ring-up-primary/30' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}">
                                 <input type="radio" wire:model.live="fotoSourceType" value="files" class="mt-0.5 text-up-primary">
                                 <div class="space-y-0.5">
-                                    <div class="font-bold text-xs text-ink-900 dark:text-white">📁 Folder Lokal / Multi-File</div>
-                                    <div class="text-[11px] text-ink-500 dark:text-ink-400">Pilih satu folder langsung dari PC atau seleksi puluhan foto</div>
+                                    <div class="font-bold text-xs text-ink-950 dark:text-white flex items-center gap-1.5">
+                                        <span>📁</span>
+                                        <span>Folder Lokal / Multi-File</span>
+                                        @if($fotoSourceType === 'files')
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-primary text-white font-bold ml-1">Aktif</span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[11px] text-ink-600 dark:text-ink-400">Pilih satu folder langsung dari PC atau seleksi puluhan foto</div>
                                 </div>
                             </label>
-                            <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $fotoSourceType === 'zip' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                            <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 {{ $fotoSourceType === 'zip' ? 'bg-up-primary/10 border-up-primary ring-1 ring-up-primary/30' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}">
                                 <input type="radio" wire:model.live="fotoSourceType" value="zip" class="mt-0.5 text-up-primary">
                                 <div class="space-y-0.5">
-                                    <div class="font-bold text-xs text-ink-900 dark:text-white">🗜️ Berkas Arsip (.ZIP)</div>
-                                    <div class="text-[11px] text-ink-500 dark:text-ink-400">Unggah satu file .zip (diekstrak otomatis di server)</div>
+                                    <div class="font-bold text-xs text-ink-950 dark:text-white flex items-center gap-1.5">
+                                        <span>🗜️</span>
+                                        <span>Berkas Arsip (.ZIP)</span>
+                                        @if($fotoSourceType === 'zip')
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-primary text-white font-bold ml-1">Aktif</span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[11px] text-ink-600 dark:text-ink-400">Unggah satu file .zip (diekstrak otomatis di server)</div>
                                 </div>
                             </label>
                         </div>
@@ -1001,25 +1013,43 @@
                     <div class="space-y-2">
                         <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Strategi Terhadap Foto Produk Eksisting:</label>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'append' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'append' ? 'bg-up-primary/10 border-up-primary ring-1 ring-up-primary/30' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}">
                                 <input type="radio" wire:model.live="fotoMode" value="append" class="mt-0.5 text-up-primary">
                                 <div class="space-y-0.5">
-                                    <div class="font-bold text-[11px] text-ink-900 dark:text-white">Tambahkan ke Galeri</div>
-                                    <div class="text-[10px] text-ink-500 dark:text-ink-400 leading-tight">Foto baru ditambahkan ke galeri produk (rekomendasi)</div>
+                                    <div class="font-bold text-[11px] text-ink-950 dark:text-white flex items-center gap-1">
+                                        <span>🖼️</span>
+                                        <span>Tambahkan ke Galeri</span>
+                                        @if($fotoMode === 'append')
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-primary text-white font-bold ml-1">Dipilih</span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Foto baru ditambahkan ke galeri produk tanpa menghapus foto lama (rekomendasi)</div>
                                 </div>
                             </label>
-                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'replace' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'replace' ? 'bg-up-primary/10 border-up-primary ring-1 ring-up-primary/30' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}">
                                 <input type="radio" wire:model.live="fotoMode" value="replace" class="mt-0.5 text-up-primary">
                                 <div class="space-y-0.5">
-                                    <div class="font-bold text-[11px] text-ink-900 dark:text-white">Ganti Total (Replace)</div>
-                                    <div class="text-[10px] text-ink-500 dark:text-ink-400 leading-tight">Hapus foto lama dari disk &amp; ganti dengan foto baru</div>
+                                    <div class="font-bold text-[11px] text-ink-950 dark:text-white flex items-center gap-1">
+                                        <span>🔄</span>
+                                        <span>Ganti Total (Replace)</span>
+                                        @if($fotoMode === 'replace')
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-primary text-white font-bold ml-1">Dipilih</span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Hapus foto lama dari disk &amp; ganti sepenuhnya dengan foto baru</div>
                                 </div>
                             </label>
-                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'skip_existing' ? 'bg-up-primary/10 border-up-primary text-white' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-ink-400 hover:bg-black/10' }}">
+                            <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'skip_existing' ? 'bg-up-primary/10 border-up-primary ring-1 ring-up-primary/30' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}">
                                 <input type="radio" wire:model.live="fotoMode" value="skip_existing" class="mt-0.5 text-up-primary">
                                 <div class="space-y-0.5">
-                                    <div class="font-bold text-[11px] text-ink-900 dark:text-white">Hanya Jika Kosong</div>
-                                    <div class="text-[10px] text-ink-500 dark:text-ink-400 leading-tight">Lewati jika produk sudah punya foto di sistem</div>
+                                    <div class="font-bold text-[11px] text-ink-950 dark:text-white flex items-center gap-1">
+                                        <span>⏭️</span>
+                                        <span>Hanya Jika Kosong</span>
+                                        @if($fotoMode === 'skip_existing')
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-primary text-white font-bold ml-1">Dipilih</span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Lewati jika produk sudah punya foto di sistem</div>
                                 </div>
                             </label>
                         </div>
@@ -1027,7 +1057,7 @@
 
                     <!-- Input Dropzone -->
                     @if($fotoSourceType === 'files')
-                        <div x-data="bulkFotoUploader()" class="space-y-4">
+                        <div x-data="bulkFotoUploader($wire)" class="space-y-4">
                             <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Pilih Berkas / Folder Foto Produk:</label>
 
                             <!-- Mode Selector & Pickers -->
@@ -1106,7 +1136,7 @@
                         </div>
 
                         <script>
-                        function bulkFotoUploader() {
+                        function bulkFotoUploader(wire) {
                             return {
                                 selectedFiles: [],
                                 totalFiles: 0,
@@ -1234,8 +1264,27 @@
                                     this.statusText = 'Semua foto terunggah! Memindai & mencocokkan SKU...';
                                     const finalSessionId = this.sessionId;
 
-                                    // Panggil Livewire backend method untuk memindai staging
-                                    this.$wire.scanFromStagingSession(finalSessionId);
+                                    try {
+                                        if (wire && typeof wire.scanFromStagingSession === 'function') {
+                                            await wire.scanFromStagingSession(finalSessionId);
+                                        } else if (typeof $wire !== 'undefined' && typeof $wire.scanFromStagingSession === 'function') {
+                                            await $wire.scanFromStagingSession(finalSessionId);
+                                        } else {
+                                            const el = this.$el?.closest('[wire\\:id]');
+                                            const compId = el?.getAttribute('wire:id');
+                                            const comp = compId && window.Livewire ? window.Livewire.find(compId) : null;
+                                            if (comp) {
+                                                await comp.scanFromStagingSession(finalSessionId);
+                                            } else {
+                                                throw new Error('Komponen Livewire tidak ditemukan.');
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.error('Gagal memindai staging:', e);
+                                        alert('Terjadi kesalahan saat memindai foto: ' + (e.message || e));
+                                    } finally {
+                                        this.isUploading = false;
+                                    }
                                 }
                             };
                         }

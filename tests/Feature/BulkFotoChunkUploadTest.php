@@ -72,7 +72,7 @@ class BulkFotoChunkUploadTest extends TestCase
         ]);
 
         $stagingDir = 'tmp_foto_'.$this->user->id.'_'.$sessionId;
-        $filesInStorage = Storage::disk('local')->files($stagingDir);
+        $filesInStorage = Storage::disk('local')->allFiles($stagingDir);
         $this->assertCount(2, $filesInStorage);
     }
 

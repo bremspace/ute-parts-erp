@@ -3,6 +3,21 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-27 — Perbaikan Bug UI Galeri & Loop Loading Upload Foto Master Produk WMS ✅
+
+- **Perbaikan UI Strategi Foto Eksisting (`import-export-page.blade.php`)**:
+  - Memperbaiki kontras teks pada opsi radio "Tambahkan ke Galeri", "Ganti Total", dan "Hanya Jika Kosong" di light mode (menghapus benturan class `text-white` di atas background pastel terang).
+  - Menambahkan indikator visual badge status "Dipilih" serta ikon penjelas pada setiap opsi strategi foto.
+- **Penyelesaian Kendala Upload Berputar Terus / Hang (`import-export-page.blade.php`)**:
+  - Mengatasi `this.$wire` bernilai `undefined` pada konteks objek JS Alpine `bulkFotoUploader` dengan melewatkan instance `$wire` secara eksplisit dan menyediakan fallback lookup ID Livewire.
+  - Membungkus alur scanning dalam blok `try ... finally { this.isUploading = false; }` sehingga status loading selalu reset dengan aman saat terjadi interupsi/error.
+- **Koreksi Routing Chunk Upload (`routes/web.php`)**:
+  - Memperbaiki route prefix dari `/app/wms/import-foto/*` menjadi `/wms/import-foto/*` agar tidak terduplikasi menjadi `/app/app/...` di dalam route group backoffice.
+- **Preservasi Nama Asli Berkas Foto (`BulkFotoUploadController.php`)**:
+  - Menghapus pengacakan nama berkas (`Str::slug` + `Str::random(6)`) agar nama asli file dan struktur subfolder tetap terjaga untuk resolusi pencocokan nama berkas terhadap SKU produk di sistem.
+- **Perbaikan Pembacaan Ticker Progress (`ImportExportPage.php`)**:
+  - Menyelaraskan pembacaan `current_sku`, `current_nama`, dan `current_baris` dari atribut array `$log->detail`.
+
 ## 2026-10-27 — Chunked Streaming Upload Folder Foto Produk & Ketahanan Beban Server 1GB ✅
 
 - **Chunked / Micro-Batch Streaming Upload Foto Massal (`BulkFotoUploadController` & `bulkFotoUploader`)**:
