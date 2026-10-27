@@ -335,6 +335,19 @@ class BulkProductImageImportService
         return DB::transaction(function () use ($produk, $saved, $mode, $forcePrimary) {
             $existingFoto = is_array($produk->foto) ? $produk->foto : (json_decode((string) $produk->foto, true) ?: []);
 
+            // Jika belum ada di array 'foto' tapi produk punya foto tunggal di kolom 'gambar', migrasikan sebagai foto pertama
+            if (empty($existingFoto) && ! empty($produk->gambar)) {
+                $existingFoto = [
+                    [
+                        'url' => $produk->gambar,
+                        'thumb' => $produk->thumbnail_url ?: $produk->gambar,
+                        'path' => null,
+                        'thumb_path' => null,
+                        'is_primary' => true,
+                    ],
+                ];
+            }
+
             if ($mode === 'replace') {
                 // Hapus foto lama dari disk storage untuk efisiensi ruang
                 foreach ($existingFoto as $old) {
@@ -347,7 +360,7 @@ class BulkProductImageImportService
                 $primaryUrl = $saved['url'];
             } else {
                 // Mode 'append'
-                $isCurrentlyEmpty = empty($existingFoto) && empty($produk->gambar);
+                $isCurrentlyEmpty = empty($existingFoto);
                 $makePrimary = $forcePrimary || $isCurrentlyEmpty;
 
                 if ($makePrimary) {

@@ -180,6 +180,35 @@ class BulkProductImageImportTest extends TestCase
         $this->assertTrue($produk->foto[0]['is_primary']);
     }
 
+    public function test_append_mode_preserves_existing_legacy_gambar_into_gallery(): void
+    {
+        Storage::fake('public');
+
+        // Produk yang hanya punya single 'gambar' (misal dari import Excel), 'foto' masih null
+        $produk = Produk::create([
+            'nama' => 'Produk Single Gambar Lama',
+            'sku' => 'SKU-LEGACY-01',
+            'tipe' => 'barang',
+            'is_active' => true,
+            'gambar' => 'https://uteparts.id/storage/produk/legacy_cover.jpg',
+            'foto' => null,
+        ]);
+
+        $newImage = UploadedFile::fake()->image('foto_kedua.jpg', 600, 600);
+        $res = $this->service->processAndAttach($newImage, $produk->id, 'append', false);
+
+        $this->assertTrue($res['success']);
+        $produk->refresh();
+
+        // Foto harus menjadi 2 item di galeri: item 1 foto legacy (primary), item 2 foto baru yang di-append
+        $this->assertIsArray($produk->foto);
+        $this->assertCount(2, $produk->foto);
+        $this->assertEquals('https://uteparts.id/storage/produk/legacy_cover.jpg', $produk->foto[0]['url']);
+        $this->assertTrue($produk->foto[0]['is_primary']);
+        $this->assertFalse($produk->foto[1]['is_primary']);
+        $this->assertCount(2, $produk->galeri_foto);
+    }
+
     public function test_skipped_export_generates_collection(): void
     {
         $skipped = [

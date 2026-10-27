@@ -1011,19 +1011,22 @@
 
                     <!-- Opsi Mode Penggabungan Foto -->
                     <div class="space-y-2">
-                        <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Strategi Terhadap Foto Produk Eksisting:</label>
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Strategi Terhadap Foto Produk Eksisting:</label>
+                            <span class="text-[10px] text-ink-400">Tindakan jika produk di sistem sudah memiliki foto</span>
+                        </div>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'append' ? 'bg-up-primary/10 border-up-primary ring-1 ring-up-primary/30' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}">
                                 <input type="radio" wire:model.live="fotoMode" value="append" class="mt-0.5 text-up-primary">
                                 <div class="space-y-0.5">
                                     <div class="font-bold text-[11px] text-ink-950 dark:text-white flex items-center gap-1">
                                         <span>🖼️</span>
-                                        <span>Tambahkan ke Galeri</span>
+                                        <span>Tambahkan ke Galeri (Append)</span>
                                         @if($fotoMode === 'append')
                                             <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-primary text-white font-bold ml-1">Dipilih</span>
                                         @endif
                                     </div>
-                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Foto baru ditambahkan ke galeri produk tanpa menghapus foto lama (rekomendasi)</div>
+                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Foto baru dari komputer akan di-append ke daftar galeri produk (multi-foto didukung di Marketplace &amp; POS)</div>
                                 </div>
                             </label>
                             <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'replace' ? 'bg-up-primary/10 border-up-primary ring-1 ring-up-primary/30' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}">
@@ -1036,7 +1039,7 @@
                                             <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-primary text-white font-bold ml-1">Dipilih</span>
                                         @endif
                                     </div>
-                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Hapus foto lama dari disk &amp; ganti sepenuhnya dengan foto baru</div>
+                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Hapus seluruh foto lama dari disk storage &amp; gantikan sepenuhnya dengan foto baru</div>
                                 </div>
                             </label>
                             <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-2.5 {{ $fotoMode === 'skip_existing' ? 'bg-up-primary/10 border-up-primary ring-1 ring-up-primary/30' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}">
@@ -1044,12 +1047,12 @@
                                 <div class="space-y-0.5">
                                     <div class="font-bold text-[11px] text-ink-950 dark:text-white flex items-center gap-1">
                                         <span>⏭️</span>
-                                        <span>Hanya Jika Kosong</span>
+                                        <span>Hanya Jika Kosong (Skip)</span>
                                         @if($fotoMode === 'skip_existing')
                                             <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-primary text-white font-bold ml-1">Dipilih</span>
                                         @endif
                                     </div>
-                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Lewati jika produk sudah punya foto di sistem</div>
+                                    <div class="text-[10px] text-ink-600 dark:text-ink-400 leading-tight">Lewati jika produk di sistem sudah memiliki foto (hanya isi produk tanpa foto)</div>
                                 </div>
                             </label>
                         </div>
@@ -1057,8 +1060,11 @@
 
                     <!-- Input Dropzone -->
                     @if($fotoSourceType === 'files')
-                        <div x-data="bulkFotoUploader($wire)" class="space-y-4">
-                            <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Pilih Berkas / Folder Foto Produk:</label>
+                        <div x-data="bulkFotoUploader($wire)" wire:key="bulk-uploader-files-dropzone-panel" class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Pilih Berkas Foto Baru dari Komputer / Laptop Anda:</label>
+                                <span class="text-[10px] text-ink-400">Pilih folder atau seleksi file lokal untuk dipetakan ke SKU</span>
+                            </div>
 
                             <!-- Mode Selector & Pickers -->
                             <div x-show="!isUploading" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1066,7 +1072,7 @@
                                 <div class="p-4 rounded-xl border-2 border-dashed border-black/15 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-black/5 dark:bg-white/[0.01] transition text-center space-y-2">
                                     <div class="text-2xl">📁</div>
                                     <div class="font-bold text-xs text-ink-900 dark:text-white">Unggah Satu Folder</div>
-                                    <p class="text-[11px] text-ink-400">Pilih folder lokal (termasuk ribuan sub-file/foto)</p>
+                                    <p class="text-[11px] text-ink-400">Pilih satu folder lokal di PC (termasuk ribuan sub-file foto di dalamnya)</p>
                                     <label class="inline-block mt-2 px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs cursor-pointer border border-up-primary/40 transition">
                                         Pilih Folder...
                                         <input type="file" @change="onFilesSelected($event)" multiple webkitdirectory directory class="hidden">
@@ -1077,11 +1083,20 @@
                                 <div class="p-4 rounded-xl border-2 border-dashed border-black/15 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-black/5 dark:bg-white/[0.01] transition text-center space-y-2">
                                     <div class="text-2xl">🖼️</div>
                                     <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Multi-File Gambar</div>
-                                    <p class="text-[11px] text-ink-400">Format gambar apapun (JPG, PNG, WebP, AVIF, HEIC, TIFF, BMP, dll.)</p>
+                                    <p class="text-[11px] text-ink-400">Pilih banyak file sekaligus (JPG, PNG, WebP, AVIF, HEIC, TIFF, BMP, dll.)</p>
                                     <label class="inline-block mt-2 px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs cursor-pointer border border-up-primary/40 transition">
                                         Pilih File...
                                         <input type="file" @change="onFilesSelected($event)" multiple accept="image/*,.heic,.heif,.avif,.tiff,.tif,.psd,.bmp" class="hidden">
                                     </label>
+                                </div>
+                            </div>
+
+                            <!-- Petunjuk awal jika belum ada file dipilih -->
+                            <div x-show="totalFiles === 0 && !isUploading" class="p-3 rounded-xl bg-black/5 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 flex items-start gap-2.5 text-[11px] text-ink-500 dark:text-ink-400">
+                                <span class="text-base leading-none">💡</span>
+                                <div>
+                                    <span class="font-bold text-ink-700 dark:text-ink-300">Format Penamaan File Otomatis:</span>
+                                    Nama file foto atau nama folder sebaiknya memuat kode SKU atau Barcode (contoh: <code class="font-mono text-up-primary bg-up-primary/10 px-1 py-0.5 rounded">LCD-IP13-01.jpg</code> atau folder <code class="font-mono text-up-primary bg-up-primary/10 px-1 py-0.5 rounded">LCD-IP13/cover.jpg</code>). Sistem akan otomatis mencocokkannya ke master produk WMS.
                                 </div>
                             </div>
 
@@ -1136,7 +1151,7 @@
                         </div>
 
                         <script>
-                        function bulkFotoUploader(wire) {
+                        window.bulkFotoUploader = function(wire) {
                             return {
                                 selectedFiles: [],
                                 totalFiles: 0,
@@ -1189,8 +1204,7 @@
                                                 'Content-Type': 'application/json',
                                                 'X-CSRF-TOKEN': csrf || ''
                                             },
-                                            body: JSON.stringify({ session_id: sessId })
-                                        });
+                                            body: JSON.stringify({ session_id: sessId })\n                                        });
                                     } catch (e) {
                                         console.warn('Gagal membersihkan sesi staging:', e);
                                     }
@@ -1287,7 +1301,7 @@
                                     }
                                 }
                             };
-                        }
+                        };
                         </script>
                     @else
                         <!-- ZIP File Upload -->
