@@ -188,4 +188,38 @@ class BulkFotoChunkUploadTest extends TestCase
             ->assertSet('fotoStep', 'preview')
             ->assertDispatched('alert');
     }
+
+    public function test_livewire_scan_from_staging_session_respects_skip_existing_mode(): void
+    {
+        $p = Produk::create([
+            'nama' => 'Baterai iPhone 12',
+            'slug' => 'baterai-iphone-12-'.uniqid(),
+            'kategori' => 'Baterai',
+            'kondisi' => 'baru',
+            'status' => 'aktif',
+            'gambar' => 'https://uteparts.id/storage/baterai.webp',
+            'foto' => [['url' => 'https://uteparts.id/storage/baterai.webp', 'is_primary' => true]],
+            'is_active' => true,
+        ]);
+        SkuVariant::create([
+            'produk_id' => $p->id,
+            'sku' => 'BAT-IP12',
+            'barcode' => '899123450002',
+            'nama_varian' => 'Standar',
+            'is_active' => true,
+        ]);
+
+        $sessionId = 'sess_livewire_skip_test';
+        $stagingDir = 'tmp_foto_'.$this->user->id.'_'.$sessionId;
+        $fakeImg = UploadedFile::fake()->image('BAT-IP12_01.jpg');
+        $fakeImg->storeAs($stagingDir, 'bat-ip12-01_123456.jpg', 'local');
+
+        // Saat fotoMode = 'skip_existing', produk yang sudah memiliki foto disortir ke skipped
+        Livewire::test(ImportExportPage::class)
+            ->set('fotoMode', 'skip_existing')
+            ->call('scanFromStagingSession', $sessionId)
+            ->assertSet('fotoStep', 'preview')
+            ->assertSet('fotoScanResult.matched_count', 0)
+            ->assertSet('fotoScanResult.skipped_count', 1);
+    }
 }

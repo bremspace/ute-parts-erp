@@ -685,7 +685,7 @@ class ImportExportPage extends Component
 
                     return;
                 }
-                $scan = $bulkService->preScanFiles($extracted);
+                $scan = $bulkService->preScanFiles($extracted, $this->fotoMode);
                 $this->fotoScanResult = $scan;
                 $this->fotoStep = 'preview';
             } catch (\Throwable $e) {
@@ -725,7 +725,7 @@ class ImportExportPage extends Component
                 ];
             }
 
-            $scan = $bulkService->preScanFiles($items);
+            $scan = $bulkService->preScanFiles($items, $this->fotoMode);
             $this->fotoScanResult = $scan;
             $this->fotoStep = 'preview';
         }
@@ -759,7 +759,7 @@ class ImportExportPage extends Component
         }
 
         $this->fotoTempDir = $tempDir;
-        $this->fotoScanResult = $bulkService->preScanFiles($items);
+        $this->fotoScanResult = $bulkService->preScanFiles($items, $this->fotoMode);
         $this->fotoStep = 'preview';
 
         $totalFound = count($items);

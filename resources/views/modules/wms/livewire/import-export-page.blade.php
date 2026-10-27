@@ -1060,7 +1060,7 @@
 
                     <!-- Input Dropzone & Pre-Flight Sorter -->
                     <div x-data="bulkFotoUploader($wire)"
-                         x-init="$watch('$wire.fotoMode', (newMode) => { if (rawFilesList.length > 0) runPreCheck(newMode); })"
+                         x-init="$watch('$wire.fotoMode', (newMode) => { if (rawFilesList.length > 0) runPreCheck(newMode); }); $watch('$wire.fotoSourceType', () => resetUploader());"
                          wire:key="bulk-uploader-files-dropzone-panel"
                          class="space-y-4">
                         <div class="flex items-center justify-between">
@@ -1373,7 +1373,11 @@
                                     this.matchedList = data.matched || [];
                                     this.skippedList = data.skipped || [];
 
-                                    this.matchedSet = new Set(this.matchedList.map(m => m.filename));
+                                    this.matchedSet = new Set();
+                                    this.matchedList.forEach(m => {
+                                        if (m.filename) this.matchedSet.add(m.filename);
+                                        if (m.relative_path) this.matchedSet.add(m.relative_path);
+                                    });
                                     this.preCheckDone = true;
                                 } catch (e) {
                                     console.error('Pre-check error:', e);
