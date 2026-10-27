@@ -1071,39 +1071,38 @@
                         <div x-show="!isUploading && !isPreChecking">
                             @if($fotoSourceType === 'files')
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <!-- Option 1: Mobile-friendly Multi-File via File Manager (Preserves SKU Filenames) -->
-                                    <div class="relative overflow-hidden p-5 rounded-xl border-2 border-dashed border-up-primary/40 hover:border-up-primary bg-up-primary/[0.03] dark:bg-up-primary/[0.05] transition text-center space-y-2 cursor-pointer group">
-                                        <input type="file"
-                                               @change="onFilesSelected($event)"
-                                               multiple
-                                               accept=".jpg,.jpeg,.png,.webp,.avif,.heic,.heif,.bmp,.tiff"
-                                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
-                                        <div class="text-3xl group-hover:scale-110 transition-transform">📁</div>
-                                        <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Foto via File Manager / Dokumen</div>
-                                        <p class="text-[11px] text-ink-400">Membuka File Manager / Dokumen perangkat (bukan Galeri HP) agar nama file asli sesuai SKU tetap terjaga.</p>
-                                        <div class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/20 pointer-events-none">
-                                            <span>📂</span>
-                                            <span>Buka File Manager HP / PC...</span>
-                                        </div>
-                                        <div class="text-[10px] text-up-amber font-medium">
-                                            ⚠️ Di HP: Jika muncul pilihan, pilih menu <strong>File / Dokumen</strong> (jangan Galeri)
-                                        </div>
-                                    </div>
-
-                                    <!-- Option 2: Folder Upload (Khusus Laptop / PC) -->
-                                    <div class="relative overflow-hidden p-5 rounded-xl border-2 border-dashed border-black/15 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-black/5 dark:bg-white/[0.01] transition text-center space-y-2 cursor-pointer group hidden sm:block">
+                                    <!-- Option 1: File Manager via Folder / Directory Intent (Terbukti buka File Manager di HP) -->
+                                    <div class="relative overflow-hidden p-5 rounded-xl border-2 border-dashed border-up-primary/60 hover:border-up-primary bg-up-primary/[0.05] dark:bg-up-primary/[0.08] transition text-center space-y-2 cursor-pointer group">
                                         <input type="file"
                                                @change="onFilesSelected($event)"
                                                multiple
                                                webkitdirectory
                                                directory
                                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
-                                        <div class="text-3xl group-hover:scale-110 transition-transform">🗂️</div>
-                                        <div class="font-bold text-xs text-ink-900 dark:text-white">Unggah Satu Folder (Laptop / PC)</div>
-                                        <p class="text-[11px] text-ink-400">Pilih satu folder lokal di PC (termasuk ribuan sub-file foto di dalamnya)</p>
+                                        <div class="text-3xl group-hover:scale-110 transition-transform">📂</div>
+                                        <div class="font-bold text-xs text-ink-900 dark:text-white flex items-center justify-center gap-1.5">
+                                            <span>Buka File Manager / Folder</span>
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] bg-up-mint/20 text-up-mint font-bold">Rekomendasi HP</span>
+                                        </div>
+                                        <p class="text-[11px] text-ink-400">Membuka File Manager / Folder penyimpanan HP &amp; laptop. Menjaga 100% nama file asli sesuai SKU produk (tidak di-rename oleh galeri).</p>
+                                        <div class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/20 pointer-events-none">
+                                            <span>📁</span>
+                                            <span>Pilih Folder / File Manager...</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Option 2: Multi-File Selection (Tanpa filter galeri) -->
+                                    <div class="relative overflow-hidden p-5 rounded-xl border-2 border-dashed border-black/15 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-black/5 dark:bg-white/[0.01] transition text-center space-y-2 cursor-pointer group">
+                                        <input type="file"
+                                               @change="onFilesSelected($event)"
+                                               multiple
+                                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                                        <div class="text-3xl group-hover:scale-110 transition-transform">📄</div>
+                                        <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Multi-File Bebas</div>
+                                        <p class="text-[11px] text-ink-400">Pilih berkas satu per satu atau sekaligus dari dokumen / file penyimpanan tanpa pembatasan media.</p>
                                         <div class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-black/10 dark:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs border border-black/10 dark:border-white/10 pointer-events-none">
-                                            <span>🗂️</span>
-                                            <span>Pilih Folder PC...</span>
+                                            <span>📄</span>
+                                            <span>Pilih Berkas File...</span>
                                         </div>
                                     </div>
                                 </div>
