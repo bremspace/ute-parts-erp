@@ -54,12 +54,14 @@ class MonitoringHargaTab extends Component
     {
         $this->selectAll = ! $this->selectAll;
         if ($this->selectAll) {
-            $scan = app(MarginGuardService::class)->scanProduk([
+            $service = app(MarginGuardService::class);
+            $paged = $service->getPagedProduk([
                 'search' => $this->search,
                 'status' => $this->filterStatus,
                 'kategori' => $this->filterKategori,
-            ]);
-            $this->selectedIds = $scan['items']->pluck('produk_id')->all();
+            ], $this->perPage, $this->page);
+
+            $this->selectedIds = $paged->getCollection()->pluck('produk_id')->all();
         } else {
             $this->selectedIds = [];
         }
@@ -137,19 +139,16 @@ class MonitoringHargaTab extends Component
         }
 
         $service = app(MarginGuardService::class);
-        $scan = $service->scanProduk();
-        $berisikoIds = $scan['items']
-            ->filter(fn ($item) => in_array($item['status'], ['bahaya', 'peringatan'], true))
-            ->pluck('produk_id')
-            ->all();
+        $count = $service->terapkanSemuaBerisiko($this->filterKategori ?: null);
 
-        if (empty($berisikoIds)) {
+        if ($count === 0) {
             $this->dispatch('alert', ['type' => 'info', 'message' => 'Seluruh produk saat ini sudah memiliki margin aman!']);
 
             return;
         }
 
-        $count = $service->bulkTerapkanRekomendasi($berisikoIds);
+        $this->selectedIds = [];
+        $this->selectAll = false;
 
         $this->dispatch('alert', [
             'type' => 'success',
@@ -171,28 +170,30 @@ class MonitoringHargaTab extends Component
         $service = app(MarginGuardService::class);
         $params = $service->getParameterMargin($this->filterKategori ?: null);
 
-        $scan = $service->scanProduk([
+        $filters = [
             'search' => $this->search,
             'status' => $this->filterStatus,
             'kategori' => $this->filterKategori,
-        ]);
+        ];
 
-        $allItems = $scan['items'];
-        $totalItems = $allItems->count();
-        $totalPages = max(1, (int) ceil($totalItems / $this->perPage));
-        $this->page = min($this->page, $totalPages);
+        $scanSummary = $service->getRingkasanMetrik($filters);
+        $pagedProduk = $service->getPagedProduk($filters, $this->perPage, $this->page);
 
-        $pagedItems = $allItems->slice(($this->page - 1) * $this->perPage, $this->perPage);
+        $totalPages = max(1, $pagedProduk->lastPage());
+        if ($this->page > $totalPages) {
+            $this->page = $totalPages;
+            $pagedProduk = $service->getPagedProduk($filters, $this->perPage, $this->page);
+        }
 
         $kategoriList = KategoriProduk::where('is_active', true)->orderBy('nama')->get();
 
         return view('modules.wms.livewire.monitoring-harga-tab', [
             'params' => $params,
-            'scanSummary' => $scan,
-            'items' => $pagedItems,
-            'totalItems' => $totalItems,
-            'totalPages' => $totalPages,
-            'currentPage' => $this->page,
+            'scanSummary' => $scanSummary,
+            'items' => $pagedProduk->getCollection(),
+            'totalItems' => $pagedProduk->total(),
+            'totalPages' => $pagedProduk->lastPage(),
+            'currentPage' => $pagedProduk->currentPage(),
             'kategoriList' => $kategoriList,
         ]);
     }

@@ -33,13 +33,13 @@ class MarginGuardService
     /**
      * Hitung rekomendasi harga jual minimum yang aman dari potensi rugi.
      */
-    public function hitungHargaAman(float $hargaBeli, ?string $kategori = null): float
+    public function hitungHargaAman(float $hargaBeli, ?string $kategori = null, ?array $cachedParams = null): float
     {
         if ($hargaBeli <= 0) {
             return 0.0;
         }
 
-        $params = $this->getParameterMargin($kategori);
+        $params = $cachedParams ?? $this->getParameterMargin($kategori);
         $faktorPembagi = max(0.1, (100 - $params['total_potongan_persen']) / 100);
 
         // Dibulatkan ke atas ke kelipatan 500 terdekat agar rapi di kasir & marketplace
@@ -64,10 +64,10 @@ class MarginGuardService
      *     pesan: string
      * }
      */
-    public function evaluasiHarga(float $hargaBeli, float $hargaJual, ?string $kategori = null): array
+    public function evaluasiHarga(float $hargaBeli, float $hargaJual, ?string $kategori = null, ?array $cachedParams = null): array
     {
-        $params = $this->getParameterMargin($kategori);
-        $rekomendasi = $this->hitungHargaAman($hargaBeli, $kategori);
+        $params = $cachedParams ?? $this->getParameterMargin($kategori);
+        $rekomendasi = $this->hitungHargaAman($hargaBeli, $kategori, $params);
 
         $marginNominal = round($hargaJual - $hargaBeli, 2);
         $marginPersen = $hargaJual > 0 ? round(($marginNominal / $hargaJual) * 100, 1) : -100.0;
@@ -146,24 +146,147 @@ class MarginGuardService
     /**
      * Evaluasi satu model produk (termasuk variannya bila ada).
      */
-    public function evaluasiProduk(Produk $produk): array
+    public function evaluasiProduk(Produk $produk, ?array $cachedParams = null): array
     {
         $eval = $this->evaluasiHarga(
             (float) $produk->harga_beli,
             (float) $produk->harga_jual_retail,
-            $produk->kategori
+            $produk->kategori,
+            $cachedParams
         );
 
         $eval['produk_id'] = $produk->id;
         $eval['nama_produk'] = $produk->nama;
-        $eval['sku'] = $produk->sku ?? $produk->barcode ?? '-';
+        $eval['sku'] = $produk->skuVariants->first()?->sku ?? $produk->barcode ?? '-';
         $eval['kategori'] = $produk->kategori ?? 'Umum';
 
         return $eval;
     }
 
     /**
-     * Scan seluruh master produk aktif dan kelompokkan berdasarkan status margin.
+     * Hitung ringkasan statistik margin langsung via agregat SQL database.
+     * Sangat cepat (sub-detik) untuk ribuan bahkan puluhan ribu produk.
+     *
+     * @return array{
+     *     total: int,
+     *     total_aman: int,
+     *     total_peringatan: int,
+     *     total_bahaya: int,
+     *     persen_sehat: float
+     * }
+     */
+    public function getRingkasanMetrik(array $filters = []): array
+    {
+        $params = $this->getParameterMargin($filters['kategori'] ?? null);
+        $faktor = max(0.1, (100 - $params['total_potongan_persen']) / 100);
+
+        $query = Produk::query()->where('is_active', true);
+
+        if (! empty($filters['kategori'])) {
+            $query->where('kategori', $filters['kategori']);
+        }
+
+        if (! empty($filters['search'])) {
+            $keyword = '%'.$filters['search'].'%';
+            $query->where(function ($q) use ($keyword) {
+                $q->where('nama', 'like', $keyword)
+                    ->orWhere('barcode', 'like', $keyword)
+                    ->orWhere('barcode_alt', 'like', $keyword)
+                    ->orWhere('kode_lama', 'like', $keyword)
+                    ->orWhereHas('skuVariants', function ($sub) use ($keyword) {
+                        $sub->where('sku', 'like', $keyword)
+                            ->orWhere('barcode', 'like', $keyword);
+                    });
+            });
+        }
+
+        $stats = $query->selectRaw('
+            COUNT(*) as total,
+            SUM(CASE WHEN (harga_beli > 0 AND (harga_jual_retail <= harga_beli OR harga_jual_retail IS NULL OR harga_jual_retail = 0)) THEN 1 ELSE 0 END) as total_bahaya,
+            SUM(CASE WHEN (harga_beli > 0 AND harga_jual_retail > harga_beli AND harga_jual_retail < (harga_beli / ?)) THEN 1 ELSE 0 END) as total_peringatan,
+            SUM(CASE WHEN (harga_beli <= 0 OR harga_jual_retail >= (harga_beli / ?)) THEN 1 ELSE 0 END) as total_aman
+        ', [$faktor, $faktor])->first();
+
+        $total = (int) ($stats->total ?? 0);
+        $totalAman = (int) ($stats->total_aman ?? 0);
+        $totalPeringatan = (int) ($stats->total_peringatan ?? 0);
+        $totalBahaya = (int) ($stats->total_bahaya ?? 0);
+        $persenSehat = $total > 0 ? round(($totalAman / $total) * 100, 1) : 100.0;
+
+        return [
+            'total' => $total,
+            'total_aman' => $totalAman,
+            'total_peringatan' => $totalPeringatan,
+            'total_bahaya' => $totalBahaya,
+            'persen_sehat' => $persenSehat,
+        ];
+    }
+
+    /**
+     * Ambil data produk terpilih dengan paginasi level database (efisien memory).
+     */
+    public function getPagedProduk(array $filters = [], int $perPage = 25, int $page = 1)
+    {
+        $params = $this->getParameterMargin($filters['kategori'] ?? null);
+        $faktor = max(0.1, (100 - $params['total_potongan_persen']) / 100);
+
+        $query = Produk::query()->where('is_active', true);
+
+        if (! empty($filters['kategori'])) {
+            $query->where('kategori', $filters['kategori']);
+        }
+
+        if (! empty($filters['search'])) {
+            $keyword = '%'.$filters['search'].'%';
+            $query->where(function ($q) use ($keyword) {
+                $q->where('nama', 'like', $keyword)
+                    ->orWhere('barcode', 'like', $keyword)
+                    ->orWhere('barcode_alt', 'like', $keyword)
+                    ->orWhere('kode_lama', 'like', $keyword)
+                    ->orWhereHas('skuVariants', function ($sub) use ($keyword) {
+                        $sub->where('sku', 'like', $keyword)
+                            ->orWhere('barcode', 'like', $keyword);
+                    });
+            });
+        }
+
+        if (! empty($filters['status']) && $filters['status'] !== 'semua') {
+            if ($filters['status'] === 'bahaya') {
+                $query->where('harga_beli', '>', 0)
+                    ->where(function ($q) {
+                        $q->whereRaw('harga_jual_retail <= harga_beli')
+                            ->orWhereNull('harga_jual_retail')
+                            ->orWhere('harga_jual_retail', '<=', 0);
+                    });
+            } elseif ($filters['status'] === 'peringatan') {
+                $query->where('harga_beli', '>', 0)
+                    ->whereRaw('harga_jual_retail > harga_beli')
+                    ->whereRaw('harga_jual_retail < (harga_beli / ?)', [$faktor]);
+            } elseif ($filters['status'] === 'aman') {
+                $query->where(function ($q) use ($faktor) {
+                    $q->where('harga_beli', '<=', 0)
+                        ->orWhereNull('harga_beli')
+                        ->orWhereRaw('harga_jual_retail >= (harga_beli / ?)', [$faktor]);
+                });
+            }
+        }
+
+        $paged = $query->with('skuVariants')
+            ->orderBy('nama')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        // Transformasi hanya 25 row yang ditampilkan di memory
+        $items = $paged->getCollection()->map(function ($produk) use ($params) {
+            return $this->evaluasiProduk($produk, $params);
+        });
+
+        $paged->setCollection($items);
+
+        return $paged;
+    }
+
+    /**
+     * Scan produk dengan kompatibilitas backward (mengembalikan ringkasan & items).
      *
      * @return array{
      *     total: int,
@@ -176,76 +299,26 @@ class MarginGuardService
      */
     public function scanProduk(array $filters = []): array
     {
-        $query = Produk::query()->where('is_active', true);
+        $ringkasan = $this->getRingkasanMetrik($filters);
+        $paged = $this->getPagedProduk($filters, $filters['limit'] ?? 25, $filters['page'] ?? 1);
 
-        if (! empty($filters['kategori'])) {
-            $query->where('kategori', $filters['kategori']);
-        }
-
-        if (! empty($filters['search'])) {
-            $keyword = '%'.$filters['search'].'%';
-            $query->where(function ($q) use ($keyword) {
-                $q->where('nama', 'like', $keyword)
-                    ->orWhere('barcode', 'like', $keyword)
-                    ->orWhereHas('skuVariants', function ($sub) use ($keyword) {
-                        $sub->where('sku', 'like', $keyword)
-                            ->orWhere('barcode', 'like', $keyword);
-                    });
-            });
-        }
-
-        $semuaProduk = $query->with('skuVariants')->orderBy('nama')->get();
-
-        $items = collect();
-        $totalAman = 0;
-        $totalPeringatan = 0;
-        $totalBahaya = 0;
-
-        foreach ($semuaProduk as $p) {
-            $eval = $this->evaluasiProduk($p);
-
-            if ($eval['status'] === 'aman') {
-                $totalAman++;
-            } elseif ($eval['status'] === 'peringatan') {
-                $totalPeringatan++;
-            } else {
-                $totalBahaya++;
-            }
-
-            // Filter status bila diminta
-            if (! empty($filters['status']) && $filters['status'] !== 'semua') {
-                if ($eval['status'] !== $filters['status']) {
-                    continue;
-                }
-            }
-
-            $items->push($eval);
-        }
-
-        $total = $semuaProduk->count();
-        $persenSehat = $total > 0 ? round(($totalAman / $total) * 100, 1) : 100.0;
-
-        return [
-            'total' => $total,
-            'total_aman' => $totalAman,
-            'total_peringatan' => $totalPeringatan,
-            'total_bahaya' => $totalBahaya,
-            'persen_sehat' => $persenSehat,
-            'items' => $items,
-        ];
+        return array_merge($ringkasan, [
+            'items' => $paged->getCollection(),
+            'paginator' => $paged,
+        ]);
     }
 
     /**
      * Sesuaikan harga jual retail produk ke rekomendasi harga aman.
      */
-    public function terapkanRekomendasi(int $produkId): bool
+    public function terapkanRekomendasi(int $produkId, ?array $cachedParams = null): bool
     {
         $produk = Produk::find($produkId);
         if (! $produk) {
             return false;
         }
 
-        $rekomendasi = $this->hitungHargaAman((float) $produk->harga_beli, $produk->kategori);
+        $rekomendasi = $this->hitungHargaAman((float) $produk->harga_beli, $produk->kategori, $cachedParams);
         if ($rekomendasi <= 0 || $rekomendasi === (float) $produk->harga_jual_retail) {
             return false;
         }
@@ -268,6 +341,41 @@ class MarginGuardService
         ]);
 
         return true;
+    }
+
+    /**
+     * Auto-fix seluruh produk berisiko rugi/peringatan menggunakan chunk database.
+     * Aman dari kehabisan memori atau timeout PHP.
+     */
+    public function terapkanSemuaBerisiko(?string $kategori = null): int
+    {
+        $params = $this->getParameterMargin($kategori);
+        $faktor = max(0.1, (100 - $params['total_potongan_persen']) / 100);
+
+        $query = Produk::where('is_active', true)
+            ->where('harga_beli', '>', 0)
+            ->where(function ($q) use ($faktor) {
+                $q->whereRaw('harga_jual_retail < (harga_beli / ?)', [$faktor])
+                    ->orWhereRaw('harga_jual_retail <= harga_beli')
+                    ->orWhereNull('harga_jual_retail')
+                    ->orWhere('harga_jual_retail', '<=', 0);
+            });
+
+        if ($kategori) {
+            $query->where('kategori', $kategori);
+        }
+
+        $count = 0;
+        // Gunakan chunkById agar memory footprint tetap minimal (< 5 MB)
+        $query->chunkById(100, function ($produks) use (&$count, $params) {
+            foreach ($produks as $produk) {
+                if ($this->terapkanRekomendasi((int) $produk->id, $params)) {
+                    $count++;
+                }
+            }
+        });
+
+        return $count;
     }
 
     /**

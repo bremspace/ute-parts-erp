@@ -246,9 +246,9 @@
 
         <!-- Pagination -->
         @if($totalPages > 1)
-            <div class="p-4 border-t border-black/10 dark:border-white/10 flex items-center justify-between text-xs text-ink-500">
-                <span>Halaman {{ $currentPage }} dari {{ $totalPages }} (Total {{ $totalItems }} produk)</span>
-                <div class="flex items-center gap-1">
+            <div class="p-4 border-t border-black/10 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-500">
+                <span>Halaman {{ $currentPage }} dari {{ $totalPages }} (Total {{ number_format($totalItems, 0, ',', '.') }} produk)</span>
+                <div class="flex items-center gap-1 flex-wrap">
                     <button
                         type="button"
                         wire:click="setPage({{ $currentPage - 1 }})"
