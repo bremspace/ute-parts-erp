@@ -324,6 +324,14 @@
                             @endif
                         </div>
                     @endif
+
+                    <!-- Active Filter Chips (Individual Reset & Reset All) -->
+                    <x-prism.active-filter-chips
+                        :chips="$this->activeFilterChips"
+                        reset-action="resetSingleFilter"
+                        reset-all-action="resetAllFilters"
+                        class="pt-1"
+                    />
                 </div>
 
                 <!-- Product List -->

@@ -609,18 +609,6 @@
             </div>
 
             <div class="flex items-center gap-3">
-                @if($search || $filterKategori || $filterKondisi || $filterHpMerk || $filterHpModel || $filterBrand || $hargaMax || $filterKualitas || $filterStok || $sort)
-                    <button
-                        wire:click="$set('search', ''); $set('filterKategori', ''); $set('filterKondisi', ''); $set('filterHpMerk', ''); $set('filterHpModel', ''); $set('filterBrand', ''); $set('hargaMax', ''); $set('filterKualitas', ''); $set('filterStok', ''); $set('sort', '');"
-                        class="text-xs font-semibold text-up-primary hover:underline cursor-pointer flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        <span>Reset Filter</span>
-                    </button>
-                    <div class="h-4 w-px bg-ink-200 dark:bg-white/10 hidden sm:block"></div>
-                @endif
-
                 <!-- Modern View Switcher (Grid vs List vs Compact) -->
                 <div class="inline-flex items-center p-1 rounded-xl bg-ink-100 dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 shadow-inner">
                     <button type="button"
@@ -656,6 +644,14 @@
                 </div>
             </div>
         </div>
+
+        <!-- Active Filter Chips (Individual Reset & Reset All) -->
+        <x-prism.active-filter-chips
+            :chips="$this->activeFilterChips"
+            reset-action="resetSingleFilter"
+            reset-all-action="resetAllFilters"
+            class="px-1"
+        />
 
         <!-- 1. GRID VIEW -->
         <div x-show="viewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4.5">

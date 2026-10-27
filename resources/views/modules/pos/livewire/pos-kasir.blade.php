@@ -678,18 +678,15 @@
                         <span>Hanya Ready Stok</span>
                     </label>
                 @endif
-
-                @if($filterKategoriId || $filterBrandId || $filterKualitasId || $filterTipeHpId || $filterBrandKompatibel || $filterModelKompatibel || $filterKondisi || $filterSatuan || $filterAbcClass || $filterHanyaReadyStok)
-                    <button
-                        type="button"
-                        wire:click="resetFilterValues"
-                        class="px-2.5 py-1 rounded-lg text-xs font-semibold text-up-red hover:bg-up-red/10 transition cursor-pointer"
-                        title="Reset nilai filter aktif kembali ke default"
-                    >
-                        ✕ Reset Filter Aktif
-                    </button>
-                @endif
             </div>
+
+            <!-- Active Filter Chips (Individual Reset & Reset All) -->
+            <x-prism.active-filter-chips
+                :chips="$this->activeFilterChips"
+                reset-action="resetSingleFilter"
+                reset-all-action="resetFilterValues"
+                class="pt-1.5"
+            />
         @endif
     </div>
 

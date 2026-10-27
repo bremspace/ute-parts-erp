@@ -3,6 +3,23 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-27 — Sentralisasi Pencarian & Filter Global, Ranking Prioritas Nama Produk, dan Pemisahan Merk HP ✅
+
+- **Optimasi Ranking Relevansi Produk (`SmartSearchService::applyRelevanceRanking`)**:
+  - Mengutamakan nama produk sebagai prioritas utama dalam hasil pencarian: exact nama produk (+1000), prefix nama produk (+800), frasa lengkap di nama produk (+600), seluruh kata token di nama produk (+400), dan kecocokan per kata nama (+120), sebelum kecocokan kompatibilitas/brand (+150/+50) dan ready stock (+25).
+- **Sentralisasi Filter Katalog Global (`SmartSearchService::applyCatalogFilters` & `Produk::scopeFilterKatalog`)**:
+  - Menyentralisasi query filter katalog (`kategori`, `brand`, `kualitas`, `tipe_hp`, `merk_hp`, `kondisi`, `satuan`, `abc_class`, `stok`, `harga`) untuk digunakan secara seragam di seluruh modul (Marketplace `ShopPage`, POS Kasir `PosKasir`, WMS Master Produk `ProdukTab`, dan `ProductSearchModal`).
+  - Mengotomatiskan ranking relevansi saat kata kunci pencarian terisi.
+- **Komponen Reusable Active Filter Chips (`x-prism.active-filter-chips`)**:
+  - Membuat komponen Blade prism untuk menampilkan badge filter aktif dengan tombol reset per-item (`✕`) dan tombol reset semua.
+  - Mengintegrasikan chips ke Marketplace (`shop-catalog`), POS Kasir (`pos-kasir`), Modal Pencarian Produk Global (`product-search-modal`), dan WMS Master Produk (`produk-tab`).
+- **Pemisahan Master Merk HP & Tipe HP di Pengaturan Master Atribut (`SettingsRbac`)**:
+  - Memisahkan subtab Master Atribut menjadi `merk_hp` (Brand Smartphone) dan `tipe_hp` (Model Kompatibel).
+  - Menyediakan form & modal pengelolaan Merk HP (tambah, ubah nama massal, hapus/nonaktifkan) dan filter dropdown berdasarkan merk pada tabel Tipe HP.
+- **Testing & QA**:
+  - Menambahkan pengujian integrasi relevansi pencarian, filter katalog, filter chips reset per-item, dan manajemen Merk HP di `SmartSearchGlobalTest` (8 tests passed) dan `ProductSearchModalTest` (6 tests passed).
+  - Lulus format PSR-12 via Laravel Pint tanpa error.
+
 ## 2026-10-26 — Perbaikan Layering Modal Diskon Kasir, Standarisasi Barcode & QR Scanner, dan Kalkulasi Global Harga Partai ✅
 
 - **Perbaikan Layering Modal Diskon Kasir (`PosKasir`)**:

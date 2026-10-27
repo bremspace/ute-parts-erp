@@ -13,7 +13,8 @@
             { id: 'kualitas', label: 'Tingkat Kualitas (Grade)', subModul: 'katalog', tab: 'master_produk', subTab: 'kualitas', icon: '⭐', group: 'Katalog & Master Produk', desc: 'Grade kualitas: Original, OEM, High Copy, Copotan', keywords: 'kualitas grade ori original oem grade copy kw kualitas' },
             { id: 'satuan', label: 'Satuan Unit Produk', subModul: 'katalog', tab: 'master_produk', subTab: 'satuan', icon: '📏', group: 'Katalog & Master Produk', desc: 'Pcs, Set, Rol, Box, Lembar, Strip', keywords: 'satuan unit pcs pieces pack dus box meter' },
             { id: 'kondisi', label: 'Kondisi Fisik Barang', subModul: 'katalog', tab: 'master_produk', subTab: 'kondisi', icon: '🔄', group: 'Katalog & Master Produk', desc: 'Kondisi Baru, Refurbished, Bekas / Copotan normal', keywords: 'kondisi baru bekas second copotan refurbished reject' },
-            { id: 'tipe_hp', label: 'Tipe HP Kompatibel', subModul: 'katalog', tab: 'master_produk', subTab: 'tipe_hp', icon: '📱', group: 'Katalog & Master Produk', desc: 'Model tipe ponsel smartphone yang kompatibel dengan part', keywords: 'tipe model hp ponsel smartphone iphone samsung xiaomi oppo vivo infinix' },
+            { id: 'merk_hp', label: 'Merk HP (Brand Smartphone)', subModul: 'katalog', tab: 'master_produk', subTab: 'merk_hp', icon: '📱', group: 'Katalog & Master Produk', desc: 'Daftar merek pabrikan ponsel smartphone (Apple, Samsung, Xiaomi, dll)', keywords: 'merk brand hp smartphone apple samsung xiaomi oppo vivo infinix' },
+            { id: 'tipe_hp', label: 'Tipe HP Kompatibel', subModul: 'katalog', tab: 'master_produk', subTab: 'tipe_hp', icon: '📲', group: 'Katalog & Master Produk', desc: 'Model tipe ponsel smartphone yang kompatibel dengan part', keywords: 'tipe model hp ponsel smartphone iphone samsung xiaomi oppo vivo infinix' },
 
             { id: 'loyalitas', label: 'Strategi Loyalitas & Poin', subModul: 'kebijakan', tab: 'loyalitas', subTab: null, icon: '💎', group: 'Kebijakan & Transaksi', desc: 'Rasio earn/redeem poin belanja & diskon tier membership', keywords: 'loyalitas point poin tier membership diskon potongan cashback member' },
             { id: 'komisi', label: 'Skema Komisi Reseller & Sales', subModul: 'kebijakan', tab: 'loyalitas', subTab: null, icon: '🤝', group: 'Kebijakan & Transaksi', desc: 'Komisi reseller, mitra teknisi dan insentif penjualan tim', keywords: 'komisi reseller komisi sales insentif bagi hasil affiliate bonus' },
@@ -386,6 +387,8 @@
                         <button wire:click="openSatuanModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Satuan Baru</button>
                     @elseif($masterProdukSubTab === 'kondisi')
                         <button wire:click="openKondisiModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Kondisi Baru</button>
+                    @elseif($masterProdukSubTab === 'merk_hp')
+                        <button wire:click="openMerkHpModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Merk HP Baru</button>
                     @elseif($masterProdukSubTab === 'tipe_hp')
                         <button wire:click="openTipeHpModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">+ Tipe HP Baru</button>
                     @endif
@@ -1933,7 +1936,8 @@
                     'kualitas' => ['icon' => '⭐', 'label' => 'Tingkat Kualitas', 'count' => count($kualitasList)],
                     'satuan' => ['icon' => '📏', 'label' => 'Satuan Unit', 'count' => count($satuanList)],
                     'kondisi' => ['icon' => '🔄', 'label' => 'Kondisi Produk', 'count' => count($kondisiList)],
-                    'tipe_hp' => ['icon' => '📱', 'label' => 'Tipe HP Kompatibel', 'count' => count($tipeHpList)],
+                    'merk_hp' => ['icon' => '📱', 'label' => 'Merk HP', 'count' => count($merkHpList)],
+                    'tipe_hp' => ['icon' => '📲', 'label' => 'Tipe HP Kompatibel', 'count' => count($tipeHpList)],
                 ] as $subKey => $subData)
                     <button
                         wire:click="$set('masterProdukSubTab', '{{ $subKey }}')"
@@ -2815,6 +2819,73 @@
                     </div>
                 </x-prism.glass-card>
 
+            <!-- SUB-TAB 5B: MERK HP -->
+            @elseif($masterProdukSubTab === 'merk_hp')
+                <x-prism.glass-card title="Master Merk Smartphone" subtitle="Daftar pabrikan perangkat ponsel untuk pengelompokan tipe & model kompatibilitas">
+                    <!-- Mobile Card View (< md) -->
+                    <div class="block md:hidden space-y-2.5">
+                        @forelse($merkHpList as $m)
+                            <div class="p-3.5 rounded-2xl border bg-white/[0.02] border-white/5 hover:border-white/10">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-base">📱</span>
+                                        <span class="font-bold text-white text-xs">{{ $m->merk }}</span>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-up-primary/15 text-up-primary">
+                                        {{ $m->total_model }} Model ({{ $m->total_aktif }} Aktif)
+                                    </span>
+                                </div>
+                                <div class="flex items-center justify-end gap-3 pt-2.5 mt-2.5 border-t border-white/5">
+                                    <button wire:click="openMerkHpModal('{{ $m->merk }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">✏️ Ubah Nama</button>
+                                    <button wire:click="hapusMerkHp('{{ $m->merk }}')" wire:confirm="Hapus atau nonaktifkan semua tipe dengan merk '{{ $m->merk }}'?" class="text-up-red hover:underline text-xs cursor-pointer">🗑️ Hapus</button>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-8 text-center text-ink-500 text-xs">Belum ada data merk HP terdaftar.</div>
+                        @endforelse
+                    </div>
+
+                    <!-- Desktop Dual-Scroll Table (>= md) -->
+                    <div class="hidden md:block">
+                        <x-prism.dual-scroll>
+                            <table class="w-full text-left text-xs text-ink-200 min-w-[500px] whitespace-nowrap">
+                                <thead class="text-ink-400 border-b border-white/10 uppercase text-[10px]">
+                                    <tr>
+                                        <th class="py-2.5 px-3">Merek Smartphone</th>
+                                        <th class="py-2.5 px-3 text-center">Jumlah Model Terdaftar</th>
+                                        <th class="py-2.5 px-3 text-center">Model Aktif</th>
+                                        <th class="py-2.5 px-3 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @forelse($merkHpList as $m)
+                                        <tr class="hover:bg-white/[0.02] transition-colors">
+                                            <td class="py-2.5 px-3 font-semibold text-white flex items-center gap-2">
+                                                <span>📱</span>
+                                                <span>{{ $m->merk }}</span>
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center font-bold tabular-nums text-up-mint">
+                                                {{ $m->total_model }}
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center font-bold tabular-nums text-ink-300">
+                                                {{ $m->total_aktif }}
+                                            </td>
+                                            <td class="py-2.5 px-3 text-right space-x-2">
+                                                <button wire:click="openMerkHpModal('{{ $m->merk }}')" class="text-up-primary hover:underline font-semibold text-xs cursor-pointer">Ubah Nama</button>
+                                                <button wire:click="hapusMerkHp('{{ $m->merk }}')" wire:confirm="Hapus atau nonaktifkan semua tipe dengan merk '{{ $m->merk }}'?" class="text-up-red hover:underline text-xs cursor-pointer">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4" class="py-6 text-center text-ink-500">Belum ada data merk HP terdaftar.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </x-prism.dual-scroll>
+                    </div>
+                </x-prism.glass-card>
+
             <!-- SUB-TAB 6: TIPE HP -->
             @elseif($masterProdukSubTab === 'tipe_hp')
                 @if(count($selectedTipeHpIds) > 0)
@@ -2847,6 +2918,22 @@
                     </div>
                 @endif
                 <x-prism.glass-card title="Master Tipe HP / Perangkat Kompatibel" subtitle="Database tipe perangkat untuk pemetaan kompatibilitas sparepart">
+                    <!-- Filter Merek Dropdown -->
+                    <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-ink-400 font-semibold">Filter Merek:</span>
+                            <select wire:model.live="filterTipeHpMerk" class="px-3 py-1.5 rounded-xl glass-input text-xs font-medium text-white bg-white/5 border border-white/10 cursor-pointer">
+                                <option value="" class="bg-ink-900">Semua Merek ({{ count($merkHpList) }})</option>
+                                @foreach($merkHpList as $m)
+                                    <option value="{{ $m->merk }}" class="bg-ink-900">{{ $m->merk }} ({{ $m->total_model }})</option>
+                                @endforeach
+                            </select>
+                            @if($filterTipeHpMerk)
+                                <button type="button" wire:click="$set('filterTipeHpMerk', '')" class="text-xs text-up-red hover:underline cursor-pointer">✕ Reset Filter</button>
+                            @endif
+                        </div>
+                        <span class="text-xs text-ink-400 font-mono">{{ count($tipeHpList) }} model ditampilkan</span>
+                    </div>
                     <!-- Mobile Card View (< md) -->
                     <div class="block md:hidden space-y-2.5">
                         <div class="flex items-center justify-between px-1 py-1 text-xs text-ink-400">
@@ -3809,6 +3896,41 @@
                 <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
                     <button wire:click="$set('showTipeHpModal', false)" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
                     <button wire:click="simpanTipeHp" class="flex-1 py-3 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan Tipe HP</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL: MASTER MERK HP -->
+    @if($showMerkHpModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <span>📱</span>
+                        <span>{{ !empty($merkHpForm['old_merk']) ? 'Ubah Nama Merk HP' : 'Tambah Merk HP Baru' }}</span>
+                    </h3>
+                    <button wire:click="$set('showMerkHpModal', false)" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-white mb-1.5">Nama Merk HP / Brand Smartphone *</label>
+                        <input
+                            type="text"
+                            wire:model="merkHpForm.merk"
+                            placeholder="cth: Apple, Samsung, Xiaomi, Infinix..."
+                            class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium text-white"
+                            autofocus
+                        />
+                        @error('merkHpForm.merk') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
+                        @if(!empty($merkHpForm['old_merk']))
+                            <p class="text-[10px] text-ink-400 mt-1.5">Mengubah nama merk akan otomatis memperbarui seluruh tipe/model HP terkait merk "{{ $merkHpForm['old_merk'] }}".</p>
+                        @endif
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4 border-t border-white/5 mt-5">
+                    <button wire:click="$set('showMerkHpModal', false)" class="flex-1 py-2.5 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer">Batal</button>
+                    <button wire:click="simpanMerkHp" class="flex-1 py-2.5 rounded-xl bg-up-primary text-white font-bold text-xs cursor-pointer">Simpan Merk</button>
                 </div>
             </div>
         </div>

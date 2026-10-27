@@ -250,6 +250,8 @@ class SmartSearchService
 
     /**
      * Urutkan hasil pencarian berdasarkan skor relevansi kecocokan tertinggi.
+     * Mengutamakan nama produk di posisi paling atas (Exact, Prefix, All-words phrase),
+     * lalu kecocokan kompatibilitas, brand, kategori, dan ketersediaan stok.
      */
     public function applyRelevanceRanking(Builder $query, ?string $q): Builder
     {
@@ -267,49 +269,210 @@ class SmartSearchService
         $cases = [];
         $bindings = [];
 
-        // 1. Exact Barcode (+300)
-        $cases[] = 'CASE WHEN produk.barcode = ? THEN 300 ELSE 0 END';
+        // 1. Exact Barcode (+1200) - Scan barcode fisik / exact match
+        $cases[] = 'CASE WHEN produk.barcode = ? THEN 1200 ELSE 0 END';
         $bindings[] = $term;
 
-        // 2. Exact SKU Varian (+250)
-        $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM sku_variants WHERE sku_variants.produk_id = produk.id AND sku_variants.sku = ?) THEN 250 ELSE 0 END';
+        // 2. Exact SKU Varian (+1100)
+        $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM sku_variants WHERE sku_variants.produk_id = produk.id AND sku_variants.sku = ?) THEN 1100 ELSE 0 END';
         $bindings[] = $term;
 
-        // 3. Exact Nama (+200)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) = LOWER(?) THEN 200 ELSE 0 END';
+        // 3. Exact Nama Produk Cocok Persis (+1000)
+        $cases[] = 'CASE WHEN LOWER(produk.nama) = LOWER(?) THEN 1000 ELSE 0 END';
         $bindings[] = $term;
 
-        // 4. Prefix Nama (+150)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 150 ELSE 0 END';
+        // 4. Prefix Nama Produk (Diawali kata pencarian) (+800)
+        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 800 ELSE 0 END';
         $bindings[] = $term.'%';
 
-        // 5. Frasa Nama (+100)
-        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 100 ELSE 0 END';
+        // 5. Frasa Lengkap Ada di Nama Produk (+600)
+        $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 600 ELSE 0 END';
         $bindings[] = '%'.$term.'%';
 
-        // 6. Brand / Model Exact (+80)
-        $cases[] = 'CASE WHEN LOWER(produk.brand_kompatibel) = LOWER(?) OR LOWER(produk.model_kompatibel) = LOWER(?) THEN 80 ELSE 0 END';
-        $bindings[] = $term;
-        $bindings[] = $term;
-
-        // 7. Kata per kata (+30 per kata nama, +15 per kata model/brand)
+        // 6. Seluruh Kata Token Ada di Nama Produk (+400)
         if (count($words) > 1) {
+            $allWordsCase = [];
             foreach ($words as $w) {
-                $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 30 ELSE 0 END';
+                $allWordsCase[] = 'LOWER(produk.nama) LIKE LOWER(?)';
                 $bindings[] = '%'.$w.'%';
+            }
+            $cases[] = 'CASE WHEN ('.implode(' AND ', $allWordsCase).') THEN 400 ELSE 0 END';
+        }
 
-                $cases[] = 'CASE WHEN LOWER(produk.brand_kompatibel) LIKE LOWER(?) OR LOWER(produk.model_kompatibel) LIKE LOWER(?) THEN 15 ELSE 0 END';
+        // 7. Kata per kata di Nama Produk (+120 per kata nama)
+        if (! empty($words)) {
+            foreach ($words as $w) {
+                $cases[] = 'CASE WHEN LOWER(produk.nama) LIKE LOWER(?) THEN 120 ELSE 0 END';
+                $bindings[] = '%'.$w.'%';
+            }
+        }
+
+        // 8. Brand / Model Exact (+150)
+        $cases[] = 'CASE WHEN LOWER(produk.brand_kompatibel) = LOWER(?) OR LOWER(produk.model_kompatibel) = LOWER(?) THEN 150 ELSE 0 END';
+        $bindings[] = $term;
+        $bindings[] = $term;
+
+        // 9. Brand / Model per kata (+50 per kata)
+        if (! empty($words)) {
+            foreach ($words as $w) {
+                $cases[] = 'CASE WHEN LOWER(produk.brand_kompatibel) LIKE LOWER(?) OR LOWER(produk.model_kompatibel) LIKE LOWER(?) THEN 50 ELSE 0 END';
                 $bindings[] = '%'.$w.'%';
                 $bindings[] = '%'.$w.'%';
             }
         }
 
-        // 8. Ready Stock Boost (+20)
-        $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM stok_items WHERE stok_items.produk_id = produk.id AND stok_items.jumlah > 0) THEN 20 ELSE 0 END';
+        // 10. Kategori / Deskripsi (+30)
+        $cases[] = 'CASE WHEN LOWER(produk.kategori) LIKE LOWER(?) OR LOWER(produk.deskripsi) LIKE LOWER(?) THEN 30 ELSE 0 END';
+        $bindings[] = '%'.$term.'%';
+        $bindings[] = '%'.$term.'%';
+
+        // 11. Ready Stock Boost (+25)
+        $cases[] = 'CASE WHEN EXISTS (SELECT 1 FROM stok_items WHERE stok_items.produk_id = produk.id AND stok_items.jumlah > 0) THEN 25 ELSE 0 END';
 
         $sql = '('.implode(' + ', $cases).')';
 
-        return $query->orderByRaw($sql.' DESC', $bindings);
+        return $query->orderByRaw($sql.' DESC', $bindings)->orderBy('produk.nama', 'asc');
+    }
+
+    /**
+     * Terapkan kumpulan filter katalog dan pencarian cerdas secara terpusat.
+     * Dapat digunakan di POS Kasir, Katalog Toko Online, WMS Master Produk, dan Modal Global.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    public function applyCatalogFilters(Builder $query, array $filters = []): Builder
+    {
+        $search = trim((string) ($filters['search'] ?? $filters['q'] ?? ''));
+        if ($search !== '') {
+            $this->applySmartSearch($query, $search);
+            if ($filters['auto_relevance'] ?? true) {
+                $this->applyRelevanceRanking($query, $search);
+            }
+        }
+
+        // Filter Kategori
+        $katVal = $filters['kategori_id'] ?? $filters['kategori'] ?? null;
+        if (! empty($katVal)) {
+            if (is_numeric($katVal)) {
+                $kat = KategoriProduk::find($katVal);
+                $ids = $kat ? $kat->semuaKeturunanIds() : [(int) $katVal];
+                $query->whereIn('kategori_id', $ids);
+            } else {
+                $query->where(function ($q) use ($katVal) {
+                    $q->where('kategori', $katVal)
+                        ->orWhereHas('kategoriRelasi', fn ($kq) => $kq->where('nama', $katVal)->orWhere('slug', $katVal));
+                });
+            }
+        }
+
+        // Filter Brand Part / Merk Komponen
+        $bId = $filters['brand_id'] ?? null;
+        if (! empty($bId)) {
+            $query->where('brand_id', (int) $bId);
+        } elseif (! empty($filters['brand'])) {
+            $bVal = (string) $filters['brand'];
+            $query->where(function ($q) use ($bVal) {
+                $q->where('brand_kompatibel', $bVal)
+                    ->orWhereHas('brand', fn ($bq) => $bq->where('nama', $bVal));
+            });
+        }
+
+        // Filter Kualitas (Grade)
+        $kualVal = $filters['kualitas_id'] ?? $filters['kualitas'] ?? null;
+        if (! empty($kualVal)) {
+            if (is_numeric($kualVal)) {
+                $query->where('kualitas_id', (int) $kualVal);
+            } else {
+                $query->whereHas('kualitas', fn ($kq) => $kq->where('nama', (string) $kualVal));
+            }
+        }
+
+        // Filter Tipe HP Spesifik (ID)
+        $tipeHpId = $filters['tipe_hp_id'] ?? null;
+        if (! empty($tipeHpId)) {
+            $targetTipe = TipeHp::find($tipeHpId);
+            $query->where(function ($q) use ($tipeHpId, $targetTipe) {
+                $q->whereHas('tipeHps', fn ($th) => $th->where('tipe_hp.id', (int) $tipeHpId));
+                if ($targetTipe) {
+                    $q->orWhere(function ($sub) use ($targetTipe) {
+                        $sub->where('brand_kompatibel', $targetTipe->merk)
+                            ->where('model_kompatibel', $targetTipe->model);
+                    });
+                }
+            });
+        }
+
+        // Filter Merk HP / Brand Kompatibel
+        $merkHp = $filters['brand_kompatibel'] ?? $filters['hpMerk'] ?? $filters['merk_hp'] ?? null;
+        if (! empty($merkHp)) {
+            $query->where(function ($q) use ($merkHp) {
+                $q->where('brand_kompatibel', $merkHp)
+                    ->orWhereHas('tipeHps', fn ($tq) => $tq->where('merk', $merkHp))
+                    ->orWhere('kompatibilitas_hp', 'like', '%"merk":"'.$merkHp.'"%');
+            });
+        }
+
+        // Filter Model HP / Model Kompatibel
+        $modelHp = $filters['model_kompatibel'] ?? $filters['hpModel'] ?? $filters['tipe_hp'] ?? null;
+        if (! empty($modelHp) && ! is_numeric($modelHp)) {
+            $query->where(function ($q) use ($modelHp) {
+                $q->where('model_kompatibel', $modelHp)
+                    ->orWhereHas('tipeHps', fn ($tq) => $tq->where('model', $modelHp))
+                    ->orWhere('kompatibilitas_hp', 'like', '%"model":"'.$modelHp.'"%');
+            });
+        }
+
+        // Filter Kondisi
+        if (! empty($filters['kondisi'])) {
+            $query->where('kondisi', (string) $filters['kondisi']);
+        }
+
+        // Filter Satuan Unit
+        if (! empty($filters['satuan'])) {
+            $query->where('satuan', (string) $filters['satuan']);
+        }
+
+        // Filter Klasifikasi ABC
+        if (! empty($filters['abc_class'])) {
+            $query->where('abc_class', (string) $filters['abc_class']);
+        }
+
+        // Filter Ketersediaan Stok
+        $stokFilter = $filters['stok'] ?? null;
+        $hanyaReady = filter_var($filters['hanya_ready_stok'] ?? $filters['ready_stok'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if ($stokFilter === 'tersedia' || $hanyaReady) {
+            $cabangId = $filters['cabang_id'] ?? null;
+            $gudangId = $filters['gudang_id'] ?? null;
+
+            $query->whereHas('stokItems', function ($sq) use ($cabangId, $gudangId) {
+                $sq->where('jumlah', '>', 0);
+                if ($gudangId) {
+                    $sq->where('gudang_id', $gudangId);
+                } elseif ($cabangId) {
+                    $sq->whereIn('gudang_id', function ($gq) use ($cabangId) {
+                        $gq->select('id')->from('gudang')->where('cabang_id', $cabangId);
+                    });
+                }
+            });
+        } elseif ($stokFilter === 'habis') {
+            $query->doesntHave('stokItems');
+        }
+
+        // Filter Range Harga
+        if (isset($filters['harga_min']) && is_numeric($filters['harga_min'])) {
+            $query->where('harga_jual_retail', '>=', (float) $filters['harga_min']);
+        }
+        if (isset($filters['harga_max']) && is_numeric($filters['harga_max'])) {
+            $query->where('harga_jual_retail', '<=', (float) $filters['harga_max']);
+        }
+
+        // Filter Supplier
+        if (! empty($filters['supplier_id'])) {
+            $query->where('supplier_id', (int) $filters['supplier_id']);
+        }
+
+        return $query;
     }
 
     /**

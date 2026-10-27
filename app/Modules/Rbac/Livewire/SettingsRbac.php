@@ -874,6 +874,13 @@ class SettingsRbac extends Component
 
     public array $tipeHpForm = ['id' => null, 'merk' => '', 'model' => '', 'nama' => '', 'is_active' => true];
 
+    // Master Merk HP
+    public bool $showMerkHpModal = false;
+
+    public array $merkHpForm = ['old_merk' => '', 'merk' => ''];
+
+    public string $filterTipeHpMerk = '';
+
     // [T-16] JenisServis CRUD editable
     public bool $showJenisServisModal = false;
 
@@ -2464,6 +2471,75 @@ class SettingsRbac extends Component
             : $defaultKondisi;
     }
 
+    // 5b. Master Merk HP
+    public function openMerkHpModal(?string $merk = null): void
+    {
+        if (! $this->bolehBuka(self::PERM_MASTER_PRODUK)) {
+            return;
+        }
+
+        $this->merkHpForm = [
+            'old_merk' => $merk ?: '',
+            'merk' => $merk ?: '',
+        ];
+        $this->showMerkHpModal = true;
+    }
+
+    public function simpanMerkHp(): void
+    {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengelola merk HP.')) {
+            return;
+        }
+
+        $this->validate([
+            'merkHpForm.merk' => 'required|string|max:100',
+        ]);
+
+        $newMerk = trim($this->merkHpForm['merk']);
+        $oldMerk = trim($this->merkHpForm['old_merk']);
+
+        if ($oldMerk !== '') {
+            TipeHp::where('merk', $oldMerk)->update(['merk' => $newMerk]);
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Merk HP '{$oldMerk}' berhasil diubah menjadi '{$newMerk}'"]);
+        } else {
+            $exists = TipeHp::whereRaw('LOWER(TRIM(merk)) = ?', [strtolower($newMerk)])->exists();
+            if ($exists) {
+                $this->addError('merkHpForm.merk', "Merk HP '{$newMerk}' sudah terdaftar.");
+
+                return;
+            }
+            TipeHp::create([
+                'merk' => $newMerk,
+                'model' => 'Semua Tipe',
+                'nama' => "{$newMerk} Semua Tipe",
+                'is_active' => true,
+            ]);
+            $this->dispatch('alert', ['type' => 'success', 'message' => "Merk HP '{$newMerk}' berhasil ditambahkan"]);
+        }
+
+        $this->showMerkHpModal = false;
+    }
+
+    public function hapusMerkHp(string $merk): void
+    {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin menghapus merk HP.')) {
+            return;
+        }
+
+        $tipes = TipeHp::withCount('produk')->where('merk', $merk)->get();
+        $totalProduk = $tipes->sum('produk_count');
+
+        if ($totalProduk > 0) {
+            TipeHp::where('merk', $merk)->update(['is_active' => false]);
+            $this->dispatch('alert', ['type' => 'warning', 'message' => "Merk '{$merk}' dinonaktifkan karena memiliki {$totalProduk} produk terkait."]);
+
+            return;
+        }
+
+        TipeHp::where('merk', $merk)->delete();
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Merk HP '{$merk}' berhasil dihapus."]);
+    }
+
     // 6. Tipe HP
     public function openTipeHpModal(?int $id = null): void
     {
@@ -3018,7 +3094,17 @@ class SettingsRbac extends Component
             'kualitasList' => KualitasProduk::with('brand')->withCount('produk')->orderByRaw('brand_id IS NULL ASC')->orderBy('nama')->get(),
             'satuanList' => SatuanUnit::orderBy('kode')->get(),
             'kondisiList' => $this->getKondisiList(),
-            'tipeHpList' => TipeHp::withCount('produk')->orderBy('merk')->orderBy('model')->get(),
+            'merkHpList' => TipeHp::select('merk')
+                ->selectRaw('count(id) as total_model')
+                ->selectRaw('sum(case when is_active = 1 then 1 else 0 end) as total_aktif')
+                ->groupBy('merk')
+                ->orderBy('merk')
+                ->get(),
+            'tipeHpList' => TipeHp::withCount('produk')
+                ->when($this->filterTipeHpMerk, fn ($q) => $q->where('merk', $this->filterTipeHpMerk))
+                ->orderBy('merk')
+                ->orderBy('model')
+                ->get(),
             'merekHpOptions' => TipeHp::where('is_active', true)->distinct()->orderBy('merk')->pluck('merk')->filter()->values()->all(),
             'existingModelsForSelectedMerk' => (! empty($this->tipeHpForm['merk']) && $this->tipeHpForm['merk'] !== '__custom__')
                 ? TipeHp::where('is_active', true)

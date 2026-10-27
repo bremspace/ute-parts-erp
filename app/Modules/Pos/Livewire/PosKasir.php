@@ -451,12 +451,83 @@ class PosKasir extends Component
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
     }
 
+    public function resetSingleFilter(string $key): void
+    {
+        match ($key) {
+            'search' => $this->search = '',
+            'kategori' => $this->filterKategoriId = null,
+            'brand' => $this->filterBrandId = null,
+            'kualitas' => $this->filterKualitasId = null,
+            'tipe_hp' => $this->filterTipeHpId = null,
+            'brand_kompatibel' => $this->filterBrandKompatibel = null,
+            'model_kompatibel' => $this->filterModelKompatibel = null,
+            'kondisi' => $this->filterKondisi = null,
+            'satuan' => $this->filterSatuan = null,
+            'abc_class' => $this->filterAbcClass = null,
+            'stok' => $this->filterHanyaReadyStok = false,
+            default => null,
+        };
+        $this->batasProduk = self::BATAS_PRODUK_AWAL;
+    }
+
     protected function simpanPreferensi(): void
     {
         $userId = auth()->id();
         if ($userId) {
             UserPreference::setPref($userId, 'pos_kasir_custom_filters', $this->visibleFilters);
         }
+    }
+
+    public function getActiveFilterChipsProperty(): array
+    {
+        $chips = [];
+        if (! empty(trim($this->search))) {
+            $chips[] = ['key' => 'search', 'label' => 'Cari: "'.trim($this->search).'"'];
+        }
+        if ($this->visibleFilters['kategori'] && $this->filterKategoriId) {
+            $kat = KategoriProduk::find($this->filterKategoriId);
+            if ($kat) {
+                $chips[] = ['key' => 'kategori', 'label' => 'Kategori: '.$kat->nama];
+            }
+        }
+        if ($this->visibleFilters['brand'] && $this->filterBrandId) {
+            $brand = Brand::find($this->filterBrandId);
+            if ($brand) {
+                $chips[] = ['key' => 'brand', 'label' => 'Brand: '.$brand->nama];
+            }
+        }
+        if ($this->visibleFilters['kualitas'] && $this->filterKualitasId) {
+            $kual = KualitasProduk::find($this->filterKualitasId);
+            if ($kual) {
+                $chips[] = ['key' => 'kualitas', 'label' => 'Kualitas: '.$kual->nama];
+            }
+        }
+        if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
+            $th = TipeHp::find($this->filterTipeHpId);
+            if ($th) {
+                $chips[] = ['key' => 'tipe_hp', 'label' => 'Tipe HP: '.$th->merk.' '.$th->model];
+            }
+        }
+        if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
+            $chips[] = ['key' => 'brand_kompatibel', 'label' => 'Merk: '.$this->filterBrandKompatibel];
+        }
+        if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
+            $chips[] = ['key' => 'model_kompatibel', 'label' => 'Model: '.$this->filterModelKompatibel];
+        }
+        if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
+            $chips[] = ['key' => 'kondisi', 'label' => 'Kondisi: '.ucfirst($this->filterKondisi)];
+        }
+        if ($this->visibleFilters['satuan'] && $this->filterSatuan) {
+            $chips[] = ['key' => 'satuan', 'label' => 'Satuan: '.strtoupper($this->filterSatuan)];
+        }
+        if ($this->visibleFilters['abc_class'] && $this->filterAbcClass) {
+            $chips[] = ['key' => 'abc_class', 'label' => 'Kelas '.$this->filterAbcClass];
+        }
+        if ($this->visibleFilters['stok'] && $this->filterHanyaReadyStok) {
+            $chips[] = ['key' => 'stok', 'label' => 'Hanya Ready'];
+        }
+
+        return $chips;
     }
 
     public function updatedFilterKategoriId(): void
@@ -3695,76 +3766,27 @@ class PosKasir extends Component
                 'kualitas',
             ]);
 
-        if (! empty($this->search)) {
-            $productsQuery->cariPintar($this->search);
-        } else {
+        $filters = [
+            'search' => $this->search,
+            'auto_relevance' => ! empty($this->search),
+            'kategori_id' => $this->visibleFilters['kategori'] ? $this->filterKategoriId : null,
+            'brand_id' => $this->visibleFilters['brand'] ? $this->filterBrandId : null,
+            'kualitas_id' => $this->visibleFilters['kualitas'] ? $this->filterKualitasId : null,
+            'tipe_hp_id' => $this->visibleFilters['tipe_hp'] ? $this->filterTipeHpId : null,
+            'brand_kompatibel' => $this->visibleFilters['brand_kompatibel'] ? $this->filterBrandKompatibel : null,
+            'model_kompatibel' => $this->visibleFilters['model_kompatibel'] ? $this->filterModelKompatibel : null,
+            'kondisi' => $this->visibleFilters['kondisi'] ? $this->filterKondisi : null,
+            'satuan' => $this->visibleFilters['satuan'] ? $this->filterSatuan : null,
+            'abc_class' => $this->visibleFilters['abc_class'] ? $this->filterAbcClass : null,
+            'hanya_ready_stok' => $this->visibleFilters['stok'] && $this->filterHanyaReadyStok,
+            'cabang_id' => session('cabang_id'),
+            'gudang_id' => $this->selectedGudangId,
+        ];
+
+        $productsQuery->filterKatalog($filters);
+
+        if (empty($this->search)) {
             $productsQuery->urutKetersediaanDanTerlaris($this->selectedGudangId, session('cabang_id'));
-        }
-
-        if ($this->visibleFilters['kategori'] && $this->filterKategoriId) {
-            $kat = KategoriProduk::with('children')->find($this->filterKategoriId);
-            $katIds = $kat ? array_merge([$kat->id], $kat->children->pluck('id')->all()) : [$this->filterKategoriId];
-            $productsQuery->whereIn('kategori_id', $katIds);
-        }
-
-        if ($this->visibleFilters['brand'] && $this->filterBrandId) {
-            $productsQuery->where('brand_id', $this->filterBrandId);
-        }
-
-        if ($this->visibleFilters['kualitas'] && $this->filterKualitasId) {
-            $productsQuery->where('kualitas_id', $this->filterKualitasId);
-        }
-
-        if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
-            $targetTipe = TipeHp::find($this->filterTipeHpId);
-            $productsQuery->where(function ($q) use ($targetTipe) {
-                $q->whereHas('tipeHps', fn ($th) => $th->where('tipe_hp.id', $this->filterTipeHpId));
-                if ($targetTipe) {
-                    $q->orWhere(function ($sub) use ($targetTipe) {
-                        $sub->where('brand_kompatibel', $targetTipe->merk)
-                            ->where('model_kompatibel', $targetTipe->model);
-                    });
-                }
-            });
-        }
-
-        if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
-            $productsQuery->where(function ($q) {
-                $q->where('brand_kompatibel', $this->filterBrandKompatibel)
-                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel));
-            });
-        }
-
-        if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
-            $productsQuery->where(function ($q) {
-                $q->where('model_kompatibel', $this->filterModelKompatibel)
-                    ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel));
-            });
-        }
-
-        if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
-            $productsQuery->where('kondisi', $this->filterKondisi);
-        }
-
-        if ($this->visibleFilters['satuan'] && $this->filterSatuan) {
-            $productsQuery->where('satuan', $this->filterSatuan);
-        }
-
-        if ($this->visibleFilters['abc_class'] && $this->filterAbcClass) {
-            $productsQuery->where('abc_class', $this->filterAbcClass);
-        }
-
-        if ($this->visibleFilters['stok'] && $this->filterHanyaReadyStok) {
-            $productsQuery->whereHas('stokItems', function ($q) {
-                $q->where('jumlah', '>', 0);
-                if ($this->selectedGudangId) {
-                    $q->where('gudang_id', $this->selectedGudangId);
-                } elseif ($cabangId = session('cabang_id')) {
-                    $q->whereIn('gudang_id', function ($gq) use ($cabangId) {
-                        $gq->select('id')->from('gudang')->where('cabang_id', $cabangId);
-                    });
-                }
-            });
         }
 
         // [B-02/P1-5] Load-more: ambil batas+1 utk tahu masih ada sisanya

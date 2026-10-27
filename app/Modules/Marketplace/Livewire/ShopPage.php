@@ -133,6 +133,39 @@ class ShopPage extends Component
         $this->resetPage();
     }
 
+    public function resetSingleFilter(string $key): void
+    {
+        match ($key) {
+            'search' => $this->search = '',
+            'kategori' => $this->filterKategori = '',
+            'kondisi' => $this->filterKondisi = '',
+            'brand' => $this->filterBrand = '',
+            'hpMerk' => $this->filterHpMerk = '',
+            'hpModel' => $this->filterHpModel = '',
+            'kualitas' => $this->filterKualitas = '',
+            'stok' => $this->filterStok = '',
+            'hargaMax' => $this->hargaMax = null,
+            'sort' => $this->sort = '',
+            default => null,
+        };
+        $this->resetPage();
+    }
+
+    public function resetAllFilters(): void
+    {
+        $this->search = '';
+        $this->filterKategori = '';
+        $this->filterKondisi = '';
+        $this->filterBrand = '';
+        $this->filterHpMerk = '';
+        $this->filterHpModel = '';
+        $this->filterKualitas = '';
+        $this->filterStok = '';
+        $this->hargaMax = null;
+        $this->sort = '';
+        $this->resetPage();
+    }
+
     public function getFacetedOptionsProperty(): array
     {
         return app(SmartSearchService::class)->getFacetedOptions([
@@ -145,6 +178,52 @@ class ShopPage extends Component
             'stok' => $this->filterStok,
             'hargaMax' => $this->hargaMax,
         ], $this->search);
+    }
+
+    public function getActiveFilterChipsProperty(): array
+    {
+        $chips = [];
+        if (! empty($this->search)) {
+            $chips[] = ['key' => 'search', 'label' => 'Cari: "'.$this->search.'"'];
+        }
+        if (! empty($this->filterKategori)) {
+            $kat = is_numeric($this->filterKategori) ? KategoriProduk::find($this->filterKategori)?->nama : $this->filterKategori;
+            $chips[] = ['key' => 'kategori', 'label' => 'Kategori: '.($kat ?: $this->filterKategori)];
+        }
+        if (! empty($this->filterHpMerk)) {
+            $chips[] = ['key' => 'hpMerk', 'label' => 'Merk HP: '.$this->filterHpMerk];
+        }
+        if (! empty($this->filterHpModel)) {
+            $chips[] = ['key' => 'hpModel', 'label' => 'Tipe HP: '.$this->filterHpModel];
+        }
+        if (! empty($this->filterBrand)) {
+            $chips[] = ['key' => 'brand', 'label' => 'Brand: '.$this->filterBrand];
+        }
+        if (! empty($this->filterKualitas)) {
+            $kual = is_numeric($this->filterKualitas) ? KualitasProduk::find($this->filterKualitas)?->nama : $this->filterKualitas;
+            $chips[] = ['key' => 'kualitas', 'label' => 'Kualitas: '.($kual ?: $this->filterKualitas)];
+        }
+        if (! empty($this->filterKondisi)) {
+            $chips[] = ['key' => 'kondisi', 'label' => 'Kondisi: '.ucfirst($this->filterKondisi)];
+        }
+        if (! empty($this->filterStok)) {
+            $chips[] = ['key' => 'stok', 'label' => 'Stok: '.ucfirst($this->filterStok)];
+        }
+        if (! empty($this->hargaMax)) {
+            $chips[] = ['key' => 'hargaMax', 'label' => 'Maks: Rp '.number_format((float) $this->hargaMax, 0, ',', '.')];
+        }
+        if (! empty($this->sort)) {
+            $sortLabels = [
+                'termurah' => 'Harga Terendah',
+                'termahal' => 'Harga Tertinggi',
+                'terbaru' => 'Terbaru',
+                'terlaris' => 'Terlaris',
+                'relevansi' => 'Paling Sesuai',
+            ];
+            $chips[] = ['key' => 'sort', 'label' => 'Urut: '.($sortLabels[$this->sort] ?? $this->sort)];
+        }
+
+        return $chips;
     }
 
     public function getKualitasListProperty(): array
@@ -179,69 +258,23 @@ class ShopPage extends Component
         // Diurutkan dari ketersediaan stok (tersedia > habis) dan produk terlaris.
         $query = Produk::where('is_active', true)
             ->withSum('stokItems', 'jumlah')
-            ->with(['hargaTier', 'skuVariants'])
-            ->urutKetersediaanDanTerlaris();
+            ->with(['hargaTier', 'skuVariants']);
 
-        if ($this->search) {
-            $query->cariPintar($this->search);
-        }
-        if ($this->filterKategori) {
-            if (is_numeric($this->filterKategori)) {
-                $kat = KategoriProduk::find($this->filterKategori);
-                $ids = $kat ? $kat->semuaKeturunanIds() : [(int) $this->filterKategori];
-                $query->whereIn('kategori_id', $ids);
-            } else {
-                $query->where(function ($q) {
-                    $q->where('kategori', $this->filterKategori)
-                        ->orWhereHas('kategoriRelasi', fn ($kq) => $kq->where('nama', $this->filterKategori)->orWhere('slug', $this->filterKategori));
-                });
-            }
-        }
-        if ($this->filterKondisi) {
-            $query->where('kondisi', $this->filterKondisi);
-        }
-        if ($this->filterBrand) {
-            $query->where(function ($q) {
-                $q->where('brand_kompatibel', $this->filterBrand)
-                    ->orWhereHas('brand', fn ($bq) => $bq->where('nama', $this->filterBrand));
-            });
-        }
-        // Filter by HP merk/model menggunakan B-Tree join tipeHps (cepat) dan JSON fallback
-        if ($this->filterHpMerk) {
-            $query->where(function ($q) {
-                $q->whereHas('tipeHps', fn ($tq) => $tq->where('merk', $this->filterHpMerk))
-                    ->orWhere('brand_kompatibel', $this->filterHpMerk)
-                    ->orWhere('kompatibilitas_hp', 'like', '%"merk":"'.$this->filterHpMerk.'"%');
-            });
-        }
-        if ($this->filterHpModel) {
-            $query->where(function ($q) {
-                $q->whereHas('tipeHps', fn ($tq) => $tq->where('model', $this->filterHpModel))
-                    ->orWhere('model_kompatibel', $this->filterHpModel)
-                    ->orWhere('kompatibilitas_hp', 'like', '%"model":"'.$this->filterHpModel.'"%');
-            });
-        }
-        if ($this->hargaMax) {
-            $query->where('harga_jual_retail', '<=', $this->hargaMax);
-        }
+        $filters = [
+            'search' => $this->search,
+            'auto_relevance' => false,
+            'kategori' => $this->filterKategori,
+            'kondisi' => $this->filterKondisi,
+            'brand' => $this->filterBrand,
+            'hpMerk' => $this->filterHpMerk,
+            'hpModel' => $this->filterHpModel,
+            'kualitas' => $this->filterKualitas,
+            'stok' => $this->filterStok,
+            'harga_max' => $this->hargaMax,
+        ];
+        $query->filterKatalog($filters);
 
-        // Filter kualitas (grade part, mis. OEM vs compatible)
-        if ($this->filterKualitas) {
-            if (is_numeric($this->filterKualitas)) {
-                $query->where('kualitas_id', (int) $this->filterKualitas);
-            } else {
-                $query->whereHas('kualitas', fn ($kq) => $kq->where('nama', $this->filterKualitas));
-            }
-        }
-
-        // Filter ketersediaan stok mengikuti stok_items live (tersinkron dgn POS/backoffice)
-        if ($this->filterStok === 'tersedia') {
-            $query->has('stokItems');
-        } elseif ($this->filterStok === 'habis') {
-            $query->doesntHave('stokItems');
-        }
-
-        // Urutan: dropdown user > kompatibilitas gaid (semester filterHpModel) > relevansi dgn keyword > default (ready-stok "& terlaris)
+        // Urutan: dropdown user > relevansi dgn keyword (default saat search aktif) > kompatibilitas HP > default (ready-stok & terlaris)
         if ($this->sort === 'termurah') {
             $query->orderBy('harga_jual_retail', 'asc');
         } elseif ($this->sort === 'termahal') {
@@ -250,10 +283,12 @@ class ShopPage extends Component
             $query->latest('produk.id');
         } elseif ($this->sort === 'terlaris') {
             $query->orderByDesc('total_terjual')->orderByDesc('stok_katalog');
-        } elseif ($this->sort === 'relevansi' && $this->search) {
+        } elseif (! empty($this->search)) {
             $query->urutkanRelevansi($this->search);
-        } elseif (! $this->sort && ! $this->search && $this->filterHpModel) {
+        } elseif (! $this->sort && $this->filterHpModel) {
             $query->urutkanKompatibilitas($this->filterHpModel, $this->filterHpMerk ?: null);
+        } else {
+            $query->urutKetersediaanDanTerlaris();
         }
 
         return $query->paginate(24);

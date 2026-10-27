@@ -2718,6 +2718,89 @@ class ProdukTab extends Component
         return $count;
     }
 
+    public function getActiveFilterChipsProperty(): array
+    {
+        $chips = [];
+        if (! empty(trim((string) $this->produkSearch))) {
+            $chips[] = ['key' => 'search', 'label' => 'Cari: "'.trim((string) $this->produkSearch).'"'];
+        }
+        if ($this->filterKategoriId) {
+            $kat = KategoriProduk::find($this->filterKategoriId);
+            if ($kat) {
+                $chips[] = ['key' => 'kategori', 'label' => 'Kategori: '.$kat->nama];
+            }
+        }
+        if ($this->filterBrandId) {
+            $brand = Brand::find($this->filterBrandId);
+            if ($brand) {
+                $chips[] = ['key' => 'brand', 'label' => 'Brand: '.$brand->nama];
+            }
+        }
+        if ($this->filterKualitasId) {
+            $kual = KualitasProduk::find($this->filterKualitasId);
+            if ($kual) {
+                $chips[] = ['key' => 'kualitas', 'label' => 'Kualitas: '.$kual->nama];
+            }
+        }
+        if ($this->filterTipeHpId) {
+            $th = TipeHp::find($this->filterTipeHpId);
+            if ($th) {
+                $chips[] = ['key' => 'tipe_hp', 'label' => 'Tipe HP: '.$th->merk.' '.$th->model];
+            }
+        }
+        if ($this->filterBrandKompatibel) {
+            $chips[] = ['key' => 'brand_kompatibel', 'label' => 'Merk HP: '.$this->filterBrandKompatibel];
+        }
+        if ($this->filterModelKompatibel) {
+            $chips[] = ['key' => 'model_kompatibel', 'label' => 'Model HP: '.$this->filterModelKompatibel];
+        }
+        if ($this->filterKondisi) {
+            $chips[] = ['key' => 'kondisi', 'label' => 'Kondisi: '.ucfirst($this->filterKondisi)];
+        }
+        if ($this->filterSatuan) {
+            $chips[] = ['key' => 'satuan', 'label' => 'Satuan: '.strtoupper($this->filterSatuan)];
+        }
+        if ($this->filterAbcClass) {
+            $chips[] = ['key' => 'abc_class', 'label' => 'Kelas '.$this->filterAbcClass];
+        }
+        if ($this->filterSupplierId) {
+            $sup = Supplier::find($this->filterSupplierId);
+            if ($sup) {
+                $chips[] = ['key' => 'supplier', 'label' => 'Supplier: '.$sup->nama];
+            }
+        }
+        if ($this->filterHanyaReadyStok) {
+            $chips[] = ['key' => 'stok', 'label' => 'Hanya Ready'];
+        }
+        if ($this->filterStatusAktif && $this->filterStatusAktif !== 'semua') {
+            $chips[] = ['key' => 'status', 'label' => 'Status: '.ucfirst($this->filterStatusAktif)];
+        }
+
+        return $chips;
+    }
+
+    public function resetSingleFilter(string $key): void
+    {
+        match ($key) {
+            'search', 'produk' => $this->produkSearch = '',
+            'kategori' => $this->filterKategoriId = null,
+            'brand' => $this->filterBrandId = null,
+            'kualitas' => $this->filterKualitasId = null,
+            'tipe_hp' => $this->filterTipeHpId = null,
+            'brand_kompatibel', 'merk_hp' => $this->filterBrandKompatibel = null,
+            'model_kompatibel' => $this->filterModelKompatibel = null,
+            'kondisi' => $this->filterKondisi = null,
+            'satuan' => $this->filterSatuan = null,
+            'abc_class' => $this->filterAbcClass = null,
+            'stok' => $this->filterHanyaReadyStok = false,
+            'supplier' => $this->filterSupplierId = null,
+            'gudang' => $this->filterGudangId = null,
+            'status' => $this->filterStatusAktif = 'semua',
+            default => $this->resetFilterKolom($key),
+        };
+        $this->resetPage();
+    }
+
     public function resetFilterKolom(string $kolom): void
     {
         match ($kolom) {

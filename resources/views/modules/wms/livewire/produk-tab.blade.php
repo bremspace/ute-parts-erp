@@ -351,6 +351,15 @@
                         </div>
                     </div>
                 @endif
+
+            <!-- Active Filter Chips (Individual Reset & Reset All) -->
+            <x-prism.active-filter-chips
+                :chips="$this->activeFilterChips"
+                reset-action="resetSingleFilter"
+                reset-all-action="resetSemuaFilter"
+                class="px-1"
+            />
+
             @if(!empty($selectedProdukIds))
                 <div class="p-3 bg-up-primary/10 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
                     <div class="flex items-center gap-3">

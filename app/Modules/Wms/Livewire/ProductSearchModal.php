@@ -129,6 +129,93 @@ class ProductSearchModal extends Component
         }
     }
 
+    public function resetSingleFilter(string $key): void
+    {
+        match ($key) {
+            'search' => $this->search = '',
+            'kategori' => $this->filterKategoriId = null,
+            'brand' => $this->filterBrandId = null,
+            'kualitas' => $this->filterKualitasId = null,
+            'tipe_hp' => $this->filterTipeHpId = null,
+            'brand_kompatibel' => $this->filterBrandKompatibel = null,
+            'model_kompatibel' => $this->filterModelKompatibel = null,
+            'kondisi' => $this->filterKondisi = null,
+            'satuan' => $this->filterSatuan = null,
+            'abc_class' => $this->filterAbcClass = null,
+            'stok' => $this->filterHanyaReadyStok = false,
+            default => null,
+        };
+        $this->resetPage();
+    }
+
+    public function getActiveFilterChipsProperty(): array
+    {
+        $chips = [];
+        if (! empty(trim((string) $this->search))) {
+            $chips[] = ['key' => 'search', 'label' => 'Cari: "'.trim((string) $this->search).'"'];
+        }
+        if ($this->visibleFilters['kategori'] && $this->filterKategoriId) {
+            $kat = KategoriProduk::find($this->filterKategoriId);
+            if ($kat) {
+                $chips[] = ['key' => 'kategori', 'label' => 'Kategori: '.$kat->nama];
+            }
+        }
+        if ($this->visibleFilters['brand'] && $this->filterBrandId) {
+            $brand = Brand::find($this->filterBrandId);
+            if ($brand) {
+                $chips[] = ['key' => 'brand', 'label' => 'Brand: '.$brand->nama];
+            }
+        }
+        if ($this->visibleFilters['kualitas'] && $this->filterKualitasId) {
+            $kual = KualitasProduk::find($this->filterKualitasId);
+            if ($kual) {
+                $chips[] = ['key' => 'kualitas', 'label' => 'Kualitas: '.$kual->nama];
+            }
+        }
+        if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
+            $th = TipeHp::find($this->filterTipeHpId);
+            if ($th) {
+                $chips[] = ['key' => 'tipe_hp', 'label' => 'Tipe HP: '.$th->merk.' '.$th->model];
+            }
+        }
+        if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
+            $chips[] = ['key' => 'brand_kompatibel', 'label' => 'Merk: '.$this->filterBrandKompatibel];
+        }
+        if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
+            $chips[] = ['key' => 'model_kompatibel', 'label' => 'Model: '.$this->filterModelKompatibel];
+        }
+        if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
+            $chips[] = ['key' => 'kondisi', 'label' => 'Kondisi: '.ucfirst($this->filterKondisi)];
+        }
+        if ($this->visibleFilters['satuan'] && $this->filterSatuan) {
+            $chips[] = ['key' => 'satuan', 'label' => 'Satuan: '.strtoupper($this->filterSatuan)];
+        }
+        if ($this->visibleFilters['abc_class'] && $this->filterAbcClass) {
+            $chips[] = ['key' => 'abc_class', 'label' => 'Kelas '.$this->filterAbcClass];
+        }
+        if ($this->visibleFilters['stok'] && $this->filterHanyaReadyStok) {
+            $chips[] = ['key' => 'stok', 'label' => 'Hanya Ready'];
+        }
+
+        return $chips;
+    }
+
+    public function resetAllFilters(): void
+    {
+        $this->search = '';
+        $this->filterKategoriId = null;
+        $this->filterBrandId = null;
+        $this->filterKualitasId = null;
+        $this->filterTipeHpId = null;
+        $this->filterBrandKompatibel = null;
+        $this->filterModelKompatibel = null;
+        $this->filterKondisi = null;
+        $this->filterSatuan = null;
+        $this->filterAbcClass = null;
+        $this->filterHanyaReadyStok = false;
+        $this->resetPage();
+    }
+
     public function resetCustomFilters(): void
     {
         $this->visibleFilters = [
@@ -322,59 +409,31 @@ class ProductSearchModal extends Component
             ->withSum('stokItems as total_stok', 'jumlah')
             ->where('is_active', true);
 
+        $filters = [
+            'search' => $this->search,
+            'kategori_id' => $this->visibleFilters['kategori'] ? $this->filterKategoriId : null,
+            'brand_id' => $this->visibleFilters['brand'] ? $this->filterBrandId : null,
+            'kualitas_id' => $this->visibleFilters['kualitas'] ? $this->filterKualitasId : null,
+            'tipe_hp_id' => $this->visibleFilters['tipe_hp'] ? $this->filterTipeHpId : null,
+            'brand_kompatibel' => $this->visibleFilters['brand_kompatibel'] ? $this->filterBrandKompatibel : null,
+            'model_kompatibel' => $this->visibleFilters['model_kompatibel'] ? $this->filterModelKompatibel : null,
+            'kondisi' => $this->visibleFilters['kondisi'] ? $this->filterKondisi : null,
+            'satuan' => $this->visibleFilters['satuan'] ? $this->filterSatuan : null,
+            'abc_class' => $this->visibleFilters['abc_class'] ? $this->filterAbcClass : null,
+            'hanya_ready_stok' => $this->visibleFilters['stok'] && $this->filterHanyaReadyStok,
+        ];
+
         if ($this->context === 'po' && $this->curatedSupplierId && $this->supplierScope === 'curated') {
-            $query->where('supplier_id', $this->curatedSupplierId);
+            $filters['supplier_id'] = $this->curatedSupplierId;
         }
 
-        if (! empty($this->search)) {
-            $query->cariPintar($this->search);
+        $query->filterKatalog($filters);
+
+        if (empty($this->search)) {
+            $query->orderBy('nama');
         }
 
-        if ($this->visibleFilters['kategori'] && $this->filterKategoriId) {
-            $kat = KategoriProduk::with('children')->find($this->filterKategoriId);
-            $katIds = $kat ? array_merge([$kat->id], $kat->children->pluck('id')->all()) : [$this->filterKategoriId];
-            $query->whereIn('kategori_id', $katIds);
-        }
-
-        if ($this->visibleFilters['brand'] && $this->filterBrandId) {
-            $query->where('brand_id', $this->filterBrandId);
-        }
-
-        if ($this->visibleFilters['kualitas'] && $this->filterKualitasId) {
-            $query->where('kualitas_id', $this->filterKualitasId);
-        }
-
-        if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
-            $query->whereHas('tipeHps', fn ($q) => $q->where('tipe_hp.id', $this->filterTipeHpId));
-        }
-
-        if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
-            $query->where('brand_kompatibel', $this->filterBrandKompatibel);
-        }
-
-        if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
-            $query->where('model_kompatibel', $this->filterModelKompatibel);
-        }
-
-        if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
-            $query->where('kondisi', $this->filterKondisi);
-        }
-
-        if ($this->visibleFilters['satuan'] && $this->filterSatuan) {
-            $query->where('satuan', $this->filterSatuan);
-        }
-
-        if ($this->visibleFilters['abc_class'] && $this->filterAbcClass) {
-            $query->where('abc_class', $this->filterAbcClass);
-        }
-
-        if ($this->visibleFilters['stok'] && $this->filterHanyaReadyStok) {
-            $query->whereHas('stokItems', fn ($q) => $q->where('jumlah', '>', 0));
-        }
-
-        $products = $query
-            ->orderBy('nama')
-            ->paginate(20);
+        $products = $query->paginate(20);
 
         $brandKompatibelList = TipeHp::where('is_active', true)
             ->distinct()

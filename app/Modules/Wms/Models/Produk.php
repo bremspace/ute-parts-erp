@@ -427,6 +427,15 @@ class Produk extends Model
     }
 
     /**
+     * Terapkan kumpulan filter katalog dan pencarian cerdas secara terpusat.
+     * Digunakan secara global di POS Kasir, Shop Marketplace, WMS Master Produk, dan Modal Global.
+     */
+    public function scopeFilterKatalog($query, array $filters = [])
+    {
+        return app(SmartSearchService::class)->applyCatalogFilters($query, $filters);
+    }
+
+    /**
      * Urutkan hasil berdasarkan prioritas kompatibilitas saat filter Tipe HP aktif tanpa search input:
      * 1. Exact primary model (model_kompatibel cocok persis) -> paling atas (misal semua LCD A11 dari brand OG, Braderpart, Crown)
      * 2. Nama memuat model kompatibel -> urutan kedua

@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Modules\Marketplace\Livewire\ShopPage;
+use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Services\SmartSearchService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -130,5 +133,142 @@ class SmartSearchGlobalTest extends TestCase
             ->set('filterHpMerk', 'Apple')
             ->assertSet('filterHpModel', '') // Reset otomatis model saat ganti merk
             ->assertStatus(200);
+    }
+
+    public function test_relevance_ranking_prioritizes_exact_and_prefix_product_name_at_top(): void
+    {
+        $brand = Brand::firstOrCreate(['nama' => 'Crown'], ['is_active' => true]);
+
+        // Prod A: Nama persis "iPhone 11"
+        $prodExact = Produk::create([
+            'nama' => 'iPhone 11',
+            'slug' => 'iphone-11-exact',
+            'brand_id' => $brand->id,
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11',
+            'harga_jual_retail' => 1000000,
+            'is_active' => true,
+        ]);
+
+        // Prod B: Prefix nama "iPhone 11 Pro Max Original"
+        $prodPrefix = Produk::create([
+            'nama' => 'iPhone 11 Pro Max Original',
+            'slug' => 'iphone-11-pro-max',
+            'brand_id' => $brand->id,
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11 Pro Max',
+            'harga_jual_retail' => 1200000,
+            'is_active' => true,
+        ]);
+
+        // Prod C: Hanya kompatibel, nama di belakang "Kabel Fleksibel iPhone 11"
+        $prodSuffix = Produk::create([
+            'nama' => 'Kabel Fleksibel iPhone 11',
+            'slug' => 'kabel-fleksibel-iphone-11',
+            'brand_id' => $brand->id,
+            'brand_kompatibel' => 'Apple',
+            'model_kompatibel' => 'iPhone 11',
+            'harga_jual_retail' => 50000,
+            'is_active' => true,
+        ]);
+
+        $ordered = Produk::query()
+            ->cariPintar('iPhone 11')
+            ->urutkanRelevansi('iPhone 11')
+            ->pluck('id')
+            ->all();
+
+        // Exact match nama produk harus berada di posisi teratas
+        $this->assertEquals($prodExact->id, $ordered[0]);
+        // Prefix match harus berada di urutan berikutnya sebelum match di tengah/akhir frasa
+        $this->assertEquals($prodPrefix->id, $ordered[1]);
+        $this->assertEquals($prodSuffix->id, $ordered[2]);
+    }
+
+    public function test_filter_katalog_scope_filters_correctly(): void
+    {
+        $kat = KategoriProduk::firstOrCreate(['slug' => 'baterai-test'], ['nama' => 'Baterai Test', 'is_active' => true]);
+
+        $prod = Produk::create([
+            'nama' => 'Baterai Hippo iPhone 11',
+            'slug' => 'baterai-hippo-iphone-11',
+            'kategori_id' => $kat->id,
+            'kategori' => 'Baterai Test',
+            'kondisi' => 'baru',
+            'harga_jual_retail' => 250000,
+            'is_active' => true,
+        ]);
+
+        $results = Produk::query()->filterKatalog([
+            'search' => 'Hippo',
+            'kategori_id' => $kat->id,
+            'kondisi' => 'baru',
+        ])->get();
+
+        $this->assertTrue($results->contains('id', $prod->id));
+
+        $emptyResults = Produk::query()->filterKatalog([
+            'search' => 'Hippo',
+            'kondisi' => 'bekas',
+        ])->get();
+
+        $this->assertFalse($emptyResults->contains('id', $prod->id));
+    }
+
+    public function test_active_filter_chips_and_reset_single_filter_on_shop_page(): void
+    {
+        $component = Livewire::test(ShopPage::class)
+            ->set('search', 'iPhone 11')
+            ->set('filterKondisi', 'baru');
+
+        $chips = $component->get('activeFilterChips');
+        $this->assertCount(2, $chips);
+        $this->assertEquals('search', $chips[0]['key']);
+        $this->assertEquals('kondisi', $chips[1]['key']);
+
+        // Reset individual filter
+        $component->call('resetSingleFilter', 'kondisi');
+        $this->assertEquals('', $component->get('filterKondisi'));
+        $this->assertCount(1, $component->get('activeFilterChips'));
+
+        // Reset all
+        $component->call('resetAllFilters');
+        $this->assertEquals('', $component->get('search'));
+        $this->assertEmpty($component->get('activeFilterChips'));
+    }
+
+    public function test_settings_rbac_manages_merk_hp_and_tipe_hp(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $user = User::factory()->create();
+        $user->assignRole('super-admin');
+        $this->actingAs($user);
+
+        // Tambah Merk HP Baru
+        Livewire::test(SettingsRbac::class)
+            ->set('activeTab', 'master_produk')
+            ->set('masterProdukSubTab', 'merk_hp')
+            ->call('openMerkHpModal')
+            ->set('merkHpForm.merk', 'Google Pixel')
+            ->call('simpanMerkHp')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('tipe_hp', [
+            'merk' => 'Google Pixel',
+        ]);
+
+        // Ubah Merk HP
+        Livewire::test(SettingsRbac::class)
+            ->call('openMerkHpModal', 'Google Pixel')
+            ->set('merkHpForm.merk', 'Google')
+            ->call('simpanMerkHp')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('tipe_hp', [
+            'merk' => 'Google',
+        ]);
+        $this->assertDatabaseMissing('tipe_hp', [
+            'merk' => 'Google Pixel',
+        ]);
     }
 }
