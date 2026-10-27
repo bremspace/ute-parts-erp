@@ -88,9 +88,10 @@ class QrisNotificationController extends Controller
             }
         }
 
-        // 3. Ekstrak pesan teks dari berbagai variasi field MacroDroid / forwarder Android
+        // 3. Ekstrak pesan teks dan judul dari berbagai variasi field MacroDroid / PayHook / forwarder Android
         $rawText = (string) (
-            $request->input('text')
+            $request->input('notification_text')
+            ?? $request->input('text')
             ?? $request->input('body')
             ?? $request->input('message')
             ?? $request->input('not_body')
@@ -102,7 +103,8 @@ class QrisNotificationController extends Controller
         );
 
         $title = (string) (
-            $request->input('title')
+            $request->input('notification_title')
+            ?? $request->input('title')
             ?? $request->query('title')
             ?? $request->input('not_title')
             ?? 'QRIS Notification'
