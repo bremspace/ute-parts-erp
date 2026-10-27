@@ -34,28 +34,46 @@ class QrisNotificationController extends Controller
             }
         }
 
-        // 1. Ekstrak secret token dari header, input parameter, query string, atau raw body
-        $secretProvided = trim((string) (
-            $request->header('X-QRIS-Secret')
-            ?? $request->input('secret')
-            ?? $request->query('secret')
-            ?? $request->input('token')
-            ?? $request->query('token')
-        ), " \t\n\r\0\x0B\"'");
+        // 1. Ekstrak kandidat secret token dari seluruh sumber (Header, Input, Query, Raw content)
+        $candidates = [];
 
-        if (blank($secretProvided) && filled($rawContent)) {
-            if (preg_match('/["\']?(?:secret|token)["\']?\s*[:=]\s*["\']?([^"\'&\s\r\n]+)/i', $rawContent, $mSec)) {
-                $secretProvided = trim($mSec[1], " \t\n\r\0\x0B\"'");
+        if (filled($request->header('X-QRIS-Secret'))) {
+            $candidates[] = trim((string) $request->header('X-QRIS-Secret'), " \t\n\r\0\x0B\"'");
+        }
+        if (filled($request->input('secret'))) {
+            $candidates[] = trim((string) $request->input('secret'), " \t\n\r\0\x0B\"'");
+        }
+        if (filled($request->query('secret'))) {
+            $candidates[] = trim((string) $request->query('secret'), " \t\n\r\0\x0B\"'");
+        }
+        if (filled($request->input('token'))) {
+            $candidates[] = trim((string) $request->input('token'), " \t\n\r\0\x0B\"'");
+        }
+        if (filled($request->query('token'))) {
+            $candidates[] = trim((string) $request->query('token'), " \t\n\r\0\x0B\"'");
+        }
+
+        if (filled($rawContent)) {
+            if (preg_match_all('/["\']?(?:secret|token)["\']?\s*[:=]\s*["\']?([^"\'&\s\r\n]+)/i', $rawContent, $mSecs)) {
+                foreach ($mSecs[1] as $val) {
+                    $candidates[] = trim($val, " \t\n\r\0\x0B\"'");
+                }
             }
         }
+
+        $candidates = array_unique(array_filter($candidates, fn ($c) => filled($c)));
 
         // 2. Validasi secret token jika dikonfigurasi di sistem
         $secretExpected = trim((string) $configService->get('qris_webhook_secret'), " \t\n\r\0\x0B\"'");
         if (filled($secretExpected)) {
-            if ($secretProvided !== $secretExpected) {
+            // Lolos jika salah satu kandidat secret token yang dikirim cocok dengan yang diharapkan
+            $isAuthorized = in_array($secretExpected, $candidates, true);
+
+            if (! $isAuthorized) {
+                $providedList = ! empty($candidates) ? implode(', ', $candidates) : '(kosong)';
                 $this->catatLogHistory([
                     'status' => 'unauthorized',
-                    'pesan' => 'Secret token tidak cocok (diterima: '.($secretProvided ?: '(kosong)').', diharapkan: '.$secretExpected.')',
+                    'pesan' => 'Secret token tidak cocok (diterima: '.$providedList.', diharapkan: '.$secretExpected.')',
                     'nominal' => null,
                     'title' => (string) ($request->input('title') ?? $request->query('title') ?? 'QRIS Notification'),
                     'raw' => filled($rawContent) ? $rawContent : json_encode($request->all()),
