@@ -711,6 +711,14 @@ class CrmDashboard extends Component
         $finalMinNominal = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiNominal) ? max(0.0, (float) $this->hargaPartaiMinNominal) : 0.0;
         $finalNominalDiskon = ($this->hargaPartaiAktif && $this->hargaPartaiOpsiNominal) ? (float) $this->hargaPartaiNominalDiskon : 0.0;
 
+        // Sinkronkan tier pertama dengan form utama jika tier tunggal
+        if (count($this->hargaPartaiTiersQty) <= 1 && $finalMinQty > 0 && $finalQtyDiskon > 0) {
+            $this->hargaPartaiTiersQty = [['min_qty' => $finalMinQty, 'diskon_persen' => $finalQtyDiskon]];
+        }
+        if (count($this->hargaPartaiTiersNominal) <= 1 && $finalMinNominal > 0 && $finalNominalDiskon > 0) {
+            $this->hargaPartaiTiersNominal = [['min_nominal' => $finalMinNominal, 'diskon_persen' => $finalNominalDiskon]];
+        }
+
         // Bersihkan dan susun array multi-tier
         $cleanedTiersQty = [];
         if ($this->hargaPartaiAktif && $this->hargaPartaiOpsiQty) {

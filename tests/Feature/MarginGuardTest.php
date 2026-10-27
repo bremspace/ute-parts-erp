@@ -73,15 +73,16 @@ class MarginGuardTest extends TestCase
 
         // Tier Platinum di seeder adalah 10%
         $this->assertGreaterThanOrEqual(10.0, $params['max_mitra_diskon']);
+        $this->assertEquals(3.0, $params['diskon_partai_max']);
         $this->assertEquals(5.0, $params['komisi_persen']);
         $this->assertEquals(5.0, $params['buffer_biaya_persen']);
 
-        // Total potongan = 10 + 5 + 5 = 20%
-        $this->assertEquals(20.0, $params['total_potongan_persen']);
+        // Total potongan terakumulasi (termasuk partai) = 10 + 3 + 5 + 5 = 23%
+        $this->assertEquals(23.0, $params['total_potongan_persen']);
 
-        // HPP 100.000 / (1 - 0.20) = 100.000 / 0.80 = Rp 125.000
+        // HPP 100.000 / (1 - 0.23) = 100.000 / 0.77 = 129.870 -> round 500 = Rp 130.000
         $hargaAman = $service->hitungHargaAman(100000);
-        $this->assertEquals(125000.0, $hargaAman);
+        $this->assertEquals(130000.0, $hargaAman);
     }
 
     public function test_margin_guard_evaluasi_status_bahaya_peringatan_dan_aman(): void
@@ -97,13 +98,13 @@ class MarginGuardTest extends TestCase
         $evalImpas = $service->evaluasiHarga(100000, 100000);
         $this->assertEquals('bahaya', $evalImpas['status']);
 
-        // 3. Jual di atas modal tapi di bawah rekomendasi aman (110.000 < 125.000) -> Status PERINGATAN (Margin Tipis)
+        // 3. Jual di atas modal tapi di bawah rekomendasi aman (110.000 < 130.000) -> Status PERINGATAN (Margin Tipis)
         $evalTipis = $service->evaluasiHarga(100000, 110000);
         $this->assertEquals('peringatan', $evalTipis['status']);
-        $this->assertEquals(125000.0, $evalTipis['rekomendasi_harga']);
+        $this->assertEquals(130000.0, $evalTipis['rekomendasi_harga']);
 
-        // 4. Jual di atas rekomendasi aman (130.000 >= 125.000) -> Status AMAN (Margin Sehat)
-        $evalAman = $service->evaluasiHarga(100000, 130000);
+        // 4. Jual di atas rekomendasi aman (135.000 >= 130.000) -> Status AMAN (Margin Sehat)
+        $evalAman = $service->evaluasiHarga(100000, 135000);
         $this->assertEquals('aman', $evalAman['status']);
     }
 
@@ -178,7 +179,7 @@ class MarginGuardTest extends TestCase
             ->assertSee('LCD Xiaomi Redmi Note 10')
             ->assertSee('Rp 100.000')
             ->assertSee('Rp 105.000')
-            ->assertSee('Rp 125.000');
+            ->assertSee('Rp 130.000');
 
         // 3. Eksekusi Auto-Fix via terapkanSatu
         $test->call('terapkanSatu', $produkTepis->id)
@@ -186,9 +187,9 @@ class MarginGuardTest extends TestCase
 
         $produkTepis->refresh();
 
-        // Terbukti harga disesuaikan otomatis ke harga aman Rp 125.000
-        $this->assertEquals(125000.0, (float) $produkTepis->harga_jual_retail);
-        $this->assertEquals(20.0, (float) $produkTepis->margin_persen);
+        // Terbukti harga disesuaikan otomatis ke harga aman Rp 130.000
+        $this->assertEquals(130000.0, (float) $produkTepis->harga_jual_retail);
+        $this->assertEquals(23.08, (float) $produkTepis->margin_persen);
     }
 
     public function test_staf_biasa_dilarang_mengakses_monitoring_harga(): void
