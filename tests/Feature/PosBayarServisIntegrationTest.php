@@ -14,6 +14,7 @@ use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\CabangSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -164,5 +165,33 @@ class PosBayarServisIntegrationTest extends TestCase
 
         $tiket->refresh();
         $this->assertSame('belum_bayar', $tiket->status_pembayaran);
+    }
+
+    public function test_qris_webhook_auto_completes_pembayaran_servis(): void
+    {
+        $tiket = $this->buatTiketSelesai(350000);
+
+        // Simulasikan webhook notifikasi QRIS masuk ke Cache
+        Cache::put('qris_payment_350000', [
+            'nominal' => 350000,
+            'title' => 'BCA Mobile',
+            'text' => 'QRIS Rp 350.000,00 diterima',
+            'waktu' => now()->toIso8601String(),
+        ], 300);
+
+        // Eksekusi Livewire: buka modal servis dan pilih QRIS
+        Livewire::test(PosKasir::class)
+            ->call('bukaBayarServisModal', $tiket->id)
+            ->set('servisMetodeBayar', 'qris')
+            ->call('cekStatusQrisOtomatis')
+            ->assertSet('qrisTerbayarOtomatis', true)
+            ->assertSet('showBayarServisModal', false)
+            ->assertSet('showReceiptModal', true);
+
+        // Tiket servis harus otomatis lunas tanpa perlu klik manual
+        $tiket->refresh();
+        $this->assertSame('lunas', $tiket->status_pembayaran);
+        $this->assertNotNull($tiket->transaksi_id);
+        $this->assertNull(Cache::get('qris_payment_350000'));
     }
 }

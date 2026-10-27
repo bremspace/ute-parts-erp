@@ -8,6 +8,7 @@ use App\Modules\Marketplace\Controllers\ShippingController;
 use App\Modules\Marketplace\Controllers\ShopController;
 use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Pos\Controllers\PosController;
+use App\Modules\Pos\Controllers\QrisNotificationController;
 use App\Modules\Pos\Controllers\ReturnPenjualanController;
 use App\Modules\Rbac\Controllers\AuthController;
 use App\Modules\Rbac\Controllers\RbacController;
@@ -37,6 +38,10 @@ Route::middleware(['throttle:60,1'])->group(function () {
     Route::post('/servis/public/approve/{token}', [ServisController::class, 'publicApprove']);
     Route::post('/servis/booking-online', [ServisController::class, 'bookingOnline']);
     Route::get('/servis/tracking/{token}', [ServisController::class, 'trackingPublik']);
+
+    // [API: QRIS-01] Webhook Notifikasi Pembayaran QRIS dari Android forwarder & polling status
+    Route::match(['get', 'post'], '/webhook/qris-notif', [QrisNotificationController::class, 'handle']);
+    Route::get('/qris/check-status', [QrisNotificationController::class, 'checkStatus']);
 
     // Authenticated routes
     Route::middleware(['auth:sanctum', 'cabang.selected'])->group(function () {

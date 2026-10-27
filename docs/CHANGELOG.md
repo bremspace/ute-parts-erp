@@ -3,6 +3,71 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-28 — Perbaikan Webhook MacroDroid, Auto-Complete Transaksi Kasir, & Tombol Cek Status QRIS ✅
+
+- **Ketahanan Parser Webhook Notifikasi Android (`QrisNotificationController.php`, `routes/api.php`, `routes/web.php`)**:
+  - Dukungan metode `POST` dan `GET` pada endpoint webhook (`/api/webhook/qris-notif` dan `/webhook/qris-notif` dengan bypass CSRF).
+  - Parser multiline & sanitasi raw body MacroDroid: menangani payload text mentah dengan pemisah baris (`\n`, `\r\n`), parameter URL-encoded, JSON, dan query string.
+  - Pemotongan desimal sen `,00` / `.00` pada nominal mata uang bank Indonesia via `cleanNominalString()` agar nominal tidak berlipat ganda.
+  - Sanitasi secret token token/secret dengan pembersihan spasi dan tanda kutip (`trim`) serta pencatatan detail token di audit log saat terjadi unauthorized.
+- **Otomatisasi Penyelesaian Transaksi Kasir POS & Servis (`PosKasir.php`)**:
+  - `cekStatusQrisOtomatis()`: begitu pelunasan QRIS terdeteksi di cache, transaksi belanja kasir POS (`processTransaction()`) dan pembayaran tiket servis (`prosesBayarServis()`) dieksekusi otomatis tanpa perlu klik konfirmasi manual oleh kasir.
+  - Struk pembayaran langsung tampil di layar kasir seketika pembayaran masuk.
+- **Penyempurnaan Tombol Cek Status / Cek Bayar Manual (`PosKasir.php`, `payment-modal.blade.php`, `bayar-servis-modal.blade.php`)**:
+  - Penambahan method `cekStatusQrisManual()` yang memberikan umpan balik toast instan: info saat pembayaran belum masuk, peringatan saat terdeteksi nominal yang tidak cocok/selisih, dan otomatis selesai saat lunas.
+  - Indikator visual loading spinner (`wire:loading`) pada tombol **Cek Status** dan **Cek Bayar**.
+- **Pengujian Terotomasi**:
+  - `PosKasirQrisAutoPaymentTest`: verifikasi auto-complete transaksi belanja POS dan respon tombol cek manual.
+  - `PosBayarServisIntegrationTest`: verifikasi auto-complete pembayaran servis via QRIS.
+  - `QrisNotificationWebhookTest`: verifikasi beragam payload notifikasi (sen desimal, MacroDroid not_body, GET query, raw text).
+
+## 2026-10-27 — Optimalisasi QRIS Dinamis Toko & Otomasi Deteksi Lunas POS Kasir ✅
+
+- **Pengecekan, Status Koneksi & Riwayat Webhook Notifikasi QRIS (`QrisNotificationController.php`, `SettingsRbac.php`, `settings-rbac.blade.php`)**:
+  - Perekaman riwayat 15 log panggilan webhook masuk (status sukses/gagal/unauthorized, nominal terdeteksi, nama aplikasi/judul, raw payload ringkas, IP pemanggil, timestamp).
+  - Indikator koneksi live dan status transaksi terakhir yang berhasil masuk di Pengaturan RBAC.
+  - Tombol aksi uji coba "⚡ Tes Simulasi Webhook (Rp 50.000)" langsung dari panel RBAC untuk menguji polling auto-detect POS tanpa perlu forwarder HP fisik.
+  - Tombol pembersihan riwayat log webhook (`hapusRiwayatWebhook`).
+- **Mitigasi Anti-Hilang Keranjang & Checkout POS Saat Refresh Halaman (`PosKasir.php`, `pos-kasir.blade.php`, `payment-modal.blade.php`)**:
+  - Auto-Save State Draft Transaksi Kasir (`dehydrate` hook di `PosKasir.php`): otomatis menyimpan keranjang belanja, diskon, poin, pajak, status checkout, invoice QRIS, dan payload QRIS dinamis ke Cache per `user_id` & `cabang_id` aktif (TTL 24 jam).
+  - Auto-Restore Saat Halaman Dimuat Ulang (`mount` hook): jika kasir me-refresh halaman browser (F5 / reload) atau tab tertutup tak sengaja, keranjang belanja dan QRIS dinamis yang sedang menunggu pembayaran otomatis dipulihkan kembali ke layar kasir.
+  - Pembersihan Otomatis Draft: Cache draft otomatis dibersihkan saat transaksi berhasil diproses (`processTransaction`), transaksi ditahan/park (`tahanTransaksi`), atau keranjang dibatalkan/dikosongkan (`clearCart`).
+  - Dialog Konfirmasi Browser (`beforeunload` listener di `pos-kasir.blade.php`): browser menampilkan konfirmasi/peringatan jika kasir hendak merefresh atau menutup halaman saat keranjang belanja terisi.
+  - Indikator Status Menunggu Webhook di Layar Kasir (`payment-modal.blade.php`): badge animasi pulsa live yang memberi kepastian visual kepada kasir bahwa webhook m-banking sedang aktif didengarkan.
+  - Automated Feature Test (`tests/Feature/PosDraftAutoRestoreTest.php`): memverifikasi persistensi dan pemulihan draft keranjang & invoice QRIS pasca-refresh.
+
+- **Dokumentasi Lengkap Otomasi Notifikasi Android (`docs/PANDUAN-OTOMASI-QRIS-ANDROID.md`)**:
+  - Panduan langkah demi langkah konfigurasi aplikasi Android (MacroDroid / Webhook Forwarder) di HP kasir toko.
+  - Setup trigger notifikasi aplikasi perbankan (BCA, Mandiri, BRI, GoPay, OVO, DANA, SMS), parameter HTTP POST, secret header `X-QRIS-Secret`, serta pengujian simulasi via cURL dan transaksi riil kasir.
+- **Server-Side QRIS Image Decoder 100% & Eliminasi Scan Kamera (`SettingsRbac.php` & `settings-rbac.blade.php`)**:
+  - Menghapus menu & skrip scan kamera browser dari antarmuka pengaturan toko, menyederhanakan formulir ke dropzone berkas foto/screenshot.
+  - Pemrosesan decode QRIS sepenuhnya dieksekusi di backend via `QrisService::decodeFromImage()` (multi-pass GD: rotasi 90°/180°/270°, resampling skala bertingkat, binarisasi & kontras) dan pustaka `khanamiryan/qrcode-detector-decoder`.
+  - Pengecilan bundel JS Vite produksi dari ~617 kB menjadi ~469 kB.
+- **Kirim WhatsApp Langsung & Input Nomor Cepat di Kasir POS (`PosKasir.php`, `payment-modal.blade.php`)**:
+  - Menyediakan input nomor WhatsApp konsumen langsung di modal bayar untuk pelanggan umum/walk-in yang belum memiliki kontak tersimpan.
+  - Membuka tautan universal/langsung `https://wa.me/` dengan template pesan rincian tagihan belanja dan instruksi pembayaran.
+- **Popup Zoom QRIS Dinamis Layar Penuh & Unduh Gambar (`payment-modal.blade.php`, `bayar-servis-modal.blade.php`)**:
+  - Modal popup fullscreen kontras tinggi (latar putih bersih, ukuran QR 320x320 px) yang dapat dibuka dengan klik tombol "Layar Penuh (Popup)" maupun klik langsung pada kode QR, memudahkan konsumen memindai dari jarak jauh di depan meja kasir.
+  - Tombol aksi instan "Unduh Gambar (PNG)" yang merender kode QR vektor ke berkas PNG resolusi tinggi (600x600 px) dengan quiet zone putih, memudahkan kasir mengirim berkas gambar via WhatsApp Web atau mencetaknya.
+- **Mesin QRIS Dinamis Standar EMVCo & ASPI (`QrisService.php`)**:
+  - Parser TLV (Tag-Length-Value) untuk ekstraksi merchant metadata (Tag 59, Tag 60, Tag 58, Tag 51/26 NMID).
+  - Generator QRIS dinamis: transformasi Point of Initiation (Tag 01: `11` statis → `12` dinamis), injeksi nominal tagihan belanja konsumen (Tag 54), dan rekalkulasi checksum CRC16-CCITT False (`0x1021`, init `0xFFFF`, Tag 63).
+  - Integrasi vector inline SVG rendering via `QrCodeService` (`bacon/bacon-qr-code`).
+- **Menu Pengaturan QRIS Toko (`SettingsRbac.php` & `settings-rbac.blade.php`)**:
+  - Tab pengaturan QRIS toko dengan dukungan cakupan cabang spesifik maupun default global.
+  - Unggah foto QRIS dengan scanning client-side berbasis `html5-qrcode` (zero CPU/RAM overhead di server 1GB) serta fallback penempelan kode teks manual.
+  - Pratinjau langsung dynamic QRIS tersimulasi (Rp 50.000).
+- **Integrasi POS Kasir (`PosKasir.php`, `payment-modal.blade.php`, `bayar-servis-modal.blade.php`)**:
+  - Tampilan otomatis QR dinamis saat kasir memilih metode bayar `QRIS` atau metode `Split` (porsi non-tunai QRIS), mengunci nominal tagihan tanpa perlu input manual oleh konsumen.
+  - Tombol aksi "Kirim QRIS via WhatsApp" (menghasilkan tautan langsung `wa.me` dan antrean pengiriman via `NotificationService`).
+  - Indikator polling real-time untuk status pelunasan otomatis.
+- **Webhook Notifikasi Pembayaran Tanpa Payment Gateway (`QrisNotificationController.php`)**:
+  - Endpoint `POST /api/webhook/qris-notif` untuk menerima forward notifikasi SMS/m-Banking dari aplikasi Android di HP kasir (Tasker/MacroDroid/Notification Forwarder).
+  - Ekstraksi nominal via regex/JSON, penyimpanan status lunas instan di cache, dan verifikasi header `X-QRIS-Secret`.
+- **Pengujian & Verifikasi Komprehensif**:
+  - Unit test `QrisServiceTest` (CRC16 test vector, parser TLV, generator dinamis, dan render SVG).
+  - Feature test `QrisNotificationWebhookTest` (penerimaan nominal langsung, parsing dari teks notifikasi mentah, validasi secret, dan polling status).
+
 ## 2026-10-27 — Dukungan Mobile File Manager, Persistensi Tab URL, & Bundling Uploader Foto WMS ✅
 
 - **Dukungan Mobile File Manager & Preservasi SKU Asli**:

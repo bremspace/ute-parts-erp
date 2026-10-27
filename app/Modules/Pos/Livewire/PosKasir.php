@@ -12,12 +12,14 @@ use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Crm\Services\PartaiPricingService;
 use App\Modules\Crm\Services\PelangganService;
+use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\HargaFleksibelService;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PembayaranPesananOnlineService;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Pos\Services\QrisService;
 use App\Modules\Pos\Services\TransaksiVoidService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
@@ -315,6 +317,21 @@ class PosKasir extends Component
 
     public mixed $nominalBayarOnline = 0;
 
+    // [POS-QRIS] Integrasi QRIS Dinamis Toko
+    public ?string $qrisKasirSvg = null;
+
+    public ?string $qrisMerchantName = null;
+
+    public bool $qrisTersedia = false;
+
+    public bool $qrisTerbayarOtomatis = false;
+
+    public ?string $waQrisUrl = null;
+
+    public ?string $qrisCustomerPhone = null;
+
+    public ?string $qrisInvoice = null;
+
     public function mount()
     {
         // Set default gudang dari active session cabang
@@ -363,6 +380,122 @@ class PosKasir extends Component
         } elseif (request()->boolean('retur')) {
             return redirect()->to('/app/pos/retur');
         }
+
+        // [AUTO-RESTORE] Pulihkan draft transaksi & checkout jika kasir me-refresh browser
+        if (! app()->runningUnitTests() || config('pos.test_auto_restore')) {
+            if (! request()->has('bayar_servis_id') && ! request()->has('tiket_servis_id') && ! request()->has('pesanan_online_id') && ! request()->has('pickup_id')) {
+                $this->pulihkanDraftCheckout();
+            }
+        }
+    }
+
+    /**
+     * Livewire lifecycle hook — simpan draft state otomatis setiap siklus render selesai.
+     */
+    public function dehydrate(): void
+    {
+        $this->simpanDraftCheckout();
+    }
+
+    private function getDraftCacheKey(): string
+    {
+        $userId = auth()->id() ?? 0;
+        $cabangId = session('cabang_id') ?? auth()->user()?->cabangs()->first()?->id ?? 1;
+
+        return "pos_draft_{$userId}_{$cabangId}";
+    }
+
+    public function simpanDraftCheckout(): void
+    {
+        if (empty($this->cart)) {
+            $this->hapusDraftCheckout();
+
+            return;
+        }
+
+        $draft = [
+            'cart' => $this->cart,
+            'selectedCustomerId' => $this->selectedCustomerId,
+            'selectedGudangId' => $this->selectedGudangId,
+            'diskonPersen' => $this->diskonPersen,
+            'diskonNominal' => $this->diskonNominal,
+            'diskonManualAuthorizedById' => $this->diskonManualAuthorizedById,
+            'diskonManualAuthorizedByName' => $this->diskonManualAuthorizedByName,
+            'diskonManualAlasan' => $this->diskonManualAlasan,
+            'poinDitukar' => $this->poinDitukar,
+            'diskonPoin' => $this->diskonPoin,
+            'diskonPartai' => $this->diskonPartai,
+            'alasanPartai' => $this->alasanPartai,
+            'showPaymentModal' => $this->showPaymentModal,
+            'metodeBayar' => $this->metodeBayar,
+            'jumlahBayar' => $this->jumlahBayar,
+            'catatan' => $this->catatan,
+            'splitTunai' => $this->splitTunai,
+            'splitNonTunai' => $this->splitNonTunai,
+            'splitMetodeNonTunai' => $this->splitMetodeNonTunai,
+            'qrisKasirSvg' => $this->qrisKasirSvg,
+            'qrisMerchantName' => $this->qrisMerchantName,
+            'qrisTersedia' => $this->qrisTersedia,
+            'qrisInvoice' => $this->qrisInvoice,
+            'qrisCustomerPhone' => $this->qrisCustomerPhone,
+            'qrisTerbayarOtomatis' => $this->qrisTerbayarOtomatis,
+            'saved_at' => now()->timestamp,
+        ];
+
+        Cache::put($this->getDraftCacheKey(), $draft, 86400);
+    }
+
+    public function pulihkanDraftCheckout(): void
+    {
+        $draft = Cache::get($this->getDraftCacheKey());
+        if (! is_array($draft) || empty($draft['cart'])) {
+            return;
+        }
+
+        $this->cart = $draft['cart'] ?? [];
+        $this->selectedCustomerId = $draft['selectedCustomerId'] ?? null;
+        if (! empty($draft['selectedGudangId'])) {
+            $this->selectedGudangId = $draft['selectedGudangId'];
+        }
+        $this->diskonPersen = (float) ($draft['diskonPersen'] ?? 0);
+        $this->diskonNominal = (float) ($draft['diskonNominal'] ?? 0);
+        $this->diskonManualAuthorizedById = $draft['diskonManualAuthorizedById'] ?? null;
+        $this->diskonManualAuthorizedByName = $draft['diskonManualAuthorizedByName'] ?? '';
+        $this->diskonManualAlasan = $draft['diskonManualAlasan'] ?? '';
+        $this->poinDitukar = (int) ($draft['poinDitukar'] ?? 0);
+        $this->diskonPoin = (float) ($draft['diskonPoin'] ?? 0);
+        $this->diskonPartai = (float) ($draft['diskonPartai'] ?? 0);
+        $this->alasanPartai = $draft['alasanPartai'] ?? '';
+
+        if (! empty($draft['showPaymentModal'])) {
+            $this->showPaymentModal = true;
+            $this->metodeBayar = $draft['metodeBayar'] ?? 'tunai';
+            $this->jumlahBayar = $draft['jumlahBayar'] ?? 0.0;
+            $this->catatan = $draft['catatan'] ?? '';
+            $this->splitTunai = $draft['splitTunai'] ?? 0.0;
+            $this->splitNonTunai = $draft['splitNonTunai'] ?? 0.0;
+            $this->splitMetodeNonTunai = $draft['splitMetodeNonTunai'] ?? 'qris';
+
+            $this->qrisKasirSvg = $draft['qrisKasirSvg'] ?? null;
+            $this->qrisMerchantName = $draft['qrisMerchantName'] ?? '';
+            $this->qrisTersedia = (bool) ($draft['qrisTersedia'] ?? false);
+            $this->qrisInvoice = $draft['qrisInvoice'] ?? null;
+            $this->qrisCustomerPhone = $draft['qrisCustomerPhone'] ?? null;
+            $this->qrisTerbayarOtomatis = (bool) ($draft['qrisTerbayarOtomatis'] ?? false);
+        }
+
+        $this->resetComputedTotals();
+        $this->recalcPajak();
+
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Draft transaksi kasir sebelumnya berhasil dipulihkan otomatis.',
+        ]);
+    }
+
+    public function hapusDraftCheckout(): void
+    {
+        Cache::forget($this->getDraftCacheKey());
     }
 
     public function loadUserPreferences(): void
@@ -1653,6 +1786,7 @@ class PosKasir extends Component
         $this->ppnPersen = 0.0;
         $this->resetComputedTotals();
         $this->recalcPajak();
+        $this->hapusDraftCheckout();
     }
 
     /**
@@ -1832,6 +1966,12 @@ class PosKasir extends Component
         $this->jumlahBayar = $this->totalAkhir > 0 ? number_format($this->totalAkhir, 0, ',', '.') : '0';
         $this->splitTunai = $this->totalAkhir > 0 ? number_format($this->totalAkhir, 0, ',', '.') : '0';
         $this->splitNonTunai = '0';
+        $this->qrisTerbayarOtomatis = false;
+
+        if ($this->metodeBayar === 'qris') {
+            $this->refreshQrisKasir((float) $this->totalAkhir);
+        }
+
         $this->showPaymentModal = true;
     }
 
@@ -1844,6 +1984,8 @@ class PosKasir extends Component
     public function updatedMetodeBayar(): void
     {
         unset($this->kembalian);
+        $this->qrisTerbayarOtomatis = false;
+
         if ($this->metodeBayar === 'split') {
             $tunaiVal = (float) $this->parseNominal($this->splitTunai);
             $nonTunaiVal = (float) $this->parseNominal($this->splitNonTunai);
@@ -1851,6 +1993,11 @@ class PosKasir extends Component
                 $this->splitTunai = $this->totalAkhir > 0 ? number_format($this->totalAkhir, 0, ',', '.') : '0';
                 $this->splitNonTunai = '0';
             }
+            if ($this->splitMetodeNonTunai === 'qris') {
+                $this->refreshQrisKasir((float) $this->parseNominal($this->splitNonTunai));
+            }
+        } elseif ($this->metodeBayar === 'qris') {
+            $this->refreshQrisKasir((float) $this->totalAkhir);
         }
     }
 
@@ -1867,11 +2014,18 @@ class PosKasir extends Component
     public function updatedSplitNonTunai($value): void
     {
         unset($this->kembalian);
+        if ($this->splitMetodeNonTunai === 'qris') {
+            $this->refreshQrisKasir((float) $this->parseNominal($this->splitNonTunai));
+        }
     }
 
     public function updatedSplitMetodeNonTunai(): void
     {
         unset($this->kembalian);
+        $this->qrisTerbayarOtomatis = false;
+        if ($this->splitMetodeNonTunai === 'qris') {
+            $this->refreshQrisKasir((float) $this->parseNominal($this->splitNonTunai));
+        }
     }
 
     public function quickSplitHalf(): void
@@ -1881,6 +2035,10 @@ class PosKasir extends Component
         $this->splitTunai = number_format($half, 0, ',', '.');
         $this->splitNonTunai = number_format($total - $half, 0, ',', '.');
         unset($this->kembalian);
+
+        if ($this->splitMetodeNonTunai === 'qris') {
+            $this->refreshQrisKasir((float) ($total - $half));
+        }
     }
 
     public function quickSplitTunaiPas(): void
@@ -1888,6 +2046,10 @@ class PosKasir extends Component
         $this->splitTunai = number_format($this->totalAkhir, 0, ',', '.');
         $this->splitNonTunai = '0';
         unset($this->kembalian);
+
+        if ($this->splitMetodeNonTunai === 'qris') {
+            $this->refreshQrisKasir(0);
+        }
     }
 
     public function quickSplitNonTunaiPas(): void
@@ -1895,6 +2057,276 @@ class PosKasir extends Component
         $this->splitTunai = '0';
         $this->splitNonTunai = number_format($this->totalAkhir, 0, ',', '.');
         unset($this->kembalian);
+
+        if ($this->splitMetodeNonTunai === 'qris') {
+            $this->refreshQrisKasir((float) $this->totalAkhir);
+        }
+    }
+
+    public function refreshQrisKasir(float|int $nominal, ?string $invoice = null): void
+    {
+        $cabangId = session('cabang_id');
+        $qrisService = app(QrisService::class);
+        $qris = $qrisService->getActiveQris($cabangId);
+
+        if (! $qris || ! $qris->is_active || $nominal <= 0) {
+            $this->qrisKasirSvg = null;
+            $this->qrisTersedia = (bool) ($qris && $qris->is_active);
+            $this->qrisMerchantName = $qris?->merchant_name;
+            $this->waQrisUrl = null;
+            $this->qrisInvoice = null;
+
+            return;
+        }
+
+        $this->qrisTersedia = true;
+        $this->qrisMerchantName = $qris->merchant_name;
+        $inv = $invoice ?: ('INV-'.date('YmdHis'));
+        $this->qrisInvoice = $inv;
+
+        if (blank($this->qrisCustomerPhone) && filled($this->customer?->telepon)) {
+            $this->qrisCustomerPhone = $this->customer->telepon;
+        }
+
+        try {
+            $dynamicPayload = $qrisService->generateDynamic($qris->payload_static, $nominal, $inv);
+            $this->qrisKasirSvg = $qrisService->renderSvg($dynamicPayload, 200);
+
+            $storeName = $qris->merchant_name ?: config('app.name', 'Ute Parts');
+            $msg = $qrisService->formatWhatsAppMessage(
+                $storeName,
+                $inv,
+                $nominal,
+                $this->customer?->nama ?? 'Pelanggan'
+            );
+
+            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->qrisCustomerPhone);
+            if (str_starts_with($cleanPhone, '0')) {
+                $cleanPhone = '62'.substr($cleanPhone, 1);
+            }
+
+            $this->waQrisUrl = filled($cleanPhone)
+                ? 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($msg)
+                : 'https://wa.me/?text='.rawurlencode($msg);
+        } catch (\Throwable $e) {
+            $this->qrisKasirSvg = null;
+        }
+    }
+
+    public function updatedQrisCustomerPhone(): void
+    {
+        $nominal = 0;
+        if ($this->metodeBayar === 'qris') {
+            $nominal = (int) round((float) $this->totalAkhir);
+        } elseif ($this->metodeBayar === 'split' && $this->splitMetodeNonTunai === 'qris') {
+            $nominal = (int) round((float) $this->parseNominal($this->splitNonTunai));
+        }
+
+        if ($nominal <= 0 || ! $this->qrisTersedia) {
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $qrisService = app(QrisService::class);
+        $qris = $qrisService->getActiveQris($cabangId);
+        $storeName = $qris?->merchant_name ?: config('app.name', 'Ute Parts');
+        $inv = $this->qrisInvoice ?: ('INV-'.date('YmdHis'));
+
+        $msg = $qrisService->formatWhatsAppMessage(
+            $storeName,
+            $inv,
+            $nominal,
+            $this->customer?->nama ?? 'Pelanggan'
+        );
+
+        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->qrisCustomerPhone);
+        if (str_starts_with($cleanPhone, '0')) {
+            $cleanPhone = '62'.substr($cleanPhone, 1);
+        }
+
+        $this->waQrisUrl = filled($cleanPhone)
+            ? 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($msg)
+            : 'https://wa.me/?text='.rawurlencode($msg);
+    }
+
+    public function cekStatusQrisOtomatis(bool $isManual = false): void
+    {
+        $this->cekStatusQris($isManual);
+    }
+
+    public function cekStatusQrisManual(): void
+    {
+        $this->cekStatusQris(true);
+    }
+
+    public function cekStatusQris(bool $isManual = false): void
+    {
+        // 1. Skenario Modal Pembayaran Servis
+        if ($this->showBayarServisModal && $this->selectedServisDetail) {
+            $nominalServis = 0;
+            if ($this->servisMetodeBayar === 'qris') {
+                $nominalServis = (int) round((float) ($this->selectedServisDetail['total'] ?? 0));
+            } elseif ($this->servisMetodeBayar === 'split' && $this->servisSplitMetodeNonTunai === 'qris') {
+                $nominalServis = (int) round((float) $this->parseNominal($this->servisSplitNonTunai));
+            }
+
+            if ($nominalServis > 0) {
+                $payment = Cache::get("qris_payment_{$nominalServis}");
+                if ($payment) {
+                    $this->qrisTerbayarOtomatis = true;
+                    Cache::forget("qris_payment_{$nominalServis}");
+                    $this->dispatch('alert', [
+                        'type' => 'success',
+                        'message' => 'Pembayaran QRIS servis sebesar Rp '.number_format($nominalServis, 0, ',', '.').' terdeteksi LUNAS! Transaksi otomatis diselesaikan.',
+                    ]);
+                    $this->prosesBayarServis();
+
+                    return;
+                }
+
+                if ($isManual) {
+                    $latest = Cache::get('qris_latest_payment');
+                    if ($latest && ! empty($latest['nominal']) && (int) $latest['nominal'] !== $nominalServis) {
+                        $this->dispatch('alert', [
+                            'type' => 'warning',
+                            'message' => 'Belum lunas. Terdeteksi notifikasi QRIS masuk terakhir Rp '.number_format((float) $latest['nominal'], 0, ',', '.').', sedangkan tagihan servis Rp '.number_format($nominalServis, 0, ',', '.').'.',
+                        ]);
+                    } else {
+                        $this->dispatch('alert', [
+                            'type' => 'info',
+                            'message' => 'Pembayaran QRIS servis Rp '.number_format($nominalServis, 0, ',', '.').' belum terdeteksi masuk. Sistem terus memantau otomatis...',
+                        ]);
+                    }
+
+                    return;
+                }
+            } elseif ($isManual) {
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => 'Nominal tagihan servis belum valid atau Rp 0.',
+                ]);
+
+                return;
+            }
+        }
+
+        // 2. Skenario Modal Pembayaran Kasir Belanja POS
+        $nominal = 0;
+        if ($this->metodeBayar === 'qris') {
+            $nominal = (int) round((float) $this->totalAkhir);
+        } elseif ($this->metodeBayar === 'split' && $this->splitMetodeNonTunai === 'qris') {
+            $nominal = (int) round((float) $this->parseNominal($this->splitNonTunai));
+        }
+
+        if ($nominal <= 0) {
+            if ($isManual) {
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => 'Nominal tagihan QRIS belum ditentukan atau bernilai Rp 0.',
+                ]);
+            }
+
+            return;
+        }
+
+        $payment = Cache::get("qris_payment_{$nominal}");
+        if ($payment) {
+            $this->qrisTerbayarOtomatis = true;
+            Cache::forget("qris_payment_{$nominal}");
+
+            // Auto-complete transaksi jika modal pembayaran kasir aktif
+            if ($this->showPaymentModal) {
+                $this->jumlahBayar = number_format($this->totalAkhir, 0, ',', '.');
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => 'Pembayaran QRIS sebesar Rp '.number_format($nominal, 0, ',', '.').' terdeteksi LUNAS! Transaksi otomatis diselesaikan.',
+                ]);
+                $this->processTransaction();
+            } else {
+                $this->dispatch('alert', [
+                    'type' => 'success',
+                    'message' => 'Pembayaran QRIS sebesar Rp '.number_format($nominal, 0, ',', '.').' terdeteksi LUNAS!',
+                ]);
+            }
+
+            return;
+        }
+
+        if ($isManual) {
+            $latest = Cache::get('qris_latest_payment');
+            if ($latest && ! empty($latest['nominal']) && (int) $latest['nominal'] !== $nominal) {
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => 'Belum lunas. Terdeteksi notifikasi masuk terakhir Rp '.number_format((float) $latest['nominal'], 0, ',', '.').', sedangkan tagihan transaksi saat ini Rp '.number_format($nominal, 0, ',', '.').'.',
+                ]);
+            } else {
+                $this->dispatch('alert', [
+                    'type' => 'info',
+                    'message' => 'Pembayaran QRIS sebesar Rp '.number_format($nominal, 0, ',', '.').' belum terdeteksi masuk. Sistem terus memantau otomatis...',
+                ]);
+            }
+        }
+    }
+
+    public function kirimQrisViaWhatsApp(): void
+    {
+        $custPhone = $this->qrisCustomerPhone ?: ($this->customer?->telepon ?? null);
+
+        $nominal = $this->metodeBayar === 'qris'
+            ? (float) $this->totalAkhir
+            : (float) $this->parseNominal($this->splitNonTunai);
+
+        if ($nominal <= 0) {
+            return;
+        }
+
+        $cabangId = session('cabang_id');
+        $qrisService = app(QrisService::class);
+        $qris = $qrisService->getActiveQris($cabangId);
+        $storeName = $qris?->merchant_name ?: config('app.name', 'Ute Parts');
+        $inv = $this->qrisInvoice ?: ('INV-'.date('YmdHis'));
+
+        $pesan = $qrisService->formatWhatsAppMessage(
+            $storeName,
+            $inv,
+            $nominal,
+            $this->customer?->nama ?? 'Pelanggan'
+        );
+
+        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $custPhone);
+        if (str_starts_with($cleanPhone, '0')) {
+            $cleanPhone = '62'.substr($cleanPhone, 1);
+        }
+
+        if (filled($cleanPhone)) {
+            try {
+                $notifService = app(NotificationService::class);
+                $notifService->kirim(
+                    'wa',
+                    $cleanPhone,
+                    'Tagihan Pembayaran QRIS Toko',
+                    $pesan,
+                    [
+                        'cabang_id' => $cabangId,
+                        'kategori' => 'transaksi',
+                        'pelanggan_id' => $this->selectedCustomerId,
+                        'invoice' => $inv,
+                    ]
+                );
+            } catch (\Throwable $e) {
+            }
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "Membuka WhatsApp untuk nomor {$cleanPhone}...",
+            ]);
+        }
+
+        $targetUrl = filled($cleanPhone)
+            ? 'https://wa.me/'.$cleanPhone.'?text='.rawurlencode($pesan)
+            : 'https://wa.me/?text='.rawurlencode($pesan);
+
+        $this->dispatch('open-url', ['url' => $targetUrl]);
     }
 
     /**
@@ -3196,6 +3628,9 @@ class PosKasir extends Component
     public function updatedServisMetodeBayar(): void
     {
         $this->hitungKembalianServis();
+        if ($this->servisMetodeBayar === 'qris' && $this->selectedServisDetail) {
+            $this->refreshQrisKasir((float) $this->selectedServisDetail['total'], $this->selectedServisDetail['no_tiket'] ?? null);
+        }
     }
 
     public function updatedServisSplitTunai(): void
@@ -3858,6 +4293,13 @@ class PosKasir extends Component
             'modelKompatibelList' => $modelKompatibelList,
             'kondisiList' => $kondisiList,
             'satuanList' => $satuanList,
+            'qrisKasirSvg' => $this->qrisKasirSvg,
+            'qrisMerchantName' => $this->qrisMerchantName,
+            'qrisTersedia' => $this->qrisTersedia,
+            'qrisTerbayarOtomatis' => $this->qrisTerbayarOtomatis,
+            'waQrisUrl' => $this->waQrisUrl,
+            'qrisCustomerPhone' => $this->qrisCustomerPhone,
+            'qrisInvoice' => $this->qrisInvoice,
         ])->layout('layouts.backoffice', ['header' => 'Kasir Point of Sale (POS)']);
     }
 }

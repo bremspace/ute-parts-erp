@@ -1,6 +1,6 @@
 <div class="space-y-6"
     x-data="{
-        subModul: @js(in_array($activeTab, ['users', 'role', 'cabang']) ? 'akses' : ($activeTab === 'master_produk' ? 'katalog' : (in_array($activeTab, ['loyalitas', 'pajak']) ? 'kebijakan' : (in_array($activeTab, ['master', 'printer']) ? 'operasional' : ($activeTab === 'integrasi' ? 'integrasi' : 'sistem'))))),
+        subModul: @js(in_array($activeTab, ['users', 'role', 'cabang']) ? 'akses' : ($activeTab === 'master_produk' ? 'katalog' : (in_array($activeTab, ['loyalitas', 'pajak', 'qris']) ? 'kebijakan' : (in_array($activeTab, ['master', 'printer']) ? 'operasional' : ($activeTab === 'integrasi' ? 'integrasi' : 'sistem'))))),
         searchQuery: '',
         searchOpen: false,
         menuItems: [
@@ -19,6 +19,7 @@
             { id: 'loyalitas', label: 'Strategi Loyalitas & Poin', subModul: 'kebijakan', tab: 'loyalitas', subTab: null, icon: '💎', group: 'Kebijakan & Transaksi', desc: 'Rasio earn/redeem poin belanja & diskon tier membership', keywords: 'loyalitas point poin tier membership diskon potongan cashback member' },
             { id: 'komisi', label: 'Skema Komisi Reseller & Sales', subModul: 'kebijakan', tab: 'loyalitas', subTab: null, icon: '🤝', group: 'Kebijakan & Transaksi', desc: 'Komisi reseller, mitra teknisi dan insentif penjualan tim', keywords: 'komisi reseller komisi sales insentif bagi hasil affiliate bonus' },
             { id: 'pajak', label: 'Pajak & Pengaturan PPN', subModul: 'kebijakan', tab: 'pajak', subTab: null, icon: '⚖️', group: 'Kebijakan & Transaksi', desc: 'Tarif PPN (11%/12%), target POS kasir & akun penampung', keywords: 'pajak ppn tax tarif faktur pajak kasir pos marketplace b2b persentase' },
+            { id: 'qris', label: 'QRIS Toko & Dinamis', subModul: 'kebijakan', tab: 'qris', subTab: null, icon: '📱', group: 'Kebijakan & Transaksi', desc: 'Upload QRIS toko, konversi otomatis ke QR dinamis nominal belanja kasir & kirim WA', keywords: 'qris dinamis barcode scan pembayaran kasir toko gopay ovo dana bca transfer tagihan' },
 
             { id: 'servis', label: 'Master Servis & Garansi', subModul: 'operasional', tab: 'master', subTab: null, icon: '🛠️', group: 'Operasional & Periferal', desc: 'Katalog jasa servis, estimasi waktu teknisi, masa garansi klaim', keywords: 'servis service jasa perbaikan teknisi garansi klaim pengerjaan tarif' },
             { id: 'struk', label: 'Template Struk & Faktur POS', subModul: 'operasional', tab: 'printer', subTab: 'struk', icon: '🧾', group: 'Operasional & Periferal', desc: 'Kustomisasi header/footer struk thermal, QR retur, kertas 58/80mm', keywords: 'struk printer thermal nota faktur kasir thermal print kertas retur' },
@@ -319,6 +320,12 @@
                     >
                         ⚖️ Pajak & Tarif PPN
                     </button>
+                    <button
+                        wire:click="$set('activeTab', 'qris')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'qris' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    >
+                        📱 QRIS Toko (Upload & Dinamis)
+                    </button>
                 </div>
 
                 <!-- Group 4: Operasional & Periferal -->
@@ -394,6 +401,8 @@
                     @endif
                 @elseif($activeTab === 'integrasi')
                     <button wire:click="simpanIntegrasi" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">💾 Simpan Konfigurasi Integrasi</button>
+                @elseif($activeTab === 'qris')
+                    <button wire:click="simpanQris" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-mint hover:opacity-90 text-ink-950 font-bold text-xs shadow-md shadow-up-mint/20 transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer">💾 Simpan Konfigurasi QRIS</button>
                 @endif
             </div>
         </div>
@@ -830,6 +839,317 @@
                         <a href="{{ route('laporan.pajak') }}" class="mt-3 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-up-primary font-bold text-xs transition-colors">
                             <span>Buka Laporan Pajak Bulanan →</span>
                         </a>
+                    </x-prism.glass-card>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- TAB: QRIS TOKO & DINAMIS -->
+    @if($activeTab === 'qris')
+        <div class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Col Span 2: Input & Parsing Form -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Scope Cabang Selector Card -->
+                    <x-prism.glass-card title="Cakupan Cabang Toko" subtitle="Pilih cabang spesifik atau buat konfigurasi global default">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div class="w-full sm:w-80">
+                                <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">Target Cabang</label>
+                                <select wire:model.live="qrisForm.cabang_id" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-bold bg-white dark:bg-ink-900 border border-ink-200 dark:border-white/10">
+                                    <option value="">🌐 Global (Semua Cabang Toko)</option>
+                                    @foreach($cabangs as $cb)
+                                        <option value="{{ $cb->id }}">🏬 Cabang: {{ $cb->nama }} ({{ $cb->kode }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="text-xs text-ink-500 dark:text-ink-400">
+                                <span>QRIS cabang spesifik akan diutamakan di kasir cabang terkait. Jika belum ada, sistem otomatis memakai QRIS Global.</span>
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
+
+                    <!-- Upload & Parse Card -->
+                    <x-prism.glass-card title="Unggah Foto QRIS Toko" subtitle="Unggah foto QRIS statis toko untuk didekode dan diurai otomatis oleh server">
+                        <div class="space-y-4">
+                            <!-- File Upload Area -->
+                            <div>
+                                <label for="qris-file-input" class="w-full px-5 py-6 rounded-2xl border-2 border-dashed border-ink-300 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-ink-50/50 dark:bg-white/[0.02] text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group">
+                                    <div class="w-12 h-12 rounded-2xl bg-up-primary/10 group-hover:bg-up-primary/20 text-up-primary flex items-center justify-center transition-colors">
+                                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    <div class="text-center">
+                                        <span class="text-sm font-bold text-ink-800 dark:text-white block group-hover:text-up-primary transition-colors">Pilih Berkas Foto / Tangkapan Layar QRIS Toko</span>
+                                        <span class="text-xs text-ink-400 mt-0.5 block">Format JPG, PNG, atau WebP (Diproses & didekode otomatis di server via multi-pass GD)</span>
+                                    </div>
+                                </label>
+                                <input
+                                    type="file"
+                                    id="qris-file-input"
+                                    accept="image/*"
+                                    wire:model="qrisImageFile"
+                                    class="hidden"
+                                />
+                            </div>
+
+                            <!-- Server Processing Spinner -->
+                            <div wire:loading wire:target="qrisImageFile, scanImageViaServer" class="p-3.5 rounded-xl bg-up-primary/10 border border-up-primary/20 flex items-center gap-3 text-xs text-up-primary font-bold">
+                                <svg class="animate-spin h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Sedang mengunggah dan mendekode QRIS di server (multi-pass auto-orient & contrast)...</span>
+                            </div>
+
+                            <!-- Scanning Error Banner -->
+                            @if($qrisScanError)
+                                <div class="p-3.5 rounded-xl bg-up-red/10 border border-up-red/25 text-xs text-up-red font-medium flex items-start gap-2">
+                                    <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{{ $qrisScanError }}</span>
+                                </div>
+                            @endif
+
+                            @if($qrisImageFile)
+                                <div class="flex items-center justify-between p-3 rounded-xl bg-ink-100 dark:bg-white/5 border border-ink-200 dark:border-white/10 text-xs">
+                                    <span class="text-ink-600 dark:text-ink-300">File terpilih: <strong class="text-ink-800 dark:text-white">{{ $qrisImageFile->getClientOriginalName() }}</strong></span>
+                                    <button
+                                        type="button"
+                                        wire:click="scanImageViaServer"
+                                        wire:loading.attr="disabled"
+                                        class="px-3.5 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                                    >
+                                        <span wire:loading.remove wire:target="scanImageViaServer">⚡ Pindai Ulang via Server</span>
+                                        <span wire:loading wire:target="scanImageViaServer" class="flex items-center gap-1">
+                                            <svg class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                            Memindai...
+                                        </span>
+                                    </button>
+                                </div>
+                            @endif
+
+                            <!-- Manual Payload Textarea -->
+                            <div class="pt-2">
+                                <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5 flex items-center justify-between">
+                                    <span>Kode Payload EMVCo (Teks Mentah QRIS)</span>
+                                    <span class="text-[10px] text-ink-400 font-normal">Diawali 000201...</span>
+                                </label>
+                                <textarea
+                                    wire:model.live.debounce.500ms="qrisForm.payload_static"
+                                    rows="3"
+                                    class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono border border-ink-200 dark:border-white/10 break-all"
+                                    placeholder="00020101021126610016ID.CO.QRIS.WWW..."
+                                ></textarea>
+                                <div class="mt-2 flex justify-end">
+                                    <button
+                                        type="button"
+                                        wire:click="parseUploadedPayload"
+                                        class="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-ink-800 dark:text-ink-200 border border-ink-200 dark:border-white/10 transition cursor-pointer"
+                                    >
+                                        🔍 Uraikan Metadata Payload
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
+
+                    <!-- Extracted Metadata Card -->
+                    <x-prism.glass-card title="Informasi Merchant QRIS" subtitle="Data hasil parsing yang akan tertera pada QR dinamis">
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Nama Merchant (Tag 59) *</label>
+                                    <input
+                                        type="text"
+                                        wire:model="qrisForm.merchant_name"
+                                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-bold"
+                                        placeholder="Contoh: UTE PARTS STORE"
+                                    />
+                                    @error('qrisForm.merchant_name') <span class="text-[10px] text-up-red">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Kota Merchant (Tag 60)</label>
+                                    <input
+                                        type="text"
+                                        wire:model="qrisForm.merchant_city"
+                                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium"
+                                        placeholder="Contoh: JAKARTA"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">NMID (National Merchant ID)</label>
+                                    <input
+                                        type="text"
+                                        wire:model="qrisForm.nmid"
+                                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                                        placeholder="ID102..."
+                                    />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Kode Pos (Tag 61)</label>
+                                    <input
+                                        type="text"
+                                        wire:model="qrisForm.postal_code"
+                                        class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono"
+                                        placeholder="12345"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="pt-2 border-t border-ink-200/80 dark:border-white/10 flex items-center justify-between">
+                                <div>
+                                    <span class="text-xs font-bold text-ink-900 dark:text-white block">Status Penggunaan</span>
+                                    <span class="text-[11px] text-ink-500">Aktifkan agar metode QRIS kasir otomatis menampilkan QR ini</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" wire:model="qrisForm.is_active" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-ink-200 peer-focus:outline-none rounded-full peer dark:bg-white/10 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-mint"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
+                </div>
+
+                <!-- Col Span 1: Dynamic Preview & Webhook Helper -->
+                <div class="space-y-6">
+                    <!-- Live Dynamic QR Preview Card -->
+                    <x-prism.glass-card title="Simulasi QR Dinamis Kasir" subtitle="Contoh QRIS yang digenerate dengan nominal Rp 50.000">
+                        <div class="flex flex-col items-center justify-center p-4">
+                            @if($qrisPreviewSvg)
+                                <div class="p-3 bg-white rounded-2xl shadow-lg border border-ink-200 flex flex-col items-center">
+                                    <div class="w-48 h-48 flex items-center justify-center">
+                                        {!! $qrisPreviewSvg !!}
+                                    </div>
+                                    <div class="mt-2 text-center">
+                                        <span class="text-[11px] font-black tracking-tight text-ink-900 block uppercase">
+                                            {{ $qrisForm['merchant_name'] ?: 'MERCHANT TOKO' }}
+                                        </span>
+                                        <span class="text-xs font-extrabold text-up-primary tabular-nums block mt-0.5">
+                                            Rp 50.000
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 p-3 rounded-xl bg-up-mint/10 border border-up-mint/25 text-left text-xs text-up-mint space-y-1 w-full">
+                                    <div class="font-bold flex items-center gap-1.5">
+                                        <span>✅ Standar EMVCo / ASPI Siap</span>
+                                    </div>
+                                    <p class="text-[11px] text-ink-600 dark:text-ink-300">
+                                        Saat kasir bertransaksi, sistem secara otomatis mengubah Tag 01 menjadi dinamis, mengisi Tag 54 dengan total tagihan riil belanja, dan meregenerasi checksum CRC16.
+                                    </p>
+                                </div>
+                            @else
+                                <div class="w-48 h-48 rounded-2xl border-2 border-dashed border-ink-200 dark:border-white/10 flex flex-col items-center justify-center text-ink-400 p-4 text-center">
+                                    <svg class="w-10 h-10 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                    </svg>
+                                    <span class="text-xs">Unggah QRIS atau masukkan kode payload untuk melihat pratinjau</span>
+                                </div>
+                            @endif
+                        </div>
+                    </x-prism.glass-card>
+
+                    <!-- Webhook Notif Auto-Detect Helper -->
+                    <x-prism.glass-card title="Otomasi Deteksi Lunas (Tanpa PG)" subtitle="Webhook masuk dari forwarder notifikasi m-Banking di HP toko">
+                        <div class="space-y-3 text-xs text-ink-600 dark:text-ink-300">
+                            <p>
+                                Pasang aplikasi pengirim notifikasi ringan (contoh: <em>MacroDroid</em> / <em>Tasker</em> / <em>Notification Forwarder</em>) di HP Android toko kasir yang menerima push SMS / m-Banking bank/e-wallet Anda.
+                            </p>
+
+                            <div class="p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 space-y-1">
+                                <span class="text-[10px] text-ink-400 uppercase tracking-wider font-bold block">Webhook URL (POST)</span>
+                                <code class="text-[11px] font-mono text-up-primary select-all break-all block">{{ url('/api/webhook/qris-notif') }}</code>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Secret Key Webhook (Opsional)</label>
+                                <input
+                                    type="text"
+                                    wire:model="qrisForm.webhook_secret"
+                                    class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono"
+                                    placeholder="Token rahasia pencegah spam"
+                                />
+                                <span class="text-[10px] text-ink-400">Kirim di header <code class="font-mono">X-QRIS-Secret</code> atau field JSON <code class="font-mono">secret</code>.</span>
+                            </div>
+
+                            <div class="p-2.5 rounded-xl bg-ink-50 dark:bg-white/[0.02] border border-ink-200 dark:border-white/10 text-[11px] text-ink-500">
+                                💡 Begitu notifikasi diterima HP, forwarder langsung menembak server. Kasir POS otomatis mendeteksi status "Lunas" secara real-time.
+                            </div>
+
+                            <!-- Indikator Status & Tes Simulasi Webhook -->
+                            <div class="pt-2 border-t border-black/10 dark:border-white/10 space-y-3">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        @if($qrisLastWebhook)
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold {{ ($qrisLastWebhook['status'] ?? '') === 'sukses' ? 'bg-up-mint/20 text-up-mint border border-up-mint/30' : 'bg-up-red/20 text-up-red border border-up-red/30' }}">
+                                                <span class="w-1.5 h-1.5 rounded-full {{ ($qrisLastWebhook['status'] ?? '') === 'sukses' ? 'bg-up-mint animate-pulse' : 'bg-up-red' }}"></span>
+                                                Terkoneksi: {{ ($qrisLastWebhook['status'] ?? '') === 'sukses' ? 'Rp '.number_format((float) ($qrisLastWebhook['nominal'] ?? 0), 0, ',', '.') : 'Gagal' }}
+                                            </span>
+                                            <span class="text-[10px] text-ink-400 font-mono">{{ $qrisLastWebhook['waktu'] ?? '' }}</span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-ink-100 dark:bg-white/5 text-ink-400 border border-black/5 dark:border-white/5">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-ink-400"></span>
+                                                Belum ada webhook masuk
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            wire:click="tesSimulasiWebhook(50000)"
+                                            class="px-2.5 py-1 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white text-[11px] font-bold transition flex items-center gap-1 shadow-sm cursor-pointer"
+                                            title="Kirim simulasi data webhook nominal Rp 50.000"
+                                        >
+                                            <span>⚡ Tes Simulasi</span>
+                                        </button>
+                                        @if(!empty($qrisWebhookLogs))
+                                            <button
+                                                type="button"
+                                                wire:click="hapusRiwayatWebhook"
+                                                class="px-2 py-1 rounded-lg bg-ink-200/50 hover:bg-up-red/20 hover:text-up-red text-ink-600 dark:text-ink-400 text-[10px] font-medium transition cursor-pointer"
+                                                title="Bersihkan riwayat log"
+                                            >
+                                                Hapus Log
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <!-- Riwayat Webhook Log List -->
+                                @if(!empty($qrisWebhookLogs))
+                                    <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                        <span class="text-[10px] uppercase font-bold text-ink-400 tracking-wider block">Riwayat Panggilan Terakhir</span>
+                                        @foreach($qrisWebhookLogs as $log)
+                                            <div class="p-2 rounded-lg bg-black/5 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-[11px] flex items-center justify-between gap-2">
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <span class="font-bold {{ ($log['status'] ?? '') === 'sukses' ? 'text-up-mint' : 'text-up-red' }}">
+                                                            {{ strtoupper($log['status'] ?? 'UNKNOWN') }}
+                                                        </span>
+                                                        @if(!empty($log['nominal']))
+                                                            <span class="font-mono font-bold text-ink-800 dark:text-ink-100">
+                                                                Rp {{ number_format((float) $log['nominal'], 0, ',', '.') }}
+                                                            </span>
+                                                        @endif
+                                                        <span class="text-[10px] text-ink-400 truncate">({{ $log['title'] ?: 'Tanpa Judul' }})</span>
+                                                    </div>
+                                                    <p class="text-[10px] text-ink-400 truncate font-mono mt-0.5">{{ $log['raw'] ?? '-' }}</p>
+                                                </div>
+                                                <div class="text-right flex-shrink-0">
+                                                    <span class="text-[9px] text-ink-400 block font-mono">{{ $log['waktu'] ?? '' }}</span>
+                                                    <span class="text-[9px] text-ink-500 block font-mono">{{ $log['ip'] ?? '' }}</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
                     </x-prism.glass-card>
                 </div>
             </div>

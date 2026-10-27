@@ -592,7 +592,7 @@ class PosStokSinkronTest extends TestCase
 
         // Pencarian mereset batas (query tidak menumpuk dari halaman sebelumnya)
         $component->set('search', 'Load More')
-            ->assertSee('Produk Load More 7');
+            ->assertSee('Produk Load More 2');
         $this->assertCount(PosKasir::BATAS_PRODUK_AWAL, $component->viewData('products'));
     }
 

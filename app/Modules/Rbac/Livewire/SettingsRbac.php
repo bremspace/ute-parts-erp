@@ -7,6 +7,8 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Pos\Models\QrisCabang;
+use App\Modules\Pos\Services\QrisService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Reseller\Models\SkemaKomisi;
@@ -21,11 +23,13 @@ use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
 use App\Traits\ParsesNominal;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -37,6 +41,7 @@ use Spatie\Permission\Models\Role;
 class SettingsRbac extends Component
 {
     use ParsesNominal;
+    use WithFileUploads;
     use WithPagination;
 
     /**
@@ -57,7 +62,26 @@ class SettingsRbac extends Component
      */
     private const PERM_JENIS_SERVIS = ['pengaturan.manage', 'servis.manage'];
 
-    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, printer, database
+    public string $activeTab = 'users'; // users, role, cabang, master, loyalitas, pajak, printer, database, qris
+
+    // Konfigurasi QRIS Toko (Upload & Dinamis EMVCo)
+    public array $qrisForm = [
+        'id' => null,
+        'cabang_id' => '', // '' = Global fallback
+        'payload_static' => '',
+        'merchant_name' => '',
+        'merchant_city' => '',
+        'postal_code' => '',
+        'nmid' => '',
+        'is_active' => true,
+        'webhook_secret' => '',
+    ];
+
+    public $qrisImageFile = null;
+
+    public ?string $qrisPreviewSvg = null;
+
+    public ?string $qrisScanError = null;
 
     // [T-22] Strategi Loyalitas (editable tanpa deploy, non-retroaktif)
     public array $loyalitasForm = [
@@ -191,7 +215,7 @@ class SettingsRbac extends Component
     {
         if (request()->has('tab')) {
             $tab = (string) request('tab');
-            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database'], true)) {
+            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris'], true)) {
                 $this->activeTab = $tab;
             }
         }
@@ -204,6 +228,8 @@ class SettingsRbac extends Component
                 $this->printerSubTab = $sub;
             }
         }
+
+        $this->loadQrisConfig();
 
         $config = app(KonfigurasiService::class);
 
@@ -281,6 +307,294 @@ class SettingsRbac extends Component
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => "Pengaturan pajak {$targetText} berhasil disimpan ({$statusText})",
+        ]);
+    }
+
+    public function loadQrisConfig(?int $cabangId = null): void
+    {
+        $qrisService = app(QrisService::class);
+        $qris = $qrisService->getActiveQris($cabangId);
+        $secret = app(KonfigurasiService::class)->get('qris_webhook_secret', '');
+
+        if ($qris) {
+            $this->qrisForm = [
+                'id' => $qris->id,
+                'cabang_id' => $qris->cabang_id ? (string) $qris->cabang_id : '',
+                'payload_static' => $qris->payload_static,
+                'merchant_name' => $qris->merchant_name,
+                'merchant_city' => $qris->merchant_city,
+                'postal_code' => $qris->postal_code ?? '',
+                'nmid' => $qris->nmid ?? '',
+                'is_active' => (bool) $qris->is_active,
+                'webhook_secret' => (string) $secret,
+            ];
+
+            try {
+                $dynamic = $qrisService->generateDynamic($qris->payload_static, 50000, 'SAMPLE-PREVIEW');
+                $this->qrisPreviewSvg = $qrisService->renderSvg($dynamic, 180);
+            } catch (\Throwable $e) {
+                $this->qrisPreviewSvg = null;
+            }
+        } else {
+            $this->qrisForm = [
+                'id' => null,
+                'cabang_id' => $cabangId ? (string) $cabangId : '',
+                'payload_static' => '',
+                'merchant_name' => '',
+                'merchant_city' => 'JAKARTA',
+                'postal_code' => '',
+                'nmid' => '',
+                'is_active' => true,
+                'webhook_secret' => (string) $secret,
+            ];
+            $this->qrisPreviewSvg = null;
+        }
+    }
+
+    public function updatedQrisFormCabangId($val): void
+    {
+        $cabangId = ! empty($val) ? (int) $val : null;
+        $this->loadQrisConfig($cabangId);
+    }
+
+    public function updatedQrisImageFile(): void
+    {
+        if (! $this->qrisImageFile) {
+            return;
+        }
+
+        $this->qrisScanError = null;
+
+        try {
+            $path = $this->qrisImageFile->getRealPath();
+            if ($path && file_exists($path)) {
+                $decoded = app(QrisService::class)->decodeFromImage($path);
+
+                if (! empty($decoded)) {
+                    $this->qrisForm['payload_static'] = $decoded;
+                    $this->parseUploadedPayload($decoded);
+                    $this->dispatch('alert', [
+                        'type' => 'success',
+                        'message' => 'Kode QRIS berhasil dipindai dan diurai otomatis!',
+                    ]);
+
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback to client-side or manual
+        }
+
+        if (blank($this->qrisForm['payload_static'])) {
+            $this->qrisScanError = 'Gambar QRIS belum terdeteksi otomatis. Pastikan foto tegak & fokus, atau tempel kode QRIS di kolom teks.';
+        }
+    }
+
+    public function scanImageViaServer(): void
+    {
+        if (! $this->qrisImageFile) {
+            $this->qrisScanError = 'Pilih berkas gambar QRIS terlebih dahulu.';
+
+            return;
+        }
+
+        $this->qrisScanError = null;
+
+        try {
+            $path = $this->qrisImageFile->getRealPath();
+            if ($path && file_exists($path)) {
+                $decoded = app(QrisService::class)->decodeFromImage($path);
+
+                if (! empty($decoded)) {
+                    $this->qrisForm['payload_static'] = $decoded;
+                    $this->parseUploadedPayload($decoded);
+                    $this->dispatch('alert', [
+                        'type' => 'success',
+                        'message' => 'Kode QRIS berhasil dipindai oleh server!',
+                    ]);
+
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->qrisScanError = 'Terjadi kesalahan saat memproses gambar di server: '.$e->getMessage();
+
+            return;
+        }
+
+        $this->qrisScanError = 'Server tidak mendeteksi kode QR dari gambar. Silakan gunakan Scan Kamera atau tempel kode QRIS di kolom teks.';
+    }
+
+    public function parseUploadedPayload(?string $payload = null): void
+    {
+        $payload = $payload ?? $this->qrisForm['payload_static'];
+        if (blank($payload)) {
+            return;
+        }
+
+        $qrisService = app(QrisService::class);
+        $meta = $qrisService->extractMetadata($payload);
+
+        if (! $meta['valid']) {
+            $this->qrisScanError = $meta['error'] ?? 'Format payload QRIS tidak valid.';
+            $this->qrisPreviewSvg = null;
+
+            return;
+        }
+
+        $this->qrisScanError = null;
+        $this->qrisForm['payload_static'] = trim($payload);
+        if (filled($meta['merchant_name'])) {
+            $this->qrisForm['merchant_name'] = $meta['merchant_name'];
+        }
+        if (filled($meta['merchant_city'])) {
+            $this->qrisForm['merchant_city'] = $meta['merchant_city'];
+        }
+        if (filled($meta['postal_code'])) {
+            $this->qrisForm['postal_code'] = $meta['postal_code'];
+        }
+        if (filled($meta['nmid'])) {
+            $this->qrisForm['nmid'] = $meta['nmid'];
+        }
+
+        try {
+            $dynamic = $qrisService->generateDynamic($this->qrisForm['payload_static'], 50000, 'SAMPLE-PREVIEW');
+            $this->qrisPreviewSvg = $qrisService->renderSvg($dynamic, 180);
+        } catch (\Throwable $e) {
+            $this->qrisPreviewSvg = null;
+        }
+    }
+
+    public function simpanQris(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin mengubah konfigurasi QRIS.')) {
+            return;
+        }
+
+        $this->validate([
+            'qrisForm.payload_static' => 'required|string|min:20',
+            'qrisForm.merchant_name' => 'required|string|max:100',
+            'qrisForm.merchant_city' => 'nullable|string|max:100',
+            'qrisForm.postal_code' => 'nullable|string|max:20',
+            'qrisForm.nmid' => 'nullable|string|max:50',
+            'qrisForm.is_active' => 'required|boolean',
+            'qrisImageFile' => 'nullable|image|max:4096',
+        ]);
+
+        $qrisService = app(QrisService::class);
+        $meta = $qrisService->extractMetadata($this->qrisForm['payload_static']);
+        if (! $meta['valid']) {
+            $this->addError('qrisForm.payload_static', $meta['error'] ?? 'Format payload QRIS tidak valid.');
+
+            return;
+        }
+
+        $cabangId = ! empty($this->qrisForm['cabang_id']) ? (int) $this->qrisForm['cabang_id'] : null;
+
+        $imagePath = null;
+        if ($this->qrisImageFile) {
+            $imagePath = $this->qrisImageFile->store('qris-toko', 'public');
+        }
+
+        $data = [
+            'cabang_id' => $cabangId,
+            'payload_static' => trim($this->qrisForm['payload_static']),
+            'merchant_name' => $this->qrisForm['merchant_name'],
+            'merchant_city' => $this->qrisForm['merchant_city'] ?: 'JAKARTA',
+            'postal_code' => $this->qrisForm['postal_code'] ?: null,
+            'nmid' => $this->qrisForm['nmid'] ?: null,
+            'is_active' => (bool) $this->qrisForm['is_active'],
+        ];
+
+        if ($imagePath) {
+            $data['image_path'] = $imagePath;
+        }
+
+        if ($this->qrisForm['id']) {
+            $qris = QrisCabang::find($this->qrisForm['id']);
+            if ($qris) {
+                $qris->update($data);
+            }
+        } else {
+            $existing = QrisCabang::where('cabang_id', $cabangId)->first();
+            if ($existing) {
+                $existing->update($data);
+            } else {
+                QrisCabang::create($data);
+            }
+        }
+
+        if (isset($this->qrisForm['webhook_secret'])) {
+            app(KonfigurasiService::class)->set('qris_webhook_secret', $this->qrisForm['webhook_secret']);
+        }
+
+        $targetText = $cabangId ? "Cabang #{$cabangId}" : 'Global (Semua Cabang)';
+        app(AuditService::class)->catat('Konfigurasi', 'update', null, "Konfigurasi QRIS {$targetText} berhasil disimpan");
+
+        $this->loadQrisConfig($cabangId);
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Pengaturan QRIS {$targetText} berhasil disimpan.",
+        ]);
+    }
+
+    /**
+     * Jalankan simulasi penerimaan webhook QRIS untuk menguji deteksi otomatis dan logging.
+     */
+    public function tesSimulasiWebhook(int $nominal = 50000): void
+    {
+        $nominal = $nominal > 0 ? $nominal : 50000;
+        $title = 'Simulasi Bank Toko (QRIS)';
+        $rawText = 'QRIS transfer masuk Rp '.number_format($nominal, 0, ',', '.').' berhasil diterima. Ref: SIM-'.now()->timestamp;
+
+        $entry = [
+            'status' => 'sukses',
+            'pesan' => 'Simulasi webhook via Panel Pengaturan RBAC',
+            'nominal' => $nominal,
+            'title' => $title,
+            'raw' => $rawText,
+            'waktu' => now()->format('Y-m-d H:i:s'),
+            'ip' => request()->ip() ?? '127.0.0.1',
+        ];
+
+        // Masukkan ke cache payment agar POS kasir juga mendeteksi bila sedang menunggu nominal ini
+        $paymentData = [
+            'nominal' => $nominal,
+            'title' => $title,
+            'text' => $rawText,
+            'waktu' => now()->toIso8601String(),
+        ];
+        Cache::put("qris_payment_{$nominal}", $paymentData, 300);
+        Cache::put('qris_latest_payment', $paymentData, 300);
+
+        // Catat riwayat log
+        $history = Cache::get('qris_webhook_log_history', []);
+        if (! is_array($history)) {
+            $history = [];
+        }
+        array_unshift($history, $entry);
+        $history = array_slice($history, 0, 15);
+        Cache::put('qris_webhook_log_history', $history, 86400 * 7);
+        Cache::put('qris_last_webhook_received', $entry, 86400 * 7);
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Simulasi webhook berhasil! Data pembayaran Rp '.number_format($nominal, 0, ',', '.').' tercatat.',
+        ]);
+    }
+
+    /**
+     * Hapus riwayat log webhook QRIS dari cache.
+     */
+    public function hapusRiwayatWebhook(): void
+    {
+        Cache::forget('qris_webhook_log_history');
+        Cache::forget('qris_last_webhook_received');
+
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Riwayat log webhook QRIS berhasil dibersihkan.',
         ]);
     }
 
@@ -3116,6 +3430,8 @@ class SettingsRbac extends Component
                     ->values()
                     ->all()
                 : [],
+            'qrisWebhookLogs' => Cache::get('qris_webhook_log_history', []),
+            'qrisLastWebhook' => Cache::get('qris_last_webhook_received'),
         ])->layout('layouts.backoffice', ['header' => 'Pengaturan & RBAC']);
     }
 }

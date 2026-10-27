@@ -30,6 +30,7 @@ use App\Modules\Marketplace\Livewire\WebKonsumenSettings;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Omnichannel\Controllers\OmnichannelController;
 use App\Modules\Omnichannel\Livewire\OmnichannelCommandCenter;
+use App\Modules\Pos\Controllers\QrisNotificationController;
 use App\Modules\Pos\Livewire\PesananOnlineIndex;
 use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Livewire\ReturPenjualanIndex;
@@ -288,6 +289,10 @@ if (class_exists(BookingServis::class)) {
 // Duitku menembak POST /webhook/duitku dengan x-www-form-urlencoded — bebaskan dari CSRF.
 Route::post('/webhook/duitku', [PaymentController::class, 'webhook'])
     ->middleware('throttle:60,1')
+    ->withoutMiddleware([ValidateCsrfToken::class, PreventRequestForgery::class]);
+
+Route::match(['get', 'post'], '/webhook/qris-notif', [QrisNotificationController::class, 'handle'])
+    ->middleware('throttle:120,1')
     ->withoutMiddleware([ValidateCsrfToken::class, PreventRequestForgery::class]);
 
 // ===== Endpoint Pembayaran Duitku (Web Session / AJAX) =====

@@ -10,8 +10,10 @@ import './components/barcode-scanner.js'; // Barcode scanner engine (hardware ke
 import './components/notification-sound.js'; // [2026] Precision Web Audio notification synthesizer
 import * as fflate from 'fflate'; // Fast client-side ZIP directory inspection & selective extraction
 import './components/bulk-foto-uploader.js'; // [2026] Bulk product photo pre-flight sorter & chunk uploader
+import { Html5Qrcode } from 'html5-qrcode';
 
 window.fflate = fflate;
+window.Html5Qrcode = Html5Qrcode;
 
 // PWA Service Worker — SATU-SATUNYA registrasi via VitePWA (generateSW, /build/sw.js).
 // Registrasi manual lama `/sw.js` (404) dihapus; virtual module ini menyuntik
@@ -208,6 +210,14 @@ document.addEventListener('livewire:init', () => {
 });
 
 // Single unified Window-level listener for Livewire dispatched events & custom scripts
+window.addEventListener('open-url', (e) => {
+    const data = Array.isArray(e.detail) ? e.detail[0] : (e.detail || {});
+    const url = typeof data === 'string' ? data : (data.url || '');
+    if (url) {
+        window.open(url, '_blank');
+    }
+});
+
 window.addEventListener('ute:notification-arrived', (e) => {
     const data = e.detail || {};
     showToast(data.konten || data.message || 'Notifikasi Baru', data.tipe || 'info', {

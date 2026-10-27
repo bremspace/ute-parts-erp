@@ -7,6 +7,14 @@
         setCartViewMode(mode) {
             this.cartViewMode = mode;
             localStorage.setItem('pos_cart_view_mode', mode);
+        },
+        init() {
+            window.addEventListener('beforeunload', (e) => {
+                if (this.$wire.cart && Object.keys(this.$wire.cart).length > 0) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
         }
     }"
     @keydown.window.f4.prevent="$wire.openPaymentModal()"

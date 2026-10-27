@@ -94,6 +94,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'webhook/duitku',
             'webhook/channel/*',
+            'webhook/qris-notif',
+            'api/webhook/qris-notif',
             'api/payment/check-status',
         ]);
     })
