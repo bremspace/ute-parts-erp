@@ -508,8 +508,9 @@
                                 wire:model.live="hargaPartaiBerlakuUntuk"
                                 class="w-full px-2 py-1 bg-ink-950/80 border border-white/10 rounded-lg text-xs text-ink-200 focus:outline-none focus:border-up-primary"
                             >
-                                <option value="semua">Semua Pembeli (Umum & Member)</option>
-                                <option value="member">Khusus Member / Mitra</option>
+                                <option value="semua">Keduanya (Umum &amp; Member)</option>
+                                <option value="member">Khusus Member Saja</option>
+                                <option value="umum">Khusus Umum Saja</option>
                             </select>
                         </div>
                     @endif

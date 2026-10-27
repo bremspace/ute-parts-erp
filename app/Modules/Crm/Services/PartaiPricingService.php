@@ -58,12 +58,18 @@ class PartaiPricingService
         }
 
         $berlakuUntuk = $this->config->hargaPartaiBerlakuUntuk();
-        if ($berlakuUntuk === 'member') {
-            // Pelanggan yang terdaftar (baik di POS maupun login di web) adalah member
+        if (in_array($berlakuUntuk, ['member', 'member_saja'], true)) {
+            // Khusus pelanggan terdaftar (member)
             if (! $pelanggan) {
                 return $default;
             }
+        } elseif (in_array($berlakuUntuk, ['umum', 'umum_saja'], true)) {
+            // Khusus pembeli umum / non-member (tanpa akun/kontak pelanggan)
+            if ($pelanggan) {
+                return $default;
+            }
         }
+        // Opsi 'semua' / 'keduanya' berlaku untuk umum maupun member.
 
         $totalQty = 0;
         $subtotal = 0.0;

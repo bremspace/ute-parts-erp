@@ -97,6 +97,8 @@ class CrmPotonganSsotTest extends TestCase
             ->set('paymentGatewayFeePersen', 2.0)
             ->set('poinMaksPotonganPersen', 40.0)
             ->set('komisiAgenDefaultPersen', 6.0)
+            ->set('hargaPartaiAktif', true)
+            ->set('hargaPartaiBerlakuUntuk', 'umum')
             ->call('simpanPengaturanLoyaltyGlobal')
             ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success');
 
@@ -107,6 +109,7 @@ class CrmPotonganSsotTest extends TestCase
         $this->assertEquals(2.0, $konfig->paymentGatewayFeePersen());
         $this->assertEquals(40.0, $konfig->poinMaksPotonganPersen());
         $this->assertEquals(6.0, $konfig->komisiAgenDefaultPersen());
+        $this->assertEquals('umum', $konfig->hargaPartaiBerlakuUntuk());
     }
 
     public function test_pos_kasir_mematuhi_batas_maksimal_potongan_poin_ssot(): void

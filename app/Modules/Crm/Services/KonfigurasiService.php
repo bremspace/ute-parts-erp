@@ -132,7 +132,7 @@ class KonfigurasiService
             'mitra_dapat_poin' => false,      // mitra tidak dapat poin loyalty untuk mencegah dobel benefit
             'mitra_reward_mode' => 'diskon_langsung', // diskon_langsung | komisi_akumulasi
             'harga_partai_aktif' => true,
-            'harga_partai_berlaku_untuk' => 'semua', // semua | member
+            'harga_partai_berlaku_untuk' => 'semua', // semua (keduanya) | member (member saja) | umum (umum saja)
             'harga_partai_min_qty' => 5,      // minimal qty 1 produk (atau akumulasi)
             'harga_partai_qty_diskon_persen' => 3.0, // diskon % harga partai berbasis qty
             'harga_partai_min_nominal' => 1000000.0, // minimal belanja keranjang

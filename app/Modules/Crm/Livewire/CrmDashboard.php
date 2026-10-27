@@ -625,7 +625,7 @@ class CrmDashboard extends Component
         ];
 
         if ($this->hargaPartaiAktif) {
-            $rules['hargaPartaiBerlakuUntuk'] = 'required|in:semua,member';
+            $rules['hargaPartaiBerlakuUntuk'] = 'required|in:semua,member,umum';
 
             if (! $this->hargaPartaiOpsiQty && ! $this->hargaPartaiOpsiNominal) {
                 $this->dispatch('alert', [

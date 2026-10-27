@@ -661,6 +661,32 @@ class PosMitraPoinPartaiTest extends TestCase
             ->assertSet('diskonPartai', 14250.0);
     }
 
+    public function test_harga_partai_bisa_dibatasi_khusus_umum_saja_lewat_konfigurasi(): void
+    {
+        $this->actingAs($this->kasir);
+
+        // Set konfigurasi harga partai khusus pembeli umum saja
+        app(KonfigurasiService::class)->set('harga_partai_berlaku_untuk', 'umum');
+
+        // 1. Pelanggan umum (walk-in) beli 5 pcs -> DAPAT diskon partai (3% dari Rp 500.000 = Rp 15.000)
+        $testUmum = Livewire::test(PosKasir::class)
+            ->call('addToCart', $this->produk->id);
+
+        $cartKeyUmum = array_key_first($testUmum->get('cart'));
+        $testUmum->call('setQty', $cartKeyUmum, 5)
+            ->assertSet('diskonPartai', 15000.0)
+            ->assertSet('totalAkhir', 485000.0);
+
+        // 2. Member beli 5 pcs -> TIDAK dapat diskon partai (karena khusus umum)
+        $testMember = Livewire::test(PosKasir::class)
+            ->call('addToCart', $this->produk->id)
+            ->call('setPelanggan', $this->member->id);
+
+        $cartKeyMember = array_key_first($testMember->get('cart'));
+        $testMember->call('setQty', $cartKeyMember, 5)
+            ->assertSet('diskonPartai', 0.0);
+    }
+
     public function test_mitra_tidak_dapat_poin_loyalty_dan_fallback_skema_default(): void
     {
         $pelangganService = app(PelangganService::class);
