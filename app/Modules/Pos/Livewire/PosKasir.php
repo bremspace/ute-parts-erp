@@ -92,6 +92,8 @@ class PosKasir extends Component
 
     public bool $filterHanyaReadyStok = false;
 
+    public string $filterStokStatus = 'semua'; // 'semua', 'ready', 'menipis', 'habis'
+
     // Filter toggle preferences (checkbox custom)
     public array $visibleFilters = [
         'kategori' => false,
@@ -394,7 +396,10 @@ class PosKasir extends Component
                     'kondisi' => $this->filterKondisi = null,
                     'satuan' => $this->filterSatuan = null,
                     'abc_class' => $this->filterAbcClass = null,
-                    'stok' => $this->filterHanyaReadyStok = false,
+                    'stok' => [
+                        $this->filterHanyaReadyStok = false,
+                        $this->filterStokStatus = 'semua',
+                    ],
                     default => null,
                 };
                 $this->batasProduk = self::BATAS_PRODUK_AWAL;
@@ -428,6 +433,7 @@ class PosKasir extends Component
         $this->filterSatuan = null;
         $this->filterAbcClass = null;
         $this->filterHanyaReadyStok = false;
+        $this->filterStokStatus = 'semua';
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
 
         $userId = auth()->id();
@@ -448,6 +454,7 @@ class PosKasir extends Component
         $this->filterSatuan = null;
         $this->filterAbcClass = null;
         $this->filterHanyaReadyStok = false;
+        $this->filterStokStatus = 'semua';
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
     }
 
@@ -464,7 +471,10 @@ class PosKasir extends Component
             'kondisi' => $this->filterKondisi = null,
             'satuan' => $this->filterSatuan = null,
             'abc_class' => $this->filterAbcClass = null,
-            'stok' => $this->filterHanyaReadyStok = false,
+            'stok' => [
+                $this->filterHanyaReadyStok = false,
+                $this->filterStokStatus = 'semua',
+            ],
             default => null,
         };
         $this->batasProduk = self::BATAS_PRODUK_AWAL;
@@ -476,58 +486,6 @@ class PosKasir extends Component
         if ($userId) {
             UserPreference::setPref($userId, 'pos_kasir_custom_filters', $this->visibleFilters);
         }
-    }
-
-    public function getActiveFilterChipsProperty(): array
-    {
-        $chips = [];
-        if (! empty(trim($this->search))) {
-            $chips[] = ['key' => 'search', 'label' => 'Cari: "'.trim($this->search).'"'];
-        }
-        if ($this->visibleFilters['kategori'] && $this->filterKategoriId) {
-            $kat = KategoriProduk::find($this->filterKategoriId);
-            if ($kat) {
-                $chips[] = ['key' => 'kategori', 'label' => 'Kategori: '.$kat->nama];
-            }
-        }
-        if ($this->visibleFilters['brand'] && $this->filterBrandId) {
-            $brand = Brand::find($this->filterBrandId);
-            if ($brand) {
-                $chips[] = ['key' => 'brand', 'label' => 'Brand: '.$brand->nama];
-            }
-        }
-        if ($this->visibleFilters['kualitas'] && $this->filterKualitasId) {
-            $kual = KualitasProduk::find($this->filterKualitasId);
-            if ($kual) {
-                $chips[] = ['key' => 'kualitas', 'label' => 'Kualitas: '.$kual->nama];
-            }
-        }
-        if ($this->visibleFilters['tipe_hp'] && $this->filterTipeHpId) {
-            $th = TipeHp::find($this->filterTipeHpId);
-            if ($th) {
-                $chips[] = ['key' => 'tipe_hp', 'label' => 'Tipe HP: '.$th->merk.' '.$th->model];
-            }
-        }
-        if ($this->visibleFilters['brand_kompatibel'] && $this->filterBrandKompatibel) {
-            $chips[] = ['key' => 'brand_kompatibel', 'label' => 'Merk: '.$this->filterBrandKompatibel];
-        }
-        if ($this->visibleFilters['model_kompatibel'] && $this->filterModelKompatibel) {
-            $chips[] = ['key' => 'model_kompatibel', 'label' => 'Model: '.$this->filterModelKompatibel];
-        }
-        if ($this->visibleFilters['kondisi'] && $this->filterKondisi) {
-            $chips[] = ['key' => 'kondisi', 'label' => 'Kondisi: '.ucfirst($this->filterKondisi)];
-        }
-        if ($this->visibleFilters['satuan'] && $this->filterSatuan) {
-            $chips[] = ['key' => 'satuan', 'label' => 'Satuan: '.strtoupper($this->filterSatuan)];
-        }
-        if ($this->visibleFilters['abc_class'] && $this->filterAbcClass) {
-            $chips[] = ['key' => 'abc_class', 'label' => 'Kelas '.$this->filterAbcClass];
-        }
-        if ($this->visibleFilters['stok'] && $this->filterHanyaReadyStok) {
-            $chips[] = ['key' => 'stok', 'label' => 'Hanya Ready'];
-        }
-
-        return $chips;
     }
 
     public function updatedFilterKategoriId(): void
@@ -3778,7 +3736,8 @@ class PosKasir extends Component
             'kondisi' => $this->visibleFilters['kondisi'] ? $this->filterKondisi : null,
             'satuan' => $this->visibleFilters['satuan'] ? $this->filterSatuan : null,
             'abc_class' => $this->visibleFilters['abc_class'] ? $this->filterAbcClass : null,
-            'hanya_ready_stok' => $this->visibleFilters['stok'] && $this->filterHanyaReadyStok,
+            'stok_status' => $this->visibleFilters['stok'] && $this->filterStokStatus !== 'semua' ? $this->filterStokStatus : null,
+            'hanya_ready_stok' => $this->visibleFilters['stok'] && ($this->filterHanyaReadyStok || $this->filterStokStatus === 'ready'),
             'cabang_id' => session('cabang_id'),
             'gudang_id' => $this->selectedGudangId,
         ];

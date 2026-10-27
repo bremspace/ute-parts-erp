@@ -446,11 +446,15 @@
                         @endif
                     @endforeach
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($filterKategori))
+                    <button type="button" wire:click="$set('filterKategori', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Kategori">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
 
             <!-- Kondisi -->
@@ -462,11 +466,15 @@
                     <option value="oem">OEM Certified</option>
                     <option value="compatible">Compatible Grade A</option>
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($filterKondisi))
+                    <button type="button" wire:click="$set('filterKondisi', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Kondisi">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
 
             <!-- Merk HP -->
@@ -482,11 +490,15 @@
                         <option value="{{ $m }}">{{ $m }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                     @endforeach
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($filterHpMerk))
+                    <button type="button" wire:click="$set('filterHpMerk', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Merk">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
 
             <!-- Model HP -->
@@ -502,11 +514,15 @@
                         <option value="{{ $m }}">{{ $m }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                     @endforeach
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($filterHpModel))
+                    <button type="button" wire:click="$set('filterHpModel', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Model">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
 
             <!-- Brand Part -->
@@ -522,11 +538,15 @@
                         <option value="{{ $b }}">{{ $b }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                     @endforeach
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($filterBrand))
+                    <button type="button" wire:click="$set('filterBrand', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Brand">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
 
             <!-- Rentang Harga -->
@@ -538,11 +558,15 @@
                         <option value="{{ $hb }}">≤ Rp {{ number_format($hb, 0, ',', '.') }}</option>
                     @endforeach
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($hargaMax))
+                    <button type="button" wire:click="$set('hargaMax', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Harga">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
 
             <!-- Kualitas / Grade Part -->
@@ -559,11 +583,15 @@
                         <option value="{{ $kId }}">{{ $kNama }}{{ $kCount !== null ? ' (' . $kCount . ')' : '' }}</option>
                     @endforeach
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($filterKualitas))
+                    <button type="button" wire:click="$set('filterKualitas', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Kualitas">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
 
             <!-- Ketersediaan Stok (sinkron live dengan stok_items backoffice) -->
@@ -574,11 +602,15 @@
                     <option value="tersedia">Ready Stock</option>
                     <option value="habis">Stok Habis</option>
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($filterStok))
+                    <button type="button" wire:click="$set('filterStok', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Stok">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
 
             <!-- Sortasi -->
@@ -591,11 +623,15 @@
                     <option value="termurah">Harga Termurah</option>
                     <option value="termahal">Harga Termahal</option>
                 </select>
-                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
+                @if(!empty($sort))
+                    <button type="button" wire:click="$set('sort', '')" class="absolute inset-y-0 right-0 pr-2 flex items-center text-ink-400 hover:text-up-red cursor-pointer" title="Reset Urutan">✕</button>
+                @else
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-ink-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                @endif
             </div>
         </div>
     </section>
@@ -644,14 +680,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Active Filter Chips (Individual Reset & Reset All) -->
-        <x-prism.active-filter-chips
-            :chips="$this->activeFilterChips"
-            reset-action="resetSingleFilter"
-            reset-all-action="resetAllFilters"
-            class="px-1"
-        />
 
         <!-- 1. GRID VIEW -->
         <div x-show="viewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4.5">

@@ -57,94 +57,170 @@
                         </button>
 
                         @if($visibleFilters['kategori'] ?? true)
-                            <select wire:model.live="filterKategoriId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kategori</option>
-                                @foreach($kategoriTree as $parent)
-                                    <option value="{{ $parent->id }}" class="bg-white dark:bg-ink-900 font-bold text-ink-900 dark:text-white">{{ $parent->nama }}</option>
-                                    @foreach($parent->children as $child)
-                                        <option value="{{ $child->id }}" class="bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterKategoriId" class="px-3 py-2 {{ $filterKategoriId ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kategori</option>
+                                    @foreach($kategoriTree as $parent)
+                                        <option value="{{ $parent->id }}" class="bg-white dark:bg-ink-900 font-bold text-ink-900 dark:text-white">{{ $parent->nama }}</option>
+                                        @foreach($parent->children as $child)
+                                            <option value="{{ $child->id }}" class="bg-white dark:bg-ink-900 text-ink-700 dark:text-ink-300">&nbsp;&nbsp;↳ {{ $child->nama }}</option>
+                                        @endforeach
                                     @endforeach
-                                @endforeach
-                            </select>
+                                </select>
+                                @if($filterKategoriId)
+                                    <button type="button" wire:click="$set('filterKategoriId', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kategori">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if($visibleFilters['brand'] ?? true)
-                            <select wire:model.live="filterBrandId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Brand Part</option>
-                                @foreach($brands as $b)
-                                    <option value="{{ $b->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $b->nama }}</option>
-                                @endforeach
-                            </select>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterBrandId" class="px-3 py-2 {{ $filterBrandId ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Brand Part</option>
+                                    @foreach($brands as $b)
+                                        <option value="{{ $b->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $b->nama }}</option>
+                                    @endforeach
+                                </select>
+                                @if($filterBrandId)
+                                    <button type="button" wire:click="$set('filterBrandId', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Brand">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if($visibleFilters['kualitas'] ?? false)
-                            <select wire:model.live="filterKualitasId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kualitas</option>
-                                @foreach($kualitasList as $k)
-                                    <option value="{{ $k->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
-                                @endforeach
-                            </select>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterKualitasId" class="px-3 py-2 {{ $filterKualitasId ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kualitas</option>
+                                    @foreach($kualitasList as $k)
+                                        <option value="{{ $k->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $k->nama }}{{ $k->brand_id ? ' ('.$k->brand?->nama.')' : '' }}</option>
+                                    @endforeach
+                                </select>
+                                @if($filterKualitasId)
+                                    <button type="button" wire:click="$set('filterKualitasId', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kualitas">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if(($visibleFilters['brand_kompatibel'] ?? false) || ($visibleFilters['merk_hp'] ?? false))
-                            <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Merk Smartphone Kompatibel">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Merk HP</option>
-                                @foreach($brandKompatibelList as $bk)
-                                    <option value="{{ $bk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $bk }}</option>
-                                @endforeach
-                            </select>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterBrandKompatibel" class="px-3 py-2 {{ $filterBrandKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Merk Smartphone Kompatibel">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Merk HP</option>
+                                    @foreach($brandKompatibelList as $bk)
+                                        <option value="{{ $bk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $bk }}</option>
+                                    @endforeach
+                                </select>
+                                @if($filterBrandKompatibel)
+                                    <button type="button" wire:click="$set('filterBrandKompatibel', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Merk HP">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if(($visibleFilters['model_kompatibel'] ?? false) || ($visibleFilters['tipe_hp'] ?? false))
-                            <select wire:model.live="filterModelKompatibel" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Tipe/Model Smartphone Kompatibel">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
-                                @foreach($modelKompatibelList as $mk)
-                                    <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mk }}</option>
-                                @endforeach
-                            </select>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterModelKompatibel" class="px-3 py-2 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Tipe/Model Smartphone Kompatibel">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
+                                    @foreach($modelKompatibelList as $mk)
+                                        <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mk }}</option>
+                                    @endforeach
+                                </select>
+                                @if($filterModelKompatibel)
+                                    <button type="button" wire:click="$set('filterModelKompatibel', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Tipe HP">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if($visibleFilters['kondisi'] ?? false)
-                            <select wire:model.live="filterKondisi" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kondisi</option>
-                                @foreach($kondisiList as $kd)
-                                    <option value="{{ $kd['kode'] }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $kd['nama'] }}</option>
-                                @endforeach
-                            </select>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterKondisi" class="px-3 py-2 {{ $filterKondisi ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Kondisi</option>
+                                    @foreach($kondisiList as $kd)
+                                        <option value="{{ $kd['kode'] }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $kd['nama'] }}</option>
+                                    @endforeach
+                                </select>
+                                @if($filterKondisi)
+                                    <button type="button" wire:click="$set('filterKondisi', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kondisi">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if($visibleFilters['satuan'] ?? false)
-                            <select wire:model.live="filterSatuan" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Satuan</option>
-                                @foreach($satuanUnits as $su)
-                                    <option value="{{ $su->kode }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $su->nama }} ({{ $su->kode }})</option>
-                                @endforeach
-                            </select>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterSatuan" class="px-3 py-2 {{ $filterSatuan ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Satuan</option>
+                                    @foreach($satuanUnits as $su)
+                                        <option value="{{ $su->kode }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $su->nama }} ({{ $su->kode }})</option>
+                                    @endforeach
+                                </select>
+                                @if($filterSatuan)
+                                    <button type="button" wire:click="$set('filterSatuan', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Satuan">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if($visibleFilters['abc_class'] ?? false)
-                            <select wire:model.live="filterAbcClass" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas ABC</option>
-                                <option value="A" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas A</option>
-                                <option value="B" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas B</option>
-                                <option value="C" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas C</option>
-                            </select>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterAbcClass" class="px-3 py-2 {{ $filterAbcClass ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas ABC</option>
+                                    <option value="A" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas A</option>
+                                    <option value="B" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas B</option>
+                                    <option value="C" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Kelas C</option>
+                                </select>
+                                @if($filterAbcClass)
+                                    <button type="button" wire:click="$set('filterAbcClass', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Kelas ABC">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if($visibleFilters['stok'] ?? false)
-                            <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 text-xs text-ink-900 dark:text-ink-200 cursor-pointer select-none min-h-[40px]">
-                                <input type="checkbox" wire:model.live="filterHanyaReadyStok" class="rounded border-black/20 dark:border-white/20 bg-white dark:bg-ink-900 text-up-primary focus:ring-up-primary/30">
-                                <span>Ready Stok</span>
-                            </label>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterStokStatus" class="px-3 py-2 {{ $filterStokStatus !== 'semua' ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter Ketersediaan Stok">
+                                    <option value="semua" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Stok</option>
+                                    <option value="ready" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Ready Stok (> 0)</option>
+                                    <option value="menipis" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Stok Menipis (≤ Min)</option>
+                                    <option value="habis" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Stok Habis (0)</option>
+                                </select>
+                                @if($filterStokStatus !== 'semua')
+                                    <button type="button" wire:click="$set('filterStokStatus', 'semua')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Filter Stok">✕</button>
+                                @endif
+                            </div>
+                        @endif
+
+                        @if($visibleFilters['harga'] ?? false)
+                            <div class="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter Rentang Harga Jual Retail">
+                                <input type="number" wire:model.live.debounce.400ms="filterMinHarga" placeholder="Min Rp" class="w-18 bg-transparent text-xs text-ink-900 dark:text-white placeholder-ink-400 outline-none">
+                                <span class="text-ink-400 text-xs">-</span>
+                                <input type="number" wire:model.live.debounce.400ms="filterMaxHarga" placeholder="Max Rp" class="w-18 bg-transparent text-xs text-ink-900 dark:text-white placeholder-ink-400 outline-none">
+                                @if($filterMinHarga !== null || $filterMaxHarga !== null)
+                                    <button type="button" wire:click="resetSingleFilter('harga')" class="text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Rentang Harga">✕</button>
+                                @endif
+                            </div>
+                        @endif
+
+                        @if($visibleFilters['status'] ?? false)
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterStatusAktif" class="px-3 py-2 {{ $filterStatusAktif !== 'semua' ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]">
+                                    <option value="semua" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Status</option>
+                                    <option value="aktif" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Hanya Aktif</option>
+                                    <option value="nonaktif" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Hanya Nonaktif</option>
+                                </select>
+                                @if($filterStatusAktif !== 'semua')
+                                    <button type="button" wire:click="$set('filterStatusAktif', 'semua')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Status Aktif">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if($visibleFilters['supplier'] ?? false)
-                            <select wire:model.live="filterSupplierId" class="px-3 py-2 rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px] cursor-pointer">
-                                <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Supplier</option>
-                                @foreach($suppliers as $sup)
-                                    <option value="{{ $sup->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $sup->nama }}</option>
-                                @endforeach
-                            </select>
+                            <div class="relative inline-flex items-center">
+                                <select wire:model.live="filterSupplierId" class="px-3 py-2 {{ $filterSupplierId ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px] cursor-pointer">
+                                    <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">Semua Supplier</option>
+                                    @foreach($suppliers as $sup)
+                                        <option value="{{ $sup->id }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $sup->nama }}</option>
+                                    @endforeach
+                                </select>
+                                @if($filterSupplierId)
+                                    <button type="button" wire:click="$set('filterSupplierId', '')" class="absolute right-2 text-ink-400 hover:text-up-red p-0.5 rounded cursor-pointer" title="Reset Supplier">✕</button>
+                                @endif
+                            </div>
                         @endif
 
                         @if($this->activeFilterCount > 0)
@@ -160,6 +236,23 @@
 
                     <div class="flex items-center gap-2 ml-auto shrink-0 py-0.5">
                         <span class="text-[11px] text-ink-400 pl-1 whitespace-nowrap">{{ $produks->total() }} produk</span>
+
+                        <!-- Sort / Relevansi Selector -->
+                        <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2 py-1 rounded-xl">
+                            <span class="text-[10px] text-ink-400">Urut:</span>
+                            <select wire:model.live="sortPreset" class="bg-transparent text-xs font-semibold text-ink-200 outline-none cursor-pointer">
+                                @if(!empty($produkSearch))
+                                    <option value="relevansi" class="bg-ink-900 text-white">Paling Relevan</option>
+                                @endif
+                                <option value="nama_asc" class="bg-ink-900 text-white">Nama (A-Z)</option>
+                                <option value="nama_desc" class="bg-ink-900 text-white">Nama (Z-A)</option>
+                                <option value="harga_asc" class="bg-ink-900 text-white">Harga Terendah</option>
+                                <option value="harga_desc" class="bg-ink-900 text-white">Harga Tertinggi</option>
+                                <option value="stok_desc" class="bg-ink-900 text-white">Stok Terbanyak</option>
+                                <option value="stok_asc" class="bg-ink-900 text-white">Stok Tersedikit</option>
+                                <option value="created_at_desc" class="bg-ink-900 text-white">Terbaru</option>
+                            </select>
+                        </div>
 
                         <!-- Per Page Selector -->
                         <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2 py-1 rounded-xl">
@@ -237,7 +330,15 @@
                             </label>
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
                                 <input type="checkbox" wire:key="pt-chk-stok-{{ ($visibleFilters['stok'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('stok')" @checked($visibleFilters['stok'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
-                                <span>Ready Stok</span>
+                                <span>Status Stok</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-harga-{{ ($visibleFilters['harga'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('harga')" @checked($visibleFilters['harga'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Rentang Harga</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
+                                <input type="checkbox" wire:key="pt-chk-status-{{ ($visibleFilters['status'] ?? false) ? '1' : '0' }}" wire:click="toggleFilter('status')" @checked($visibleFilters['status'] ?? false) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
+                                <span>Status Aktif</span>
                             </label>
                             <label class="inline-flex items-center gap-1.5 text-xs text-ink-200 cursor-pointer select-none">
                                 <input type="checkbox" wire:key="pt-chk-tier-{{ ($visibleFilters['tier'] ?? true) ? '1' : '0' }}" wire:click="toggleFilter('tier')" @checked($visibleFilters['tier'] ?? true) class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30">
@@ -351,14 +452,6 @@
                         </div>
                     </div>
                 @endif
-
-            <!-- Active Filter Chips (Individual Reset & Reset All) -->
-            <x-prism.active-filter-chips
-                :chips="$this->activeFilterChips"
-                reset-action="resetSingleFilter"
-                reset-all-action="resetSemuaFilter"
-                class="px-1"
-            />
 
             @if(!empty($selectedProdukIds))
                 <div class="p-3 bg-up-primary/10 border border-up-primary/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">

@@ -171,6 +171,8 @@ class ProdukTab extends Component
         'satuan' => false,
         'abc_class' => false,
         'stok' => false,
+        'harga' => false,
+        'status' => false,
         'tier' => true,
         'supplier' => false,
     ];
@@ -448,7 +450,15 @@ class ProdukTab extends Component
                     'kondisi' => $this->filterKondisi = null,
                     'satuan' => $this->filterSatuan = null,
                     'abc_class' => $this->filterAbcClass = null,
-                    'stok' => $this->filterHanyaReadyStok = false,
+                    'stok' => [
+                        $this->filterHanyaReadyStok = false,
+                        $this->filterStokStatus = 'semua',
+                    ],
+                    'harga' => [
+                        $this->filterMinHarga = null,
+                        $this->filterMaxHarga = null,
+                    ],
+                    'status' => $this->filterStatusAktif = 'semua',
                     'tier' => $this->filterTierHarga = 'retail',
                     'supplier' => $this->filterSupplierId = null,
                     default => null,
@@ -472,6 +482,8 @@ class ProdukTab extends Component
             'satuan' => false,
             'abc_class' => false,
             'stok' => false,
+            'harga' => false,
+            'status' => false,
             'tier' => true,
             'supplier' => false,
         ];
@@ -487,6 +499,10 @@ class ProdukTab extends Component
         $this->filterAbcClass = null;
         $this->filterSupplierId = null;
         $this->filterHanyaReadyStok = false;
+        $this->filterStokStatus = 'semua';
+        $this->filterMinHarga = null;
+        $this->filterMaxHarga = null;
+        $this->filterStatusAktif = 'semua';
         $this->filterTierHarga = 'retail';
         $this->resetPage();
 
@@ -2637,6 +2653,14 @@ class ProdukTab extends Component
 
     public function updatedSortPreset($value): void
     {
+        if ($value === 'relevansi') {
+            $this->sortBy = 'relevansi';
+            $this->sortDir = 'desc';
+            $this->resetPage();
+
+            return;
+        }
+
         $parts = explode('_', (string) $value);
         $dir = array_pop($parts);
         $col = implode('_', $parts);
@@ -2681,7 +2705,7 @@ class ProdukTab extends Component
         if ($this->filterAbcClass) {
             $count++;
         }
-        if ($this->filterHanyaReadyStok) {
+        if ($this->filterHanyaReadyStok || $this->filterStokStatus !== 'semua') {
             $count++;
         }
         if ($this->filterTierHarga !== 'retail') {
@@ -2702,9 +2726,6 @@ class ProdukTab extends Component
         if ($this->filterMaxHargaBeli !== null && $this->filterMaxHargaBeli !== '') {
             $count++;
         }
-        if ($this->filterStokStatus !== 'semua') {
-            $count++;
-        }
         if ($this->filterStatusAktif !== 'semua') {
             $count++;
         }
@@ -2716,67 +2737,6 @@ class ProdukTab extends Component
         }
 
         return $count;
-    }
-
-    public function getActiveFilterChipsProperty(): array
-    {
-        $chips = [];
-        if (! empty(trim((string) $this->produkSearch))) {
-            $chips[] = ['key' => 'search', 'label' => 'Cari: "'.trim((string) $this->produkSearch).'"'];
-        }
-        if ($this->filterKategoriId) {
-            $kat = KategoriProduk::find($this->filterKategoriId);
-            if ($kat) {
-                $chips[] = ['key' => 'kategori', 'label' => 'Kategori: '.$kat->nama];
-            }
-        }
-        if ($this->filterBrandId) {
-            $brand = Brand::find($this->filterBrandId);
-            if ($brand) {
-                $chips[] = ['key' => 'brand', 'label' => 'Brand: '.$brand->nama];
-            }
-        }
-        if ($this->filterKualitasId) {
-            $kual = KualitasProduk::find($this->filterKualitasId);
-            if ($kual) {
-                $chips[] = ['key' => 'kualitas', 'label' => 'Kualitas: '.$kual->nama];
-            }
-        }
-        if ($this->filterTipeHpId) {
-            $th = TipeHp::find($this->filterTipeHpId);
-            if ($th) {
-                $chips[] = ['key' => 'tipe_hp', 'label' => 'Tipe HP: '.$th->merk.' '.$th->model];
-            }
-        }
-        if ($this->filterBrandKompatibel) {
-            $chips[] = ['key' => 'brand_kompatibel', 'label' => 'Merk HP: '.$this->filterBrandKompatibel];
-        }
-        if ($this->filterModelKompatibel) {
-            $chips[] = ['key' => 'model_kompatibel', 'label' => 'Model HP: '.$this->filterModelKompatibel];
-        }
-        if ($this->filterKondisi) {
-            $chips[] = ['key' => 'kondisi', 'label' => 'Kondisi: '.ucfirst($this->filterKondisi)];
-        }
-        if ($this->filterSatuan) {
-            $chips[] = ['key' => 'satuan', 'label' => 'Satuan: '.strtoupper($this->filterSatuan)];
-        }
-        if ($this->filterAbcClass) {
-            $chips[] = ['key' => 'abc_class', 'label' => 'Kelas '.$this->filterAbcClass];
-        }
-        if ($this->filterSupplierId) {
-            $sup = Supplier::find($this->filterSupplierId);
-            if ($sup) {
-                $chips[] = ['key' => 'supplier', 'label' => 'Supplier: '.$sup->nama];
-            }
-        }
-        if ($this->filterHanyaReadyStok) {
-            $chips[] = ['key' => 'stok', 'label' => 'Hanya Ready'];
-        }
-        if ($this->filterStatusAktif && $this->filterStatusAktif !== 'semua') {
-            $chips[] = ['key' => 'status', 'label' => 'Status: '.ucfirst($this->filterStatusAktif)];
-        }
-
-        return $chips;
     }
 
     public function resetSingleFilter(string $key): void
@@ -4058,11 +4018,13 @@ class ProdukTab extends Component
             $query->whereHas('stokItems', fn ($q) => $q->where('gudang_id', $this->filterGudangId));
         }
 
-        // Prioritaskan kecocokan tertinggi jika kata kunci pencarian aktif
+        // Prioritaskan kecocokan relevansi saat pencarian aktif kecuali pengguna memilih pengurutan eksplisit (harga, stok, tanggal)
         $hasSearch = ! empty(trim((string) $this->produkSearch));
-        if ($hasSearch) {
+        $explicitSort = in_array($this->sortBy, ['harga_beli', 'harga', 'harga_jual', 'harga_jual_retail', 'stok', 'total_stok', 'created_at', 'terbaru', 'sku', 'abc_class', 'reorder_point', 'rop']);
+
+        if ($hasSearch && ! $explicitSort) {
             $query->urutkanRelevansi($this->produkSearch);
-        } elseif ($model !== '' || $this->filterTipeHpId) {
+        } elseif (! $hasSearch && ($model !== '' || $this->filterTipeHpId) && ! $explicitSort) {
             // [T-44b] Hierarki kompatibilitas murni filter: Primary target A11 teratas, cross-compatible A15 dibawahnya
             $targetSortingModel = $model !== '' ? $model : (TipeHp::find($this->filterTipeHpId)?->model ?? '');
             $targetSortingMerk = $merk !== '' ? $merk : (TipeHp::find($this->filterTipeHpId)?->merk ?? null);
@@ -4071,8 +4033,9 @@ class ProdukTab extends Component
             }
         }
 
-        // Apply secondary sorting
+        // Apply secondary / explicit sorting
         match ($this->sortBy) {
+            'relevansi' => null,
             'sku' => $query->orderBy(
                 SkuVariant::select('sku')->whereColumn('sku_variants.produk_id', 'produk.id')->limit(1),
                 $this->sortDir
@@ -4092,7 +4055,7 @@ class ProdukTab extends Component
             'kondisi' => $query->orderBy('kondisi', $this->sortDir),
             'satuan' => $query->orderBy('satuan', $this->sortDir),
             'status', 'is_active' => $query->orderBy('is_active', $this->sortDir),
-            default => $query->orderBy('is_active', 'desc')->orderBy('nama', $this->sortDir),
+            default => $hasSearch ? null : $query->orderBy('is_active', 'desc')->orderBy('nama', $this->sortDir),
         };
 
         return $query;

@@ -77,14 +77,29 @@
         data-barcode-input="true"
         placeholder="{{ $placeholder }}"
         {{ $model ? "wire:model.live.debounce.350ms={$model}" : '' }}
-        {{ $attributes->merge(['class' => 'w-full pl-11 pr-10 py-2.5 rounded-xl glass-input text-base sm:text-sm font-medium placeholder-ink-400 focus:ring-2 focus:ring-up-primary/30 transition-[border-color,box-shadow,background-color] duration-140']) }}
+        {{ $attributes->merge(['class' => 'w-full pl-11 pr-16 sm:pr-20 py-2.5 rounded-xl glass-input text-base sm:text-sm font-medium placeholder-ink-400 focus:ring-2 focus:ring-up-primary/30 transition-[border-color,box-shadow,background-color] duration-140']) }}
         x-ref="barcodeInput"
         @keydown.window.f2.prevent="$refs.barcodeInput.focus(); $refs.barcodeInput.select()"
     />
 
-    <!-- Right Action Toolbar: F2 Badge (Desktop Only) -->
-    <div class="absolute right-2.5 flex items-center gap-1.5 pointer-events-none">
-        <div class="hidden sm:flex items-center gap-1 text-[11px] font-mono text-ink-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded">
+    <!-- Right Action Toolbar: Clear Button & F2 Badge (Desktop Only) -->
+    <div class="absolute right-2.5 flex items-center gap-1.5 z-10">
+        @if($model)
+            <button
+                type="button"
+                x-show="$wire.get('{{ $model }}') && $wire.get('{{ $model }}').length > 0"
+                x-cloak
+                @click.stop="$wire.set('{{ $model }}', ''); if ($refs.barcodeInput) { $refs.barcodeInput.value = ''; $refs.barcodeInput.focus(); }"
+                class="p-1 rounded-md text-ink-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                title="Hapus pencarian"
+                aria-label="Hapus pencarian"
+            >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        @endif
+        <div class="hidden sm:flex items-center gap-1 text-[11px] font-mono text-ink-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded pointer-events-none">
             <span>F2</span>
         </div>
     </div>

@@ -5,7 +5,6 @@ namespace App\Modules\Marketplace\Livewire;
 use App\Modules\Marketplace\Services\CartService;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Pos\Services\PricingService;
-use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Services\SmartSearchService;
@@ -178,52 +177,6 @@ class ShopPage extends Component
             'stok' => $this->filterStok,
             'hargaMax' => $this->hargaMax,
         ], $this->search);
-    }
-
-    public function getActiveFilterChipsProperty(): array
-    {
-        $chips = [];
-        if (! empty($this->search)) {
-            $chips[] = ['key' => 'search', 'label' => 'Cari: "'.$this->search.'"'];
-        }
-        if (! empty($this->filterKategori)) {
-            $kat = is_numeric($this->filterKategori) ? KategoriProduk::find($this->filterKategori)?->nama : $this->filterKategori;
-            $chips[] = ['key' => 'kategori', 'label' => 'Kategori: '.($kat ?: $this->filterKategori)];
-        }
-        if (! empty($this->filterHpMerk)) {
-            $chips[] = ['key' => 'hpMerk', 'label' => 'Merk HP: '.$this->filterHpMerk];
-        }
-        if (! empty($this->filterHpModel)) {
-            $chips[] = ['key' => 'hpModel', 'label' => 'Tipe HP: '.$this->filterHpModel];
-        }
-        if (! empty($this->filterBrand)) {
-            $chips[] = ['key' => 'brand', 'label' => 'Brand: '.$this->filterBrand];
-        }
-        if (! empty($this->filterKualitas)) {
-            $kual = is_numeric($this->filterKualitas) ? KualitasProduk::find($this->filterKualitas)?->nama : $this->filterKualitas;
-            $chips[] = ['key' => 'kualitas', 'label' => 'Kualitas: '.($kual ?: $this->filterKualitas)];
-        }
-        if (! empty($this->filterKondisi)) {
-            $chips[] = ['key' => 'kondisi', 'label' => 'Kondisi: '.ucfirst($this->filterKondisi)];
-        }
-        if (! empty($this->filterStok)) {
-            $chips[] = ['key' => 'stok', 'label' => 'Stok: '.ucfirst($this->filterStok)];
-        }
-        if (! empty($this->hargaMax)) {
-            $chips[] = ['key' => 'hargaMax', 'label' => 'Maks: Rp '.number_format((float) $this->hargaMax, 0, ',', '.')];
-        }
-        if (! empty($this->sort)) {
-            $sortLabels = [
-                'termurah' => 'Harga Terendah',
-                'termahal' => 'Harga Tertinggi',
-                'terbaru' => 'Terbaru',
-                'terlaris' => 'Terlaris',
-                'relevansi' => 'Paling Sesuai',
-            ];
-            $chips[] = ['key' => 'sort', 'label' => 'Urut: '.($sortLabels[$this->sort] ?? $this->sort)];
-        }
-
-        return $chips;
     }
 
     public function getKualitasListProperty(): array

@@ -215,26 +215,24 @@ class SmartSearchGlobalTest extends TestCase
         $this->assertFalse($emptyResults->contains('id', $prod->id));
     }
 
-    public function test_active_filter_chips_and_reset_single_filter_on_shop_page(): void
+    public function test_reset_single_filter_and_reset_all_on_shop_page(): void
     {
         $component = Livewire::test(ShopPage::class)
             ->set('search', 'iPhone 11')
             ->set('filterKondisi', 'baru');
 
-        $chips = $component->get('activeFilterChips');
-        $this->assertCount(2, $chips);
-        $this->assertEquals('search', $chips[0]['key']);
-        $this->assertEquals('kondisi', $chips[1]['key']);
+        $this->assertEquals('baru', $component->get('filterKondisi'));
+        $this->assertEquals('iPhone 11', $component->get('search'));
 
         // Reset individual filter
         $component->call('resetSingleFilter', 'kondisi');
         $this->assertEquals('', $component->get('filterKondisi'));
-        $this->assertCount(1, $component->get('activeFilterChips'));
+        $this->assertEquals('iPhone 11', $component->get('search'));
 
         // Reset all
         $component->call('resetAllFilters');
         $this->assertEquals('', $component->get('search'));
-        $this->assertEmpty($component->get('activeFilterChips'));
+        $this->assertEquals('', $component->get('filterKondisi'));
     }
 
     public function test_settings_rbac_manages_merk_hp_and_tipe_hp(): void
