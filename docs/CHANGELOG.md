@@ -3,6 +3,17 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-27 — Dukungan Mobile File Manager, Persistensi Tab URL, & Bundling Uploader Foto WMS ✅
+
+- **Dukungan Mobile File Manager & Preservasi SKU Asli**:
+  - Mengarahkan intent unggah foto di mobile browser (Android/iOS) ke File Manager/Penyimpanan dokumen via direktori picker alih-alih Galeri foto bawaan OS, mencegah penggantian nama file menjadi acak oleh galeri HP sehingga nama file tetap sesuai dengan kode SKU produk.
+  - Memperbaiki overlay picker transparan interaktif untuk eliminasi masalah tap gesture di iOS Safari dan Android WebKit.
+- **Persistensi State Tab URL (`ImportExportPage.php`)**:
+  - Menambahkan `#[Url(as: 'tab')]` dan `$queryString` agar tab aktif (`?tab=foto`) tetap terbuka saat browser di-refresh.
+- **Modularisasi Alpine Component (`bulk-foto-uploader.js`)**:
+  - Memisahkan skrip inline uploader ke dalam bundle aplikasi Vite `resources/js/components/bulk-foto-uploader.js` agar langsung terdaftar di global Alpine tanpa ketergantungan pada morphing DOM Livewire.
+
+
 ## 2026-10-27 — Perbaikan Bug UI Galeri & Loop Loading Upload Foto Master Produk WMS ✅
 
 - **Perbaikan UI Strategi Foto Eksisting (`import-export-page.blade.php`)**:
