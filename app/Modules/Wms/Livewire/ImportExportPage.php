@@ -15,6 +15,7 @@ use App\Modules\Wms\Services\ImportSidRetailService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Maatwebsite\Excel\Facades\Excel;
@@ -24,7 +25,12 @@ class ImportExportPage extends Component
 {
     use WithFileUploads;
 
-    public string $activeTab = 'import'; // 'import' | 'export'
+    #[Url(as: 'tab')]
+    public string $activeTab = 'import'; // 'import' | 'export' | 'foto'
+
+    protected $queryString = [
+        'activeTab' => ['as' => 'tab'],
+    ];
 
     // Form Import
     public $importFile = null;
