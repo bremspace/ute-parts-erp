@@ -8,6 +8,9 @@ import './components/format-number.js'; // [T-34] Ribuan separator input nominal
 import './components/thermal-print.js'; // [T-35] Cetak thermal Bluetooth 58/80mm + fallback web print
 import './components/barcode-scanner.js'; // Barcode scanner engine (hardware keyboard wedge + web mobile camera)
 import './components/notification-sound.js'; // [2026] Precision Web Audio notification synthesizer
+import * as fflate from 'fflate'; // Fast client-side ZIP directory inspection & selective extraction
+
+window.fflate = fflate;
 
 // PWA Service Worker — SATU-SATUNYA registrasi via VitePWA (generateSW, /build/sw.js).
 // Registrasi manual lama `/sw.js` (404) dihapus; virtual module ini menyuntik

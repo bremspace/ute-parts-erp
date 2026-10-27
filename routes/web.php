@@ -600,6 +600,10 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
         ->middleware('permission:wms.view');
 
     // WMS Chunked Bulk Foto Upload
+    Route::post('/wms/import-foto/pre-check', [BulkFotoUploadController::class, 'preCheck'])
+        ->name('wms.import-foto.pre-check')
+        ->middleware('permission:wms.view');
+
     Route::post('/wms/import-foto/chunk', [BulkFotoUploadController::class, 'uploadChunk'])
         ->name('wms.import-foto.chunk')
         ->middleware('permission:wms.view');

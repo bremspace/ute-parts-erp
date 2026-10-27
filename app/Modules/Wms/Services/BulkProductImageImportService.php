@@ -151,6 +151,7 @@ class BulkProductImageImportService
      * Pre-scan daftar file atau nama file terhadap database master produk.
      *
      * @param  array<int, array{name: string, relative_path?: string, size?: int, temp_path?: string}>  $files
+     * @param  string  $mode  'append' | 'replace' | 'skip_existing'
      * @return array{
      *     total: int,
      *     matched_count: int,
@@ -159,7 +160,7 @@ class BulkProductImageImportService
      *     skipped: array<int, array>
      * }
      */
-    public function preScanFiles(array $files): array
+    public function preScanFiles(array $files, string $mode = 'append'): array
     {
         $matched = [];
         $skipped = [];
@@ -266,6 +267,20 @@ class BulkProductImageImportService
 
             $produk = $matchedVariant->produk;
             $hasExisting = ! empty($produk->gambar) || ! empty($produk->foto);
+
+            // Jika mode skip_existing dan produk sudah punya foto, sortir sebagai skipped agar tidak perlu diupload
+            if ($mode === 'skip_existing' && $hasExisting) {
+                $skipped[] = [
+                    'index' => $idx,
+                    'filename' => $name,
+                    'relative_path' => $rel,
+                    'sku' => $matchedSku,
+                    'reason' => 'Dilewati: Produk sudah memiliki foto di sistem (Strategi: Hanya Jika Kosong)',
+                    'size' => $size,
+                ];
+
+                continue;
+            }
 
             $matched[] = [
                 'index' => $idx,

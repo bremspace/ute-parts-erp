@@ -19,6 +19,7 @@
         "@laravel/multiplex": "^0.4.1"
     },
     "dependencies": {
+        "fflate": "^0.8.3",
         "html5-qrcode": "^2.3.8",
         "impeccable": "^4.1.0"
     }

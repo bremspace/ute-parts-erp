@@ -3,6 +3,7 @@
 namespace App\Modules\Wms\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Wms\Services\BulkProductImageImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -10,6 +11,39 @@ use Illuminate\Support\Facades\Storage;
 
 class BulkFotoUploadController extends Controller
 {
+    public function __construct(
+        protected BulkProductImageImportService $importService
+    ) {}
+
+    /**
+     * Pre-check daftar nama berkas terhadap SKU produk sebelum diunggah (Pre-Flight Filter).
+     */
+    public function preCheck(Request $request): JsonResponse
+    {
+        $request->validate([
+            'files' => ['required', 'array', 'max:10000'],
+            'files.*.name' => ['required', 'string', 'max:500'],
+            'files.*.relative_path' => ['nullable', 'string', 'max:1000'],
+            'files.*.size' => ['nullable', 'numeric'],
+            'mode' => ['nullable', 'string', 'in:append,replace,skip_existing'],
+        ]);
+
+        $files = $request->input('files', []);
+        $mode = (string) $request->input('mode', 'append');
+
+        $result = $this->importService->preScanFiles($files, $mode);
+
+        return response()->json([
+            'success' => true,
+            'mode' => $mode,
+            'total' => $result['total'],
+            'matched_count' => $result['matched_count'],
+            'skipped_count' => $result['skipped_count'],
+            'matched' => $result['matched'],
+            'skipped' => $result['skipped'],
+        ]);
+    }
+
     /**
      * Upload chunk of image files to session temporary directory.
      */
