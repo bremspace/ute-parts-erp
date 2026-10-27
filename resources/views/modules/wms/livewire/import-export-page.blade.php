@@ -1027,17 +1027,19 @@
 
                     <!-- Input Dropzone -->
                     @if($fotoSourceType === 'files')
-                        <div class="space-y-3">
-                            <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Pilih Berkas Foto:</label>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div x-data="bulkFotoUploader()" class="space-y-4">
+                            <label class="text-xs font-bold text-ink-700 dark:text-ink-300">Pilih Berkas / Folder Foto Produk:</label>
+
+                            <!-- Mode Selector & Pickers -->
+                            <div x-show="!isUploading" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <!-- Option 1: Folder Upload -->
                                 <div class="p-4 rounded-xl border-2 border-dashed border-black/15 dark:border-white/15 hover:border-up-primary dark:hover:border-up-primary bg-black/5 dark:bg-white/[0.01] transition text-center space-y-2">
                                     <div class="text-2xl">📁</div>
                                     <div class="font-bold text-xs text-ink-900 dark:text-white">Unggah Satu Folder</div>
-                                    <p class="text-[11px] text-ink-400">Pilih folder lokal yang berisi seluruh foto produk</p>
+                                    <p class="text-[11px] text-ink-400">Pilih folder lokal (termasuk ribuan sub-file/foto)</p>
                                     <label class="inline-block mt-2 px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs cursor-pointer border border-up-primary/40 transition">
                                         Pilih Folder...
-                                        <input type="file" wire:model="fotoUploads" multiple webkitdirectory directory class="hidden">
+                                        <input type="file" @change="onFilesSelected($event)" multiple webkitdirectory directory class="hidden">
                                     </label>
                                 </div>
 
@@ -1048,23 +1050,196 @@
                                     <p class="text-[11px] text-ink-400">Format gambar apapun (JPG, PNG, WebP, AVIF, HEIC, TIFF, BMP, dll.)</p>
                                     <label class="inline-block mt-2 px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/30 text-up-primary font-bold text-xs cursor-pointer border border-up-primary/40 transition">
                                         Pilih File...
-                                        <input type="file" wire:model="fotoUploads" multiple accept="image/*,.heic,.heif,.avif,.tiff,.tif,.psd,.bmp" class="hidden">
+                                        <input type="file" @change="onFilesSelected($event)" multiple accept="image/*,.heic,.heif,.avif,.tiff,.tif,.psd,.bmp" class="hidden">
                                     </label>
                                 </div>
                             </div>
 
-                            @if(! empty($fotoUploads))
-                                <div class="p-3 rounded-xl bg-up-mint/10 border border-up-mint/30 flex items-center justify-between text-xs">
-                                    <div class="flex items-center gap-2 text-up-mint font-bold">
-                                        <span>✓</span>
-                                        <span>{{ count($fotoUploads) }} file foto berhasil dipilih dan siap di-scan</span>
+                            <!-- File Selected Summary & Start Upload Button -->
+                            <div x-show="totalFiles > 0 && !isUploading" class="p-4 rounded-xl bg-up-primary/10 border border-up-primary/30 space-y-3">
+                                <div class="flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-2 text-ink-900 dark:text-white font-bold">
+                                        <span class="text-up-mint">✓</span>
+                                        <span><strong x-text="totalFiles.toLocaleString('id-ID')"></strong> berkas foto siap diunggah ke staging</span>
                                     </div>
-                                    <button type="button" wire:click="$set('fotoUploads', [])" class="text-[11px] text-ink-400 hover:text-up-red underline cursor-pointer">
-                                        Hapus Pilihan
+                                    <button type="button" @click="resetUploader()" class="text-[11px] text-ink-400 hover:text-up-red underline cursor-pointer">
+                                        Reset Pilihan
                                     </button>
                                 </div>
-                            @endif
+                                <div class="flex items-center justify-between pt-1">
+                                    <div class="text-[11px] text-ink-500">
+                                        Sistem mengunggah dalam chunk 5 file per batch (aman untuk RAM 1GB &amp; tahan putus koneksi).
+                                    </div>
+                                    <button type="button"
+                                            @click="startUpload()"
+                                            class="px-5 py-2 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer shadow-md shadow-up-primary/20">
+                                        <span>🚀 Mulai Upload &amp; Scan</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Upload Progress Bar & Status (Active Uploading) -->
+                            <div x-show="isUploading" class="p-4 rounded-xl bg-black/5 dark:bg-white/[0.03] border border-black/10 dark:border-white/10 space-y-3">
+                                <div class="flex items-center justify-between text-xs font-bold text-ink-900 dark:text-white">
+                                    <div class="flex items-center gap-2">
+                                        <span class="animate-spin inline-block w-3.5 h-3.5 border-2 border-up-primary border-t-transparent rounded-full"></span>
+                                        <span x-text="statusText"></span>
+                                    </div>
+                                    <div class="tabular-nums font-mono text-up-primary" x-text="percent + '%'"></div>
+                                </div>
+
+                                <!-- Progress bar container -->
+                                <div class="w-full bg-black/10 dark:bg-white/10 rounded-full h-2.5 overflow-hidden">
+                                    <div class="bg-gradient-to-r from-up-primary to-up-mint h-2.5 rounded-full transition-all duration-300"
+                                         :style="'width: ' + percent + '%'"></div>
+                                </div>
+
+                                <div class="flex items-center justify-between text-[11px] text-ink-500 pt-1">
+                                    <div>
+                                        Terunggah: <strong class="text-ink-900 dark:text-white tabular-nums" x-text="uploadedFiles.toLocaleString('id-ID') + ' / ' + totalFiles.toLocaleString('id-ID')"></strong> foto
+                                    </div>
+                                    <button type="button" @click="cancelUpload()" class="text-up-red hover:underline font-bold cursor-pointer">
+                                        Batalkan
+                                    </button>
+                                </div>
+                            </div>
                         </div>
+
+                        <script>
+                        function bulkFotoUploader() {
+                            return {
+                                selectedFiles: [],
+                                totalFiles: 0,
+                                uploadedFiles: 0,
+                                percent: 0,
+                                isUploading: false,
+                                isCancelled: false,
+                                sessionId: '',
+                                statusText: 'Mengunggah...',
+                                chunkSize: 5,
+                                maxRetries: 3,
+
+                                onFilesSelected(event) {
+                                    const files = Array.from(event.target.files || []);
+                                    if (files.length === 0) return;
+                                    this.selectedFiles = files;
+                                    this.totalFiles = files.length;
+                                    this.uploadedFiles = 0;
+                                    this.percent = 0;
+                                    this.sessionId = 'bulk_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+                                },
+
+                                resetUploader() {
+                                    if (this.sessionId && this.uploadedFiles > 0) {
+                                        this.callClearSession(this.sessionId);
+                                    }
+                                    this.selectedFiles = [];
+                                    this.totalFiles = 0;
+                                    this.uploadedFiles = 0;
+                                    this.percent = 0;
+                                    this.isUploading = false;
+                                    this.isCancelled = false;
+                                    this.sessionId = '';
+                                },
+
+                                async cancelUpload() {
+                                    this.isCancelled = true;
+                                    this.statusText = 'Membatalkan upload...';
+                                    await this.callClearSession(this.sessionId);
+                                    this.resetUploader();
+                                },
+
+                                async callClearSession(sessId) {
+                                    if (!sessId) return;
+                                    try {
+                                        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                                        await fetch('{{ route("wms.import-foto.clear-session") }}', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRF-TOKEN': csrf || ''
+                                            },
+                                            body: JSON.stringify({ session_id: sessId })
+                                        });
+                                    } catch (e) {
+                                        console.warn('Gagal membersihkan sesi staging:', e);
+                                    }
+                                },
+
+                                async startUpload() {
+                                    if (this.totalFiles === 0) return;
+
+                                    this.isUploading = true;
+                                    this.isCancelled = false;
+                                    this.uploadedFiles = 0;
+                                    this.percent = 0;
+                                    this.statusText = 'Mengunggah foto ke staging...';
+
+                                    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                                    const total = this.totalFiles;
+
+                                    for (let i = 0; i < total; i += this.chunkSize) {
+                                        if (this.isCancelled) return;
+
+                                        const chunk = this.selectedFiles.slice(i, i + this.chunkSize);
+                                        const formData = new FormData();
+                                        formData.append('session_id', this.sessionId);
+
+                                        chunk.forEach((file, idx) => {
+                                            formData.append('files[]', file);
+                                            const relPath = file.webkitRelativePath || file.name;
+                                            formData.append('paths[]', relPath);
+                                        });
+
+                                        let success = false;
+                                        let attempt = 0;
+
+                                        while (!success && attempt < this.maxRetries && !this.isCancelled) {
+                                            attempt++;
+                                            try {
+                                                const res = await fetch('{{ route("wms.import-foto.chunk") }}', {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'X-CSRF-TOKEN': csrf || '',
+                                                        'Accept': 'application/json'
+                                                    },
+                                                    body: formData
+                                                });
+
+                                                if (res.ok) {
+                                                    success = true;
+                                                } else {
+                                                    const errJson = await res.json().catch(() => null);
+                                                    console.warn(`Chunk retry ${attempt}/${this.maxRetries}:`, errJson);
+                                                    await new Promise(r => setTimeout(r, 1000 * attempt));
+                                                }
+                                            } catch (err) {
+                                                console.warn(`Chunk network error retry ${attempt}/${this.maxRetries}:`, err);
+                                                await new Promise(r => setTimeout(r, 1000 * attempt));
+                                            }
+                                        }
+
+                                        if (!success && !this.isCancelled) {
+                                            alert('Gagal mengunggah beberapa berkas setelah ' + this.maxRetries + 'x percobaan. Mohon periksa koneksi internet Anda.');
+                                            this.isUploading = false;
+                                            return;
+                                        }
+
+                                        this.uploadedFiles = Math.min(total, i + chunk.length);
+                                        this.percent = Math.round((this.uploadedFiles / total) * 100);
+                                    }
+
+                                    if (this.isCancelled) return;
+
+                                    this.statusText = 'Semua foto terunggah! Memindai & mencocokkan SKU...';
+                                    const finalSessionId = this.sessionId;
+
+                                    // Panggil Livewire backend method untuk memindai staging
+                                    this.$wire.scanFromStagingSession(finalSessionId);
+                                }
+                            };
+                        }
+                        </script>
                     @else
                         <!-- ZIP File Upload -->
                         <div class="space-y-3">
@@ -1093,25 +1268,27 @@
                         </div>
                     @endif
 
-                    <!-- Loading Indicator Saat Uploading -->
-                    <div wire:loading wire:target="fotoUploads, fotoZip" class="w-full p-3 rounded-xl bg-up-primary/10 border border-up-primary/30 text-center text-xs text-up-primary font-bold animate-pulse">
+                    <!-- Loading Indicator Saat Uploading ZIP -->
+                    <div wire:loading wire:target="fotoZip" class="w-full p-3 rounded-xl bg-up-primary/10 border border-up-primary/30 text-center text-xs text-up-primary font-bold animate-pulse">
                         ⏳ Mengunggah file ke server... Mohon tunggu sebentar.
                     </div>
 
-                    <!-- Tombol Aksi Scan & Match -->
-                    <div class="pt-2 flex items-center justify-end gap-3 border-t border-black/5 dark:border-white/5">
-                        <button type="button"
-                                wire:click="scanUploadedFoto"
-                                wire:loading.attr="disabled"
-                                @if(($fotoSourceType === 'files' && empty($fotoUploads)) || ($fotoSourceType === 'zip' && empty($fotoZip))) disabled @endif
-                                class="min-h-[44px] px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span wire:loading.remove wire:target="scanUploadedFoto">🔍 Scan &amp; Cocokkan SKU Otomatis</span>
-                            <span wire:loading wire:target="scanUploadedFoto" class="flex items-center gap-2">
-                                <span class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
-                                <span>Sedang Membaca &amp; Memetakan SKU...</span>
-                            </span>
-                        </button>
-                    </div>
+                    <!-- Tombol Aksi Scan & Match (Khusus ZIP) -->
+                    @if($fotoSourceType === 'zip')
+                        <div class="pt-2 flex items-center justify-end gap-3 border-t border-black/5 dark:border-white/5">
+                            <button type="button"
+                                    wire:click="scanUploadedFoto"
+                                    wire:loading.attr="disabled"
+                                    @if(empty($fotoZip)) disabled @endif
+                                    class="min-h-[44px] px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span wire:loading.remove wire:target="scanUploadedFoto">🔍 Scan &amp; Cocokkan SKU Otomatis</span>
+                                <span wire:loading wire:target="scanUploadedFoto" class="flex items-center gap-2">
+                                    <span class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
+                                    <span>Sedang Membaca &amp; Memetakan SKU...</span>
+                                </span>
+                            </button>
+                        </div>
+                    @endif
                 </div>
 
                 <!-- Right: Rules & Info Box -->

@@ -46,6 +46,7 @@ use App\Modules\Reseller\Livewire\ResellerDashboard;
 use App\Modules\Servis\Livewire\ServisBoard;
 use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
+use App\Modules\Wms\Controllers\BulkFotoUploadController;
 use App\Modules\Wms\Livewire\CycleCountPage;
 use App\Modules\Wms\Livewire\ImportExportPage;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
@@ -596,6 +597,15 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
     // WMS Export & Import Master Produk Screen
     Route::get('/wms/import-export', ImportExportPage::class)
         ->name('wms.import-export')
+        ->middleware('permission:wms.view');
+
+    // WMS Chunked Bulk Foto Upload
+    Route::post('/app/wms/import-foto/chunk', [BulkFotoUploadController::class, 'uploadChunk'])
+        ->name('wms.import-foto.chunk')
+        ->middleware('permission:wms.view');
+
+    Route::post('/app/wms/import-foto/clear-session', [BulkFotoUploadController::class, 'clearSession'])
+        ->name('wms.import-foto.clear-session')
         ->middleware('permission:wms.view');
 
     // Cetak Dokumen PO Fisik & Dokumen Penolakan PO (Print A4 & WhatsApp)

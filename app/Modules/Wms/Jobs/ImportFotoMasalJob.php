@@ -165,12 +165,17 @@ class ImportFotoMasalJob implements ShouldQueue
                 }
             }
 
+            // Simpan detail hasil: jika lebih dari 300 item, ringkas log untuk efisiensi RAM/DB
+            $finalDetail = $totalItems > 300
+                ? array_values(array_filter($detail, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true)))
+                : $detail;
+
             $log->update([
                 'total_baris' => $totalItems,
                 'sukses' => $sukses,
                 'gagal' => $gagal,
                 'status' => 'selesai',
-                'detail' => $detail,
+                'detail' => $finalDetail,
             ]);
 
             $notifikasi->kirim(

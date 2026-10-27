@@ -731,6 +731,45 @@ class ImportExportPage extends Component
         }
     }
 
+    public function scanFromStagingSession(string $sessionId): void
+    {
+        $cleanSessionId = preg_replace('/[^a-zA-Z0-9_\-]/', '', $sessionId);
+        if ($cleanSessionId === '') {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'ID Sesi upload tidak valid.']);
+
+            return;
+        }
+
+        $folderName = 'tmp_foto_'.auth()->id().'_'.$cleanSessionId;
+        $tempDir = Storage::disk('local')->path($folderName);
+
+        if (! is_dir($tempDir)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Direktori berkas upload tidak ditemukan atau telah kedaluwarsa.']);
+
+            return;
+        }
+
+        $bulkService = app(BulkProductImageImportService::class);
+        $items = $bulkService->scanStagingDirectory($tempDir);
+
+        if (empty($items)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak ditemukan berkas gambar yang didukung dalam sesi ini.']);
+
+            return;
+        }
+
+        $this->fotoTempDir = $tempDir;
+        $this->fotoScanResult = $bulkService->preScanFiles($items);
+        $this->fotoStep = 'preview';
+
+        $totalFound = count($items);
+        $totalMatched = $this->fotoScanResult['matched_count'] ?? 0;
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => "Berhasil memindai {$totalFound} foto ({$totalMatched} cocok dengan SKU master).",
+        ]);
+    }
+
     public function startFotoProcessing(): void
     {
         $matched = $this->fotoScanResult['matched'] ?? [];
@@ -802,6 +841,11 @@ class ImportExportPage extends Component
             $gagalRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'gagal'));
             $skipRows = array_values(array_filter($detailList, fn ($d) => is_array($d) && ($d['status'] ?? '') === 'skip'));
 
+            // Optimasi RAM/payload Livewire: jangan bawa ribuan baris 'ok' ke Livewire wire:poll state
+            $trimmedDetail = count($detailList) > 100
+                ? array_slice(array_values(array_filter($detailList, fn ($d) => is_array($d) && in_array($d['status'] ?? '', ['gagal', 'skip'], true))), 0, 50)
+                : $detailList;
+
             $this->activeFotoImportLog = [
                 'id' => $log->id,
                 'status' => $log->status,
@@ -813,7 +857,7 @@ class ImportExportPage extends Component
                 'current_sku' => $log->current_sku,
                 'current_nama' => $log->current_nama,
                 'current_baris' => $log->current_baris ?? $selesai,
-                'detail' => $detailList,
+                'detail' => $trimmedDetail,
                 'gagal_rows' => $gagalRows,
                 'skip_rows' => $skipRows,
                 'created_at' => $log->created_at?->format('d/m/Y H:i'),

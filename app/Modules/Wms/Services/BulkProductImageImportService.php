@@ -451,4 +451,57 @@ class BulkProductImageImportService
 
         return $extractedFiles;
     }
+
+    /**
+     * Memindai semua berkas gambar di dalam direktori target staging.
+     *
+     * @return array<int, array{name: string, relative_path: string, size: int, temp_path: string}>
+     */
+    public function scanStagingDirectory(string $targetDir): array
+    {
+        if (! is_dir($targetDir)) {
+            return [];
+        }
+
+        $items = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($targetDir, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::FOLLOW_SYMLINKS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        $targetDirClean = rtrim(str_replace('\\', '/', $targetDir), '/');
+
+        /** @var \SplFileInfo $file */
+        foreach ($iterator as $file) {
+            if ($file->isDir()) {
+                continue;
+            }
+
+            $filename = $file->getFilename();
+            // Abaikan hidden files (.DS_Store, Thumbs.db, .gitkeep, dll.)
+            if (str_starts_with($filename, '.')) {
+                continue;
+            }
+
+            $realPath = $file->getRealPath() ?: $file->getPathname();
+            if (! $this->isImageFile($filename, $realPath)) {
+                continue;
+            }
+
+            $normRealPath = str_replace('\\', '/', $realPath);
+            $relPath = ltrim(str_replace($targetDirClean, '', $normRealPath), '/');
+
+            // Cek apakah nama file encode relative path dengan double underscore (misal: "folder__file.jpg")
+            $origRelative = str_contains($filename, '__') ? str_replace('__', '/', $filename) : $relPath;
+
+            $items[] = [
+                'name' => $filename,
+                'relative_path' => $origRelative,
+                'size' => (int) $file->getSize(),
+                'temp_path' => $realPath,
+            ];
+        }
+
+        return $items;
+    }
 }

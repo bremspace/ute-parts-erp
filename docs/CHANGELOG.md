@@ -3,6 +3,21 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-27 — Chunked Streaming Upload Folder Foto Produk & Ketahanan Beban Server 1GB ✅
+
+- **Chunked / Micro-Batch Streaming Upload Foto Massal (`BulkFotoUploadController` & `bulkFotoUploader`)**:
+  - Menyelesaikan kendala batas `max_file_uploads` (default 20 PHP) dan `post_max_size` saat mengunggah folder lokal berisi ratusan hingga ribuan foto produk.
+  - Browser (Alpine.js) memecah pengunggahan menjadi batch kecil (5 berkas per request HTTP) ke direktori staging sementara disk.
+  - Menambahkan mekanisme Auto-Retry 3x jika terjadi gangguan sinyal jaringan, tanpa perlu mengulang unggahan dari awal.
+  - Menyediakan progress bar interaktif dengan persentase dan counter foto terunggah real-time.
+- **Penyederhanaan Memori Server & Staging Disk (`BulkProductImageImportService::scanStagingDirectory`)**:
+  - Pemindaian berkas dilakukan langsung dari disk staging (zero memory bloat pada Livewire state).
+  - Mengabaikan berkas sistem/tersembunyi secara otomatis (.DS_Store, Thumbs.db).
+- **Optimasi Background Queue & Polling Payload (`ImportFotoMasalJob` & `ImportExportPage`)**:
+  - Peringkasan log detail impor pada batch besar (>300 foto) untuk menjaga ukuran payload JSON database dan wire:poll Livewire pada server RAM 1GB.
+- **Testing & QA**:
+  - Menambahkan pengujian integrasi chunked upload, pembersihan sesi staging, dan scanning Livewire di `BulkFotoChunkUploadTest` (3 tests passed). Seluruh 21 test bulk foto lulus 100%.
+
 ## 2026-10-27 — Sentralisasi Pencarian & Filter Global, Ranking Prioritas Nama Produk, dan Pemisahan Merk HP ✅
 
 - **Optimasi Ranking Relevansi Produk (`SmartSearchService::applyRelevanceRanking`)**:
