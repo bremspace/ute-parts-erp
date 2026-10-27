@@ -685,6 +685,19 @@ class PosKasir extends Component
         return $this->diskonTierTotal + $this->diskonTotal;
     }
 
+    public function getPotensiKomisiTotalProperty(): float
+    {
+        if ($this->modeRewardMitra !== 'komisi_akumulasi') {
+            return 0.0;
+        }
+
+        return array_reduce(
+            $this->cart,
+            fn ($carry, $it) => $carry + ((float) ($it['potensi_komisi'] ?? 0) * (int) ($it['qty'] ?? 1)),
+            0.0
+        );
+    }
+
     public function getSubtotalProperty(): float
     {
         return array_reduce($this->cart, fn ($carry, $item) => $carry + ($item['subtotal'] ?? 0), 0.0);
@@ -704,7 +717,7 @@ class PosKasir extends Component
      */
     private function recalcPajak(): void
     {
-        // Pastikan poin ditukar tidak melebihi sisa tagihan belanja
+        // Pastikan poin ditukar tidak melebihi sisa tagihan belanja dan cap SSOT persentase maksimal
         if ($this->poinDitukar > 0) {
             $saldo = (int) ($this->customer?->poin_loyalty ?? 0);
             $konversi = app(PelangganService::class)->nilaiTukarPoinPelanggan($this->customer);
@@ -712,7 +725,10 @@ class PosKasir extends Component
             if ($this->diskonPersen > 0) {
                 $diskonSebelumPoin += round(($this->subtotal * $this->diskonPersen) / 100, 2);
             }
-            $maksRupiah = max(0.0, $this->subtotal - $diskonSebelumPoin);
+            $konfig = app(KonfigurasiService::class);
+            $maksPersenPoin = $konfig->poinMaksPotonganPersen();
+            $capRupiahPoin = round(($this->subtotal * $maksPersenPoin) / 100, 2);
+            $maksRupiah = min($capRupiahPoin, max(0.0, $this->subtotal - $diskonSebelumPoin));
             $maksPoin = $konversi > 0 ? (int) floor($maksRupiah / $konversi) : 0;
             $this->poinDitukar = min($saldo, min($this->poinDitukar, $maksPoin));
             $this->diskonPoin = round($this->poinDitukar * $konversi, 2);
@@ -769,7 +785,10 @@ class PosKasir extends Component
         if ($this->diskonPersen > 0) {
             $diskonSebelumPoin += round(($this->subtotal * $this->diskonPersen) / 100, 2);
         }
-        $maksRupiah = max(0.0, $this->subtotal - $diskonSebelumPoin);
+        $konfig = app(KonfigurasiService::class);
+        $maksPersenPoin = $konfig->poinMaksPotonganPersen();
+        $capRupiahPoin = round(($this->subtotal * $maksPersenPoin) / 100, 2);
+        $maksRupiah = min($capRupiahPoin, max(0.0, $this->subtotal - $diskonSebelumPoin));
         $maksPoin = (int) floor($maksRupiah / $konversi);
 
         $this->poinDitukar = min($saldo, min($val, $maksPoin));
@@ -1018,6 +1037,7 @@ class PosKasir extends Component
             $this->subtotal,
             $this->subtotalRetail,
             $this->diskonTierTotal,
+            $this->potensiKomisiTotal,
             $this->hematTotal,
             $this->totalAkhir,
             $this->total,

@@ -337,6 +337,16 @@
             </div>
         @endif
 
+        @if(($potensiKomisiTotal ?? 0) > 0)
+            <div class="p-2 rounded-xl bg-up-amber/10 border border-up-amber/30 flex items-center justify-between text-[11px] font-bold text-up-amber">
+                <span class="flex items-center gap-1">
+                    <span>💰</span>
+                    <span>Akumulasi Komisi Mitra:</span>
+                </span>
+                <span class="tabular-nums">+Rp {{ number_format($potensiKomisiTotal, 0, ',', '.') }}</span>
+            </div>
+        @endif
+
         <div class="flex justify-between items-center text-sm font-bold border-t border-ink-200/80 dark:border-white/10 pt-2 text-ink-900 dark:text-white">
             <span>TOTAL AKHIR</span>
             <span class="text-up-mint tabular-nums text-lg font-black">Rp {{ number_format($totalBayar ?? $total ?? 0, 0, ',', '.') }}</span>

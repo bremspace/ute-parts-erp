@@ -23,6 +23,7 @@ use App\Modules\Wms\Models\TipeHp;
 use App\Modules\Wms\Services\ExportMasterProdukService;
 use App\Modules\Wms\Services\ImportProdukService;
 use App\Modules\Wms\Services\ImportSidRetailService;
+use App\Modules\Wms\Services\MarginGuardService;
 use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\ProductImageService;
 use App\Modules\Wms\Services\ProdukService;
@@ -905,6 +906,50 @@ class ProdukTab extends Component
         $this->hitungKonversiMultiSatuan('edit');
     }
 
+    public function getMarginGuardCreateProperty(): array
+    {
+        $beli = (float) $this->parseNominal($this->produkForm['harga_beli'] ?? 0);
+        $jual = (float) $this->parseNominal($this->produkForm['harga_jual_retail'] ?? 0);
+        $kategori = $this->produkForm['kategori'] ?? null;
+
+        return app(MarginGuardService::class)->evaluasiHarga($beli, $jual, $kategori);
+    }
+
+    public function getMarginGuardEditProperty(): array
+    {
+        $beli = (float) $this->parseNominal($this->editProdukForm['harga_beli'] ?? 0);
+        $jual = (float) $this->parseNominal($this->editProdukForm['harga_jual_retail'] ?? 0);
+        $kategori = $this->editProdukForm['kategori'] ?? null;
+
+        return app(MarginGuardService::class)->evaluasiHarga($beli, $jual, $kategori);
+    }
+
+    public function terapkanRekomendasiMargin(string $mode = 'create'): void
+    {
+        if (! isSuperAdminOrOwner() && ! $this->boleh('wms.create', 'Anda tidak memiliki izin mengubah harga produk.')) {
+            return;
+        }
+
+        $formKey = $mode === 'create' ? 'produkForm' : 'editProdukForm';
+        $eval = $mode === 'create' ? $this->marginGuardCreate : $this->marginGuardEdit;
+        $rekomendasi = $eval['rekomendasi_harga'] ?? 0;
+
+        if ($rekomendasi > 0) {
+            $this->{$formKey}['harga_jual_retail'] = $rekomendasi;
+            $this->{$formKey}['harga_tier']['retail']['nominal_tetap'] = $rekomendasi;
+            $beli = (float) $this->parseNominal($this->{$formKey}['harga_beli'] ?? 0);
+            if ($beli > 0) {
+                $this->{$formKey}['margin_persen'] = round((($rekomendasi - $beli) / $beli) * 100, 2);
+            }
+            $this->syncTierHargaDariRetail($mode);
+            $this->hitungKonversiMultiSatuan($mode);
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => 'Harga jual retail disesuaikan ke rekomendasi aman: Rp '.number_format($rekomendasi, 0, ',', '.'),
+            ]);
+        }
+    }
+
     public function simpanProduk()
     {
         if (! $this->boleh('wms.create', 'Anda tidak memiliki izin menambah produk.')) {
@@ -914,6 +959,25 @@ class ProdukTab extends Component
         $this->produkForm['harga_beli'] = $this->parseNominal($this->produkForm['harga_beli'] ?? 0);
         $this->produkForm['harga_jual_retail'] = $this->parseNominal($this->produkForm['harga_jual_retail'] ?? 0);
         $this->syncTierHargaDariRetail('create');
+
+        // [MARGIN GUARD] Proteksi harga jual di bawah HPP modal saat pembuatan produk manual
+        $hargaBeliAwal = (float) $this->produkForm['harga_beli'];
+        $hargaJualAwal = (float) $this->produkForm['harga_jual_retail'];
+        if ($hargaBeliAwal > 0 && $hargaJualAwal <= $hargaBeliAwal) {
+            $marginGuard = app(MarginGuardService::class);
+            $rekomendasi = $marginGuard->hitungHargaAman($hargaBeliAwal, $this->produkForm['kategori'] ?? null);
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => sprintf(
+                    'Harga jual (Rp %s) tidak boleh lebih rendah atau sama dengan HPP modal (Rp %s). Toko pasti rugi langsung! Rekomendasi aman: Rp %s.',
+                    number_format($hargaJualAwal, 0, ',', '.'),
+                    number_format($hargaBeliAwal, 0, ',', '.'),
+                    number_format($rekomendasi, 0, ',', '.')
+                ),
+            ]);
+
+            return;
+        }
 
         if (isset($this->produkForm['harga_tier'])) {
             foreach ($this->produkForm['harga_tier'] as $k => $tier) {
@@ -1332,6 +1396,25 @@ class ProdukTab extends Component
 
         $this->editProdukForm['harga_beli'] = $this->parseNominal($this->editProdukForm['harga_beli'] ?? 0);
         $this->editProdukForm['harga_jual_retail'] = $this->parseNominal($this->editProdukForm['harga_jual_retail'] ?? 0);
+
+        // [MARGIN GUARD] Proteksi harga jual di bawah HPP modal saat edit produk manual
+        $hargaBeliEdit = (float) $this->editProdukForm['harga_beli'];
+        $hargaJualEdit = (float) $this->editProdukForm['harga_jual_retail'];
+        if ($hargaBeliEdit > 0 && $hargaJualEdit <= $hargaBeliEdit) {
+            $marginGuard = app(MarginGuardService::class);
+            $rekomendasi = $marginGuard->hitungHargaAman($hargaBeliEdit, $this->editProdukForm['kategori'] ?? null);
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => sprintf(
+                    'Harga jual (Rp %s) tidak boleh lebih rendah atau sama dengan HPP modal (Rp %s). Toko pasti rugi langsung! Rekomendasi aman: Rp %s.',
+                    number_format($hargaJualEdit, 0, ',', '.'),
+                    number_format($hargaBeliEdit, 0, ',', '.'),
+                    number_format($rekomendasi, 0, ',', '.')
+                ),
+            ]);
+
+            return;
+        }
         if (isset($this->editProdukForm['harga_tier'])) {
             foreach ($this->editProdukForm['harga_tier'] as $k => $tier) {
                 if (isset($tier['nominal_tetap']) && $tier['nominal_tetap'] !== '' && $tier['nominal_tetap'] !== null) {
@@ -4399,6 +4482,8 @@ class ProdukTab extends Component
             'brandKompatibelList' => $brandKompatibelList,
             'modelKompatibelList' => $modelKompatibelList,
             'quickAddExistingModels' => $quickAddExistingModels,
+            'marginGuardCreate' => $this->marginGuardCreate,
+            'marginGuardEdit' => $this->marginGuardEdit,
         ]);
     }
 }

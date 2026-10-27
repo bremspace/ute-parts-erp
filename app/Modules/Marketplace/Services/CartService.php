@@ -45,15 +45,19 @@ class CartService
                         ? (float) $variant->harga_jual_retail
                         : (float) $produk->harga_jual_retail;
                     $diskonTier = max(0.0, $hargaRetail - (float) $pricing['harga']);
+                    $potensiKomisi = (float) ($pricing['potensi_komisi'] ?? 0.0);
 
                     if (
                         (float) ($item['harga'] ?? 0) !== (float) $pricing['harga']
                         || (float) ($item['harga_retail'] ?? 0) !== $hargaRetail
+                        || (float) ($item['potensi_komisi'] ?? 0) !== $potensiKomisi
                         || empty($item['tier_nama'])
                     ) {
                         $cart[$key]['harga'] = (float) $pricing['harga'];
                         $cart[$key]['harga_retail'] = $hargaRetail;
                         $cart[$key]['diskon_tier'] = $diskonTier;
+                        $cart[$key]['potensi_komisi'] = $potensiKomisi;
+                        $cart[$key]['mode_reward'] = $pricing['mode_reward'] ?? 'diskon_langsung';
                         $cart[$key]['tier_nama'] = $pricing['tier'] ?? null;
                         $cart[$key]['alasan_harga'] = $pricing['alasan'] ?? null;
                         $changed = true;
@@ -113,6 +117,8 @@ class CartService
             'harga' => (float) $pricing['harga'],
             'harga_retail' => $hargaRetail,
             'diskon_tier' => $diskonTier,
+            'potensi_komisi' => (float) ($pricing['potensi_komisi'] ?? 0.0),
+            'mode_reward' => $pricing['mode_reward'] ?? 'diskon_langsung',
             'tier_nama' => $pricing['tier'] ?? null,
             'qty' => $newQty,
             'alasan_harga' => $pricing['alasan'],
@@ -184,6 +190,16 @@ class CartService
     public function hitungDiskonTier(): float
     {
         return max(0.0, $this->hitungSubtotalRetail() - $this->hitungSubtotal());
+    }
+
+    public function hitungPotensiKomisi(): float
+    {
+        $total = 0.0;
+        foreach ($this->all() as $item) {
+            $total += ((float) ($item['potensi_komisi'] ?? 0.0)) * (int) ($item['qty'] ?? 1);
+        }
+
+        return $total;
     }
 
     public function hitungDiskonPartai(?Pelanggan $customer = null): array

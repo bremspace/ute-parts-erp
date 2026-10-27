@@ -13,6 +13,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\PricingService;
+use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
@@ -469,6 +470,29 @@ class PosController extends Controller
 
                 // Komisi multi-aktor (PRD §4.3): reseller/agen/karyawan marketing via rule aktif
                 app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
+
+                // Pencatatan komisi akumulasi jika mode komisi_akumulasi aktif & belum dicatat rule engine
+                if ($transaksi->mode_reward_mitra === 'komisi_akumulasi' && (float) $transaksi->komisi_mitra_nominal > 0 && $request->pelanggan_id) {
+                    $sudahAda = Komisi::where('transaksi_id', $transaksi->id)->where('pelanggan_id', $request->pelanggan_id)->exists();
+                    if (! $sudahAda) {
+                        $today = now()->format('Ymd');
+                        $count = Komisi::whereDate('created_at', now()->toDateString())->count() + 1;
+                        $noKomisi = sprintf('KMS-%s-%04d', $today, $count);
+                        $pelangganModel = Pelanggan::find($request->pelanggan_id);
+                        $tipeKonsumen = $pelangganModel ? app(PelangganService::class)->tipeKonsumen($pelangganModel) : 'reseller';
+                        Komisi::create([
+                            'no_komisi' => $noKomisi,
+                            'pelanggan_id' => $request->pelanggan_id,
+                            'transaksi_id' => $transaksi->id,
+                            'aktor_tipe' => $tipeKonsumen === 'agen' ? 'agen' : 'reseller',
+                            'aktor_id' => $request->pelanggan_id,
+                            'nominal_komisi' => $transaksi->komisi_mitra_nominal,
+                            'jumlah_transaksi' => $transaksi->total_akhir,
+                            'status' => Komisi::STATUS_PENDING,
+                            'keterangan' => 'Komisi akumulasi mitra transaksi '.$transaksi->no_transaksi,
+                        ]);
+                    }
+                }
 
                 return $this->success(
                     $transaksi->load(['items.produk', 'items.skuVariant', 'pelanggan', 'cabang']),

@@ -483,7 +483,11 @@
                                     class="px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 {{ $modeRewardMitra === 'komisi_akumulasi' ? 'bg-up-amber text-ink-950 border-up-amber' : 'bg-up-mint/20 text-up-mint border-up-mint/30' }}"
                                     title="Klik untuk ubah: Diskon Langsung vs Simpan Komisi Mitra"
                                 >
-                                    {{ $modeRewardMitra === 'komisi_akumulasi' ? '💰 Mitra: Simpan Komisi' : '🏷️ Mitra: Diskon Langsung' }}
+                                    @if($modeRewardMitra === 'komisi_akumulasi')
+                                        <span>💰 Mitra: Simpan Komisi {{ ($potensiKomisiTotal ?? 0) > 0 ? '(+Rp '.number_format($potensiKomisiTotal/1000).'rb)' : '' }}</span>
+                                    @else
+                                        <span>🏷️ Mitra: Diskon Langsung {{ ($diskonTierTotal ?? 0) > 0 ? '(-Rp '.number_format($diskonTierTotal/1000).'rb)' : '' }}</span>
+                                    @endif
                                 </button>
                             @endif
 

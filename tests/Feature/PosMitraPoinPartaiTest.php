@@ -660,4 +660,56 @@ class PosMitraPoinPartaiTest extends TestCase
         $testMember->call('setQty', $cartKeyMember, 5)
             ->assertSet('diskonPartai', 14250.0);
     }
+
+    public function test_mitra_tidak_dapat_poin_loyalty_dan_fallback_skema_default(): void
+    {
+        $pelangganService = app(PelangganService::class);
+
+        // Buat agen dengan kode referral
+        $agen = Pelanggan::create([
+            'nama' => 'Agen Sukses',
+            'telepon' => '08777777777',
+            'is_reseller' => true,
+            'tipe_konsumen' => 'agen',
+            'kode_agen' => 'AGN-SUKSES',
+            'poin_loyalty' => 0,
+            'status' => 'approved',
+        ]);
+
+        // Produk baru tanpa baris harga tier manual
+        $produkPolos = Produk::create([
+            'nama' => 'Baterai Polos',
+            'slug' => 'baterai-polos-'.Str::random(4),
+            'harga_beli' => 50000,
+            'harga_jual_retail' => 100000,
+            'satuan' => 'pcs',
+            'is_active' => true,
+        ]);
+
+        // 1. Uji Fallback Harga Default Global CRM (Agen 10% diskon dari 100.000 = 90.000)
+        $pricing = $pelangganService->resolveHarga($produkPolos, $agen);
+        $this->assertEquals(90000.0, (float) $pricing['harga']);
+        $this->assertEquals(10000.0, (float) $pricing['diskon_nominal']);
+        $this->assertEquals('Agen', $pricing['tier']);
+
+        // 2. Uji Proteksi Poin: Mitra (Agen/Reseller) tidak mendapat poin bila mitra_dapat_poin = false
+        $pelangganService->tambahBelanjaDanPoin($agen->id, 500000);
+        $agen->refresh();
+        $this->assertEquals(500000.0, (float) $agen->total_belanja_12bulan);
+        $this->assertEquals(0, (int) $agen->poin_loyalty, 'Mitra tidak boleh mendapat poin loyalty dobel benefit!');
+
+        // 3. Uji Downline Agen via referral_kode
+        $downline = Pelanggan::create([
+            'nama' => 'Downline Agen',
+            'telepon' => '08888888888',
+            'referral_kode' => 'AGN-SUKSES',
+            'tipe_konsumen' => 'retail',
+            'is_reseller' => false,
+            'status' => 'approved',
+        ]);
+
+        $this->assertEquals('AGN-SUKSES', $downline->referral_kode);
+        $downlines = Pelanggan::where('referral_kode', $agen->kode_agen)->get();
+        $this->assertTrue($downlines->contains('id', $downline->id));
+    }
 }

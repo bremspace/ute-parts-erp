@@ -243,6 +243,12 @@
                                 </div>
                             @endif
 
+                            @if(($potensiKomisi ?? 0) > 0)
+                                <div class="p-2.5 rounded-2xl bg-up-amber/10 border border-up-amber/20 text-center text-xs font-bold text-up-amber">
+                                    💰 Akumulasi komisi mitra +Rp {{ number_format($potensiKomisi, 0, ',', '.') }} akan tersimpan ke saldo komisi Anda setelah pesanan terverifikasi!
+                                </div>
+                            @endif
+
                             @if(($diskonPartai ?? 0) > 0)
                                 <div class="p-2.5 rounded-2xl bg-up-accent/10 border border-up-accent/20 text-center text-xs font-bold text-up-accent">
                                     📦 Potongan Pembelian Partai hemat Rp {{ number_format($diskonPartai, 0, ',', '.') }} telah diterapkan!
@@ -398,6 +404,12 @@
                             @if(($diskonTier ?? 0) > 0)
                                 <div class="mt-1 text-up-mint font-bold text-[11px]">
                                     🎉 Anda menghemat total Rp {{ number_format($diskonTier, 0, ',', '.') }} dengan harga tier member
+                                </div>
+                            @endif
+                            @if(($potensiKomisi ?? 0) > 0)
+                                <div class="mt-1 text-up-amber font-bold text-[11px] flex items-center gap-1">
+                                    <span>💰</span>
+                                    <span>Akumulasi komisi mitra: +Rp {{ number_format($potensiKomisi, 0, ',', '.') }} (Harga Retail)</span>
                                 </div>
                             @endif
                             @if(($diskonPartai ?? 0) > 0)

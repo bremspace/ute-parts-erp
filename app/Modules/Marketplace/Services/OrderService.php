@@ -51,6 +51,8 @@ class OrderService
             $noTransaksi = sprintf('MP-%s-%04d', $today, $count);
 
             $subtotal = 0.0;
+            $totalKomisiMitra = 0.0;
+            $modeRewardMitra = 'diskon_langsung';
             $rows = [];
 
             foreach ($items as $item) {
@@ -75,8 +77,11 @@ class OrderService
                 $pricing = $this->pricingService->resolve($produk, $pelanggan, $variant);
                 $harga = $pricing['harga'];
                 $diskonPerUnit = (float) ($pricing['diskon_nominal'] ?? 0);
+                $potensiKomisiPerUnit = (float) ($pricing['potensi_komisi'] ?? 0);
+                $modeRewardMitra = $pricing['mode_reward'] ?? 'diskon_langsung';
                 $lineSubtotal = round($harga * $qty, 2);
                 $subtotal += $lineSubtotal;
+                $totalKomisiMitra += round($potensiKomisiPerUnit * $qty, 2);
 
                 $rows[] = [
                     'produk' => $produk,
@@ -84,6 +89,7 @@ class OrderService
                     'jumlah' => $qty,
                     'harga_satuan' => $harga,
                     'diskon_nominal' => round($diskonPerUnit * $qty, 2),
+                    'potensi_komisi' => round($potensiKomisiPerUnit * $qty, 2),
                     'hpp' => (float) $produk->harga_beli,
                     'subtotal' => $lineSubtotal,
                     'catatan' => $item['catatan'] ?? null,
@@ -116,6 +122,8 @@ class OrderService
                 'diskon_persen' => 0,
                 'diskon_nominal' => $diskon,
                 'diskon_partai' => $diskonPartai,
+                'mode_reward_mitra' => $modeRewardMitra,
+                'komisi_mitra_nominal' => $totalKomisiMitra,
                 'dpp' => $pajak['dpp'],
                 'pajak_nominal' => $pajak['ppn_nominal'],
                 'ppn_nominal' => $pajak['ppn_nominal'],

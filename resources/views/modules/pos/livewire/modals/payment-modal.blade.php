@@ -69,8 +69,9 @@
                     </div>
                 @endif
                 @if($modeRewardMitra === 'komisi_akumulasi' && ($customer?->is_reseller || in_array($customer?->tipe_konsumen, ['reseller', 'agen'], true)))
-                    <div class="mt-1 text-[10px] text-up-amber font-bold">
-                        💰 Mode: Komisi Akumulasi Mitra (Harga Retail)
+                    <div class="mt-2 p-2 rounded-xl bg-up-amber/15 border border-up-amber/30 text-[11px] text-up-amber font-bold flex items-center justify-between">
+                        <span>💰 Mode: Simpan Komisi Mitra (Harga Retail)</span>
+                        <span class="tabular-nums">+Rp {{ number_format($potensiKomisiTotal ?? 0, 0, ',', '.') }}</span>
                     </div>
                 @endif
             </div>

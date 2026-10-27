@@ -110,6 +110,22 @@ class CrmDashboard extends Component
 
     public ?float $hargaPartaiNominalDiskon = 2.0;
 
+    // Skema Default Mitra (Reseller & Agen) & Proteksi Poin
+    public float $resellerDefaultPersen = 5.0;
+
+    public float $agenDefaultPersen = 10.0;
+
+    public bool $mitraDapatPoin = false;
+
+    // Komponen Potongan & Buffer Biaya Margin Guard (SSOT)
+    public float $marginGuardBufferPersen = 5.0;
+
+    public float $paymentGatewayFeePersen = 0.0;
+
+    public float $poinMaksPotonganPersen = 50.0;
+
+    public float $komisiAgenDefaultPersen = 5.0;
+
     public function mount(): void
     {
         $config = app(KonfigurasiService::class);
@@ -117,6 +133,14 @@ class CrmDashboard extends Component
         $this->poinRedeemRupiahGlobal = $config->poinRedeemRupiah();
         $this->hargaPartaiAktif = $config->hargaPartaiAktif();
         $this->hargaPartaiBerlakuUntuk = $config->hargaPartaiBerlakuUntuk();
+        $this->resellerDefaultPersen = $config->resellerDefaultPersen();
+        $this->agenDefaultPersen = $config->agenDefaultPersen();
+        $this->mitraDapatPoin = $config->mitraDapatPoin();
+
+        $this->marginGuardBufferPersen = $config->marginGuardBufferPersen();
+        $this->paymentGatewayFeePersen = $config->paymentGatewayFeePersen();
+        $this->poinMaksPotonganPersen = $config->poinMaksPotonganPersen();
+        $this->komisiAgenDefaultPersen = $config->komisiAgenDefaultPersen();
 
         $minQty = $config->hargaPartaiMinQty();
         $qtyDiskon = $config->hargaPartaiQtyDiskonPersen();
@@ -591,6 +615,13 @@ class CrmDashboard extends Component
         $rules = [
             'poinEarnPersenGlobal' => 'required|numeric|min:0|max:100',
             'poinRedeemRupiahGlobal' => 'required|numeric|min:0',
+            'resellerDefaultPersen' => 'required|numeric|min:0|max:100',
+            'agenDefaultPersen' => 'required|numeric|min:0|max:100',
+            'mitraDapatPoin' => 'boolean',
+            'marginGuardBufferPersen' => 'required|numeric|min:0|max:50',
+            'paymentGatewayFeePersen' => 'required|numeric|min:0|max:20',
+            'poinMaksPotonganPersen' => 'required|numeric|min:1|max:100',
+            'komisiAgenDefaultPersen' => 'required|numeric|min:0|max:50',
         ];
 
         if ($this->hargaPartaiAktif) {
@@ -621,6 +652,9 @@ class CrmDashboard extends Component
         $config = app(KonfigurasiService::class);
         $config->set('poin_earn_persen', (float) $this->poinEarnPersenGlobal, 'Rasio earn poin dari nominal transaksi (%)');
         $config->set('poin_redeem_rupiah', (float) $this->poinRedeemRupiahGlobal, 'Nilai tukar 1 poin loyalitas menjadi rupiah (diskon)');
+        $config->set('reseller_default_persen', (float) $this->resellerDefaultPersen, 'Default diskon % harga reseller jika master produk kosong');
+        $config->set('agen_default_persen', (float) $this->agenDefaultPersen, 'Default diskon % harga agen jika master produk kosong');
+        $config->set('mitra_dapat_poin', (bool) $this->mitraDapatPoin, 'Apakah reseller & agen berhak mendapatkan poin loyalty konsumen');
         $config->set('harga_partai_aktif', (bool) $this->hargaPartaiAktif, 'Status aktif diskon harga partai member');
         $config->set('harga_partai_berlaku_untuk', $this->hargaPartaiBerlakuUntuk, 'Cakupan pembeli harga partai (semua / member)');
 
@@ -635,9 +669,15 @@ class CrmDashboard extends Component
         $config->set('harga_partai_min_nominal', $finalMinNominal, 'Minimal belanja untuk mendapatkan diskon partai nominal');
         $config->set('harga_partai_nominal_diskon_persen', $finalNominalDiskon, 'Persentase diskon harga partai berbasis nominal');
 
+        // Parameter Potongan SSOT Margin Guard
+        $config->set('margin_guard_buffer_persen', (float) $this->marginGuardBufferPersen, 'Buffer margin error, packaging, & operasional (%)');
+        $config->set('payment_gateway_fee_persen', (float) $this->paymentGatewayFeePersen, 'Biaya transaksi / MDR payment gateway toko (%)');
+        $config->set('poin_maks_potongan_persen', (float) $this->poinMaksPotonganPersen, 'Batas maksimal subtotal yang boleh dipotong poin per transaksi (%)');
+        $config->set('komisi_agen_default_persen', (float) $this->komisiAgenDefaultPersen, 'Estimasi default komisi penjualan agen (%)');
+
         $this->dispatch('alert', [
             'type' => 'success',
-            'message' => 'Pengaturan global poin loyalty & harga partai berhasil disimpan',
+            'message' => 'Pengaturan SSOT potongan, loyalty, dan proteksi margin berhasil disimpan',
         ]);
     }
 
@@ -744,7 +784,8 @@ class CrmDashboard extends Component
 
     protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool
     {
-        if (auth()->user()?->can($permission)) {
+        $user = auth()->user();
+        if (isSuperAdminOrOwner($user) || $user?->can($permission)) {
             return true;
         }
 
@@ -762,6 +803,7 @@ class CrmDashboard extends Component
             'totalPelanggan' => Pelanggan::count(),
             'riwayatKampanye' => KampanyeBroadcast::with('user')->latest()->take(15)->get(),
             'activeTab' => $this->activeTab,
+            'ringkasanPotongan' => app(KonfigurasiService::class)->getRingkasanPotonganSistem(),
         ])->layout('layouts.backoffice', ['header' => 'CRM & Membership']);
     }
 }

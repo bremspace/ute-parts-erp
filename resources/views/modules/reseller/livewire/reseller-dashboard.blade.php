@@ -430,6 +430,14 @@
                         <input type="text" wire:model="skemaForm.nama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Komisi LCD 5%" />
                     </div>
                     <div>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Target Mitra *</label>
+                        <select wire:model="skemaForm.target_mitra" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
+                            <option value="semua" class="bg-ink-900">Semua Mitra (Reseller & Agen)</option>
+                            <option value="agen" class="bg-ink-900">Khusus Agen (Referral Downline)</option>
+                            <option value="reseller" class="bg-ink-900">Khusus Reseller</option>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Kategori Produk (opsional, kosongkan jika global)</label>
                         <input type="text" wire:model="skemaForm.kategori" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="LCD, Baterai, Flexible..." />
                     </div>

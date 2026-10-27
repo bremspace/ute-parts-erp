@@ -1,10 +1,10 @@
 <div class="space-y-6"
     x-data="{
-        subModul: @js(in_array($activeTab, ['stok', 'produk']) ? 'inventori' : (in_array($activeTab, ['transfer', 'opname']) ? 'operasional' : 'pengadaan')),
+        subModul: @js(in_array($activeTab, ['stok', 'produk', 'monitoring_harga']) ? 'inventori' : (in_array($activeTab, ['transfer', 'opname']) ? 'operasional' : 'pengadaan')),
         setSubModul(modul) {
             this.subModul = modul;
             const currentTab = $wire.get('activeTab');
-            if (modul === 'inventori' && !['stok', 'produk'].includes(currentTab)) {
+            if (modul === 'inventori' && !['stok', 'produk', 'monitoring_harga'].includes(currentTab)) {
                 $wire.set('activeTab', 'produk');
             } else if (modul === 'operasional' && !['transfer', 'opname'].includes(currentTab)) {
                 $wire.set('activeTab', 'transfer');
@@ -14,7 +14,7 @@
         }
     }"
     x-init="$watch('$wire.activeTab', value => {
-        if (['stok', 'produk'].includes(value)) subModul = 'inventori';
+        if (['stok', 'produk', 'monitoring_harga'].includes(value)) subModul = 'inventori';
         else if (['transfer', 'opname'].includes(value)) subModul = 'operasional';
         else if (['po', 'grn', 'retur', 'histori_po'].includes(value)) subModul = 'pengadaan';
     })"
@@ -165,6 +165,18 @@
                     >
                         Master Produk & Stok
                     </button>
+
+                    <!-- Tab Monitoring Margin & Harga (Khusus Owner / Super Admin) -->
+                    @if(function_exists('isSuperAdminOrOwner') && (isSuperAdminOrOwner() || auth()->user()?->can('pengaturan.manage')))
+                    <button
+                        wire:click="$set('activeTab', 'monitoring_harga')"
+                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex items-center gap-1.5 {{ $activeTab === 'monitoring_harga' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        title="Monitoring Margin & Guard Anti-Rugi Harga Jual"
+                    >
+                        <span>🛡️</span>
+                        <span>Monitoring Margin &amp; Harga</span>
+                    </button>
+                    @endif
 
                     <!-- Tombol Auto ABC WMS Seluruh Produk (Sejajar dengan Master Produk & Stok) -->
                     @can('wms.create')
@@ -361,6 +373,10 @@
     @elseif($activeTab === 'produk')
         <div key="tab-produk">
             @livewire(\App\Modules\Wms\Livewire\ProdukTab::class)
+        </div>
+    @elseif($activeTab === 'monitoring_harga')
+        <div key="tab-monitoring-harga">
+            @livewire(\App\Modules\Wms\Livewire\MonitoringHargaTab::class)
         </div>
     @elseif($activeTab === 'transfer')
         <div key="tab-transfer">

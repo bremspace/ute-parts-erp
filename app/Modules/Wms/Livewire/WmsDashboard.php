@@ -12,14 +12,18 @@ use Livewire\Component;
  */
 class WmsDashboard extends Component
 {
-    public string $activeTab = 'produk'; // produk, transfer, opname, po, grn, retur, stok, histori_po
+    public string $activeTab = 'produk'; // produk, transfer, opname, po, grn, retur, stok, histori_po, monitoring_harga
 
     public function mount(): void
     {
         // [FIX] Dukung deep-link ke tab via query param ?tab=...
         // Default langsung ke 'produk' (Master Produk & Stok terpadu)
-        $allowed = ['produk', 'stok', 'transfer', 'opname', 'po', 'grn', 'retur', 'histori_po'];
+        $allowed = ['produk', 'stok', 'transfer', 'opname', 'po', 'grn', 'retur', 'histori_po', 'monitoring_harga'];
         $tab = (string) request('tab', 'produk');
+
+        if ($tab === 'monitoring_harga' && ! isSuperAdminOrOwner() && ! auth()->user()?->can('pengaturan.manage')) {
+            $tab = 'produk';
+        }
 
         $this->activeTab = in_array($tab, $allowed, true) ? $tab : 'produk';
     }

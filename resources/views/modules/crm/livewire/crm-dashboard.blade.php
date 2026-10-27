@@ -395,7 +395,7 @@
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
                 <!-- 1. Rasio Earn Poin Global -->
                 <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
                     <label class="block font-semibold text-ink-300 text-[11px]">Rasio Earn Poin (%)</label>
@@ -425,7 +425,67 @@
                             class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white"
                         />
                     </div>
-                    <span class="text-[10px] text-ink-400 block">Default diskon saat penukaran poin di POS kasir</span>
+                    <div class="pt-1 border-t border-white/5">
+                        <span class="text-[9px] text-ink-400 block">Maks Potongan Belanja:</span>
+                        <div class="flex items-center gap-1">
+                            <input
+                                type="number"
+                                wire:model="poinMaksPotonganPersen"
+                                min="1"
+                                max="100"
+                                class="w-full px-1.5 py-0.5 rounded glass-input text-xs font-bold tabular-nums text-white"
+                            />
+                            <span class="text-ink-400 text-[10px] font-bold">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2b. Skema Default Mitra & Proteksi Poin -->
+                <div class="p-3 rounded-xl bg-up-primary/5 border border-up-primary/20 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="block font-semibold text-up-accent text-[11px]">🏷️ Skema Default Mitra (Global)</label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <div>
+                            <span class="text-[9px] text-ink-400 block">Diskon Reseller</span>
+                            <div class="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    wire:model="resellerDefaultPersen"
+                                    min="0"
+                                    max="100"
+                                    step="0.5"
+                                    class="w-full px-1.5 py-1 rounded glass-input text-xs font-bold tabular-nums text-white"
+                                />
+                                <span class="text-ink-400 text-[10px] font-bold">%</span>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-[9px] text-ink-400 block">Diskon Agen</span>
+                            <div class="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    wire:model="agenDefaultPersen"
+                                    min="0"
+                                    max="100"
+                                    step="0.5"
+                                    class="w-full px-1.5 py-1 rounded glass-input text-xs font-bold tabular-nums text-white"
+                                />
+                                <span class="text-ink-400 text-[10px] font-bold">%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <label class="flex items-center gap-1.5 pt-1 border-t border-white/5 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            wire:model="mitraDapatPoin"
+                            class="accent-up-primary w-3.5 h-3.5 rounded cursor-pointer"
+                        />
+                        <span class="text-[10px] {{ $mitraDapatPoin ? 'text-up-mint font-bold' : 'text-ink-400' }}">
+                            Mitra Dapat Poin Loyalty
+                        </span>
+                    </label>
+                    <span class="text-[9px] text-ink-500 block">Jika nonaktif, reseller/agen tidak diganjar poin (cegah dobel benefit).</span>
                 </div>
 
                 <!-- 3. Status Diskon Partai -->
@@ -542,6 +602,94 @@
                                 placeholder="2"
                             />
                         </div>
+                    </div>
+                </div>
+
+                <!-- 5. Buffer Operasional & Packing (SSOT Margin Guard) -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                    <label class="block font-semibold text-ink-300 text-[11px]">🛡️ Buffer Biaya &amp; Error (%)</label>
+                    <div class="flex items-center gap-1.5">
+                        <input
+                            type="number"
+                            wire:model="marginGuardBufferPersen"
+                            min="0"
+                            max="50"
+                            step="0.5"
+                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-up-amber"
+                        />
+                        <span class="text-ink-400 font-bold">%</span>
+                    </div>
+                    <span class="text-[10px] text-ink-400 block">Biaya packing, bubble wrap, pembulatan kasir, toleransi error</span>
+                </div>
+
+                <!-- 6. Payment Gateway Fee / MDR Toko -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                    <label class="block font-semibold text-ink-300 text-[11px]">💳 MDR Payment Gateway (%)</label>
+                    <div class="flex items-center gap-1.5">
+                        <input
+                            type="number"
+                            wire:model="paymentGatewayFeePersen"
+                            min="0"
+                            max="20"
+                            step="0.1"
+                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white"
+                        />
+                        <span class="text-ink-400 font-bold">%</span>
+                    </div>
+                    <span class="text-[10px] text-ink-400 block">Biaya MDR QRIS / VA jika toko menanggung biaya transaksi</span>
+                </div>
+
+                <!-- 7. Estimasi Komisi Penjualan Default -->
+                <div class="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                    <label class="block font-semibold text-ink-300 text-[11px]">🤝 Komisi Penjualan Default (%)</label>
+                    <div class="flex items-center gap-1.5">
+                        <input
+                            type="number"
+                            wire:model="komisiAgenDefaultPersen"
+                            min="0"
+                            max="50"
+                            step="0.5"
+                            class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs font-bold tabular-nums text-white"
+                        />
+                        <span class="text-ink-400 font-bold">%</span>
+                    </div>
+                    <span class="text-[10px] text-ink-400 block">Komisi penjualan agen jika kategori belum punya skema khusus</span>
+                </div>
+
+                <!-- 8. Widget Ringkasan SSOT Proteksi Margin (Span 3 Kolom) -->
+                <div class="p-3.5 rounded-xl bg-gradient-to-r from-up-primary/10 via-up-primary/5 to-transparent border border-up-primary/20 space-y-2 sm:col-span-2 lg:col-span-3">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-white text-[11px] flex items-center gap-1.5">
+                            <span>🛡️</span>
+                            <span>SSOT Beban Potongan &amp; Proteksi Margin Toko</span>
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-up-primary/20 text-up-primary border border-up-primary/30 font-bold font-mono">
+                            Sinkron Otomatis WMS &amp; POS
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+                        <div class="p-2 rounded-lg bg-black/20">
+                            <span class="text-ink-400 block">Diskon Member Max:</span>
+                            <strong class="text-up-primary text-xs font-mono font-bold">{{ $ringkasanPotongan['max_mitra_diskon'] }}%</strong>
+                        </div>
+                        <div class="p-2 rounded-lg bg-black/20">
+                            <span class="text-ink-400 block">Komisi Penjualan:</span>
+                            <strong class="text-up-amber text-xs font-mono font-bold">{{ $ringkasanPotongan['komisi_persen'] }}%</strong>
+                        </div>
+                        <div class="p-2 rounded-lg bg-black/20">
+                            <span class="text-ink-400 block">Buffer &amp; Fee Gateway:</span>
+                            <strong class="text-up-mint text-xs font-mono font-bold">{{ $ringkasanPotongan['buffer_biaya_persen'] + $ringkasanPotongan['gateway_fee_persen'] }}%</strong>
+                        </div>
+                        <div class="p-2 rounded-lg bg-black/20">
+                            <span class="text-ink-400 block">Total Potongan Wajib:</span>
+                            <strong class="text-up-red text-xs font-mono font-bold">{{ $ringkasanPotongan['total_potongan_persen'] }}%</strong>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] pt-1 border-t border-white/5 text-ink-300">
+                        <span>Rekomendasi Markup Minimal Retail: <strong class="text-up-mint">+{{ $ringkasanPotongan['min_markup_persen'] }}% dari HPP</strong></span>
+                        <a href="/app/wms?tab=monitoring_harga" class="text-up-primary hover:underline font-bold flex items-center gap-1">
+                            <span>Buka Audit WMS &rarr;</span>
+                        </a>
                     </div>
                 </div>
             </div>

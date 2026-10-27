@@ -293,8 +293,12 @@ class PelangganService
 
             $model->increment('total_belanja_12bulan', $nominal);
 
+            $konfigurasi = app(KonfigurasiService::class);
+            $isMitra = $model->is_reseller || in_array($model->tipe_konsumen, ['reseller', 'agen'], true);
+            $dapatPoin = ! $isMitra || $konfigurasi->mitraDapatPoin();
+
             $tierService = app(TierService::class);
-            $poin = $tierService->hitungPoin($nominal, $model->tierMembership);
+            $poin = $dapatPoin ? $tierService->hitungPoin($nominal, $model->tierMembership) : 0;
             if ($poin > 0) {
                 $saldoSebelum = (int) $model->poin_loyalty;
                 $saldoSesudah = $saldoSebelum + $poin;
@@ -548,6 +552,16 @@ class PelangganService
                 }
             }
 
+            // Fallback skema default global CRM jika harga spesifik produk kosong
+            if ($hargaTierMitra === null) {
+                $konfig = app(KonfigurasiService::class);
+                $persenDefault = $tipe === 'agen' ? $konfig->agenDefaultPersen() : $konfig->resellerDefaultPersen();
+                if ($persenDefault > 0) {
+                    $diskonDefault = round(($hargaDasar * $persenDefault) / 100, 2);
+                    $hargaTierMitra = max(0.0, $hargaDasar - $diskonDefault);
+                }
+            }
+
             $potensiKomisi = $hargaTierMitra !== null ? max(0.0, round($hargaDasar - $hargaTierMitra, 2)) : 0.0;
 
             return [
@@ -631,6 +645,26 @@ class PelangganService
             // Nominal placeholder hasil seed = harga_jual → sama dengan fallback; tetap dievaluasi
             // agar struktur harga per tipe_konsumen konsisten (harga tidak berubah vs perilaku lama).
             return $this->hitungDariTierBaru($tipeDefault, $hargaDasar, 'Harga Khusus ', null);
+        }
+
+        // 5b. Fallback default global CRM untuk Reseller / Agen (jika baris master produk tidak diset manual)
+        if (in_array($tipe, ['reseller', 'agen'], true)) {
+            $konfig = app(KonfigurasiService::class);
+            $persenDefault = $tipe === 'agen' ? $konfig->agenDefaultPersen() : $konfig->resellerDefaultPersen();
+            if ($persenDefault > 0) {
+                $diskonNominal = round(($hargaDasar * $persenDefault) / 100, 2);
+                $finalHarga = max(0.0, $hargaDasar - $diskonNominal);
+
+                return [
+                    'harga' => $finalHarga,
+                    'harga_dasar' => $hargaDasar,
+                    'diskon_nominal' => $diskonNominal,
+                    'potensi_komisi' => 0.0,
+                    'mode_reward' => 'diskon_langsung',
+                    'alasan' => 'Skema Default '.($tipe === 'agen' ? 'Agen' : 'Reseller')." ({$persenDefault}%)",
+                    'tier' => $tipe === 'agen' ? 'Agen' : 'Reseller',
+                ];
+            }
         }
 
         // 6. Fallback retail

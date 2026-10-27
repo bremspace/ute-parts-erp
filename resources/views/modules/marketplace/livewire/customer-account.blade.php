@@ -816,10 +816,84 @@
             </div>
         @endif
 
-        <!-- KOMISI -->
+        <!-- KOMISI & DOWNLINE AFILIASI -->
         @if($activeTab === 'komisi' && $customer->is_reseller)
-            <div class="space-y-3">
-                @forelse($komisi as $k)
+            <div class="space-y-6">
+                <!-- Banner Referral Agen / Mitra -->
+                @if($customer->kode_agen)
+                    <div class="bg-gradient-to-br from-up-accent/15 via-up-primary/10 to-transparent rounded-3xl border border-up-accent/30 p-6 shadow-sm relative overflow-hidden">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <span class="text-xs uppercase tracking-wider font-bold text-up-accent">Program Afiliasi Mitra & Downline</span>
+                                <h3 class="text-lg font-black text-ink-900 dark:text-white mt-1">Kode Referral Agen Anda</h3>
+                                <p class="text-xs text-ink-500 dark:text-ink-400 mt-1">
+                                    Bagikan kode referral ini kepada calon pembeli atau pelanggan toko Anda. Setiap transaksi yang mereka lakukan otomatis menghasilkan komisi untuk Anda.
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2 self-start md:self-auto bg-white dark:bg-ink-900 p-2 rounded-2xl border border-up-accent/40 shadow-sm">
+                                <span class="font-mono text-base font-black text-up-accent px-3 select-all tracking-wider">{{ $customer->kode_agen }}</span>
+                                <button
+                                    type="button"
+                                    x-data="{ copied: false }"
+                                    @click="navigator.clipboard.writeText('{{ $customer->kode_agen }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                    class="px-3 py-1.5 rounded-xl bg-up-accent text-white text-xs font-bold transition hover:bg-up-accent/90 cursor-pointer flex items-center gap-1"
+                                >
+                                    <span x-show="!copied">Salin Kode</span>
+                                    <span x-show="copied" class="text-white">✓ Tersalin!</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Link Referral Langsung -->
+                        <div class="mt-4 pt-3 border-t border-up-accent/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                            <span class="text-ink-500 dark:text-ink-400">Link Pendaftaran Downline:</span>
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-[11px] text-ink-600 dark:text-ink-300 truncate max-w-xs select-all">{{ url('/daftar-pelanggan?ref='.$customer->kode_agen) }}</span>
+                                <button
+                                    type="button"
+                                    x-data="{ copied: false }"
+                                    @click="navigator.clipboard.writeText('{{ url('/daftar-pelanggan?ref='.$customer->kode_agen) }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                    class="px-2.5 py-1 rounded-lg bg-white/80 dark:bg-white/10 hover:bg-white border border-ink-200 dark:border-white/10 text-[11px] font-bold text-ink-700 dark:text-ink-200 transition cursor-pointer"
+                                >
+                                    <span x-show="!copied">Salin Link</span>
+                                    <span x-show="copied" class="text-up-mint">✓ Tersalin</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Daftar Downline -->
+                    <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-5 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-sm font-bold text-ink-900 dark:text-white flex items-center gap-2">
+                                <span>👥</span>
+                                <span>Daftar Downline / Pelanggan Terhubung ({{ $downlines->count() }})</span>
+                            </h4>
+                        </div>
+                        <div class="divide-y divide-ink-100 dark:divide-white/5">
+                            @forelse($downlines as $dl)
+                                <div class="py-2.5 flex items-center justify-between text-xs">
+                                    <div>
+                                        <p class="font-bold text-ink-900 dark:text-white">{{ $dl->nama }}</p>
+                                        <p class="text-[10px] text-ink-400">{{ $dl->telepon }} • Terdaftar {{ $dl->created_at->format('d/m/Y') }}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-[10px] text-ink-400 block">Total Belanja</span>
+                                        <span class="font-bold tabular-nums text-ink-800 dark:text-ink-200">Rp {{ number_format((float) $dl->total_belanja_12bulan, 0, ',', '.') }}</span>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="py-6 text-center text-xs text-ink-400">
+                                    Belum ada downline yang terdaftar menggunakan kode referral Anda.
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                @endif
+
+                <div class="space-y-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-ink-400">Riwayat Komisi Transaksi</h4>
+                    @forelse($komisi as $k)
                     <div class="bg-white dark:bg-ink-900 rounded-3xl border border-ink-100 dark:border-white/10 p-5 shadow-sm">
                         <div class="flex items-center justify-between">
                             <span class="font-mono text-up-accent font-bold text-sm">{{ $k->no_komisi }}</span>

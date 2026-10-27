@@ -7,6 +7,7 @@ use App\Modules\Akunting\Services\ExportLaporanService;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Reseller\Models\Komisi;
+use App\Modules\Reseller\Models\KomisiSkema;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Reseller\Services\KomisiService;
 use App\Traits\ParsesNominal;
@@ -44,7 +45,7 @@ class ResellerDashboard extends Component
     // Skema komisi modal
     public bool $showSkemaModal = false;
 
-    public array $skemaForm = ['id' => null, 'nama' => '', 'kategori' => '', 'tipe' => 'persen', 'nilai' => 5, 'is_active' => true];
+    public array $skemaForm = ['id' => null, 'nama' => '', 'kategori' => '', 'tipe' => 'persen', 'nilai' => 5, 'target_mitra' => 'semua', 'is_active' => true];
 
     // Konfigurasi global persentase default reseller & agen
     public float $resellerDefaultPersen = 1.0;
@@ -243,7 +244,7 @@ class ResellerDashboard extends Component
 
     public function openSkemaModal()
     {
-        $this->skemaForm = ['id' => null, 'nama' => '', 'kategori' => '', 'tipe' => 'persen', 'nilai' => 5, 'is_active' => true];
+        $this->skemaForm = ['id' => null, 'nama' => '', 'kategori' => '', 'tipe' => 'persen', 'nilai' => 5, 'target_mitra' => 'semua', 'is_active' => true];
         $this->showSkemaModal = true;
     }
 
@@ -255,11 +256,33 @@ class ResellerDashboard extends Component
             'skemaForm.nama' => 'required|string|max:255',
             'skemaForm.tipe' => 'required|in:persen,nominal',
             'skemaForm.nilai' => 'required|numeric|min:0',
+            'skemaForm.target_mitra' => 'required|in:semua,reseller,agen',
         ]);
 
-        SkemaKomisi::create($this->skemaForm);
+        $targetMitra = $this->skemaForm['target_mitra'] ?? 'semua';
+        unset($this->skemaForm['target_mitra']);
+
+        $skema = SkemaKomisi::create($this->skemaForm);
+
+        // Sinkronisasi otomatis ke KomisiSkema multi-aktor
+        $targetAktors = $targetMitra === 'semua' ? ['reseller', 'agen'] : [$targetMitra];
+        foreach ($targetAktors as $aktor) {
+            KomisiSkema::create([
+                'nama' => $skema->nama.($targetMitra !== 'semua' ? " ({$targetMitra})" : ''),
+                'aktor_tipe' => $aktor,
+                'aktor_id' => null,
+                'trigger_tipe' => 'penjualan',
+                'kategori' => $skema->kategori ?: null,
+                'tipe' => $skema->tipe,
+                'nilai' => $skema->nilai,
+                'min_amount' => 0,
+                'cabang_id' => null,
+                'is_aktif' => (bool) $skema->is_active,
+            ]);
+        }
+
         $this->showSkemaModal = false;
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Skema komisi ditambahkan']);
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Skema komisi berhasil ditambahkan & disinkronkan ke multi-aktor']);
     }
 
     public function render()

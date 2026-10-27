@@ -66,6 +66,11 @@ class CartCheckout extends Component
         return app(CartService::class)->hitungDiskonTier();
     }
 
+    public function getPotensiKomisiProperty(): float
+    {
+        return app(CartService::class)->hitungPotensiKomisi();
+    }
+
     public function getPartaiInfoProperty(): array
     {
         return app(CartService::class)->hitungDiskonPartai(auth('customer')->user());
@@ -197,6 +202,7 @@ class CartCheckout extends Component
             'subtotal' => $this->subtotal,
             'subtotalRetail' => $this->subtotalRetail,
             'diskonTier' => $this->diskonTier,
+            'potensiKomisi' => $this->potensiKomisi,
             'partaiInfo' => $this->partaiInfo,
             'diskonPartai' => $this->diskonPartai,
             'pajakPreview' => $this->pajakPreview,

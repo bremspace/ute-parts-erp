@@ -8,6 +8,8 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Reseller\Models\Komisi;
+use App\Modules\Reseller\Services\KomisiService;
 use App\Modules\Wms\Services\StokDeductionService;
 use Illuminate\Support\Facades\DB;
 
@@ -189,6 +191,29 @@ class PembayaranPesananOnlineService
             //     prosesPickupKasir lama — cabang handover/sudah-lunas TIDAK menambah) ---
             if ($transaksi->pelanggan_id) {
                 app(PelangganService::class)->tambahBelanjaDanPoin($transaksi->pelanggan_id, $total);
+            }
+
+            // Komisi multi-aktor & komisi akumulasi mitra
+            app(KomisiService::class)->hitungKomisiMultiAktor('penjualan', ['transaksi_id' => $transaksi->id]);
+            if ($transaksi->mode_reward_mitra === 'komisi_akumulasi' && (float) $transaksi->komisi_mitra_nominal > 0 && $transaksi->pelanggan_id) {
+                $sudahAda = Komisi::where('transaksi_id', $transaksi->id)->where('pelanggan_id', $transaksi->pelanggan_id)->exists();
+                if (! $sudahAda) {
+                    $today = now()->format('Ymd');
+                    $count = Komisi::whereDate('created_at', now()->toDateString())->count() + 1;
+                    $noKomisi = sprintf('KMS-%s-%04d', $today, $count);
+                    $tipeKonsumen = $transaksi->pelanggan ? app(PelangganService::class)->tipeKonsumen($transaksi->pelanggan) : 'reseller';
+                    Komisi::create([
+                        'no_komisi' => $noKomisi,
+                        'pelanggan_id' => $transaksi->pelanggan_id,
+                        'transaksi_id' => $transaksi->id,
+                        'aktor_tipe' => $tipeKonsumen === 'agen' ? 'agen' : 'reseller',
+                        'aktor_id' => $transaksi->pelanggan_id,
+                        'nominal_komisi' => $transaksi->komisi_mitra_nominal,
+                        'jumlah_transaksi' => $transaksi->total_akhir,
+                        'status' => Komisi::STATUS_PENDING,
+                        'keterangan' => 'Komisi akumulasi mitra transaksi pickup '.$transaksi->no_transaksi,
+                    ]);
+                }
             }
 
             // --- Notifikasi konsumen: judul/konten konfirmasi pembayaran

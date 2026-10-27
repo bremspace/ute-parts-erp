@@ -234,12 +234,40 @@ class KomisiService
             }
 
             foreach ($totalPerRule as $bagian) {
-                if ($bagian['nominal'] <= 0) {
+                $nominal = (float) $bagian['nominal'];
+                $safetyFloorNote = null;
+
+                // [SAFETY FLOOR] Proteksi margin anti-rugi otomatis untuk transaksi penjualan:
+                // Komisi tidak boleh membuat pendapatan toko turun di bawah total HPP/modal barang.
+                if ($triggerTipe === 'penjualan' && $entitas instanceof Transaksi) {
+                    $items = $entitas->relationLoaded('items') ? $entitas->items : $entitas->items()->with('produk')->get();
+                    $totalHpp = (float) $items->sum(function ($item) {
+                        $hppSatuan = (float) ($item->hpp > 0 ? $item->hpp : ($item->produk?->harga_beli ?? 0));
+
+                        return $hppSatuan * (float) $item->jumlah;
+                    });
+
+                    if ($totalHpp > 0) {
+                        $marginKotorMaksimal = max(0.0, round((float) $entitas->total_akhir - $totalHpp, 2));
+                        if ($nominal > $marginKotorMaksimal) {
+                            $nominalAwal = $nominal;
+                            $nominal = $marginKotorMaksimal;
+                            $safetyFloorNote = sprintf(
+                                ' [Safety Floor: Disesuaikan dari Rp %s ke Rp %s agar margin HPP terlindungi]',
+                                number_format($nominalAwal, 0, ',', '.'),
+                                number_format($nominal, 0, ',', '.')
+                            );
+                        }
+                    }
+                }
+
+                if ($nominal <= 0) {
                     continue;
                 }
+
                 $komisi = $this->catatKomisi(
                     $triggerTipe, (int) $refId, $bagian['rule'], $aktorTipe, (int) $aktorId,
-                    $pelanggan, $bagian['nominal'], $bagian['dasar']
+                    $pelanggan, $nominal, $bagian['dasar'], $safetyFloorNote
                 );
                 if ($komisi) {
                     $hasil[] = $komisi;
@@ -269,7 +297,7 @@ class KomisiService
 
     protected function resolusiPenjualan(array $konteks): array
     {
-        $transaksi = Transaksi::with('pelanggan')->find($konteks['transaksi_id'] ?? 0);
+        $transaksi = Transaksi::with(['pelanggan', 'items.produk'])->find($konteks['transaksi_id'] ?? 0);
         if (! $transaksi) {
             return [null, 0, null, 0.0, null];
         }
@@ -470,8 +498,20 @@ class KomisiService
             ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId))
             ->where(fn ($q) => $q->whereNull('kategori')->orWhere('kategori', $kategori));
 
-        return $query()->where('aktor_id', $aktorId)->first()
+        $rule = $query()->where('aktor_id', $aktorId)->first()
             ?? $query()->whereNull('aktor_id')->first();
+
+        // Fallback cerdas: Jika agen belum memiliki rule khusus di komisi_skema,
+        // gunakan rule komisi penjualan umum (reseller) agar transaksi downline tetap terkomisi.
+        if (! $rule && $aktorTipe === 'agen') {
+            $fallbackQuery = fn () => $this->queryRuleAktif('reseller', $triggerTipe)
+                ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId))
+                ->where(fn ($q) => $q->whereNull('kategori')->orWhere('kategori', $kategori));
+
+            $rule = $fallbackQuery()->whereNull('aktor_id')->first();
+        }
+
+        return $rule;
     }
 
     /**
@@ -485,7 +525,8 @@ class KomisiService
         int $aktorId,
         ?Pelanggan $pelanggan,
         float $nominal,
-        float $jumlahDasar
+        float $jumlahDasar,
+        ?string $safetyFloorNote = null
     ): ?Komisi {
         $key = sprintf('%s:%d:%d:%s:%d', $triggerTipe, $refId, $rule->id, $aktorTipe, $aktorId);
 
@@ -515,10 +556,11 @@ class KomisiService
                 'nominal_komisi' => $nominal,
                 'status' => 'pending',
                 'keterangan' => sprintf(
-                    'Komisi %s (%s) — %s',
+                    'Komisi %s (%s) — %s%s',
                     $labelTrigger,
                     $rule->nama,
-                    ($pelanggan?->nama) ?? "aktor #{$aktorId}"
+                    ($pelanggan?->nama) ?? "aktor #{$aktorId}",
+                    $safetyFloorNote ?? ''
                 ),
             ]
         );

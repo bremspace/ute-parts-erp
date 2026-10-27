@@ -122,9 +122,14 @@
                                         wire:click="setModeRewardMitra('diskon_langsung')"
                                         class="p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col gap-0.5 {{ $modeRewardMitra === 'diskon_langsung' ? 'bg-up-mint/15 border-up-mint text-up-mint dark:text-up-mint shadow-sm' : 'bg-white dark:bg-white/5 border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-400 hover:border-ink-300' }}"
                                     >
-                                        <span class="text-xs font-bold flex items-center gap-1.5">
-                                            <span>🏷️</span>
-                                            <span>Diskon Langsung</span>
+                                        <span class="text-xs font-bold flex items-center justify-between">
+                                            <span class="flex items-center gap-1.5">
+                                                <span>🏷️</span>
+                                                <span>Diskon Langsung</span>
+                                            </span>
+                                            @if(($diskonTierTotal ?? 0) > 0)
+                                                <span class="text-[10px] font-black bg-up-mint/20 px-1.5 py-0.2 rounded">-Rp {{ number_format($diskonTierTotal / 1000) }}rb</span>
+                                            @endif
                                         </span>
                                         <span class="text-[10px] opacity-80">Harga dipotong langsung di kasir</span>
                                     </button>
@@ -133,9 +138,14 @@
                                         wire:click="setModeRewardMitra('komisi_akumulasi')"
                                         class="p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col gap-0.5 {{ $modeRewardMitra === 'komisi_akumulasi' ? 'bg-up-amber/15 border-up-amber text-up-amber dark:text-up-amber shadow-sm' : 'bg-white dark:bg-white/5 border-ink-200 dark:border-white/10 text-ink-600 dark:text-ink-400 hover:border-ink-300' }}"
                                     >
-                                        <span class="text-xs font-bold flex items-center gap-1.5">
-                                            <span>💰</span>
-                                            <span>Simpan Komisi</span>
+                                        <span class="text-xs font-bold flex items-center justify-between">
+                                            <span class="flex items-center gap-1.5">
+                                                <span>💰</span>
+                                                <span>Simpan Komisi</span>
+                                            </span>
+                                            @if(($potensiKomisiTotal ?? 0) > 0)
+                                                <span class="text-[10px] font-black bg-up-amber/30 px-1.5 py-0.2 rounded">+Rp {{ number_format($potensiKomisiTotal / 1000) }}rb</span>
+                                            @endif
                                         </span>
                                         <span class="text-[10px] opacity-80">Harga retail, selisih jadi saldo komisi</span>
                                     </button>

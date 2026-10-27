@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Services;
 
+use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Reseller\Models\KomisiSkema;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -125,8 +127,9 @@ class KonfigurasiService
             'diskon_silver' => 3,
             'diskon_gold' => 5,
             'diskon_platinum' => 10,
-            'reseller_default_persen' => 1.0, // default % harga reseller dari retail
-            'agen_default_persen' => 2.0,     // default % harga agen dari retail
+            'reseller_default_persen' => 5.0, // default % diskon reseller dari retail
+            'agen_default_persen' => 10.0,    // default % diskon agen dari retail
+            'mitra_dapat_poin' => false,      // mitra tidak dapat poin loyalty untuk mencegah dobel benefit
             'mitra_reward_mode' => 'diskon_langsung', // diskon_langsung | komisi_akumulasi
             'harga_partai_aktif' => true,
             'harga_partai_berlaku_untuk' => 'semua', // semua | member
@@ -134,17 +137,124 @@ class KonfigurasiService
             'harga_partai_qty_diskon_persen' => 3.0, // diskon % harga partai berbasis qty
             'harga_partai_min_nominal' => 1000000.0, // minimal belanja keranjang
             'harga_partai_nominal_diskon_persen' => 2.0, // diskon % harga partai berbasis nominal belanja
+            'margin_guard_buffer_persen' => 5.0, // buffer operasional, packing, & toleransi pembulatan (%)
+            'payment_gateway_fee_persen' => 0.0, // biaya MDR/transaksi gateway toko (%)
+            'poin_maks_potongan_persen' => 50.0, // batas maksimal transaksi dipotong poin (%)
+            'komisi_agen_default_persen' => 5.0, // estimasi komisi default agen (%)
+        ];
+    }
+
+    public function marginGuardBufferPersen(): float
+    {
+        return (float) ($this->get('margin_guard_buffer_persen') ?? 5.0);
+    }
+
+    public function paymentGatewayFeePersen(): float
+    {
+        return (float) ($this->get('payment_gateway_fee_persen') ?? 0.0);
+    }
+
+    public function poinMaksPotonganPersen(): float
+    {
+        return (float) ($this->get('poin_maks_potongan_persen') ?? 50.0);
+    }
+
+    public function komisiAgenDefaultPersen(): float
+    {
+        return (float) ($this->get('komisi_agen_default_persen') ?? 5.0);
+    }
+
+    /**
+     * [SSOT] Single Source of Truth ringkasan seluruh komponen potongan, komisi,
+     * dan beban biaya pengurang nilai harga produk di seluruh sistem Ute Parts.
+     */
+    public function getRingkasanPotonganSistem(?string $kategori = null): array
+    {
+        // 1. Diskon member tier tertinggi yang aktif
+        $maxTierDiskon = 0.0;
+        if (class_exists(TierMembership::class)) {
+            $maxTierDiskon = (float) (TierMembership::where('is_active', true)->max('diskon_persen') ?? 10.0);
+        }
+
+        // 2. Diskon mitra default
+        $diskonReseller = $this->resellerDefaultPersen();
+        $diskonAgen = $this->agenDefaultPersen();
+        $maxMitraDiskon = max($maxTierDiskon, $diskonAgen, $diskonReseller);
+
+        // 3. Diskon partai (jika diaktifkan)
+        $diskonPartai = 0.0;
+        if ($this->hargaPartaiAktif()) {
+            $diskonPartai = max($this->hargaPartaiQtyDiskonPersen(), $this->hargaPartaiNominalDiskonPersen());
+        }
+
+        // 4. Komisi penjualan tertinggi aktif
+        $komisiPersen = $this->komisiAgenDefaultPersen();
+        if (class_exists(KomisiSkema::class)) {
+            $komisiQuery = KomisiSkema::where('trigger_tipe', 'penjualan')
+                ->where('is_aktif', true)
+                ->where('tipe', 'persen');
+
+            if ($kategori) {
+                $komisiQuery->where(function ($q) use ($kategori) {
+                    $q->whereNull('kategori')->orWhere('kategori', $kategori);
+                });
+            }
+
+            $maxKomisiDb = $komisiQuery->max('nilai');
+            if ($maxKomisiDb !== null && (float) $maxKomisiDb > 0) {
+                $komisiPersen = (float) $maxKomisiDb;
+            }
+        }
+
+        // 5. Buffer biaya operasional, packaging & margin error
+        $bufferPersen = $this->marginGuardBufferPersen();
+
+        // 6. Biaya MDR / payment gateway toko
+        $gatewayFeePersen = $this->paymentGatewayFeePersen();
+
+        // 7. Maksimal potongan poin per transaksi
+        $poinMaksPotongan = $this->poinMaksPotonganPersen();
+
+        // Total akumulasi beban potongan maksimal yang wajib diantisipasi oleh harga retail
+        $totalPotonganPersen = min(60.0, round($maxMitraDiskon + $komisiPersen + $bufferPersen + $gatewayFeePersen, 2));
+
+        // Minimum markup % yang dibutuhkan: (P / (100 - P)) * 100
+        $faktorPembagi = max(0.1, (100 - $totalPotonganPersen) / 100);
+        $minMarkupPersen = round(((1 / $faktorPembagi) - 1) * 100, 2);
+
+        return [
+            'max_tier_diskon' => $maxTierDiskon,
+            'diskon_reseller' => $diskonReseller,
+            'diskon_agen' => $diskonAgen,
+            'max_mitra_diskon' => $maxMitraDiskon,
+            'diskon_partai_max' => $diskonPartai,
+            'komisi_persen' => $komisiPersen,
+            'buffer_biaya_persen' => $bufferPersen,
+            'gateway_fee_persen' => $gatewayFeePersen,
+            'poin_maks_potongan_persen' => $poinMaksPotongan,
+            'total_potongan_persen' => $totalPotonganPersen,
+            'min_markup_persen' => $minMarkupPersen,
         ];
     }
 
     public function resellerDefaultPersen(): float
     {
-        return (float) ($this->get('reseller_default_persen') ?? 1.0);
+        return (float) ($this->get('reseller_default_persen') ?? 5.0);
     }
 
     public function agenDefaultPersen(): float
     {
-        return (float) ($this->get('agen_default_persen') ?? 2.0);
+        return (float) ($this->get('agen_default_persen') ?? 10.0);
+    }
+
+    public function mitraDapatPoin(): bool
+    {
+        $val = $this->get('mitra_dapat_poin');
+        if ($val === null) {
+            return false;
+        }
+
+        return filter_var($val, FILTER_VALIDATE_BOOLEAN);
     }
 
     public function mitraRewardMode(): string

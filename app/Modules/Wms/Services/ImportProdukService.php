@@ -1441,6 +1441,22 @@ class ImportProdukService
             $errors[] = 'Harga jual tidak boleh negatif';
         }
 
+        // [MARGIN GUARD] Deteksi harga jual di bawah HPP modal saat import master produk
+        if (is_numeric($hargaBeli) && is_numeric($hargaJual)) {
+            $fBeli = (float) $hargaBeli;
+            $fJual = (float) $hargaJual;
+            if ($fBeli > 0 && $fJual > 0 && $fJual < $fBeli) {
+                $marginGuard = app(MarginGuardService::class);
+                $rekomendasi = $marginGuard->hitungHargaAman($fBeli, $row['kategori'] ?? null);
+                $errors[] = sprintf(
+                    'Harga jual (Rp %s) lebih rendah dari modal/HPP (Rp %s) — potensi rugi langsung! Rekomendasi harga aman: Rp %s.',
+                    number_format($fJual, 0, ',', '.'),
+                    number_format($fBeli, 0, ',', '.'),
+                    number_format($rekomendasi, 0, ',', '.')
+                );
+            }
+        }
+
         $stokAwalRaw = $row['stok_awal'] ?? '';
         $stokAwal = ($stokAwalRaw === '' || $stokAwalRaw === '-' || $stokAwalRaw === null) ? 0 : $stokAwalRaw;
         if (! is_numeric($stokAwal)) {

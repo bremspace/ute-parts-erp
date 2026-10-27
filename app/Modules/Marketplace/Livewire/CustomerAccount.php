@@ -2,6 +2,7 @@
 
 namespace App\Modules\Marketplace\Livewire;
 
+use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Notifikasi\Models\NotifikasiKeluar;
 use App\Modules\Pos\Models\Transaksi;
@@ -185,6 +186,20 @@ class CustomerAccount extends Component
             ->get();
     }
 
+    public function getDownlinesProperty()
+    {
+        $customer = auth('customer')->user();
+        if (! $customer || empty($customer->kode_agen)) {
+            return collect();
+        }
+
+        return Pelanggan::where('referral_kode', $customer->kode_agen)
+            ->where('id', '!=', $customer->id)
+            ->select(['id', 'nama', 'telepon', 'tipe_konsumen', 'total_belanja_12bulan', 'created_at'])
+            ->latest()
+            ->get();
+    }
+
     public function getTiersProperty()
     {
         return TierMembership::where('is_active', true)
@@ -323,6 +338,7 @@ class CustomerAccount extends Component
             'servis' => $this->servis,
             'notifikasi' => $this->notifikasi,
             'komisi' => $this->komisi,
+            'downlines' => $this->downlines,
             'membershipInfo' => $this->membershipInfo,
         ])->layout('layouts.marketplace', ['title' => 'Akun Saya']);
     }

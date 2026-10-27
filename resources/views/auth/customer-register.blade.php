@@ -61,6 +61,15 @@
                     <input type="password" id="password" name="password" required minlength="6" placeholder="Minimal 6 karakter"
                         class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-medium" />
                 </div>
+                <div>
+                    <label for="referral_kode" class="block text-xs font-semibold text-ink-700 mb-1.5 flex items-center justify-between">
+                        <span>Kode Referral Agen (Opsional)</span>
+                        <span class="text-[10px] text-ink-400 font-normal">Dari mitra yang mengundang</span>
+                    </label>
+                    <input type="text" id="referral_kode" name="referral_kode" value="{{ old('referral_kode', request('ref')) }}" placeholder="Contoh: AGN-XXXXXX"
+                        class="w-full px-4 py-3 rounded-xl bg-ink-50 border border-ink-100 focus:border-up-primary focus:ring-2 focus:ring-up-primary/20 outline-none text-sm font-mono uppercase tracking-wider" />
+                    <p class="text-[11px] text-ink-400 mt-1">Masukkan kode agen pengundang untuk terhubung ke jaringan mitra.</p>
+                </div>
 
                 <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-up-primary to-indigo-600 hover:from-up-primary-dark text-white font-bold text-sm shadow-lg shadow-up-primary/25 transition-[transform,background-color] duration-150 cursor-pointer active:scale-[0.97] min-h-[44px]">
                     Daftar & Lanjut Checkout
