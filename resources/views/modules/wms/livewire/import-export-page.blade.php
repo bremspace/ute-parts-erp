@@ -1071,19 +1071,22 @@
                         <div x-show="!isUploading && !isPreChecking">
                             @if($fotoSourceType === 'files')
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <!-- Option 1: Mobile-friendly Multi-File / Gallery / Camera -->
+                                    <!-- Option 1: Mobile-friendly Multi-File via File Manager (Preserves SKU Filenames) -->
                                     <div class="relative overflow-hidden p-5 rounded-xl border-2 border-dashed border-up-primary/40 hover:border-up-primary bg-up-primary/[0.03] dark:bg-up-primary/[0.05] transition text-center space-y-2 cursor-pointer group">
                                         <input type="file"
                                                @change="onFilesSelected($event)"
                                                multiple
-                                               accept="image/*,.heic,.heif,.avif,.webp,.png,.jpg,.jpeg,.bmp"
+                                               accept=".jpg,.jpeg,.png,.webp,.avif,.heic,.heif,.bmp,.tiff"
                                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
-                                        <div class="text-3xl group-hover:scale-110 transition-transform">📸</div>
-                                        <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Foto dari Galeri / Kamera / File</div>
-                                        <p class="text-[11px] text-ink-400">Dukungan penuh smartphone &amp; tablet. Pilih banyak foto sekaligus (JPG, PNG, WebP, HEIC, dll.)</p>
+                                        <div class="text-3xl group-hover:scale-110 transition-transform">📁</div>
+                                        <div class="font-bold text-xs text-ink-900 dark:text-white">Pilih Foto via File Manager / Dokumen</div>
+                                        <p class="text-[11px] text-ink-400">Membuka File Manager / Dokumen perangkat (bukan Galeri HP) agar nama file asli sesuai SKU tetap terjaga.</p>
                                         <div class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-up-primary text-white font-bold text-xs shadow-md shadow-up-primary/20 pointer-events-none">
                                             <span>📂</span>
-                                            <span>Buka Galeri / Pilih Foto...</span>
+                                            <span>Buka File Manager HP / PC...</span>
+                                        </div>
+                                        <div class="text-[10px] text-up-amber font-medium">
+                                            ⚠️ Di HP: Jika muncul pilihan, pilih menu <strong>File / Dokumen</strong> (jangan Galeri)
                                         </div>
                                     </div>
 
@@ -1095,11 +1098,11 @@
                                                webkitdirectory
                                                directory
                                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
-                                        <div class="text-3xl group-hover:scale-110 transition-transform">📁</div>
+                                        <div class="text-3xl group-hover:scale-110 transition-transform">🗂️</div>
                                         <div class="font-bold text-xs text-ink-900 dark:text-white">Unggah Satu Folder (Laptop / PC)</div>
                                         <p class="text-[11px] text-ink-400">Pilih satu folder lokal di PC (termasuk ribuan sub-file foto di dalamnya)</p>
                                         <div class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-black/10 dark:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs border border-black/10 dark:border-white/10 pointer-events-none">
-                                            <span>📁</span>
+                                            <span>🗂️</span>
                                             <span>Pilih Folder PC...</span>
                                         </div>
                                     </div>
