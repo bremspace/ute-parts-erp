@@ -6,6 +6,7 @@ use App\Models\UserPreference;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Pos\Models\HargaTier;
+use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Jobs\ImportProdukExcelJob;
 use App\Modules\Wms\Models\Brand;

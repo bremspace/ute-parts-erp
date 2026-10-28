@@ -7,6 +7,7 @@ use App\Modules\Wms\Models\KategoriProduk;
 use App\Modules\Wms\Models\KualitasProduk;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
+use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
@@ -196,7 +197,16 @@ class SmartSearchService
             ->pluck('id')
             ->all() : [];
 
-        return $query->where(function ($sub) use ($term, $tokenGroups, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds) {
+        $matchingSupplierIds = ! empty($allKeywords) ? Supplier::query()
+            ->where(function ($sq) use ($allKeywords) {
+                foreach ($allKeywords as $kw) {
+                    $sq->orWhere('nama', 'like', "%{$kw}%");
+                }
+            })
+            ->pluck('id')
+            ->all() : [];
+
+        return $query->where(function ($sub) use ($term, $tokenGroups, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds, $matchingSupplierIds) {
             // 1. Exact match Barcode utama produk (B-Tree index)
             $sub->where('produk.barcode', $term)
                 // 2. Barcode & SKU varian produk (subquery terindeks)
@@ -210,11 +220,11 @@ class SmartSearchService
                     ->select('produk_id')
                 )
                 // 3. Multi-word AND Matching dengan toleransi sinonim & variasi part
-                ->orWhere(function ($allTokensQ) use ($tokenGroups, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds) {
+                ->orWhere(function ($allTokensQ) use ($tokenGroups, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds, $matchingSupplierIds) {
                     foreach ($tokenGroups as $group) {
-                        $allTokensQ->where(function ($oneTokenQ) use ($group, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds) {
+                        $allTokensQ->where(function ($oneTokenQ) use ($group, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds, $matchingSupplierIds) {
                             foreach ($group as $syn) {
-                                $oneTokenQ->orWhere(function ($clause) use ($syn, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds) {
+                                $oneTokenQ->orWhere(function ($clause) use ($syn, $matchingBrandIds, $matchingKualitasIds, $matchingKategoriIds, $matchingTipeHpIds, $matchingSupplierIds) {
                                     $clause->where('produk.nama', 'like', "%{$syn}%")
                                         ->orWhere('produk.brand_kompatibel', 'like', "%{$syn}%")
                                         ->orWhere('produk.model_kompatibel', 'like', "%{$syn}%")
@@ -239,6 +249,9 @@ class SmartSearchService
                                                 ->whereColumn('kompatibilitas_produk_tipe_hp.produk_id', 'produk.id')
                                                 ->whereIn('kompatibilitas_produk_tipe_hp.tipe_hp_id', $matchingTipeHpIds);
                                         });
+                                    }
+                                    if (! empty($matchingSupplierIds)) {
+                                        $clause->orWhereIn('produk.supplier_id', $matchingSupplierIds);
                                     }
                                 });
                             }
