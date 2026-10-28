@@ -117,28 +117,46 @@ function pair(l, r, w = 32) {
 function layoutStruk58(data) {
     const E = [];
     const W = 32;
-    E.push({ t: 'line', s: 'UTE PARTS', c: 1, b: 1, h: 1 });
-    E.push({ t: 'line', s: 'Pusat Sparepart & Servis HP', c: 1 });
-    if (data.cabang) {
+    const namaToko = data.nama_toko || 'UTE PARTS';
+    const slogan = data.slogan || 'Pusat Sparepart & Servis HP';
+    E.push({ t: 'line', s: namaToko, c: 1, b: 1, h: 1 });
+    if (slogan) E.push({ t: 'line', s: slogan, c: 1 });
+    if (data.alamat) E.push({ t: 'line', s: String(data.alamat), c: 1 });
+    if (data.telepon) E.push({ t: 'line', s: 'Telp: ' + String(data.telepon), c: 1 });
+    if (data.show_cabang !== false && data.cabang) {
         E.push({ t: 'line', s: String(data.cabang), c: 1 });
     }
-    E.push({ t: 'line', s: String(data.waktu ?? ''), c: 1 });
+    if (data.show_waktu !== false && data.waktu) {
+        E.push({ t: 'line', s: String(data.waktu), c: 1 });
+    }
     E.push({ t: 'sep', w: W });
     E.push({ t: 'line', s: pair('No. TRX:', data.no_transaksi ?? '-', W) });
+    if (data.sumber && !['pos', 'offline'].includes(String(data.sumber).toLowerCase())) {
+        E.push({ t: 'line', s: pair('Pesanan:', String(data.sumber).toUpperCase(), W) });
+    }
+    if (data.kurir) {
+        const kurirLbl = data.is_pickup ? 'Metode Ambil:' : 'Kurir:';
+        const resiTeks = data.resi && data.resi !== '-' ? ' (' + data.resi + ')' : '';
+        E.push({ t: 'line', s: pair(kurirLbl, data.kurir + resiTeks, W) });
+    }
     if (data.no_tiket) {
         E.push({ t: 'line', s: pair('No. Tiket:', data.no_tiket, W), b: 1 });
     }
     if (data.jenis_hp) {
         E.push({ t: 'line', s: pair('Unit HP:', data.jenis_hp, W) });
     }
-    E.push({ t: 'line', s: pair('Kasir:', data.kasir ?? '-', W) });
-    E.push({ t: 'line', s: pair('Pelanggan:', `${data.pelanggan ?? 'Umum'}`, W) });
-    if (data.tier && data.tier !== 'Retail' && data.tier !== 'Umum') {
-        const lbl = ['reseller', 'agen'].includes(data.tipe_konsumen) ? 'Tipe Mitra:' : 'Tier Member:';
-        E.push({ t: 'line', s: pair(lbl, data.tier, W), b: 1 });
+    if (data.show_kasir !== false) {
+        E.push({ t: 'line', s: pair('Kasir:', data.kasir ?? '-', W) });
     }
-    if (data.saldo_poin && Number(data.saldo_poin) > 0) {
-        E.push({ t: 'line', s: pair('Saldo Poin:', `${Math.round(data.saldo_poin)} Poin`, W) });
+    if (data.show_pelanggan !== false) {
+        E.push({ t: 'line', s: pair('Pelanggan:', `${data.pelanggan ?? 'Umum'}`, W) });
+        if (data.tier && data.tier !== 'Retail' && data.tier !== 'Umum') {
+            const lbl = ['reseller', 'agen'].includes(data.tipe_konsumen) ? 'Tipe Mitra:' : 'Tier Member:';
+            E.push({ t: 'line', s: pair(lbl, data.tier, W), b: 1 });
+        }
+        if (data.saldo_poin && Number(data.saldo_poin) > 0) {
+            E.push({ t: 'line', s: pair('Saldo Poin:', `${Math.round(data.saldo_poin)} Poin`, W) });
+        }
     }
     E.push({ t: 'sep', w: W });
     for (const it of (data.items ?? [])) {
@@ -157,7 +175,9 @@ function layoutStruk58(data) {
         E.push({ t: 'sep', w: W });
     }
 
-    if (Number(data.diskon_tier) > 0) {
+    const showBreakdown = data.show_subtotal_breakdown !== false;
+
+    if (showBreakdown && Number(data.diskon_tier) > 0) {
         const tierLbl = data.tier && data.tier !== 'Retail' ? `Potongan ${data.tier}:` : 'Potongan Tier:';
         E.push({ t: 'line', s: pair('Subtotal Retail:', rupiah(data.subtotal_retail ?? (Number(data.subtotal) + Number(data.diskon_tier))), W) });
         E.push({ t: 'line', s: pair(tierLbl, '-' + rupiah(data.diskon_tier), W) });
@@ -166,11 +186,11 @@ function layoutStruk58(data) {
         E.push({ t: 'line', s: pair('Subtotal:', rupiah(data.subtotal), W) });
     }
 
-    if (Number(data.diskon_partai) > 0) {
+    if (showBreakdown && Number(data.diskon_partai) > 0) {
         E.push({ t: 'line', s: pair('Diskon Partai:', '-' + rupiah(data.diskon_partai), W) });
     }
 
-    if (Number(data.diskon_poin) > 0) {
+    if (showBreakdown && Number(data.diskon_poin) > 0) {
         E.push({ t: 'line', s: pair('Tukar Poin (' + (data.poin_ditukar ?? 0) + 'pts):', '-' + rupiah(data.diskon_poin), W) });
     }
 
@@ -181,6 +201,9 @@ function layoutStruk58(data) {
     if (data.pajak != null && Number(data.pajak) > 0) {
         const ppnLbl = data.ppn_persen ? `PPN (${data.ppn_persen}%):` : 'PPN:';
         E.push({ t: 'line', s: pair(ppnLbl, '+' + rupiah(data.pajak), W) });
+    }
+    if (Number(data.ongkir) > 0) {
+        E.push({ t: 'line', s: pair('Ongkos Kirim:', '+' + rupiah(data.ongkir), W) });
     }
     E.push({ t: 'sep', w: W });
 
@@ -204,14 +227,19 @@ function layoutStruk58(data) {
         E.push({ t: 'sep', w: W });
     }
 
-    if (data.no_transaksi) {
+    if (data.show_qr_retur !== false && data.no_transaksi) {
         E.push({ t: 'qrcode', d: data.no_transaksi, size: 4 });
         E.push({ t: 'line', s: data.no_transaksi, c: 1, b: 1 });
-        E.push({ t: 'line', s: 'Scan QR untuk Retur & Garansi', c: 1 });
+        E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Garansi', c: 1 });
         E.push({ t: 'sep', w: W });
     }
-    E.push({ t: 'line', s: 'Terima Kasih atas Kunjungan Anda!', c: 1 });
-    E.push({ t: 'line', s: 'Garansi part sesuai ketentuan toko.', c: 1 });
+    E.push({ t: 'line', s: data.footer_text || 'Terima Kasih atas Kunjungan Anda!', c: 1 });
+    if (data.kebijakan_retur) {
+        for (const ln of wrap(String(data.kebijakan_retur), W)) E.push({ t: 'line', s: ln, c: 1 });
+    }
+    if (data.catatan_kaki) {
+        for (const ln of wrap(String(data.catatan_kaki), W)) E.push({ t: 'line', s: ln, c: 1 });
+    }
     E.push({ t: 'feed', n: 1 });
     return E;
 }
@@ -221,28 +249,46 @@ function layoutStruk58(data) {
 function layoutFaktur80(data) {
     const E = [];
     const W = 42;
-    E.push({ t: 'line', s: 'UTE PARTS', c: 1, b: 1, h: 1 });
-    E.push({ t: 'line', s: 'Pusat Sparepart & Servis HP', c: 1 });
-    if (data.cabang) {
+    const namaToko = data.nama_toko || 'UTE PARTS';
+    const slogan = data.slogan || 'Pusat Sparepart & Servis HP';
+    E.push({ t: 'line', s: namaToko, c: 1, b: 1, h: 1 });
+    if (slogan) E.push({ t: 'line', s: slogan, c: 1 });
+    if (data.alamat) E.push({ t: 'line', s: String(data.alamat), c: 1 });
+    if (data.telepon) E.push({ t: 'line', s: 'Telp/WA: ' + String(data.telepon), c: 1 });
+    if (data.show_cabang !== false && data.cabang) {
         E.push({ t: 'line', s: String(data.cabang), c: 1 });
     }
-    E.push({ t: 'line', s: `${data.waktu ?? ''}`, c: 1 });
+    if (data.show_waktu !== false && data.waktu) {
+        E.push({ t: 'line', s: `${data.waktu}`, c: 1 });
+    }
     E.push({ t: 'sep', w: W, c: '=' });
     E.push({ t: 'line', s: pair('No. Faktur:', data.no_transaksi ?? '-', W) });
+    if (data.sumber && !['pos', 'offline'].includes(String(data.sumber).toLowerCase())) {
+        E.push({ t: 'line', s: pair('Pesanan Online:', String(data.sumber).toUpperCase(), W) });
+    }
+    if (data.kurir) {
+        const kurirLbl = data.is_pickup ? 'Metode Ambil:' : 'Kurir / Resi:';
+        const resiTeks = data.resi && data.resi !== '-' ? ' (' + data.resi + ')' : '';
+        E.push({ t: 'line', s: pair(kurirLbl, data.kurir + resiTeks, W) });
+    }
     if (data.no_tiket) {
         E.push({ t: 'line', s: pair('No. Tiket:', data.no_tiket, W), b: 1 });
     }
     if (data.jenis_hp) {
         E.push({ t: 'line', s: pair('Unit HP:', data.jenis_hp, W) });
     }
-    E.push({ t: 'line', s: pair('Kasir:', data.kasir ?? '-', W) });
-    E.push({ t: 'line', s: pair('Pelanggan:', data.pelanggan ?? 'Umum', W) });
-    if (data.tier && data.tier !== 'Retail' && data.tier !== 'Umum') {
-        const lbl = ['reseller', 'agen'].includes(data.tipe_konsumen) ? 'Tipe Mitra:' : 'Tier Member:';
-        E.push({ t: 'line', s: pair(lbl, data.tier, W), b: 1 });
+    if (data.show_kasir !== false) {
+        E.push({ t: 'line', s: pair('Kasir:', data.kasir ?? '-', W) });
     }
-    if (data.saldo_poin && Number(data.saldo_poin) > 0) {
-        E.push({ t: 'line', s: pair('Saldo Poin Reward:', `${Math.round(data.saldo_poin)} Poin`, W) });
+    if (data.show_pelanggan !== false) {
+        E.push({ t: 'line', s: pair('Pelanggan:', data.pelanggan ?? 'Umum', W) });
+        if (data.tier && data.tier !== 'Retail' && data.tier !== 'Umum') {
+            const lbl = ['reseller', 'agen'].includes(data.tipe_konsumen) ? 'Tipe Mitra:' : 'Tier Member:';
+            E.push({ t: 'line', s: pair(lbl, data.tier, W), b: 1 });
+        }
+        if (data.saldo_poin && Number(data.saldo_poin) > 0) {
+            E.push({ t: 'line', s: pair('Saldo Poin Reward:', `${Math.round(data.saldo_poin)} Poin`, W) });
+        }
     }
     E.push({ t: 'sep', w: W, c: '=' });
     E.push({ t: 'line', s: pad('NAMA / JASA', 15) + pad('QTY', 4) + pad('HARGA', 11) + pad('SUB', 12), b: 1 });
@@ -264,7 +310,9 @@ function layoutFaktur80(data) {
         E.push({ t: 'sep', w: W, c: '-' });
     }
 
-    if (Number(data.diskon_tier) > 0) {
+    const showBreakdown80 = data.show_subtotal_breakdown !== false;
+
+    if (showBreakdown80 && Number(data.diskon_tier) > 0) {
         const tierLbl = data.tier && data.tier !== 'Retail' ? `POTONGAN ${data.tier.toUpperCase()}` : 'POTONGAN TIER';
         E.push({ t: 'line', s: pair('SUBTOTAL RETAIL', rupiah(data.subtotal_retail ?? (Number(data.subtotal) + Number(data.diskon_tier))), W) });
         E.push({ t: 'line', s: pair(tierLbl, '-' + rupiah(data.diskon_tier), W) });
@@ -273,21 +321,24 @@ function layoutFaktur80(data) {
         E.push({ t: 'line', s: pair('SUBTOTAL', rupiah(data.subtotal), W) });
     }
 
-    if (Number(data.diskon_partai) > 0) {
+    if (showBreakdown80 && Number(data.diskon_partai) > 0) {
         E.push({ t: 'line', s: pair('DISKON PARTAI MEMBER', '-' + rupiah(data.diskon_partai), W) });
     }
 
-    if (Number(data.diskon_poin) > 0) {
+    if (showBreakdown80 && Number(data.diskon_poin) > 0) {
         E.push({ t: 'line', s: pair('TUKAR POIN (' + (data.poin_ditukar ?? 0) + ' PTS)', '-' + rupiah(data.diskon_poin), W) });
     }
 
     if (Number(data.diskon) > 0) {
-        const lbl = Number(data.diskon_persen) > 0 ? `DISKON KASIR (${data.diskon_persen}%)` : 'DISKON KASIR';
+        const lbl = Number(data.diskon_persen) > 0 ? `DISKON KASIR (${data.diskon_persen}%):` : 'DISKON KASIR';
         E.push({ t: 'line', s: pair(lbl, '-' + rupiah(data.diskon), W) });
     }
     if (data.pajak != null && Number(data.pajak) > 0) {
         const ppnLbl = data.ppn_persen ? `PPN (${data.ppn_persen}%)` : 'PPN';
         E.push({ t: 'line', s: pair(ppnLbl, '+' + rupiah(data.pajak), W) });
+    }
+    if (Number(data.ongkir) > 0) {
+        E.push({ t: 'line', s: pair('ONGKOS KIRIM', '+' + rupiah(data.ongkir), W) });
     }
     E.push({ t: 'line', s: pair('TOTAL', rupiah(data.total), W), b: 1, h: 1 });
     E.push({ t: 'line', s: pair('BAYAR (' + (data.metode ?? '') + ')', rupiah(data.bayar), W) });
@@ -308,14 +359,19 @@ function layoutFaktur80(data) {
         E.push({ t: 'sep', w: W, c: '-' });
     }
 
-    if (data.no_transaksi) {
+    if (data.show_qr_retur !== false && data.no_transaksi) {
         E.push({ t: 'qrcode', d: data.no_transaksi, size: 5 });
         E.push({ t: 'line', s: data.no_transaksi, c: 1, b: 1 });
-        E.push({ t: 'line', s: 'Scan QR untuk Retur & Klaim Garansi', c: 1 });
+        E.push({ t: 'line', s: data.qr_caption || 'Scan QR untuk Retur & Klaim Garansi', c: 1 });
         E.push({ t: 'sep', w: W, c: '-' });
     }
-    E.push({ t: 'line', s: 'Terima Kasih atas Kunjungan Anda!', c: 1 });
-    E.push({ t: 'line', s: 'Garansi part sesuai ketentuan toko.', c: 1 });
+    E.push({ t: 'line', s: data.footer_text || 'Terima Kasih atas Kunjungan Anda!', c: 1 });
+    if (data.kebijakan_retur) {
+        for (const ln of wrap(String(data.kebijakan_retur), W)) E.push({ t: 'line', s: ln, c: 1 });
+    }
+    if (data.catatan_kaki) {
+        for (const ln of wrap(String(data.catatan_kaki), W)) E.push({ t: 'line', s: ln, c: 1 });
+    }
     E.push({ t: 'feed', n: 1 });
     E.push({ t: 'line', s: pad('( ' + (data.kasir ?? '') + ' )', W / 2) + '  ( Pelanggan )' });
     E.push({ t: 'line', s: pad('', W / 2) + '  ' });

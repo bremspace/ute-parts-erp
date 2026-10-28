@@ -623,9 +623,15 @@ class PesananOnlineIndex extends Component
      */
     public function cetakLabel(int $id): void
     {
-        $transaksi = Transaksi::with(['items.produk', 'pelanggan', 'cabang', 'pengiriman'])->findOrFail($id);
+        $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'cabang', 'pengiriman', 'kasir'])->findOrFail($id);
 
         $isPickup = str_contains(strtolower($transaksi->catatan ?? ''), 'ambil_ke_toko');
+        $ongkir = (float) ($transaksi->pengiriman?->ongkir ?? 0);
+        $kurir = $isPickup ? 'Ambil di Toko (Pickup)' : ($transaksi->pengiriman?->kurir ?? 'Ekspedisi');
+        $resi = $transaksi->pengiriman?->tracking_id ?? '-';
+        $alamat = $isPickup
+            ? 'Ambil di Konter Toko (Pickup)'
+            : ($transaksi->pengiriman?->alamat_tujuan ?? $transaksi->pelanggan?->alamat ?? 'Alamat pengiriman');
 
         $subtotalRetail = $transaksi->items->sum(function ($it) {
             $retail = (float) ($it->produk?->harga_jual_retail ?? ($it->harga_satuan + $it->diskon_nominal));
@@ -636,18 +642,26 @@ class PesananOnlineIndex extends Component
         $tierNama = $transaksi->pelanggan?->tierMembership?->nama ?? ($transaksi->pelanggan?->is_reseller ? 'Reseller' : null);
         $tipeKonsumen = $transaksi->pelanggan?->tipe_konsumen ?? ($transaksi->pelanggan?->is_reseller ? 'reseller' : 'retail');
 
+        $sumberLabel = $transaksi->sumber === 'marketplace'
+            ? 'Marketplace'
+            : (str_starts_with((string) $transaksi->sumber, 'channel:')
+                ? strtoupper(str_replace('channel:', '', (string) $transaksi->sumber))
+                : strtoupper((string) $transaksi->sumber));
+
+        $this->completedTransactionId = $transaksi->id;
         $this->receiptData = [
             'no_transaksi' => $transaksi->no_transaksi,
             'tanggal' => $transaksi->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
             'waktu' => $transaksi->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
             'cabang' => $transaksi->cabang?->nama ?? 'Ute Parts Store',
-            'kasir' => $transaksi->kasir?->name ?? 'Kasir Online',
+            'kasir' => $transaksi->kasir?->name ?? 'Web Store',
             'pelanggan' => $transaksi->pelanggan?->nama ?? 'Pelanggan Umum',
             'telepon' => $transaksi->pengiriman?->telepon_tujuan ?? $transaksi->pelanggan?->telepon ?? '-',
-            'alamat' => $isPickup ? 'Ambil di Konter Toko (Pickup)' : ($transaksi->pengiriman?->alamat_tujuan ?? $transaksi->pelanggan?->alamat ?? 'Alamat pengiriman'),
-            'kurir' => $isPickup ? 'Ambil di Toko' : ($transaksi->pengiriman?->kurir ?? 'Ekspedisi'),
-            'resi' => $transaksi->pengiriman?->tracking_id ?? '-',
+            'alamat' => $alamat,
+            'kurir' => $kurir,
+            'resi' => $resi,
             'is_pickup' => $isPickup,
+            'sumber' => $sumberLabel,
             'metode' => strtoupper($transaksi->metode_bayar ?? 'ONLINE'),
             'metode_bayar' => strtoupper($transaksi->metode_bayar ?? 'ONLINE'),
             'tier' => $tierNama,
@@ -659,7 +673,7 @@ class PesananOnlineIndex extends Component
                     'nama' => $it->produk?->nama ?? 'Produk',
                     'sku' => $it->produk?->sku ?? '-',
                     'qty' => (int) $it->jumlah,
-                    'satuan' => 'pcs',
+                    'satuan' => $it->satuan ?? 'pcs',
                     'harga' => (float) $it->harga_satuan,
                     'harga_retail' => $retail,
                     'subtotal' => (float) $it->subtotal,
@@ -669,7 +683,9 @@ class PesananOnlineIndex extends Component
             'subtotal_retail' => $subtotalRetail,
             'diskon_tier' => $diskonTier,
             'subtotal' => (float) $transaksi->subtotal,
+            'ongkir' => $ongkir,
             'diskon' => (float) ($transaksi->diskon_nominal ?? 0),
+            'diskon_nominal' => (float) ($transaksi->diskon_nominal ?? 0),
             'diskon_persen' => (float) ($transaksi->diskon_persen ?? 0),
             'dpp' => (float) ($transaksi->dpp ?? $transaksi->subtotal),
             'pajak' => (float) ($transaksi->pajak_nominal ?? 0),
@@ -680,6 +696,7 @@ class PesananOnlineIndex extends Component
             'kembali' => (float) ($transaksi->kembalian ?? 0),
             'kembalian' => (float) ($transaksi->kembalian ?? 0),
             'status' => strtoupper($transaksi->status),
+            'garansi' => $transaksi->garansi_teks ?: null,
         ];
 
         $this->showReceiptModal = true;

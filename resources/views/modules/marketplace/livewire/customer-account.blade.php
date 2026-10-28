@@ -219,6 +219,70 @@
                     }
                 },
 
+                downloadQris(format = 'png') {
+                    if (!this.infoBayar || !this.infoBayar.qr_image) {
+                        if (window.showToast) showToast('Gambar QRIS belum tersedia.', 'warning');
+                        return;
+                    }
+                    const noTrx = (this.orderBayar && this.orderBayar.no) ? this.orderBayar.no : 'pesanan';
+                    const filename = 'QRIS-' + noTrx + '-' + Date.now();
+
+                    if (format === 'svg') {
+                        const link = document.createElement('a');
+                        link.href = this.infoBayar.qr_image;
+                        link.download = filename + '.svg';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        if (window.showToast) showToast('QRIS berhasil diunduh (SVG).', 'success');
+                        return;
+                    }
+
+                    // Format PNG: gambar di canvas berlatar belakang putih solid
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            const size = 640;
+                            canvas.width = size;
+                            canvas.height = size;
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, size, size);
+                            ctx.drawImage(img, 40, 40, size - 80, size - 80);
+
+                            const pngUrl = canvas.toDataURL('image/png');
+                            const link = document.createElement('a');
+                            link.href = pngUrl;
+                            link.download = filename + '.png';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            if (window.showToast) showToast('QRIS berhasil diunduh (PNG).', 'success');
+                        } catch (err) {
+                            console.warn('Canvas export error, fallback to SVG:', err);
+                            const fallbackLink = document.createElement('a');
+                            fallbackLink.href = this.infoBayar.qr_image;
+                            fallbackLink.download = filename + '.svg';
+                            document.body.appendChild(fallbackLink);
+                            fallbackLink.click();
+                            document.body.removeChild(fallbackLink);
+                            if (window.showToast) showToast('QRIS berhasil diunduh (SVG).', 'success');
+                        }
+                    };
+                    img.onerror = () => {
+                        const fallbackLink = document.createElement('a');
+                        fallbackLink.href = this.infoBayar.qr_image;
+                        fallbackLink.download = filename + '.svg';
+                        document.body.appendChild(fallbackLink);
+                        fallbackLink.click();
+                        document.body.removeChild(fallbackLink);
+                        if (window.showToast) showToast('QRIS diunduh (SVG).', 'success');
+                    };
+                    img.src = this.infoBayar.qr_image;
+                },
+
                 async salinVa() {
                     if (!this.infoBayar || !this.infoBayar.va_number) return;
                     try {
@@ -624,6 +688,25 @@
                                     <div>
                                         <p class="font-bold text-ink-900 dark:text-white text-sm" x-text="infoBayar ? infoBayar.merchant_name : ''"></p>
                                         <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">Scan via BCA, Mandiri, BRI, BNI, DANA, GoPay, OVO, ShopeePay, dll</p>
+                                    </div>
+                                    <div class="flex items-center justify-center gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            x-on:click="downloadQris('png')"
+                                            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-ink-900 hover:bg-black dark:bg-white/10 dark:hover:bg-white/20 text-white font-bold text-xs shadow-sm transition active:scale-[0.98] cursor-pointer"
+                                            title="Unduh kode QRIS sebagai file gambar PNG berlatar putih"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                            <span>Unduh QRIS (PNG)</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            x-on:click="downloadQris('svg')"
+                                            class="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/5 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-bold text-xs transition cursor-pointer"
+                                            title="Unduh format vektor SVG"
+                                        >
+                                            <span>SVG</span>
+                                        </button>
                                     </div>
                                     <div class="p-2 rounded-xl bg-up-mint/10 border border-up-mint/20 text-xs text-up-mint font-semibold flex items-center justify-center gap-2">
                                         <span class="w-2 h-2 rounded-full bg-up-mint animate-ping"></span>

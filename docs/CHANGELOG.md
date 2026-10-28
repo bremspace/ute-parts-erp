@@ -3,6 +3,16 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-28 — Unduh QRIS Toko (PNG Berlatar Putih/SVG) & Sinkronisasi Format Struk Online Terpusat ✅
+
+- **Fitur Unduh QRIS Dinamis Toko (`customer-account.blade.php`, `payment-modal.blade.php`)**:
+  - Penambahan tombol unduh QRIS format gambar PNG berlatar putih solid dan file vektor SVG pada modal akun konsumen marketplace dan modal kasir POS (layar reguler, split bill, maupun popup zoom).
+  - Mengonversi data URI SVG ke canvas berlatar putih dengan fallback otomatis direct SVG download bila canvas export terhambat, serta sanitasi namespace XML SVG.
+- **Kepatuhan Struk Transaksi Online Terhadap Konfigurasi Terpusat (`PesananOnlineIndex.php`, `PosKasir.php`, `RiwayatTransaksiIndex.php`, `thermal-receipt-modal.blade.php`, `thermal-print.js`)**:
+  - Penyiapan payload `receiptData` pada cetak label/struk online, serah terima pickup online kasir, dan riwayat transaksi kini menyertakan rincian ongkos kirim (`ongkir`), kurir, nomor resi, alamat tujuan, indikator pickup, dan sumber transaksi.
+  - Modal pratinjau struk thermal (`thermal-receipt-modal.blade.php`) menggabungkan konfigurasi `strukConfig` secara dinamis, menyesuaikan lebar pratinjau sesuai ukuran kertas (58mm/80mm), mematuhi opsi toggle `show_subtotal_breakdown`, dan merender baris ongkir jika `ongkir > 0`.
+  - Layout thermal ESC/POS 58mm (`layoutStruk58`) dan 80mm (`layoutFaktur80`) pada `thermal-print.js` disinkronkan dengan konfigurasi toko (nama toko, slogan, alamat, telepon, kebijakan retur, catatan kaki, QR retur, kurir/resi pesanan online, dan baris ongkos kirim).
+
 ## 2026-10-28 — Integrasi QRIS Toko Marketplace, Mode Hibrida Duitku & Sinkronisasi CMS ✅
 
 - **Saluran Pembayaran QRIS Dinamis Toko di Marketplace (`PaymentController.php`, `customer-account.blade.php`)**:

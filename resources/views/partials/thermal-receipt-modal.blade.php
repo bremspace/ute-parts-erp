@@ -13,7 +13,7 @@
     </script>
     <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
-        x-data="{ ...thermalPrinter({{ \Illuminate\Support\Js::from($receiptData) }}), paperSize: '{{ $defaultPaperSize }}', autoPrint: {{ $autoPrint ? 'true' : 'false' }} }"
+        x-data="{ ...thermalPrinter({{ \Illuminate\Support\Js::from(array_merge($strukConfig, $receiptData)) }}), paperSize: '{{ $defaultPaperSize }}', autoPrint: {{ $autoPrint ? 'true' : 'false' }} }"
         x-init="if (autoPrint) { setTimeout(() => { paperSize === '58' ? webPrint58() : webPrint80(); }, 400); }"
     >
         <div class="w-full max-w-sm glass-panel p-5 rounded-3xl border border-white/10 shadow-2xl relative my-auto max-h-[95vh] flex flex-col"> 
@@ -39,7 +39,7 @@
 
             <!-- Preview Struk Kertas Thermal (Juga sebagai target print) -->
             <div class="overflow-y-auto pr-1 flex-1">
-                <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-4 rounded-2xl font-mono text-xs shadow-inner space-y-2 select-text" id="thermalReceipt">
+                <div class="thermal-receipt-container thermal-receipt-preview bg-white text-black p-4 rounded-2xl font-mono text-xs shadow-inner space-y-2 select-text transition-all duration-200" id="thermalReceipt" :style="paperSize === '58' ? 'max-width: 280px; margin: 0 auto;' : 'max-width: 340px; margin: 0 auto;'">
                     <!-- Brand Header -->
                     <div class="receipt-center pb-2 border-b border-dashed border-gray-400">
                         <h3 class="receipt-title text-sm font-black tracking-wider text-gray-900">{{ $strukConfig['nama_toko'] ?? 'UTE PARTS' }}</h3>
@@ -77,6 +77,25 @@
                             <span class="text-gray-600">No. TRX:</span>
                             <span class="font-bold text-gray-900">{{ $receiptData['no_transaksi'] }}</span>
                         </div>
+                        @if(!empty($receiptData['sumber']) && !in_array(strtolower($receiptData['sumber']), ['pos', 'offline'], true))
+                            <div class="receipt-row flex justify-between">
+                                <span class="text-gray-600">Pesanan:</span>
+                                <span class="font-bold text-up-primary uppercase">{{ $receiptData['sumber'] }}</span>
+                            </div>
+                        @endif
+                        @if(!empty($receiptData['kurir']))
+                            <div class="receipt-row flex justify-between">
+                                <span class="text-gray-600">{{ !empty($receiptData['is_pickup']) ? 'Metode Ambil:' : 'Kurir / Resi:' }}</span>
+                                <span class="text-gray-900 font-semibold text-right">
+                                    {{ $receiptData['kurir'] }}{{ !empty($receiptData['resi']) && $receiptData['resi'] !== '-' ? ' (' . $receiptData['resi'] . ')' : '' }}
+                                </span>
+                            </div>
+                        @endif
+                        @if(!empty($receiptData['alamat']) && empty($receiptData['is_pickup']))
+                            <div class="text-[9px] text-gray-500 text-left pt-0.5 leading-tight">
+                                <span class="text-gray-600 font-medium">Alamat:</span> {{ $receiptData['alamat'] }}
+                            </div>
+                        @endif
                         @if(!empty($receiptData['no_tiket']))
                             <div class="receipt-row flex justify-between">
                                 <span class="text-gray-600">No. Tiket:</span>
@@ -171,7 +190,11 @@
 
                     <!-- Total & Pembayaran -->
                     <div class="space-y-1 text-[11px] pt-1 font-bold">
-                        @if(!empty($receiptData['diskon_tier']) && (float)$receiptData['diskon_tier'] > 0)
+                        @php
+                            $showBreakdown = $strukConfig['show_subtotal_breakdown'] ?? true;
+                        @endphp
+
+                        @if($showBreakdown && !empty($receiptData['diskon_tier']) && (float)$receiptData['diskon_tier'] > 0)
                             <div class="receipt-row flex justify-between text-gray-600 font-normal text-[10px]">
                                 <span>Subtotal Retail:</span>
                                 <span>Rp {{ number_format($receiptData['subtotal_retail'] ?? ($receiptData['subtotal'] + $receiptData['diskon_tier']), 0, ',', '.') }}</span>
@@ -191,14 +214,14 @@
                             </div>
                         @endif
 
-                        @if(!empty($receiptData['diskon_partai']) && (float)$receiptData['diskon_partai'] > 0)
+                        @if($showBreakdown && !empty($receiptData['diskon_partai']) && (float)$receiptData['diskon_partai'] > 0)
                             <div class="receipt-row flex justify-between text-emerald-700 font-bold text-[10px]">
                                 <span>Diskon Partai (Member):</span>
                                 <span>-Rp {{ number_format($receiptData['diskon_partai'], 0, ',', '.') }}</span>
                             </div>
                         @endif
 
-                        @if(!empty($receiptData['diskon_poin']) && (float)$receiptData['diskon_poin'] > 0)
+                        @if($showBreakdown && !empty($receiptData['diskon_poin']) && (float)$receiptData['diskon_poin'] > 0)
                             <div class="receipt-row flex justify-between text-emerald-700 font-bold text-[10px]">
                                 <span>Tukar Poin ({{ number_format($receiptData['poin_ditukar'] ?? 0) }} pts):</span>
                                 <span>-Rp {{ number_format($receiptData['diskon_poin'], 0, ',', '.') }}</span>
@@ -216,6 +239,13 @@
                             <div class="receipt-row flex justify-between text-gray-600 font-normal text-[10px]">
                                 <span>PPN {{ !empty($receiptData['ppn_persen']) ? '('.$receiptData['ppn_persen'].'%)' : '' }}:</span>
                                 <span>+Rp {{ number_format($receiptData['pajak'], 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+
+                        @if(!empty($receiptData['ongkir']) && (float)$receiptData['ongkir'] > 0)
+                            <div class="receipt-row flex justify-between text-gray-800 font-medium text-[10px]">
+                                <span>Ongkos Kirim ({{ $receiptData['kurir'] ?? 'Ekspedisi' }}):</span>
+                                <span>+Rp {{ number_format($receiptData['ongkir'], 0, ',', '.') }}</span>
                             </div>
                         @endif
 

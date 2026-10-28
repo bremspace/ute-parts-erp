@@ -2813,7 +2813,7 @@ class PosKasir extends Component
     public function lihatDetailTransaksi(int $id): void
     {
         $cabangId = session('cabang_id');
-        $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir'])
+        $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang', 'pengiriman'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
 
@@ -2861,12 +2861,24 @@ class PosKasir extends Component
         }
         $hematTotal = $diskonTier + $diskonPartai + $diskonPoin + $diskonKasir;
 
+        $isPickup = str_contains(strtolower($transaksi->catatan ?? ''), 'ambil_ke_toko');
+        $ongkir = (float) ($transaksi->pengiriman?->ongkir ?? 0);
+        $kurir = $isPickup ? 'Ambil di Toko (Pickup)' : ($transaksi->pengiriman?->kurir ?? ($transaksi->sumber !== 'pos' ? 'Ekspedisi' : null));
+        $resi = $transaksi->pengiriman?->tracking_id ?? null;
+        $alamat = $transaksi->pengiriman?->alamat_tujuan ?? $transaksi->pelanggan?->alamat ?? null;
+
         $this->receiptData = [
             'no_transaksi' => $transaksi->no_transaksi,
             'waktu' => $transaksi->created_at?->format('d/m/Y H:i'),
-            'kasir' => $transaksi->kasir?->name ?? 'Kasir',
+            'kasir' => $transaksi->kasir?->name ?? ($transaksi->sumber === 'marketplace' ? 'Web Store' : 'Kasir'),
             'pelanggan' => $transaksi->pelanggan?->nama ?? 'Umum',
             'telepon' => $transaksi->pelanggan?->telepon ?? null,
+            'alamat' => $alamat,
+            'kurir' => $kurir,
+            'resi' => $resi,
+            'is_pickup' => $isPickup,
+            'sumber' => $transaksi->sumber,
+            'ongkir' => $ongkir,
             'tier' => $transaksi->pelanggan?->tierMembership?->nama ?? ($tipeKonsumen === 'reseller' ? 'Reseller' : ($tipeKonsumen === 'agen' ? 'Agen' : 'Retail')),
             'tipe_konsumen' => $tipeKonsumen,
             'saldo_poin' => $saldoPoin,
@@ -4111,6 +4123,8 @@ class PosKasir extends Component
      */
     private function siapkanStrukPickupOnline(Transaksi $transaksi, ?float $kembalian = null): void
     {
+        $ongkir = (float) ($transaksi->pengiriman?->ongkir ?? 0);
+
         $this->receiptData = [
             'no_transaksi' => $transaksi->no_transaksi,
             'cabang' => $transaksi->cabang?->nama,
@@ -4118,6 +4132,11 @@ class PosKasir extends Component
             'kasir' => auth()->user()?->name ?? 'Kasir',
             'pelanggan' => $transaksi->pelanggan?->nama ?? 'Konsumen Umum',
             'telepon' => $transaksi->pelanggan?->telepon ?? null,
+            'alamat' => 'Konter Toko (Pickup)',
+            'kurir' => 'Ambil di Toko (Pickup)',
+            'resi' => $transaksi->pengiriman?->tracking_id ?? '-',
+            'is_pickup' => true,
+            'sumber' => 'Pesanan Online',
             'tier' => 'Ambil di Toko (Pickup Online)',
             'items' => $transaksi->items->map(fn ($it) => [
                 'nama' => $it->produk?->nama ?? 'Produk',
@@ -4128,6 +4147,7 @@ class PosKasir extends Component
                 'catatan' => $it->catatan,
             ])->values()->all(),
             'subtotal' => (float) ($transaksi->subtotal ?: $transaksi->total_akhir),
+            'ongkir' => $ongkir,
             'diskon' => (float) ($transaksi->diskon_nominal ?? 0),
             'dpp' => (float) ($transaksi->dpp ?? $transaksi->total_akhir),
             'pajak' => (float) ($transaksi->pajak_nominal ?? 0),

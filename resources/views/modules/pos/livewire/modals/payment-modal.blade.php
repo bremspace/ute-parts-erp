@@ -11,43 +11,77 @@
                  if (!svgContainer) return;
                  const svg = svgContainer.querySelector('svg');
                  if (!svg) return;
+
+                 if (!svg.getAttribute('xmlns')) {
+                     svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                 }
+
                  const serializer = new XMLSerializer();
                  const svgStr = serializer.serializeToString(svg);
+                 const filename = 'QRIS-{{ $qrisSlug }}-' + Date.now();
 
                  if (format === 'svg') {
                      const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
                      const url = URL.createObjectURL(blob);
                      const a = document.createElement('a');
                      a.href = url;
-                     a.download = 'QRIS-{{ $qrisSlug }}-' + Date.now() + '.svg';
+                     a.download = filename + '.svg';
                      document.body.appendChild(a);
                      a.click();
                      document.body.removeChild(a);
-                     URL.revokeObjectURL(url);
+                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                      return;
                  }
 
+                 const base64Svg = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr)));
                  const img = new Image();
-                 const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-                 const url = URL.createObjectURL(svgBlob);
+                 img.crossOrigin = 'anonymous';
+
                  img.onload = () => {
-                     const canvas = document.createElement('canvas');
-                     canvas.width = 600;
-                     canvas.height = 600;
-                     const ctx = canvas.getContext('2d');
-                     ctx.fillStyle = '#FFFFFF';
-                     ctx.fillRect(0, 0, 600, 600);
-                     ctx.drawImage(img, 40, 40, 520, 520);
-                     URL.revokeObjectURL(url);
-                     const pngUrl = canvas.toDataURL('image/png');
+                     try {
+                         const canvas = document.createElement('canvas');
+                         canvas.width = 640;
+                         canvas.height = 640;
+                         const ctx = canvas.getContext('2d');
+                         ctx.fillStyle = '#FFFFFF';
+                         ctx.fillRect(0, 0, 640, 640);
+                         ctx.drawImage(img, 40, 40, 560, 560);
+
+                         const pngUrl = canvas.toDataURL('image/png');
+                         const a = document.createElement('a');
+                         a.href = pngUrl;
+                         a.download = filename + '.png';
+                         document.body.appendChild(a);
+                         a.click();
+                         document.body.removeChild(a);
+                     } catch (err) {
+                         console.warn('Canvas export failed, fallback to SVG:', err);
+                         const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+                         const url = URL.createObjectURL(blob);
+                         const a = document.createElement('a');
+                         a.href = url;
+                         a.download = filename + '.svg';
+                         document.body.appendChild(a);
+                         a.click();
+                         document.body.removeChild(a);
+                         setTimeout(() => URL.revokeObjectURL(url), 1000);
+                     }
+                 };
+
+                 img.onerror = () => {
+                     console.warn('Image load failed, fallback to SVG');
+                     const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+                     const url = URL.createObjectURL(blob);
                      const a = document.createElement('a');
-                     a.href = pngUrl;
-                     a.download = 'QRIS-{{ $qrisSlug }}-' + Date.now() + '.png';
+                     a.href = url;
+                     a.download = filename + '.svg';
                      document.body.appendChild(a);
                      a.click();
                      document.body.removeChild(a);
+                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                  };
-                 img.src = url;
+
+                 img.src = base64Svg;
              }
          }"
          x-transition:enter="transition ease-out duration-200"
@@ -351,9 +385,17 @@
                                                 type="button"
                                                 @click="downloadQris('qris-svg-render-split', 'png')"
                                                 class="px-2.5 py-1.5 rounded-lg bg-ink-100 hover:bg-ink-200 dark:bg-white/10 dark:hover:bg-white/15 text-ink-800 dark:text-ink-200 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
-                                                title="Unduh QR Code sebagai file gambar PNG"
+                                                title="Unduh QR Code sebagai file gambar PNG berlatar putih"
                                             >
-                                                📥 Unduh PNG
+                                                📥 PNG
+                                            </button>
+                                            <button
+                                                type="button"
+                                                @click="downloadQris('qris-svg-render-split', 'svg')"
+                                                class="px-2 py-1.5 rounded-lg bg-ink-100 hover:bg-ink-200 dark:bg-white/10 dark:hover:bg-white/15 text-ink-800 dark:text-ink-200 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                                title="Unduh QR Code sebagai file vektor SVG"
+                                            >
+                                                SVG
                                             </button>
                                             <button
                                                 type="button"
@@ -499,12 +541,20 @@
                                     type="button"
                                     @click="downloadQris('qris-svg-render-main', 'png')"
                                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ink-200/80 hover:bg-ink-300 dark:bg-white/10 dark:hover:bg-white/15 text-xs font-bold text-ink-800 dark:text-ink-200 transition cursor-pointer"
-                                    title="Unduh QR Code sebagai file gambar PNG"
+                                    title="Unduh QR Code sebagai file gambar PNG berlatar putih"
                                 >
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
                                     <span>Unduh PNG</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="downloadQris('qris-svg-render-main', 'svg')"
+                                    class="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-ink-200/80 hover:bg-ink-300 dark:bg-white/10 dark:hover:bg-white/15 text-xs font-bold text-ink-800 dark:text-ink-200 transition cursor-pointer"
+                                    title="Unduh QR Code sebagai file vektor SVG"
+                                >
+                                    <span>SVG</span>
                                 </button>
 
                                 <button
@@ -703,12 +753,21 @@
                         type="button"
                         @click="downloadQris('qris-svg-zoom-render', 'png')"
                         class="px-4 py-2.5 rounded-xl bg-ink-900 hover:bg-black text-white font-bold text-xs flex items-center gap-2 shadow-sm transition active:scale-[0.98] cursor-pointer"
-                        title="Unduh file gambar QR Code"
+                        title="Unduh file gambar QR Code PNG berlatar putih"
                     >
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                         <span>Unduh PNG</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="downloadQris('qris-svg-zoom-render', 'svg')"
+                        class="px-3.5 py-2.5 rounded-xl bg-ink-100 hover:bg-ink-200 dark:bg-white/10 dark:hover:bg-white/15 text-ink-800 dark:text-ink-200 font-bold text-xs transition active:scale-[0.98] cursor-pointer"
+                        title="Unduh file vektor SVG"
+                    >
+                        <span>SVG</span>
                     </button>
 
                     <button

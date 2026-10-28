@@ -552,7 +552,7 @@ class RiwayatTransaksiIndex extends Component
         $cabangId = $this->getActiveCabangId();
 
         if ($tipe === 'pos' || $tipe === 'online') {
-            $trx = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang'])
+            $trx = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang', 'pengiriman'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->find($id);
 
@@ -607,6 +607,12 @@ class RiwayatTransaksiIndex extends Component
             }
             $hematTotal = $diskonTier + $diskonPartai + $diskonPoin + $diskonKasir;
 
+            $isPickup = str_contains(strtolower($trx->catatan ?? ''), 'ambil_ke_toko');
+            $ongkir = (float) ($trx->pengiriman?->ongkir ?? 0);
+            $kurir = $isPickup ? 'Ambil di Toko (Pickup)' : ($trx->pengiriman?->kurir ?? ($trx->sumber !== 'pos' ? 'Ekspedisi' : null));
+            $resi = $trx->pengiriman?->tracking_id ?? null;
+            $alamat = $trx->pengiriman?->alamat_tujuan ?? $trx->pelanggan?->alamat ?? null;
+
             $this->completedTransactionId = $trx->id;
             $this->receiptData = [
                 'no_transaksi' => $trx->no_transaksi,
@@ -614,6 +620,11 @@ class RiwayatTransaksiIndex extends Component
                 'kasir' => $kasirName,
                 'pelanggan' => $trx->pelanggan?->nama ?? 'Pelanggan Umum',
                 'telepon' => $trx->pelanggan?->telepon ?? null,
+                'alamat' => $alamat,
+                'kurir' => $kurir,
+                'resi' => $resi,
+                'is_pickup' => $isPickup,
+                'sumber' => $trx->sumber,
                 'tier' => $trx->pelanggan?->tierMembership?->nama ?? ($tipeKonsumen === 'reseller' ? 'Reseller' : ($tipeKonsumen === 'agen' ? 'Agen' : 'Retail')),
                 'tipe_konsumen' => $tipeKonsumen,
                 'saldo_poin' => $saldoPoin,
@@ -626,6 +637,7 @@ class RiwayatTransaksiIndex extends Component
                 'subtotal_retail' => $subtotalRetail,
                 'diskon_tier' => $diskonTier,
                 'subtotal' => (float) $trx->subtotal,
+                'ongkir' => $ongkir,
                 'diskon' => $diskonKasir,
                 'diskon_nominal' => (float) $trx->diskon_nominal,
                 'diskon_persen' => (float) ($trx->diskon_persen ?? 0),
