@@ -1531,9 +1531,15 @@
                         @if($visibleColumns['kompatibilitas'] ?? false)
                             <td class="py-2.5 px-3 text-xs min-w-[140px]">
                                 @php
-                                    $allTipeHpList = $p->tipeHps && $p->tipeHps->isNotEmpty()
-                                        ? $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->filter()->values()
-                                        : collect(array_filter(array_map('trim', explode(',', (string) ($p->model_kompatibel ?? '')))));
+                                    $allTipeHpList = collect();
+                                    if ($p->tipeHps && $p->tipeHps->isNotEmpty()) {
+                                        $allTipeHpList = $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->filter();
+                                    } elseif (is_array($p->kompatibilitas_hp) && !empty($p->kompatibilitas_hp)) {
+                                        $allTipeHpList = collect($p->kompatibilitas_hp)->map(fn($t) => trim((!empty($t['merk']) ? $t['merk'].' ' : '').($t['model'] ?? '')))->filter();
+                                    } elseif (!empty($p->model_kompatibel)) {
+                                        $allTipeHpList = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))));
+                                    }
+                                    $allTipeHpList = $allTipeHpList->unique()->values();
                                     $fullTipeTooltip = $allTipeHpList->isNotEmpty()
                                         ? $allTipeHpList->join(', ')
                                         : trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));

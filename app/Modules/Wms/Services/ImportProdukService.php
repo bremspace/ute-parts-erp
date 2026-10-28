@@ -177,8 +177,8 @@ class ImportProdukService
             'kondisi', 'kondisi_produk', 'condition', 'status_kondisi' => 'kondisi',
             'supplier', 'nama_supplier', 'supplier_id', 'pemasok', 'vendor', 'nama_pemasok', 'distributor' => 'supplier',
             'merk_hp', 'merek_hp', 'brand_hp', 'brand_ponsel', 'merk_ponsel', 'device_brand' => 'merk_hp',
-            'tipe_hp', 'tipe_ponsel', 'model_hp', 'model_ponsel', 'tipe_model', 'model_kompatibel', 'kompatibel_tipe', 'device_model', 'compatible_models', 'kompatibel_model' => 'tipe_hp',
-            'kompatibilitas', 'kompatibilitas_hp', 'compatibility' => 'kompatibilitas_hp',
+            'tipe_hp', 'tipe_ponsel', 'model_hp', 'model_ponsel', 'tipe_model', 'model_kompatibel', 'kompatibel_tipe', 'device_model', 'compatible_models', 'kompatibel_model', 'model_kompatibilitas', 'model_kompabilitas' => 'tipe_hp',
+            'kompatibilitas', 'kompatibilitas_hp', 'compatibility', 'kompabilitas', 'kompabilitas_hp', 'kompatibel_hp', 'kompabel_hp', 'tipe_kompatibel', 'kompatibilitas_tipe', 'kompabilitas_tipe', 'kompatibilitas_model', 'kompabilitas_model' => 'kompatibilitas_hp',
             'produk_kompatibel_sku', 'produk_kompatibel', 'cross_sku', 'kompatibel_sku' => 'produk_kompatibel_sku',
             'harga_beli', 'hpp', 'harga_modal', 'modal', 'buy_price', 'cost', 'cost_price', 'purchase_price' => 'harga_beli',
             'harga_jual', 'harga_retail', 'harga_umum', 'harga_normal', 'sell_price', 'selling_price', 'price', 'harga_jual_retail' => 'harga_jual',
@@ -1796,15 +1796,16 @@ class ImportProdukService
             if ($supplier !== '' && ! in_array(strtolower($supplier), ['-', '0', 'none', 'null', 'kosong'], true)) {
                 $refValues['supplier'][$supplier] = true;
             }
-            $merkHp = trim((string) ($row['merk_hp'] ?? ''));
-            $tipeHpRaw = trim((string) ($row['tipe_hp'] ?? ''));
-            if ($merkHp !== '' && $tipeHpRaw !== '') {
-                $refValues['merk_hp'][$merkHp] = true;
-                // Parse tipe_hp (comma separated models)
-                foreach (explode(',', $tipeHpRaw) as $model) {
-                    $model = trim($model);
-                    if ($model !== '') {
-                        $refValues['tipe_hp'][] = ['merk' => $merkHp, 'model' => $model];
+            $merkHpNorm = $this->normalizeMerkHp($row['merk_hp'] ?? null);
+            $parsedTipe = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHpNorm);
+            $parsedKompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null, $merkHpNorm);
+            $allTipeBaris = $this->gabungDaftarTipe($parsedTipe, $parsedKompat);
+
+            foreach ($allTipeBaris as $pair) {
+                if (! empty($pair['merk'])) {
+                    $refValues['merk_hp'][$pair['merk']] = true;
+                    if (! empty($pair['model'])) {
+                        $refValues['tipe_hp'][] = ['merk' => $pair['merk'], 'model' => $pair['model']];
                     }
                 }
             }
@@ -2484,11 +2485,9 @@ class ImportProdukService
 
         // 1. Merge Tipe HP & Kompatibilitas
         $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);
-        $daftarTipe = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
-        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null);
-        if (! $daftarTipe && $kompat) {
-            $daftarTipe = $kompat;
-        }
+        $daftarTipeHp = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
+        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null, $merkHp);
+        $daftarTipe = $this->gabungDaftarTipe($daftarTipeHp, $kompat);
 
         if ($daftarTipe) {
             $ids = [];
@@ -2505,8 +2504,18 @@ class ImportProdukService
             $targetProduk->tipeHps()->syncWithoutDetaching($ids);
 
             $existingKompat = is_array($targetProduk->kompatibilitas_hp) ? $targetProduk->kompatibilitas_hp : [];
-            $mergedKompat = array_values(array_unique(array_merge($existingKompat, $daftarTipe), SORT_REGULAR));
-            $targetProduk->update(['kompatibilitas_hp' => $mergedKompat]);
+            $mergedKompat = $this->gabungDaftarTipe($existingKompat, $daftarTipe);
+            $allMerks = collect($mergedKompat)->pluck('merk')->filter()->unique()->values();
+            $allModels = collect($mergedKompat)->pluck('model')->filter()->unique()->values();
+
+            $updateMerge = ['kompatibilitas_hp' => $mergedKompat];
+            if ($allMerks->isNotEmpty() && empty($targetProduk->brand_kompatibel)) {
+                $updateMerge['brand_kompatibel'] = $allMerks->implode(', ');
+            }
+            if ($allModels->isNotEmpty()) {
+                $updateMerge['model_kompatibel'] = $allModels->implode(', ');
+            }
+            $targetProduk->update($updateMerge);
         }
 
         // 2. Variant resolution
@@ -2706,11 +2715,9 @@ class ImportProdukService
 
         // Sync Tipe HP jika diisi
         $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);
-        $daftarTipe = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
-        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null);
-        if (! $daftarTipe && $kompat) {
-            $daftarTipe = $kompat;
-        }
+        $daftarTipeHp = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
+        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null, $merkHp);
+        $daftarTipe = $this->gabungDaftarTipe($daftarTipeHp, $kompat);
 
         if ($daftarTipe) {
             $ids = [];
@@ -2911,11 +2918,9 @@ class ImportProdukService
 
         // Merk Smartphone & Tipe HP kompatibilitas
         $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);
-        $daftarTipe = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
-        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null);
-        if (! $daftarTipe && $kompat) {
-            $daftarTipe = $kompat; // derivasi dari JSON legacy
-        }
+        $daftarTipeHp = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
+        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null, $merkHp);
+        $daftarTipe = $this->gabungDaftarTipe($daftarTipeHp, $kompat);
 
         $allMerks = collect($daftarTipe)->pluck('merk')->filter()->unique()->values();
         $allModels = collect($daftarTipe)->pluck('model')->filter()->unique()->values();
@@ -2976,9 +2981,6 @@ class ImportProdukService
                 $ids[] = $this->tipeHpCache[$cacheKey];
             }
             $produk->tipeHps()->sync($ids);
-        }
-        if ($kompat && $kompat !== $daftarTipe) {
-            $produk->update(['kompatibilitas_hp' => $kompat]);
         }
 
         // HargaTier default: retail = harga_jual; reseller/agen bila diisi kolom.
@@ -3247,12 +3249,53 @@ class ImportProdukService
      *
      * @return array<int, array{merk: string, model: string}>
      */
+    /**
+     * Gabungkan dan deduplikasi daftar tipe [{merk, model}].
+     *
+     * @param  array<int, array{merk: string, model: string}>  $list1
+     * @param  array<int, array{merk: string, model: string}>  $list2
+     * @return array<int, array{merk: string, model: string}>
+     */
+    public function gabungDaftarTipe(array $list1, array $list2): array
+    {
+        $unique = [];
+        foreach (array_merge($list1, $list2) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $merk = trim((string) ($item['merk'] ?? ''));
+            $model = trim((string) ($item['model'] ?? ''));
+            if ($merk === '' || $model === '') {
+                continue;
+            }
+            $key = strtolower($merk.'|'.$model);
+            if (! isset($unique[$key])) {
+                $unique[$key] = [
+                    'merk' => $merk,
+                    'model' => $model,
+                ];
+            }
+        }
+
+        return array_values($unique);
+    }
+
+    /**
+     * Parse kolom tipe_hp / kompatibilitas_hp yang mendukung berbagai format:
+     * - "Merk:Model;Merk:Model" (format standar ekspor sistem)
+     * - "Merk: Model 1, Model 2; Merk 2: Model 3"
+     * - "Merk Model; Merk Model" (cth: "Samsung Galaxy A11; Xiaomi Redmi 9")
+     * - "Model 1, Model 2" dengan $defaultMerk (cth: "iPhone 13, iPhone 13 Pro")
+     * - JSON array string [{"merk":"...", "model":"..."}]
+     *
+     * @return array<int, array{merk: string, model: string}>
+     */
     public function parseTipeHp(mixed $value, ?string $defaultMerk = null): array
     {
         $value = trim((string) ($value ?? ''));
         $normDefaultMerk = $this->normalizeMerkHp($defaultMerk);
 
-        if (! $value) {
+        if ($value === '') {
             if ($normDefaultMerk) {
                 return [['merk' => $normDefaultMerk, 'model' => 'Universal']];
             }
@@ -3260,16 +3303,29 @@ class ImportProdukService
             return [];
         }
 
-        if (str_starts_with($value, '[')) {
+        // 1. Dukungan format JSON
+        if (str_starts_with($value, '[') || str_starts_with($value, '{')) {
             $decoded = json_decode($value, true);
             if (is_array($decoded)) {
-                return array_map(function ($d) use ($normDefaultMerk) {
+                // Jika single object {...}
+                if (isset($decoded['merk']) || isset($decoded['model'])) {
+                    $decoded = [$decoded];
+                }
+                $list = [];
+                foreach ($decoded as $d) {
+                    if (! is_array($d)) {
+                        continue;
+                    }
                     $mRaw = trim((string) ($d['merk'] ?? ($d['nama'] ?? '')));
-                    $merk = $this->normalizeMerkHp($mRaw ?: $normDefaultMerk);
+                    $merk = $this->normalizeMerkHp($mRaw ?: $normDefaultMerk) ?: 'Universal';
                     $model = $this->normalizeModelHp(trim((string) ($d['model'] ?? '')));
-
-                    return ['merk' => $merk, 'model' => $model];
-                }, $decoded);
+                    if ($model !== '') {
+                        $list[] = ['merk' => $merk, 'model' => $model];
+                    }
+                }
+                if (! empty($list)) {
+                    return $this->gabungDaftarTipe($list, []);
+                }
             }
         }
 
@@ -3282,8 +3338,10 @@ class ImportProdukService
             'realme' => 'Realme',
             'infinix' => 'Infinix',
             'tecno' => 'Tecno',
+            'itel' => 'Itel',
             'asus' => 'Asus',
             'huawei' => 'Huawei',
+            'honor' => 'Honor',
             'google' => 'Google',
             'sony' => 'Sony',
             'nokia' => 'Nokia',
@@ -3293,74 +3351,100 @@ class ImportProdukService
             'universal' => 'Universal',
         ];
 
+        $seriesToBrand = [
+            'iphone' => 'Apple',
+            'ipad' => 'Apple',
+            'galaxy' => 'Samsung',
+            'redmi' => 'Xiaomi',
+            'mi' => 'Xiaomi',
+            'poco' => 'Poco',
+            'pixel' => 'Google',
+            'rog' => 'Asus',
+        ];
+
+        // Pisahkan segmen utama: prioritas delimiter baris baru (\n) atau titik koma (;)
+        $primaryDelimiter = str_contains($value, "\n") ? "\n" : (str_contains($value, ';') ? ';' : null);
+        $segments = $primaryDelimiter !== null
+            ? explode($primaryDelimiter, $value)
+            : [$value];
+
         $hasil = [];
-        // Jika terdapat titik koma ';', prioritaskan sebagai pemisah antar entri multi-tipe/multi-brand.
-        // Jika tidak ada ';', pisahkan dengan koma ','
-        $delimiter = str_contains($value, ';') ? ';' : (str_contains($value, "\n") ? "\n" : ',');
-        foreach (explode($delimiter, $value) as $part) {
-            $part = trim($part);
-            if (! $part) {
+
+        foreach ($segments as $segment) {
+            $segment = trim($segment);
+            if ($segment === '') {
                 continue;
             }
 
-            $words = preg_split('/\s+/', $part, 2);
-            $candidateFirstWord = strtolower($words[0] ?? '');
-            $candidateRest = $words[1] ?? '';
+            // Pola A: Ada tanda titik dua ":" pemisah Merk dan Model (cth: "Apple:iPhone 13" atau "Apple: iPhone 13, iPhone 14")
+            if (str_contains($segment, ':')) {
+                [$merkPart, $modelPart] = explode(':', $segment, 2);
+                $merkCandidate = $this->normalizeMerkHp(trim($merkPart)) ?: ($normDefaultMerk ?: 'Universal');
+                // Model part bisa berupa multi-model dipisah koma
+                $subModels = explode(',', $modelPart);
+                foreach ($subModels as $sub) {
+                    $sub = trim($sub);
+                    if ($sub !== '') {
+                        $hasil[] = [
+                            'merk' => $merkCandidate,
+                            'model' => $this->normalizeModelHp($sub),
+                        ];
+                    }
+                }
 
-            if (isset($manufacturers[$candidateFirstWord]) && ! empty($candidateRest)) {
-                $hasil[] = [
-                    'merk' => $manufacturers[$candidateFirstWord],
-                    'model' => $this->normalizeModelHp($candidateRest),
-                ];
-            } else {
-                $hasil[] = [
-                    'merk' => $normDefaultMerk ?: 'Universal',
-                    'model' => $this->normalizeModelHp($part),
-                ];
-            }
-        }
-
-        // Deduplikasi hasil
-        $unique = [];
-        foreach ($hasil as $h) {
-            if (empty($h['merk']) || empty($h['model'])) {
                 continue;
             }
-            $key = strtolower($h['merk'].'|'.$h['model']);
-            if (! isset($unique[$key])) {
-                $unique[$key] = $h;
+
+            // Pola B: Tidak ada titik dua, periksa apakah ada koma pemisah antar item
+            // Jika tidak ada primaryDelimiter titik koma, maka koma adalah pemisah antar item
+            $items = ($primaryDelimiter === null && str_contains($segment, ','))
+                ? explode(',', $segment)
+                : [$segment];
+
+            foreach ($items as $item) {
+                $item = trim($item);
+                if ($item === '') {
+                    continue;
+                }
+
+                // Cek kata pertama untuk deteksi brand atau series prefix
+                $words = preg_split('/\s+/', $item, 2);
+                $candidateFirstWord = strtolower($words[0] ?? '');
+                $candidateRest = $words[1] ?? '';
+
+                if (isset($manufacturers[$candidateFirstWord])) {
+                    $detectedMerk = $manufacturers[$candidateFirstWord];
+                    $modelName = ! empty($candidateRest) ? $candidateRest : $item;
+                    $hasil[] = [
+                        'merk' => $detectedMerk,
+                        'model' => $this->normalizeModelHp($modelName),
+                    ];
+                } elseif (isset($seriesToBrand[$candidateFirstWord])) {
+                    $detectedMerk = $normDefaultMerk ?: $seriesToBrand[$candidateFirstWord];
+                    $hasil[] = [
+                        'merk' => $detectedMerk,
+                        'model' => $this->normalizeModelHp($item),
+                    ];
+                } else {
+                    $hasil[] = [
+                        'merk' => $normDefaultMerk ?: 'Universal',
+                        'model' => $this->normalizeModelHp($item),
+                    ];
+                }
             }
         }
 
-        return array_values($unique);
+        return $this->gabungDaftarTipe($hasil, []);
     }
 
     /**
-     * Parse kolom kompatibilitas_hp (JSON string) → [{merk, model}].
+     * Parse kolom kompatibilitas_hp (mendukung JSON atau format delimiter Merk:Model).
+     *
+     * @return array<int, array{merk: string, model: string}>
      */
-    public function parseKompatibilitas(mixed $value): array
+    public function parseKompatibilitas(mixed $value, ?string $defaultMerk = null): array
     {
-        $value = trim((string) ($value ?? ''));
-        if (! $value) {
-            return [];
-        }
-        $decoded = json_decode($value, true);
-        if (! is_array($decoded)) {
-            return [];
-        }
-
-        return array_values(array_filter(array_map(function ($d) {
-            if (! is_array($d)) {
-                return null;
-            }
-            $merk = trim((string) ($d['merk'] ?? ''));
-            $model = trim((string) ($d['model'] ?? ''));
-            if (! $merk) {
-                return null;
-            }
-
-            return ['merk' => $merk, 'model' => $model];
-        }, $decoded)));
+        return $this->parseTipeHp($value, $defaultMerk);
     }
 
     /**

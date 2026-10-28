@@ -177,4 +177,52 @@ class WmsImportStatusAndNormalizerTest extends TestCase
         $this->assertSame('Gagal Total', $logGagal->status_label);
         $this->assertStringContainsString('text-up-red', $logGagal->status_badge_class);
     }
+
+    public function test_normalizer_heading_kompabilitas_varian(): void
+    {
+        $this->assertSame('kompatibilitas_hp', $this->service->normalizeImportHeading('kompabilitas_hp'));
+        $this->assertSame('kompatibilitas_hp', $this->service->normalizeImportHeading('kompabilitas'));
+        $this->assertSame('kompatibilitas_hp', $this->service->normalizeImportHeading('tipe_kompatibel'));
+        $this->assertSame('tipe_hp', $this->service->normalizeImportHeading('model_kompatibilitas'));
+    }
+
+    public function test_parse_kompatibilitas_hp_multi_model_dan_multi_brand(): void
+    {
+        // 1. Format export sistem: Merk:Model;Merk:Model
+        $hasil1 = $this->service->parseKompatibilitas('Apple:iPhone 13;Apple:iPhone 13 Pro;Apple:iPhone 14');
+        $this->assertCount(3, $hasil1);
+        $this->assertSame('Apple', $hasil1[0]['merk']);
+        $this->assertSame('iPhone 13', $hasil1[0]['model']);
+        $this->assertSame('Apple', $hasil1[1]['merk']);
+        $this->assertSame('iPhone 13 Pro', $hasil1[1]['model']);
+        $this->assertSame('Apple', $hasil1[2]['merk']);
+        $this->assertSame('iPhone 14', $hasil1[2]['model']);
+
+        // 2. Format multi-model dalam satu merk dengan koma: Apple: iPhone 13, iPhone 13 Pro; Samsung: Galaxy A54
+        $hasil2 = $this->service->parseKompatibilitas('Apple: iPhone 13, iPhone 13 Pro; Samsung: Galaxy A54');
+        $this->assertCount(3, $hasil2);
+        $this->assertSame('Apple', $hasil2[0]['merk']);
+        $this->assertSame('iPhone 13', $hasil2[0]['model']);
+        $this->assertSame('Apple', $hasil2[1]['merk']);
+        $this->assertSame('iPhone 13 Pro', $hasil2[1]['model']);
+        $this->assertSame('Samsung', $hasil2[2]['merk']);
+        $this->assertSame('Galaxy A54', $hasil2[2]['model']);
+
+        // 3. Format JSON array
+        $json = json_encode([
+            ['merk' => 'Xiaomi', 'model' => 'Redmi Note 10'],
+            ['merk' => 'Xiaomi', 'model' => 'Redmi Note 11'],
+        ]);
+        $hasil3 = $this->service->parseKompatibilitas($json);
+        $this->assertCount(2, $hasil3);
+        $this->assertSame('Xiaomi', $hasil3[0]['merk']);
+        $this->assertSame('Redmi Note 10', $hasil3[0]['model']);
+
+        // 4. Penggabungan tipe_hp dan kompatibilitas_hp via gabungDaftarTipe
+        $gabung = $this->service->gabungDaftarTipe(
+            [['merk' => 'Apple', 'model' => 'iPhone 13']],
+            [['merk' => 'Apple', 'model' => 'iPhone 13 Pro'], ['merk' => 'Apple', 'model' => 'iPhone 13']]
+        );
+        $this->assertCount(2, $gabung);
+    }
 }

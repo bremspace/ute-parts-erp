@@ -290,16 +290,36 @@ class ExportMasterProdukService
         foreach ($query as $p) {
             $merkHp = '';
             $tipeHp = '';
-            if ($p->tipeHps->isNotEmpty()) {
-                $firstTipe = $p->tipeHps->first();
-                $merkHp = $firstTipe->merk ?? '';
-                $tipeHp = $firstTipe->model ?? '';
-            } elseif (! empty($p->brand_kompatibel) || ! empty($p->model_kompatibel)) {
-                $merkHp = $p->brand_kompatibel ?? '';
-                $tipeHp = $p->model_kompatibel ?? '';
+            $daftarKompat = collect();
+            if ($p->tipeHps && $p->tipeHps->isNotEmpty()) {
+                foreach ($p->tipeHps as $th) {
+                    if (! empty($th->model)) {
+                        $daftarKompat->push(['merk' => $th->merk ?: '', 'model' => $th->model]);
+                    }
+                }
+            }
+            if (is_array($p->kompatibilitas_hp)) {
+                foreach ($p->kompatibilitas_hp as $kh) {
+                    if (is_array($kh) && ! empty($kh['model'])) {
+                        $daftarKompat->push(['merk' => $kh['merk'] ?? '', 'model' => $kh['model']]);
+                    }
+                }
+            }
+            if ($daftarKompat->isEmpty() && (! empty($p->brand_kompatibel) || ! empty($p->model_kompatibel))) {
+                $subModels = explode(',', (string) $p->model_kompatibel);
+                foreach ($subModels as $sm) {
+                    $sm = trim($sm);
+                    if ($sm !== '') {
+                        $daftarKompat->push(['merk' => $p->brand_kompatibel ?? '', 'model' => $sm]);
+                    }
+                }
             }
 
-            $kompatibilitasHp = $p->tipeHps->map(fn ($th) => trim((string) $th->merk.':'.(string) $th->model))->filter()->unique()->implode(';');
+            $daftarKompatUnique = $daftarKompat->filter(fn ($item) => ! empty($item['model']))->unique(fn ($item) => strtolower(($item['merk'] ?? '').'|'.($item['model'] ?? '')))->values();
+
+            $merkHp = $p->brand_kompatibel ?: ($daftarKompatUnique->pluck('merk')->filter()->first() ?? '');
+            $tipeHp = $daftarKompatUnique->pluck('model')->filter()->implode(', ');
+            $kompatibilitasHp = $daftarKompatUnique->map(fn ($th) => trim(($th['merk'] ? $th['merk'].':' : '').$th['model']))->filter()->implode(';');
             $stokAwal = (int) ($p->total_stok ?? 0);
 
             $gudangNama = '';
