@@ -120,7 +120,36 @@
                                 <select wire:model.live="filterModelKompatibel" class="px-3 py-2 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs font-medium text-ink-900 dark:text-ink-100 bg-white/80 dark:bg-ink-900/60 border border-black/10 dark:border-white/10 min-h-[40px]" title="Filter berdasarkan Tipe/Model Smartphone Kompatibel">
                                     <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
                                     @foreach($modelKompatibelList as $mk)
-                                        <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mk }}</option>
+                                        @php
+                                            $brandFilter = trim((string) ($filterBrandKompatibel ?? ''));
+                                            if (!empty($brandFilter)) {
+                                                if (str_starts_with(strtolower($mk), strtolower($brandFilter))) {
+                                                    $mkLabel = $mk;
+                                                } elseif (strcasecmp($brandFilter, 'Apple') === 0) {
+                                                    if (str_starts_with(strtolower($mk), 'iphone') || str_starts_with(strtolower($mk), 'ipad')) {
+                                                        $mkLabel = $mk;
+                                                    } elseif (preg_match('/^\d+(\s*(pro|plus|max|mini|e))?/i', $mk)) {
+                                                        $mkLabel = 'iPhone ' . $mk;
+                                                    } else {
+                                                        $mkLabel = $brandFilter . ' ' . $mk;
+                                                    }
+                                                } else {
+                                                    $mkLabel = $brandFilter . ' ' . $mk;
+                                                }
+                                            } else {
+                                                $foundTh = isset($tipeHpList) ? $tipeHpList->firstWhere('model', $mk) : null;
+                                                if ($foundTh && !empty($foundTh->merk) && !str_starts_with(strtolower($mk), strtolower($foundTh->merk))) {
+                                                    if (strcasecmp($foundTh->merk, 'Apple') === 0 && preg_match('/^\d+/i', $mk)) {
+                                                        $mkLabel = 'iPhone ' . $mk;
+                                                    } else {
+                                                        $mkLabel = $foundTh->merk . ' ' . $mk;
+                                                    }
+                                                } else {
+                                                    $mkLabel = $mk;
+                                                }
+                                            }
+                                        @endphp
+                                        <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mkLabel }}</option>
                                     @endforeach
                                 </select>
                                 @if($filterModelKompatibel)
@@ -789,7 +818,38 @@
                                                     <label class="block text-[10px] uppercase font-bold text-ink-700 dark:text-ink-400 mb-1">Tipe HP</label>
                                                     <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 rounded-lg glass-input text-xs bg-white dark:bg-ink-900 text-ink-900 dark:text-white border border-black/10 dark:border-white/10">
                                                         <option value="" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Semua Tipe HP' }}</option>
-                                                        @foreach($modelKompatibelList as $mk) <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mk }}</option> @endforeach
+                                                        @foreach($modelKompatibelList as $mk)
+                                                            @php
+                                                                $brandFilter = trim((string) ($filterBrandKompatibel ?? ''));
+                                                                if (!empty($brandFilter)) {
+                                                                    if (str_starts_with(strtolower($mk), strtolower($brandFilter))) {
+                                                                        $mkLabel = $mk;
+                                                                    } elseif (strcasecmp($brandFilter, 'Apple') === 0) {
+                                                                        if (str_starts_with(strtolower($mk), 'iphone') || str_starts_with(strtolower($mk), 'ipad')) {
+                                                                            $mkLabel = $mk;
+                                                                        } elseif (preg_match('/^\d+(\s*(pro|plus|max|mini|e))?/i', $mk)) {
+                                                                            $mkLabel = 'iPhone ' . $mk;
+                                                                        } else {
+                                                                            $mkLabel = $brandFilter . ' ' . $mk;
+                                                                        }
+                                                                    } else {
+                                                                        $mkLabel = $brandFilter . ' ' . $mk;
+                                                                    }
+                                                                } else {
+                                                                    $foundTh = isset($tipeHpList) ? $tipeHpList->firstWhere('model', $mk) : null;
+                                                                    if ($foundTh && !empty($foundTh->merk) && !str_starts_with(strtolower($mk), strtolower($foundTh->merk))) {
+                                                                        if (strcasecmp($foundTh->merk, 'Apple') === 0 && preg_match('/^\d+/i', $mk)) {
+                                                                            $mkLabel = 'iPhone ' . $mk;
+                                                                        } else {
+                                                                            $mkLabel = $foundTh->merk . ' ' . $mk;
+                                                                        }
+                                                                    } else {
+                                                                        $mkLabel = $mk;
+                                                                    }
+                                                                }
+                                                            @endphp
+                                                            <option value="{{ $mk }}" class="bg-white dark:bg-ink-900 text-ink-900 dark:text-white">{{ $mkLabel }}</option>
+                                                        @endforeach
                                                     </select>
                                                 </div>
                                             </div>
@@ -2294,7 +2354,14 @@
                                                        wire:model.live="kompatibelSelectedTipeHpIds"
                                                        class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30"
                                                        {{ $sudahTerdaftar ? 'disabled' : '' }}>
-                                                <span class="truncate flex-1">{{ $opt->model }}</span>
+                                                @php
+                                                    $optLabel = str_starts_with(strtolower($opt->model), strtolower($opt->merk))
+                                                        ? $opt->model
+                                                        : (strcasecmp($opt->merk, 'Apple') === 0 && preg_match('/^\d+/i', $opt->model)
+                                                            ? 'iPhone ' . $opt->model
+                                                            : $opt->merk . ' ' . $opt->model);
+                                                @endphp
+                                                <span class="truncate flex-1">{{ $optLabel }}</span>
                                                 @if($sudahTerdaftar)
                                                     <span class="text-[9px] text-up-mint font-semibold">✓</span>
                                                 @endif
@@ -3216,7 +3283,14 @@
                                                        wire:model.live="editKompatibelSelectedTipeHpIds"
                                                        class="rounded border-white/20 bg-ink-900 text-up-primary focus:ring-up-primary/30"
                                                        {{ $sudahTerdaftar ? 'disabled' : '' }}>
-                                                <span class="truncate flex-1">{{ $opt->model }}</span>
+                                                @php
+                                                    $optLabel = str_starts_with(strtolower($opt->model), strtolower($opt->merk))
+                                                        ? $opt->model
+                                                        : (strcasecmp($opt->merk, 'Apple') === 0 && preg_match('/^\d+/i', $opt->model)
+                                                            ? 'iPhone ' . $opt->model
+                                                            : $opt->merk . ' ' . $opt->model);
+                                                @endphp
+                                                <span class="truncate flex-1">{{ $optLabel }}</span>
                                                 @if($sudahTerdaftar)
                                                     <span class="text-[9px] text-up-mint font-semibold">✓</span>
                                                 @endif

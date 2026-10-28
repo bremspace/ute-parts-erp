@@ -264,7 +264,14 @@
                                     <select wire:model.live="filterTipeHpId" class="w-full px-2.5 py-1.5 {{ $filterTipeHpId ? 'pr-7' : '' }} rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
                                         <option value="">Semua Tipe HP</option>
                                         @foreach($tipeHpList as $th)
-                                            <option value="{{ $th->id }}" class="bg-ink-900">{{ $th->merk }} - {{ $th->model }}</option>
+                                            @php
+                                                $thLabel = str_starts_with(strtolower($th->model), strtolower($th->merk))
+                                                    ? $th->model
+                                                    : (strcasecmp($th->merk, 'Apple') === 0 && preg_match('/^\d+/i', $th->model)
+                                                        ? 'iPhone ' . $th->model
+                                                        : $th->merk . ' ' . $th->model);
+                                            @endphp
+                                            <option value="{{ $th->id }}" class="bg-ink-900">{{ $thLabel }}</option>
                                         @endforeach
                                     </select>
                                     @if($filterTipeHpId)
@@ -290,9 +297,38 @@
                             @if($visibleFilters['model_kompatibel'])
                                 <div class="relative inline-flex items-center w-36 sm:w-44">
                                     <select wire:model.live="filterModelKompatibel" class="w-full px-2.5 py-1.5 {{ $filterModelKompatibel ? 'pr-7' : '' }} rounded-xl glass-input text-xs text-ink-200 bg-ink-900/90 border border-white/10">
-                                        <option value="">Model Kompatibel</option>
+                                        <option value="">{{ $filterBrandKompatibel ? 'Semua Tipe '.$filterBrandKompatibel : 'Model Kompatibel' }}</option>
                                         @foreach($modelKompatibelList as $mk)
-                                            <option value="{{ $mk }}" class="bg-ink-900">{{ $mk }}</option>
+                                            @php
+                                                $brandFilter = trim((string) ($filterBrandKompatibel ?? ''));
+                                                if (!empty($brandFilter)) {
+                                                    if (str_starts_with(strtolower($mk), strtolower($brandFilter))) {
+                                                        $mkLabel = $mk;
+                                                    } elseif (strcasecmp($brandFilter, 'Apple') === 0) {
+                                                        if (str_starts_with(strtolower($mk), 'iphone') || str_starts_with(strtolower($mk), 'ipad')) {
+                                                            $mkLabel = $mk;
+                                                        } elseif (preg_match('/^\d+(\s*(pro|plus|max|mini|e))?/i', $mk)) {
+                                                            $mkLabel = 'iPhone ' . $mk;
+                                                        } else {
+                                                            $mkLabel = $brandFilter . ' ' . $mk;
+                                                        }
+                                                    } else {
+                                                        $mkLabel = $brandFilter . ' ' . $mk;
+                                                    }
+                                                } else {
+                                                    $foundTh = isset($tipeHpList) ? $tipeHpList->firstWhere('model', $mk) : null;
+                                                    if ($foundTh && !empty($foundTh->merk) && !str_starts_with(strtolower($mk), strtolower($foundTh->merk))) {
+                                                        if (strcasecmp($foundTh->merk, 'Apple') === 0 && preg_match('/^\d+/i', $mk)) {
+                                                            $mkLabel = 'iPhone ' . $mk;
+                                                        } else {
+                                                            $mkLabel = $foundTh->merk . ' ' . $mk;
+                                                        }
+                                                    } else {
+                                                        $mkLabel = $mk;
+                                                    }
+                                                }
+                                            @endphp
+                                            <option value="{{ $mk }}" class="bg-ink-900">{{ $mkLabel }}</option>
                                         @endforeach
                                     </select>
                                     @if($filterModelKompatibel)

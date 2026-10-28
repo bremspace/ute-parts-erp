@@ -505,13 +505,50 @@
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="filterHpModel"
                         class="w-full min-w-0 max-w-full truncate appearance-none px-2.5 sm:px-3 py-2 pr-7 rounded-xl bg-white dark:bg-ink-900 border border-ink-200/80 dark:border-white/10 text-xs sm:text-sm font-semibold text-ink-700 dark:text-ink-200 outline-none focus:border-up-primary focus:ring-2 focus:ring-up-primary/15 transition-[border-color,box-shadow] duration-140 min-h-[44px] cursor-pointer">
-                    <option value="">Model Gadget</option>
+                    <option value="">{{ !empty($filterHpMerk) ? 'Semua Model ' . $filterHpMerk : 'Model Gadget' }}</option>
                     @foreach($hpModelList as $key => $val)
                         @php
                             $m = is_numeric($key) ? $val : $key;
                             $count = is_numeric($key) ? null : $val;
+                            $brand = trim((string) ($filterHpMerk ?? ''));
+                            if (!empty($brand)) {
+                                if (str_starts_with(strtolower($m), strtolower($brand))) {
+                                    $mLabel = $m;
+                                } elseif (strcasecmp($brand, 'Apple') === 0) {
+                                    if (str_starts_with(strtolower($m), 'iphone') || str_starts_with(strtolower($m), 'ipad')) {
+                                        $mLabel = $m;
+                                    } elseif (preg_match('/^\d+(\s*(pro|plus|max|mini|e))?/i', $m)) {
+                                        $mLabel = 'iPhone ' . $m;
+                                    } else {
+                                        $mLabel = $brand . ' ' . $m;
+                                    }
+                                } else {
+                                    $mLabel = $brand . ' ' . $m;
+                                }
+                            } else {
+                                static $tipeHpMap = null;
+                                if ($tipeHpMap === null) {
+                                    $tipeHpMap = \Illuminate\Support\Facades\Cache::remember('shop_tipe_hp_map', 300, function () {
+                                        return \App\Modules\Wms\Models\TipeHp::where('is_active', true)
+                                            ->select('merk', 'model')
+                                            ->get()
+                                            ->pluck('merk', 'model')
+                                            ->all();
+                                    });
+                                }
+                                $inferredMerk = $tipeHpMap[$m] ?? null;
+                                if ($inferredMerk && !str_starts_with(strtolower($m), strtolower($inferredMerk))) {
+                                    if (strcasecmp($inferredMerk, 'Apple') === 0 && preg_match('/^\d+/i', $m)) {
+                                        $mLabel = 'iPhone ' . $m;
+                                    } else {
+                                        $mLabel = $inferredMerk . ' ' . $m;
+                                    }
+                                } else {
+                                    $mLabel = $m;
+                                }
+                            }
                         @endphp
-                        <option value="{{ $m }}">{{ $m }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
+                        <option value="{{ $m }}">{{ $mLabel }}{{ $count !== null ? ' (' . $count . ')' : '' }}</option>
                     @endforeach
                 </select>
                 @if(!empty($filterHpModel))
