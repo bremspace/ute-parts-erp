@@ -134,12 +134,8 @@ class ProdukService
             if (! empty($finalTipeHpIds)) {
                 $tipeModels = TipeHp::whereIn('id', $finalTipeHpIds)->get();
                 if ($tipeModels->isNotEmpty()) {
-                    if (empty($brand)) {
-                        $brand = $tipeModels->pluck('merk')->unique()->implode(', ');
-                    }
-                    if (empty($model)) {
-                        $model = $tipeModels->pluck('model')->unique()->implode(', ');
-                    }
+                    $brand = $tipeModels->pluck('merk')->filter()->unique()->implode(', ');
+                    $model = $tipeModels->pluck('model')->filter()->unique()->implode(', ');
                     $kompatibilitasHp = $tipeModels->map(fn ($t) => ['merk' => $t->merk, 'model' => $t->model])->toArray();
                 }
             }
@@ -311,12 +307,8 @@ class ProdukService
             if (! empty($finalTipeHpIds)) {
                 $tipeModels = TipeHp::whereIn('id', $finalTipeHpIds)->get();
                 if ($tipeModels->isNotEmpty()) {
-                    if (empty($brand)) {
-                        $brand = $tipeModels->pluck('merk')->unique()->implode(', ');
-                    }
-                    if (empty($model)) {
-                        $model = $tipeModels->pluck('model')->unique()->implode(', ');
-                    }
+                    $brand = $tipeModels->pluck('merk')->filter()->unique()->implode(', ');
+                    $model = $tipeModels->pluck('model')->filter()->unique()->implode(', ');
                     $kompatibilitasHp = $tipeModels->map(fn ($t) => ['merk' => $t->merk, 'model' => $t->model])->toArray();
                 }
             }
@@ -334,7 +326,7 @@ class ProdukService
                 'supplier_id' => $supplierId,
                 'brand_kompatibel' => $brand,
                 'model_kompatibel' => $model,
-                'kompatibilitas_hp' => ! empty($kompatibilitasHp) ? $kompatibilitasHp : $produk->kompatibilitas_hp,
+                'kompatibilitas_hp' => ! empty($kompatibilitasHp) ? $kompatibilitasHp : (empty($brand) && empty($model) ? null : $produk->kompatibilitas_hp),
                 'kondisi' => ! empty($kondisi) ? trim($kondisi) : 'baru',
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,

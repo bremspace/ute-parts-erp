@@ -710,13 +710,13 @@ class ProdukTab extends Component
 
         $this->{$formKey}['tipe_hp_ids'] = array_values(array_unique($current));
 
-        // Sinkronkan brand_kompatibel dan model_kompatibel ringkasan dari tipe pertama
-        if (empty($this->{$formKey}['brand_kompatibel']) && ! empty($current)) {
-            $th = TipeHp::find($current[0]);
-            if ($th) {
-                $this->{$formKey}['brand_kompatibel'] = $th->merk;
-                $this->{$formKey}['model_kompatibel'] = $th->model;
-            }
+        // Sinkronkan brand_kompatibel dan model_kompatibel ringkasan
+        if (! empty($current)) {
+            $allTipes = TipeHp::whereIn('id', $current)->get();
+            $merks = $allTipes->pluck('merk')->filter()->unique()->values();
+            $models = $allTipes->pluck('model')->filter()->unique()->values();
+            $this->{$formKey}['brand_kompatibel'] = $merks->isNotEmpty() ? $merks->implode(', ') : null;
+            $this->{$formKey}['model_kompatibel'] = $models->isNotEmpty() ? $models->implode(', ') : null;
         }
 
         if ($target === 'edit') {
@@ -744,11 +744,11 @@ class ProdukTab extends Component
         $this->{$formKey}['tipe_hp_ids'] = $filtered;
 
         if (! empty($filtered)) {
-            $first = TipeHp::find($filtered[0]);
-            if ($first) {
-                $this->{$formKey}['brand_kompatibel'] = $first->merk;
-                $this->{$formKey}['model_kompatibel'] = $first->model;
-            }
+            $allTipes = TipeHp::whereIn('id', $filtered)->get();
+            $merks = $allTipes->pluck('merk')->filter()->unique()->values();
+            $models = $allTipes->pluck('model')->filter()->unique()->values();
+            $this->{$formKey}['brand_kompatibel'] = $merks->isNotEmpty() ? $merks->implode(', ') : null;
+            $this->{$formKey}['model_kompatibel'] = $models->isNotEmpty() ? $models->implode(', ') : null;
         } else {
             $this->{$formKey}['brand_kompatibel'] = null;
             $this->{$formKey}['model_kompatibel'] = null;
@@ -1065,14 +1065,14 @@ class ProdukTab extends Component
         // Pastikan harga tier retail selalu sinkron dengan harga jual retail
         $this->produkForm['harga_tier']['retail']['nominal_tetap'] = (float) $this->produkForm['harga_jual_retail'];
 
-        // Pastikan brand & model kompatibel sinkron dari Tipe HP bila ada
+        // Pastikan brand & model kompatibel sinkron dari seluruh Tipe HP yang dipilih
         $this->produkForm['tipe_hp_ids'] = array_values(array_unique(array_map('intval', (array) ($this->produkForm['tipe_hp_ids'] ?? []))));
         if (! empty($this->produkForm['tipe_hp_ids'])) {
-            $firstT = TipeHp::find($this->produkForm['tipe_hp_ids'][0]);
-            if ($firstT) {
-                $this->produkForm['brand_kompatibel'] = $firstT->merk;
-                $this->produkForm['model_kompatibel'] = $firstT->model;
-            }
+            $allTipes = TipeHp::whereIn('id', $this->produkForm['tipe_hp_ids'])->get();
+            $merks = $allTipes->pluck('merk')->filter()->unique()->values();
+            $models = $allTipes->pluck('model')->filter()->unique()->values();
+            $this->produkForm['brand_kompatibel'] = $merks->isNotEmpty() ? $merks->implode(', ') : null;
+            $this->produkForm['model_kompatibel'] = $models->isNotEmpty() ? $models->implode(', ') : null;
         } else {
             $this->produkForm['brand_kompatibel'] = null;
             $this->produkForm['model_kompatibel'] = null;
@@ -1179,15 +1179,61 @@ class ProdukTab extends Component
         $existingCodes = SatuanUnit::pluck('kode')->map(fn ($k) => strtolower($k))->all();
 
         $tipeHpIds = $p->tipeHps->pluck('id')->all();
-        if (empty($tipeHpIds) && ! empty($p->brand_kompatibel) && ! empty($p->model_kompatibel)) {
-            $matched = TipeHp::where('merk', $p->brand_kompatibel)->where('model', $p->model_kompatibel)->first();
-            if ($matched) {
-                $tipeHpIds = [$matched->id];
+
+        // Resolusi otomatis dari kompatibilitas_hp (array JSON)
+        if (is_array($p->kompatibilitas_hp) && ! empty($p->kompatibilitas_hp)) {
+            foreach ($p->kompatibilitas_hp as $kh) {
+                if (is_array($kh) && ! empty($kh['model'])) {
+                    $m = trim((string) ($kh['merk'] ?? $p->brand_kompatibel ?? 'Universal'));
+                    $mod = trim((string) $kh['model']);
+                    $matched = TipeHp::firstOrCreate(
+                        ['merk' => $m, 'model' => $mod],
+                        ['nama' => $m.' '.$mod, 'is_active' => true]
+                    );
+                    $tipeHpIds[] = $matched->id;
+                }
             }
         }
+
+        // Resolusi otomatis dari brand_kompatibel & model_kompatibel (comma-separated string)
+        if (! empty($p->model_kompatibel)) {
+            $m = trim((string) ($p->brand_kompatibel ?: 'Universal'));
+            $models = explode(',', (string) $p->model_kompatibel);
+            foreach ($models as $mod) {
+                $mod = trim($mod);
+                if ($mod !== '') {
+                    $matched = TipeHp::firstOrCreate(
+                        ['merk' => $m, 'model' => $mod],
+                        ['nama' => $m.' '.$mod, 'is_active' => true]
+                    );
+                    $tipeHpIds[] = $matched->id;
+                }
+            }
+        }
+
         $tipeHpIds = array_values(array_unique(array_map('intval', $tipeHpIds)));
-        $this->editKompatibelMerekHp = null;
+
+        // Sinkronkan ke pivot jika ada relasi yang baru di-resolve
+        if (! empty($tipeHpIds)) {
+            $p->tipeHps()->syncWithoutDetaching($tipeHpIds);
+            $allLoadedTipes = TipeHp::whereIn('id', $tipeHpIds)->get();
+            $merks = $allLoadedTipes->pluck('merk')->filter()->unique()->values();
+            $models = $allLoadedTipes->pluck('model')->filter()->unique()->values();
+            $formBrand = $merks->isNotEmpty() ? $merks->implode(', ') : $p->brand_kompatibel;
+            $formModel = $models->isNotEmpty() ? $models->implode(', ') : $p->model_kompatibel;
+        } else {
+            $formBrand = $p->brand_kompatibel;
+            $formModel = $p->model_kompatibel;
+        }
+
+        $defaultMerekHp = null;
+        if (! empty($tipeHpIds)) {
+            $defaultMerekHp = TipeHp::whereIn('id', $tipeHpIds)->value('merk');
+        }
+        $this->editKompatibelMerekHp = $defaultMerekHp ?: ($p->brand_kompatibel ?: null);
         $this->editKompatibelTipeHpId = null;
+        $this->editKompatibelSelectedTipeHpIds = [];
+        $this->searchTipeHpEdit = '';
 
         $this->editProdukForm = [
             'nama' => $p->nama,
@@ -1195,8 +1241,8 @@ class ProdukTab extends Component
             'barcode' => $p->barcode ?? '',
             'kategori' => $p->kategori,
             'kategori_id' => $p->kategori_id,
-            'brand_kompatibel' => $p->brand_kompatibel,
-            'model_kompatibel' => $p->model_kompatibel,
+            'brand_kompatibel' => $formBrand,
+            'model_kompatibel' => $formModel,
             'kondisi' => $p->kondisi,
             'satuan_kode' => $p->satuan ?: 'pcs',
             'harga_beli' => (float) $p->harga_beli,
@@ -1482,14 +1528,14 @@ class ProdukTab extends Component
             }
         }
 
-        // Pastikan brand & model kompatibel sinkron dari Tipe HP bila ada
+        // Pastikan brand & model kompatibel sinkron dari seluruh Tipe HP yang dipilih
         $this->editProdukForm['tipe_hp_ids'] = array_values(array_unique(array_map('intval', (array) ($this->editProdukForm['tipe_hp_ids'] ?? []))));
         if (! empty($this->editProdukForm['tipe_hp_ids'])) {
-            $firstT = TipeHp::find($this->editProdukForm['tipe_hp_ids'][0]);
-            if ($firstT) {
-                $this->editProdukForm['brand_kompatibel'] = $firstT->merk;
-                $this->editProdukForm['model_kompatibel'] = $firstT->model;
-            }
+            $allTipes = TipeHp::whereIn('id', $this->editProdukForm['tipe_hp_ids'])->get();
+            $merks = $allTipes->pluck('merk')->filter()->unique()->values();
+            $models = $allTipes->pluck('model')->filter()->unique()->values();
+            $this->editProdukForm['brand_kompatibel'] = $merks->isNotEmpty() ? $merks->implode(', ') : null;
+            $this->editProdukForm['model_kompatibel'] = $models->isNotEmpty() ? $models->implode(', ') : null;
         } else {
             $this->editProdukForm['brand_kompatibel'] = null;
             $this->editProdukForm['model_kompatibel'] = null;

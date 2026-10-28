@@ -125,9 +125,19 @@
                                                 <span class="text-[10px] font-bold text-ink-500 dark:text-ink-400 bg-ink-100/60 dark:bg-white/5 px-1.5 py-0.5 rounded uppercase">
                                                     Satuan: {{ $satuanDasar }}
                                                 </span>
-                                                @if($prod->tipeHps->count() > 0)
+                                                @php
+                                                    $thModels = collect($prod->tipeHps ? $prod->tipeHps->pluck('model') : []);
+                                                    if (is_array($prod->kompatibilitas_hp)) {
+                                                        $thModels = $thModels->merge(collect($prod->kompatibilitas_hp)->pluck('model'));
+                                                    }
+                                                    if (!empty($prod->model_kompatibel)) {
+                                                        $thModels = $thModels->merge(explode(',', (string) $prod->model_kompatibel));
+                                                    }
+                                                    $thModels = $thModels->map(fn($m) => trim((string)$m))->filter()->unique()->values();
+                                                @endphp
+                                                @if($thModels->isNotEmpty())
                                                     <span class="text-[10px] text-up-primary font-medium bg-up-primary/10 px-1.5 py-0.5 rounded border border-up-primary/20">
-                                                        📱 {{ $prod->tipeHps->pluck('model')->take(2)->join(', ') }}
+                                                        📱 {{ $thModels->join(', ') }}
                                                     </span>
                                                 @endif
                                             </div>

@@ -1471,8 +1471,24 @@
                                 </div>
                                 <div class="min-w-0">
                                     <span class="font-semibold text-ink-900 dark:text-white block text-xs leading-snug line-clamp-2" title="{{ $p->nama }}">{{ $p->nama }}</span>
-                                    <span class="block text-[10px] text-ink-400 mt-0.5 truncate" title="{{ $p->tipeHps && $p->tipeHps->isNotEmpty() ? $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->join(', ') : trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? '')) }}">
-                                        <strong class="text-ink-700 dark:text-ink-200">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</strong> · {{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}
+                                    @php
+                                        $kompatibelListRow = collect();
+                                        if ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
+                                            $kompatibelListRow = $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->filter();
+                                        } elseif (is_array($p->kompatibilitas_hp) && !empty($p->kompatibilitas_hp)) {
+                                            $kompatibelListRow = collect($p->kompatibilitas_hp)->map(fn($t) => trim((!empty($t['merk']) ? $t['merk'].' ' : '').($t['model'] ?? '')))->filter();
+                                        } elseif (!empty($p->model_kompatibel)) {
+                                            $m = trim((string)($p->brand_kompatibel ?? ''));
+                                            $kompatibelListRow = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))))
+                                                ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod));
+                                        }
+                                        $kompatibelListRow = $kompatibelListRow->unique()->values();
+                                        $kompatibelTextRow = $kompatibelListRow->isNotEmpty()
+                                            ? $kompatibelListRow->join(', ')
+                                            : trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
+                                    @endphp
+                                    <span class="block text-[10px] text-ink-400 mt-0.5 truncate" title="{{ $kompatibelTextRow ?: '-' }}">
+                                        <strong class="text-ink-700 dark:text-ink-200">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</strong> · {{ $kompatibelTextRow ?: '-' }}
                                     </span>
                                     <span class="flex gap-1 mt-1 flex-wrap items-center">
                                         @if(!empty($filterModelKompatibel) && strcasecmp((string)$p->model_kompatibel, (string)$filterModelKompatibel) !== 0)
@@ -1532,19 +1548,21 @@
                             <td class="py-2.5 px-3 text-xs min-w-[140px]">
                                 @php
                                     $allTipeHpList = collect();
-                                    if ($p->tipeHps && $p->tipeHps->isNotEmpty()) {
+                                    if ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
                                         $allTipeHpList = $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->filter();
                                     } elseif (is_array($p->kompatibilitas_hp) && !empty($p->kompatibilitas_hp)) {
                                         $allTipeHpList = collect($p->kompatibilitas_hp)->map(fn($t) => trim((!empty($t['merk']) ? $t['merk'].' ' : '').($t['model'] ?? '')))->filter();
                                     } elseif (!empty($p->model_kompatibel)) {
-                                        $allTipeHpList = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))));
+                                        $m = trim((string)($p->brand_kompatibel ?? ''));
+                                        $allTipeHpList = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))))
+                                            ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod));
                                     }
                                     $allTipeHpList = $allTipeHpList->unique()->values();
                                     $fullTipeTooltip = $allTipeHpList->isNotEmpty()
                                         ? $allTipeHpList->join(', ')
                                         : trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
                                 @endphp
-                                <span class="font-medium text-ink-200 block truncate" title="{{ $fullTipeTooltip }}">{{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}</span>
+                                <span class="font-medium text-ink-200 block truncate" title="{{ $fullTipeTooltip }}">{{ $fullTipeTooltip ?: '-' }}</span>
                                 @if(!empty($filterModelKompatibel) && strcasecmp((string)$p->model_kompatibel, (string)$filterModelKompatibel) !== 0)
                                     <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-up-primary/20 border border-up-primary/40 text-[9px] font-bold text-up-primary">
                                         Kompatibel {{ $filterModelKompatibel }}
@@ -1552,16 +1570,11 @@
                                 @endif
                                 @if($allTipeHpList->isNotEmpty())
                                     <div class="mt-1 flex flex-wrap gap-1" title="{{ $fullTipeTooltip }}">
-                                        @foreach($allTipeHpList->take(3) as $thItem)
+                                        @foreach($allTipeHpList as $thItem)
                                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300">
                                                 {{ $thItem }}
                                             </span>
                                         @endforeach
-                                        @if($allTipeHpList->count() > 3)
-                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-up-primary/10 border border-up-primary/20 text-up-primary">
-                                                +{{ $allTipeHpList->count() - 3 }} lainnya
-                                            </span>
-                                        @endif
                                     </div>
                                 @endif
                             </td>
@@ -1901,12 +1914,17 @@
                             </div>
 
                             @php
-                                $kompatibelGrid = trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
-                                if (empty($kompatibelGrid) && !empty($p->kompatibilitas_hp) && is_array($p->kompatibilitas_hp)) {
-                                    $kompatibelGrid = collect($p->kompatibilitas_hp)->map(fn($k) => trim(($k['merk'] ?? '').' '.($k['model'] ?? '')))->filter()->implode(', ');
-                                }
-                                if (empty($kompatibelGrid) && $p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
-                                    $kompatibelGrid = $p->tipeHps->map(fn($t) => trim("{$t->merk} {$t->model}"))->filter()->implode(', ');
+                                $kompatibelGrid = '';
+                                if ($p->relationLoaded('tipeHps') && $p->tipeHps->isNotEmpty()) {
+                                    $kompatibelGrid = $p->tipeHps->map(fn($t) => trim("{$t->merk} {$t->model}"))->filter()->unique()->implode(', ');
+                                } elseif (!empty($p->kompatibilitas_hp) && is_array($p->kompatibilitas_hp)) {
+                                    $kompatibelGrid = collect($p->kompatibilitas_hp)->map(fn($k) => trim(($k['merk'] ?? '').' '.($k['model'] ?? '')))->filter()->unique()->implode(', ');
+                                } elseif (!empty($p->model_kompatibel)) {
+                                    $m = trim((string)($p->brand_kompatibel ?? ''));
+                                    $kompatibelGrid = collect(array_filter(array_map('trim', explode(',', (string) $p->model_kompatibel))))
+                                        ->map(fn($mod) => trim(($m ? $m.' ' : '').$mod))->implode(', ');
+                                } else {
+                                    $kompatibelGrid = trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
                                 }
                             @endphp
                             <div class="px-2.5 py-2 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] flex items-center justify-between gap-2">

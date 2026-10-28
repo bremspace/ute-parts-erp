@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Pos\Livewire\PosKasir;
 use App\Modules\Pos\Models\HargaTier;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Wms\Livewire\PoTab;
@@ -15,6 +16,7 @@ use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\Supplier;
+use App\Modules\Wms\Models\TipeHp;
 use App\Support\WhatsAppHelper;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -625,5 +627,121 @@ class MasterProdukUiDanBatchTest extends TestCase
             ->assertSet('supplierScope', 'all')
             ->assertSee('Touchscreen Vivo Y12')
             ->assertSee('Speaker Buzzer Xiaomi Note 8'); // Sekarang produk supplier lain dapat dipilih
+    }
+
+    public function test_edit_produk_mempertahankan_semua_kompatibilitas_hp_pada_ui_dan_database(): void
+    {
+        $this->actingAs($this->user);
+
+        $th1 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy A54 Test'], ['nama' => 'Samsung Galaxy A54 Test', 'is_active' => true]);
+        $th2 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy A34 Test'], ['nama' => 'Samsung Galaxy A34 Test', 'is_active' => true]);
+        $th3 = TipeHp::firstOrCreate(['merk' => 'Samsung', 'model' => 'Galaxy A24 Test'], ['nama' => 'Samsung Galaxy A24 Test', 'is_active' => true]);
+
+        $produk = Produk::create([
+            'nama' => 'LCD Samsung Galaxy A Series Multi',
+            'harga_beli' => 200000,
+            'harga_jual_retail' => 350000,
+            'satuan' => 'pcs',
+            'kondisi' => 'baru',
+            'brand_kompatibel' => 'Samsung',
+            'model_kompatibel' => 'Galaxy A54 Test, Galaxy A34 Test, Galaxy A24 Test',
+            'kompatibilitas_hp' => [
+                ['merk' => 'Samsung', 'model' => 'Galaxy A54 Test'],
+                ['merk' => 'Samsung', 'model' => 'Galaxy A34 Test'],
+                ['merk' => 'Samsung', 'model' => 'Galaxy A24 Test'],
+            ],
+            'is_active' => true,
+        ]);
+        $produk->tipeHps()->sync([$th1->id, $th2->id, $th3->id]);
+        SkuVariant::create([
+            'produk_id' => $produk->id,
+            'sku' => 'SKU-LCD-SAM-MULTI',
+            'harga_beli' => 200000,
+            'harga_jual_retail' => 350000,
+            'satuan_kode' => 'pcs',
+            'is_active' => true,
+        ]);
+
+        // Verifikasi sebelum edit: tabel dan grid menampilkan ketiga model
+        $lwBefore = Livewire::test(ProdukTab::class);
+        $lwBefore->assertSee('Galaxy A54 Test')
+            ->assertSee('Galaxy A34 Test')
+            ->assertSee('Galaxy A24 Test');
+
+        // Buka modal edit produk
+        $lwEdit = Livewire::test(ProdukTab::class)
+            ->call('openEditProdukModal', $produk->id);
+
+        $this->assertCount(3, $lwEdit->get('editProdukForm.tipe_hp_ids'));
+        $this->assertStringContainsString('Galaxy A54 Test', $lwEdit->get('editProdukForm.model_kompatibel'));
+        $this->assertStringContainsString('Galaxy A34 Test', $lwEdit->get('editProdukForm.model_kompatibel'));
+        $this->assertStringContainsString('Galaxy A24 Test', $lwEdit->get('editProdukForm.model_kompatibel'));
+
+        // Lakukan pengeditan data (misal ubah nama & harga) lalu simpan
+        $lwEdit->set('editProdukForm.nama', 'LCD Samsung Galaxy A Series Multi (Updated)')
+            ->set('editProdukForm.harga_jual_retail', 360000)
+            ->call('simpanEditProduk');
+
+        $produk->refresh();
+        $this->assertEquals('LCD Samsung Galaxy A Series Multi (Updated)', $produk->nama);
+        $this->assertCount(3, $produk->tipeHps);
+        $this->assertStringContainsString('Galaxy A54 Test', $produk->model_kompatibel);
+        $this->assertStringContainsString('Galaxy A34 Test', $produk->model_kompatibel);
+        $this->assertStringContainsString('Galaxy A24 Test', $produk->model_kompatibel);
+
+        // Verifikasi setelah edit: UI tetap menampilkan seluruh model kompatibilitas
+        $lwAfter = Livewire::test(ProdukTab::class);
+        $lwAfter->assertSee('Galaxy A54 Test')
+            ->assertSee('Galaxy A34 Test')
+            ->assertSee('Galaxy A24 Test');
+    }
+
+    public function test_kasir_menampilkan_seluruh_tipe_kompatibilitas_hp_tanpa_dibatasi(): void
+    {
+        $this->actingAs($this->user);
+
+        $th1 = TipeHp::firstOrCreate(['merk' => 'Xiaomi', 'model' => 'Redmi Note 11 Test'], ['nama' => 'Xiaomi Redmi Note 11 Test', 'is_active' => true]);
+        $th2 = TipeHp::firstOrCreate(['merk' => 'Xiaomi', 'model' => 'Redmi Note 11S Test'], ['nama' => 'Xiaomi Redmi Note 11S Test', 'is_active' => true]);
+        $th3 = TipeHp::firstOrCreate(['merk' => 'Xiaomi', 'model' => 'POCO M4 Pro Test'], ['nama' => 'Xiaomi POCO M4 Pro Test', 'is_active' => true]);
+
+        $produk = Produk::create([
+            'nama' => 'Baterai Xiaomi BN5D Multi Type',
+            'harga_beli' => 50000,
+            'harga_jual_retail' => 95000,
+            'satuan' => 'pcs',
+            'kondisi' => 'baru',
+            'brand_kompatibel' => 'Xiaomi',
+            'model_kompatibel' => 'Redmi Note 11 Test, Redmi Note 11S Test, POCO M4 Pro Test',
+            'kompatibilitas_hp' => [
+                ['merk' => 'Xiaomi', 'model' => 'Redmi Note 11 Test'],
+                ['merk' => 'Xiaomi', 'model' => 'Redmi Note 11S Test'],
+                ['merk' => 'Xiaomi', 'model' => 'POCO M4 Pro Test'],
+            ],
+            'is_active' => true,
+        ]);
+        $produk->tipeHps()->sync([$th1->id, $th2->id, $th3->id]);
+        SkuVariant::create([
+            'produk_id' => $produk->id,
+            'sku' => 'SKU-BAT-BN5D',
+            'harga_beli' => 50000,
+            'harga_jual_retail' => 95000,
+            'satuan_kode' => 'pcs',
+            'is_active' => true,
+        ]);
+
+        $gudang = Gudang::where('cabang_id', $this->cabang->id)->first();
+        StokItem::create([
+            'produk_id' => $produk->id,
+            'gudang_id' => $gudang->id,
+            'jumlah' => 10,
+            'jumlah_minimum' => 2,
+        ]);
+
+        // Verifikasi PosKasir merender ketiga model (tidak dipotong take 2)
+        Livewire::test(PosKasir::class)
+            ->set('search', 'BN5D')
+            ->assertSee('Redmi Note 11 Test')
+            ->assertSee('Redmi Note 11S Test')
+            ->assertSee('POCO M4 Pro Test');
     }
 }
