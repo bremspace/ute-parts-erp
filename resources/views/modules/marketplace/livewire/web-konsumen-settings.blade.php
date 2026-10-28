@@ -96,6 +96,14 @@
                 <span>Kontak &amp; Pop-up</span>
             </button>
 
+            <button type="button" wire:click="setTab('pembayaran')"
+                    class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'pembayaran' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-white/[0.03] text-ink-400 hover:text-white hover:bg-white/[0.07] border border-white/5' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <span>Metode Pembayaran</span>
+            </button>
+
             <button type="button" wire:click="setTab('preview')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color,color] duration-140 active:scale-[0.97] min-h-[44px] flex items-center gap-2 flex-nowrap shrink-0 whitespace-nowrap cursor-pointer {{ $activeTab === 'preview' ? 'bg-up-mint text-ink-950 shadow-md shadow-up-mint/25' : 'bg-up-mint/10 text-up-mint hover:bg-up-mint/20 border border-up-mint/20' }}">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -944,7 +952,145 @@
     </div>
     @endif
 
-    <!-- Tab 6: Live Simulator Preview -->
+    <!-- Tab 6: Pengaturan Metode Pembayaran MP Toko -->
+    @if ($activeTab === 'pembayaran')
+    <div class="space-y-6">
+        @php
+            $activeQris = app(\App\Modules\Pos\Services\QrisService::class)->getActiveQris();
+            $duitkuActive = (bool) ($paymentForm['payment_mp_duitku_enabled'] ?? false);
+            $qrisTokoActive = (bool) ($paymentForm['payment_mp_qris_toko_enabled'] ?? false);
+        @endphp
+
+        <!-- Banner Info Aturan Otomatis -->
+        <div class="p-4 sm:p-5 rounded-2xl border transition-all duration-200 {{ $duitkuActive && $qrisTokoActive ? 'bg-up-primary/10 border-up-primary/30 text-indigo-100' : ($qrisTokoActive ? 'bg-up-mint/10 border-up-mint/30 text-emerald-100' : 'bg-up-accent/10 border-up-accent/30 text-amber-100') }}">
+            <div class="flex items-start gap-3.5">
+                <div class="p-2.5 rounded-xl shrink-0 {{ $duitkuActive && $qrisTokoActive ? 'bg-up-primary text-white' : ($qrisTokoActive ? 'bg-up-mint text-ink-950 font-bold' : 'bg-up-accent text-white') }}">
+                    @if($duitkuActive && $qrisTokoActive)
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    @elseif($qrisTokoActive)
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                    @else
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    @endif
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        @if($duitkuActive && $qrisTokoActive)
+                            <span>Mode Hibrida Cerdas Aktif</span>
+                            <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-up-primary/30 text-indigo-300 border border-up-primary/40">Duitku + QRIS Toko</span>
+                        @elseif($qrisTokoActive)
+                            <span>Mode QRIS Toko Langsung</span>
+                            <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-up-mint/30 text-up-mint border border-up-mint/40">Hemat Biaya 100%</span>
+                        @elseif($duitkuActive)
+                            <span>Mode Payment Gateway Penuh</span>
+                            <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-up-accent/30 text-up-accent border border-up-accent/40">Duitku Only</span>
+                        @else
+                            <span class="text-up-red font-bold">Semua Opsi Nonaktif (Wajib Pilih Minimal 1)</span>
+                        @endif
+                    </h3>
+                    <p class="text-xs text-ink-300 leading-relaxed mt-1">
+                        @if($duitkuActive && $qrisTokoActive)
+                            Sistem secara otomatis <strong>menghilangkan channel QRIS dari gateway Duitku</strong> dan <strong>menggantikannya dengan QRIS Dinamis Toko</strong> (bebas potongan biaya transaksi). Metode Virtual Account Transfer Bank (BCA, Mandiri, BRI, BNI) dan E-Wallet Duitku tetap aktif melayani pembeli.
+                        @elseif($qrisTokoActive)
+                            Pembeli marketplace hanya dapat menyelesaikan pesanan melalui <strong>Scan QRIS Dinamis Toko</strong> (langsung terverifikasi lunas otomatis via webhook Android tanpa potongan fee gateway).
+                        @elseif($duitkuActive)
+                            Seluruh opsi pembayaran online (Transfer VA, E-Wallet, Retail, dan QRIS Duitku) diproses secara penuh melalui gateway Duitku.
+                        @else
+                            Mohon aktifkan minimal salah satu metode pembayaran agar pembeli di marketplace dapat menyelesaikan transaksi pesanan.
+                        @endif
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selector Toggles -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Card 1: Duitku Gateway -->
+            <x-prism.glass-card class="p-5 sm:p-6 space-y-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-up-primary/10 border border-up-primary/20 flex items-center justify-center text-up-primary font-black text-base">
+                            💳
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold text-white">Payment Gateway Duitku</h4>
+                            <p class="text-[11px] text-ink-400">Virtual Account Bank, E-Wallet, Gerai Retail</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" wire:model.live="paymentForm.payment_mp_duitku_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-primary"></div>
+                    </label>
+                </div>
+
+                <div class="pt-2 border-t border-white/5 space-y-2 text-xs text-ink-400">
+                    <div class="flex items-center justify-between">
+                        <span>Status Saluran:</span>
+                        <span class="font-bold {{ $duitkuActive ? 'text-up-mint' : 'text-ink-500' }}">
+                            {{ $duitkuActive ? '● Aktif di Marketplace' : '○ Dinonaktifkan' }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Cakupan Bank:</span>
+                        <span class="text-white font-mono text-[11px]">BCA, Mandiri, BRI, BNI, Permata, dll</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Pengaturan Kredensial:</span>
+                        <a href="/app/pengaturan?tab=integrasi" class="text-up-primary hover:underline font-semibold flex items-center gap-1">
+                            Pusat Pengaturan ↗
+                        </a>
+                    </div>
+                </div>
+            </x-prism.glass-card>
+
+            <!-- Card 2: QRIS Toko Langsung -->
+            <x-prism.glass-card class="p-5 sm:p-6 space-y-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-up-mint/10 border border-up-mint/20 flex items-center justify-center text-up-mint font-black text-base">
+                            ⚡
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold text-white">QRIS Dinamis Toko</h4>
+                            <p class="text-[11px] text-ink-400">Scan QRIS Langsung (Bebas Biaya Gateway / Fee 0%)</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" wire:model.live="paymentForm.payment_mp_qris_toko_enabled" class="sr-only peer">
+                        <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-up-mint"></div>
+                    </label>
+                </div>
+
+                <div class="pt-2 border-t border-white/5 space-y-2 text-xs text-ink-400">
+                    <div class="flex items-center justify-between">
+                        <span>Status Saluran:</span>
+                        <span class="font-bold {{ $qrisTokoActive ? 'text-up-mint' : 'text-ink-500' }}">
+                            {{ $qrisTokoActive ? '● Aktif di Marketplace' : '○ Dinonaktifkan' }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Merchant Aktif:</span>
+                        <span class="text-white font-semibold truncate max-w-[180px]">
+                            {{ $activeQris?->merchant_name ?: '(Belum Disetup)' }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Verifikasi Otomatis:</span>
+                        <span class="text-up-mint font-semibold">Webhook Android (MacroDroid / PayHook)</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Kelola QRIS &amp; Secret:</span>
+                        <a href="/app/pengaturan?tab=qris" class="text-up-primary hover:underline font-semibold flex items-center gap-1">
+                            Pengaturan QRIS Toko ↗
+                        </a>
+                    </div>
+                </div>
+            </x-prism.glass-card>
+        </div>
+    </div>
+    @endif
+
+    <!-- Tab 7: Live Simulator Preview -->
     @if ($activeTab === 'preview')
     <div class="space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-black/40 border border-white/10">

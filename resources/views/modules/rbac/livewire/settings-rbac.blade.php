@@ -3525,6 +3525,43 @@
                         </div>
                     </x-prism.glass-card>
 
+                    <!-- Saluran Pembayaran Marketplace (MP Toko) -->
+                    <x-prism.glass-card title="Saluran Pembayaran Marketplace (Web Konsumen)" subtitle="Aktivasi gateway Duitku dan QRIS Dinamis Toko untuk pesanan storefront">
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label class="p-4 rounded-xl bg-white/[0.02] border border-white/10 flex items-start gap-3 cursor-pointer hover:bg-white/[0.04] transition-colors">
+                                    <input type="checkbox" wire:model="integrasiForm.payment_mp_duitku_enabled" class="accent-up-primary w-4 h-4 rounded mt-0.5">
+                                    <div class="space-y-0.5">
+                                        <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                                            <span>💳 Gateway Duitku</span>
+                                            @if($integrasiForm['payment_mp_duitku_enabled'] ?? false)
+                                                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-up-primary/20 text-up-primary">AKTIF</span>
+                                            @endif
+                                        </div>
+                                        <p class="text-[11px] text-ink-400 leading-relaxed">Aktifkan channel VA Bank, E-Wallet, dan Retail di checkout konsumen.</p>
+                                    </div>
+                                </label>
+
+                                <label class="p-4 rounded-xl bg-white/[0.02] border border-white/10 flex items-start gap-3 cursor-pointer hover:bg-white/[0.04] transition-colors">
+                                    <input type="checkbox" wire:model="integrasiForm.payment_mp_qris_toko_enabled" class="accent-up-mint w-4 h-4 rounded mt-0.5">
+                                    <div class="space-y-0.5">
+                                        <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                                            <span>⚡ QRIS Dinamis Toko</span>
+                                            @if($integrasiForm['payment_mp_qris_toko_enabled'] ?? false)
+                                                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-up-mint/20 text-up-mint">AKTIF</span>
+                                            @endif
+                                        </div>
+                                        <p class="text-[11px] text-ink-400 leading-relaxed">Bebas fee gateway (0%). Gantikan QRIS Duitku otomatis jika keduanya aktif.</p>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-ink-400">
+                                💡 Aturan Hibrida: Jika Duitku dan QRIS Toko sama-sama aktif, opsi QRIS dari Duitku akan disembunyikan dan digantikan QRIS Toko.
+                            </div>
+                        </div>
+                    </x-prism.glass-card>
+
                     <!-- Biteship Logistics Card -->
                     <x-prism.glass-card title="Logistik & Ekspedisi Biteship" subtitle="Perhitungan ongkos kirim real-time dan booking kurir multi-ekspedisi">
                         <div class="space-y-4">

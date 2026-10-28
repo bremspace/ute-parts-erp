@@ -6,6 +6,8 @@ namespace App\Modules\Pos\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Marketplace\Services\DuitkuPaymentProcessor;
+use App\Modules\Pos\Models\Transaksi;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -152,9 +154,39 @@ class QrisNotificationController extends Controller
         Cache::put("qris_payment_{$nominal}", $paymentData, 300);
         Cache::put('qris_latest_payment', $paymentData, 300);
 
+        // Auto-complete transaksi marketplace jika ada order yang sedang menunggu pembayaran dengan nominal pas
+        $orderMatched = null;
+        try {
+            $pendingMp = Transaksi::where('status', 'menunggu_pembayaran')
+                ->where('sumber', 'marketplace')
+                ->where(function ($q) {
+                    $q->where('payment_reference', 'LIKE', 'QRIS-%')
+                        ->orWhere('metode_bayar', 'qris');
+                })
+                ->whereRaw('ROUND(total_akhir) = ?', [$nominal])
+                ->latest()
+                ->first();
+
+            if ($pendingMp) {
+                app(DuitkuPaymentProcessor::class)->prosesLunas(
+                    $pendingMp->no_transaksi,
+                    $nominal,
+                    'QRIS-TOKO',
+                    'qris'
+                );
+                Cache::forget("qris_payment_{$nominal}");
+                $orderMatched = $pendingMp->no_transaksi;
+                Log::info("Order marketplace {$pendingMp->no_transaksi} otomatis dilunasi via QRIS webhook", [
+                    'nominal' => $nominal,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Gagal auto-complete order marketplace via webhook QRIS: '.$e->getMessage());
+        }
+
         $this->catatLogHistory([
             'status' => 'sukses',
-            'pesan' => 'Berhasil diproses ke cache',
+            'pesan' => $orderMatched ? "Berhasil melunasi order MP {$orderMatched}" : 'Berhasil diproses ke cache',
             'nominal' => $nominal,
             'title' => $title,
             'raw' => $rawText,

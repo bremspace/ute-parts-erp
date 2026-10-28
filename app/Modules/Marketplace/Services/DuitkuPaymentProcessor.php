@@ -57,10 +57,10 @@ class DuitkuPaymentProcessor
      *                                  ke payment_reference bila kosong/beda.
      * @return array{kode: string, status?: string, expected?: int, diterima?: int, error?: string}
      */
-    public function prosesLunas(string $merchantOrderId, int $amount, ?string $reference = null): array
+    public function prosesLunas(string $merchantOrderId, int $amount, ?string $reference = null, ?string $metodeBayar = null): array
     {
         try {
-            return DB::transaction(function () use ($merchantOrderId, $amount, $reference) {
+            return DB::transaction(function () use ($merchantOrderId, $amount, $reference, $metodeBayar) {
                 // lockForUpdate() → baris order terkunci sampai commit; webhook
                 // paralel untuk order yang sama akan MENUNGGU di titik ini lalu
                 // membaca status 'lunas' (idempotent skip), bukan lolos guard.
@@ -87,12 +87,10 @@ class DuitkuPaymentProcessor
                 }
 
                 // a. Update status transaksi SEBELUM operasi lain (idempotency marker).
-                //    metode_bayar diseragamkan 'duitku' (PAY-02) — satu-satunya
-                //    penulis status lunas kini webhook/rekon (simulasi frontend
-                //    sudah dihapus di T-05).
+                $channelBayar = $metodeBayar ?: 'duitku';
                 $update = [
                     'status' => 'lunas',
-                    'metode_bayar' => 'duitku',
+                    'metode_bayar' => $channelBayar,
                     'jumlah_bayar' => (float) $transaksi->total_akhir,
                     'paid_at' => now(),
                 ];
@@ -115,27 +113,19 @@ class DuitkuPaymentProcessor
                         Transaksi::class,
                         $transaksi->id,
                         null,
-                        "POS Online {$merchantOrderId} (lunas Duitku)"
+                        "POS Online {$merchantOrderId} (lunas ".($channelBayar === 'qris' ? 'QRIS Toko' : 'Duitku').')'
                     );
                 }
 
                 // c. Jurnal otomatis: Kas masuk / Pendapatan / PPN / HPP / Persediaan turun
-                //    [B-14] PPN dipisah ke akun pajak 220-01 — POLA SAMA dgn POS
-                //    (`PosController::store()`): debit Kas = total_akhir (nilai yang
-                //    benar-benar dibayar pelanggan, TIDAK diubah), kredit pendapatan
-                //    410-01 = DPP, kredit 220-01 = PPN. Tanpa ini seluruh
-                //    `total_akhir` masuk pendapatan → laporan penjualan marketplace
-                //    ≠ POS + laporan pajak F1-2 under-reported.
-                //    PPN TIDAK dihitung ulang di sini: nominalnya sudah disimpan
-                //    saat order dibuat (`OrderService::buatOrder` → PajakService)
-                //    sehingga tetap non-retroaktif bila konfigurasi pajak berubah.
                 $totalHpp = (float) $transaksi->items->sum(fn ($i) => (float) $i->hpp * (int) $i->jumlah);
                 $totalAkhir = (float) $transaksi->total_akhir;
                 [$dpp, $ppnNominal] = $this->pisahDppPpn($transaksi, $totalAkhir);
                 $noJurnal = $this->jurnalService->generateNoJurnal('pos', $cabangId);
 
+                $debitAkun = ($channelBayar === 'qris') ? '110-02' : '120-02';
                 $lines = [
-                    ['akun_kode' => '120-02', 'debit' => $totalAkhir, 'kredit' => 0],
+                    ['akun_kode' => $debitAkun, 'debit' => $totalAkhir, 'kredit' => 0],
                     ['akun_kode' => '410-03', 'debit' => 0, 'kredit' => $dpp],
                 ];
                 // PPN Keluaran → akun 220-01 (kontrak AC F1-2, baris dari PajakService)
@@ -151,7 +141,7 @@ class DuitkuPaymentProcessor
                     now(),
                     'pos',
                     $lines,
-                    "Jurnal order online {$merchantOrderId} (lunas Duitku)",
+                    "Jurnal order online {$merchantOrderId} (lunas ".($channelBayar === 'qris' ? 'QRIS Toko' : 'Duitku').')',
                     $cabangId,
                     null,
                     Transaksi::class,

@@ -2,13 +2,16 @@
 
 namespace App\Modules\Marketplace\Controllers;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Marketplace\Services\DuitkuPaymentProcessor;
 use App\Modules\Marketplace\Services\DuitkuService;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Pos\Services\QrisService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
@@ -37,6 +40,50 @@ class PaymentController extends Controller
 
         if ($transaksi->status !== 'menunggu_pembayaran') {
             return $this->error('Transaksi tidak dalam status menunggu pembayaran', 422);
+        }
+
+        // Jalur Pembayaran QRIS Toko (Langsung tanpa gateway)
+        if ($request->payment_method === 'QRIS_TOKO') {
+            $qrisService = app(QrisService::class);
+            $qris = $qrisService->getActiveQris($transaksi->cabang_id);
+
+            if (! $qris || blank($qris->payload_static)) {
+                return $this->error('QRIS Toko belum dikonfigurasi atau tidak aktif.', 503);
+            }
+
+            try {
+                $totalNominal = (float) $transaksi->total_akhir;
+                $dynamicPayload = $qrisService->generateDynamic(
+                    $qris->payload_static,
+                    $totalNominal,
+                    $transaksi->no_transaksi
+                );
+
+                $svg = $qrisService->renderSvg($dynamicPayload, 260);
+                $qrDataUri = 'data:image/svg+xml;base64,'.base64_encode($svg);
+
+                $transaksi->update([
+                    'metode_bayar' => 'qris',
+                    'payment_reference' => 'QRIS-'.$transaksi->no_transaksi,
+                    'payment_url' => null,
+                ]);
+
+                return $this->success([
+                    'no_transaksi' => $transaksi->no_transaksi,
+                    'payment_url' => null,
+                    'reference' => 'QRIS-'.$transaksi->no_transaksi,
+                    'va_number' => null,
+                    'qr_string' => $dynamicPayload,
+                    'qr_image' => $qrDataUri,
+                    'merchant_name' => $qris->merchant_name ?: config('app.name', 'Ute Parts'),
+                    'expiry' => now()->addMinutes(60)->format('Y-m-d H:i:s'),
+                    'sandbox' => false,
+                    'is_qris_toko' => true,
+                    'total' => $totalNominal,
+                ], 'Tagihan QRIS Toko berhasil dibuat');
+            } catch (\Exception $e) {
+                return $this->error('Gagal membuat tagihan QRIS Toko: '.$e->getMessage(), 500);
+            }
         }
 
         if (! $this->duitku->isConfigured()) {
@@ -210,22 +257,72 @@ class PaymentController extends Controller
     }
 
     /**
-     * Daftar metode pembayaran Duitku (dinamis).
+     * Daftar metode pembayaran Duitku & QRIS Toko (dinamis berdasarkan konfigurasi owner).
      */
     public function paymentMethods(Request $request)
     {
         $amount = (float) ($request->query('amount', 0));
+        $config = app(KonfigurasiService::class);
+        $duitkuEnabled = (bool) $config->get('payment_mp_duitku_enabled', true);
+        $qrisTokoEnabled = (bool) $config->get('payment_mp_qris_toko_enabled', true);
+
+        $qrisService = app(QrisService::class);
+        $qrisToko = $qrisService->getActiveQris();
+        $qrisTokoAvailable = $qrisTokoEnabled && ($qrisToko !== null && filled($qrisToko->payload_static));
+
+        $qrisTokoItem = [
+            'kode' => 'QRIS_TOKO',
+            'nama' => 'QRIS Toko (Scan Semua Bank & E-Wallet)',
+            'fee' => 0,
+            'kategori' => 'qris',
+            'badge' => 'QRIS',
+            'deskripsi' => 'BCA, Mandiri, BRI, BNI, DANA, GoPay, OVO, ShopeePay — Bebas Biaya',
+        ];
+
+        // 1. Jika Duitku dinonaktifkan
+        if (! $duitkuEnabled) {
+            if ($qrisTokoAvailable) {
+                return $this->success([$qrisTokoItem], 'Daftar metode pembayaran berhasil dimuat');
+            }
+
+            return $this->error('Layanan pembayaran online sedang tidak aktif', 503);
+        }
+
+        // 2. Jika Duitku diaktifkan
         try {
             $methods = $this->duitku->getPaymentMethods($amount);
 
+            // Jika QRIS Toko juga diaktifkan: hilangkan opsi QRIS Duitku dan gantikan dengan QRIS Toko
+            if ($qrisTokoAvailable) {
+                $filtered = array_values(array_filter($methods, function ($m) {
+                    $kat = strtolower((string) ($m['kategori'] ?? ''));
+                    $kode = strtoupper((string) ($m['kode'] ?? ''));
+                    $nama = strtoupper((string) ($m['nama'] ?? ''));
+
+                    if ($kat === 'qris' || in_array($kode, ['SP', 'NQ', 'SQ', 'TQ', 'QRIS'], true) || str_contains($nama, 'QRIS')) {
+                        return false;
+                    }
+
+                    return true;
+                }));
+
+                array_unshift($filtered, $qrisTokoItem);
+                $methods = $filtered;
+            }
+
             return $this->success($methods, 'Daftar metode pembayaran berhasil dimuat');
         } catch (\Exception $e) {
+            // Jika Duitku bermasalah/offline namun QRIS Toko tersedia, fallback ke QRIS Toko
+            if ($qrisTokoAvailable) {
+                return $this->success([$qrisTokoItem], 'Daftar metode pembayaran berhasil dimuat');
+            }
+
             return $this->error('Duitku: '.$e->getMessage(), 502);
         }
     }
 
     /**
-     * Cek status pembayaran ke Duitku secara on-demand & sinkronisasi otomatis.
+     * Cek status pembayaran ke Duitku / QRIS Toko secara on-demand & sinkronisasi otomatis.
      */
     public function checkStatus(Request $request)
     {
@@ -244,37 +341,55 @@ class PaymentController extends Controller
             ], 'Status terkini transaksi');
         }
 
-        // Tanyakan status live ke server Duitku
-        $res = $this->duitku->transactionStatus($transaksi->no_transaksi);
+        $expectedAmount = (int) round((float) $transaksi->total_akhir);
 
-        if ($res['status'] === 'sukses' && $res['status_code'] === '00') {
-            $amount = $res['amount'] ?? (int) round($transaksi->total_akhir);
-            $this->processor->prosesLunas($transaksi->no_transaksi, $amount, $res['reference']);
+        // 1. Cek notifikasi QRIS Toko di cache
+        $cachedQris = Cache::get("qris_payment_{$expectedAmount}");
+        if ($cachedQris) {
+            Cache::forget("qris_payment_{$expectedAmount}");
+            $this->processor->prosesLunas($transaksi->no_transaksi, $expectedAmount, 'QRIS-TOKO', 'qris');
             $transaksi->refresh();
 
             return $this->success([
                 'no_transaksi' => $transaksi->no_transaksi,
                 'status' => $transaksi->status,
                 'is_lunas' => true,
-            ], 'Pembayaran berhasil diverifikasi lunas');
+            ], 'Pembayaran QRIS Toko berhasil diverifikasi lunas');
         }
 
-        if ($res['status'] === 'batal' || in_array($res['status_code'], ['02', '03'], true)) {
-            $this->processor->prosesGagal($transaksi->no_transaksi, (string) $res['status_code']);
-            $transaksi->refresh();
+        // 2. Jika bukan transaksi khusus QRIS Toko dan Duitku terkonfigurasi, cek status ke Duitku
+        $isQrisTokoRef = str_starts_with((string) $transaksi->payment_reference, 'QRIS-');
+        if (! $isQrisTokoRef && $this->duitku->isConfigured()) {
+            $res = $this->duitku->transactionStatus($transaksi->no_transaksi);
 
-            return $this->success([
-                'no_transaksi' => $transaksi->no_transaksi,
-                'status' => $transaksi->status,
-                'is_lunas' => false,
-            ], 'Transaksi telah dibatalkan atau kadaluarsa');
+            if ($res['status'] === 'sukses' && $res['status_code'] === '00') {
+                $amount = $res['amount'] ?? $expectedAmount;
+                $this->processor->prosesLunas($transaksi->no_transaksi, $amount, $res['reference']);
+                $transaksi->refresh();
+
+                return $this->success([
+                    'no_transaksi' => $transaksi->no_transaksi,
+                    'status' => $transaksi->status,
+                    'is_lunas' => true,
+                ], 'Pembayaran berhasil diverifikasi lunas');
+            }
+
+            if ($res['status'] === 'batal' || in_array($res['status_code'], ['02', '03'], true)) {
+                $this->processor->prosesGagal($transaksi->no_transaksi, (string) $res['status_code']);
+                $transaksi->refresh();
+
+                return $this->success([
+                    'no_transaksi' => $transaksi->no_transaksi,
+                    'status' => $transaksi->status,
+                    'is_lunas' => false,
+                ], 'Transaksi telah dibatalkan atau kadaluarsa');
+            }
         }
 
         return $this->success([
             'no_transaksi' => $transaksi->no_transaksi,
             'status' => $transaksi->status,
             'is_lunas' => false,
-            'duitku_status' => $res['status'],
-        ], 'Transaksi masih menunggu pembayaran');
+        ], 'Menunggu pembayaran');
     }
 }

@@ -13,8 +13,9 @@
                 kategoriDipilih: 'qris',
                 loadingMetode: false,
                 loadingCreate: false,
+                qrisPollInterval: null,
                 errorBayar: '',        // pesan bebas; 'PAYMENT_UNAVAILABLE' = gateway belum dikonfigurasi (503)
-                infoBayar: null,       // { payment_url, va_number, qr_string, expiry, sandbox, kode, namaMetode, badge, kategori }
+                infoBayar: null,       // { payment_url, va_number, qr_string, qr_image, merchant_name, is_qris_toko, expiry, sandbox, kode, namaMetode, badge, kategori }
 
                 init() {
                     const params = new URLSearchParams(window.location.search);
@@ -74,6 +75,10 @@
                 /** Langkah 1: buka panel + muat daftar metode dinamis utk nominal order ini. */
                 async bukaBayar(id, no, total) {
                     if (this.loadingCreate) return;
+                    if (this.qrisPollInterval) {
+                        clearInterval(this.qrisPollInterval);
+                        this.qrisPollInterval = null;
+                    }
                     this.orderBayar = { id, no, total };
                     this.metodeList = [];
                     this.metodeDipilih = null;
@@ -152,6 +157,9 @@
                             payment_url: d.payment_url || d.paymentUrl || null,
                             va_number: d.va_number || d.vaNumber || null,
                             qr_string: d.qr_string || d.qrString || null,
+                            qr_image: d.qr_image || d.qrImage || null,
+                            merchant_name: d.merchant_name || d.merchantName || '',
+                            is_qris_toko: !!d.is_qris_toko || this.metodeDipilih === 'QRIS_TOKO',
                             expiry: d.expiry || d.expiryTime || null,
                             sandbox: !!d.sandbox,
                             kode: this.metodeDipilih,
@@ -161,11 +169,48 @@
                         };
 
                         this.loadingCreate = false;
+
+                        if (this.infoBayar.is_qris_toko) {
+                            this.mulaiPollingQris();
+                        }
                     } catch (e) {
                         this.loadingCreate = false;
                         this.errorBayar = (e && e.message) || 'Pembayaran gagal diproses. Silakan coba lagi.';
                         if (window.showToast) showToast(this.errorBayar, 'error');
                     }
+                },
+
+                mulaiPollingQris() {
+                    if (this.qrisPollInterval) clearInterval(this.qrisPollInterval);
+                    this.qrisPollInterval = setInterval(async () => {
+                        if (!this.showBayar || !this.infoBayar || !this.infoBayar.is_qris_toko || !this.orderBayar) {
+                            clearInterval(this.qrisPollInterval);
+                            this.qrisPollInterval = null;
+                            return;
+                        }
+                        try {
+                            const res = await fetch('/api/payment/check-status', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': this.csrf(),
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify({ no_transaksi: this.orderBayar.no }),
+                            });
+                            const body = await res.json().catch(() => null);
+                            if (body && body.data && body.data.is_lunas) {
+                                clearInterval(this.qrisPollInterval);
+                                this.qrisPollInterval = null;
+                                this.showBayar = false;
+                                if (window.showToast) {
+                                    showToast('Pembayaran QRIS Toko terdeteksi lunas! Pesanan segera disiapkan.', 'success');
+                                }
+                                if (this.$wire) this.$wire.$refresh();
+                            }
+                        } catch (e) {}
+                    }, 3000);
                 },
 
                 bukaHalamanPembayaran() {
@@ -189,6 +234,10 @@
                     const noOrder = this.orderBayar ? this.orderBayar.no : null;
                     this.showBayar = false;
                     this.loadingCreate = false;
+                    if (this.qrisPollInterval) {
+                        clearInterval(this.qrisPollInterval);
+                        this.qrisPollInterval = null;
+                    }
 
                     if (noOrder) {
                         try {
@@ -218,6 +267,10 @@
 
                 tutupBayar() {
                     if (this.loadingCreate) return; // jangan tutup saat transisi redirect
+                    if (this.qrisPollInterval) {
+                        clearInterval(this.qrisPollInterval);
+                        this.qrisPollInterval = null;
+                    }
                     this.showBayar = false;
                     this.loadingCreate = false;
                     // Muat ulang status order (mis. webhook sudah masuk saat pengguna kembali dari Duitku)
@@ -553,8 +606,34 @@
                                 </p>
                             </div>
 
-                            <!-- QRIS: Instruksi Scan Universal -->
-                            <div x-show="infoBayar && infoBayar.kategori === 'qris'" class="p-4 rounded-2xl bg-up-primary/5 border border-up-primary/20 text-xs text-ink-600 dark:text-indigo-200 space-y-2">
+                            <!-- QRIS Toko: Display QR Image Langsung & Live Auto Detect -->
+                            <div x-show="infoBayar && infoBayar.is_qris_toko" class="space-y-3">
+                                <div class="p-4 rounded-2xl bg-white dark:bg-ink-950 border border-ink-100 dark:border-white/10 shadow-sm space-y-3 text-center">
+                                    <div class="flex items-center justify-between">
+                                        <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-up-primary text-white tracking-wider">QRIS TOKO</span>
+                                        <span class="text-[10px] text-up-mint font-bold flex items-center gap-1">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-up-mint"></span>
+                                            Bebas Biaya (0%)
+                                        </span>
+                                    </div>
+                                    <div class="flex justify-center p-3 bg-white rounded-2xl border border-ink-100 max-w-[240px] mx-auto shadow-inner">
+                                        <template x-if="infoBayar && infoBayar.qr_image">
+                                            <img :src="infoBayar.qr_image" alt="QRIS Toko" class="w-52 h-52 object-contain" />
+                                        </template>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-ink-900 dark:text-white text-sm" x-text="infoBayar ? infoBayar.merchant_name : ''"></p>
+                                        <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">Scan via BCA, Mandiri, BRI, BNI, DANA, GoPay, OVO, ShopeePay, dll</p>
+                                    </div>
+                                    <div class="p-2 rounded-xl bg-up-mint/10 border border-up-mint/20 text-xs text-up-mint font-semibold flex items-center justify-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-up-mint animate-ping"></span>
+                                        <span>Menunggu deteksi otomatis pembayaran masuk...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- QRIS Duitku: Instruksi Scan Universal Gateway -->
+                            <div x-show="infoBayar && !infoBayar.is_qris_toko && infoBayar.kategori === 'qris'" class="p-4 rounded-2xl bg-up-primary/5 border border-up-primary/20 text-xs text-ink-600 dark:text-indigo-200 space-y-2">
                                 <div class="flex items-center gap-2">
                                     <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-up-primary text-white tracking-wider">QRIS</span>
                                     <p class="font-bold text-up-primary">Scan QRIS Semua Bank & E-Wallet</p>

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Marketplace\Livewire;
 
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Marketplace\Models\WebBanner;
 use App\Modules\Marketplace\Services\WebKonsumenService;
 use App\Modules\Rbac\Services\AuditService;
@@ -83,6 +84,11 @@ class WebKonsumenSettings extends Component
         'popup_active' => false,
         'popup_banner_id' => '',
         'popup_frequency' => 'once_per_day',
+    ];
+
+    public array $paymentForm = [
+        'payment_mp_duitku_enabled' => true,
+        'payment_mp_qris_toko_enabled' => true,
     ];
 
     // Banner Modal State
@@ -173,6 +179,11 @@ class WebKonsumenSettings extends Component
         $this->contactForm['popup_active'] = (bool) ($settings['popup_active'] ?? false);
         $this->contactForm['popup_banner_id'] = (string) ($settings['popup_banner_id'] ?? '');
         $this->contactForm['popup_frequency'] = $settings['popup_frequency'] ?? 'once_per_day';
+
+        // Populate Payment Options
+        $crmConfig = app(KonfigurasiService::class);
+        $this->paymentForm['payment_mp_duitku_enabled'] = (bool) ($settings['payment_mp_duitku_enabled'] ?? $crmConfig->get('payment_mp_duitku_enabled', true));
+        $this->paymentForm['payment_mp_qris_toko_enabled'] = (bool) ($settings['payment_mp_qris_toko_enabled'] ?? $crmConfig->get('payment_mp_qris_toko_enabled', true));
     }
 
     public function setTab(string $tab): void
@@ -263,9 +274,18 @@ class WebKonsumenSettings extends Component
             'popup_active' => $this->contactForm['popup_active'],
             'popup_banner_id' => $this->contactForm['popup_banner_id'],
             'popup_frequency' => $this->contactForm['popup_frequency'],
+
+            // Pembayaran MP Toko
+            'payment_mp_duitku_enabled' => (bool) $this->paymentForm['payment_mp_duitku_enabled'],
+            'payment_mp_qris_toko_enabled' => (bool) $this->paymentForm['payment_mp_qris_toko_enabled'],
         ];
 
         $service->saveSettings($payload, Auth::id());
+
+        // Sinkronisasi ke KonfigurasiService
+        $crmConfig = app(KonfigurasiService::class);
+        $crmConfig->set('payment_mp_duitku_enabled', (bool) $this->paymentForm['payment_mp_duitku_enabled'], 'Aktivasi Gateway Duitku MP');
+        $crmConfig->set('payment_mp_qris_toko_enabled', (bool) $this->paymentForm['payment_mp_qris_toko_enabled'], 'Aktivasi QRIS Dinamis Toko MP');
 
         // Catat Audit Log
         $after = $service->getAll();

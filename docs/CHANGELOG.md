@@ -3,6 +3,25 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-28 — Integrasi QRIS Toko Marketplace, Mode Hibrida Duitku & Sinkronisasi CMS ✅
+
+- **Saluran Pembayaran QRIS Dinamis Toko di Marketplace (`PaymentController.php`, `customer-account.blade.php`)**:
+  - Dukungan metode `QRIS_TOKO` pada endpoint `POST /api/payment/create`: menghasilkan QRIS dinamis toko dengan QR code SVG/Data URI langsung di modal akun/checkout pembeli tanpa redirect ke gateway pihak ketiga.
+  - Auto-polling status pembayaran setiap 3 detik di modal `customer-account.blade.php`: otomatis menutup modal dan memunculkan toast sukses saat pembayaran QRIS toko terdeteksi.
+  - Endpoint `POST /api/payment/check-status` on-demand memverifikasi pembayaran dari cache QRIS toko dan mengeksekusi `prosesLunas()` secara atomik.
+- **Mode Hibrida Cerdas Duitku & QRIS Toko (`PaymentController::paymentMethods()`)**:
+  - Filter otomatis metode pembayaran: jika gateway Duitku dan QRIS Toko sama-sama aktif, sistem menyaring keluar channel QRIS Duitku (`kategori === 'qris'` / kode `SP`, `NQ`, `SQ`, `TQ`, `QRIS`) dan menempatkan `QRIS_TOKO` di urutan pertama (bebas biaya potongan gateway). Metode Virtual Account Bank dan E-Wallet Duitku tetap aktif.
+  - Dukungan mode eksklusif (hanya Duitku atau hanya QRIS Toko).
+- **Pengaturan Saluran Pembayaran di CMS (`WebKonsumenSettings.php`, `web-konsumen-settings.blade.php`, `SettingsRbac.php`, `settings-rbac.blade.php`)**:
+  - Tab baru **Metode Pembayaran** di CMS Web Konsumen untuk toggle aktivasi Duitku dan QRIS Toko lengkap dengan indikator status hibrida/eksklusif.
+  - Kontrol aktivasi pembayaran MP toko pada tab **Integrasi** di Pengaturan RBAC pusat.
+  - Konfigurasi tersinkronisasi dua arah via `KonfigurasiService` (`payment_mp_duitku_enabled` & `payment_mp_qris_toko_enabled`) dan `WebKonsumenService`.
+- **Auto-Settle Pesanan Marketplace Langsung dari Webhook Android (`QrisNotificationController.php`, `DuitkuPaymentProcessor.php`)**:
+  - Listener webhook mendeteksi pesanan marketplace dengan status `menunggu_pembayaran` yang cocok nominalnya dan langsung mengeksekusi pelunasan otomatis.
+  - Penambahan parameter `$metodeBayar` pada `DuitkuPaymentProcessor::prosesLunas()` untuk menjurnal debit kas Bank `110-02` (QRIS Toko) atau Piutang Duitku `120-02`.
+- **Pengujian Terotomasi (`MarketplaceQrisTokoPaymentTest.php`)**:
+  - 5 test case mencakup pengujian hanya QRIS Toko, mode hibrida penggantian QRIS Duitku, pembuatan tagihan QRIS Toko, verifikasi status on-demand, dan auto-settle via webhook notifikasi.
+
 ## 2026-10-28 — Perbaikan Webhook MacroDroid, Auto-Complete Transaksi Kasir, & Tombol Cek Status QRIS ✅
 
 - **Ketahanan Parser Webhook Notifikasi Android (`QrisNotificationController.php`, `routes/api.php`, `routes/web.php`)**:

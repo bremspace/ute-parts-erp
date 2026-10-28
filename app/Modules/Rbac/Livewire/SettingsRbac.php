@@ -207,6 +207,10 @@ class SettingsRbac extends Component
         // Biteship Logistics Gateway
         'biteship_api_key' => '',
         'biteship_origin_type' => 'closest_branch',
+
+        // Metode Pembayaran MP Toko
+        'payment_mp_duitku_enabled' => true,
+        'payment_mp_qris_toko_enabled' => true,
     ];
 
     public ?string $waTestStatus = null;
@@ -936,6 +940,10 @@ class SettingsRbac extends Component
         } else {
             $this->integrasiForm['biteship_api_key'] = (string) env('BITESHIP_API_KEY', '');
         }
+
+        // Metode Pembayaran MP Toko
+        $this->integrasiForm['payment_mp_duitku_enabled'] = (bool) $config->get('payment_mp_duitku_enabled', true);
+        $this->integrasiForm['payment_mp_qris_toko_enabled'] = (bool) $config->get('payment_mp_qris_toko_enabled', true);
     }
 
     public function updatedIntegrasiFormWaProvider(): void
@@ -992,6 +1000,10 @@ class SettingsRbac extends Component
             'api_key' => $this->integrasiForm['biteship_api_key'],
             'origin_type' => $this->integrasiForm['biteship_origin_type'],
         ], 'Konfigurasi Ekspedisi Biteship');
+
+        // 4. Pembayaran MP Toko
+        $config->set('payment_mp_duitku_enabled', (bool) ($this->integrasiForm['payment_mp_duitku_enabled'] ?? true), 'Aktivasi Gateway Duitku MP');
+        $config->set('payment_mp_qris_toko_enabled', (bool) ($this->integrasiForm['payment_mp_qris_toko_enabled'] ?? true), 'Aktivasi QRIS Dinamis Toko MP');
 
         app(AuditService::class)->catat(
             'Konfigurasi',

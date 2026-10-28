@@ -226,7 +226,7 @@ class QrisService
         return QrisCabang::query()
             ->whereNull('cabang_id')
             ->where('is_active', true)
-            ->first();
+            ->first() ?? QrisCabang::query()->where('is_active', true)->first();
     }
 
     /**
