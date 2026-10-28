@@ -357,8 +357,8 @@ class ProdukTab extends Component
         $this->loadUserPreferences();
 
         $config = app(KonfigurasiService::class);
-        $resellerDef = (float) ($config->get('reseller_default_persen') ?? 1.0);
-        $agenDef = (float) ($config->get('agen_default_persen') ?? 2.0);
+        $resellerDef = $config->resellerDefaultPersen();
+        $agenDef = $config->agenDefaultPersen();
         $this->produkForm['harga_tier']['reseller']['persen_diskon'] = $resellerDef;
         $this->produkForm['harga_tier']['agen']['persen_diskon'] = $agenDef;
     }
@@ -585,8 +585,8 @@ class ProdukTab extends Component
     public function openProdukModal()
     {
         $config = app(KonfigurasiService::class);
-        $resellerDef = (float) ($config->get('reseller_default_persen') ?? 1.0);
-        $agenDef = (float) ($config->get('agen_default_persen') ?? 2.0);
+        $resellerDef = $config->resellerDefaultPersen();
+        $agenDef = $config->agenDefaultPersen();
 
         $this->produkForm = [
             'nama' => '', 'barcode' => '', 'kategori' => '', 'kategori_id' => null, 'brand_kompatibel' => '', 'model_kompatibel' => '',
@@ -808,8 +808,8 @@ class ProdukTab extends Component
 
         $config = app(KonfigurasiService::class);
         $defaultPersen = [
-            'reseller' => (float) ($config->get('reseller_default_persen') ?? 1.0),
-            'agen' => (float) ($config->get('agen_default_persen') ?? 2.0),
+            'reseller' => $config->resellerDefaultPersen(),
+            'agen' => $config->agenDefaultPersen(),
         ];
 
         foreach (['reseller', 'agen'] as $tipe) {
@@ -1161,8 +1161,8 @@ class ProdukTab extends Component
         }
 
         $config = app(KonfigurasiService::class);
-        $resellerDef = (float) ($config->get('reseller_default_persen') ?? 1.0);
-        $agenDef = (float) ($config->get('agen_default_persen') ?? 2.0);
+        $resellerDef = $config->resellerDefaultPersen();
+        $agenDef = $config->agenDefaultPersen();
         $retailHarga = (float) $p->harga_jual_retail;
 
         foreach (['reseller' => $resellerDef, 'agen' => $agenDef] as $t => $defP) {
@@ -4249,7 +4249,7 @@ class ProdukTab extends Component
 
     public function render()
     {
-        $kategoriTree = KategoriProduk::getTreeTersediaDiProduk();
+        $kategoriTree = KategoriProduk::getTree();
 
         $produks = $this->getFilteredProdukQuery()
             ->paginate($this->perPage);
@@ -4348,7 +4348,7 @@ class ProdukTab extends Component
             'label' => $p->nama,
         ])->all();
 
-        // 1. Merk HP Kompatibel (Hanya brand smartphone dari master produk & relasinya)
+        // 1. Merk HP Kompatibel (Semua brand smartphone aktif di sistem & relasinya)
         $merekHpDariProduk = Produk::query()
             ->whereNotNull('brand_kompatibel')
             ->where('brand_kompatibel', '!=', '')
@@ -4356,7 +4356,7 @@ class ProdukTab extends Component
             ->pluck('brand_kompatibel');
 
         $merekHpDariRelasi = TipeHp::query()
-            ->whereHas('produk')
+            ->where('is_active', true)
             ->distinct()
             ->pluck('merk');
 
@@ -4376,20 +4376,14 @@ class ProdukTab extends Component
 
         $brandKompatibelList = $merekHpDariProduk
             ->merge($merekHpDariRelasi)
-            ->merge($merekHpJson);
-
-        if ($brandKompatibelList->isEmpty()) {
-            $brandKompatibelList = TipeHp::where('is_active', true)->distinct()->pluck('merk');
-        }
-
-        $brandKompatibelList = $brandKompatibelList
+            ->merge($merekHpJson)
             ->filter()
             ->unique()
             ->sort()
             ->values()
             ->all();
 
-        // 2. Tipe HP Kompatibel (Model smartphone dari master produk, cascading jika Merk HP dipilih)
+        // 2. Tipe HP Kompatibel (Model smartphone aktif di sistem, cascading jika Merk HP dipilih)
         $selectedMerk = $this->filterBrandKompatibel;
 
         $modelHpDariProduk = Produk::query()
@@ -4400,7 +4394,7 @@ class ProdukTab extends Component
             ->pluck('model_kompatibel');
 
         $modelHpDariRelasi = TipeHp::query()
-            ->whereHas('produk')
+            ->where('is_active', true)
             ->when($selectedMerk, fn ($q) => $q->where('merk', $selectedMerk))
             ->distinct()
             ->pluck('model');
@@ -4420,31 +4414,16 @@ class ProdukTab extends Component
 
         $modelKompatibelList = $modelHpDariProduk
             ->merge($modelHpDariRelasi)
-            ->merge($modelHpJson);
-
-        if ($modelKompatibelList->isEmpty()) {
-            $modelKompatibelList = TipeHp::where('is_active', true)
-                ->when($selectedMerk, fn ($q) => $q->where('merk', $selectedMerk))
-                ->distinct()
-                ->pluck('model');
-        }
-
-        $modelKompatibelList = $modelKompatibelList
+            ->merge($modelHpJson)
             ->filter()
             ->unique()
             ->sort()
             ->values()
             ->all();
 
-        // 3. Filter data pendukung agar sesuai dengan data riil master produk
+        // 3. Filter data pendukung agar seluruh master data aktif terintegrasi penuh
         $allBrands = Brand::where('is_active', true)->orderBy('nama')->get();
-        $brandsMaster = Brand::where('is_active', true)
-            ->when(Produk::whereNotNull('brand_id')->exists(), fn ($q) => $q->whereIn('id', Produk::whereNotNull('brand_id')->distinct()->pluck('brand_id')))
-            ->orderBy('nama')
-            ->get();
-        if ($brandsMaster->isEmpty()) {
-            $brandsMaster = $allBrands;
-        }
+        $brandsMaster = $allBrands;
 
         $kualitasFilterOptions = KualitasProduk::with('brand')
             ->where('is_active', true)

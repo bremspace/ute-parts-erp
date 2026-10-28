@@ -879,16 +879,16 @@ class MasterProdukManagementTest extends TestCase
         $this->assertNotContains('Crown Part', $brandKompatibel);
         $this->assertNotContains('Olike Part', $brandKompatibel);
 
-        // 2. Tree kategori terkalibrasi ke yang ada produknya
+        // 2. Tree kategori memuat semua master kategori aktif agar selalu terintegrasi penuh
         $kategoriTree = $comp->viewData('kategoriTree');
         $kategoriTreeIds = $kategoriTree->pluck('id')->all();
         $this->assertContains($katLcd->id, $kategoriTreeIds);
-        $this->assertNotContains($katHousing->id, $kategoriTreeIds);
+        $this->assertContains($katHousing->id, $kategoriTreeIds);
 
-        // 3. Brands sparepart dropdown hanya memuat brand yang ada di produk (Crown Part), bukan unused
+        // 3. Brands sparepart dropdown memuat semua brand aktif
         $brands = $comp->viewData('brands')->pluck('id')->all();
         $this->assertContains($brandCrown->id, $brands);
-        $this->assertNotContains($brandUnused->id, $brands);
+        $this->assertContains($brandUnused->id, $brands);
     }
 
     public function test_pencarian_murni_filter_kategori_dan_tipe_hp_urutkan_exact_dan_cross_kompatibel(): void
@@ -1352,31 +1352,35 @@ class MasterProdukManagementTest extends TestCase
     {
         $this->authedAdmin();
 
-        // 1. Verifikasi default config global persentase reseller (1%) & agen (2%)
+        // 1. Verifikasi default config global persentase reseller (5%) & agen (10%)
         $config = app(KonfigurasiService::class);
-        $this->assertSame(1.0, $config->resellerDefaultPersen());
-        $this->assertSame(2.0, $config->agenDefaultPersen());
+        $this->assertSame(5.0, $config->resellerDefaultPersen());
+        $this->assertSame(10.0, $config->agenDefaultPersen());
 
         // 2. Buka form tambah produk di ProdukTab -> persen default terisi otomatis
         $comp = Livewire::test(ProdukTab::class)
             ->call('openProdukModal');
 
-        $this->assertSame(1.0, (float) $comp->get('produkForm.harga_tier.reseller.persen_diskon'));
-        $this->assertSame(2.0, (float) $comp->get('produkForm.harga_tier.agen.persen_diskon'));
+        $this->assertSame(5.0, (float) $comp->get('produkForm.harga_tier.reseller.persen_diskon'));
+        $this->assertSame(10.0, (float) $comp->get('produkForm.harga_tier.agen.persen_diskon'));
 
         // 3. Set harga jual retail -> nominal reseller & agen otomatis terhitung
         $comp->set('produkForm.harga_jual_retail', 100000);
         $this->assertSame(100000.0, (float) $comp->get('produkForm.harga_tier.retail.nominal_tetap'));
-        // 1% diskon dari 100.000 = 99.000
-        $this->assertSame(99000.0, (float) $comp->get('produkForm.harga_tier.reseller.nominal_tetap'));
-        // 2% diskon dari 100.000 = 98.000
-        $this->assertSame(98000.0, (float) $comp->get('produkForm.harga_tier.agen.nominal_tetap'));
+        // 5% diskon dari 100.000 = 95.000
+        $this->assertSame(95000.0, (float) $comp->get('produkForm.harga_tier.reseller.nominal_tetap'));
+        // 10% diskon dari 100.000 = 90.000
+        $this->assertSame(90000.0, (float) $comp->get('produkForm.harga_tier.agen.nominal_tetap'));
 
-        // 4. Ubah persen reseller menjadi 5% -> nominal otomatis berubah jadi 95.000
+        // 4. Ubah persen reseller menjadi 7% -> nominal otomatis berubah jadi 93.000 lalu kembalikan ke 5% (95.000)
+        $comp->set('produkForm.harga_tier.reseller.persen_diskon', 7.0);
+        $this->assertSame(93000.0, (float) $comp->get('produkForm.harga_tier.reseller.nominal_tetap'));
         $comp->set('produkForm.harga_tier.reseller.persen_diskon', 5.0);
         $this->assertSame(95000.0, (float) $comp->get('produkForm.harga_tier.reseller.nominal_tetap'));
 
-        // 5. Ubah nominal agen menjadi 90.000 -> persen diskon otomatis terhitung jadi 10%
+        // 5. Ubah nominal agen menjadi 85.000 -> persen diskon otomatis terhitung jadi 15% lalu kembalikan ke 90.000 (10%)
+        $comp->set('produkForm.harga_tier.agen.nominal_tetap', 85000);
+        $this->assertSame(15.0, (float) $comp->get('produkForm.harga_tier.agen.persen_diskon'));
         $comp->set('produkForm.harga_tier.agen.nominal_tetap', 90000);
         $this->assertSame(10.0, (float) $comp->get('produkForm.harga_tier.agen.persen_diskon'));
 
