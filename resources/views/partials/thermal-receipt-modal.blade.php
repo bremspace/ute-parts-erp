@@ -12,7 +12,7 @@
         {!! json_encode($receiptData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}
     </script>
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
+        class="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
         x-data="{ ...thermalPrinter({{ \Illuminate\Support\Js::from(array_merge($strukConfig, $receiptData)) }}), paperSize: '{{ $defaultPaperSize }}', autoPrint: {{ $autoPrint ? 'true' : 'false' }} }"
         x-init="if (autoPrint) { setTimeout(() => { paperSize === '58' ? webPrint58() : webPrint80(); }, 400); }"
     >
@@ -71,6 +71,16 @@
                                 @if(!empty($receiptData['void_alasan']))
                                     <div class="text-[9px] font-normal normal-case mt-0.5">{{ $receiptData['void_alasan'] }}</div>
                                 @endif
+                            </div>
+                        @endif
+                        @if(!empty($receiptData['is_piutang']))
+                            <div class="p-1.5 mb-1.5 text-center bg-amber-50 border-2 border-dashed border-amber-600 rounded text-amber-900 font-black uppercase text-[11px] tracking-wider print:border-black print:text-black">
+                                *** TAGIHAN PIUTANG / BELUM LUNAS ***
+                            </div>
+                        @endif
+                        @if(!empty($receiptData['no_tiket']))
+                            <div class="p-1.5 mb-1.5 text-center {{ !empty($receiptData['is_lunas']) ? 'bg-emerald-50 border-2 border-emerald-600 text-emerald-900' : 'bg-blue-50 border-2 border-dashed border-blue-600 text-blue-900' }} rounded font-black uppercase text-[11px] tracking-wider print:border-black print:text-black">
+                                {{ $receiptData['label_struk'] ?? (!empty($receiptData['is_lunas']) ? '*** KWITANSI PELUNASAN SERVIS ***' : '*** SPK / TANDA TERIMA ESTIMASI ***') }}
                             </div>
                         @endif
                         <div class="receipt-row flex justify-between">
@@ -253,14 +263,40 @@
                             <span class="tracking-wide">TOTAL:</span>
                             <span class="font-black">Rp {{ number_format($receiptData['total'], 0, ',', '.') }}</span>
                         </div>
-                        <div class="receipt-row flex justify-between text-gray-700 font-normal text-[10px]">
-                            <span>BAYAR ({{ $receiptData['metode'] ?? 'TUNAI' }}):</span>
-                            <span>Rp {{ number_format($receiptData['bayar'] ?? $receiptData['total'], 0, ',', '.') }}</span>
-                        </div>
-                        <div class="receipt-row flex justify-between text-gray-700 font-normal text-[10px]">
-                            <span>KEMBALI:</span>
-                            <span>Rp {{ number_format($receiptData['kembali'] ?? 0, 0, ',', '.') }}</span>
-                        </div>
+                        @if(!empty($receiptData['is_piutang']))
+                            <div class="receipt-row flex justify-between text-black font-bold text-[10px]">
+                                <span>STATUS BAYAR:</span>
+                                <span class="text-amber-800 print:text-black font-black uppercase">BELUM LUNAS</span>
+                            </div>
+                            @if(!empty($receiptData['jatuh_tempo']))
+                                <div class="receipt-row flex justify-between text-gray-800 font-bold text-[10px]">
+                                    <span>JATUH TEMPO:</span>
+                                    <span>{{ $receiptData['jatuh_tempo'] }}</span>
+                                </div>
+                            @endif
+                            <div class="receipt-row flex justify-between text-black font-black text-[10px]">
+                                <span>SISA PIUTANG:</span>
+                                <span>Rp {{ number_format($receiptData['sisa_piutang'] ?? $receiptData['total'], 0, ',', '.') }}</span>
+                            </div>
+                        @elseif(!empty($receiptData['no_tiket']) && !empty($receiptData['is_spk']))
+                            <div class="receipt-row flex justify-between text-black font-bold text-[10px]">
+                                <span>STATUS:</span>
+                                <span class="text-blue-800 print:text-black font-black uppercase">BELUM LUNAS (ESTIMASI)</span>
+                            </div>
+                            <div class="receipt-row flex justify-between text-gray-700 font-normal text-[10px]">
+                                <span>SISA PEMBAYARAN:</span>
+                                <span class="font-bold">Rp {{ number_format($receiptData['sisa_tagihan'] ?? $receiptData['total'], 0, ',', '.') }}</span>
+                            </div>
+                        @else
+                            <div class="receipt-row flex justify-between text-gray-700 font-normal text-[10px]">
+                                <span>BAYAR ({{ $receiptData['metode'] ?? 'TUNAI' }}):</span>
+                                <span>Rp {{ number_format($receiptData['bayar'] ?? $receiptData['total'], 0, ',', '.') }}</span>
+                            </div>
+                            <div class="receipt-row flex justify-between text-gray-700 font-normal text-[10px]">
+                                <span>KEMBALI:</span>
+                                <span>Rp {{ number_format($receiptData['kembali'] ?? 0, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
 
                         @if(!empty($receiptData['hemat_total']) && (float)$receiptData['hemat_total'] > 0)
                             <div class="receipt-row flex justify-between text-emerald-800 font-black text-[10px] pt-1 border-t border-dashed border-gray-300">
@@ -292,6 +328,31 @@
                             </div>
                             <p class="font-mono text-[9px] text-gray-900 font-bold mt-1 tracking-wider">{{ $receiptData['no_transaksi'] }}</p>
                             <p class="text-[8px] text-gray-500 text-center mt-0.5">{{ $qrCaption }}</p>
+                        </div>
+                    @endif
+
+                    @if(!empty($receiptData['is_piutang']))
+                        <!-- Tanda Tangan Akad Piutang / Kasbon -->
+                        <div class="receipt-center py-2.5 border-t border-dashed border-gray-300 text-[9px] text-gray-800">
+                            <p class="font-medium text-center italic mb-2 text-gray-600">
+                                "Barang telah diterima lengkap & berjanji melunasi tagihan sebelum tanggal jatuh tempo."
+                            </p>
+                            <div class="grid grid-cols-2 gap-4 text-center text-[9px] pt-1">
+                                <div>
+                                    <p class="text-gray-500">Penerima / Konsumen,</p>
+                                    <div class="h-9"></div>
+                                    <p class="font-bold border-t border-dotted border-gray-400 mx-2 pt-0.5 truncate">
+                                        {{ $receiptData['pelanggan'] ?? 'Konsumen' }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500">Kasir Toko,</p>
+                                    <div class="h-9"></div>
+                                    <p class="font-bold border-t border-dotted border-gray-400 mx-2 pt-0.5 truncate">
+                                        {{ $receiptData['kasir'] ?? 'Kasir' }}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     @endif
 

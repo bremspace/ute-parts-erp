@@ -164,16 +164,16 @@
                 <div class="w-full sm:w-auto flex items-center gap-1.5">
                     <input
                         type="date"
-                        wire:model.live="filterTanggalDari"
-                        class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white border border-white/10 cursor-pointer min-h-[44px]"
+                        wire:model.live.debounce.300ms="filterTanggalDari"
+                        class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900/90 border border-white/10 cursor-pointer min-h-[44px] focus:ring-1 focus:ring-up-primary"
                         title="Tanggal Dari"
                         aria-label="Tanggal Dari"
                     />
                     <span class="text-ink-400 text-xs px-1">s/d</span>
                     <input
                         type="date"
-                        wire:model.live="filterTanggalSampai"
-                        class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white border border-white/10 cursor-pointer min-h-[44px]"
+                        wire:model.live.debounce.300ms="filterTanggalSampai"
+                        class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900/90 border border-white/10 cursor-pointer min-h-[44px] focus:ring-1 focus:ring-up-primary"
                         title="Tanggal Sampai"
                         aria-label="Tanggal Sampai"
                     />

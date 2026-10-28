@@ -552,7 +552,7 @@ class RiwayatTransaksiIndex extends Component
         $cabangId = $this->getActiveCabangId();
 
         if ($tipe === 'pos' || $tipe === 'online') {
-            $trx = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang', 'pengiriman'])
+            $trx = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang', 'pengiriman', 'piutang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->find($id);
 
@@ -568,6 +568,11 @@ class RiwayatTransaksiIndex extends Component
             $pelanggan = $trx->pelanggan;
             $saldoPoin = $pelanggan?->poin_loyalty ?? 0;
             $tipeKonsumen = $pelanggan ? app(PelangganService::class)->tipeKonsumen($pelanggan) : 'retail';
+
+            $isPiutang = in_array(strtolower($trx->metode_bayar ?? ''), ['piutang', 'kasbon']) || (bool) $trx->piutang;
+            $piutangModel = $trx->piutang;
+            $jatuhTempoTgl = $piutangModel?->jatuh_tempo ? Carbon::parse($piutangModel->jatuh_tempo)->format('d/m/Y') : ($isPiutang ? $trx->created_at?->copy()->addDays(30)->format('d/m/Y') : null);
+            $sisaPiutang = $piutangModel ? (float) $piutangModel->sisa_piutang : ($isPiutang ? (float) $trx->total_akhir : 0);
 
             $items = $trx->items->map(function ($it) {
                 $retailPerUnit = (float) ($it->produk?->harga_jual_retail ?? $it->harga_satuan);
@@ -648,6 +653,9 @@ class RiwayatTransaksiIndex extends Component
                 'kembalian' => (float) ($trx->kembalian ?? 0),
                 'hemat_total' => $hematTotal,
                 'metode' => strtoupper($trx->metode_bayar ?: 'ONLINE'),
+                'is_piutang' => $isPiutang,
+                'jatuh_tempo' => $jatuhTempoTgl,
+                'sisa_piutang' => $sisaPiutang,
                 'cabang' => $trx->cabang?->nama ?? 'Ute Parts Store',
                 'garansi' => $trx->garansi_teks ?: null,
             ];

@@ -195,6 +195,17 @@
                                         <div class="flex items-center justify-between gap-1">
                                             <span class="font-mono text-[10px] text-up-primary font-bold truncate">{{ $tiket->no_tiket }}</span>
                                             <div class="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    @click.stop
+                                                    @mousedown.stop
+                                                    draggable="false"
+                                                    wire:click="bukaStrukServis({{ $tiket->id }})"
+                                                    class="text-[10px] text-ink-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 px-1.5 py-0.5 rounded cursor-pointer inline-flex items-center gap-1 transition"
+                                                    title="Cetak Struk SPK / Kwitansi"
+                                                >
+                                                    <span>🖨 Struk</span>
+                                                </button>
                                                 @if($tiket->status_pembayaran === 'lunas')
                                                     <span class="bg-up-mint/20 text-up-mint text-[9px] font-bold px-1.5 py-0.5 rounded">LUNAS</span>
                                                 @elseif(in_array($tiket->status, ['selesai', 'diambil'], true))
@@ -238,14 +249,25 @@
                                     @if($tiket->pengerjaan_deadline_at)
                                         @php
                                             $isOverdue = now()->greaterThan($tiket->pengerjaan_deadline_at);
-                                            $sisaMnt = max(0, (int) now()->diffInMinutes($tiket->pengerjaan_deadline_at, false));
+                                            $diffMnt = abs((int) now()->diffInMinutes($tiket->pengerjaan_deadline_at, false));
+                                            if ($diffMnt >= 1440) {
+                                                $hari = floor($diffMnt / 1440);
+                                                $sisaJam = floor(($diffMnt % 1440) / 60);
+                                                $slaTeks = "{$hari} hari" . ($sisaJam > 0 ? " {$sisaJam} jam" : "");
+                                            } elseif ($diffMnt >= 60) {
+                                                $jam = floor($diffMnt / 60);
+                                                $sisaMnt = $diffMnt % 60;
+                                                $slaTeks = "{$jam} jam" . ($sisaMnt > 0 ? " {$sisaMnt} mnt" : "");
+                                            } else {
+                                                $slaTeks = "{$diffMnt} mnt";
+                                            }
                                         @endphp
-                                        <div class="mb-2 p-1.5 rounded-lg {{ $isOverdue ? 'bg-up-red/15 border border-up-red/30' : ($sisaMnt <= 30 ? 'bg-up-amber/15 border border-up-amber/30 animate-pulse' : 'bg-up-primary/10 border border-up-primary/20') }} flex items-center justify-between text-[9px]">
-                                            <span class="flex items-center gap-1 font-semibold {{ $isOverdue ? 'text-up-red' : ($sisaMnt <= 30 ? 'text-up-amber' : 'text-up-primary') }}">
+                                        <div class="mb-2 p-1.5 rounded-lg {{ $isOverdue ? 'bg-up-red/15 border border-up-red/30' : ($diffMnt <= 30 ? 'bg-up-amber/15 border border-up-amber/30 animate-pulse' : 'bg-up-primary/10 border border-up-primary/20') }} flex items-center justify-between text-[9px]">
+                                            <span class="flex items-center gap-1 font-semibold {{ $isOverdue ? 'text-up-red' : ($diffMnt <= 30 ? 'text-up-amber' : 'text-up-primary') }}">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                {{ $isOverdue ? 'Waktu Habis (Overdue)' : ($sisaMnt <= 30 ? "Segera Habis (~{$sisaMnt}m)" : "SLA: ~{$sisaMnt}m") }}
+                                                {{ $isOverdue ? "Terlambat ({$slaTeks})" : ($diffMnt <= 30 ? "Segera Habis (~{$slaTeks})" : "SLA: ~{$slaTeks}") }}
                                             </span>
                                             <button
                                                 type="button"
@@ -410,7 +432,7 @@
             <div class="w-full max-w-2xl glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl relative max-h-[90vh] flex flex-col">
                 <div class="flex items-center justify-between pb-4 mb-4 border-b border-white/10 flex-shrink-0">
                     <h3 class="text-lg font-bold text-white">Terima Unit Servis</h3>
-                    <button wire:click="$set('showTerimaModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button wire:click="$set('showTerimaModal', false)" class="text-ink-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-white/10" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="overflow-y-auto pr-1 space-y-4 flex-1">
@@ -1116,7 +1138,7 @@
                         <h3 class="text-lg font-bold text-white">Unggah Progres Pengerjaan</h3>
                         <p class="text-xs text-ink-400">Pembaruan progres kerja teknisi & transparansi ke konsumen</p>
                     </div>
-                    <button wire:click="$set('showProgressModal', false)" class="text-ink-400 hover:text-white">✕</button>
+                    <button wire:click="$set('showProgressModal', false)" class="text-ink-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-white/10" aria-label="Tutup">✕</button>
                 </div>
 
                 <div class="space-y-4">
@@ -1270,7 +1292,7 @@
                             </button>
                         @endif
                     </div>
-                    <button wire:click="$set('selectedTiketId', null)" class="text-ink-400 hover:text-white">✕</button>
+                    <button wire:click="$set('selectedTiketId', null)" class="text-ink-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-white/10" aria-label="Tutup Detail Tiket">✕</button>
                 </div>
 
                 <div class="overflow-y-auto pr-1 flex-1 space-y-5">
@@ -1752,19 +1774,65 @@
                         </div>
                     @endif
 
-                    <!-- Progres Pengerjaan Teknisi (Foto & Log) -->
-                    @if($selectedTiket->progressList->count() > 0)
-                        <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2.5">
-                            <div class="flex items-center justify-between">
-                                <span class="text-[10px] text-ink-400 uppercase font-bold">Log Progres Pengerjaan & Dokumentasi Foto</span>
-                                <span class="text-xs font-bold text-up-mint tabular-nums">
-                                    {{ $selectedTiket->progressList->first()?->persentase }}% Selesai
-                                </span>
+                    <!-- Progres Pengerjaan Teknisi (Progress Bar Otomatis Sesuai Posisi Kanban & Dokumentasi Foto) -->
+                    @php
+                        $kanbanPct = match ($selectedTiket->status) {
+                            'diajukan_online' => 5,
+                            'diterima' => 15,
+                            'diagnosa' => 30,
+                            'menunggu_approval', 'ditolak' => 40,
+                            'disetujui' => 50,
+                            'dikerjakan' => 70,
+                            'qc' => 85,
+                            'selesai' => 95,
+                            'diambil', 'batal' => 100,
+                            default => 10,
+                        };
+                        $logPct = (int) ($selectedTiket->progressList->first()?->persentase ?? 0);
+                        $currentProgressPct = max($kanbanPct, $logPct);
+                        $tahapanTeks = match ($selectedTiket->status) {
+                            'diajukan_online' => 'Booking Online Masuk',
+                            'diterima' => 'Unit Diterima di Gerai',
+                            'diagnosa' => 'Pemeriksaan / Diagnosa Unit',
+                            'menunggu_approval' => 'Menunggu Persetujuan Estimasi',
+                            'ditolak' => 'Estimasi Ditolak',
+                            'disetujui' => 'Estimasi Disetujui',
+                            'dikerjakan' => 'Sedang Dikerjakan Teknisi',
+                            'qc' => 'Tahap Quality Control (QC)',
+                            'selesai' => 'Perbaikan Selesai',
+                            'diambil' => 'Unit Telah Diambil',
+                            'batal' => 'Dibatalkan',
+                            default => ucfirst($selectedTiket->status),
+                        };
+                    @endphp
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-[10px] text-ink-400 uppercase font-bold tracking-wider block">Progres Alur Pengerjaan Servis</span>
+                                <span class="text-xs font-semibold text-white mt-0.5 block">{{ $tahapanTeks }}</span>
                             </div>
-                            <div class="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                                <div class="bg-gradient-to-r from-up-primary to-up-mint h-2 rounded-full transition-[width] duration-300" style="width: {{ $selectedTiket->progressList->first()?->persentase }}%"></div>
-                            </div>
-                            <div class="space-y-2 mt-2 max-h-48 overflow-y-auto pr-1">
+                            <span class="text-xs font-bold text-up-mint tabular-nums">
+                                {{ $currentProgressPct }}% Selesai
+                            </span>
+                        </div>
+                        <div class="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-gradient-to-r from-up-primary via-up-accent to-up-mint h-2.5 rounded-full transition-[width] duration-300 shadow-sm shadow-up-mint/20" style="width: {{ $currentProgressPct }}%"></div>
+                        </div>
+
+                        <!-- Stepper Tahapan Indikator -->
+                        <div class="grid grid-cols-4 sm:grid-cols-7 gap-1 pt-1 text-[9px] text-center font-medium">
+                            <div class="p-1 rounded {{ $currentProgressPct >= 15 ? 'bg-up-primary/20 text-up-primary font-bold' : 'text-ink-500' }}">1. Terima</div>
+                            <div class="p-1 rounded {{ $currentProgressPct >= 30 ? 'bg-up-primary/20 text-up-primary font-bold' : 'text-ink-500' }}">2. Diagnosa</div>
+                            <div class="p-1 rounded {{ $currentProgressPct >= 50 ? 'bg-up-primary/20 text-up-primary font-bold' : 'text-ink-500' }}">3. Setuju</div>
+                            <div class="p-1 rounded {{ $currentProgressPct >= 70 ? 'bg-up-primary/20 text-up-primary font-bold' : 'text-ink-500' }}">4. Pengerjaan</div>
+                            <div class="p-1 rounded {{ $currentProgressPct >= 85 ? 'bg-up-primary/20 text-up-primary font-bold' : 'text-ink-500' }}">5. QC</div>
+                            <div class="p-1 rounded {{ $currentProgressPct >= 95 ? 'bg-up-mint/20 text-up-mint font-bold' : 'text-ink-500' }}">6. Selesai</div>
+                            <div class="p-1 rounded {{ $currentProgressPct >= 100 ? 'bg-up-mint/20 text-up-mint font-bold' : 'text-ink-500' }}">7. Diambil</div>
+                        </div>
+
+                        @if($selectedTiket->progressList->count() > 0)
+                            <div class="pt-2 border-t border-white/5 space-y-2 mt-2 max-h-48 overflow-y-auto pr-1">
+                                <span class="text-[10px] text-ink-400 font-bold uppercase">Catatan & Dokumentasi Foto Teknisi</span>
                                 @foreach($selectedTiket->progressList as $pr)
                                     <div class="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5 text-xs">
                                         <div class="flex items-center justify-between">
@@ -1794,8 +1862,8 @@
                                     </div>
                                 @endforeach
                             </div>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
 
                     <!-- [T-17] Item Pekerjaan Teknisi (part/jasa) -->
                     @php
@@ -1993,14 +2061,25 @@
                                 </div>
                             @endforeach
 
-                            <div class="flex items-center justify-between pt-1">
-                                <button
-                                    type="button"
-                                    wire:click="addPekerjaanRow"
-                                    class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-200 text-xs font-semibold border border-white/10 cursor-pointer flex items-center gap-1"
-                                >
-                                    <span>+ Baris Item</span>
-                                </button>
+                            <div class="flex items-center justify-between pt-1 gap-2 flex-wrap">
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        wire:click="addPekerjaanRow('jasa')"
+                                        class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-mint text-xs font-semibold border border-up-mint/30 cursor-pointer flex items-center gap-1 transition"
+                                        title="Tambah baris pekerjaan jasa servis"
+                                    >
+                                        <span>+ Tambah Jasa</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="addPekerjaanRow('part')"
+                                        class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-up-amber text-xs font-semibold border border-up-amber/30 cursor-pointer flex items-center gap-1 transition"
+                                        title="Tambah baris penggantian suku cadang / sparepart"
+                                    >
+                                        <span>+ Tambah Sparepart</span>
+                                    </button>
+                                </div>
                                 <button
                                     type="button"
                                     wire:click="simpanPekerjaan"

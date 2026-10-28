@@ -70,6 +70,31 @@ class ServisService
             $teleponPelanggan = $clean;
         }
 
+        // Auto-sync konsumen baru ke database CRM Pelanggan
+        if (! $pelanggan && ! empty($namaPelanggan)) {
+            $query = Pelanggan::query();
+            if (! empty($teleponPelanggan)) {
+                $query->where('telepon', $teleponPelanggan);
+            } else {
+                $query->where('nama', $namaPelanggan);
+            }
+            $pelanggan = $query->first();
+
+            if (! $pelanggan) {
+                $pelanggan = Pelanggan::create([
+                    'nama' => $namaPelanggan,
+                    'telepon' => $teleponPelanggan ?: null,
+                    'tipe_konsumen' => 'retail',
+                ]);
+            }
+        }
+
+        if ($pelanggan) {
+            $data['pelanggan_id'] = $pelanggan->id;
+            $namaPelanggan = $pelanggan->nama;
+            $teleponPelanggan = $pelanggan->telepon ?: $teleponPelanggan;
+        }
+
         $tiket = TiketServis::create([
             'no_tiket' => $noTiket,
             'cabang_id' => $cabangId,
@@ -151,6 +176,31 @@ class ServisService
                 $clean = '0'.substr($clean, 2);
             }
             $teleponPelanggan = $clean;
+        }
+
+        // Auto-sync booking konsumen online ke database CRM Pelanggan
+        if (! $pelanggan && ! empty($namaPelanggan)) {
+            $query = Pelanggan::query();
+            if (! empty($teleponPelanggan)) {
+                $query->where('telepon', $teleponPelanggan);
+            } else {
+                $query->where('nama', $namaPelanggan);
+            }
+            $pelanggan = $query->first();
+
+            if (! $pelanggan) {
+                $pelanggan = Pelanggan::create([
+                    'nama' => $namaPelanggan,
+                    'telepon' => $teleponPelanggan ?: null,
+                    'tipe_konsumen' => 'retail',
+                ]);
+            }
+        }
+
+        if ($pelanggan) {
+            $data['pelanggan_id'] = $pelanggan->id;
+            $namaPelanggan = $pelanggan->nama;
+            $teleponPelanggan = $pelanggan->telepon ?: $teleponPelanggan;
         }
 
         $tiket = TiketServis::create([

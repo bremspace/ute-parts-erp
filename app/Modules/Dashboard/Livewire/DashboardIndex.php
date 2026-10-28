@@ -9,22 +9,27 @@ use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\KampanyeBroadcast;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Report\Services\ReportBuilderService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\RiwayatPerubahanHarga;
 use App\Modules\Wms\Models\StokItem;
 use Closure;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use Livewire\WithPagination;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Facades\Excel;
@@ -35,6 +40,10 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 class DashboardIndex extends Component
 {
+    use WithPagination;
+
+    protected string $paginationTheme = 'tailwind';
+
     /** Filter periode penjualan dashboard */
     public string $periodePenjualan = 'today';
 
@@ -47,6 +56,36 @@ class DashboardIndex extends Component
     public string $penjualanFilterSumber = '';
 
     public string $penjualanFilterStatus = '';
+
+    public function updatedPeriodePenjualan(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPenjualanCustomDari(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPenjualanCustomSampai(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPenjualanSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPenjualanFilterSumber(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPenjualanFilterStatus(): void
+    {
+        $this->resetPage();
+    }
 
     // Modal detail transaksi untuk tracking instan
     public bool $showDetailTransaksiModal = false;
@@ -301,29 +340,145 @@ class DashboardIndex extends Component
         return (float) $this->cacheWidget('komisi-pending', self::TTL_LIVE, fn (): float => (float) Komisi::where('status', 'pending')->sum('nominal_komisi'));
     }
 
+    public function getCanViewTransaksiTerbaruProperty(): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasAnyRole(['owner', 'super-admin'])
+            || $user->can('dashboard.transaksi-terkini')
+            || $user->can('pos.transaksi.view');
+    }
+
     public function getTransaksiTerbaruProperty()
     {
+        if (! $this->canViewTransaksiTerbaru) {
+            return collect();
+        }
+
         $cached = $this->cacheWidget('transaksi-terbaru', self::TTL_LIVE, function (): array {
-            $raw = Transaksi::with(['pelanggan', 'cabang'])
-                ->when(session('cabang_id'), fn ($q) => $q->where('cabang_id', session('cabang_id')))
+            $cabangId = session('cabang_id');
+
+            $feed = collect();
+
+            // 1. Penjualan
+            $trx = Transaksi::with(['pelanggan', 'cabang'])
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->latest()
                 ->limit(6)
-                ->get();
+                ->get()
+                ->map(fn ($t) => [
+                    'tipe' => 'Penjualan',
+                    'badge' => 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+                    'no_transaksi' => $t->no_transaksi,
+                    'no_dokumen' => $t->no_transaksi,
+                    'sumber' => $t->sumber ?? 'pos',
+                    'info' => $t->pelanggan?->nama ?? 'Umum',
+                    'cabang_nama' => $t->cabang?->nama ?? '-',
+                    'created_at_raw' => $t->created_at?->toIso8601String(),
+                    'created_at_fmt' => $t->created_at?->format('H:i d/m') ?? '-',
+                    'total_akhir' => (float) $t->total_akhir,
+                    'status' => $t->status,
+                ]);
+            $feed = $feed->concat($trx);
 
-            return $raw->map(fn ($t) => [
-                'no_transaksi' => $t->no_transaksi,
-                'sumber' => $t->sumber,
-                'cabang_nama' => $t->cabang?->nama ?? '-',
-                'created_at_fmt' => $t->created_at?->format('H:i d/m') ?? '-',
-                'total_akhir' => (float) $t->total_akhir,
-                'status' => $t->status,
-            ])->all();
+            // 2. Purchase Order
+            $pos = PurchaseOrder::with(['supplier'])
+                ->latest()
+                ->limit(4)
+                ->get()
+                ->map(fn ($p) => [
+                    'tipe' => 'Purchase Order',
+                    'badge' => 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                    'no_transaksi' => $p->no_po,
+                    'no_dokumen' => $p->no_po,
+                    'sumber' => 'wms',
+                    'info' => $p->supplier?->nama ?? 'Supplier',
+                    'cabang_nama' => '-',
+                    'created_at_raw' => $p->created_at?->toIso8601String(),
+                    'created_at_fmt' => $p->created_at?->format('H:i d/m') ?? '-',
+                    'total_akhir' => (float) $p->total,
+                    'status' => $p->status,
+                ]);
+            $feed = $feed->concat($pos);
+
+            // 3. Penerimaan GRN
+            $grns = Grn::with(['cabang'])
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->latest()
+                ->limit(4)
+                ->get()
+                ->map(fn ($g) => [
+                    'tipe' => 'Penerimaan GRN',
+                    'badge' => 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+                    'no_transaksi' => $g->no_grn,
+                    'no_dokumen' => $g->no_grn,
+                    'sumber' => 'gudang',
+                    'info' => 'Penerimaan Barang',
+                    'cabang_nama' => $g->cabang?->nama ?? '-',
+                    'created_at_raw' => $g->created_at?->toIso8601String(),
+                    'created_at_fmt' => $g->created_at?->format('H:i d/m') ?? '-',
+                    'total_akhir' => null,
+                    'status' => $g->status,
+                ]);
+            $feed = $feed->concat($grns);
+
+            // 4. Tiket Servis
+            $tikets = TiketServis::with(['pelanggan', 'cabang'])
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->latest()
+                ->limit(4)
+                ->get()
+                ->map(fn ($s) => [
+                    'tipe' => 'Tiket Servis',
+                    'badge' => 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+                    'no_transaksi' => $s->no_tiket,
+                    'no_dokumen' => $s->no_tiket,
+                    'sumber' => 'servis',
+                    'info' => $s->pelanggan?->nama ?? $s->nama_pelanggan_non_member ?? 'Konsumen',
+                    'cabang_nama' => $s->cabang?->nama ?? '-',
+                    'created_at_raw' => $s->created_at?->toIso8601String(),
+                    'created_at_fmt' => $s->created_at?->format('H:i d/m') ?? '-',
+                    'total_akhir' => (float) ($s->estimasi_biaya ?? 0),
+                    'status' => $s->status,
+                ]);
+            $feed = $feed->concat($tikets);
+
+            // 5. Retur Penjualan
+            $returs = ReturnPenjualan::with(['cabang'])
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->latest()
+                ->limit(4)
+                ->get()
+                ->map(fn ($r) => [
+                    'tipe' => 'Retur Konsumen',
+                    'badge' => 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+                    'no_transaksi' => $r->no_return,
+                    'no_dokumen' => $r->no_return,
+                    'sumber' => 'pos',
+                    'info' => 'Retur Penjualan',
+                    'cabang_nama' => $r->cabang?->nama ?? '-',
+                    'created_at_raw' => $r->created_at?->toIso8601String(),
+                    'created_at_fmt' => $r->created_at?->format('H:i d/m') ?? '-',
+                    'total_akhir' => (float) ($r->jumlah ?? 0),
+                    'status' => $r->status,
+                ]);
+            $feed = $feed->concat($returs);
+
+            return $feed->sortByDesc('created_at_raw')->take(10)->values()->all();
         });
 
         return collect($cached ?? [])->map(fn ($t) => (object) [
+            'tipe' => $t['tipe'] ?? 'Penjualan',
+            'badge' => $t['badge'] ?? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
             'no_transaksi' => $t['no_transaksi'] ?? '-',
+            'no_dokumen' => $t['no_dokumen'] ?? $t['no_transaksi'] ?? '-',
             'sumber' => $t['sumber'] ?? '-',
+            'info' => $t['info'] ?? '-',
             'cabang' => (object) ['nama' => $t['cabang_nama'] ?? '-'],
+            'cabang_nama' => $t['cabang_nama'] ?? '-',
             'created_at' => new class($t['created_at_fmt'] ?? '-')
             {
                 public function __construct(private string $val) {}
@@ -333,7 +488,8 @@ class DashboardIndex extends Component
                     return $this->val;
                 }
             },
-            'total_akhir' => $t['total_akhir'] ?? 0,
+            'created_at_fmt' => $t['created_at_fmt'] ?? '-',
+            'total_akhir' => $t['total_akhir'],
             'status' => $t['status'] ?? 'pending',
         ]);
     }
@@ -420,8 +576,25 @@ class DashboardIndex extends Component
         return Transaksi::with(['pelanggan', 'kasir', 'cabang'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->whereBetween('created_at', [$periode['dari'], $periode['sampai']])
-            ->when($this->penjualanFilterSumber, fn ($q) => $q->where('sumber', $this->penjualanFilterSumber))
-            ->when($this->penjualanFilterStatus, fn ($q) => $q->where('status', $this->penjualanFilterStatus))
+            ->when($this->penjualanFilterSumber, function ($q) {
+                if ($this->penjualanFilterSumber === 'website') {
+                    $q->whereIn('sumber', ['marketplace', 'website']);
+                } elseif ($this->penjualanFilterSumber === 'marketplace') {
+                    $q->where(function ($sub) {
+                        $sub->where('sumber', 'marketplace')
+                            ->orWhere('sumber', 'like', 'channel:%');
+                    });
+                } else {
+                    $q->where('sumber', $this->penjualanFilterSumber);
+                }
+            })
+            ->when($this->penjualanFilterStatus, function ($q) {
+                if ($this->penjualanFilterStatus === 'selesai') {
+                    $q->whereIn('status', self::STATUS_OMZET);
+                } else {
+                    $q->where('status', $this->penjualanFilterStatus);
+                }
+            })
             ->when($this->penjualanSearch, function ($q) {
                 $search = '%'.$this->penjualanSearch.'%';
                 $q->where(function ($sub) use ($search) {
@@ -430,6 +603,42 @@ class DashboardIndex extends Component
                         ->orWhereHas('kasir', fn ($k) => $k->where('name', 'like', $search));
                 });
             });
+    }
+
+    /** Koleksi transaksi terfilter terpaginasi untuk tabel tracking (>15 data) */
+    public function getTrackingPenjualanProperty()
+    {
+        $page = $this->getPage();
+        $periode = $this->resolvePeriodePenjualan();
+        $suffix = '-p'.$page
+            .'-per'.$this->periodePenjualan
+            .'-d'.($periode['dari']?->format('YmdHi') ?? '')
+            .'-s'.($periode['sampai']?->format('YmdHi') ?? '')
+            .'-sub'.($this->penjualanFilterSumber ?: 'all')
+            .'-st'.($this->penjualanFilterStatus ?: 'all')
+            .'-q'.md5($this->penjualanSearch);
+
+        $cached = $this->cacheWidget('tracking-penjualan', self::TTL_LIVE, function () use ($page): array {
+            $paginator = $this->queryPenjualanFiltered()->latest()->paginate(15, ['*'], 'page', $page);
+
+            return [
+                'items' => $paginator->items(),
+                'total' => $paginator->total(),
+                'perPage' => $paginator->perPage(),
+                'currentPage' => $paginator->currentPage(),
+            ];
+        }, $suffix);
+
+        return new LengthAwarePaginator(
+            $cached['items'] ?? [],
+            $cached['total'] ?? 0,
+            $cached['perPage'] ?? 15,
+            $cached['currentPage'] ?? 1,
+            [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ]
+        );
     }
 
     /** Agregat data penjualan terfilter untuk widget dashboard */
@@ -676,11 +885,12 @@ class DashboardIndex extends Component
 
             $query = TransaksiItem::query()
                 ->join('produk', 'produk.id', '=', 'transaksi_item.produk_id')
+                ->leftJoin('kategori_produk', 'kategori_produk.id', '=', 'produk.kategori_id')
                 ->join('transaksi', 'transaksi.id', '=', 'transaksi_item.transaksi_id')
                 ->whereIn('transaksi.status', self::STATUS_OMZET)
                 ->when($cabangId, fn ($q) => $q->where('transaksi.cabang_id', $cabangId))
                 ->where('transaksi.created_at', '>=', now()->startOfMonth())
-                ->selectRaw('COALESCE(produk.kategori, \'Umum\') as kate, SUM(transaksi_item.subtotal) as total')
+                ->selectRaw('COALESCE(kategori_produk.nama, produk.kategori, \'Umum\') as kate, SUM(transaksi_item.subtotal) as total')
                 ->groupBy('kate')
                 ->orderByDesc('total')
                 ->limit(6)
@@ -878,8 +1088,8 @@ class DashboardIndex extends Component
                 'piutang_30d' => round($piutang30d, 2),
                 'utang_30d' => round($utang30d, 2),
                 'proyeksi_30d' => $proyeksi30d,
-                'drill_piutang' => route('laporan.drill', ['model' => 'Piutang']),
-                'drill_utang' => route('laporan.drill', ['model' => 'Utang']),
+                'drill_piutang' => route('akunting', ['tab' => 'piutang']),
+                'drill_utang' => route('akunting', ['tab' => 'utang']),
             ];
         });
     }
@@ -972,8 +1182,8 @@ class DashboardIndex extends Component
                 'piutang_30d' => 0,
                 'utang_30d' => 0,
                 'proyeksi_30d' => 0,
-                'drill_piutang' => route('laporan.drill', ['model' => 'Piutang']),
-                'drill_utang' => route('laporan.drill', ['model' => 'Utang']),
+                'drill_piutang' => route('akunting', ['tab' => 'piutang']),
+                'drill_utang' => route('akunting', ['tab' => 'utang']),
             ],
             'marketInsight' => [
                 'tier' => collect(),
@@ -1033,6 +1243,8 @@ class DashboardIndex extends Component
             'currentRole' => $this->role,
             'drillDownModels' => $this->getDrillDownModels(),
             'dataPenjualan' => $this->dataPenjualan,
+            'trackingPenjualan' => $this->trackingPenjualan,
+            'canViewTransaksiTerbaru' => $this->canViewTransaksiTerbaru,
             'defaultWidgetConfig' => $this->defaultWidgetConfig,
             'periodePenjualan' => $this->periodePenjualan,
             'penjualanCustomDari' => $this->penjualanCustomDari,

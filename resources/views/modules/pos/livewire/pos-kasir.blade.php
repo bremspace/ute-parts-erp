@@ -39,9 +39,9 @@
                     @input="searchOpen = true"
                 />
 
-                <!-- Floating Search Results Dropdown (HANYA MUNCUL SAAT PENCARIAN) -->
+                <!-- Floating Search Results Dropdown (MUNCUL OTOMATIS SAAT FOKUS / PENCARIAN) -->
                 <div
-                    x-show="searchOpen && $wire.search.length > 0"
+                    x-show="searchOpen"
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="opacity-0 translate-y-2 scale-[0.98]"
                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
@@ -57,7 +57,7 @@
                                 <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
-                                Hasil Pencarian Produk
+                                {{ strlen($search) > 0 ? 'Hasil Pencarian Produk' : 'Katalog Produk Cepat' }}
                             </span>
                             <span class="px-2 py-0.5 rounded-full bg-up-primary/10 text-up-primary font-bold text-[10px] tabular-nums border border-up-primary/20">
                                 {{ count($products) }} item
@@ -302,7 +302,7 @@
 
                 <!-- Floating Customer Search Results -->
                 <div
-                    x-show="crmOpen && $wire.pelangganSearch.length >= 1"
+                    x-show="crmOpen"
                     x-transition:enter="transition ease-out duration-120"
                     x-transition:enter-start="opacity-0 translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0"
@@ -314,7 +314,7 @@
                 >
                     @if($pelangganCari->isNotEmpty())
                         <div class="px-2.5 py-1.5 text-[10px] uppercase font-bold text-ink-400 tracking-wider">
-                            Pilih Konsumen Terdaftar
+                            {{ strlen($pelangganSearch) >= 1 ? 'Hasil Pencarian Konsumen' : 'Konsumen Terakhir / Cepat' }}
                         </div>
                         @foreach($pelangganCari as $p)
                             <div
@@ -1020,7 +1020,15 @@
                                     class="w-8 h-8 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Kurangi"
                                 >-</button>
-                                <span class="w-8 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white">{{ $item['qty'] }}</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="{{ $item['stok_max'] ?? 9999 }}"
+                                    value="{{ $item['qty'] }}"
+                                    wire:change="setQty('{{ $key }}', $event.target.value)"
+                                    class="w-10 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded"
+                                    aria-label="Jumlah item"
+                                >
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', 1)"
@@ -1176,7 +1184,15 @@
                                     class="w-8 h-8 rounded hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
                                     aria-label="Kurangi"
                                 >-</button>
-                                <span class="w-7 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white">{{ $item['qty'] }}</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="{{ $item['stok_max'] ?? 9999 }}"
+                                    value="{{ $item['qty'] }}"
+                                    wire:change="setQty('{{ $key }}', $event.target.value)"
+                                    class="w-10 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded"
+                                    aria-label="Jumlah item"
+                                >
                                 <button
                                     type="button"
                                     wire:click="updateQty('{{ $key }}', 1)"
@@ -1391,7 +1407,15 @@
                                         class="w-7 h-7 rounded-lg hover:bg-white dark:hover:bg-white/10 text-ink-800 dark:text-white flex items-center justify-center text-xs font-bold transition-all cursor-pointer active:scale-90"
                                         aria-label="Kurangi"
                                     >-</button>
-                                    <span class="w-8 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white">{{ $item['qty'] }}</span>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="{{ $item['stok_max'] ?? 9999 }}"
+                                        value="{{ $item['qty'] }}"
+                                        wire:change="setQty('{{ $key }}', $event.target.value)"
+                                        class="w-10 text-center text-xs font-bold tabular-nums text-ink-900 dark:text-white bg-transparent border-0 p-0 focus:ring-1 focus:ring-up-primary rounded"
+                                        aria-label="Jumlah item"
+                                    >
                                     <button
                                         type="button"
                                         wire:click="updateQty('{{ $key }}', 1)"

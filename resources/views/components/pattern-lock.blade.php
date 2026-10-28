@@ -167,113 +167,137 @@
         </button>
     </div>
 
-    <!-- Area Kanvas Pola Interaktif -->
-    <div class="flex flex-col sm:flex-row gap-4 items-center sm:items-start justify-center">
-        <div class="relative w-64 h-64 sm:w-60 sm:h-60 rounded-2xl {{ $dark ? 'bg-ink-950' : 'bg-slate-100 dark:bg-ink-950' }} border-2 border-up-primary/40 shadow-xl flex items-center justify-center p-2 touch-none">
-            <svg
-                x-ref="svgCanvas"
-                viewBox="0 0 300 300"
-                class="w-full h-full cursor-crosshair"
-                style="touch-action: none;"
-                @pointerdown="startDrag($event)"
-                @pointermove="onDrag($event)"
-                @pointerup="endDrag($event)"
-                @pointercancel="endDrag($event)"
-            >
-                <defs>
-                    <filter id="glow-pola" x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#8B5CF6" flood-opacity="0.8"/>
-                    </filter>
-                </defs>
-                <!-- Grid background lines (decorative subtle) -->
-                <line x1="50" y1="50" x2="250" y2="50" :stroke="isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)'" stroke-dasharray="4,4" />
-                <line x1="50" y1="150" x2="250" y2="150" :stroke="isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)'" stroke-dasharray="4,4" />
-                <line x1="50" y1="250" x2="250" y2="250" :stroke="isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)'" stroke-dasharray="4,4" />
-                <line x1="50" y1="50" x2="50" y2="250" :stroke="isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)'" stroke-dasharray="4,4" />
-                <line x1="150" y1="50" x2="150" y2="250" :stroke="isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)'" stroke-dasharray="4,4" />
-                <line x1="250" y1="50" x2="250" y2="250" :stroke="isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)'" stroke-dasharray="4,4" />
+    <!-- Area Kanvas Pola Interaktif dalam Smartphone Frame Mockup -->
+    <div class="flex flex-col sm:flex-row gap-5 items-center sm:items-start justify-center">
+        <!-- Smartphone Body Container -->
+        <div class="relative w-64 sm:w-[260px] p-3 pt-3.5 pb-4 rounded-[2.5rem] {{ $dark ? 'bg-[#0f172a] border-4 border-slate-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.8)]' : 'bg-slate-900 border-4 border-slate-700 shadow-2xl' }} flex flex-col items-center flex-shrink-0 transition-transform select-none">
+            <!-- Smartphone Top Speaker & Front Camera Hole -->
+            <div class="w-full flex items-center justify-center gap-2 mb-2.5">
+                <div class="w-10 h-1.5 rounded-full bg-slate-800 border border-slate-700/50"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-slate-800 border border-slate-700/60 relative">
+                    <span class="absolute inset-0.5 rounded-full bg-blue-900/60"></span>
+                </div>
+            </div>
 
-                <!-- Polyline connecting selected dots -->
-                <polyline
-                    :points="polylinePoints"
-                    fill="none"
-                    stroke="#8B5CF6"
-                    stroke-width="7"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    filter="url(#glow-pola)"
-                    class="transition-all"
-                />
+            <!-- Smartphone Screen Area -->
+            <div class="relative w-full aspect-square rounded-[1.8rem] {{ $dark ? 'bg-ink-950' : 'bg-slate-950' }} border border-white/10 shadow-inner flex items-center justify-center p-2 touch-none overflow-hidden">
+                <!-- Watermark / Brand in Screen -->
+                <div class="absolute top-2 left-0 right-0 text-center pointer-events-none opacity-40">
+                    <span class="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-mono">Buka Pola Layar</span>
+                </div>
 
-                <!-- Line following dragging finger/mouse -->
-                <template x-if="isDragging && lastDot && currentPos">
-                    <line
-                        :x1="lastDot.x"
-                        :y1="lastDot.y"
-                        :x2="currentPos.x"
-                        :y2="currentPos.y"
-                        stroke="#A78BFA"
-                        stroke-width="5"
+                <svg
+                    x-ref="svgCanvas"
+                    viewBox="0 0 300 300"
+                    class="w-full h-full cursor-crosshair mt-1"
+                    style="touch-action: none;"
+                    @pointerdown="startDrag($event)"
+                    @pointermove="onDrag($event)"
+                    @pointerup="endDrag($event)"
+                    @pointercancel="endDrag($event)"
+                >
+                    <defs>
+                        <filter id="glow-pola" x="-30%" y="-30%" width="160%" height="160%">
+                            <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#8B5CF6" flood-opacity="0.9"/>
+                        </filter>
+                        <filter id="dot-active-glow" x="-40%" y="-40%" width="180%" height="180%">
+                            <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#A78BFA" flood-opacity="1"/>
+                        </filter>
+                    </defs>
+                    <!-- Grid background lines (decorative subtle) -->
+                    <line x1="50" y1="50" x2="250" y2="50" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
+                    <line x1="50" y1="150" x2="250" y2="150" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
+                    <line x1="50" y1="250" x2="250" y2="250" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
+                    <line x1="50" y1="50" x2="50" y2="250" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
+                    <line x1="150" y1="50" x2="150" y2="250" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
+                    <line x1="250" y1="50" x2="250" y2="250" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
+
+                    <!-- Polyline connecting selected dots -->
+                    <polyline
+                        :points="polylinePoints"
+                        fill="none"
+                        stroke="#8B5CF6"
+                        stroke-width="7"
                         stroke-linecap="round"
-                        stroke-dasharray="6,4"
-                        opacity="0.9"
+                        stroke-linejoin="round"
+                        filter="url(#glow-pola)"
+                        class="transition-all"
                     />
-                </template>
 
-                <!-- 9 Touch Dots -->
-                <template x-for="dot in dots" :key="dot.id">
-                    <g :transform="`translate(${dot.x}, ${dot.y})`" class="cursor-pointer" @click="clickDot(dot.id)">
-                        <!-- Outer Touch Area Ring -->
-                        <circle
-                            r="34"
-                            fill="transparent"
+                    <!-- Line following dragging finger/mouse -->
+                    <template x-if="isDragging && lastDot && currentPos">
+                        <line
+                            :x1="lastDot.x"
+                            :y1="lastDot.y"
+                            :x2="currentPos.x"
+                            :y2="currentPos.y"
+                            stroke="#C4B5FD"
+                            stroke-width="5"
+                            stroke-linecap="round"
+                            stroke-dasharray="6,4"
+                            opacity="0.95"
                         />
+                    </template>
 
-                        <!-- Outer Visual Ring -->
-                        <circle
-                            r="24"
-                            :fill="sequence.includes(dot.id) ? 'rgba(139, 92, 246, 0.35)' : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)')"
-                            :stroke="sequence.includes(dot.id) ? '#8B5CF6' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)')"
-                            stroke-width="2.5"
-                        />
+                    <!-- 9 Touch Dots -->
+                    <template x-for="dot in dots" :key="dot.id">
+                        <g :transform="`translate(${dot.x}, ${dot.y})`" class="cursor-pointer transition-transform duration-150" @click="clickDot(dot.id)">
+                            <!-- Outer Touch Area Ring -->
+                            <circle
+                                r="36"
+                                fill="transparent"
+                            />
 
-                        <!-- Inner Core Dot -->
-                        <circle
-                            r="10"
-                            :fill="sequence.includes(dot.id) ? '#FFFFFF' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)')"
-                            :stroke="sequence.includes(dot.id) ? '#7C3AED' : 'none'"
-                            stroke-width="2"
-                        />
+                            <!-- Outer Visual Pulse Ring on Active -->
+                            <circle
+                                r="26"
+                                :fill="sequence.includes(dot.id) ? 'rgba(139, 92, 246, 0.4)' : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)')"
+                                :stroke="sequence.includes(dot.id) ? '#8B5CF6' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)')"
+                                stroke-width="2.5"
+                                :filter="sequence.includes(dot.id) ? 'url(#dot-active-glow)' : 'none'"
+                            />
 
-                        <!-- Step Order Badge if visited -->
-                        <template x-if="sequence.includes(dot.id)">
-                            <g transform="translate(14, -14)">
-                                <circle r="11" fill="#EA580C" stroke="#FFFFFF" stroke-width="1.5" />
+                            <!-- Inner Core Dot -->
+                            <circle
+                                r="10"
+                                :fill="sequence.includes(dot.id) ? '#FFFFFF' : (isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.65)')"
+                                :stroke="sequence.includes(dot.id) ? '#7C3AED' : 'none'"
+                                stroke-width="2"
+                            />
+
+                            <!-- Step Order Badge if visited -->
+                            <template x-if="sequence.includes(dot.id)">
+                                <g transform="translate(14, -14)">
+                                    <circle r="11" fill="#EA580C" stroke="#FFFFFF" stroke-width="1.5" />
+                                    <text
+                                        text-anchor="middle"
+                                        dy="4"
+                                        fill="#FFFFFF"
+                                        font-size="11"
+                                        font-weight="bold"
+                                        x-text="sequence.indexOf(dot.id) + 1"
+                                    ></text>
+                                </g>
+                            </template>
+
+                            <!-- Node Number (subtle background) -->
+                            <template x-if="!sequence.includes(dot.id)">
                                 <text
                                     text-anchor="middle"
                                     dy="4"
-                                    fill="#FFFFFF"
+                                    :fill="isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'"
                                     font-size="11"
                                     font-weight="bold"
-                                    x-text="sequence.indexOf(dot.id) + 1"
+                                    x-text="dot.id"
                                 ></text>
-                            </g>
-                        </template>
+                            </template>
+                        </g>
+                    </template>
+                </svg>
+            </div>
 
-                        <!-- Node Number (subtle background) -->
-                        <template x-if="!sequence.includes(dot.id)">
-                            <text
-                                text-anchor="middle"
-                                dy="4"
-                                :fill="isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'"
-                                font-size="11"
-                                font-weight="bold"
-                                x-text="dot.id"
-                            ></text>
-                        </template>
-                    </g>
-                </template>
-            </svg>
+            <!-- Smartphone Bottom Home Bar Indicator -->
+            <div class="w-16 h-1 rounded-full bg-slate-700/80 mt-2.5 mb-0.5"></div>
         </div>
 
         <!-- Terjemahan Langsung di Bawah / Samping Pola -->

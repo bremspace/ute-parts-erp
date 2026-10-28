@@ -626,53 +626,73 @@
         </x-prism.glass-card>
 
         <!-- Transaksi Terkini Feed -->
-        <x-prism.glass-card class="lg:col-span-2" title="Aktivitas Transaksi Terkini" subtitle="Penjualan dan pesanan yang baru masuk di cabang">
-            <x-prism.dual-scroll class="-mt-1">
-                <table class="w-full text-left text-xs min-w-[580px]">
-                    <thead>
-                        <tr class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold border-b border-white/5 whitespace-nowrap">
-                            <th class="py-2.5 px-3">No. Transaksi</th>
-                            <th class="py-2.5 px-3">Sumber</th>
-                            <th class="py-2.5 px-3">Cabang</th>
-                            <th class="py-2.5 px-3">Waktu</th>
-                            <th class="py-2.5 px-3 text-right">Total Akhir</th>
-                            <th class="py-2.5 px-3 text-center">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-white/5">
-                        @forelse($transaksiTerbaru as $t)
-                            <tr class="hover:bg-white/[0.02] transition-colors duration-150 whitespace-nowrap">
-                                <td class="py-2.5 px-3 font-mono font-semibold text-white">
-                                    {{ $t->no_transaksi }}
-                                </td>
-                                <td class="py-2.5 px-3">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/5 border border-white/10 text-ink-300">
-                                        {{ ucfirst($t->sumber) }}
-                                    </span>
-                                </td>
-                                <td class="py-2.5 px-3 text-ink-400">
-                                    {{ $t->cabang?->nama ?? '-' }}
-                                </td>
-                                <td class="py-2.5 px-3 text-ink-500 tabular-nums">
-                                    {{ $t->created_at->format('H:i') }}
-                                </td>
-                                <td class="py-2.5 px-3 text-right font-black text-white tabular-nums">
-                                    Rp {{ number_format($t->total_akhir, 0, ',', '.') }}
-                                </td>
-                                <td class="py-2.5 px-3 text-center">
-                                    <x-prism.status-pill :status="$t->status" size="sm" />
-                                </td>
+        <x-prism.glass-card class="lg:col-span-2" title="Aktivitas Transaksi Terkini" subtitle="Feed aktivitas lintas modul (Penjualan, PO, GRN, Servis, Retur)">
+            @if($canViewTransaksiTerbaru)
+                <x-prism.dual-scroll class="-mt-1">
+                    <table class="w-full text-left text-xs min-w-[640px]">
+                        <thead>
+                            <tr class="text-[10px] uppercase tracking-wider text-ink-400 font-semibold border-b border-white/5 whitespace-nowrap">
+                                <th class="py-2.5 px-3">Tipe / No. Dokumen</th>
+                                <th class="py-2.5 px-3">Info / Relasi</th>
+                                <th class="py-2.5 px-3">Cabang</th>
+                                <th class="py-2.5 px-3">Waktu</th>
+                                <th class="py-2.5 px-3 text-right">Nominal</th>
+                                <th class="py-2.5 px-3 text-center">Status</th>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="py-8 text-center text-ink-500">
-                                    Belum ada transaksi hari ini.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </x-prism.dual-scroll>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            @forelse($transaksiTerbaru as $t)
+                                <tr class="hover:bg-white/[0.02] transition-colors duration-150 whitespace-nowrap">
+                                    <td class="py-2.5 px-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border {{ $t->badge ?? 'bg-white/5 text-ink-300 border-white/10' }}">
+                                                {{ $t->tipe ?? 'Penjualan' }}
+                                            </span>
+                                            <span class="font-mono font-semibold text-white">
+                                                {{ $t->no_dokumen ?? $t->no_transaksi }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="py-2.5 px-3 text-ink-300 max-w-[140px] truncate" title="{{ $t->info ?? '-' }}">
+                                        {{ $t->info ?? '-' }}
+                                    </td>
+                                    <td class="py-2.5 px-3 text-ink-400">
+                                        {{ $t->cabang?->nama ?? $t->cabang_nama ?? '-' }}
+                                    </td>
+                                    <td class="py-2.5 px-3 text-ink-500 tabular-nums">
+                                        {{ $t->created_at_fmt ?? $t->created_at->format('H:i') }}
+                                    </td>
+                                    <td class="py-2.5 px-3 text-right font-black text-white tabular-nums">
+                                        @if(!is_null($t->total_akhir))
+                                            Rp {{ number_format($t->total_akhir, 0, ',', '.') }}
+                                        @else
+                                            <span class="text-ink-500 font-normal">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-2.5 px-3 text-center">
+                                        <x-prism.status-pill :status="$t->status" size="sm" />
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="py-8 text-center text-ink-500">
+                                        Belum ada aktivitas transaksi hari ini.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </x-prism.dual-scroll>
+            @else
+                <div class="py-8 px-4 text-center">
+                    <div class="w-10 h-10 rounded-full bg-white/5 border border-white/10 text-ink-400 mx-auto flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <p class="text-xs text-ink-400 font-medium mt-2">Aktivitas transaksi multi-entitas dibatasi untuk Super-Admin, Owner, atau staf berwenang.</p>
+                </div>
+            @endif
         </x-prism.glass-card>
     </div>
 
@@ -861,7 +881,9 @@
             <div class="pt-2">
                 <div class="flex items-center justify-between mb-2">
                     <h4 class="text-xs font-bold uppercase tracking-wider text-ink-300">Tracking Transaksi Terfilter</h4>
-                    <span class="text-[11px] text-ink-500">Menampilkan 15 transaksi teratas</span>
+                    <span class="text-[11px] text-ink-500">
+                        Total {{ $trackingPenjualan->total() }} transaksi (Halaman {{ $trackingPenjualan->currentPage() }} dari {{ $trackingPenjualan->lastPage() }})
+                    </span>
                 </div>
                 <x-prism.dual-scroll>
                     <table class="w-full text-left text-xs min-w-[820px]">
@@ -879,36 +901,36 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-white/5">
-                            @forelse($dataPenjualan['items'] ?? [] as $item)
-                                <tr wire:key="penjualan-row-{{ $item['id'] }}" class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
+                            @forelse($trackingPenjualan as $item)
+                                <tr wire:key="penjualan-row-{{ $item->id }}" class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
                                     <td class="py-2.5 px-3 font-mono font-semibold text-white">
-                                        {{ $item['no_transaksi'] }}
+                                        {{ $item->no_transaksi }}
                                     </td>
                                     <td class="py-2.5 px-3">
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/5 border border-white/10 text-ink-300">
-                                            {{ ucfirst($item['sumber']) }}
+                                            {{ ucfirst($item->sumber ?? 'pos') }}
                                         </span>
                                     </td>
-                                    <td class="py-2.5 px-3 text-ink-300 max-w-[160px] truncate" title="{{ $item['pelanggan_nama'] }}">
-                                        {{ $item['pelanggan_nama'] }}
+                                    <td class="py-2.5 px-3 text-ink-300 max-w-[160px] truncate" title="{{ $item->pelanggan?->nama ?? 'Umum' }}">
+                                        {{ $item->pelanggan?->nama ?? 'Umum' }}
                                     </td>
                                     <td class="py-2.5 px-3 text-ink-400">
-                                        {{ $item['kasir_nama'] }}
+                                        {{ $item->kasir?->name ?? '-' }}
                                     </td>
                                     <td class="py-2.5 px-3 text-ink-500 tabular-nums">
-                                        {{ $item['waktu'] }}
+                                        {{ $item->created_at?->format('d/m/Y H:i') ?? '-' }}
                                     </td>
                                     <td class="py-2.5 px-3 text-center text-ink-300 text-[11px] font-mono">
-                                        {{ $item['metode_bayar'] }}
+                                        {{ strtoupper($item->metode_bayar ?? 'TUNAI') }}
                                     </td>
                                     <td class="py-2.5 px-3 text-right font-black text-white tabular-nums">
-                                        Rp {{ number_format($item['total_akhir'], 0, ',', '.') }}
+                                        Rp {{ number_format($item->total_akhir, 0, ',', '.') }}
                                     </td>
                                     <td class="py-2.5 px-3 text-center">
-                                        <x-prism.status-pill :status="$item['status']" size="sm" />
+                                        <x-prism.status-pill :status="$item->status" size="sm" />
                                     </td>
                                     <td class="py-2.5 px-3 text-center">
-                                        <button type="button" wire:click="lihatDetailTransaksi({{ $item['id'] }})"
+                                        <button type="button" wire:click="lihatDetailTransaksi({{ $item->id }})"
                                             class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/30 text-up-primary text-[10px] font-semibold transition-all cursor-pointer whitespace-nowrap">
                                             Detail & Tracking
                                         </button>
@@ -924,6 +946,12 @@
                         </tbody>
                     </table>
                 </x-prism.dual-scroll>
+
+                @if($trackingPenjualan->hasPages())
+                    <div class="pt-4 border-t border-white/5">
+                        {{ $trackingPenjualan->links() }}
+                    </div>
+                @endif
             </div>
         </div>
     </x-prism.glass-card>
@@ -1112,8 +1140,8 @@
             </div>
             <div class="flex gap-3 mt-4 flex-wrap">
                 @can('laporan.cabang')
-                    <a href="{{ $treasuryProjection['drill_piutang'] ?? route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
-                    <a href="{{ $treasuryProjection['drill_utang'] ?? route('laporan.drill', ['model' => 'Utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
+                    <a href="{{ $treasuryProjection['drill_piutang'] ?? route('akunting', ['tab' => 'piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
+                    <a href="{{ $treasuryProjection['drill_utang'] ?? route('akunting', ['tab' => 'utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
                 @endcan
             </div>
         </x-prism.glass-card>
@@ -1141,8 +1169,8 @@
             </div>
             <div class="flex gap-3 mt-4 flex-wrap">
                 @can('laporan.cabang')
-                    <a href="{{ $treasuryProjection['drill_piutang'] ?? route('laporan.drill', ['model' => 'Piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
-                    <a href="{{ $treasuryProjection['drill_utang'] ?? route('laporan.drill', ['model' => 'Utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
+                    <a href="{{ $treasuryProjection['drill_piutang'] ?? route('akunting', ['tab' => 'piutang']) }}" class="text-[11px] text-up-primary hover:text-indigo-400 font-semibold">Drill-down Piutang →</a>
+                    <a href="{{ $treasuryProjection['drill_utang'] ?? route('akunting', ['tab' => 'utang']) }}" class="text-[11px] text-up-amber hover:text-orange-400 font-semibold">Drill-down Utang →</a>
                 @endcan
             </div>
         </x-prism.glass-card>

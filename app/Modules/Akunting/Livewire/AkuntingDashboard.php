@@ -136,6 +136,11 @@ class AkuntingDashboard extends Component
         $this->periodeDari = now()->startOfMonth()->toDateString();
         $this->periodeSampai = now()->toDateString();
         $this->resetManualJournalForm();
+
+        $tab = request('tab');
+        if ($tab && in_array($tab, ['laporan', 'jurnal', 'coa', 'piutang', 'utang', 'matching-kas', 'diagnosa-neraca'], true)) {
+            $this->activeTab = $tab;
+        }
     }
 
     // ===== GUARD [B-10a / P0-2] =====

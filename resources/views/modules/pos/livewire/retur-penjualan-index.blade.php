@@ -804,4 +804,7 @@
             </div>
         </div>
     @endif
+
+    {{-- Modal Riwayat Aktivitas Audit Trail --}}
+    @include('partials.riwayat-modal')
 </div>

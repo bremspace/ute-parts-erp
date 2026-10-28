@@ -38,6 +38,7 @@ use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\StokTransfer;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Models\TipeHp;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\Paginator;
 use Livewire\Component;
 
@@ -364,5 +365,201 @@ class RiwayatAktivitas extends Component
                 'komisi_teknisi' => 'Aturan Komisi Teknisi',
             ],
         ])->layout('layouts.backoffice', ['header' => 'Audit Trail & Log']);
+    }
+
+    public static function labelEntitas(?string $subjectType): string
+    {
+        if (empty($subjectType)) {
+            return 'Sistem';
+        }
+
+        $base = class_basename($subjectType);
+        $map = [
+            'Transaksi' => 'Transaksi Penjualan',
+            'TiketServis' => 'Tiket Servis',
+            'ReturnPenjualan' => 'Retur Penjualan',
+            'ReturnPembelian' => 'Retur Pembelian',
+            'JurnalAkuntansi' => 'Jurnal Akuntansi',
+            'Piutang' => 'Piutang Konsumen',
+            'Utang' => 'Utang Supplier',
+            'PurchaseOrder' => 'Purchase Order (PO)',
+            'Grn' => 'Penerimaan Barang (GRN)',
+            'Produk' => 'Produk & SKU',
+            'Pelanggan' => 'Pelanggan CRM',
+            'Supplier' => 'Supplier / Vendor',
+            'StokItem' => 'Stok Barang',
+            'StokOpname' => 'Stok Opname',
+            'StokTransfer' => 'Transfer Stok',
+            'User' => 'Akun Pengguna',
+            'Cabang' => 'Cabang Toko',
+            'KategoriProduk' => 'Kategori Produk',
+            'Brand' => 'Brand / Merek',
+            'KualitasProduk' => 'Kualitas Produk',
+            'SatuanUnit' => 'Satuan Unit',
+            'TipeHp' => 'Tipe / Model HP',
+            'Gudang' => 'Gudang Toko',
+            'Rak' => 'Rak Gudang',
+            'JenisServis' => 'Jenis Servis',
+            'AkunCOA' => 'Akun COA',
+            'Karyawan' => 'Data Karyawan',
+            'PayrollPeriode' => 'Periode Penggajian',
+            'PayrollSlip' => 'Slip Gaji',
+            'AbsensiLog' => 'Log Absensi',
+            'KpiHasil' => 'Hasil Evaluasi KPI',
+            'ShiftJadwal' => 'Jadwal Shift',
+            'KomisiTeknisiRule' => 'Aturan Komisi Teknisi',
+        ];
+
+        return $map[$base] ?? ucwords(str_replace('_', ' ', $base));
+    }
+
+    public static function labelKolom(string $key): string
+    {
+        $dictionary = [
+            'no_transaksi' => 'Nomor Transaksi',
+            'no_tiket' => 'Nomor Tiket Servis',
+            'no_jurnal' => 'Nomor Jurnal',
+            'no_po' => 'Nomor PO',
+            'no_grn' => 'Nomor GRN',
+            'no_return' => 'Nomor Retur',
+            'no_opname' => 'Nomor Opname',
+            'no_transfer' => 'Nomor Transfer Stok',
+            'no_piutang' => 'Nomor Piutang',
+            'no_utang' => 'Nomor Utang',
+            'total_akhir' => 'Total Tagihan',
+            'subtotal' => 'Subtotal',
+            'jumlah_bayar' => 'Jumlah Bayar',
+            'kembalian' => 'Kembalian',
+            'metode_bayar' => 'Metode Bayar',
+            'metode_pengembalian' => 'Metode Pengembalian Dana',
+            'tipe_penyelesaian' => 'Bentuk Penyelesaian Retur',
+            'status' => 'Status',
+            'status_pembayaran' => 'Status Pembayaran',
+            'status_garansi' => 'Status Garansi',
+            'kondisi_barang' => 'Kondisi Barang',
+            'pelanggan_id' => 'ID Pelanggan',
+            'cabang_id' => 'ID Cabang',
+            'user_id' => 'ID Pengguna',
+            'kasir_id' => 'ID Kasir',
+            'teknisi_id' => 'ID Teknisi',
+            'gudang_id' => 'ID Gudang',
+            'produk_id' => 'ID Produk',
+            'supplier_id' => 'ID Supplier',
+            'diskon_nominal' => 'Potongan Diskon',
+            'diskon_persen' => 'Persen Diskon',
+            'pajak_nominal' => 'Nominal Pajak',
+            'ppn_persen' => 'Persen PPN',
+            'ongkir' => 'Ongkos Kirim',
+            'catatan' => 'Catatan',
+            'catatan_qc' => 'Catatan QC',
+            'keterangan' => 'Keterangan',
+            'alasan' => 'Alasan',
+            'void_alasan' => 'Alasan Batal / Void',
+            'void_by' => 'Dibatalkan Oleh',
+            'nama' => 'Nama',
+            'telepon' => 'Nomor Telepon',
+            'email' => 'Alamat Email',
+            'alamat' => 'Alamat',
+            'is_active' => 'Status Aktif',
+            'is_reseller' => 'Status Reseller',
+            'harga_jual_retail' => 'Harga Retail',
+            'harga_modal' => 'Harga Modal / HPP',
+            'harga_satuan' => 'Harga Satuan',
+            'jumlah' => 'Jumlah / Qty',
+            'qty' => 'Kuantitas',
+            'satuan' => 'Satuan',
+            'konversi' => 'Faktor Konversi',
+            'poin_loyalty' => 'Poin Loyalitas',
+            'saldo_piutang' => 'Saldo Piutang',
+            'jatuh_tempo' => 'Jatuh Tempo',
+            'tanggal' => 'Tanggal Transaksi',
+            'tanggal_masuk' => 'Tanggal Masuk',
+            'tanggal_selesai' => 'Tanggal Selesai',
+            'tanggal_bayar' => 'Tanggal Bayar',
+            'jenis_hp' => 'Tipe / Model HP',
+            'keluhan' => 'Keluhan Kerusakan',
+            'kelengkapan' => 'Kelengkapan Unit',
+            'biaya_jasa' => 'Biaya Jasa',
+            'biaya_part' => 'Biaya Sparepart',
+            'estimasi_biaya' => 'Estimasi Biaya',
+            'garansi_hari' => 'Masa Garansi (Hari)',
+            'garansi_teks' => 'Keterangan Garansi',
+            'password' => 'Kata Sandi',
+            'role' => 'Peran Pengguna',
+            'gaji_pokok' => 'Gaji Pokok',
+            'tunjangan' => 'Tunjangan',
+            'potongan' => 'Potongan',
+            'total_gaji' => 'Total Gaji',
+        ];
+
+        if (isset($dictionary[$key])) {
+            return $dictionary[$key];
+        }
+
+        $clean = preg_replace('/_id$/', '', $key);
+        $clean = str_replace('_', ' ', (string) $clean);
+
+        return ucwords($clean);
+    }
+
+    public static function formatNilai(mixed $value, string $key): string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+        if (is_bool($value)) {
+            return $value ? 'Ya / Aktif' : 'Tidak / Nonaktif';
+        }
+
+        $statusMap = [
+            'lunas' => 'Lunas',
+            'belum_lunas' => 'Belum Lunas',
+            'selesai' => 'Selesai',
+            'batal' => 'Dibatalkan',
+            'void' => 'Dibatalkan (Void)',
+            'draft' => 'Draf / Menunggu',
+            'disetujui' => 'Disetujui',
+            'ditolak' => 'Ditolak',
+            'refund' => 'Pengembalian Dana (Refund)',
+            'tukar_produk' => 'Tukar Produk (Exchange)',
+            'antrian' => 'Dalam Antrean',
+            'dicek' => 'Sedang Diperiksa',
+            'menunggu_persetujuan' => 'Menunggu Persetujuan',
+            'dikerjakan' => 'Sedang Dikerjakan',
+            'siap_diambil' => 'Siap Diambil',
+            'sudah_diambil' => 'Sudah Diambil',
+            'kas' => 'Kas Toko',
+            'piutang' => 'Potong Piutang',
+            'rusak' => 'Barang Rusak',
+            'normal' => 'Barang Normal',
+        ];
+
+        if (is_string($value) && isset($statusMap[strtolower($value)])) {
+            return $statusMap[strtolower($value)];
+        }
+
+        if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/', $value)) {
+            try {
+                $c = Carbon::parse($value);
+
+                return str_contains($value, ':') ? $c->format('d/m/Y H:i') : $c->format('d/m/Y');
+            } catch (\Exception) {
+                return $value;
+            }
+        }
+
+        if (is_numeric($value) && ! str_ends_with($key, '_id') && ! str_ends_with($key, '_persen') && ! in_array($key, ['qty', 'jumlah', 'garansi_hari', 'poin_loyalty', 'konversi'], true)) {
+            if (preg_match('/(total|harga|subtotal|bayar|kembali|nominal|ongkir|gaji|biaya|jumlah)/i', $key)) {
+                return 'Rp '.number_format((float) $value, 0, ',', '.');
+            }
+
+            return number_format((float) $value, 0, ',', '.');
+        }
+
+        if (is_array($value)) {
+            return implode(', ', array_map(fn ($k, $v) => is_numeric($k) ? (string) $v : self::labelKolom((string) $k).': '.$v, array_keys($value), array_values($value)));
+        }
+
+        return (string) $value;
     }
 }

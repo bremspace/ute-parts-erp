@@ -103,8 +103,8 @@
                     </td>
                     @if(empty($tipe))
                         <td class="py-3.5 px-4 font-medium text-ink-200 whitespace-nowrap">
-                            <span class="text-up-primary font-semibold">{{ class_basename($baris->subject_type ?? 'Sistem') }}</span>
-                            <span class="text-ink-400 text-[10px] block font-mono">#{{ $baris->subject_id }}</span>
+                            <span class="text-up-primary font-semibold block">{{ \App\Modules\Rbac\Livewire\RiwayatAktivitas::labelEntitas($baris->subject_type ?? null) }}</span>
+                            <span class="text-ink-400 text-[10px] font-mono">ID: #{{ $baris->subject_id }}</span>
                         </td>
                     @endif
                     <td class="py-3.5 px-4">
@@ -123,21 +123,21 @@
                         @else
                             <div class="space-y-1">
                                 @foreach($kunci as $key)
-                                    <div class="flex flex-wrap gap-1 items-baseline">
-                                        <span class="font-mono text-[10px] text-ink-400">{{ $key }}</span>
+                                    <div class="flex flex-wrap gap-1.5 items-baseline">
+                                        <span class="font-medium text-[11px] text-ink-300">{{ \App\Modules\Rbac\Livewire\RiwayatAktivitas::labelKolom($key) }}:</span>
                                         @if($baris->event === 'created')
-                                            <span class="font-semibold text-white tabular-nums">{{ $fmt($sesudah[$key] ?? null, $key) }}</span>
+                                            <span class="font-semibold text-white tabular-nums">{{ \App\Modules\Rbac\Livewire\RiwayatAktivitas::formatNilai($sesudah[$key] ?? null, $key) }}</span>
                                         @elseif($baris->event === 'deleted')
-                                            <span class="text-up-red tabular-nums line-through">{{ $fmt($sebelum[$key] ?? null, $key) }}</span>
+                                            <span class="text-up-red tabular-nums line-through">{{ \App\Modules\Rbac\Livewire\RiwayatAktivitas::formatNilai($sebelum[$key] ?? null, $key) }}</span>
                                         @else
-                                            <span class="text-up-red tabular-nums line-through">{{ $fmt($sebelum[$key] ?? null, $key) }}</span>
+                                            <span class="text-up-red tabular-nums line-through">{{ \App\Modules\Rbac\Livewire\RiwayatAktivitas::formatNilai($sebelum[$key] ?? null, $key) }}</span>
                                             <span class="text-ink-500">→</span>
-                                            <span class="text-up-mint font-semibold tabular-nums">{{ $fmt($sesudah[$key] ?? null, $key) }}</span>
+                                            <span class="text-up-mint font-semibold tabular-nums">{{ \App\Modules\Rbac\Livewire\RiwayatAktivitas::formatNilai($sesudah[$key] ?? null, $key) }}</span>
                                         @endif
                                     </div>
                                 @endforeach
                                 @if($sisa > 0)
-                                    <p class="text-[10px] text-ink-500">+{{ $sisa }} field lainnya</p>
+                                    <p class="text-[10px] text-ink-500">+{{ $sisa }} data lainnya</p>
                                 @endif
                             </div>
                         @endempty

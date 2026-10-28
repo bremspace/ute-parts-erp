@@ -1036,6 +1036,28 @@ class ServisBoard extends Component
 
         $tiket = $this->tiketScoped($tiketId);
 
+        // [T-16] Validasi wajib update catatan + foto per step sebelum membuka tombol step berikutnya
+        if (in_array($statusBaru, ['qc', 'selesai'], true)) {
+            $hasValidProgress = $tiket->progressList()
+                ->whereNotNull('foto')
+                ->where(function ($q) {
+                    $q->whereNotNull('deskripsi')->where('deskripsi', '!=', '')
+                        ->orWhereNotNull('judul')->where('judul', '!=', '');
+                })
+                ->exists();
+
+            if (! $hasValidProgress) {
+                $stepLabel = ($statusBaru === 'qc' ? 'Quality Control (QC)' : 'Selesai');
+                $this->openProgressModal($tiketId);
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Wajib memperbarui catatan dan mengunggah foto progres perbaikan unit sebelum beralih ke tahap {$stepLabel}.",
+                ]);
+
+                return;
+            }
+        }
+
         try {
             $tiket = app(ServisService::class)->updateStatus($tiket, $statusBaru, auth()->user(), $alasan);
             $this->dispatch('alert', ['type' => 'success', 'message' => "Status → {$statusBaru}"]);
@@ -1354,7 +1376,12 @@ class ServisBoard extends Component
     {
         $tiket = $this->tiketScoped($tiketId);
         $this->progressTiketId = $tiketId;
-        $this->progressPersentase = 50;
+        $this->progressPersentase = match ($tiket->status) {
+            'qc' => 85,
+            'selesai' => 95,
+            'dikerjakan' => 70,
+            default => 50,
+        };
         $this->progressJudul = '';
         $this->progressDeskripsi = '';
         $this->progressTampilkanKonsumen = true;
@@ -1538,6 +1565,8 @@ class ServisBoard extends Component
         $rincian = $tiket->getRincianBiayaLengkap();
         $cabang = $tiket->cabang;
 
+        $isLunas = ($tiket->status_pembayaran === 'lunas');
+
         $this->receiptData = [
             'no_transaksi' => $tiket->transaksi?->no_transaksi ?? $tiket->no_tiket,
             'no_tiket' => $tiket->no_tiket,
@@ -1557,11 +1586,17 @@ class ServisBoard extends Component
             'pajak' => 0,
             'ppn_persen' => 0,
             'total' => $rincian['total'],
-            'bayar' => $rincian['total'],
+            'bayar' => $isLunas ? $rincian['total'] : 0,
             'kembali' => 0,
+            'sisa_tagihan' => $isLunas ? 0 : $rincian['total'],
             'metode' => strtoupper($tiket->metode_pembayaran ?? 'TUNAI'),
             'status_pembayaran' => $tiket->status_pembayaran ?? 'belum_bayar',
+            'is_lunas' => $isLunas,
+            'is_spk' => ! $isLunas,
+            'tipe_struk' => $isLunas ? 'kwitansi' : 'spk',
+            'label_struk' => $isLunas ? 'KWITANSI PELUNASAN SERVIS' : 'SPK / TANDA TERIMA ESTIMASI',
             'garansi' => $tiket->garansi ? ($tiket->garansi->durasi_hari.' Hari (s/d '.$tiket->garansi->tanggal_berakhir?->format('d/m/Y').')') : null,
+            'cabang' => $cabang?->nama ?? session('cabang_nama') ?? null,
         ];
 
         $this->showReceiptModal = true;
@@ -1712,10 +1747,10 @@ class ServisBoard extends Component
         $this->bukaKunciGadget = ! $this->bukaKunciGadget;
     }
 
-    private function pekerjaanRowBaru(): array
+    private function pekerjaanRowBaru(string $tipe = 'jasa'): array
     {
         return [
-            'tipe' => 'jasa',
+            'tipe' => in_array($tipe, ['part', 'jasa'], true) ? $tipe : 'jasa',
             'produk_id' => null,
             'produk_nama' => '',
             'nama_item' => '',
@@ -1726,9 +1761,9 @@ class ServisBoard extends Component
         ];
     }
 
-    public function addPekerjaanRow()
+    public function addPekerjaanRow(string $tipe = 'jasa')
     {
-        $this->pekerjaanItems[] = $this->pekerjaanRowBaru();
+        $this->pekerjaanItems[] = $this->pekerjaanRowBaru($tipe);
     }
 
     public function removePekerjaanRow(int $idx)

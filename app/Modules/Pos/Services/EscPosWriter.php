@@ -52,6 +52,9 @@ class EscPosWriter
         }
 
         $this->align(0)->rule();
+        if (! empty($data['is_piutang'])) {
+            $this->bold(true)->text('*** PIUTANG / BELUM LUNAS ***')->bold(false);
+        }
         $this->text('No    : '.$data['no_transaksi']);
         if (! empty($data['no_tiket'])) {
             $this->text('Tiket : '.$data['no_tiket']);
@@ -121,9 +124,17 @@ class EscPosWriter
         }
 
         $this->bold(true)->text($this->pad('TOTAL', $this->money($data['total'])))->bold(false);
-        $this->text('Bayar   : '.$this->money($data['bayar']));
-        $this->text('Kembali : '.$this->money($data['kembali']));
-        $this->text('Metode  : '.$data['metode_bayar']);
+        if (! empty($data['is_piutang'])) {
+            $this->text('Status  : BELUM LUNAS (PIUTANG)');
+            if (! empty($data['jatuh_tempo'])) {
+                $this->text('Jatuh Tmp: '.$data['jatuh_tempo']);
+            }
+            $this->text('Sisa Tag: '.$this->money($data['sisa_piutang'] ?? $data['total']));
+        } else {
+            $this->text('Bayar   : '.$this->money($data['bayar']));
+            $this->text('Kembali : '.$this->money($data['kembali']));
+            $this->text('Metode  : '.$data['metode_bayar']);
+        }
 
         if (! empty($data['hemat_total']) && (float) $data['hemat_total'] > 0) {
             $this->bold(true)->text($this->pad('TOTAL HEMAT', $this->money($data['hemat_total'])))->bold(false);
@@ -149,6 +160,15 @@ class EscPosWriter
         // Footer
         foreach ($data['footerLines'] ?? [] as $line) {
             $this->text($line);
+        }
+
+        if (! empty($data['is_piutang'])) {
+            $this->feed(1);
+            $this->text('"Barang diterima & berjanji melunasi sblm jatuh tempo"');
+            $this->feed(1);
+            $this->text('Penerima,              Kasir,');
+            $this->feed(2);
+            $this->text('(............)        (............)');
         }
 
         // Feed 1 baris minimal lalu cut (hemat kertas struk)

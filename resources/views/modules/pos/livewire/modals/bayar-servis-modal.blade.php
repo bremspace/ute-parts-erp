@@ -369,7 +369,7 @@
         <div
             x-show="showQrisZoom"
             x-cloak
-            class="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 sm:p-6"
+            class="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 sm:p-6"
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0 scale-95"
             x-transition:enter-end="opacity-100 scale-100"
@@ -380,21 +380,21 @@
         >
             <div
                 @click.away="showQrisZoom = false"
-                class="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 text-center shadow-2xl relative border-4 border-up-primary/40 space-y-4 text-ink-900"
+                class="w-full max-w-sm sm:max-w-md bg-white rounded-3xl p-5 sm:p-6 text-center shadow-2xl relative border border-ink-200/80 space-y-4 text-ink-900"
             >
                 <button
                     type="button"
                     @click="showQrisZoom = false"
-                    class="absolute top-4 right-4 w-9 h-9 rounded-full bg-ink-100 hover:bg-ink-200 text-ink-700 font-black text-sm flex items-center justify-center transition cursor-pointer"
+                    class="absolute top-4 right-4 w-8 h-8 rounded-full bg-ink-100 hover:bg-ink-200 text-ink-600 font-bold text-xs flex items-center justify-center transition cursor-pointer"
                 >
                     ✕
                 </button>
 
                 <div class="space-y-1">
-                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-up-primary/10 text-up-primary font-black text-[11px] tracking-wider uppercase">
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-up-primary/10 text-up-primary font-bold text-[11px] tracking-wider uppercase">
                         <span>QRIS DINAMIS • SERVIS</span>
                     </div>
-                    <h3 class="text-xl font-black text-ink-900 uppercase tracking-tight">
+                    <h3 class="text-lg font-black text-ink-900 uppercase tracking-tight">
                         {{ $qrisMerchantName ?: 'QRIS TOKO' }}
                     </h3>
                     <span class="text-xs text-ink-500 font-mono block">
@@ -402,7 +402,7 @@
                     </span>
                 </div>
 
-                <div class="w-72 h-72 sm:w-80 sm:h-80 mx-auto p-4 bg-white rounded-2xl border-2 border-ink-200 shadow-inner flex items-center justify-center">
+                <div class="w-64 h-64 sm:w-72 sm:h-72 mx-auto p-3.5 bg-white rounded-2xl border border-ink-200 shadow-sm flex items-center justify-center">
                     {!! $qrisKasirSvg !!}
                 </div>
 

@@ -41,6 +41,7 @@ use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Wms\Services\StockReservationService;
 use App\Modules\Wms\Services\StokDeductionService;
 use App\Traits\ParsesNominal;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -2008,14 +2009,35 @@ class PosKasir extends Component
 
     public function updatedSplitTunai($value): void
     {
+        $total = (float) $this->totalAkhir;
+        $tunai = (float) $this->parseNominal($value);
+        if ($tunai < 0) {
+            $tunai = 0;
+            $this->splitTunai = '0';
+        }
+        $sisaNonTunai = max(0, $total - $tunai);
+        $this->splitNonTunai = number_format($sisaNonTunai, 0, ',', '.');
         unset($this->kembalian);
+
+        if ($this->splitMetodeNonTunai === 'qris') {
+            $this->refreshQrisKasir($sisaNonTunai);
+        }
     }
 
     public function updatedSplitNonTunai($value): void
     {
+        $total = (float) $this->totalAkhir;
+        $nonTunai = (float) $this->parseNominal($value);
+        if ($nonTunai < 0) {
+            $nonTunai = 0;
+            $this->splitNonTunai = '0';
+        }
+        $sisaTunai = max(0, $total - $nonTunai);
+        $this->splitTunai = number_format($sisaTunai, 0, ',', '.');
         unset($this->kembalian);
+
         if ($this->splitMetodeNonTunai === 'qris') {
-            $this->refreshQrisKasir((float) $this->parseNominal($this->splitNonTunai));
+            $this->refreshQrisKasir($nonTunai);
         }
     }
 
@@ -2752,6 +2774,9 @@ class PosKasir extends Component
                 }
                 $hematTotal = $diskonTierStruk + $this->diskonPartai + $this->diskonPoin + $diskonKasirLangsung;
 
+                $isPiutang = in_array(strtolower($this->metodeBayar), ['piutang', 'kasbon']);
+                $jatuhTempoTgl = $isPiutang ? now()->addDays(30)->format('d/m/Y') : null;
+
                 $this->receiptData = [
                     'no_transaksi' => $transaksi->no_transaksi,
                     'waktu' => now()->format('d/m/Y H:i'),
@@ -2784,6 +2809,9 @@ class PosKasir extends Component
                     'kembali' => $kembalianFinal,
                     'hemat_total' => $hematTotal,
                     'metode' => strtoupper($this->metodeBayar),
+                    'is_piutang' => $isPiutang,
+                    'jatuh_tempo' => $jatuhTempoTgl,
+                    'sisa_piutang' => $isPiutang ? $totalAkhir : 0,
                     'garansi' => $garansiTeks,
                     'cabang' => session('cabang_nama') ?? auth()->user()?->cabang?->nama ?? null,
                 ];
@@ -2813,13 +2841,18 @@ class PosKasir extends Component
     public function lihatDetailTransaksi(int $id): void
     {
         $cabangId = session('cabang_id');
-        $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang', 'pengiriman'])
+        $transaksi = Transaksi::with(['items.produk', 'pelanggan.tierMembership', 'kasir', 'cabang', 'pengiriman', 'piutang'])
             ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->findOrFail($id);
 
         $pelanggan = $transaksi->pelanggan;
         $saldoPoin = $pelanggan?->poin_loyalty ?? 0;
         $tipeKonsumen = $pelanggan ? app(PelangganService::class)->tipeKonsumen($pelanggan) : 'retail';
+
+        $isPiutang = in_array(strtolower($transaksi->metode_bayar ?? ''), ['piutang', 'kasbon']) || (bool) $transaksi->piutang;
+        $piutangModel = $transaksi->piutang;
+        $jatuhTempoTgl = $piutangModel?->jatuh_tempo ? Carbon::parse($piutangModel->jatuh_tempo)->format('d/m/Y') : ($isPiutang ? $transaksi->created_at?->copy()->addDays(30)->format('d/m/Y') : null);
+        $sisaPiutang = $piutangModel ? (float) $piutangModel->sisa_piutang : ($isPiutang ? (float) $transaksi->total_akhir : 0);
 
         $items = $transaksi->items->map(function ($item) {
             $retailPerUnit = (float) ($item->produk?->harga_jual_retail ?? $item->harga_satuan);
@@ -2902,6 +2935,9 @@ class PosKasir extends Component
             'kembali' => (float) $transaksi->kembalian,
             'hemat_total' => $hematTotal,
             'metode' => strtoupper($transaksi->metode_bayar ?? 'TUNAI'),
+            'is_piutang' => $isPiutang,
+            'jatuh_tempo' => $jatuhTempoTgl,
+            'sisa_piutang' => $sisaPiutang,
             'status' => $transaksi->status,
             'void_alasan' => $transaksi->void_alasan,
             'garansi' => $transaksi->garansi_teks,
@@ -3205,16 +3241,16 @@ class PosKasir extends Component
     public function getPelangganCariProperty()
     {
         $term = trim($this->pelangganSearch);
-        if (strlen($term) < 1) {
-            return collect();
-        }
 
         return Pelanggan::with('tierMembership')
-            ->where(function ($q) use ($term) {
-                $q->where('nama', 'like', "%{$term}%")
-                    ->orWhere('telepon', 'like', "%{$term}%")
-                    ->orWhere('email', 'like', "%{$term}%");
+            ->when(strlen($term) >= 1, function ($q) use ($term) {
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('nama', 'like', "%{$term}%")
+                        ->orWhere('telepon', 'like', "%{$term}%")
+                        ->orWhere('email', 'like', "%{$term}%");
+                });
             })
+            ->latest('updated_at')
             ->limit(8)
             ->get();
     }
@@ -3647,11 +3683,31 @@ class PosKasir extends Component
 
     public function updatedServisSplitTunai(): void
     {
+        if ($this->selectedServisDetail) {
+            $total = (float) $this->selectedServisDetail['total'];
+            $tunai = (float) $this->parseNominal($this->servisSplitTunai);
+            if ($tunai < 0) {
+                $tunai = 0;
+                $this->servisSplitTunai = '0';
+            }
+            $sisaNonTunai = max(0, $total - $tunai);
+            $this->servisSplitNonTunai = number_format($sisaNonTunai, 0, ',', '.');
+        }
         $this->hitungKembalianServis();
     }
 
     public function updatedServisSplitNonTunai(): void
     {
+        if ($this->selectedServisDetail) {
+            $total = (float) $this->selectedServisDetail['total'];
+            $nonTunai = (float) $this->parseNominal($this->servisSplitNonTunai);
+            if ($nonTunai < 0) {
+                $nonTunai = 0;
+                $this->servisSplitNonTunai = '0';
+            }
+            $sisaTunai = max(0, $total - $nonTunai);
+            $this->servisSplitTunai = number_format($sisaTunai, 0, ',', '.');
+        }
         $this->hitungKembalianServis();
     }
 

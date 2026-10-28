@@ -3,6 +3,79 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-28 — Perbaikan 17 Bug Operasional: Fase 4 (Modul Servis & Pengerjaan) ✅
+
+- **T-13 — Form Terima Servis Standar & Auto-Sync CRM Pelanggan (`ServisService.php`, `ServisBoard.php`)**:
+  - Penyeragaman penanganan identitas konsumen servis walk-in dan booking online: jika konsumen belum terdaftar di modul CRM, sistem otomatis menyimpannya ke tabel `pelanggan` dan menautkan `pelanggan_id` ke `TiketServis`.
+  - Mencegah fragmentasi data dan memastikan data riwayat servis tercatat terpusat di CRM pelanggan.
+- **T-14 — Kunci Pola Animasi Mobile Mockup Frame (`pattern-lock.blade.php`)**:
+  - Komponen pattern lock interaktif diperbarui dengan frame smartphone modern (bezel rounded, lubang kamera depan, speaker bar, indikator home bar bawah).
+  - Animasi visual sentuh ditingkatkan dengan filter glow drop-shadow titik aktif (`#A78BFA`), garis penghubung interaktif, dan haptic feedback sentuhan mobile-friendly.
+- **T-15 — Part/Jasa Terpisah, SLA Jam/Hari, Tombol Struk Kanban, Modal Close, & SPK vs Kwitansi (`ServisBoard.php`, `servis-board.blade.php`, `thermal-receipt-modal.blade.php`)**:
+  - Dukungan tombol penambahan baris `+ Tambah Jasa` dan `+ Tambah Sparepart` secara terpisah pada modal rincian pengerjaan teknisi.
+  - Perhitungan SLA dan sisa waktu servis cerdas: dikonversi otomatis ke format hari dan jam (misal `2 hari 4 jam` atau `1 jam 30 mnt`) menggantikan menit mentah berlebih.
+  - Tombol pintas cetak struk langsung tersedia pada setiap card tiket di papan kanban (`🖨 Struk`).
+  - Tombol tutup modal (✕) dipoles konsisten dan responsif di seluruh modal servis (detail, progress, intake fisik, approve, dll).
+  - Pembedaan format struk servis: tiket berstatus belum lunas mencetak `SPK / TANDA TERIMA ESTIMASI` dengan rincian biaya estimasi dan sisa tagihan, sedangkan tiket lunas mencetak `KWITANSI PELUNASAN SERVIS`.
+- **T-16 — Progress Bar Dinamis & Validasi Catatan/Foto Sebelum QC/Selesai (`ServisBoard.php`, `servis-board.blade.php`)**:
+  - Progress bar tiket servis dihitung otomatis dan dinamis berdasarkan tahapan status alur kanban (dari 15% pada saat diterima hingga 95% pada status selesai), disinkronkan dengan log progres pengerjaan teknisi.
+  - Visualisasi alur 7 stepper tahapan pengerjaan (Terima -> Diagnosa -> Setuju -> Pengerjaan -> QC -> Selesai -> Diambil).
+  - Proteksi validasi ketat: teknisi wajib mencatat minimal 1 log progres beserta deskripsi dan dokumentasi foto sebelum sistem mengizinkan perpindahan tiket ke tahap Quality Control (`qc`) dan `selesai`.
+- **Pengujian Terotomasi (`ServisFase4FixTest.php`)**:
+  - 4 feature tests komprehensif menguji auto-sync CRM, komponen pattern lock mockup frame, struk SPK vs kwitansi kanban, baris part/jasa, serta pemblokiran transisi status tanpa foto/catatan (22 assertions passing).
+
+## 2026-10-28 — Perbaikan 17 Bug Operasional: Fase 3 (Audit Trail & Retur) ✅
+
+- **T-11 — Penerjemahan Audit Trail Ramah Awam (`RiwayatAktivitas.php`, `riwayat-aktivitas.blade.php`)**:
+  - Sentralisasi kamus istilah teknis database: nama kolom mentah (seperti `no_transaksi`, `total_akhir`, `tipe_penyelesaian`, `void_alasan`, `diskon_nominal`, `pelanggan_id`) diterjemahkan otomatis ke bahasa Indonesia formal yang mudah dipahami orang awam (`Nomor Transaksi`, `Total Tagihan`, `Bentuk Penyelesaian Retur`, dll.).
+  - Penerjemahan nama entitas model teknis Eloquent (`Transaksi`, `ReturnPenjualan`, `TiketServis`, `JurnalAkuntansi`, dll.) ke label formal sistem.
+  - Pemformatan nilai audit trail: nilai nominal uang otomatis berformat `Rp x.xxx`, status terpetakan ramah awam (`Lunas`, `Belum Lunas`, `Pengembalian Dana`, `Barang Rusak`), nilai boolean menjadi `Ya / Aktif`, dan tanggal berformat `d/m/Y H:i`.
+- **T-12 — Tombol Audit Retur Konsumen (`retur-penjualan-index.blade.php`, `ReturPenjualanIndex.php`)**:
+  - Menyertakan modal partial riwayat aktivitas (`@include('partials.riwayat-modal')`) pada view retur penjualan kasir.
+  - Tombol aksi "Audit" pada tabel desktop dan mobile card sekarang langsung membuka modal riwayat aktivitas audit log untuk setiap data retur secara akurat dan interaktif.
+- **Pengujian Terotomasi (`AuditFase3FixTest.php`)**:
+  - 2 feature test komprehensif menguji kamus label kolom, label entitas, format nilai status dan mata uang, serta pembukaan dan penutupan modal riwayat audit retur konsumen (18 assertions passing).
+
+## 2026-10-28 — Perbaikan 17 Bug Operasional: Fase 2 (POS Kasir & Transaksi) ✅
+
+- **T-05 — Modal Z-Index Stacking (`thermal-receipt-modal.blade.php`)**:
+  - Modal struk thermal / detail receipt dinaikkan ke stacking `z-[80]` di atas riwayat transaksi modal (`z-50`) sehingga tidak tertutup atau terpotong saat dibuka dari tab riwayat.
+- **T-06 — Input Qty Manual Keranjang Kasir (`pos-kasir.blade.php`, `cart-content.blade.php`, `PosKasir.php`)**:
+  - Mengganti teks `<span>` kuantitas pada 3 tabel desktop dengan input angka numerik `type="number"` terikat ke method `setQty($itemKey, $qty)` yang memvalidasi batas stok maksimal secara real-time.
+- **T-07 — Auto-Show Search on Focus Barang & Konsumen (`pos-kasir.blade.php`, `PosKasir.php`)**:
+  - Dropdown pencarian barang langsung aktif saat field difokuskan (`x-show="searchOpen"`), menampilkan katalog produk terlaris/cepat dipilih.
+  - Dropdown pencarian konsumen CRM langsung menampilkan daftar konsumen terakhir (`x-show="crmOpen"`) tanpa mewajibkan kasir mengetik karakter terlebih dahulu.
+- **T-08 — Auto-Balance Split Bill POS & Servis (`PosKasir.php`, `payment-modal.blade.php`)**:
+  - Implementasi auto-balancing kalkulasi split bill: perubahan nominal `splitTunai` otomatis menghitung sisa pada `splitNonTunai` agar selalu seimbang dengan total tagihan, dan sebaliknya. Berlaku untuk transaksi reguler kasir dan pelunasan tiket servis.
+- **T-09 — Popup Zoom QRIS Minimalis (`payment-modal.blade.php`, `bayar-servis-modal.blade.php`)**:
+  - Refactor modal fullscreen zoom QRIS dinamis kasir dan servis menggunakan backdrop transparan elegan `bg-black/45 backdrop-blur-sm` dengan frame card minimalis, menghilangkan latar belakang hitam pekat berlebih.
+- **T-10 — Struk Piutang / Kasbon & Akad Tanda Tangan (`PosKasir.php`, `RiwayatTransaksiIndex.php`, `thermal-receipt-modal.blade.php`, `EscPosWriter.php`)**:
+  - Integrasi status `is_piutang`, tanggal `jatuh_tempo` (+30 hari atau dari subledger piutang), dan `sisa_piutang` pada modal struk thermal dan printer ESC/POS fisik.
+  - Tampilan visual struk memuat banner jelas `*** TAGIHAN PIUTANG / BELUM LUNAS ***`, status belum lunas, tanggal jatuh tempo, dan akad tanda tangan antara konsumen dan kasir.
+- **T-17 — Filter Tanggal Kustom Riwayat Transaksi Responsif (`RiwayatTransaksiIndex.php`, `riwayat-transaksi-index.blade.php`)**:
+  - Opsi dropdown custom date picker dioptimalkan dengan debounce responsif, auto-set default hari ini saat opsi dipilih, dan boundary swapping aman jika tanggal awal lebih besar dari tanggal akhir.
+- **Pengujian Terotomasi (`PosFase2FixTest.php`)**:
+  - 6 feature test komprehensif menguji set kuantitas manual, auto-show pencarian konsumen awal, auto-balance split bill, struk piutang & jatuh tempo, filter custom date, serta verifikasi modal z-index & zoom QRIS (23 assertions passing).
+
+## 2026-10-28 — Perbaikan 17 Bug Operasional: Fase 1 (Dashboard) ✅
+
+- **T-01 — Data & Analisis Penjualan (`DashboardIndex.php`, `dashboard-index.blade.php`)**:
+  - Filter rentang waktu terintegrasi dinamis; penanganan filter sumber mencakup `website` (`marketplace`/`website`) dan `marketplace` (`marketplace` + `channel:%`).
+  - Penyelarasan filter status `selesai` mencakup status `lunas` (`STATUS_OMZET`).
+  - Pagination terpaginasi 15 item per halaman via `LengthAwarePaginator` dengan Tailwind UI theme dan cache terisolasi per halaman/filter (memenuhi zero N+1 & cache hit budget).
+  - Modal tracking & detail transaksi langsung interaktif dengan rincian item, kasir, pelanggan, dan status.
+- **T-02 — Tren Omzet 30 Hari & Komposisi Kategori Produk (`DashboardIndex.php`)**:
+  - Query kategori produk disempurnakan dengan `leftJoin('kategori_produk')` dan ekspresi fallback `COALESCE(kategori_produk.nama, produk.kategori, 'Umum')` untuk menangani produk lama dan baru secara akurat.
+  - Perhitungan tren omzet 30 hari akurat berbasis scope cabang aktif dan status omzet valid (`selesai` & `lunas`).
+- **T-03 — Aktivitas Transaksi Terkini Multi-Entitas (`DashboardIndex.php`, `dashboard-index.blade.php`)**:
+  - Feed transaksi terbaru diperluas menggabungkan 5 entitas lintas modul: Penjualan (POS/Web), Purchase Order (PO), Penerimaan Barang (GRN), Tiket Servis, dan Retur Konsumen.
+  - Pembatasan hak akses berbasis role (`super-admin`, `owner`) dan permission; pengguna tanpa hak akses diberikan tampilan proteksi visual.
+- **T-04 — Drill-down Arus Kas 30 Hari & Handler Tab Akunting (`DashboardIndex.php`, `AkuntingDashboard.php`, `dashboard-index.blade.php`)**:
+  - Tombol drill-down Piutang dan Utang pada widget proyeksi arus kas 30 hari diarahkan ke `route('akunting', ['tab' => 'piutang'])` dan `route('akunting', ['tab' => 'utang'])`.
+  - Komponen `AkuntingDashboard::mount()` ditambahkan parsing query parameter `tab` (`request('tab')`) sehingga tautan langsung membuka subledger piutang atau utang.
+- **Pengujian Terotomasi (`DashboardFase1FixTest.php`)**:
+  - 4 test feature komprehensif menguji filter sumber, status, pagination >15 data, detail modal, akurasi grafik kategori dan omzet, multi-entity feed dengan role gate, serta drill-down routing.
+
 ## 2026-10-28 — Perbaikan Pembuatan User Karyawan & Manajemen Custom Role RBAC ✅
 
 - **Service Sinkronisasi Tersentralisasi (`UserHrSyncService.php`, `SyncUsersToHrCommand.php`)**:
