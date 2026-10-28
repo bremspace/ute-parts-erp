@@ -156,18 +156,44 @@ class ImportProdukService
         return $aliasMap[$alphanumeric] ?? $clean;
     }
 
-    protected function normalizeImportHeading(string $heading): string
+    public function normalizeImportHeading(string $heading): string
     {
         $heading = strtolower(trim($heading));
+        // Strip common suffixes in parentheses like (Rp), (Pcs), (IDR)
+        $heading = preg_replace('/\s*\(.*?\)\s*/', '', $heading) ?? $heading;
+        $cleaned = preg_replace('/[^a-z0-9\s_-]/', '', $heading) ?? $heading;
+        $normalized = preg_replace('/[\s_-]+/', '_', trim($cleaned)) ?? '';
 
-        return match ($heading) {
-            'gudang_id', 'gudang id' => 'gudang',
-            'rak_id', 'rak id' => 'rak',
-            'multi_satuan', 'konversi satuan', 'satuan_konversi', 'konversi_satuan' => 'konversi_satuan',
-            'kategori utama', 'kategori_utama' => 'kategori',
-            'sub kategori', 'sub_kategori' => 'sub_kategori',
-            'brand part', 'brand_part' => 'brand',
-            default => $heading,
+        return match ($normalized) {
+            'sku', 'kode_sku', 'kode', 'kode_barang', 'kode_item', 'part_number', 'part_no', 'item_code' => 'sku',
+            'nama', 'nama_produk', 'nama_barang', 'nama_item', 'product_name', 'item_name', 'deskripsi_barang', 'nama_sparepart' => 'nama',
+            'barcode', 'bar_code', 'kode_barcode', 'upc', 'ean' => 'barcode',
+            'satuan', 'satuan_unit', 'unit', 'uom', 'satuan_dasar' => 'satuan',
+            'multi_satuan', 'konversi_satuan', 'satuan_konversi', 'multi_uom', 'konversi' => 'konversi_satuan',
+            'kategori', 'kategori_utama', 'kategori_produk', 'kategori_barang', 'category', 'main_category' => 'kategori',
+            'sub_kategori', 'subkategori', 'sub_category', 'subcategory', 'sub_kategori_produk', 'sub_kategori_barang' => 'sub_kategori',
+            'brand', 'brand_part', 'merk_part', 'merek_part', 'merek', 'merk', 'brand_produk', 'merk_produk' => 'brand',
+            'kualitas', 'kualitas_produk', 'grade', 'kualitas_part', 'quality' => 'kualitas',
+            'kondisi', 'kondisi_produk', 'condition', 'status_kondisi' => 'kondisi',
+            'supplier', 'nama_supplier', 'supplier_id', 'pemasok', 'vendor', 'nama_pemasok', 'distributor' => 'supplier',
+            'merk_hp', 'merek_hp', 'brand_hp', 'brand_ponsel', 'merk_ponsel', 'device_brand' => 'merk_hp',
+            'tipe_hp', 'tipe_ponsel', 'model_hp', 'model_ponsel', 'tipe_model', 'model_kompatibel', 'kompatibel_tipe', 'device_model', 'compatible_models', 'kompatibel_model' => 'tipe_hp',
+            'kompatibilitas', 'kompatibilitas_hp', 'compatibility' => 'kompatibilitas_hp',
+            'produk_kompatibel_sku', 'produk_kompatibel', 'cross_sku', 'kompatibel_sku' => 'produk_kompatibel_sku',
+            'harga_beli', 'hpp', 'harga_modal', 'modal', 'buy_price', 'cost', 'cost_price', 'purchase_price' => 'harga_beli',
+            'harga_jual', 'harga_retail', 'harga_umum', 'harga_normal', 'sell_price', 'selling_price', 'price', 'harga_jual_retail' => 'harga_jual',
+            'harga_reseller', 'reseller', 'harga_grosir' => 'harga_reseller',
+            'harga_agen', 'agen', 'harga_distributor' => 'harga_agen',
+            'min_stock', 'stok_min', 'stok_minimum', 'minimum_stock' => 'min_stock',
+            'reorder_point', 'titik_pesan_ulang', 'rop' => 'reorder_point',
+            'sn', 'serial_number', 'is_sn', 'pakai_sn', 'lacak_sn', 'serial' => 'sn',
+            'stok_awal', 'stok', 'qty', 'jumlah_stok', 'initial_stock', 'saldo_awal' => 'stok_awal',
+            'gudang', 'gudang_id', 'nama_gudang', 'warehouse', 'lokasi_gudang' => 'gudang',
+            'rak', 'rak_id', 'nama_rak', 'shelf', 'bin', 'lokasi_rak' => 'rak',
+            'cabang', 'cabang_id', 'nama_cabang', 'branch' => 'cabang',
+            'deskripsi', 'deskripsi_produk', 'keterangan', 'catatan', 'description', 'notes' => 'deskripsi',
+            'foto_url', 'foto', 'gambar', 'gambar_url', 'image', 'image_url' => 'foto_url',
+            default => $normalized,
         };
     }
 
@@ -552,6 +578,109 @@ class ImportProdukService
         }
 
         return $this->satuanCache[$satuan];
+    }
+
+    public function resolveOrCreateBrand(?string $brandName): int
+    {
+        $brandName = trim((string) ($brandName ?? ''));
+        if ($brandName === '' || in_array(strtolower($brandName), ['-', 'none', 'null', 'kosong'], true)) {
+            $brandName = 'OEM';
+        }
+        if (! isset($this->brandCache[$brandName])) {
+            $this->brandCache[$brandName] = Brand::firstOrCreate(
+                ['nama' => $brandName],
+                ['is_active' => true]
+            )->id;
+        }
+
+        return $this->brandCache[$brandName];
+    }
+
+    public function resolveOrCreateKualitas(?string $kualitasRaw, ?int $brandId = null): int
+    {
+        $kualitasName = $this->normalizeKualitas(trim((string) ($kualitasRaw ?? '')));
+        if ($kualitasName === '') {
+            $kualitasName = 'Original';
+        }
+        $cacheKey = "{$brandId}:{$kualitasName}";
+        if (! isset($this->kualitasCache[$cacheKey])) {
+            $kualitasRow = KualitasProduk::where('nama', $kualitasName)
+                ->where(function ($q) use ($brandId) {
+                    $q->where('brand_id', $brandId)
+                        ->orWhereNull('brand_id');
+                })
+                ->orderByRaw('brand_id IS NOT NULL DESC')
+                ->first();
+
+            if (! $kualitasRow) {
+                $kualitasRow = KualitasProduk::firstOrCreate(
+                    ['nama' => $kualitasName, 'brand_id' => $brandId],
+                    ['is_active' => true]
+                );
+            }
+            $this->kualitasCache[$cacheKey] = $kualitasRow->id;
+        }
+
+        return $this->kualitasCache[$cacheKey];
+    }
+
+    public function resolveOrCreateKategori(string $kategoriUtamaInput, string $subKategoriInput = ''): array
+    {
+        $kategoriUtamaInput = trim($kategoriUtamaInput) ?: 'Umum';
+        $subKategoriInput = trim($subKategoriInput);
+
+        $cacheKey = $kategoriUtamaInput.'|'.$subKategoriInput;
+        if (! isset($this->kategoriCache[$cacheKey])) {
+            $parent = KategoriProduk::where('nama', $kategoriUtamaInput)
+                ->orWhere('slug', Str::slug($kategoriUtamaInput))
+                ->first();
+
+            if (! $parent) {
+                $parent = KategoriProduk::create([
+                    'nama' => $kategoriUtamaInput,
+                    'slug' => Str::slug($kategoriUtamaInput),
+                    'parent_id' => null,
+                    'is_active' => true,
+                ]);
+            }
+
+            if ($subKategoriInput !== '') {
+                $child = KategoriProduk::where('parent_id', $parent->id)
+                    ->where(function ($q) use ($subKategoriInput) {
+                        $q->where('nama', $subKategoriInput)
+                            ->orWhere('slug', Str::slug($subKategoriInput));
+                    })->first();
+
+                if (! $child) {
+                    $existing = KategoriProduk::where('nama', $subKategoriInput)
+                        ->orWhere('slug', Str::slug($subKategoriInput))
+                        ->first();
+
+                    if ($existing && (empty($existing->parent_id) || (int) $existing->parent_id === 0)) {
+                        $existing->update(['parent_id' => $parent->id]);
+                        $child = $existing;
+                    } else {
+                        $child = KategoriProduk::create([
+                            'nama' => $subKategoriInput,
+                            'parent_id' => $parent->id,
+                            'is_active' => true,
+                        ]);
+                    }
+                }
+                $kategoriId = $child->id;
+                $kategoriSimpan = $subKategoriInput;
+            } else {
+                $kategoriId = $parent->id;
+                $kategoriSimpan = $kategoriUtamaInput;
+            }
+
+            $this->kategoriCache[$cacheKey] = [
+                'id' => $kategoriId,
+                'nama' => $kategoriSimpan,
+            ];
+        }
+
+        return $this->kategoriCache[$cacheKey];
     }
 
     /**
@@ -2498,24 +2627,91 @@ class ImportProdukService
 
         $produk = $variant->produk;
 
-        // Update harga dan barcode jika ada
-        $variantUpdate = [];
+        // Update atribut produk jika diisi pada import baris ini
+        $produkUpdate = [];
+
+        $namaInput = trim((string) ($row['nama'] ?? ''));
+        if ($namaInput !== '') {
+            $produkUpdate['nama'] = $namaInput;
+        }
+
+        $kategoriUtamaInput = trim((string) ($row['kategori'] ?? $row['kategori_utama'] ?? ''));
+        $subKategoriInput = trim((string) ($row['sub_kategori'] ?? ''));
+        if ($kategoriUtamaInput !== '') {
+            $katData = $this->resolveOrCreateKategori($kategoriUtamaInput, $subKategoriInput);
+            $produkUpdate['kategori_id'] = $katData['id'];
+            $produkUpdate['kategori'] = $katData['nama'];
+        }
+
+        $brandRaw = trim((string) ($row['brand'] ?? ''));
+        if ($brandRaw !== '' && ! in_array(strtolower($brandRaw), ['-', 'none', 'null', 'kosong'], true)) {
+            $brandId = $this->resolveOrCreateBrand($brandRaw);
+            $produkUpdate['brand_id'] = $brandId;
+        } else {
+            $brandId = $produk->brand_id;
+        }
+
+        $kualitasRaw = trim((string) ($row['kualitas'] ?? ''));
+        if ($kualitasRaw !== '') {
+            $produkUpdate['kualitas_id'] = $this->resolveOrCreateKualitas($kualitasRaw, $brandId);
+        }
+
+        $supplierRaw = trim((string) ($row['supplier'] ?? ''));
+        if ($supplierRaw !== '') {
+            $produkUpdate['supplier_id'] = $this->resolveSupplierId($supplierRaw);
+        }
+
+        $satuanRaw = trim((string) ($row['satuan'] ?? ''));
+        if ($satuanRaw !== '') {
+            $satuan = $this->resolveOrCreateSatuan($satuanRaw);
+            $produkUpdate['satuan'] = $satuan;
+        }
+
+        if (isset($row['kondisi']) && trim((string) $row['kondisi']) !== '') {
+            $produkUpdate['kondisi'] = $this->normalizeKondisi((string) $row['kondisi']);
+        }
+
+        if (isset($row['min_stock']) && is_numeric($row['min_stock'])) {
+            $produkUpdate['min_stock'] = (int) $row['min_stock'];
+        }
+
+        if (isset($row['reorder_point']) && is_numeric($row['reorder_point'])) {
+            $produkUpdate['reorder_point'] = (int) $row['reorder_point'];
+        }
+
+        if (isset($row['sn']) && trim((string) $row['sn']) !== '') {
+            $produkUpdate['sn'] = $this->normalizeSn($row['sn']);
+        }
+
+        if (isset($row['deskripsi']) && trim((string) $row['deskripsi']) !== '') {
+            $produkUpdate['deskripsi'] = trim((string) $row['deskripsi']);
+        }
+
+        if (isset($row['foto_url']) && trim((string) $row['foto_url']) !== '') {
+            $produkUpdate['gambar'] = trim((string) $row['foto_url']);
+        }
+
         if ($hargaBeli > 0) {
-            $variantUpdate['harga_beli'] = $hargaBeli;
+            $produkUpdate['harga_beli'] = $hargaBeli;
         }
         if ($hargaJual > 0) {
-            $variantUpdate['harga_jual_retail'] = $hargaJual;
+            $produkUpdate['harga_jual_retail'] = $hargaJual;
         }
-        if ($barcode && ! $variant->barcode) {
-            $variantUpdate['barcode'] = $barcode;
-        }
-        if (! empty($variantUpdate)) {
-            $variant->update($variantUpdate);
+
+        $finalHpp = $hargaBeli > 0 ? $hargaBeli : (float) $produk->harga_beli;
+        $finalJual = $hargaJual > 0 ? $hargaJual : (float) $produk->harga_jual_retail;
+        if ($finalHpp > 0 && $finalJual > 0) {
+            $produkUpdate['margin_persen'] = round((($finalJual - $finalHpp) / $finalHpp) * 100, 2);
         }
 
         // Sync Tipe HP jika diisi
         $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);
         $daftarTipe = $this->parseTipeHp($row['tipe_hp'] ?? null, $merkHp);
+        $kompat = $this->parseKompatibilitas($row['kompatibilitas_hp'] ?? null);
+        if (! $daftarTipe && $kompat) {
+            $daftarTipe = $kompat;
+        }
+
         if ($daftarTipe) {
             $ids = [];
             foreach ($daftarTipe as $t) {
@@ -2529,6 +2725,59 @@ class ImportProdukService
                 $ids[] = $this->tipeHpCache[$cacheKey];
             }
             $produk->tipeHps()->syncWithoutDetaching($ids);
+
+            $allMerks = collect($daftarTipe)->pluck('merk')->filter()->unique()->values();
+            $allModels = collect($daftarTipe)->pluck('model')->filter()->unique()->values();
+            if ($merkHp || $allMerks->isNotEmpty()) {
+                $produkUpdate['brand_kompatibel'] = $merkHp ?: $allMerks->implode(', ');
+            }
+            if ($allModels->isNotEmpty()) {
+                $produkUpdate['model_kompatibel'] = $allModels->implode(', ');
+            }
+            $produkUpdate['kompatibilitas_hp'] = $daftarTipe;
+        }
+
+        if (! empty($produkUpdate)) {
+            $produk->update($produkUpdate);
+        }
+
+        // Update harga dan barcode jika ada
+        $variantUpdate = [];
+        if ($hargaBeli > 0) {
+            $variantUpdate['harga_beli'] = $hargaBeli;
+        }
+        if ($hargaJual > 0) {
+            $variantUpdate['harga_jual_retail'] = $hargaJual;
+        }
+        if ($barcode && ! $variant->barcode) {
+            $variantUpdate['barcode'] = $barcode;
+        }
+        if (isset($satuan)) {
+            $variantUpdate['satuan_kode'] = $satuan;
+        }
+        if (! empty($variantUpdate)) {
+            $variant->update($variantUpdate);
+        }
+
+        // Multi satuan / konversi satuan
+        if (! empty($row['konversi_satuan'])) {
+            $this->simpanKonversiSatuan($produk, (string) $row['konversi_satuan'], $produk->satuan);
+        }
+
+        // Update HargaTier
+        if ($hargaJual > 0) {
+            HargaTier::updateOrCreate(
+                ['produk_id' => $produk->id, 'sku_variant_id' => null, 'tier_membership_id' => null, 'tipe_konsumen' => 'retail'],
+                ['is_reseller' => false, 'harga' => $hargaJual, 'nominal_tetap' => $hargaJual, 'persen_diskon' => null]
+            );
+        }
+        foreach (['reseller' => 'harga_reseller', 'agen' => 'harga_agen'] as $tipe => $kolom) {
+            if (isset($row[$kolom]) && is_numeric($row[$kolom])) {
+                HargaTier::updateOrCreate(
+                    ['produk_id' => $produk->id, 'sku_variant_id' => null, 'tier_membership_id' => null, 'tipe_konsumen' => $tipe],
+                    ['is_reseller' => $tipe === 'reseller', 'harga' => round((float) $row[$kolom], 2), 'nominal_tetap' => round((float) $row[$kolom], 2), 'persen_diskon' => null]
+                );
+            }
         }
 
         // Tambah stok awal jika diisi
@@ -2652,97 +2901,13 @@ class ImportProdukService
 
         // Brand & kualitas: runtime cache to accelerate massive imports
         $brandName = trim((string) ($row['brand'] ?? ''));
-        if ($brandName === '' || in_array(strtolower($brandName), ['-', 'none', 'null', 'kosong'], true)) {
-            $brandName = 'OEM';
-        }
-        if (! isset($this->brandCache[$brandName])) {
-            $this->brandCache[$brandName] = Brand::firstOrCreate(
-                ['nama' => $brandName],
-                ['is_active' => true]
-            )->id;
-        }
-        $brandId = $this->brandCache[$brandName];
-
-        $kualitasName = $this->normalizeKualitas(trim((string) ($row['kualitas'] ?? '')));
-        if ($kualitasName === '') {
-            $kualitasName = 'Original';
-        }
-        $cacheKey = "{$brandId}:{$kualitasName}";
-        if (! isset($this->kualitasCache[$cacheKey])) {
-            $kualitasRow = KualitasProduk::where('nama', $kualitasName)
-                ->where(function ($q) use ($brandId) {
-                    $q->where('brand_id', $brandId)
-                        ->orWhereNull('brand_id');
-                })
-                ->orderByRaw('brand_id IS NOT NULL DESC')
-                ->first();
-
-            if (! $kualitasRow) {
-                $kualitasRow = KualitasProduk::firstOrCreate(
-                    ['nama' => $kualitasName, 'brand_id' => $brandId],
-                    ['is_active' => true]
-                );
-            }
-            $this->kualitasCache[$cacheKey] = $kualitasRow->id;
-        }
-        $kualitasId = $this->kualitasCache[$cacheKey];
+        $brandId = $this->resolveOrCreateBrand($brandName);
+        $kualitasId = $this->resolveOrCreateKualitas(trim((string) ($row['kualitas'] ?? '')), $brandId);
 
         // Kategori & sub-kategori: runtime cache & firstOrCreate
-        $kategoriId = null;
-        $kategoriSimpan = $kategoriUtamaInput;
-        $cacheKey = $kategoriUtamaInput.'|'.$subKategoriInput;
-        if (! isset($this->kategoriCache[$cacheKey])) {
-            $parent = KategoriProduk::where('nama', $kategoriUtamaInput)
-                ->orWhere('slug', Str::slug($kategoriUtamaInput))
-                ->first();
-
-            if (! $parent) {
-                $parent = KategoriProduk::create([
-                    'nama' => $kategoriUtamaInput,
-                    'slug' => Str::slug($kategoriUtamaInput),
-                    'parent_id' => null,
-                    'is_active' => true,
-                ]);
-            }
-
-            if ($subKategoriInput !== '') {
-                $child = KategoriProduk::where('parent_id', $parent->id)
-                    ->where(function ($q) use ($subKategoriInput) {
-                        $q->where('nama', $subKategoriInput)
-                            ->orWhere('slug', Str::slug($subKategoriInput));
-                    })->first();
-
-                if (! $child) {
-                    $existing = KategoriProduk::where('nama', $subKategoriInput)
-                        ->orWhere('slug', Str::slug($subKategoriInput))
-                        ->first();
-
-                    if ($existing && (empty($existing->parent_id) || (int) $existing->parent_id === 0)) {
-                        $existing->update(['parent_id' => $parent->id]);
-                        $child = $existing;
-                    } else {
-                        $child = KategoriProduk::create([
-                            'nama' => $subKategoriInput,
-                            'parent_id' => $parent->id,
-                            'is_active' => true,
-                        ]);
-                    }
-                }
-                $kategoriId = $child->id;
-                $kategoriSimpan = $subKategoriInput;
-            } else {
-                $kategoriId = $parent->id;
-                $kategoriSimpan = $kategoriUtamaInput;
-            }
-
-            $this->kategoriCache[$cacheKey] = [
-                'id' => $kategoriId,
-                'nama' => $kategoriSimpan,
-            ];
-        }
-
-        $kategoriId = $this->kategoriCache[$cacheKey]['id'];
-        $kategoriSimpan = $this->kategoriCache[$cacheKey]['nama'];
+        $katData = $this->resolveOrCreateKategori($kategoriUtamaInput, $subKategoriInput);
+        $kategoriId = $katData['id'];
+        $kategoriSimpan = $katData['nama'];
 
         // Merk Smartphone & Tipe HP kompatibilitas
         $merkHp = $this->normalizeMerkHp($row['merk_hp'] ?? null);
@@ -2752,8 +2917,11 @@ class ImportProdukService
             $daftarTipe = $kompat; // derivasi dari JSON legacy
         }
 
-        $primaryMerk = $merkHp ?: ($daftarTipe[0]['merk'] ?? ($brandName ?: null));
-        $primaryModel = $daftarTipe[0]['model'] ?? null;
+        $allMerks = collect($daftarTipe)->pluck('merk')->filter()->unique()->values();
+        $allModels = collect($daftarTipe)->pluck('model')->filter()->unique()->values();
+
+        $primaryMerk = $merkHp ?: ($allMerks->isNotEmpty() ? $allMerks->implode(', ') : ($brandName ?: null));
+        $primaryModel = $allModels->isNotEmpty() ? $allModels->implode(', ') : null;
 
         $marginPersen = ($hargaBeli > 0 && $hargaJual > 0)
             ? round((($hargaJual - $hargaBeli) / $hargaBeli) * 100, 2)
@@ -2771,6 +2939,7 @@ class ImportProdukService
             'barcode' => $barcode ?: null,
             'brand_kompatibel' => $primaryMerk,
             'model_kompatibel' => $primaryModel,
+            'kompatibilitas_hp' => ! empty($daftarTipe) ? $daftarTipe : null,
             'kondisi' => $kondisi,
             'satuan' => $satuan,
             'harga_beli' => $hargaBeli,
@@ -2808,10 +2977,8 @@ class ImportProdukService
             }
             $produk->tipeHps()->sync($ids);
         }
-        if ($kompat) {
+        if ($kompat && $kompat !== $daftarTipe) {
             $produk->update(['kompatibilitas_hp' => $kompat]);
-        } elseif ($daftarTipe) {
-            $produk->update(['kompatibilitas_hp' => $daftarTipe]);
         }
 
         // HargaTier default: retail = harga_jual; reseller/agen bila diisi kolom.

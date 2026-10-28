@@ -34,7 +34,8 @@
             { id: 'biteship', label: 'Logistik & Ekspedisi Biteship', subModul: 'integrasi', tab: 'integrasi', subTab: null, icon: '🚚', group: 'Gateway & Integrasi', desc: 'API kurir ongkir otomatis (JNE, SiCepat, J&T, GoSend, Grab)', keywords: 'ekspedisi kurir shipping ongkir pengiriman biteship jne sicepat jnt' },
 
             { id: 'coa', label: 'Chart of Accounts (COA)', subModul: 'sistem', tab: 'master', subTab: null, icon: '📊', group: 'Sistem & Keuangan', desc: 'Bagan akun buku besar akuntansi, debit, kredit, klasifikasi aset/beban', keywords: 'coa akun akuntansi buku besar jurnal debit kredit kas bank' },
-            { id: 'database', label: 'Basis Data & Backup Sistem', subModul: 'sistem', tab: 'database', subTab: null, icon: '💾', group: 'Sistem & Keuangan', desc: 'Backup snapshot SQL, optimasi database, riwayat pencadangan data', keywords: 'database basis data backup restore dump sql download arsip cadangan' }
+            { id: 'database', label: 'Basis Data & Backup Sistem', subModul: 'sistem', tab: 'database', subTab: null, icon: '💾', group: 'Sistem & Keuangan', desc: 'Backup snapshot SQL, optimasi database, riwayat pencadangan data', keywords: 'database basis data backup restore dump sql download arsip cadangan' },
+            { id: 'cache', label: 'Clear Cache Server & Optimasi', subModul: 'sistem', tab: 'database', subTab: null, icon: '⚡', group: 'Sistem & Keuangan', desc: 'Bersihkan cache aplikasi, view, route, config, dan OPcache server', keywords: 'cache clear cache server optimasi bersihkan cache flush ram' }
         ],
         get filteredItems() {
             if (!this.searchQuery.trim()) return [];
@@ -97,8 +98,26 @@
                 <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Kelola hak akses, katalog produk, aturan bisnis, periferal kasir, dan basis data secara terpusat.</p>
             </div>
 
-            <!-- Spotlight Search Input -->
-            <div class="relative w-full md:w-80 lg:w-96 flex-shrink-0" @click.outside="searchOpen = false">
+            <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                @if(isSuperAdminOrOwner() || auth()->user()?->can('pengaturan.manage'))
+                <button
+                    type="button"
+                    wire:click="clearCacheServer"
+                    wire:loading.attr="disabled"
+                    wire:confirm="Bersihkan seluruh cache server sekarang? (Cache aplikasi, rute, view, konfigurasi, dan OPcache akan direset)"
+                    class="px-3.5 py-2 rounded-xl bg-up-amber/15 hover:bg-up-amber/25 border border-up-amber/30 text-up-amber text-xs font-bold transition-[background-color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 shadow-sm min-h-[40px] cursor-pointer whitespace-nowrap"
+                    title="Bersihkan cache aplikasi, rute, view, konfigurasi, dan OPcache server"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    <span wire:loading.remove wire:target="clearCacheServer">⚡ Clear Cache Server</span>
+                    <span wire:loading wire:target="clearCacheServer">Membersihkan Cache...</span>
+                </button>
+                @endif
+
+                <!-- Spotlight Search Input -->
+                <div class="relative w-full md:w-80 lg:w-96 flex-shrink-0" @click.outside="searchOpen = false">
                 <div class="relative flex items-center">
                     <span class="absolute left-3.5 text-ink-400 pointer-events-none text-sm">🔍</span>
                     <input
@@ -163,6 +182,7 @@
                     </div>
                 </div>
             </div>
+        </div>
         </div>
 
         <!-- Tier 1: Group Feature Categories (6 Kelompok Jelas & Terstruktur) -->

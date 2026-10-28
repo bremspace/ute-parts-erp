@@ -1471,7 +1471,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <span class="font-semibold text-ink-900 dark:text-white block text-xs leading-snug line-clamp-2" title="{{ $p->nama }}">{{ $p->nama }}</span>
-                                    <span class="block text-[10px] text-ink-400 mt-0.5 truncate">
+                                    <span class="block text-[10px] text-ink-400 mt-0.5 truncate" title="{{ $p->tipeHps && $p->tipeHps->isNotEmpty() ? $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->join(', ') : trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? '')) }}">
                                         <strong class="text-ink-700 dark:text-ink-200">{{ $p->kategoriRelasi?->nama ?? $p->kategori ?? '-' }}</strong> · {{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}
                                     </span>
                                     <span class="flex gap-1 mt-1 flex-wrap items-center">
@@ -1530,16 +1530,33 @@
 
                         @if($visibleColumns['kompatibilitas'] ?? false)
                             <td class="py-2.5 px-3 text-xs min-w-[140px]">
-                                <span class="font-medium text-ink-200 block truncate">{{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}</span>
+                                @php
+                                    $allTipeHpList = $p->tipeHps && $p->tipeHps->isNotEmpty()
+                                        ? $p->tipeHps->map(fn($t) => trim(($t->merk ? $t->merk.' ' : '').$t->model))->filter()->values()
+                                        : collect(array_filter(array_map('trim', explode(',', (string) ($p->model_kompatibel ?? '')))));
+                                    $fullTipeTooltip = $allTipeHpList->isNotEmpty()
+                                        ? $allTipeHpList->join(', ')
+                                        : trim(($p->brand_kompatibel ?? '').' '.($p->model_kompatibel ?? ''));
+                                @endphp
+                                <span class="font-medium text-ink-200 block truncate" title="{{ $fullTipeTooltip }}">{{ $p->brand_kompatibel ?? '-' }} {{ $p->model_kompatibel ?? '' }}</span>
                                 @if(!empty($filterModelKompatibel) && strcasecmp((string)$p->model_kompatibel, (string)$filterModelKompatibel) !== 0)
                                     <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-up-primary/20 border border-up-primary/40 text-[9px] font-bold text-up-primary">
                                         Kompatibel {{ $filterModelKompatibel }}
                                     </span>
                                 @endif
-                                @if($p->tipeHps && $p->tipeHps->isNotEmpty())
-                                    <span class="text-[10px] text-ink-400 block line-clamp-1" title="{{ $p->tipeHps->map(fn($t) => $t->merk.' '.$t->model)->join(', ') }}">
-                                        {{ $p->tipeHps->count() }} Tipe HP: {{ $p->tipeHps->first()?->model }}
-                                    </span>
+                                @if($allTipeHpList->isNotEmpty())
+                                    <div class="mt-1 flex flex-wrap gap-1" title="{{ $fullTipeTooltip }}">
+                                        @foreach($allTipeHpList->take(3) as $thItem)
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-300">
+                                                {{ $thItem }}
+                                            </span>
+                                        @endforeach
+                                        @if($allTipeHpList->count() > 3)
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-up-primary/10 border border-up-primary/20 text-up-primary">
+                                                +{{ $allTipeHpList->count() - 3 }} lainnya
+                                            </span>
+                                        @endif
+                                    </div>
                                 @endif
                             </td>
                         @endif

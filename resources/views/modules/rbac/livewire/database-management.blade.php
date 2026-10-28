@@ -18,6 +18,16 @@
         </div>
 
         <div class="flex items-center gap-2">
+            <button type="button" wire:click="clearCacheServer" wire:loading.attr="disabled"
+                wire:confirm="Bersihkan seluruh cache server sekarang? (Cache aplikasi, rute, view, konfigurasi, dan OPcache akan direset)"
+                class="px-4 py-2.5 rounded-xl bg-up-amber/10 hover:bg-up-amber/20 border border-up-amber/30 text-up-amber text-xs font-bold transition-[background-color,border-color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 shadow-sm min-h-[44px] cursor-pointer">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <span wire:loading.remove wire:target="clearCacheServer">Clear Cache Server</span>
+                <span wire:loading wire:target="clearCacheServer">Membersihkan Cache...</span>
+            </button>
+
             <button type="button" wire:click="openResetModal('transaksi_only')"
                 class="px-4 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 border border-up-red/30 text-up-red text-xs font-bold transition-[background-color,border-color,transform] duration-140 active:scale-[0.97] flex items-center gap-2 shadow-sm min-h-[44px] cursor-pointer">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

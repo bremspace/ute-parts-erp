@@ -13,6 +13,7 @@ use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Pos\Services\QrisService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Rbac\Services\DatabaseManagementService;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\JenisServis;
 use App\Modules\Wms\Models\Brand;
@@ -278,6 +279,29 @@ class SettingsRbac extends Component
         $this->pajakForm['nama'] = (string) $cfg['nama'];
         $this->pajakForm['percent'] = (float) $cfg['percent'];
         $this->pajakForm['mode'] = (string) $cfg['mode'];
+    }
+
+    /**
+     * Bersihkan cache server dari menu Pengaturan.
+     */
+    public function clearCacheServer(): void
+    {
+        if (! $this->boleh('pengaturan.manage', 'Anda tidak memiliki izin membersihkan cache server.')) {
+            return;
+        }
+
+        try {
+            $res = app(DatabaseManagementService::class)->clearServerCache();
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => $res['message'],
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Gagal membersihkan cache: '.$e->getMessage(),
+            ]);
+        }
     }
 
     public function simpanPajak(): void

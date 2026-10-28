@@ -16,6 +16,8 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\RoleUserSeeder;
 use Database\Seeders\TierMembershipSeeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -39,6 +41,38 @@ class DatabaseManagementService
         protected NotificationService $notifikasi,
         protected AuditService $auditService
     ) {}
+
+    /**
+     * Bersihkan seluruh cache server: optimize, application cache, permissions, dan OPcache.
+     */
+    public function clearServerCache(): array
+    {
+        // ponytail: artisan optimize:clear + Cache::flush + permission cache covers 99% needs; add targeted redis tagging when distributed cache introduced.
+        Artisan::call('optimize:clear');
+        Cache::flush();
+
+        if (class_exists(PermissionRegistrar::class)) {
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+        }
+
+        $opcacheReset = false;
+        if (function_exists('opcache_reset')) {
+            $opcacheReset = (bool) @opcache_reset();
+        }
+
+        $this->auditService->catat(
+            'ServerCache',
+            'clear',
+            null,
+            'Pembersihan seluruh cache server (optimize:clear, Cache::flush, permission, OPcache)'
+        );
+
+        return [
+            'success' => true,
+            'message' => 'Cache server (aplikasi, rute, view, konfigurasi, hak akses, dan OPcache) berhasil dibersihkan.',
+            'opcache' => $opcacheReset,
+        ];
+    }
 
     /**
      * Dapatkan path absolut direktori backup server.

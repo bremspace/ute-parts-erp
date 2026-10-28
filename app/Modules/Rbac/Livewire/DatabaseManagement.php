@@ -83,6 +83,27 @@ class DatabaseManagement extends Component
     }
 
     /**
+     * Bersihkan seluruh cache server.
+     */
+    public function clearCacheServer(DatabaseManagementService $dbService): void
+    {
+        $this->authorizeAccess();
+
+        try {
+            $res = $dbService->clearServerCache();
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => $res['message'],
+            ]);
+        } catch (Throwable $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Gagal membersihkan cache server: {$e->getMessage()}",
+            ]);
+        }
+    }
+
+    /**
      * Unduh file backup yang sudah ada ke perangkat lokal klien.
      */
     public function downloadBackup(string $filename, DatabaseManagementService $dbService): ?BinaryFileResponse

@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Rbac\Livewire\DatabaseManagement;
 use App\Modules\Rbac\Livewire\SettingsRbac;
+use App\Modules\Rbac\Services\DatabaseManagementService;
 use Database\Seeders\RoleUserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -71,5 +73,39 @@ class SettingsDatabaseTabIntegrationTest extends TestCase
 
         Livewire::test(SettingsRbac::class)
             ->assertDontSeeHtml('💾 Basis Data & Backup');
+    }
+
+    public function test_superadmin_dapat_menjalankan_clear_cache_server_di_settings_rbac(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        Livewire::test(SettingsRbac::class)
+            ->assertSeeHtml('Clear Cache Server')
+            ->call('clearCacheServer')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success' && str_contains($params[0]['message'] ?? '', 'berhasil dibersihkan'));
+    }
+
+    public function test_superadmin_dapat_menjalankan_clear_cache_server_di_database_management(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        Livewire::test(DatabaseManagement::class)
+            ->assertSeeHtml('Clear Cache Server')
+            ->call('clearCacheServer')
+            ->assertDispatched('alert', fn ($event, $params) => ($params[0]['type'] ?? null) === 'success' && str_contains($params[0]['message'] ?? '', 'berhasil dibersihkan'));
+    }
+
+    public function test_service_clear_server_cache_mencatat_audit_log(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        $service = app(DatabaseManagementService::class);
+        $res = $service->clearServerCache();
+
+        $this->assertTrue($res['success']);
+        $this->assertDatabaseHas('audit_logs', [
+            'entitas' => 'ServerCache',
+            'aksi' => 'clear',
+        ]);
     }
 }
