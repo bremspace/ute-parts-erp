@@ -64,6 +64,7 @@ use Illuminate\Validation\ValidationException;
 
 // ===== Zona Marketplace (public storefront, light mode) =====
 Route::get('/', fn () => redirect('/shop'));
+Route::get('/dashboard', fn () => redirect('/app/dashboard'));
 Route::get('/shop', ShopPage::class)->name('shop');
 Route::get('/shop/{slug}', ShopPage::class)->name('shop.detail');
 

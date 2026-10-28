@@ -622,15 +622,45 @@ class DashboardIndex extends Component
             $paginator = $this->queryPenjualanFiltered()->latest()->paginate(15, ['*'], 'page', $page);
 
             return [
-                'items' => $paginator->items(),
+                'items' => collect($paginator->items())->map(fn ($item) => [
+                    'id' => $item->id,
+                    'no_transaksi' => $item->no_transaksi,
+                    'sumber' => $item->sumber ?? 'pos',
+                    'pelanggan_nama' => $item->pelanggan?->nama ?? 'Umum',
+                    'kasir_nama' => $item->kasir?->name ?? '-',
+                    'created_at_fmt' => $item->created_at?->format('d/m/Y H:i') ?? '-',
+                    'metode_bayar' => $item->metode_bayar ?? 'TUNAI',
+                    'total_akhir' => (float) ($item->total_akhir ?? 0),
+                    'status' => $item->status,
+                ])->all(),
                 'total' => $paginator->total(),
                 'perPage' => $paginator->perPage(),
                 'currentPage' => $paginator->currentPage(),
             ];
         }, $suffix);
 
+        $items = collect($cached['items'] ?? [])->map(fn ($item) => (object) [
+            'id' => $item['id'],
+            'no_transaksi' => $item['no_transaksi'],
+            'sumber' => $item['sumber'] ?? 'pos',
+            'pelanggan' => (object) ['nama' => $item['pelanggan_nama'] ?? 'Umum'],
+            'kasir' => (object) ['name' => $item['kasir_nama'] ?? '-'],
+            'created_at' => new class($item['created_at_fmt'] ?? '-')
+            {
+                public function __construct(private string $val) {}
+
+                public function format(string $format): string
+                {
+                    return $this->val;
+                }
+            },
+            'metode_bayar' => $item['metode_bayar'] ?? 'TUNAI',
+            'total_akhir' => (float) ($item['total_akhir'] ?? 0),
+            'status' => $item['status'] ?? '-',
+        ]);
+
         return new LengthAwarePaginator(
-            $cached['items'] ?? [],
+            $items,
             $cached['total'] ?? 0,
             $cached['perPage'] ?? 15,
             $cached['currentPage'] ?? 1,
