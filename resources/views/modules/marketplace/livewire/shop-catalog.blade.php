@@ -511,17 +511,23 @@
                             $m = is_numeric($key) ? $val : $key;
                             $count = is_numeric($key) ? null : $val;
                             $brand = trim((string) ($filterHpMerk ?? ''));
-                            if (!empty($brand)) {
-                                if (str_starts_with(strtolower($m), strtolower($brand))) {
+                            $lowerM = strtolower($m);
+                            $nonPhoneMerks = ['Accessories', 'Tg', 'Tools Service', 'Universal', 'OEM'];
+                            if (in_array($lowerM, ['universal', 'semua tipe hp'], true)) {
+                                $mLabel = $m;
+                            } elseif (!empty($brand)) {
+                                if (in_array($brand, $nonPhoneMerks, true) || str_starts_with($lowerM, strtolower($brand))) {
                                     $mLabel = $m;
                                 } elseif (strcasecmp($brand, 'Apple') === 0) {
-                                    if (str_starts_with(strtolower($m), 'iphone') || str_starts_with(strtolower($m), 'ipad')) {
+                                    if (str_starts_with($lowerM, 'iphone') || str_starts_with($lowerM, 'ipad')) {
                                         $mLabel = $m;
                                     } elseif (preg_match('/^\d+(\s*(pro|plus|max|mini|e))?/i', $m)) {
                                         $mLabel = 'iPhone ' . $m;
                                     } else {
                                         $mLabel = $brand . ' ' . $m;
                                     }
+                                } elseif (str_starts_with($lowerM, 'galaxy') || str_starts_with($lowerM, 'redmi') || str_starts_with($lowerM, 'poco') || str_starts_with($lowerM, 'pixel')) {
+                                    $mLabel = $m;
                                 } else {
                                     $mLabel = $brand . ' ' . $m;
                                 }
@@ -532,12 +538,13 @@
                                         return \App\Modules\Wms\Models\TipeHp::where('is_active', true)
                                             ->select('merk', 'model')
                                             ->get()
+                                            ->filter(fn($t) => !in_array($t->merk, ['Accessories', 'Tg', 'Tools Service', 'Universal', 'OEM'], true))
                                             ->pluck('merk', 'model')
                                             ->all();
                                     });
                                 }
                                 $inferredMerk = $tipeHpMap[$m] ?? null;
-                                if ($inferredMerk && !str_starts_with(strtolower($m), strtolower($inferredMerk))) {
+                                if ($inferredMerk && !in_array($inferredMerk, $nonPhoneMerks, true) && !str_starts_with($lowerM, strtolower($inferredMerk))) {
                                     if (strcasecmp($inferredMerk, 'Apple') === 0 && preg_match('/^\d+/i', $m)) {
                                         $mLabel = 'iPhone ' . $m;
                                     } else {

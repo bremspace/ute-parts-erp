@@ -375,6 +375,7 @@ class SmartSearchService
             $bVal = (string) $filters['brand'];
             $query->where(function ($q) use ($bVal) {
                 $q->where('brand_kompatibel', $bVal)
+                    ->orWhere('brand_kompatibel', 'like', "%{$bVal}%")
                     ->orWhereHas('brand', fn ($bq) => $bq->where('nama', $bVal));
             });
         }
@@ -397,8 +398,13 @@ class SmartSearchService
                 $q->whereHas('tipeHps', fn ($th) => $th->where('tipe_hp.id', (int) $tipeHpId));
                 if ($targetTipe) {
                     $q->orWhere(function ($sub) use ($targetTipe) {
-                        $sub->where('brand_kompatibel', $targetTipe->merk)
-                            ->where('model_kompatibel', $targetTipe->model);
+                        $sub->where(function ($sb) use ($targetTipe) {
+                            $sb->where('brand_kompatibel', $targetTipe->merk)
+                                ->orWhere('brand_kompatibel', 'like', "%{$targetTipe->merk}%");
+                        })->where(function ($sm) use ($targetTipe) {
+                            $sm->where('model_kompatibel', $targetTipe->model)
+                                ->orWhere('model_kompatibel', 'like', "%{$targetTipe->model}%");
+                        });
                     });
                 }
             });
@@ -409,6 +415,7 @@ class SmartSearchService
         if (! empty($merkHp)) {
             $query->where(function ($q) use ($merkHp) {
                 $q->where('brand_kompatibel', $merkHp)
+                    ->orWhere('brand_kompatibel', 'like', "%{$merkHp}%")
                     ->orWhereHas('tipeHps', fn ($tq) => $tq->where('merk', $merkHp))
                     ->orWhere('kompatibilitas_hp', 'like', '%"merk":"'.$merkHp.'"%');
             });
@@ -419,6 +426,7 @@ class SmartSearchService
         if (! empty($modelHp) && ! is_numeric($modelHp)) {
             $query->where(function ($q) use ($modelHp) {
                 $q->where('model_kompatibel', $modelHp)
+                    ->orWhere('model_kompatibel', 'like', "%{$modelHp}%")
                     ->orWhereHas('tipeHps', fn ($tq) => $tq->where('model', $modelHp))
                     ->orWhere('kompatibilitas_hp', 'like', '%"model":"'.$modelHp.'"%');
             });
@@ -601,14 +609,22 @@ class SmartSearchService
 
         // 2. Dapatkan opsi Brand (difilter oleh kategori + hp + kualitas + harga + stok, tanpa filter brand itu sendiri)
         $brandFilteredQuery = $this->buildBaseFilteredQuery($activeFilters, $search, ['brand']);
-        $brandsResult = (clone $brandFilteredQuery)
+        $rawBrands = (clone $brandFilteredQuery)
             ->whereNotNull('brand_kompatibel')
             ->where('brand_kompatibel', '!=', '')
-            ->groupBy('brand_kompatibel')
-            ->select('brand_kompatibel', DB::raw('count(*) as aggregate'))
-            ->orderBy('brand_kompatibel')
-            ->pluck('aggregate', 'brand_kompatibel')
-            ->all();
+            ->pluck('brand_kompatibel');
+
+        $brandsResult = [];
+        foreach ($rawBrands as $brandStr) {
+            $parts = preg_split('/[,;\/]+/', (string) $brandStr);
+            foreach ($parts as $p) {
+                $p = trim($p);
+                if ($p !== '') {
+                    $brandsResult[$p] = ($brandsResult[$p] ?? 0) + 1;
+                }
+            }
+        }
+        ksort($brandsResult);
 
         // 3. Dapatkan opsi Merk HP (difilter oleh kategori + brand + kualitas + harga + stok, tanpa filter hpMerk & hpModel)
         $hpMerkFilteredQuery = $this->buildBaseFilteredQuery($activeFilters, $search, ['hpMerk', 'hpModel']);
@@ -625,7 +641,7 @@ class SmartSearchService
             ->all();
 
         foreach ($tipeHpMerks as $merk => $cnt) {
-            $hpMerkResult[$merk] = $cnt;
+            $hpMerkResult[$merk] = (int) $cnt;
         }
 
         // Fallback dari kolom JSON kompatibilitas_hp untuk produk tanpa pivot
@@ -640,7 +656,13 @@ class SmartSearchService
                 foreach ($decoded as $item) {
                     $m = trim($item['merk'] ?? '');
                     if ($m !== '') {
-                        $hpMerkResult[$m] = ($hpMerkResult[$m] ?? 0) + 1;
+                        $merks = preg_split('/[,;\/]+/', $m);
+                        foreach ($merks as $mSplit) {
+                            $mSplit = trim($mSplit);
+                            if ($mSplit !== '') {
+                                $hpMerkResult[$mSplit] = ($hpMerkResult[$mSplit] ?? 0) + 1;
+                            }
+                        }
                     }
                 }
             }
@@ -672,26 +694,41 @@ class SmartSearchService
         }
 
         // Fallback untuk produk yang kompatibilitasnya tersimpan di JSON/model_kompatibel tanpa pivot
-        if (! empty($selectedHpMerk)) {
-            $jsonRows = (clone $hpModelFilteredQuery)
-                ->where(function ($q) use ($selectedHpMerk) {
-                    $q->where('brand_kompatibel', $selectedHpMerk)
-                        ->orWhere('kompatibilitas_hp', 'like', '%"merk":"'.$selectedHpMerk.'"%');
-                })
-                ->whereNotIn('produk.id', function ($pQ) {
-                    $pQ->select('produk_id')->from('kompatibilitas_produk_tipe_hp');
-                })
-                ->get(['model_kompatibel', 'kompatibilitas_hp']);
+        $fallbackQuery = (clone $hpModelFilteredQuery)
+            ->whereNotIn('produk.id', function ($pQ) {
+                $pQ->select('produk_id')->from('kompatibilitas_produk_tipe_hp');
+            });
 
-            foreach ($jsonRows as $row) {
-                if ($row->model_kompatibel) {
-                    $hpModelResult[$row->model_kompatibel] = ($hpModelResult[$row->model_kompatibel] ?? 0) + 1;
+        if (! empty($selectedHpMerk)) {
+            $fallbackQuery->where(function ($q) use ($selectedHpMerk) {
+                $q->where('brand_kompatibel', $selectedHpMerk)
+                    ->orWhere('brand_kompatibel', 'like', "%{$selectedHpMerk}%")
+                    ->orWhere('kompatibilitas_hp', 'like', '%"merk":"'.$selectedHpMerk.'"%');
+            });
+        }
+
+        $fallbackRows = $fallbackQuery->get(['model_kompatibel', 'kompatibilitas_hp']);
+
+        foreach ($fallbackRows as $row) {
+            if ($row->model_kompatibel) {
+                $models = preg_split('/[,;\/]+/', (string) $row->model_kompatibel);
+                foreach ($models as $m) {
+                    $m = trim($m);
+                    if ($m !== '') {
+                        $hpModelResult[$m] = ($hpModelResult[$m] ?? 0) + 1;
+                    }
                 }
-                $decoded = is_array($row->kompatibilitas_hp) ? $row->kompatibilitas_hp : json_decode((string) $row->kompatibilitas_hp, true);
-                if (is_array($decoded)) {
-                    foreach ($decoded as $item) {
-                        if (($item['merk'] ?? '') === $selectedHpMerk && ! empty($item['model'])) {
-                            $hpModelResult[$item['model']] = ($hpModelResult[$item['model']] ?? 0) + 1;
+            }
+            $decoded = is_array($row->kompatibilitas_hp) ? $row->kompatibilitas_hp : json_decode((string) $row->kompatibilitas_hp, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $item) {
+                    if ((empty($selectedHpMerk) || strcasecmp(trim($item['merk'] ?? ''), $selectedHpMerk) === 0) && ! empty($item['model'])) {
+                        $models = preg_split('/[,;\/]+/', (string) $item['model']);
+                        foreach ($models as $m) {
+                            $m = trim($m);
+                            if ($m !== '') {
+                                $hpModelResult[$m] = ($hpModelResult[$m] ?? 0) + 1;
+                            }
                         }
                     }
                 }
@@ -764,6 +801,7 @@ class SmartSearchService
             $bVal = $activeFilters['brand'];
             $query->where(function ($q) use ($bVal) {
                 $q->where('brand_kompatibel', $bVal)
+                    ->orWhere('brand_kompatibel', 'like', "%{$bVal}%")
                     ->orWhereHas('brand', fn ($bq) => $bq->where('nama', $bVal));
             });
         }
@@ -773,6 +811,7 @@ class SmartSearchService
             $query->where(function ($q) use ($merkVal) {
                 $q->whereHas('tipeHps', fn ($tq) => $tq->where('merk', $merkVal))
                     ->orWhere('brand_kompatibel', $merkVal)
+                    ->orWhere('brand_kompatibel', 'like', "%{$merkVal}%")
                     ->orWhere('kompatibilitas_hp', 'like', '%"merk":"'.$merkVal.'"%');
             });
         }
@@ -782,6 +821,7 @@ class SmartSearchService
             $query->where(function ($q) use ($modelVal) {
                 $q->whereHas('tipeHps', fn ($tq) => $tq->where('model', $modelVal))
                     ->orWhere('model_kompatibel', $modelVal)
+                    ->orWhere('model_kompatibel', 'like', "%{$modelVal}%")
                     ->orWhere('kompatibilitas_hp', 'like', '%"model":"'.$modelVal.'"%');
             });
         }

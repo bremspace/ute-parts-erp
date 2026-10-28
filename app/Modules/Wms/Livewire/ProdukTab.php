@@ -1196,15 +1196,17 @@ class ProdukTab extends Component
         }
 
         // Resolusi otomatis dari brand_kompatibel & model_kompatibel (comma-separated string)
-        if (! empty($p->model_kompatibel)) {
+        if (empty($tipeHpIds) && ! empty($p->model_kompatibel)) {
             $m = trim((string) ($p->brand_kompatibel ?: 'Universal'));
-            $models = explode(',', (string) $p->model_kompatibel);
+            $brandParts = preg_split('/[,;\/]+/', $m);
+            $primaryBrand = trim($brandParts[0] ?? 'Universal') ?: 'Universal';
+            $models = preg_split('/[,;\/]+/', (string) $p->model_kompatibel);
             foreach ($models as $mod) {
                 $mod = trim($mod);
                 if ($mod !== '') {
                     $matched = TipeHp::firstOrCreate(
-                        ['merk' => $m, 'model' => $mod],
-                        ['nama' => $m.' '.$mod, 'is_active' => true]
+                        ['merk' => $primaryBrand, 'model' => $mod],
+                        ['nama' => $primaryBrand.' '.$mod, 'is_active' => true]
                     );
                     $tipeHpIds[] = $matched->id;
                 }
@@ -3907,10 +3909,15 @@ class ProdukTab extends Component
 
         if ($merk !== '' && $model !== '') {
             $query->where(function ($q) use ($merk, $model) {
-                // 1. Kolom langsung produk cocok keduanya secara presisi
+                // 1. Kolom langsung produk cocok keduanya secara presisi (atau substring jika multi-kompatibilitas)
                 $q->where(function ($sub) use ($merk, $model) {
-                    $sub->where('brand_kompatibel', $merk)
-                        ->where('model_kompatibel', $model);
+                    $sub->where(function ($bq) use ($merk) {
+                        $bq->where('brand_kompatibel', $merk)
+                            ->orWhere('brand_kompatibel', 'like', "%{$merk}%");
+                    })->where(function ($mq) use ($model) {
+                        $mq->where('model_kompatibel', $model)
+                            ->orWhere('model_kompatibel', 'like', "%{$model}%");
+                    });
                 })
                 // 2. Relasi pivot tipe_hp di mana satu record tipe_hp memenuhi merk & model sekaligus
                     ->orWhereHas('tipeHps', function ($th) use ($merk, $model) {
@@ -3925,14 +3932,22 @@ class ProdukTab extends Component
                 // 4. Kompatibilitas silang antar produk (substitusi langsung)
                     ->orWhereHas('produkKompatibel', function ($sub) use ($merk, $model) {
                         $sub->where(function ($sq) use ($merk, $model) {
-                            $sq->where('brand_kompatibel', $merk)->where('model_kompatibel', $model)
+                            $sq->where(function ($bq) use ($merk) {
+                                $bq->where('brand_kompatibel', $merk)->orWhere('brand_kompatibel', 'like', "%{$merk}%");
+                            })->where(function ($mq) use ($model) {
+                                $mq->where('model_kompatibel', $model)->orWhere('model_kompatibel', 'like', "%{$model}%");
+                            })
                                 ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $merk)->where('tipe_hp.model', $model))
                                 ->orWhere(fn ($jq) => $jq->where('kompatibilitas_hp', 'like', "%{$merk}%")->where('kompatibilitas_hp', 'like', "%{$model}%"));
                         });
                     })
                     ->orWhereHas('disubstitusiOleh', function ($sub) use ($merk, $model) {
                         $sub->where(function ($sq) use ($merk, $model) {
-                            $sq->where('brand_kompatibel', $merk)->where('model_kompatibel', $model)
+                            $sq->where(function ($bq) use ($merk) {
+                                $bq->where('brand_kompatibel', $merk)->orWhere('brand_kompatibel', 'like', "%{$merk}%");
+                            })->where(function ($mq) use ($model) {
+                                $mq->where('model_kompatibel', $model)->orWhere('model_kompatibel', 'like', "%{$model}%");
+                            })
                                 ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $merk)->where('tipe_hp.model', $model))
                                 ->orWhere(fn ($jq) => $jq->where('kompatibilitas_hp', 'like', "%{$merk}%")->where('kompatibilitas_hp', 'like', "%{$model}%"));
                         });
@@ -3941,21 +3956,25 @@ class ProdukTab extends Component
         } elseif ($merk !== '') {
             $query->where(function ($q) use ($merk) {
                 $q->where('brand_kompatibel', $merk)
+                    ->orWhere('brand_kompatibel', 'like', "%{$merk}%")
                     ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $merk))
                     ->orWhere('kompatibilitas_hp', 'like', "%{$merk}%");
             });
         } elseif ($model !== '') {
             $query->where(function ($q) use ($model) {
                 $q->where('model_kompatibel', $model)
+                    ->orWhere('model_kompatibel', 'like', "%{$model}%")
                     ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $model))
                     ->orWhere('kompatibilitas_hp', 'like', "%{$model}%")
                     ->orWhereHas('produkKompatibel', function ($sub) use ($model) {
                         $sub->where('model_kompatibel', $model)
+                            ->orWhere('model_kompatibel', 'like', "%{$model}%")
                             ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $model))
                             ->orWhere('kompatibilitas_hp', 'like', "%{$model}%");
                     })
                     ->orWhereHas('disubstitusiOleh', function ($sub) use ($model) {
                         $sub->where('model_kompatibel', $model)
+                            ->orWhere('model_kompatibel', 'like', "%{$model}%")
                             ->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $model))
                             ->orWhere('kompatibilitas_hp', 'like', "%{$model}%");
                     });
@@ -4136,9 +4155,9 @@ class ProdukTab extends Component
             ->when($this->produkSearch, fn ($q) => $q->cariPintar($this->produkSearch)->urutkanRelevansi($this->produkSearch))
             ->when(! empty($selectedKategoriIds), fn ($q) => $q->whereIn('kategori_id', $selectedKategoriIds))
             ->when($this->filterBrandId, fn ($q) => $q->where('brand_id', $this->filterBrandId))
-            ->when($this->filterBrandKompatibel && $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('brand_kompatibel', $this->filterBrandKompatibel)->where('model_kompatibel', $this->filterModelKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel)->where('tipe_hp.model', $this->filterModelKompatibel))))
-            ->when($this->filterBrandKompatibel && ! $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('brand_kompatibel', $this->filterBrandKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel))))
-            ->when(! $this->filterBrandKompatibel && $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('model_kompatibel', $this->filterModelKompatibel)->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel))))
+            ->when($this->filterBrandKompatibel && $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where(fn ($bq) => $bq->where('brand_kompatibel', $this->filterBrandKompatibel)->orWhere('brand_kompatibel', 'like', "%{$this->filterBrandKompatibel}%"))->where(fn ($mq) => $mq->where('model_kompatibel', $this->filterModelKompatibel)->orWhere('model_kompatibel', 'like', "%{$this->filterModelKompatibel}%"))->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel)->where('tipe_hp.model', $this->filterModelKompatibel))))
+            ->when($this->filterBrandKompatibel && ! $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('brand_kompatibel', $this->filterBrandKompatibel)->orWhere('brand_kompatibel', 'like', "%{$this->filterBrandKompatibel}%")->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.merk', $this->filterBrandKompatibel))))
+            ->when(! $this->filterBrandKompatibel && $this->filterModelKompatibel, fn ($q) => $q->where(fn ($sub) => $sub->where('model_kompatibel', $this->filterModelKompatibel)->orWhere('model_kompatibel', 'like', "%{$this->filterModelKompatibel}%")->orWhereHas('tipeHps', fn ($th) => $th->where('tipe_hp.model', $this->filterModelKompatibel))))
             ->where('is_active', true);
 
         return $this->lakukanExportPricelist($query, $format, 'pricelist_'.$this->filterTierHarga);
@@ -4398,8 +4417,10 @@ class ProdukTab extends Component
         $merekHpDariProduk = Produk::query()
             ->whereNotNull('brand_kompatibel')
             ->where('brand_kompatibel', '!=', '')
-            ->distinct()
-            ->pluck('brand_kompatibel');
+            ->pluck('brand_kompatibel')
+            ->flatMap(fn ($b) => preg_split('/[,;\/]+/', (string) $b))
+            ->map(fn ($b) => trim($b))
+            ->filter();
 
         $merekHpDariRelasi = TipeHp::query()
             ->where('is_active', true)
@@ -4414,7 +4435,13 @@ class ProdukTab extends Component
             if (is_array($kJson)) {
                 foreach ($kJson as $item) {
                     if (! empty($item['merk'])) {
-                        $merekHpJson->push(trim((string) $item['merk']));
+                        $merks = preg_split('/[,;\/]+/', (string) $item['merk']);
+                        foreach ($merks as $m) {
+                            $m = trim($m);
+                            if ($m !== '') {
+                                $merekHpJson->push($m);
+                            }
+                        }
                     }
                 }
             }
@@ -4432,12 +4459,24 @@ class ProdukTab extends Component
         // 2. Tipe HP Kompatibel (Model smartphone aktif di sistem, cascading jika Merk HP dipilih)
         $selectedMerk = $this->filterBrandKompatibel;
 
-        $modelHpDariProduk = Produk::query()
+        $modelHpQuery = Produk::query()
             ->whereNotNull('model_kompatibel')
-            ->where('model_kompatibel', '!=', '')
-            ->when($selectedMerk, fn ($q) => $q->where('brand_kompatibel', $selectedMerk))
-            ->distinct()
-            ->pluck('model_kompatibel');
+            ->where('model_kompatibel', '!=', '');
+
+        if (! empty($selectedMerk)) {
+            $modelHpQuery->where(fn ($sub) => $sub->where('brand_kompatibel', $selectedMerk)->orWhere('brand_kompatibel', 'like', "%{$selectedMerk}%"))
+                ->whereDoesntHave('tipeHps')
+                ->where(function ($q) {
+                    $q->whereNull('kompatibilitas_hp')
+                        ->orWhere('kompatibilitas_hp', '[]')
+                        ->orWhere('kompatibilitas_hp', '');
+                });
+        }
+
+        $modelHpDariProduk = $modelHpQuery->pluck('model_kompatibel')
+            ->flatMap(fn ($m) => preg_split('/[,;\/]+/', (string) $m))
+            ->map(fn ($m) => trim($m))
+            ->filter();
 
         $modelHpDariRelasi = TipeHp::query()
             ->where('is_active', true)
@@ -4451,7 +4490,13 @@ class ProdukTab extends Component
                 foreach ($kJson as $item) {
                     if (! empty($item['model'])) {
                         if (empty($selectedMerk) || strcasecmp(trim((string) ($item['merk'] ?? '')), $selectedMerk) === 0) {
-                            $modelHpJson->push(trim((string) $item['model']));
+                            $models = preg_split('/[,;\/]+/', (string) $item['model']);
+                            foreach ($models as $mod) {
+                                $mod = trim($mod);
+                                if ($mod !== '') {
+                                    $modelHpJson->push($mod);
+                                }
+                            }
                         }
                     }
                 }

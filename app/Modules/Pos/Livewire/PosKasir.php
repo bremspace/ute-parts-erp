@@ -4281,7 +4281,13 @@ class PosKasir extends Component
                 ->distinct()
                 ->pluck('merk')
                 ->merge(Brand::where('is_active', true)->pluck('nama'))
-                ->merge(Produk::whereNotNull('brand_kompatibel')->where('brand_kompatibel', '!=', '')->distinct()->pluck('brand_kompatibel'))
+                ->merge(
+                    Produk::whereNotNull('brand_kompatibel')
+                        ->where('brand_kompatibel', '!=', '')
+                        ->pluck('brand_kompatibel')
+                        ->flatMap(fn ($b) => preg_split('/[,;\/]+/', (string) $b))
+                        ->map(fn ($b) => trim($b))
+                )
                 ->filter()
                 ->unique()
                 ->sort()
@@ -4289,16 +4295,28 @@ class PosKasir extends Component
                 ->all();
         });
 
+        $selectedMerk = $this->filterBrandKompatibel;
+        $modelHpQuery = Produk::whereNotNull('model_kompatibel')
+            ->where('model_kompatibel', '!=', '');
+
+        if (! empty($selectedMerk)) {
+            $modelHpQuery->where(fn ($sub) => $sub->where('brand_kompatibel', $selectedMerk)->orWhere('brand_kompatibel', 'like', "%{$selectedMerk}%"))
+                ->whereDoesntHave('tipeHps')
+                ->where(function ($q) {
+                    $q->whereNull('kompatibilitas_hp')
+                        ->orWhere('kompatibilitas_hp', '[]')
+                        ->orWhere('kompatibilitas_hp', '');
+                });
+        }
+
         $modelKompatibelList = TipeHp::where('is_active', true)
-            ->when($this->filterBrandKompatibel, fn ($q) => $q->where('merk', $this->filterBrandKompatibel))
+            ->when($selectedMerk, fn ($q) => $q->where('merk', $selectedMerk))
             ->distinct()
             ->pluck('model')
             ->merge(
-                Produk::whereNotNull('model_kompatibel')
-                    ->where('model_kompatibel', '!=', '')
-                    ->when($this->filterBrandKompatibel, fn ($q) => $q->where('brand_kompatibel', $this->filterBrandKompatibel))
-                    ->distinct()
-                    ->pluck('model_kompatibel')
+                $modelHpQuery->pluck('model_kompatibel')
+                    ->flatMap(fn ($m) => preg_split('/[,;\/]+/', (string) $m))
+                    ->map(fn ($m) => trim($m))
             )
             ->filter()
             ->unique()
