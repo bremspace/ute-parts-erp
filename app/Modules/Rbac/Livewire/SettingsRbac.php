@@ -7,6 +7,8 @@ use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Services\PajakService;
 use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Crm\Services\KonfigurasiService;
+use App\Modules\Hr\Models\Karyawan;
+use App\Modules\Hr\Services\UserHrSyncService;
 use App\Modules\Pos\Models\QrisCabang;
 use App\Modules\Pos\Services\QrisService;
 use App\Modules\Rbac\Models\Cabang;
@@ -1124,7 +1126,8 @@ class SettingsRbac extends Component
 
     public array $userForm = [
         'id' => null, 'name' => '', 'email' => '', 'password' => '', 'phone' => '',
-        'role' => '', 'cabang_ids' => [], 'cabang_default_id' => null, 'is_active' => true,
+        'role' => 'karyawan', 'cabang_ids' => [], 'cabang_default_id' => null, 'is_active' => true,
+        'buat_karyawan' => false, 'nik_karyawan' => '',
     ];
 
     // Cabang CRUD
@@ -1592,9 +1595,15 @@ class SettingsRbac extends Component
             return;
         }
 
-        $this->validate(['roleBaruNama' => 'required|string|max:255|unique:roles,name']);
+        $this->validate([
+            'roleBaruNama' => 'required|string|max:100|regex:/^[a-z0-9\-]+$/|unique:roles,name',
+        ], [
+            'roleBaruNama.required' => 'Nama role wajib diisi.',
+            'roleBaruNama.regex' => 'Format nama role harus huruf kecil, angka, atau tanda minus (contoh: koordinator-servis).',
+            'roleBaruNama.unique' => 'Nama role sudah terdaftar.',
+        ]);
 
-        $role = Role::create(['name' => $this->roleBaruNama]);
+        $role = Role::create(['name' => $this->roleBaruNama, 'guard_name' => 'web']);
         if (! empty($this->roleBaruPermissions)) {
             $role->syncPermissions($this->roleBaruPermissions);
         }
@@ -1602,7 +1611,38 @@ class SettingsRbac extends Component
         app(AuditService::class)->catat('Role', 'create', $role->id, "Role {$role->name} dibuat");
 
         $this->showRoleModal = false;
-        $this->dispatch('alert', ['type' => 'success', 'message' => 'Role baru dibuat']);
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Role '{$role->name}' berhasil dibuat"]);
+    }
+
+    public function hapusRole(int $roleId)
+    {
+        if (! $this->boleh('user.delete', 'Anda tidak memiliki izin menghapus role.')) {
+            return;
+        }
+
+        $role = Role::withCount('users')->findOrFail($roleId);
+
+        $systemRoles = [
+            'super-admin', 'owner', 'admin-toko', 'kasir', 'teknisi',
+            'staff-gudang', 'finance', 'marketing', 'kelola-hr', 'karyawan',
+        ];
+
+        if (in_array($role->name, $systemRoles, true)) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Role sistem '{$role->name}' tidak dapat dihapus."]);
+
+            return;
+        }
+
+        if ($role->users_count > 0) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => "Role '{$role->name}' masih digunakan oleh {$role->users_count} user."]);
+
+            return;
+        }
+
+        $roleName = $role->name;
+        $role->delete();
+        app(AuditService::class)->catat('Role', 'delete', $roleId, "Role {$roleName} dihapus");
+        $this->dispatch('alert', ['type' => 'success', 'message' => "Role '{$roleName}' berhasil dihapus."]);
     }
 
     public function openEditRole(int $roleId)
@@ -1662,7 +1702,7 @@ class SettingsRbac extends Component
 
     public function getUsersProperty()
     {
-        return User::with('roles', 'cabangs')->latest()->paginate(15);
+        return User::with(['roles', 'cabangs', 'karyawan'])->latest()->paginate(15);
     }
 
     public function getJenisServisProperty()
@@ -1758,19 +1798,22 @@ class SettingsRbac extends Component
     public function openUserModal(?int $id = null)
     {
         if ($id) {
-            $u = User::with('roles', 'cabangs')->findOrFail($id);
+            $u = User::with(['roles', 'cabangs', 'karyawan'])->findOrFail($id);
             $defaultCabang = $u->cabangs->first(fn ($c) => (bool) $c->pivot->is_default);
             $this->userForm = [
                 'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'password' => '',
-                'phone' => $u->phone ?? '', 'role' => $u->roles->first()?->name ?? '',
+                'phone' => $u->phone ?? '', 'role' => $u->roles->first()?->name ?? 'karyawan',
                 'cabang_ids' => $u->cabangs->pluck('id')->toArray(),
                 'cabang_default_id' => $defaultCabang?->id ?? $u->cabangs->first()?->id,
                 'is_active' => (bool) $u->is_active,
+                'buat_karyawan' => (bool) $u->karyawan,
+                'nik_karyawan' => $u->karyawan?->nik ?? '',
             ];
         } else {
             $this->userForm = [
                 'id' => null, 'name' => '', 'email' => '', 'password' => '', 'phone' => '',
-                'role' => 'kasir', 'cabang_ids' => [], 'cabang_default_id' => null, 'is_active' => true,
+                'role' => 'karyawan', 'cabang_ids' => [], 'cabang_default_id' => null, 'is_active' => true,
+                'buat_karyawan' => true, 'nik_karyawan' => '',
             ];
         }
         $this->showUserModal = true;
@@ -1783,14 +1826,36 @@ class SettingsRbac extends Component
             return;
         }
 
-        $this->validate([
+        $rules = [
             'userForm.name' => 'required|string|max:255',
             'userForm.email' => 'required|email|unique:users,email,'.($this->userForm['id'] ?? 'NULL'),
+            'userForm.role' => 'required|string|exists:roles,name',
+        ];
+
+        if (! $this->userForm['id']) {
+            $rules['userForm.password'] = 'required|string|min:6';
+        } else {
+            $rules['userForm.password'] = 'nullable|string|min:6';
+        }
+
+        if (! empty($this->userForm['buat_karyawan']) && ! empty($this->userForm['nik_karyawan'])) {
+            $existingKaryawanId = Karyawan::where('user_id', $this->userForm['id'])->value('id');
+            $rules['userForm.nik_karyawan'] = 'nullable|string|max:50|unique:karyawan,nik,'.($existingKaryawanId ?: 'NULL').',id';
+        }
+
+        $this->validate($rules, [
+            'userForm.name.required' => 'Nama pengguna wajib diisi.',
+            'userForm.email.required' => 'Email pengguna wajib diisi.',
+            'userForm.email.email' => 'Format email tidak valid.',
+            'userForm.email.unique' => 'Email sudah digunakan.',
+            'userForm.password.required' => 'Password wajib diisi untuk pengguna baru.',
+            'userForm.password.min' => 'Password minimal 6 karakter.',
+            'userForm.role.required' => 'Role wajib dipilih.',
+            'userForm.role.exists' => 'Role yang dipilih tidak valid.',
+            'userForm.nik_karyawan.unique' => 'NIK karyawan sudah digunakan.',
         ]);
 
         if (! $this->userForm['id']) {
-            $this->validate(['userForm.password' => 'required|string|min:6']);
-
             $user = User::create([
                 'name' => $this->userForm['name'],
                 'email' => $this->userForm['email'],
@@ -1851,6 +1916,15 @@ class SettingsRbac extends Component
         }
         $user->cabangs()->sync($syncData);
 
+        if (! empty($this->userForm['buat_karyawan'])) {
+            app(UserHrSyncService::class)->syncUserToKaryawan(
+                $user,
+                $this->userForm['nik_karyawan'] ?: null,
+                null,
+                $defaultId
+            );
+        }
+
         app(AuditService::class)->catat('User', $aksi, $user->id, "User {$user->name} dikelola ({$this->userForm['role']})");
 
         $this->showUserModal = false;
@@ -1871,6 +1945,7 @@ class SettingsRbac extends Component
 
         $u = User::findOrFail($id);
         $u->update(['is_active' => ! $u->is_active]);
+        app(UserHrSyncService::class)->syncUserStatus($u);
         app(AuditService::class)->catat('User', 'update', $u->id, "Status user {$u->name} → ".($u->is_active ? 'aktif' : 'nonaktif'));
         $this->dispatch('alert', ['type' => 'success', 'message' => 'Status user diubah']);
     }

@@ -730,6 +730,7 @@
                         </select>
                     </div>
 
+                    @if(!$inputBuatUserBaru)
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Hubungkan Akun User Login</label>
                         <select wire:model="inputUserId"
@@ -741,6 +742,43 @@
                         </select>
                         <p class="text-[10px] text-ink-400 mt-1">Dihubungkan agar karyawan dapat presensi &amp; lihat slip di menu HR Saya.</p>
                     </div>
+                    @endif
+
+                    @if(!$karyawanEditId)
+                    <div class="sm:col-span-2 p-3.5 rounded-xl bg-ink-50 dark:bg-white/[0.02] border border-ink-200 dark:border-white/5 space-y-3">
+                        <label class="flex items-center gap-2 text-xs font-bold text-ink-900 dark:text-white cursor-pointer">
+                            <input type="checkbox" wire:model.live="inputBuatUserBaru" class="rounded accent-up-primary w-4 h-4" />
+                            Buat Akun Login User Baru untuk Karyawan Ini
+                        </label>
+
+                        @if($inputBuatUserBaru)
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                                <div>
+                                    <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1 text-[11px]">Email Login *</label>
+                                    <input type="email" wire:model="inputEmailLogin" placeholder="email@uteparts.id"
+                                        class="block w-full text-base sm:text-sm min-h-[40px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                                    @error('inputEmailLogin') <span class="text-red-500 text-[11px] mt-0.5 block">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1 text-[11px]">Password Login *</label>
+                                    <input type="password" wire:model="inputPasswordLogin" placeholder="Min 6 karakter"
+                                        class="block w-full text-base sm:text-sm min-h-[40px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                                    @error('inputPasswordLogin') <span class="text-red-500 text-[11px] mt-0.5 block">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1 text-[11px]">Role Akun *</label>
+                                    <select wire:model="inputRoleLogin"
+                                        class="block w-full text-base sm:text-sm min-h-[40px] rounded-xl border-ink-300 dark:border-white/10 dark:bg-black/40 text-ink-900 dark:text-white shadow-sm focus:border-up-primary focus:ring-up-primary">
+                                        @foreach($roleList as $role)
+                                            <option value="{{ $role->name }}">{{ $role->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('inputRoleLogin') <span class="text-red-500 text-[11px] mt-0.5 block">{{ $message }}</span> @enderror
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                    @endif
 
                     <div>
                         <label class="block font-semibold uppercase text-ink-600 dark:text-ink-300 mb-1">Tanggal Mulai Masuk *</label>

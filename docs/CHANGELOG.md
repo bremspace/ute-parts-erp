@@ -3,6 +3,29 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-28 — Perbaikan Pembuatan User Karyawan & Manajemen Custom Role RBAC ✅
+
+- **Service Sinkronisasi Tersentralisasi (`UserHrSyncService.php`, `SyncUsersToHrCommand.php`)**:
+  - Penambahan service terpusat `UserHrSyncService` untuk menangani sinkronisasi dua arah User dan Karyawan, pemetaan jabatan otomatis dari role, auto-generate NIK unik (`EMP-xxxx`), dan resolusi cabang default.
+  - Perintah artisan `php artisan hr:sync-users` untuk sinkronisasi massal seluruh akun user aktif ke data master Karyawan HR.
+- **Model Lifecycle Hook & Konsistensi API (`User.php`, `RbacController.php`)**:
+  - Event Eloquent `booted()` pada model `User`: perubahan nama (`name`) dan status keaktifan (`is_active`) otomatis merefleksikan perubahan ke record `Karyawan`. Penghapusan akun user otomatis mendetach `user_id` dan menonaktifkan status di HR tanpa menghilangkan data historis gaji/slip.
+  - Endpoint API `POST /api/users` dan `PUT /api/users/{user}` (`RbacController`) terintegrasi langsung dengan `UserHrSyncService`.
+- **Role Karyawan & Relasi Model User (`RolesAndPermissionsSeeder.php`, `RoleUserSeeder.php`, `User.php`)**:
+  - Penambahan role `karyawan` dengan permission default `hr.lihat-sendiri` ke seeder dan database.
+  - Penambahan relasi `karyawan()` (`HasOne`) pada model `App\Models\User` ke `App\Modules\Hr\Models\Karyawan`.
+  - Pendaftaran user default `karyawan@uteparts.id` pada `RoleUserSeeder`.
+- **Manajemen User & Custom Role di Pengaturan RBAC (`SettingsRbac.php`, `settings-rbac.blade.php`)**:
+  - Tampilan umpan balik validasi error `@error` eksplisit pada seluruh input modal User Baru/Edit dan Role Baru (mencegah silent fail saat validasi gagal).
+  - Kolom **Profil HR** pada tabel daftar pengguna backoffice: menampilkan indikator visual NIK dan jabatan karyawan yang tersinkron.
+  - Fitur sinkronisasi profil karyawan (`buat_karyawan`, `nik_karyawan`) otomatis saat membuat akun user baru di modal User.
+  - Pengelolaan custom role: pembuatan role baru tervalidasi dengan guard `web`, dan penyediaan aksi `hapusRole()` untuk menghapus custom role non-sistem yang belum digunakan oleh user (dilindungi guardrail anti-hapus role sistem).
+- **Pembuatan Akun User Langsung di Modal Karyawan (`PayrollPage.php`, `payroll.blade.php`)**:
+  - Toggle `inputBuatUserBaru` pada modal Tambah Karyawan di HR & Payroll dengan form inline untuk email, password, dan pilihan role.
+  - Sinkronisasi dua arah saat data karyawan diedit langsung memperbarui nama dan status aktif pada akun login User terkait.
+- **Pengujian Terotomasi (`UserKaryawanAndRoleCreationTest.php`)**:
+  - 10 unit/feature test komprehensif menguji seed role karyawan, relasi user-karyawan, pembuatan user beserta karyawan di SettingsRbac, penanganan error validasi, daur hidup custom role, pembuatan karyawan dengan inline user, lifecycle sync `User::updated` & `deleted`, sinkronisasi via API controller, dan artisan command `hr:sync-users`.
+
 ## 2026-10-28 — Unduh QRIS Toko (PNG Berlatar Putih/SVG) & Sinkronisasi Format Struk Online Terpusat ✅
 
 - **Fitur Unduh QRIS Dinamis Toko (`customer-account.blade.php`, `payment-modal.blade.php`)**:

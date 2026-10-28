@@ -172,8 +172,11 @@ class RolesAndPermissionsSeeder extends Seeder
         $finance->givePermissionTo(['kelola-hr', 'kelola-payroll', 'payroll.view', 'payroll.create', 'payroll.approve', 'hr.lihat-sendiri']);
         $adminToko->givePermissionTo(['kelola-hr', 'hr.lihat-sendiri']);
 
-        // [F3-8b] Karyawan (kasir/teknisi/marketing/staff) lihat absensi & KPI sendiri
-        foreach ([$kasir, $teknisi, $marketing, $staffGudang] as $roleKaryawan) {
+        // [F3-8b] Karyawan (kasir/teknisi/marketing/staff/karyawan) lihat absensi & KPI sendiri
+        $karyawan = Role::findOrCreate('karyawan');
+        $karyawan->givePermissionTo('hr.lihat-sendiri');
+
+        foreach ([$kasir, $teknisi, $marketing, $staffGudang, $karyawan] as $roleKaryawan) {
             $roleKaryawan->givePermissionTo('hr.lihat-sendiri');
         }
 

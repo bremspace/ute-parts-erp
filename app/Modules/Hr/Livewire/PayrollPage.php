@@ -12,8 +12,10 @@ use App\Modules\Hr\Services\PayrollService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Traits\ParsesNominal;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Spatie\Permission\Models\Role;
 
 class PayrollPage extends Component
 {
@@ -71,6 +73,15 @@ class PayrollPage extends Component
     public string $inputRekeningBank = '';
 
     public bool $inputStatusAktif = true;
+
+    // Tambah Akun Login Langsung dari Modal Karyawan
+    public bool $inputBuatUserBaru = false;
+
+    public string $inputEmailLogin = '';
+
+    public string $inputPasswordLogin = '';
+
+    public string $inputRoleLogin = 'karyawan';
 
     // Kompensasi Karyawan Modal
     public bool $showKompensasiModal = false;
@@ -365,6 +376,10 @@ class PayrollPage extends Component
         $this->inputTglMasuk = now()->toDateString();
         $this->inputRekeningBank = '';
         $this->inputStatusAktif = true;
+        $this->inputBuatUserBaru = false;
+        $this->inputEmailLogin = '';
+        $this->inputPasswordLogin = '';
+        $this->inputRoleLogin = 'teknisi';
 
         $this->showTambahKaryawanModal = true;
     }
@@ -388,6 +403,10 @@ class PayrollPage extends Component
         $this->inputTglMasuk = $k->tgl_masuk ? $k->tgl_masuk->toDateString() : now()->toDateString();
         $this->inputRekeningBank = $k->rekening_bank ?? '';
         $this->inputStatusAktif = (bool) $k->status_aktif;
+        $this->inputBuatUserBaru = false;
+        $this->inputEmailLogin = '';
+        $this->inputPasswordLogin = '';
+        $this->inputRoleLogin = 'karyawan';
 
         $this->showTambahKaryawanModal = true;
     }
@@ -409,14 +428,53 @@ class PayrollPage extends Component
             'inputUserId' => 'nullable|exists:users,id',
         ];
 
-        $this->validate($rules);
+        if ($this->inputBuatUserBaru && ! $this->karyawanEditId) {
+            $rules['inputEmailLogin'] = 'required|email|unique:users,email';
+            $rules['inputPasswordLogin'] = 'required|string|min:6';
+            $rules['inputRoleLogin'] = 'required|string|exists:roles,name';
+        }
+
+        $this->validate($rules, [
+            'inputNama.required' => 'Nama karyawan wajib diisi.',
+            'inputNik.required' => 'NIK karyawan wajib diisi.',
+            'inputNik.unique' => 'NIK sudah digunakan.',
+            'inputJabatan.required' => 'Jabatan wajib dipilih.',
+            'inputTglMasuk.required' => 'Tanggal masuk wajib diisi.',
+            'inputEmailLogin.required' => 'Email login wajib diisi jika membuat user baru.',
+            'inputEmailLogin.email' => 'Format email login tidak valid.',
+            'inputEmailLogin.unique' => 'Email login sudah digunakan pengguna lain.',
+            'inputPasswordLogin.required' => 'Password login wajib diisi.',
+            'inputPasswordLogin.min' => 'Password login minimal 6 karakter.',
+            'inputRoleLogin.required' => 'Role akun login wajib dipilih.',
+            'inputRoleLogin.exists' => 'Role akun login tidak valid.',
+        ]);
+
+        $userId = $this->inputUserId ?: null;
+
+        if ($this->inputBuatUserBaru && ! $this->karyawanEditId) {
+            $newUser = User::create([
+                'name' => trim($this->inputNama),
+                'email' => trim($this->inputEmailLogin),
+                'password' => Hash::make($this->inputPasswordLogin),
+                'is_active' => $this->inputStatusAktif,
+            ]);
+
+            $newUser->syncRoles([$this->inputRoleLogin]);
+
+            $cabangId = $this->inputCabangId ?: Cabang::value('id');
+            if ($cabangId) {
+                $newUser->cabangs()->sync([(int) $cabangId => ['is_default' => true]]);
+            }
+
+            $userId = $newUser->id;
+        }
 
         $gaji = $this->parseNominal($this->inputKaryawanGajiPokok);
 
-        Karyawan::updateOrCreate(
+        $karyawan = Karyawan::updateOrCreate(
             ['id' => $this->karyawanEditId],
             [
-                'user_id' => $this->inputUserId ?: null,
+                'user_id' => $userId,
                 'nik' => trim($this->inputNik),
                 'nama' => trim($this->inputNama),
                 'jabatan' => $this->inputJabatan,
@@ -427,6 +485,13 @@ class PayrollPage extends Component
                 'status_aktif' => $this->inputStatusAktif,
             ]
         );
+
+        if ($userId) {
+            User::where('id', $userId)->update([
+                'name' => trim($this->inputNama),
+                'is_active' => $this->inputStatusAktif,
+            ]);
+        }
 
         $this->showTambahKaryawanModal = false;
         $this->dispatch('alert', [
@@ -603,6 +668,7 @@ class PayrollPage extends Component
             'karyawans' => $karyawans,
             'cabangList' => $cabangList,
             'userList' => $userList,
+            'roleList' => Role::orderBy('name')->get(),
             'akunKasBankList' => $akunKasBankList,
         ])->layout('layouts.backoffice', ['header' => 'HR & Payroll', 'title' => 'HR & Payroll']);
     }

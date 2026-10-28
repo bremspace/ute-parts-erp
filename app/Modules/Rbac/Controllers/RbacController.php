@@ -3,6 +3,7 @@
 namespace App\Modules\Rbac\Controllers;
 
 use App\Models\User;
+use App\Modules\Hr\Services\UserHrSyncService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AuditService;
 use App\Traits\ApiResponse;
@@ -58,6 +59,8 @@ class RbacController extends Controller
         }
         $user->cabangs()->sync($syncData);
 
+        app(UserHrSyncService::class)->syncUserToKaryawan($user);
+
         app(AuditService::class)->catat(
             'User', 'create', $user->id,
             "User {$user->name} dibuat, role {$request->role}"
@@ -96,6 +99,8 @@ class RbacController extends Controller
         if ($request->has('cabang_ids')) {
             $user->cabangs()->sync($request->cabang_ids);
         }
+
+        app(UserHrSyncService::class)->syncUserToKaryawan($user);
 
         app(AuditService::class)->catat(
             'User', 'update', $user->id,

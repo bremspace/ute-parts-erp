@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use Database\Factories\UserFactory;
@@ -28,6 +29,25 @@ class User extends Authenticatable
     public function getActivitylogOptions(): LogOptions
     {
         return $this->opsilogAktivitas('User');
+    }
+
+    protected static function booted(): void
+    {
+        static::updated(function (User $user) {
+            if ($user->wasChanged(['name', 'is_active'])) {
+                Karyawan::where('user_id', $user->id)->update([
+                    'nama' => $user->name,
+                    'status_aktif' => (bool) $user->is_active,
+                ]);
+            }
+        });
+
+        static::deleted(function (User $user) {
+            Karyawan::where('user_id', $user->id)->update([
+                'user_id' => null,
+                'status_aktif' => false,
+            ]);
+        });
     }
 
     /**
@@ -64,6 +84,11 @@ class User extends Authenticatable
         return $this->belongsToMany(Cabang::class, 'user_cabang')
             ->withPivot('is_default')
             ->withTimestamps();
+    }
+
+    public function karyawan()
+    {
+        return $this->hasOne(Karyawan::class, 'user_id');
     }
 
     /**

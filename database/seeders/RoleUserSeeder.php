@@ -26,6 +26,7 @@ class RoleUserSeeder extends Seeder
             'finance',
             'marketing',
             'kelola-hr',
+            'karyawan',
         ];
 
         // Pastikan semua role ada (idempotent + aman jika seeder role belum jalan)
@@ -45,6 +46,7 @@ class RoleUserSeeder extends Seeder
             'finance' => ['name' => 'Finance UteParts',       'email' => 'finance@uteparts.id',    'phone' => '081234567807'],
             'marketing' => ['name' => 'Marketing UteParts',     'email' => 'marketing@uteparts.id',  'phone' => '081234567808'],
             'kelola-hr' => ['name' => 'HR Manager UteParts',    'email' => 'hr@uteparts.id',         'phone' => '081234567809'],
+            'karyawan' => ['name' => 'Karyawan UteParts',     'email' => 'karyawan@uteparts.id',   'phone' => '081234567810'],
         ];
 
         foreach ($users as $role => $data) {

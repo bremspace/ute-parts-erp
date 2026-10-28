@@ -410,7 +410,7 @@
 
     <!-- TAB: USERS -->
     @if($activeTab === 'users')
-        <x-prism.data-table :headers="['Nama', 'Email', 'Role', 'Cabang', 'Status', 'Aksi']">
+        <x-prism.data-table :headers="['Nama', 'Email', 'Role', 'Profil HR', 'Cabang', 'Status', 'Aksi']">
             @forelse($users as $u)
                 <tr class="hover:bg-white/[0.02] transition-colors text-xs">
                     <td class="py-3.5 px-4 font-semibold text-white">
@@ -423,9 +423,20 @@
                             {{ $u->roles->first()?->name ?? '-' }}
                         </span>
                     </td>
+                    <td class="py-3.5 px-4">
+                        @if($u->karyawan)
+                            <div class="flex items-center gap-1.5" title="Tersinkronisasi ke HR & Payroll">
+                                <span class="w-1.5 h-1.5 rounded-full bg-up-mint shrink-0"></span>
+                                <span class="font-mono text-[11px] text-up-mint font-semibold">{{ $u->karyawan->nik }}</span>
+                                <span class="text-[10px] text-ink-400 font-normal">({{ $u->karyawan->jabatan }})</span>
+                            </div>
+                        @else
+                            <span class="text-[10px] text-ink-500 italic">Belum terhubung</span>
+                        @endif
+                    </td>
                     <td class="py-3.5 px-4 text-ink-300">{{ $u->cabangs->pluck('nama')->join(', ') ?: '-' }}</td>
                     <td class="py-3.5 px-4">
-                        <button wire:click="toggleUserActive({{ $u->id }})" class="cursor-pointer">
+                        <button wire:click="toggleUserActive({{ $u->id }})" class="cursor-pointer" title="Klik untuk ubah status user & karyawan">
                             <x-prism.status-pill :status="$u->is_active ? 'aktif' : 'batal'" size="sm" />
                         </button>
                     </td>
@@ -434,7 +445,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="py-12 text-center text-ink-400">Belum ada user.</td></tr>
+                <tr><td colspan="7" class="py-12 text-center text-ink-400">Belum ada user.</td></tr>
             @endforelse
 
             <x-slot:pagination>{{ $users->links() }}</x-slot:pagination>
@@ -500,18 +511,27 @@
                 </div>
             @endif
 
-            <x-prism.data-table :headers="['Role', 'Permission', 'Edit']">
+            <x-prism.data-table :headers="['Role', 'Permission', 'Aksi']">
                 @forelse($rolesFull as $r)
                     <tr class="hover:bg-white/[0.02] transition-colors text-xs">
                         <td class="py-3.5 px-4 font-bold text-white">
                             {{ $r->name }}
-                            @if($r->name === 'super-admin')
+                            @if(in_array($r->name, ['super-admin', 'owner'], true))
                                 <span class="ml-1 text-[9px] text-up-amber bg-up-amber/10 px-1.5 py-0.5 rounded-full">guardrail</span>
+                            @elseif(in_array($r->name, ['admin-toko', 'kasir', 'teknisi', 'staff-gudang', 'finance', 'marketing', 'kelola-hr', 'karyawan'], true))
+                                <span class="ml-1 text-[9px] text-ink-400 bg-white/5 px-1.5 py-0.5 rounded-full">sistem</span>
+                            @else
+                                <span class="ml-1 text-[9px] text-up-mint bg-up-mint/10 px-1.5 py-0.5 rounded-full">custom</span>
                             @endif
                         </td>
                         <td class="py-3.5 px-4 text-ink-300">{{ $r->permissions->count() }} permission</td>
                         <td class="py-3.5 px-4">
-                            <button wire:click="openEditRole({{ $r->id }})" class="px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/35 text-up-primary font-bold text-[11px] cursor-pointer">Edit</button>
+                            <div class="flex items-center gap-2">
+                                <button wire:click="openEditRole({{ $r->id }})" class="px-3 py-1.5 rounded-lg bg-up-primary/20 hover:bg-up-primary/35 text-up-primary font-bold text-[11px] cursor-pointer">Edit</button>
+                                @if(!in_array($r->name, ['super-admin', 'owner', 'admin-toko', 'kasir', 'teknisi', 'staff-gudang', 'finance', 'marketing', 'kelola-hr', 'karyawan'], true))
+                                    <button wire:click="hapusRole({{ $r->id }})" wire:confirm="Yakin ingin menghapus role '{{ $r->name }}'?" class="px-3 py-1.5 rounded-lg bg-up-red/15 hover:bg-up-red/30 text-up-red font-bold text-[11px] cursor-pointer">Hapus</button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty
@@ -531,6 +551,9 @@
                     <div class="mb-4">
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama Role *</label>
                         <input type="text" wire:model="roleBaruNama" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Contoh: koordinator-servis, audit-stok" />
+                        @error('roleBaruNama')
+                            <p class="text-xs text-up-red font-medium mt-1.5">{{ $message }}</p>
+                        @enderror
                     </div>
                     <p class="text-xs font-bold text-ink-200 mb-2.5">Pilih Hak Akses (Permission)</p>
                     <div class="space-y-4 max-h-96 overflow-y-auto pr-1">
@@ -3650,27 +3673,59 @@
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Nama *</label>
                         <input type="text" wire:model="userForm.name" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        @error('userForm.name')
+                            <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Email *</label>
                         <input type="email" wire:model="userForm.email" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        @error('userForm.email')
+                            <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Telepon</label>
                         <input type="text" wire:model="userForm.phone" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" />
+                        @error('userForm.phone')
+                            <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">{{ $userForm['id'] ? 'Password (kosongkan = tidak diubah)' : 'Password *' }}</label>
                         <input type="password" wire:model="userForm.password" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium" placeholder="Min 6 karakter" />
+                        @error('userForm.password')
+                            <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Role</label>
+                        <label class="block text-xs font-semibold text-ink-300 mb-1.5">Role *</label>
                         <select wire:model="userForm.role" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium">
                             @foreach($roles as $r)
                                 <option value="{{ $r->name }}" class="bg-ink-900">{{ $r->name }}</option>
                             @endforeach
                         </select>
+                        @error('userForm.role')
+                            <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
+
+                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-2.5">
+                        <label class="flex items-center gap-2 text-xs text-ink-200 font-semibold cursor-pointer">
+                            <input type="checkbox" wire:model.live="userForm.buat_karyawan" class="accent-up-mint w-4 h-4 rounded" />
+                            Hubungkan / Buat Profil Karyawan HR
+                        </label>
+                        @if(!empty($userForm['buat_karyawan']))
+                            <div>
+                                <label class="block text-[11px] font-semibold text-ink-400 mb-1">NIK Karyawan (opsional, auto-generate jika kosong)</label>
+                                <input type="text" wire:model="userForm.nik_karyawan" placeholder="EMP-0001" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium" />
+                                @error('userForm.nik_karyawan')
+                                    <p class="text-xs text-up-red font-medium mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        @endif
+                    </div>
+
                     <div>
                         <label class="block text-xs font-semibold text-ink-300 mb-1.5">Akses Cabang &amp; Cabang Utama</label>
                         <div class="space-y-2">
