@@ -90,7 +90,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminToko = Role::findOrCreate('admin-toko');
         $adminToko->givePermissionTo([
             'pos.create', 'pos.view', 'pos.view-own', 'pos.void',
-            'wms.view', 'wms.transfer', 'wms.opname', 'wms.approve-opname',
+            'wms.view', 'wms.transfer', 'wms.opname', 'wms.approve-opname', 'wms.receive-po',
             'servis.view', 'servis.create', 'servis.update-status', 'servis.input-sparepart', 'servis.approve-estimasi', 'servis.override-status',
             // admin-toko = bagian terkait servis → boleh kelola master jenis servis
             'servis.manage',
@@ -138,6 +138,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'komisi.approve',
             'laporan.cabang', 'laporan.konsolidasi',
             'approve-workflow',
+            'wms.receive-po',
             'lihat-audit-log', // [F1-4] finance melihat riwayat audit
             // [F3-1] Field-level security: finance bisa lihat harga_beli/margin
             'lihat.harga_beli',

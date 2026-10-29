@@ -1635,6 +1635,8 @@
                                         <span class="text-ink-900 dark:text-white font-semibold">Rp {{ number_format($p->harga_beli, 0, ',', '.') }}</span>
                                         @if(($p->metode_harga_beli ?? 'manual') === 'average')
                                             <span class="px-1.5 py-0.2 rounded bg-up-mint/15 text-up-mint text-[9px] font-bold border border-up-mint/30" title="Metode: Moving Average Otomatis dari PO">Avg</span>
+                                        @elseif(($p->metode_harga_beli ?? 'manual') === 'tertinggi')
+                                            <span class="px-1.5 py-0.2 rounded bg-up-amber/15 text-up-amber text-[9px] font-bold border border-up-amber/30" title="Metode: Tertinggi / Terbaru dari PO">Max/New</span>
                                         @endif
                                     </div>
                                 @else
@@ -2484,14 +2486,18 @@
                     <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-white">💰 Skema Harga Beli &amp; Harga Jual</span>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-300 cursor-pointer">
                                     <input type="radio" value="manual" wire:model.live="produkForm.metode_harga_beli" class="text-up-primary focus:ring-0">
                                     <span>Beli Manual</span>
                                 </label>
                                 <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-up-mint cursor-pointer">
                                     <input type="radio" value="average" wire:model.live="produkForm.metode_harga_beli" class="text-up-mint focus:ring-0">
-                                    <span>Otomatis (Moving Average PO)</span>
+                                    <span>Moving Average PO</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-up-amber cursor-pointer">
+                                    <input type="radio" value="tertinggi" wire:model.live="produkForm.metode_harga_beli" class="text-up-amber focus:ring-0">
+                                    <span>Tertinggi / Terbaru PO</span>
                                 </label>
                             </div>
                         </div>
@@ -2502,11 +2508,19 @@
                                     <label class="block text-xs font-semibold text-ink-300">Harga Beli (Rp) *</label>
                                     @if(($produkForm['metode_harga_beli'] ?? 'manual') === 'average')
                                         <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-mint/20 text-up-mint font-bold">Auto-Avg PO</span>
+                                    @elseif(($produkForm['metode_harga_beli'] ?? 'manual') === 'tertinggi')
+                                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-amber/20 text-up-amber font-bold">Tertinggi PO</span>
                                     @endif
                                 </div>
                                 <input type="text" inputmode="numeric" x-format-number wire:model.live="produkForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                                 <p class="text-[9px] text-ink-500 mt-1">
-                                    {{ ($produkForm['metode_harga_beli'] ?? 'manual') === 'average' ? 'Diperbarui otomatis saat terima PO/supplier (rata-rata tertimbang).' : 'Harga beli pokok tetap manual.' }}
+                                    @if(($produkForm['metode_harga_beli'] ?? 'manual') === 'average')
+                                        Diperbarui otomatis saat terima PO (rata-rata tertimbang).
+                                    @elseif(($produkForm['metode_harga_beli'] ?? 'manual') === 'tertinggi')
+                                        Mengikuti harga beli tertinggi / terbaru dari histori penerimaan PO.
+                                    @else
+                                        Harga beli pokok tetap manual.
+                                    @endif
                                 </p>
                             </div>
 
@@ -3413,14 +3427,18 @@
                     <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-bold text-white">💰 Skema Harga Beli &amp; Harga Jual</span>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-300 cursor-pointer">
                                     <input type="radio" value="manual" wire:model.live="editProdukForm.metode_harga_beli" class="text-up-primary focus:ring-0">
                                     <span>Beli Manual</span>
                                 </label>
                                 <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-up-mint cursor-pointer">
                                     <input type="radio" value="average" wire:model.live="editProdukForm.metode_harga_beli" class="text-up-mint focus:ring-0">
-                                    <span>Otomatis (Moving Average PO)</span>
+                                    <span>Moving Average PO</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-up-amber cursor-pointer">
+                                    <input type="radio" value="tertinggi" wire:model.live="editProdukForm.metode_harga_beli" class="text-up-amber focus:ring-0">
+                                    <span>Tertinggi / Terbaru PO</span>
                                 </label>
                             </div>
                         </div>
@@ -3431,12 +3449,20 @@
                                     <label class="block text-xs font-semibold text-ink-300">Harga Beli (Rp) *</label>
                                     @if(($editProdukForm['metode_harga_beli'] ?? 'manual') === 'average')
                                         <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-mint/20 text-up-mint font-bold">Auto-Avg PO</span>
+                                    @elseif(($editProdukForm['metode_harga_beli'] ?? 'manual') === 'tertinggi')
+                                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-up-amber/20 text-up-amber font-bold">Tertinggi PO</span>
                                     @endif
                                 </div>
                                 <input type="text" inputmode="numeric" x-format-number wire:model.live="editProdukForm.harga_beli" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-bold tabular-nums" />
                                 @error('editProdukForm.harga_beli') <span class="text-up-red text-[10px] block mt-1">{{ $message }}</span> @enderror
                                 <p class="text-[9px] text-ink-500 mt-1">
-                                    {{ ($editProdukForm['metode_harga_beli'] ?? 'manual') === 'average' ? 'Diperbarui otomatis saat terima PO/supplier (rata-rata tertimbang).' : 'Harga beli pokok tetap manual.' }}
+                                    @if(($editProdukForm['metode_harga_beli'] ?? 'manual') === 'average')
+                                        Diperbarui otomatis saat terima PO (rata-rata tertimbang).
+                                    @elseif(($editProdukForm['metode_harga_beli'] ?? 'manual') === 'tertinggi')
+                                        Mengikuti harga beli tertinggi / terbaru dari histori penerimaan PO.
+                                    @else
+                                        Harga beli pokok tetap manual.
+                                    @endif
                                 </p>
                             </div>
 

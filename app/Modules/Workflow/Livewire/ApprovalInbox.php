@@ -2,8 +2,11 @@
 
 namespace App\Modules\Workflow\Livewire;
 
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Crm\Models\Pelanggan;
 use App\Modules\Crm\Models\TierMembership;
+use App\Modules\Wms\Models\Grn;
+use App\Modules\Wms\Services\GrnService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Support\Facades\Cache;
@@ -26,6 +29,21 @@ class ApprovalInbox extends Component
     public $showApproveMemberModal = false;
 
     public $showApproveResetPasswordModal = false;
+
+    public $showApproveGrnModal = false;
+
+    public $grnApprovalForm = [
+        'request_id' => null,
+        'grn_id' => null,
+        'no_grn' => '',
+        'no_po' => '',
+        'supplier_nama' => '',
+        'amount' => 0,
+        'is_tunai' => false,
+        'akun_kas_bank' => '110-01',
+        'cabang_id' => null,
+        'catatan' => '',
+    ];
 
     public $resetPasswordApprovalForm = [
         'request_id' => null,
@@ -72,6 +90,12 @@ class ApprovalInbox extends Component
 
         if ($request && $request->entity_type === 'reset_password_pelanggan') {
             $this->openApproveResetPasswordModal($requestId);
+
+            return;
+        }
+
+        if ($request && $request->entity_type === 'grn') {
+            $this->openApproveGrnModal($requestId);
 
             return;
         }
@@ -254,6 +278,116 @@ class ApprovalInbox extends Component
         }
     }
 
+    public function openApproveGrnModal($requestId)
+    {
+        $request = ApprovalRequest::findOrFail($requestId);
+        $payload = $request->payload_json ?? [];
+        $grn = Grn::with('purchaseOrder.supplier')->find($request->entity_id);
+
+        $cabangId = (int) ($request->cabang_id ?: ($grn?->cabang_id ?: session('cabang_id')));
+        $amount = (float) ($payload['amount'] ?? ($grn?->total_hpp ?? 0));
+        $isTunai = ($payload['is_tunai'] ?? false) || ($grn?->purchaseOrder?->metode_bayar === 'tunai');
+        $defaultAkun = $payload['akun_kas_bank'] ?? ($grn?->akun_kas_bank ?: ($grn?->purchaseOrder?->akun_kas_bank ?: '110-01'));
+
+        $this->grnApprovalForm = [
+            'request_id' => $request->id,
+            'grn_id' => $request->entity_id,
+            'no_grn' => $payload['no_grn'] ?? ($grn?->no_grn ?? '-'),
+            'no_po' => $payload['no_po'] ?? ($grn?->purchaseOrder?->no_po ?? '-'),
+            'supplier_nama' => $payload['supplier_nama'] ?? ($grn?->purchaseOrder?->supplier?->nama ?? '-'),
+            'amount' => $amount,
+            'is_tunai' => $isTunai,
+            'akun_kas_bank' => $defaultAkun,
+            'cabang_id' => $cabangId,
+            'catatan' => '',
+        ];
+
+        $this->showApproveGrnModal = true;
+    }
+
+    public function closeApproveGrnModal()
+    {
+        $this->showApproveGrnModal = false;
+        $this->grnApprovalForm = [
+            'request_id' => null,
+            'grn_id' => null,
+            'no_grn' => '',
+            'no_po' => '',
+            'supplier_nama' => '',
+            'amount' => 0,
+            'is_tunai' => false,
+            'akun_kas_bank' => '110-01',
+            'cabang_id' => null,
+            'catatan' => '',
+        ];
+    }
+
+    public function updatedGrnApprovalFormAkunKasBank($val): void
+    {
+        if (empty($this->grnApprovalForm['is_tunai']) || empty($val)) {
+            return;
+        }
+
+        $cabangId = (int) ($this->grnApprovalForm['cabang_id'] ?: session('cabang_id'));
+        $amount = (float) ($this->grnApprovalForm['amount'] ?? 0);
+        $kasDipilih = AkunCOA::where('kode', $val)->first();
+        $saldoAktual = $kasDipilih ? GrnService::hitungSaldoKasCabang($kasDipilih, $cabangId) : 0;
+
+        if ($saldoAktual < $amount) {
+            $kasCukup = GrnService::getKasDenganSaldoCukup($amount, $cabangId);
+            $rekomendasi = $kasCukup->first();
+            $namaDipilih = $kasDipilih ? $kasDipilih->nama : $val;
+
+            if ($rekomendasi) {
+                $this->grnApprovalForm['akun_kas_bank'] = $rekomendasi->kode;
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => "Saldo kas '{$namaDipilih}' (Rp ".number_format($saldoAktual, 0, ',', '.').') tidak cukup untuk pembayaran GRN Rp '.number_format($amount, 0, ',', '.').". Otomatis dialihkan ke [{$rekomendasi->kode}] {$rekomendasi->nama}.",
+                ]);
+            } else {
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Saldo kas '{$namaDipilih}' tidak mencukupi (Rp ".number_format($saldoAktual, 0, ',', '.').' < Rp '.number_format($amount, 0, ',', '.').').',
+                ]);
+            }
+        }
+    }
+
+    public function submitApproveGrn()
+    {
+        $this->processing = true;
+
+        try {
+            $options = [];
+            if ($this->grnApprovalForm['is_tunai'] && ! empty($this->grnApprovalForm['akun_kas_bank'])) {
+                $options['akun_kas_bank'] = $this->grnApprovalForm['akun_kas_bank'];
+            }
+
+            app(ApprovalService::class)->proses(
+                (int) $this->grnApprovalForm['request_id'],
+                'disetujui',
+                auth()->id(),
+                $this->grnApprovalForm['catatan'] ?: 'GRN disetujui oleh pemilik otoritas',
+                $options
+            );
+
+            Cache::forget('backoffice-approval-badge-'.(session('cabang_id') ?? 'all'));
+            Cache::forget('backoffice-approval-badge-all');
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => "GRN {$this->grnApprovalForm['no_grn']} berhasil disetujui & diselesaikan.",
+            ]);
+            $this->closeApproveGrnModal();
+        } catch (ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+            $this->dispatch('alert', ['type' => 'error', 'message' => $msg]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        } finally {
+            $this->processing = false;
+        }
+    }
+
     public function openRejectModal($requestId)
     {
         $this->selectedRequest = $requestId;
@@ -288,9 +422,18 @@ class ApprovalInbox extends Component
             ->latest()
             ->paginate(10);
 
+        $kasCukupList = collect();
+        if ($this->showApproveGrnModal && $this->grnApprovalForm['cabang_id']) {
+            $kasCukupList = GrnService::getKasDenganSaldoCukup(
+                (float) $this->grnApprovalForm['amount'],
+                (int) $this->grnApprovalForm['cabang_id']
+            );
+        }
+
         return view('modules.workflow.livewire.approval-inbox', [
             'requests' => $requests,
             'tiers' => TierMembership::where('is_active', true)->orderBy('urutan')->get(),
+            'kasCukupList' => $kasCukupList,
         ])->layout('layouts.backoffice', ['header' => 'Approval Inbox']);
     }
 }

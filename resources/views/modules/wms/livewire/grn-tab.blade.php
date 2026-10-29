@@ -557,13 +557,13 @@
                                     <div class="flex items-center gap-2 flex-wrap">
                                         @cansee('harga_beli')
                                         <div class="w-24 sm:w-28">
-                                            <div class="text-[10px] text-ink-400 mb-0.5">Harga Beli</div>
+                                            <div class="text-[10px] text-ink-400 mb-0.5">Harga Beli Masuk</div>
                                             <input
                                                 type="number"
                                                 min="0"
                                                 step="100"
-                                                wire:model="grnForm.item_qty.{{ $idx }}.harga_beli"
-                                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs tabular-nums text-right font-medium"
+                                                wire:model.live.debounce.300ms="grnForm.item_qty.{{ $idx }}.harga_beli"
+                                                class="w-full px-2 py-1.5 rounded-lg glass-input text-xs tabular-nums text-right font-medium {{ abs((float)($item['harga_beli'] ?? 0) - (float)($item['harga_po'] ?? 0)) > 0.01 ? 'text-up-amber font-bold border-up-amber/40' : '' }}"
                                                 placeholder="Rp 0"
                                             />
                                         </div>
@@ -603,6 +603,163 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                {{-- Panel Manajemen Penyesuaian Harga Master Produk & Harga Jual --}}
+                                @cansee('harga_beli')
+                                    @php
+                                        $hbMasuk = (float)($item['harga_beli'] ?? 0);
+                                        $hbPo = (float)($item['harga_po'] ?? 0);
+                                        $hbMaster = (float)($item['harga_master'] ?? 0);
+                                        $adaPerubahanHarga = abs($hbMasuk - $hbPo) > 0.01 || abs($hbMasuk - $hbMaster) > 0.01;
+                                        $previewHb = $this->hitungPreviewHargaBeli($item);
+                                        $previewHj = $this->hitungPreviewHargaJual($item, $previewHb);
+                                        $evalMargin = $this->evaluasiMarginItem($item);
+                                        $opsiHb = $item['opsi_harga_beli'] ?? 'average';
+                                        $skemaHj = $item['skema_harga_jual'] ?? 'default_margin';
+                                        $maxHistori = (float)($item['harga_tertinggi_histori'] ?? 0);
+                                    @endphp
+
+                                    <div class="mt-2.5 p-3 rounded-xl {{ $adaPerubahanHarga ? 'bg-up-amber/10 border border-up-amber/30' : 'bg-white/[0.02] border border-white/5' }} space-y-2.5">
+                                        <div class="flex items-center justify-between flex-wrap gap-2">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="text-xs">🏷️</span>
+                                                <span class="text-[11px] font-bold text-white">Manajemen Harga Master Produk</span>
+                                                @if($adaPerubahanHarga)
+                                                    <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-up-amber/20 text-up-amber border border-up-amber/40">Harga Berubah</span>
+                                                @endif
+                                            </div>
+                                            <div class="text-[10px] text-ink-400 font-mono flex items-center gap-2">
+                                                <span>Master: Rp {{ number_format($hbMaster, 0, ',', '.') }}</span>
+                                                <span>•</span>
+                                                <span>PO: Rp {{ number_format($hbPo, 0, ',', '.') }}</span>
+                                                <span>•</span>
+                                                <span class="text-up-amber font-semibold" title="Harga tertinggi histori produk">Histori Max: Rp {{ number_format($maxHistori, 0, ',', '.') }}</span>
+                                            </div>
+                                        </div>
+
+                                        {{-- 3 Opsi Penentuan Harga Beli Master --}}
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <label class="p-2 rounded-lg border text-left cursor-pointer transition {{ $opsiHb === 'average' ? 'bg-up-mint/15 border-up-mint/50 text-white' : 'bg-white/[0.02] border-white/10 text-ink-300 hover:bg-white/[0.05]' }}">
+                                                <div class="flex items-center gap-1.5 mb-1">
+                                                    <input type="radio" value="average" wire:model.live="grnForm.item_qty.{{ $idx }}.opsi_harga_beli" class="text-up-mint focus:ring-0">
+                                                    <span class="text-[11px] font-bold">1. Moving Average</span>
+                                                </div>
+                                                <p class="text-[9px] text-ink-400 leading-tight">
+                                                    Rata-rata tertimbang stok lama &amp; barang masuk.
+                                                </p>
+                                            </label>
+
+                                            <label class="p-2 rounded-lg border text-left cursor-pointer transition {{ $opsiHb === 'tertinggi' ? 'bg-up-amber/15 border-up-amber/50 text-white' : 'bg-white/[0.02] border-white/10 text-ink-300 hover:bg-white/[0.05]' }}">
+                                                <div class="flex items-center gap-1.5 mb-1">
+                                                    <input type="radio" value="tertinggi" wire:model.live="grnForm.item_qty.{{ $idx }}.opsi_harga_beli" class="text-up-amber focus:ring-0">
+                                                    <span class="text-[11px] font-bold">2. Tertinggi / Terbaru</span>
+                                                </div>
+                                                <p class="text-[9px] text-ink-400 leading-tight">
+                                                    Pilih nilai tertinggi antara master, PO, atau histori (Max: Rp {{ number_format($maxHistori, 0, ',', '.') }}).
+                                                </p>
+                                            </label>
+
+                                            <label class="p-2 rounded-lg border text-left cursor-pointer transition {{ $opsiHb === 'manual' ? 'bg-up-primary/15 border-up-primary/50 text-white' : 'bg-white/[0.02] border-white/10 text-ink-300 hover:bg-white/[0.05]' }}">
+                                                <div class="flex items-center gap-1.5 mb-1">
+                                                    <input type="radio" value="manual" wire:model.live="grnForm.item_qty.{{ $idx }}.opsi_harga_beli" class="text-up-primary focus:ring-0">
+                                                    <span class="text-[11px] font-bold">3. Manual Sesuai Masuk</span>
+                                                </div>
+                                                <p class="text-[9px] text-ink-400 leading-tight">
+                                                    Langsung set harga beli master sama persis dengan harga masuk (Rp {{ number_format($hbMasuk, 0, ',', '.') }}).
+                                                </p>
+                                            </label>
+                                        </div>
+
+                                        {{-- Skema Penentuan Harga Jual Retail & Evaluasi Rekomendasi Rugi --}}
+                                        <div class="p-2.5 rounded-lg bg-black/30 border border-white/10 space-y-2">
+                                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                                <span class="text-[10px] font-bold uppercase tracking-wider text-ink-300">Penentuan Harga Jual Retail:</span>
+                                                <div class="flex items-center gap-3 text-[11px]">
+                                                    <label class="inline-flex items-center gap-1 cursor-pointer">
+                                                        <input type="radio" value="default_margin" wire:model.live="grnForm.item_qty.{{ $idx }}.skema_harga_jual" class="text-up-mint focus:ring-0">
+                                                        <span>Margin Default ({{ (float)($item['margin_default'] ?? 0) }}%)</span>
+                                                    </label>
+                                                    <label class="inline-flex items-center gap-1 cursor-pointer">
+                                                        <input type="radio" value="persen" wire:model.live="grnForm.item_qty.{{ $idx }}.skema_harga_jual" class="text-up-primary focus:ring-0">
+                                                        <span>Custom Persen (%)</span>
+                                                    </label>
+                                                    <label class="inline-flex items-center gap-1 cursor-pointer">
+                                                        <input type="radio" value="manual" wire:model.live="grnForm.item_qty.{{ $idx }}.skema_harga_jual" class="text-up-amber focus:ring-0">
+                                                        <span>Nominal Manual</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center pt-1">
+                                                @if($skemaHj === 'persen')
+                                                    <div>
+                                                        <label class="text-[9px] text-ink-400 block mb-0.5">Persentase Margin Baru (%):</label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.5"
+                                                            min="0"
+                                                            wire:model.live.debounce.300ms="grnForm.item_qty.{{ $idx }}.persen_margin_custom"
+                                                            class="w-full px-2 py-1 rounded glass-input text-xs tabular-nums text-right font-bold text-up-primary"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                @elseif($skemaHj === 'manual')
+                                                    <div>
+                                                        <label class="text-[9px] text-ink-400 block mb-0.5">Harga Jual Baru (Rp):</label>
+                                                        <input
+                                                            type="number"
+                                                            step="100"
+                                                            min="0"
+                                                            wire:model.live.debounce.300ms="grnForm.item_qty.{{ $idx }}.harga_jual_custom"
+                                                            class="w-full px-2 py-1 rounded glass-input text-xs tabular-nums text-right font-bold text-up-amber"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                @else
+                                                    <div class="text-[10px] text-ink-400">
+                                                        Mengikuti rasio margin standar master produk: <strong>{{ (float)($item['margin_default'] ?? 0) }}%</strong>
+                                                    </div>
+                                                @endif
+
+                                                {{-- Preview Hasil --}}
+                                                <div class="sm:col-span-2 flex items-center justify-between sm:justify-end gap-3 flex-wrap text-xs">
+                                                    <div>
+                                                        <span class="text-ink-400 text-[10px] block">HPP Beli Master:</span>
+                                                        <strong class="text-white font-mono">Rp {{ number_format($previewHb, 0, ',', '.') }}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span class="text-ink-400 text-[10px] block">Harga Jual Retail:</span>
+                                                        <strong class="text-up-mint font-mono">Rp {{ number_format($previewHj, 0, ',', '.') }}</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {{-- Feedback Analisis Risiko MarginGuard --}}
+                                            @if(($evalMargin['status'] ?? 'aman') === 'bahaya')
+                                                <div class="p-2 rounded-lg bg-up-red/15 border border-up-red/30 text-[10px] text-up-red flex items-start gap-1.5 leading-tight">
+                                                    <span>⚠️</span>
+                                                    <div>
+                                                        <strong>Peringatan Potensi Rugi!</strong> {{ $evalMargin['pesan'] ?? 'Harga jual di bawah HPP modal.' }}
+                                                        <span class="block mt-0.5 font-semibold text-ink-200">Rekomendasi harga jual aman minimum: <strong>Rp {{ number_format($evalMargin['rekomendasi_harga'] ?? 0, 0, ',', '.') }}</strong></span>
+                                                    </div>
+                                                </div>
+                                            @elseif(($evalMargin['status'] ?? 'aman') === 'peringatan')
+                                                <div class="p-2 rounded-lg bg-up-amber/15 border border-up-amber/30 text-[10px] text-up-amber flex items-start gap-1.5 leading-tight">
+                                                    <span>ℹ️</span>
+                                                    <div>
+                                                        <strong>Margin Tipis / Berisiko.</strong> {{ $evalMargin['pesan'] ?? 'Margin keuntungan sangat kecil.' }}
+                                                        <span class="block mt-0.5 text-ink-200">Rekomendasi harga jual aman: <strong>Rp {{ number_format($evalMargin['rekomendasi_harga'] ?? 0, 0, ',', '.') }}</strong></span>
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <div class="text-[9px] text-up-mint flex items-center gap-1">
+                                                    <span>✓</span>
+                                                    <span>Harga aman dari potensi rugi berdasarkan parameter Margin Guard.</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endcansee
 
                                 {{-- [F2-3] Input SN utk produk sn=true — jumlah wajib = qty diterima --}}
                                 @if($item['sn_flag'] ?? false)
@@ -650,23 +807,38 @@
                                     @if($bolehKas)
                                         <p class="text-[10px] text-up-mint mt-1 flex items-center gap-1 font-medium">
                                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                            Hak akses otorisasi pembayaran kas terverifikasi.
+                                            Hak akses otorisasi kas aktif. Pembayaran tunai akan langsung dieksekusi.
                                         </p>
                                     @else
-                                        <p class="text-[10px] text-up-red mt-1 flex items-center gap-1 font-semibold">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                            Akun Anda tidak memiliki role/izin pengeluaran kas (butuh role Kasir, Finance, atau Admin Toko).
+                                        <p class="text-[10px] text-amber-400 mt-1 flex items-center gap-1 font-medium">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            Petugas Penerima: GRN PO Tunai ini akan diajukan ke Pemilik Otoritas (Admin Toko/Finance) untuk persetujuan pembayaran.
                                         </p>
                                     @endif
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1">Sumber Kas / Bank *</label>
-                                    <select wire:model="grnForm.akun_kas_bank" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[40px]" required>
-                                        @foreach($akunKasBankList ?? [] as $ak)
-                                            <option value="{{ $ak->kode }}" class="bg-ink-900 text-white">[{{ $ak->kode }}] {{ $ak->nama }} ({{ ucfirst($ak->kelompok) }})</option>
-                                        @endforeach
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300">Sumber Kas / Bank (Saldo Cukup) *</label>
+                                        <span class="text-[10px] text-ink-400 font-mono">Dibutuhkan: Rp {{ number_format($estimasiTotalHpp ?? 0, 0, ',', '.') }}</span>
+                                    </div>
+                                    <select wire:model.live="grnForm.akun_kas_bank" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[40px]" required>
+                                        @forelse($akunKasBankList ?? [] as $ak)
+                                            <option value="{{ $ak->kode }}" class="bg-ink-900 text-white">
+                                                [{{ $ak->kode }}] {{ $ak->nama }} ({{ ucfirst($ak->kelompok) }}) — Saldo: Rp {{ number_format($ak->saldo_aktual ?? 0, 0, ',', '.') }}
+                                            </option>
+                                        @empty
+                                            <option value="" disabled selected class="bg-ink-900 text-ink-400">
+                                                ⚠️ Tidak ada kas/bank dengan saldo cukup (Dibutuhkan: Rp {{ number_format($estimasiTotalHpp ?? 0, 0, ',', '.') }})
+                                            </option>
+                                        @endforelse
                                     </select>
-                                    <p class="text-[10px] text-ink-500 mt-1">Pilih kas laci kasir atau rekening bank tempat uang keluar.</p>
+                                    @if(empty($akunKasBankList) || count($akunKasBankList) === 0)
+                                        <p class="text-[10px] text-amber-400 mt-1">
+                                            ⚠️ Saldo kas belum mencukupi. GRN tetap dapat diajukan untuk diapprove pemilik otoritas.
+                                        </p>
+                                    @else
+                                        <p class="text-[10px] text-ink-500 mt-1">Hanya menampilkan kas/bank dengan saldo aktual yang mencukupi pembayaran ini.</p>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -681,13 +853,15 @@
                 <!-- Footer Modal -->
                 <div class="flex gap-3 pt-3 mt-3 border-t border-black/10 dark:border-white/10 shrink-0">
                     <button wire:click="cancelGrnModal" class="flex-1 py-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.97]">Batal</button>
-                    @php $tombolDisabled = !empty($grnForm['is_cash']) && ! \App\Modules\Wms\Services\GrnService::userBolehOtorisasiKas(auth()->user()); @endphp
+                    @php
+                        $isCash = !empty($grnForm['is_cash']);
+                        $isOtoritas = \App\Modules\Wms\Services\GrnService::userBolehOtorisasiKas(auth()->user());
+                    @endphp
                     <button
                         wire:click="simpanGrn"
-                        @if($tombolDisabled) disabled title="Akun Anda tidak memiliki role/izin untuk otorisasi pembayaran kas" @endif
-                        class="flex-1 py-3 rounded-xl {{ $tombolDisabled ? 'bg-ink-700 opacity-50 cursor-not-allowed text-ink-300' : 'bg-up-primary hover:bg-up-primary-dark text-white cursor-pointer shadow-lg shadow-up-primary/25 active:scale-[0.97]' }} font-bold text-xs min-h-[44px] transition"
+                        class="flex-1 py-3 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white cursor-pointer shadow-lg shadow-up-primary/25 active:scale-[0.97] font-bold text-xs min-h-[44px] transition"
                     >
-                        {{ $tombolDisabled ? 'Izin Kas Tidak Memadai' : 'Simpan GRN' }}
+                        {{ ($isCash && ! $isOtoritas) ? 'Ajukan Approval GRN' : 'Simpan & Terima GRN' }}
                     </button>
                 </div>
             </div>
@@ -835,15 +1009,30 @@
     {{-- MODAL: KONFIRMASI SETUJUI GRN [F2-2] --}}
     @if($showConfirmDialog)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="w-full max-w-sm glass-panel p-6 rounded-3xl relative">
+            <div class="w-full max-w-md glass-panel p-6 rounded-3xl relative">
                 <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                     <h3 class="text-base font-bold text-white">{{ $confirmTitle }}</h3>
                     <button wire:click="tutupKonfirmasi" class="text-ink-400 hover:text-white cursor-pointer">✕</button>
                 </div>
-                <p class="text-xs text-ink-300 leading-relaxed mb-5">{{ $confirmText }}</p>
+                <p class="text-xs text-ink-300 leading-relaxed mb-4">{{ $confirmText }}</p>
+
+                <div class="mb-5 p-3 rounded-2xl bg-white/[0.04] border border-white/10">
+                    <label class="block text-xs font-semibold text-white mb-1.5">Metode / Akun Kas Pembayaran:</label>
+                    <select wire:model.live="confirmAkunKasBank" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium min-h-[40px]">
+                        @foreach($semuaKasBankList ?? $akunKasBankList ?? [] as $ak)
+                            <option value="{{ $ak->kode }}" class="bg-ink-900 text-white">
+                                [{{ $ak->kode }}] {{ $ak->nama }} ({{ ucfirst($ak->kelompok) }}) — Saldo: Rp {{ number_format($ak->saldo_aktual ?? 0, 0, ',', '.') }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-[10px] text-ink-400 mt-1.5">
+                        Jika memilih Kas Laci (110-04), pengeluaran kasir akan otomatis tercatat di mutasi laci kasir.
+                    </p>
+                </div>
+
                 <div class="flex gap-3">
                     <button wire:click="tutupKonfirmasi" class="flex-1 py-3 rounded-xl bg-white/5 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">Batal</button>
-                    <button wire:click="setujuiGrn({{ $confirmGrnId }})" class="flex-1 py-3 rounded-xl bg-up-mint text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">Ya, Setujui</button>
+                    <button wire:click="setujuiGrn({{ $confirmGrnId }})" class="flex-1 py-3 rounded-xl bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs cursor-pointer min-h-[44px]">Ya, Setujui &amp; Bayar</button>
                 </div>
             </div>
         </div>

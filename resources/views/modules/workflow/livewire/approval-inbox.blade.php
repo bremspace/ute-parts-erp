@@ -143,6 +143,13 @@
                                                     <span>🔑</span>
                                                     <span>Setujui Reset</span>
                                                 </button>
+                                            @elseif($request->entity_type === 'grn')
+                                                <button wire:click="openApproveGrnModal({{ $request->id }})" 
+                                                        class="px-3.5 py-1.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer flex items-center gap-1.5"
+                                                        :disabled="$processing">
+                                                    <span>📦</span>
+                                                    <span>Setujui GRN</span>
+                                                </button>
                                             @else
                                                 <button wire:click="approveRequest({{ $request->id }})" 
                                                         class="px-3.5 py-1.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl transition active:scale-[0.97] min-h-[36px] cursor-pointer"
@@ -462,6 +469,102 @@
                             class="px-5 py-2.5 bg-up-primary hover:bg-up-primary-dark text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5">
                         <span>✓</span>
                         <span>Setujui & Perbarui Password</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Approve GRN Modal (PO Tunai & Penerimaan) -->
+    @if($showApproveGrnModal)
+        <div class="fixed inset-0 bg-black/75 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-3 sm:p-4">
+            <div class="relative mx-auto p-5 sm:p-6 border border-gray-200 dark:border-white/10 w-full max-w-lg shadow-2xl rounded-2xl sm:rounded-3xl bg-white dark:bg-gray-800 text-left max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
+                    <div>
+                        <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span>📦</span>
+                            <span>Persetujuan Penerimaan GRN: {{ $grnApprovalForm['no_grn'] }}</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Otorisasi penerimaan fisik &amp; pembayaran kas pengadaan barang
+                        </p>
+                    </div>
+                    <button wire:click="closeApproveGrnModal" 
+                            type="button" 
+                            class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white flex items-center justify-center transition cursor-pointer text-sm">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="overflow-y-auto pr-1 flex-1 space-y-4">
+                    <!-- Ringkasan GRN & PO -->
+                    <div class="p-3.5 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-200 dark:border-white/5 space-y-2">
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400 block text-[10px] uppercase font-semibold">Nomor PO</span>
+                                <span class="font-bold font-mono text-gray-900 dark:text-white text-sm">{{ $grnApprovalForm['no_po'] }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400 block text-[10px] uppercase font-semibold">Supplier</span>
+                                <span class="font-bold text-gray-900 dark:text-white text-sm">{{ $grnApprovalForm['supplier_nama'] }}</span>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-gray-200 dark:border-white/5 flex items-center justify-between text-xs">
+                            <span class="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-semibold">Total Pembayaran / HPP:</span>
+                            <span class="font-mono font-bold text-up-mint text-base">Rp {{ number_format($grnApprovalForm['amount'], 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Metode / Sumber Kas (Hanya Kas yang Cukup) -->
+                    @if($grnApprovalForm['is_tunai'])
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                    Arahkan Sumber Kas / Bank (Saldo Cukup) *
+                                </label>
+                                <span class="text-[10px] text-gray-500 font-mono">Dibutuhkan: Rp {{ number_format($grnApprovalForm['amount'], 0, ',', '.') }}</span>
+                            </div>
+                            <select wire:model.live="grnApprovalForm.akun_kas_bank" class="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs font-medium min-h-[44px]">
+                                @forelse($kasCukupList ?? [] as $ak)
+                                    <option value="{{ $ak->kode }}" class="bg-gray-900 text-white">
+                                        [{{ $ak->kode }}] {{ $ak->nama }} ({{ ucfirst($ak->kelompok) }}) — Saldo: Rp {{ number_format($ak->saldo_aktual ?? 0, 0, ',', '.') }}
+                                    </option>
+                                @empty
+                                    <option value="" disabled selected class="bg-gray-900 text-gray-400">
+                                        ⚠️ Tidak ada kas/bank dengan saldo cukup
+                                    </option>
+                                @endforelse
+                            </select>
+                            <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                                💡 Jika diarahkan ke <strong>Kas Laci (110-04)</strong>, uang kasir otomatis tercatat keluar di mutasi kas laci sehingga closing shift kasir tidak selisih dan audit trail tercatat jelas.
+                            </p>
+                        </div>
+                    @endif
+
+                    <!-- Catatan Approval -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            Catatan Persetujuan (Opsional)
+                        </label>
+                        <textarea wire:model="grnApprovalForm.catatan" 
+                                  rows="2" 
+                                  placeholder="Contoh: Disetujui dikeluarkan dari kas laci kasir cabang..." 
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-4 mt-4 border-t border-gray-200 dark:border-white/10 flex-shrink-0">
+                    <button wire:click="closeApproveGrnModal"
+                            type="button"
+                            class="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button wire:click="submitApproveGrn"
+                            type="button"
+                            :disabled="$processing"
+                            class="px-5 py-2.5 bg-up-mint hover:bg-up-mint/90 text-ink-950 text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5">
+                        <span>✓</span>
+                        <span>Setujui &amp; Eksekusi GRN</span>
                     </button>
                 </div>
             </div>

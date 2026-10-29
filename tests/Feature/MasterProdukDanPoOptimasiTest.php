@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Wms\Livewire\PoTab;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
@@ -17,6 +18,7 @@ use App\Modules\Wms\Services\ProdukService;
 use Database\Seeders\AkunCoaSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class MasterProdukDanPoOptimasiTest extends TestCase
@@ -327,5 +329,141 @@ class MasterProdukDanPoOptimasiTest extends TestCase
         // Total baru = 1.250.000 / 60 unit = 20.833,33
         $produkFresh = $produk->fresh();
         $this->assertEquals(20833.33, (float) $produkFresh->harga_beli);
+    }
+
+    public function test_grn_manajemen_harga_opsi_tertinggi_dan_manual_dengan_skema_jual(): void
+    {
+        $service = app(ProdukService::class);
+
+        // Buat produk dengan metode tertinggi
+        $produk = $service->buatProduk(
+            nama: 'IC Power Qualcomm',
+            kategori: 'IC',
+            brand: 'Qualcomm',
+            model: 'PM8953',
+            kondisi: 'baru',
+            hargaBeli: 50000,
+            hargaJual: 75000,
+            gudangId: $this->gudang->id,
+            stokAwal: 5,
+            satuanKode: 'pcs',
+            metodeHargaBeli: 'tertinggi',
+            marginPersen: 50.0
+        );
+
+        $this->assertEquals('tertinggi', $produk->metode_harga_beli);
+
+        // Buat PO dengan harga masuk 65.000
+        $po = PurchaseOrder::create([
+            'no_po' => 'PO-TEST-TERTINGGI-001',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'user_id' => $this->user->id,
+            'status' => 'dikirim',
+            'total' => 65000,
+            'total_dibayar' => 0,
+            'metode_bayar' => 'kredit',
+            'tanggal_pesan' => now(),
+        ]);
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'produk_id' => $produk->id,
+            'jumlah' => 1,
+            'harga_beli' => 65000,
+            'subtotal' => 65000,
+        ]);
+
+        $grnService = app(GrnService::class);
+        $kunci = GrnService::kunciItem($produk->id, null);
+
+        // Input GRN dengan opsi harga tertinggi dan skema margin custom persen 40%
+        $grn = $grnService->inputGudang(
+            po: $po,
+            itemReceived: [$kunci => 1],
+            userId: $this->user->id,
+            snPerProduk: [],
+            itemHargaBeli: [$kunci => 65000],
+            itemRakId: [],
+            akunKasBank: null,
+            dibayarOleh: null,
+            itemHargaOptions: [
+                $kunci => [
+                    'opsi_harga_beli' => 'tertinggi',
+                    'skema_harga_jual' => 'persen',
+                    'nilai_jual_atau_margin' => 40,
+                ],
+            ]
+        );
+
+        $this->assertNotNull($grn);
+        $produkFresh = $produk->fresh();
+
+        // Harga beli master menjadi 65.000 (nilai tertinggi antara 50.000 dan 65.000)
+        $this->assertEquals(65000.00, (float) $produkFresh->harga_beli);
+        // Harga jual retail = 65.000 * 1.40 = 91.000
+        $this->assertEquals(91000.00, (float) $produkFresh->harga_jual_retail);
+    }
+
+    public function test_pembatalan_po_berhasil_dan_mengubah_status_menjadi_dibatalkan(): void
+    {
+        $this->actingAs($this->user);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $po = PurchaseOrder::create([
+            'no_po' => 'PO-TEST-BATAL-001',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'user_id' => $this->user->id,
+            'status' => 'draft',
+            'total' => 100000,
+            'total_dibayar' => 0,
+            'metode_bayar' => 'kredit',
+            'tanggal_pesan' => now(),
+        ]);
+
+        Livewire::test(PoTab::class)
+            ->call('batalkanPo', $po->id, 'Supplier kehabisan stok')
+            ->assertDispatched('alert');
+
+        $poFresh = $po->fresh();
+        $this->assertEquals('dibatalkan', $poFresh->status);
+        $this->assertStringContainsString('Supplier kehabisan stok', (string) $poFresh->catatan);
+    }
+
+    public function test_validasi_form_pembuatan_po_menolak_data_kosong_dengan_feedback_error(): void
+    {
+        $this->actingAs($this->user);
+        session(['cabang_id' => $this->cabang->id]);
+
+        Livewire::test(PoTab::class)
+            ->set('poForm.supplier_id', '')
+            ->set('poForm.gudang_tujuan_id', '')
+            ->set('poForm.items', [])
+            ->call('simpanPo')
+            ->assertHasErrors(['poForm.supplier_id', 'poForm.gudang_tujuan_id', 'poForm.items']);
+    }
+
+    public function test_jatuh_tempo_po_kredit_terisi_otomatis_sesuai_termin_supplier(): void
+    {
+        $this->actingAs($this->user);
+        session(['cabang_id' => $this->cabang->id]);
+
+        $this->supplier->update(['termin_hari' => 45]);
+
+        $expectedJatuhTempo = now()->addDays(45)->toDateString();
+
+        Livewire::test(PoTab::class)
+            ->call('openPoModal')
+            ->set('poForm.metode_bayar', 'kredit')
+            ->set('poForm.supplier_id', $this->supplier->id)
+            ->assertSet('poForm.jatuh_tempo', $expectedJatuhTempo);
+
+        // Ubah metode bayar ke tunai -> jatuh tempo dikosongkan
+        Livewire::test(PoTab::class)
+            ->call('openPoModal')
+            ->set('poForm.supplier_id', $this->supplier->id)
+            ->set('poForm.metode_bayar', 'tunai')
+            ->assertSet('poForm.jatuh_tempo', '');
     }
 }

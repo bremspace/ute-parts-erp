@@ -156,9 +156,9 @@
         <!-- Tier 2: Contextual Sub-Nav Tabs & Mobile Actions -->
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
             <!-- Contextual Tabs: smooth horizontal scroll on mobile, scrollbar-none, touch-pan-x -->
-            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x">
+            <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:mx-0 sm:px-0 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x overscroll-x-contain">
                 <!-- Group: Inventori -->
-                <div x-show="subModul === 'inventori'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
+                <div x-show="subModul === 'inventori'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0">
                     <button
                         wire:click="$set('activeTab', 'produk')"
                         class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ in_array($activeTab, ['produk', 'stok']) ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
@@ -192,7 +192,7 @@
                 </div>
 
                 <!-- Group: Operasional -->
-                <div x-show="subModul === 'operasional'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
+                <div x-show="subModul === 'operasional'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0" x-cloak>
                     <button
                         wire:click="$set('activeTab', 'transfer')"
                         class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'transfer' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
@@ -216,28 +216,28 @@
                 </div>
 
                 <!-- Group: Pengadaan -->
-                <div x-show="subModul === 'pengadaan'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap" x-cloak>
+                <div x-show="subModul === 'pengadaan'" class="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0 pr-2 sm:pr-0" x-cloak>
                     <button
                         wire:click="$set('activeTab', 'po')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        PO & Supplier
+                        PO &amp; Supplier
                     </button>
                     <button
                         wire:click="$set('activeTab', 'grn')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'grn' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'grn' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         GRN
                     </button>
                     <button
                         wire:click="$set('activeTab', 'retur')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'retur' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'retur' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         Retur Pembelian
                     </button>
                     <button
                         wire:click="$set('activeTab', 'histori_po')"
-                        class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === 'histori_po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                        class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'histori_po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
                         Histori Pengadaan
                     </button>
@@ -326,13 +326,32 @@
                     @endcan
                 @elseif($activeTab === 'po')
                     @can('wms.create')
-                    <div class="grid grid-cols-3 gap-1.5 w-full sm:flex sm:items-center sm:gap-2">
-                        <button @click="$dispatch('wms-procurement-modal')" class="px-2.5 sm:px-3 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap" title="Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, JIT)">
-                            <span>📊</span>
+                    <div class="flex items-center gap-1.5 w-full sm:gap-2">
+                        <button
+                            type="button"
+                            @click="$dispatch('wms-procurement-modal')"
+                            class="flex-1 min-w-0 px-2 sm:px-3 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-[11px] sm:text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                            title="Rekomendasi Pengadaan Stok (ABC, ROP, Min-Max, JIT)"
+                        >
+                            <span class="text-xs shrink-0">📊</span>
                             <span class="truncate">Saran PO</span>
                         </button>
-                        <button @click="$dispatch('wms-supplier-baru')" class="px-2.5 sm:px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 border border-black/10 dark:border-white/10 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap truncate">+ Supplier</button>
-                        <button @click="$dispatch('wms-po-baru')" class="px-2.5 sm:px-3 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center cursor-pointer whitespace-nowrap shadow-sm shadow-up-accent/20 truncate">+ PO</button>
+                        <button
+                            type="button"
+                            @click="$dispatch('wms-supplier-baru')"
+                            class="flex-1 min-w-0 px-2 sm:px-3 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 border border-black/10 dark:border-white/10 font-bold text-[11px] sm:text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                        >
+                            <span class="text-xs shrink-0">+</span>
+                            <span class="truncate">Supplier</span>
+                        </button>
+                        <button
+                            type="button"
+                            @click="$dispatch('wms-po-baru')"
+                            class="flex-1 min-w-0 px-2.5 sm:px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-[11px] sm:text-xs transition-[transform,opacity] active:scale-[0.97] min-h-[44px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap shadow-sm shadow-up-accent/20"
+                        >
+                            <span class="text-xs shrink-0">+</span>
+                            <span class="truncate">Buat PO</span>
+                        </button>
                     </div>
                     @endcan
                 @elseif($activeTab === 'grn')

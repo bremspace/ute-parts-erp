@@ -9,6 +9,7 @@ use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Services\KasSesiState;
 use App\Modules\Pos\Services\ReturnPenjualanService;
+use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Wms\Services\CycleCountService;
 use App\Modules\Wms\Services\GrnService;
@@ -146,14 +147,33 @@ class ApprovalService
             if (! $lanjut) {
                 $this->selesaikanEntity($request, $status, $actionedBy, $catatan, $options);
 
-                $this->notifikasiUser(
-                    $request->requested_by,
-                    "Approval {$request->entity_type} #{$request->entity_id} ".($status === 'disetujui' ? 'disetujui' : 'ditolak'),
-                    $status === 'disetujui'
-                        ? 'Permintaan approval Anda telah DISETUJUI.'
-                        : 'Permintaan approval Anda DITOLAK'.($catatan ? ': '.$catatan : '.'),
-                    ['approval_request_id' => $request->id]
-                );
+                $approver = User::find($actionedBy);
+                $approverName = $approver?->name ?? 'Pemilik Otoritas';
+
+                if ($request->entity_type === 'grn') {
+                    $grn = Grn::with('purchaseOrder')->find($request->entity_id);
+                    $noPo = $grn?->purchaseOrder?->no_po ?? ($request->payload_json['no_po'] ?? '-');
+                    $noGrn = $grn?->no_grn ?? ($request->payload_json['no_grn'] ?? ('#'.$request->entity_id));
+                    $pesan = $status === 'disetujui'
+                        ? "Penerimaan barang GRN {$noGrn} (PO {$noPo}) telah DISETUJUI & DISELESAIKAN oleh {$approverName}. Pembayaran kas dan persediaan telah tercatat."
+                        : "Penerimaan barang GRN {$noGrn} (PO {$noPo}) DITOLAK oleh {$approverName}".($catatan ? ': '.$catatan : '.');
+
+                    $this->notifikasiUser(
+                        $request->requested_by,
+                        "GRN {$noGrn} ".($status === 'disetujui' ? 'Selesai & Disetujui' : 'Ditolak'),
+                        $pesan,
+                        ['approval_request_id' => $request->id, 'entity_type' => 'grn', 'entity_id' => $request->entity_id]
+                    );
+                } else {
+                    $this->notifikasiUser(
+                        $request->requested_by,
+                        "Approval {$request->entity_type} #{$request->entity_id} ".($status === 'disetujui' ? 'disetujui' : 'ditolak'),
+                        $status === 'disetujui'
+                            ? 'Permintaan approval Anda telah DISETUJUI.'
+                            : 'Permintaan approval Anda DITOLAK'.($catatan ? ': '.$catatan : '.'),
+                        ['approval_request_id' => $request->id]
+                    );
+                }
             }
 
             // Otomatis selesaikan notifikasi menunggu approval untuk approver
@@ -175,7 +195,7 @@ class ApprovalService
             $grnService = app(GrnService::class);
 
             if ($status === 'disetujui') {
-                $grnService->setujuiGrn($request->entity_id, $actionedBy);
+                $grnService->setujuiGrn($request->entity_id, $actionedBy, $options);
             } else {
                 $grnService->tolakGrn($request->entity_id, $actionedBy, (string) $catatan);
             }

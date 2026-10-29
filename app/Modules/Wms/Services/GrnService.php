@@ -3,9 +3,11 @@
 namespace App\Modules\Wms\Services;
 
 use App\Models\User;
+use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Akunting\Models\JurnalHeader;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Akunting\Services\JurnalService;
+use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\PurchaseOrder;
@@ -16,7 +18,9 @@ use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokLog;
 use App\Modules\Workflow\Services\ApprovalService;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
@@ -73,8 +77,78 @@ class GrnService
     }
 
     /**
+     * Hitung saldo aktual akun kas/bank pada cabang tertentu.
+     */
+    public static function hitungSaldoKasCabang(int|string $akunIdOrKode, int $cabangId): float
+    {
+        $akun = is_numeric($akunIdOrKode)
+            ? AkunCOA::find($akunIdOrKode)
+            : AkunCOA::where('kode', $akunIdOrKode)->first();
+
+        if (! $akun) {
+            return 0.0;
+        }
+
+        $sum = DB::table('jurnal_akuntansi')
+            ->where('akun_coa_id', $akun->id)
+            ->where('cabang_id', $cabangId)
+            ->selectRaw('COALESCE(SUM(debit), 0) as total_debit, COALESCE(SUM(kredit), 0) as total_kredit')
+            ->first();
+
+        $debit = (float) ($sum->total_debit ?? 0);
+        $kredit = (float) ($sum->total_kredit ?? 0);
+
+        return round($akun->saldo_normal === 'debit' ? $debit - $kredit : $kredit - $debit, 2);
+    }
+
+    /**
+     * Dapatkan daftar akun kas/bank yang aktif dan memiliki saldo mencukupi pada cabang terkait.
+     *
+     * @return Collection<int, AkunCOA>
+     */
+    public static function getKasDenganSaldoCukup(float $nominal, int $cabangId): Collection
+    {
+        $akunList = AkunCOA::whereIn('kelompok', ['kas', 'bank'])
+            ->where('is_active', true)
+            ->orderBy('kode')
+            ->get();
+
+        $cukupList = collect();
+
+        foreach ($akunList as $akun) {
+            $saldo = static::hitungSaldoKasCabang($akun->id, $cabangId);
+            $akun->saldo_aktual = $saldo;
+
+            if ($nominal <= 0 || $saldo >= $nominal) {
+                $cukupList->push($akun);
+            }
+        }
+
+        return $cukupList;
+    }
+
+    /**
+     * Dapatkan semua akun kas/bank aktif dengan saldo aktual pada cabang terkait.
+     *
+     * @return Collection<int, AkunCOA>
+     */
+    public static function getKasDenganSaldoAktual(int $cabangId): Collection
+    {
+        $akunList = AkunCOA::whereIn('kelompok', ['kas', 'bank'])
+            ->where('is_active', true)
+            ->orderBy('kode')
+            ->get();
+
+        foreach ($akunList as $akun) {
+            $akun->saldo_aktual = static::hitungSaldoKasCabang($akun->id, $cabangId);
+        }
+
+        return $akunList;
+    }
+
+    /**
      * Cek apakah user memiliki hak akses / wewenang untuk otorisasi transaksi kas (PO tunai).
-     * Memerlukan role: super-admin, owner, admin-toko, finance, kasir, atau permission akunting.create/pos.create/approve-workflow.
+     * Memerlukan role: super-admin, owner, admin-toko, finance, atau permission akunting.create/approve-workflow.
      */
     public static function userBolehOtorisasiKas(?User $user): bool
     {
@@ -82,9 +156,8 @@ class GrnService
             return false;
         }
 
-        return $user->hasAnyRole(['super-admin', 'owner', 'admin-toko', 'finance', 'kasir'])
+        return $user->hasAnyRole(['super-admin', 'owner', 'admin-toko', 'finance'])
             || $user->can('akunting.create')
-            || $user->can('pos.create')
             || $user->can('approve-workflow');
     }
 
@@ -107,7 +180,8 @@ class GrnService
         array $itemHargaBeli = [],
         array $itemRakId = [],
         ?string $akunKasBank = null,
-        ?string $dibayarOleh = null
+        ?string $dibayarOleh = null,
+        array $itemHargaOptions = []
     ): Grn {
         $cabangId = $po->gudangTujuan?->cabang_id;
         if (! $cabangId) {
@@ -126,20 +200,17 @@ class GrnService
         $pemohon = ApprovalService::pemohon($userId ?? auth()->id());
         $userPemohon = User::find($pemohon);
 
-        if ($po->metode_bayar === 'tunai') {
-            if (! static::userBolehOtorisasiKas($userPemohon)) {
-                throw new \Exception("Pengguna {$userPemohon?->name} tidak memiliki role/hak akses untuk mengotorisasi transaksi pembayaran kas tunai PO. Memerlukan role Kasir, Finance, atau Admin Toko.");
-            }
-        }
+        $isOtoritas = static::userBolehOtorisasiKas($userPemohon);
+        $needsApprovalOtoritas = ($po->metode_bayar === 'tunai' && ! $isOtoritas);
 
         $namaPembayarOtomatis = $po->metode_bayar === 'tunai'
             ? ($userPemohon?->name ?? ($dibayarOleh ?: 'Kasir / Staf'))
             : null;
 
-        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $itemRakId, $pemohon, $cabangId, $akunKasBank, $namaPembayarOtomatis) {
+        return DB::transaction(function () use ($po, $itemReceived, $snPerProduk, $itemHargaBeli, $itemRakId, $pemohon, $cabangId, $akunKasBank, $namaPembayarOtomatis, $needsApprovalOtoritas, $userPemohon, $itemHargaOptions) {
             $itemData = [];
             $totalHpp = 0;
-            $needsApproval = false;
+            $needsApproval = $needsApprovalOtoritas;
 
             foreach ($po->items as $poItem) {
                 $kodeProduk = $poItem->produk_id;
@@ -183,6 +254,8 @@ class GrnService
                     $rakId = $this->resolveDefaultRakId((int) $kodeProduk, (int) $po->gudang_tujuan_id, $poItem->sku_variant_id);
                 }
 
+                $opts = $itemHargaOptions[$kunci] ?? $itemHargaOptions[$kodeProduk] ?? [];
+
                 $itemData[] = [
                     'produk_id' => $kodeProduk,
                     'produk_nama' => $poItem->produk?->nama ?? ('Produk #'.$kodeProduk),
@@ -197,6 +270,9 @@ class GrnService
                     'status' => $status,
                     'sn' => $snList, // [F2-3] disimpan utk finalisasi (auto & approval)
                     'rak_id' => $rakId,
+                    'opsi_harga_beli' => $opts['opsi_harga_beli'] ?? null,
+                    'skema_harga_jual' => $opts['skema_harga_jual'] ?? null,
+                    'nilai_jual_atau_margin' => $opts['nilai_jual_atau_margin'] ?? null,
                 ];
 
                 $totalHpp += $receivedQty * $hargaBeliAktual;
@@ -231,14 +307,20 @@ class GrnService
                         'amount' => $totalHpp,
                         'no_grn' => $grn->no_grn,
                         'po_id' => $po->id,
+                        'no_po' => $po->no_po,
+                        'supplier_nama' => $po->supplier?->nama,
                         'cabang_id' => $cabangId,
+                        'is_tunai' => $po->metode_bayar === 'tunai',
+                        'akun_kas_bank' => $akunKasBank ?: $po->akun_kas_bank,
+                        'petugas_penerima_id' => $pemohon,
+                        'petugas_nama' => $userPemohon?->name ?? 'Petugas Penerima',
                         'item_data' => json_encode($itemData),
                     ],
                     $pemohon
                 );
             }
 
-            // Qty sesuai ATAU rule approval tidak ada/disabled → finalisasi sekarang
+            // Qty sesuai & otoritas kas memadai ATAU rule approval tidak ada/disabled → finalisasi sekarang
             if (! $needsApproval || $approval === null) {
                 $this->selesaikanGrn($grn, $pemohon, $needsApproval ? 'tanpa rule approval' : 'qty sesuai');
             }
@@ -254,15 +336,21 @@ class GrnService
      * menggandakan jurnal + stok masuk. Lock + re-check status di dalam
      * transaksi membuat yang kedua melihat 'terima' → no-op.
      */
-    public function setujuiGrn(int $grnId, ?int $actionedBy): Grn
+    public function setujuiGrn(int $grnId, ?int $actionedBy, array $options = []): Grn
     {
-        return DB::transaction(function () use ($grnId, $actionedBy) {
+        return DB::transaction(function () use ($grnId, $actionedBy, $options) {
             $grn = Grn::whereKey($grnId)->lockForUpdate()->firstOrFail();
+
+            if (! empty($options['akun_kas_bank'])) {
+                $grn->akun_kas_bank = $options['akun_kas_bank'];
+                $grn->save();
+            }
 
             $this->selesaikanGrn(
                 $grn,
                 $actionedBy ?? ApprovalService::pemohon(),
-                'disetujui via approval'
+                'disetujui via approval',
+                $options
             );
 
             return $grn->fresh();
@@ -295,7 +383,7 @@ class GrnService
      * di-lock di sini (bukan cuma di setujuiGrn) supaya jalur auto-finalize
      * inputGudang pun ikut terlindungi.
      */
-    protected function selesaikanGrn(Grn $grn, ?int $actionedBy, string $keterangan): void
+    protected function selesaikanGrn(Grn $grn, ?int $actionedBy, string $keterangan, array $options = []): void
     {
         // Instance yang dipanggil caller (dikembalikan inputGudang) — status di
         // sana bisa basi, jadi semua operasi memakai salinan hasil lockForUpdate.
@@ -351,9 +439,35 @@ class GrnService
         }
 
         $isKredit = ($po?->metode_bayar ?? 'kredit') === 'kredit';
-        $akunKas = $grn->akun_kas_bank ?: ($po?->akun_kas_bank ?: '110-01');
+        $akunKas = $options['akun_kas_bank'] ?? $grn->akun_kas_bank ?: ($po?->akun_kas_bank ?: '110-01');
         $dibayarOleh = $grn->dibayar_oleh ?: (User::find($actionedBy)?->name ?? 'Kasir / Staf');
         $akunKredit = $isKredit ? '210-01' : $akunKas;
+
+        // Validasi saldo kas untuk PO Tunai
+        if (! $isKredit && $totalHpp > 0) {
+            $saldoKas = static::hitungSaldoKasCabang($akunKas, (int) $grn->cabang_id);
+            if ($saldoKas < $totalHpp) {
+                $hasMutasi = DB::table('jurnal_akuntansi')
+                    ->where('cabang_id', $grn->cabang_id)
+                    ->whereExists(function ($q) use ($akunKas) {
+                        $q->select(DB::raw(1))
+                            ->from('akun_coa')
+                            ->whereColumn('akun_coa.id', 'jurnal_akuntansi.akun_coa_id')
+                            ->where('akun_coa.kode', $akunKas);
+                    })
+                    ->exists();
+
+                if ($hasMutasi) {
+                    throw new \Exception("Saldo kas {$akunKas} tidak mencukupi untuk pembayaran PO tunai (Saldo: Rp ".number_format($saldoKas, 0, ',', '.').', Dibutuhkan: Rp '.number_format($totalHpp, 0, ',', '.').')');
+                }
+            }
+        }
+
+        // [KAS-LACI] Jika pembayaran PO tunai diarahkan ke Kas Laci (110-04),
+        // otomatis catat pengeluaran kas laci kasir agar saldo fisik & sistem klop dan mudah diaudit.
+        if (! $isKredit && $akunKas === '110-04' && Schema::hasTable('kas_mutasi_laci')) {
+            $this->catatPengeluaranKasLaci($grn, $po, $totalHpp, $actionedBy);
+        }
 
         if ($totalHpp > 0) {
             $keteranganJurnal = $isKredit
@@ -426,10 +540,17 @@ class GrnService
             }
 
             if ($this->produkService) {
-                $this->produkService->sesuaikanHargaBeliAverage(
+                $opsiMetode = $item['opsi_harga_beli'] ?? null;
+                $skemaJual = $item['skema_harga_jual'] ?? null;
+                $nilaiJualAtauMargin = isset($item['nilai_jual_atau_margin']) ? (float) $item['nilai_jual_atau_margin'] : null;
+
+                $this->produkService->sesuaikanHargaBeliProduk(
                     $produkId,
                     $qtyDasar,
-                    $hargaBeliPerBase
+                    $hargaBeliPerBase,
+                    $opsiMetode,
+                    $skemaJual,
+                    $nilaiJualAtauMargin
                 );
             }
         }
@@ -460,6 +581,95 @@ class GrnService
      * Catat subledger Utang (AP) untuk PO yang baru diterima via GRN.
      *
      * - Mencerminkan jurnal 210-01 yang baru diposting di selesaikanGrn —
+     *   TANPA posting jurnal kedua (murni baris subledger).
+     * - Idempoten: kunci (referensi_tipe = PurchaseOrder::class, referensi_id = po_id)
+     *   — satu baris Utang per PO; dobel finalize (auto qty-sesuai + approve path)
+     *   atau row legacy dari PurchaseOrderService::terimaBarang → no-op.
+     * - Kunci ini juga yang dibaca PurchaseOrderService::bayarPO utk mengurangi
+     *   jumlah_dibayar / status — sehingga pembayaran PO menekan Utang ini.
+    /**
+     * Catat pengeluaran kas laci kasir otomatis di kas_mutasi_laci saat GRN PO Tunai
+     * diarahkan ke akun Kas Laci (110-04).
+     */
+    protected function catatPengeluaranKasLaci(Grn $grn, ?PurchaseOrder $po, float $totalHpp, ?int $actionedBy): void
+    {
+        if ($totalHpp <= 0 || ! Schema::hasTable('kas_mutasi_laci')) {
+            return;
+        }
+
+        // Cari sesi kas terbuka di cabang terkait
+        // Prioritas 1: Sesi kas terbuka milik pembuat GRN (kasir penerima barang)
+        $sesi = DB::table('kas_sesi')
+            ->where('cabang_id', $grn->cabang_id)
+            ->where('status', 'buka')
+            ->where('user_id', $grn->user_id)
+            ->latest('id')
+            ->first();
+
+        // Prioritas 2: Sesi kas terbuka apapun di cabang tersebut
+        if (! $sesi) {
+            $sesi = DB::table('kas_sesi')
+                ->where('cabang_id', $grn->cabang_id)
+                ->where('status', 'buka')
+                ->latest('id')
+                ->first();
+        }
+
+        if (! $sesi) {
+            return; // Tidak ada sesi kas laci terbuka
+        }
+
+        $noPo = $po?->no_po ?? '-';
+        $kasirId = $sesi->user_id ?? $grn->user_id;
+
+        // Idempoten: Cek apakah sudah pernah dicatat di kas_mutasi_laci untuk GRN ini
+        $exists = DB::table('kas_mutasi_laci')
+            ->where('kas_sesi_id', $sesi->id)
+            ->where('no_jurnal', $grn->no_grn)
+            ->where('jenis', 'keluar')
+            ->exists();
+
+        if (! $exists) {
+            DB::table('kas_mutasi_laci')->insert([
+                'kas_sesi_id' => $sesi->id,
+                'cabang_id' => $grn->cabang_id,
+                'user_id' => $kasirId,
+                'jenis' => 'keluar',
+                'nominal' => $totalHpp,
+                'akun_lawan_kode' => '130-01',
+                'keterangan' => "Pengeluaran Kas Laci untuk Pembayaran GRN {$grn->no_grn} (PO {$noPo})",
+                'no_jurnal' => $grn->no_grn,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Kirim notifikasi audit ke kasir terkait pemotongan saldo laci
+            try {
+                app(NotificationService::class)->kirim(
+                    'inapp',
+                    User::find($kasirId)?->email ?? 'kasir@cabang.local',
+                    "Pengeluaran Kas Laci: GRN {$grn->no_grn}",
+                    'Uang tunai Rp '.number_format($totalHpp, 0, ',', '.')." telah otomatis dikeluarkan dari laci kasir untuk pembayaran GRN {$grn->no_grn} (PO {$noPo}). Tercatat pada sesi kas #{$sesi->id}.",
+                    [
+                        'grn_id' => $grn->id,
+                        'no_grn' => $grn->no_grn,
+                        'kas_sesi_id' => $sesi->id,
+                        'nominal' => $totalHpp,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Gagal kirim notifikasi pengeluaran kas laci: '.$e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Catat Utang (AP) dari GRN kredit.
+     *
+     * Kontrak:
+     * - Jurnal Utang Usaha (Kredit 210-01) SUDAH dicatat di JurnalService; method ini
+     *   hanya membuat baris model Utang agar modul Akunting/UtangTab bisa melacak
+     *   jatuh tempo + pelunasan bertahap (PurchaseOrderService::bayarPO)
      *   TANPA posting jurnal kedua (murni baris subledger).
      * - Idempoten: kunci (referensi_tipe = PurchaseOrder::class, referensi_id = po_id)
      *   — satu baris Utang per PO; dobel finalize (auto qty-sesuai + approve path)

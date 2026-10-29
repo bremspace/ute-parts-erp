@@ -3,16 +3,27 @@
         <div class="space-y-5">
             <!-- Action Toolbar PO & WMS Procurement -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                <div>
+                <div class="space-y-0.5">
                     <h3 class="text-sm font-bold text-white tracking-wide">Daftar Purchase Order (PO)</h3>
                     <p class="text-xs text-ink-400">Pengadaan barang ke supplier dengan tracking harga otomatis &amp; strategi reorder ABC</p>
                 </div>
-                <div class="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-                    <button wire:click="openProcurementModal" wire:loading.attr="disabled" class="flex-1 sm:flex-initial justify-center px-3 sm:px-3.5 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97] min-h-[40px] whitespace-nowrap" title="Rekomendasi Pengadaan Berdasarkan Stok & Demand">
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                        type="button"
+                        wire:click="openProcurementModal"
+                        wire:loading.attr="disabled"
+                        class="flex-1 sm:flex-initial justify-center px-3 sm:px-3.5 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition active:scale-[0.97] min-h-[44px] whitespace-nowrap"
+                        title="Rekomendasi Pengadaan Berdasarkan Stok & Demand"
+                    >
                         <span>📊</span>
                         <span class="inline">Rekomendasi PO</span>
                     </button>
-                    <button wire:click="openPoModal" wire:loading.attr="disabled" class="flex-1 sm:flex-initial justify-center px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.97] min-h-[40px] whitespace-nowrap">
+                    <button
+                        type="button"
+                        wire:click="openPoModal"
+                        wire:loading.attr="disabled"
+                        class="flex-1 sm:flex-initial justify-center px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary-dark text-white font-bold text-xs shadow-md shadow-up-primary/25 cursor-pointer transition active:scale-[0.97] min-h-[44px] whitespace-nowrap"
+                    >
                         + Buat PO
                     </button>
                 </div>
@@ -169,7 +180,7 @@
         <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4">
             <div class="w-full max-w-3xl glass-panel rounded-t-3xl sm:rounded-3xl flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl border border-white/10">
                 <!-- Header Modal -->
-                <div class="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-white/10 shrink-0 bg-ink-950/60 backdrop-blur-sm">
+                <div class="flex items-center justify-between px-3.5 sm:px-6 py-3.5 sm:py-4 border-b border-white/10 shrink-0 bg-ink-950/60 backdrop-blur-sm">
                     <div>
                         <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                             <span>Buat Purchase Order (PO)</span>
@@ -183,7 +194,21 @@
                 </div>
 
                 <!-- Body Modal (Scrollable) -->
-                <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                <div class="px-3 sm:px-6 py-4 overflow-y-auto flex-1 space-y-4 max-w-full">
+                    @if($errors->any())
+                        <div class="p-3 rounded-xl bg-up-red/15 border border-up-red/40 text-xs text-up-red space-y-1">
+                            <div class="font-bold flex items-center gap-1.5">
+                                <span>⚠️</span>
+                                <span>Data PO Belum Lengkap / Tidak Valid:</span>
+                            </div>
+                            <ul class="list-disc list-inside text-[11px] space-y-0.5 text-ink-200">
+                                @foreach($errors->all() as $err)
+                                    <li>{{ $err }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     <!-- Informasi Utama PO -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         <div>
@@ -193,12 +218,13 @@
                                     <span>+ Supplier Baru</span>
                                 </button>
                             </div>
-                            <select wire:model="poForm.supplier_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
+                            <select wire:model.live="poForm.supplier_id" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-medium min-h-[44px]">
                                 <option value="" class="bg-ink-900">— Pilih Supplier Terdaftar —</option>
                                 @foreach($suppliers as $sp)
                                     <option value="{{ $sp->id }}" class="bg-ink-900">{{ $sp->nama }} {{ $sp->telepon ? '('.$sp->telepon.')' : '' }}</option>
                                 @endforeach
                             </select>
+                            @error('poForm.supplier_id') <span class="text-up-red text-[10px] block mt-1 font-medium">{{ $message }}</span> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink-300 mb-1.5">Gudang Tujuan *</label>
@@ -208,6 +234,7 @@
                                     <option value="{{ $g->id }}" class="bg-ink-900">{{ $g->nama }}</option>
                                 @endforeach
                             </select>
+                            @error('poForm.gudang_tujuan_id') <span class="text-up-red text-[10px] block mt-1 font-medium">{{ $message }}</span> @enderror
                         </div>
                     </div>
 
@@ -218,6 +245,7 @@
                                 <option value="kredit" class="bg-ink-900">Kredit / Termin Utang</option>
                                 <option value="tunai" class="bg-ink-900">Tunai Langsung</option>
                             </select>
+                            @error('poForm.metode_bayar') <span class="text-up-red text-[10px] block mt-1 font-medium">{{ $message }}</span> @enderror
                         </div>
                         @if(($poForm['metode_bayar'] ?? 'kredit') === 'tunai')
                             <div>
@@ -230,9 +258,17 @@
                             </div>
                         @else
                             <div>
-                                <label class="block text-xs font-semibold text-ink-300 mb-1.5">Jatuh Tempo (opsional)</label>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <label class="text-xs font-semibold text-ink-300">Jatuh Tempo *</label>
+                                    @php
+                                        $selectedSupplier = !empty($poForm['supplier_id']) ? $suppliers->firstWhere('id', (int) $poForm['supplier_id']) : null;
+                                    @endphp
+                                    @if($selectedSupplier)
+                                        <span class="text-[10px] text-up-mint font-medium">Termin: {{ $selectedSupplier->termin_hari ?: 30 }} hari</span>
+                                    @endif
+                                </div>
                                 <input type="date" wire:model="poForm.jatuh_tempo" class="w-full px-3 py-2.5 rounded-xl glass-input text-xs min-h-[44px]" />
-                                <p class="text-[9px] text-ink-500 mt-1">Kosongkan jika mengikuti termin default supplier</p>
+                                <p class="text-[9px] text-ink-400 mt-1">Otomatis terisi sesuai termin supplier. Dapat disesuaikan bila ada kesepakatan khusus.</p>
                             </div>
                         @endif
                     </div>
@@ -241,7 +277,7 @@
                     <div class="pt-2 border-t border-white/5">
                         <div class="flex items-center justify-between mb-2.5">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-bold text-white uppercase tracking-wider">Item Barang</span>
+                                <span class="text-xs font-bold text-white uppercase tracking-wider">Item Barang *</span>
                                 <span class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-ink-300 font-bold tabular-nums">
                                     {{ count($poForm['items'] ?? []) }} Item
                                 </span>
@@ -250,6 +286,7 @@
                                 <span>+ Tambah Baris</span>
                             </button>
                         </div>
+                        @error('poForm.items') <div class="text-up-red text-xs font-semibold mb-2">{{ $message }}</div> @enderror
 
                         <!-- Cards Item List -->
                         <div class="space-y-3">
@@ -294,6 +331,7 @@
                                             ✕
                                         </button>
                                     </div>
+                                    @error("poForm.items.{$idx}.produk_id") <span class="text-up-red text-[10px] block font-medium">{{ $message }}</span> @enderror
 
                                     <!-- Baris 2: Grid Input Qty, Satuan, Harga Beli -->
                                     <div class="grid grid-cols-12 gap-2 sm:gap-3 items-end">
@@ -305,6 +343,7 @@
                                                    min="1"
                                                    class="w-full px-2.5 py-2 rounded-xl glass-input text-xs font-bold text-center tabular-nums min-h-[44px]"
                                                    placeholder="1" />
+                                            @error("poForm.items.{$idx}.jumlah") <span class="text-up-red text-[9px] block mt-0.5">{{ $message }}</span> @enderror
                                         </div>
                                         <div class="col-span-8 sm:col-span-3">
                                             <label class="block text-[10px] font-semibold text-ink-400 mb-1">Satuan</label>
@@ -332,6 +371,7 @@
                                                        wire:model="poForm.items.{{ $idx }}.harga_beli"
                                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs tabular-nums font-semibold min-h-[44px]"
                                                        placeholder="Harga Beli" />
+                                                @error("poForm.items.{$idx}.harga_beli") <span class="text-up-red text-[9px] block mt-0.5">{{ $message }}</span> @enderror
                                             @cannotsee('harga_beli')
                                                 <input type="text"
                                                        class="w-full px-3 py-2 rounded-xl glass-input text-xs tabular-nums text-ink-500 bg-white/5 border border-white/5 cursor-not-allowed min-h-[44px]"
@@ -521,34 +561,34 @@
 
     <!-- MODAL: DETAIL PURCHASE ORDER (AUDIT & RINCIAN) -->
     @if($detailPo)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
-            <div class="w-full max-w-3xl glass-panel p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-y-auto">
+            <div class="w-full max-w-3xl glass-panel p-4 sm:p-7 rounded-t-3xl sm:rounded-3xl relative my-0 sm:my-auto max-h-[92vh] sm:max-h-[90vh] flex flex-col border border-white/10 shadow-2xl">
                 <!-- Header -->
-                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+                <div class="flex items-start sm:items-center justify-between pb-3 sm:pb-4 border-b border-white/10 gap-2 sm:gap-3 shrink-0">
                     <div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                             <h3 class="text-base sm:text-lg font-bold text-white font-mono tracking-wide">{{ $detailPo->no_po }}</h3>
                             <x-prism.status-pill :status="str_replace('_','-',$detailPo->status)" size="sm" />
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $detailPo->metode_bayar === 'kredit' ? 'bg-up-amber/10 text-up-amber' : 'bg-up-mint/10 text-up-mint' }}">
                                 {{ strtoupper($detailPo->metode_bayar) }}
                             </span>
                         </div>
-                        <p class="text-xs text-ink-400 mt-1">
+                        <p class="text-[11px] sm:text-xs text-ink-400 mt-1">
                             Dibuat: {{ $detailPo->created_at->format('d/m/Y H:i') }} · 
                             @if($detailPo->metode_bayar === 'tunai')
-                                Pembayaran: <span class="text-up-mint font-semibold">Tunai Langsung (Tanpa Jatuh Tempo)</span>
+                                Pembayaran: <span class="text-up-mint font-semibold">Tunai Langsung</span>
                             @else
                                 Jatuh Tempo: {{ $detailPo->jatuh_tempo?->format('d/m/Y') ?? '-' }}
                             @endif
                         </p>
                     </div>
-                    <button wire:click="tutupDetailPo" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                    <button wire:click="tutupDetailPo" class="p-2 text-ink-400 hover:text-white rounded-xl hover:bg-white/5 transition-colors cursor-pointer shrink-0">
                         ✕
                     </button>
                 </div>
 
                 <!-- Info Grid -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 my-3 sm:my-4 text-xs shrink-0">
                     <div class="p-3 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1">
                         <span class="text-[10px] text-ink-400 block font-semibold uppercase">Supplier</span>
                         <div class="font-bold text-white">{{ $detailPo->supplier?->nama ?? '-' }}</div>
@@ -566,10 +606,10 @@
                 </div>
 
                 <!-- Line Items Table -->
-                <div class="space-y-2 mb-4 flex-1 overflow-y-auto">
+                <div class="space-y-2 mb-3 sm:mb-4 flex-1 overflow-y-auto">
                     <h4 class="text-xs font-bold text-ink-300 uppercase tracking-wider">Item Pembelian</h4>
-                    <div class="rounded-xl border border-white/5 overflow-hidden">
-                        <table class="w-full text-left text-xs">
+                    <div class="rounded-xl border border-white/5 overflow-x-auto">
+                        <table class="w-full text-left text-xs min-w-[500px]">
                             <thead class="bg-white/5 text-ink-400 font-semibold border-b border-white/5">
                                 <tr>
                                     <th class="py-2.5 px-3">Produk</th>
@@ -615,27 +655,27 @@
                 </div>
 
                 <!-- Financial Summary Cards -->
-                <div class="grid grid-cols-3 gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 text-xs mb-4">
+                <div class="grid grid-cols-1 xs:grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 text-xs mb-3 sm:mb-4 shrink-0">
                     <div>
-                        <span class="text-[10px] text-ink-400 block">Total Nilai PO</span>
-                        <span class="text-sm font-bold text-white tabular-nums">Rp {{ number_format((float) $detailPo->total, 0, ',', '.') }}</span>
+                        <span class="text-[10px] text-ink-400 block truncate">Total Nilai PO</span>
+                        <span class="text-sm sm:text-base font-bold text-white tabular-nums truncate block">Rp {{ number_format((float) $detailPo->total, 0, ',', '.') }}</span>
                     </div>
                     <div>
-                        <span class="text-[10px] text-ink-400 block">Total Dibayar</span>
-                        <span class="text-sm font-bold text-up-mint tabular-nums">Rp {{ number_format((float) $detailPo->total_dibayar, 0, ',', '.') }}</span>
+                        <span class="text-[10px] text-ink-400 block truncate">Total Dibayar</span>
+                        <span class="text-sm sm:text-base font-bold text-up-mint tabular-nums truncate block">Rp {{ number_format((float) $detailPo->total_dibayar, 0, ',', '.') }}</span>
                     </div>
                     <div>
-                        <span class="text-[10px] text-ink-400 block">Sisa Utang</span>
-                        <span class="text-sm font-bold text-up-amber tabular-nums">Rp {{ number_format((float) $detailPo->sisa, 0, ',', '.') }}</span>
+                        <span class="text-[10px] text-ink-400 block truncate">Sisa Utang</span>
+                        <span class="text-sm sm:text-base font-bold text-up-amber tabular-nums truncate block">Rp {{ number_format((float) $detailPo->sisa, 0, ',', '.') }}</span>
                     </div>
                 </div>
 
                 <!-- Riwayat Pembayaran Supplier (Audited) -->
-                <div class="space-y-2 mb-2">
+                <div class="space-y-2 mb-2 shrink-0">
                     <h4 class="text-xs font-bold text-ink-300 uppercase tracking-wider">Riwayat Pembayaran Supplier (Audited)</h4>
                     @if($detailPo->pembayaran->isNotEmpty())
-                        <div class="rounded-xl border border-white/5 overflow-hidden">
-                            <table class="w-full text-left text-xs">
+                        <div class="rounded-xl border border-white/5 overflow-x-auto max-h-[25vh] overflow-y-auto">
+                            <table class="w-full text-left text-xs min-w-[420px]">
                                 <thead class="bg-white/5 text-ink-400 font-semibold border-b border-white/5">
                                     <tr>
                                         <th class="py-2 px-3">Tanggal</th>
@@ -657,20 +697,32 @@
                             </table>
                         </div>
                     @else
-                        <p class="text-xs text-ink-500 py-2">Belum ada riwayat pembayaran untuk PO ini.</p>
+                        <p class="text-xs text-ink-500 py-1.5">Belum ada riwayat pembayaran untuk PO ini.</p>
                     @endif
                 </div>
 
                 <!-- Footer Actions -->
-                <div class="flex items-center justify-between pt-4 border-t border-white/10 mt-2">
-                    <button wire:click="tutupDetailPo" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
-                        Tutup
-                    </button>
+                <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between pt-3.5 sm:pt-4 border-t border-white/10 mt-2 gap-2 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <button wire:click="tutupDetailPo" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-ink-300 font-semibold text-xs cursor-pointer min-h-[44px]">
+                            Tutup
+                        </button>
+                        @if(in_array($detailPo->status, ['draft', 'dikirim'], true))
+                            <button
+                                type="button"
+                                wire:click="batalkanPo({{ $detailPo->id }}, 'Dibatalkan dari modal detail PO'); tutupDetailPo();"
+                                wire:confirm="Yakin ingin membatalkan Purchase Order {{ $detailPo->no_po }}?"
+                                class="flex-1 sm:flex-none px-3 py-2.5 rounded-xl bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/20 font-bold text-xs cursor-pointer min-h-[44px] transition active:scale-[0.97]"
+                            >
+                                ✕ Batalkan PO
+                            </button>
+                        @endif
+                    </div>
                     @if($detailPo->status === 'diterima' && $detailPo->sisa > 0)
                         @if(auth()->user()?->can('utang.manage') || auth()->user()?->can('akunting.create'))
                             <button
                                 wire:click="tutupDetailPo; bukaBayarPo({{ $detailPo->id }})"
-                                class="px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-accent/25 active:scale-[0.97]"
+                                class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-accent hover:opacity-90 text-white font-bold text-xs cursor-pointer min-h-[44px] shadow-lg shadow-up-accent/25 active:scale-[0.97]"
                             >
                                 Bayar PO Ini (Sisa Rp {{ number_format($detailPo->sisa, 0, ',', '.') }})
                             </button>
@@ -683,57 +735,57 @@
 
     <!-- MODAL: REKOMENDASI PENGADAAN (ABC, ROP, MIN-MAX, MODIFIED JIT) -->
     @if($showProcurementModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
-            <div class="w-full max-w-5xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-5 sm:p-7 rounded-3xl relative my-auto max-h-[90vh] flex flex-col border border-black/10 dark:border-white/10 shadow-2xl">
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-y-auto">
+            <div class="w-full max-w-5xl glass-panel bg-white/95 dark:bg-ink-950/95 text-ink-900 dark:text-ink-100 p-3.5 sm:p-6 rounded-t-3xl sm:rounded-3xl relative my-0 sm:my-auto max-h-[92vh] sm:max-h-[90vh] flex flex-col border border-black/10 dark:border-white/10 shadow-2xl">
                 <!-- Header Modal -->
-                <div class="flex items-start sm:items-center justify-between pb-4 border-b border-black/10 dark:border-white/10 gap-3">
+                <div class="flex items-start sm:items-center justify-between pb-3 sm:pb-4 border-b border-black/10 dark:border-white/10 gap-2.5 shrink-0">
                     <div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xl">📦</span>
-                            <h3 class="text-lg font-bold text-ink-900 dark:text-white tracking-wide">Rekomendasi Pengadaan Stok (WMS)</h3>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30">
-                                ROP • Min-Max • JIT Demand
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                            <span class="text-lg sm:text-xl">📦</span>
+                            <h3 class="text-base sm:text-lg font-bold text-ink-900 dark:text-white tracking-wide">Rekomendasi Pengadaan (WMS)</h3>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary border border-up-primary/30 whitespace-nowrap">
+                                ROP • Min-Max • JIT
                             </span>
                         </div>
-                        <p class="text-xs text-ink-500 dark:text-ink-400 mt-1">
-                            Rekomendasi terarah &amp; akurat berdasarkan titik pesan kembali (ROP), batas aman min-max, dan kebutuhan servis aktif.
+                        <p class="text-[11px] sm:text-xs text-ink-500 dark:text-ink-400 mt-1">
+                            Rekomendasi otomatis titik pesan kembali (ROP), batas aman min-max, dan demand servis aktif.
                         </p>
                     </div>
-                    <button wire:click="closeProcurementModal" class="p-2 text-ink-400 hover:text-ink-900 dark:hover:text-white rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-base font-bold">
+                    <button wire:click="closeProcurementModal" class="p-2 text-ink-400 hover:text-ink-900 dark:hover:text-white rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-base font-bold shrink-0">
                         ✕
                     </button>
                 </div>
 
                 <!-- KPI & Metric Cards -->
                 @if($procurementSummary)
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
-                        <div class="p-3.5 rounded-2xl bg-up-accent/10 border border-up-accent/25">
-                            <span class="text-[11px] font-semibold text-up-accent block">Perlu Order (Restock)</span>
-                            <span class="text-xl font-black text-up-accent tabular-nums">{{ number_format($procurementSummary['total_needs_order']) }} SKU</span>
-                            <span class="text-[10px] text-ink-400 block mt-0.5">dari total {{ number_format($procurementSummary['total_sku']) }} SKU aktif</span>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 my-3 sm:my-4 shrink-0">
+                        <div class="p-2.5 sm:p-3.5 rounded-2xl bg-up-accent/10 border border-up-accent/25">
+                            <span class="text-[10px] sm:text-[11px] font-semibold text-up-accent block truncate">Perlu Order</span>
+                            <span class="text-base sm:text-xl font-black text-up-accent tabular-nums">{{ number_format($procurementSummary['total_needs_order']) }} SKU</span>
+                            <span class="text-[9px] sm:text-[10px] text-ink-400 block mt-0.5 truncate">dari {{ number_format($procurementSummary['total_sku']) }} SKU aktif</span>
                         </div>
-                        <div class="p-3.5 rounded-2xl bg-up-red/10 border border-up-red/25">
-                            <span class="text-[11px] font-semibold text-up-red block">🔴 Kritis (Kosong / Defisit)</span>
-                            <span class="text-xl font-black text-up-red tabular-nums">{{ number_format($procurementSummary['kritis_count'] ?? 0) }} SKU</span>
-                            <span class="text-[10px] text-ink-400 block mt-0.5">stok 0 atau pesanan servis</span>
+                        <div class="p-2.5 sm:p-3.5 rounded-2xl bg-up-red/10 border border-up-red/25">
+                            <span class="text-[10px] sm:text-[11px] font-semibold text-up-red block truncate">🔴 Kritis (Kosong)</span>
+                            <span class="text-base sm:text-xl font-black text-up-red tabular-nums">{{ number_format($procurementSummary['kritis_count'] ?? 0) }} SKU</span>
+                            <span class="text-[9px] sm:text-[10px] text-ink-400 block mt-0.5 truncate">stok 0 / servis</span>
                         </div>
-                        <div class="p-3.5 rounded-2xl bg-up-primary/10 border border-up-primary/25">
-                            <span class="text-[11px] font-semibold text-up-primary block">🟡 Fast Moving (ROP)</span>
-                            <span class="text-xl font-black text-up-primary tabular-nums">{{ number_format($procurementSummary['rop_count'] ?? 0) }} SKU</span>
-                            <span class="text-[10px] text-ink-400 block mt-0.5">stok di bawah reorder point</span>
+                        <div class="p-2.5 sm:p-3.5 rounded-2xl bg-up-primary/10 border border-up-primary/25">
+                            <span class="text-[10px] sm:text-[11px] font-semibold text-up-primary block truncate">🟡 Fast Moving</span>
+                            <span class="text-base sm:text-xl font-black text-up-primary tabular-nums">{{ number_format($procurementSummary['rop_count'] ?? 0) }} SKU</span>
+                            <span class="text-[9px] sm:text-[10px] text-ink-400 block mt-0.5 truncate">di bawah ROP</span>
                         </div>
-                        <div class="p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/25">
-                            <span class="text-[11px] font-semibold text-up-mint block">Estimasi Total Biaya</span>
-                            <span class="text-lg font-bold text-up-mint tabular-nums">Rp {{ number_format($procurementSummary['total_estimasi_biaya'], 0, ',', '.') }}</span>
-                            <span class="text-[10px] text-ink-400 block mt-0.5">harga beli supplier terakhir</span>
+                        <div class="p-2.5 sm:p-3.5 rounded-2xl bg-up-mint/10 border border-up-mint/25">
+                            <span class="text-[10px] sm:text-[11px] font-semibold text-up-mint block truncate">Estimasi Biaya</span>
+                            <span class="text-sm sm:text-lg font-bold text-up-mint tabular-nums truncate block">Rp {{ number_format($procurementSummary['total_estimasi_biaya'], 0, ',', '.') }}</span>
+                            <span class="text-[9px] sm:text-[10px] text-ink-400 block mt-0.5 truncate">supplier terakhir</span>
                         </div>
                     </div>
                 @endif
 
                 <!-- Filter Bar Ringkas & Terarah -->
-                <div class="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-black/30 border border-white/5 mb-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <select wire:model.live="procurementFilter.urgensi" class="px-3 py-1.5 rounded-xl glass-input text-xs font-semibold">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:p-3 rounded-2xl bg-black/30 border border-white/5 mb-3 shrink-0">
+                    <div class="flex flex-col xs:flex-row flex-wrap items-stretch xs:items-center gap-1.5 sm:gap-2">
+                        <select wire:model.live="procurementFilter.urgensi" class="px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl glass-input text-xs font-semibold min-h-[40px]">
                             <option value="" class="bg-ink-900">Semua Tingkat Urgensi</option>
                             <option value="KRITIS_KOSONG" class="bg-ink-900">🔴 Stok Kosong (Stockout)</option>
                             <option value="KRITIS_DEMAND" class="bg-ink-900">🔴 Defisit Pesanan Servis (JIT)</option>
@@ -741,27 +793,27 @@
                             <option value="MIN_STOCK_BREACH" class="bg-ink-900">🔵 Min Stock (Kelas B/C)</option>
                         </select>
 
-                        <select wire:model.live="procurementFilter.abc_class" class="px-3 py-1.5 rounded-xl glass-input text-xs font-semibold">
+                        <select wire:model.live="procurementFilter.abc_class" class="px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl glass-input text-xs font-semibold min-h-[40px]">
                             <option value="" class="bg-ink-900">Semua Kelas ABC</option>
                             <option value="A" class="bg-ink-900">Kelas A (Fast Moving)</option>
                             <option value="B" class="bg-ink-900">Kelas B (Normal)</option>
                             <option value="C" class="bg-ink-900">Kelas C (Slow Moving)</option>
                         </select>
 
-                        <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-ink-200 cursor-pointer">
+                        <label class="inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-ink-200 cursor-pointer min-h-[40px]">
                             <input type="checkbox" wire:model.live="procurementFilter.only_reorder" class="rounded bg-black/40 border-white/20 text-up-accent focus:ring-0">
-                            <span>Hanya yang butuh order</span>
+                            <span>Butuh Order</span>
                         </label>
                     </div>
 
                     <div class="w-full sm:w-56">
-                        <input type="text" wire:model.live.debounce.300ms="procurementFilter.search" placeholder="Cari produk / barcode..." class="w-full px-3 py-1.5 rounded-xl glass-input text-xs" />
+                        <input type="text" wire:model.live.debounce.300ms="procurementFilter.search" placeholder="Cari produk / barcode..." class="w-full px-3 py-2 sm:py-1.5 rounded-xl glass-input text-xs min-h-[40px]" />
                     </div>
                 </div>
 
-                <!-- Table Content (Scrollable) -->
-                <div class="overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[48vh]">
-                    <table class="w-full text-left border-collapse text-xs">
+                <!-- Table Content (Scrollable with safe horizontal overflow) -->
+                <div class="overflow-x-auto overflow-y-auto flex-1 rounded-2xl border border-white/5 max-h-[46vh] w-full">
+                    <table class="w-full text-left border-collapse text-xs min-w-[640px]">
                         <thead class="sticky top-0 bg-ink-950/95 backdrop-blur-sm z-10 border-b border-white/10">
                             <tr class="text-ink-400 font-semibold text-[11px] uppercase tracking-wider">
                                 <th class="py-2.5 px-3.5">Produk &amp; Urgensi</th>
@@ -875,21 +927,21 @@
                 </div>
 
                 <!-- Footer Modal -->
-                <div class="flex flex-wrap items-center justify-between pt-4 border-t border-black/10 dark:border-white/10 mt-3 gap-2">
-                    <span class="text-[11px] text-ink-500">
-                        Formula ROP &amp; Min-Max disesuaikan otomatis dengan riwayat penjualan kasir &amp; pesanan servis aktif.
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3.5 border-t border-black/10 dark:border-white/10 mt-3 gap-2.5 shrink-0">
+                    <span class="text-[11px] text-ink-500 dark:text-ink-400">
+                        Formula ROP &amp; Min-Max disesuaikan otomatis dengan riwayat kasir &amp; order servis.
                     </span>
                     <div class="flex items-center gap-2 flex-wrap">
                         @if(($procurementSummary['total_needs_order'] ?? 0) > 0)
                             <button type="button"
                                     wire:click="masukkanSemuaRekomendasiKePo"
                                     wire:confirm="Sistem akan otomatis mengelompokkan barang berdasarkan supplier dan membuat draft PO terpisah untuk masing-masing supplier. Lanjutkan?"
-                                    class="px-4 py-2.5 rounded-xl bg-up-accent hover:bg-up-accent/90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-accent/20 active:scale-95 transition flex items-center gap-1.5">
+                                    class="flex-1 sm:flex-none px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-accent hover:bg-up-accent/90 text-ink-950 font-bold text-xs cursor-pointer shadow-md shadow-up-accent/20 active:scale-95 transition flex items-center justify-center gap-1.5 min-h-[44px]">
                                 <span>📦</span>
-                                <span>Buat PO Otomatis per Supplier ({{ $procurementSummary['total_needs_order'] }} SKU)</span>
+                                <span>Buat PO Otomatis ({{ $procurementSummary['total_needs_order'] }} SKU)</span>
                             </button>
                         @endif
-                        <button wire:click="closeProcurementModal" class="px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-700 dark:text-white font-semibold text-xs cursor-pointer">
+                        <button wire:click="closeProcurementModal" class="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-ink-700 dark:text-white font-semibold text-xs cursor-pointer min-h-[44px]">
                             Tutup
                         </button>
                     </div>

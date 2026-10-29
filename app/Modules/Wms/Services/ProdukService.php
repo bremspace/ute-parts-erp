@@ -158,7 +158,7 @@ class ProdukService
                 'kondisi' => ! empty($kondisi) ? trim($kondisi) : 'baru',
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,
-                'metode_harga_beli' => in_array($metodeHargaBeli, ['manual', 'average'], true) ? $metodeHargaBeli : 'manual',
+                'metode_harga_beli' => in_array($metodeHargaBeli, ['manual', 'average', 'tertinggi'], true) ? $metodeHargaBeli : 'manual',
                 'harga_jual_retail' => $hargaJual,
                 'margin_persen' => $marginPersen !== null && $marginPersen >= 0 ? $marginPersen : null,
                 'gambar' => $fotoUtamaUrl,
@@ -330,7 +330,7 @@ class ProdukService
                 'kondisi' => ! empty($kondisi) ? trim($kondisi) : 'baru',
                 'satuan' => $satuan,
                 'harga_beli' => $hargaBeli,
-                'metode_harga_beli' => $metodeHargaBeli !== null && in_array($metodeHargaBeli, ['manual', 'average'], true) ? $metodeHargaBeli : $produk->metode_harga_beli,
+                'metode_harga_beli' => $metodeHargaBeli !== null && in_array($metodeHargaBeli, ['manual', 'average', 'tertinggi'], true) ? $metodeHargaBeli : $produk->metode_harga_beli,
                 'harga_jual_retail' => $hargaJual,
                 'margin_persen' => $marginPersen !== null ? ($marginPersen >= 0 ? $marginPersen : null) : $produk->margin_persen,
                 'gambar' => $fotoUtamaUrl,
@@ -744,38 +744,92 @@ class ProdukService
      */
     public function sesuaikanHargaBeliAverage(int $produkId, int $qtyMasuk, float $hargaBeliMasuk): void
     {
+        $this->sesuaikanHargaBeliProduk($produkId, $qtyMasuk, $hargaBeliMasuk);
+    }
+
+    /**
+     * Sesuaikan harga modal/beli produk secara terpadu berdasarkan metode harga beli master produk
+     * atau opsi penentuan harga yang ditentukan (average, tertinggi, manual).
+     */
+    public function sesuaikanHargaBeliProduk(
+        int $produkId,
+        int $qtyMasuk,
+        float $hargaBeliMasuk,
+        ?string $opsiMetode = null,
+        ?string $skemaJual = null,
+        ?float $nilaiJualAtauMargin = null
+    ): array {
         if ($qtyMasuk <= 0 || $hargaBeliMasuk <= 0) {
-            return;
+            return ['sukses' => false, 'pesan' => 'Qty atau harga beli tidak valid'];
         }
 
         $produk = Produk::whereKey($produkId)->lockForUpdate()->first();
-        if (! $produk || $produk->metode_harga_beli !== 'average') {
-            return;
+        if (! $produk) {
+            return ['sukses' => false, 'pesan' => 'Produk tidak ditemukan'];
         }
 
-        $stokTotalSekarang = (int) StokItem::where('produk_id', $produkId)->sum('jumlah');
-        $stokLama = max(0, $stokTotalSekarang - $qtyMasuk);
-        $hargaBeliLama = (float) $produk->harga_beli;
+        $metodeAktif = $opsiMetode ?: ($produk->metode_harga_beli ?: 'manual');
 
-        if ($stokLama <= 0) {
+        $hargaBeliLama = (float) $produk->harga_beli;
+        $hargaBeliBaru = $hargaBeliLama;
+
+        if ($metodeAktif === 'average') {
+            $stokTotalSekarang = (int) StokItem::where('produk_id', $produkId)->sum('jumlah');
+            $stokLama = max(0, $stokTotalSekarang - $qtyMasuk);
+
+            if ($stokLama <= 0) {
+                $hargaBeliBaru = round($hargaBeliMasuk, 2);
+            } else {
+                $hargaBeliBaru = round((($stokLama * $hargaBeliLama) + ($qtyMasuk * $hargaBeliMasuk)) / ($stokLama + $qtyMasuk), 2);
+            }
+        } elseif ($metodeAktif === 'tertinggi') {
+            // Ambil harga tertinggi dari histori pembelian produk + harga masuk saat ini
+            $procurement = app(ProcurementService::class);
+            $histori = $procurement->getHistoriPembelian($produkId);
+            $hargaTertinggiHistori = (float) ($histori['statistik']['harga_tertinggi'] ?? 0);
+
+            $hargaBeliBaru = max($hargaBeliLama, $hargaBeliMasuk, $hargaTertinggiHistori);
+            $hargaBeliBaru = round($hargaBeliBaru, 2);
+        } elseif ($metodeAktif === 'manual') {
             $hargaBeliBaru = round($hargaBeliMasuk, 2);
-        } else {
-            $hargaBeliBaru = round((($stokLama * $hargaBeliLama) + ($qtyMasuk * $hargaBeliMasuk)) / ($stokLama + $qtyMasuk), 2);
         }
 
         $updateData = [
             'harga_beli' => $hargaBeliBaru,
         ];
 
-        if ($produk->margin_persen !== null && (float) $produk->margin_persen > 0) {
-            $hargaJualBaru = round($hargaBeliBaru * (1 + ((float) $produk->margin_persen / 100)));
-            $updateData['harga_jual_retail'] = $hargaJualBaru;
+        // Tentukan harga jual jika ada skema
+        $skema = $skemaJual ?: 'default_margin';
+        $hargaJualBaru = (float) $produk->harga_jual_retail;
 
+        if ($skema === 'default_margin') {
+            if ($produk->margin_persen !== null && (float) $produk->margin_persen > 0) {
+                $hargaJualBaru = round($hargaBeliBaru * (1 + ((float) $produk->margin_persen / 100)));
+                $updateData['harga_jual_retail'] = $hargaJualBaru;
+            }
+        } elseif ($skema === 'persen') {
+            $persen = (float) ($nilaiJualAtauMargin ?? $produk->margin_persen ?? 0);
+            if ($persen > 0) {
+                $hargaJualBaru = round($hargaBeliBaru * (1 + ($persen / 100)));
+                $updateData['harga_jual_retail'] = $hargaJualBaru;
+                $updateData['margin_persen'] = $persen;
+            }
+        } elseif ($skema === 'manual') {
+            if ($nilaiJualAtauMargin !== null && (float) $nilaiJualAtauMargin > 0) {
+                $hargaJualBaru = round((float) $nilaiJualAtauMargin, 2);
+                $updateData['harga_jual_retail'] = $hargaJualBaru;
+                if ($hargaBeliBaru > 0) {
+                    $updateData['margin_persen'] = round((($hargaJualBaru - $hargaBeliBaru) / $hargaBeliBaru) * 100, 2);
+                }
+            }
+        }
+
+        if (isset($updateData['harga_jual_retail'])) {
             HargaTier::where('produk_id', $produk->id)
                 ->where('tipe_konsumen', 'retail')
                 ->update([
-                    'nominal_tetap' => $hargaJualBaru,
-                    'harga' => $hargaJualBaru,
+                    'nominal_tetap' => $updateData['harga_jual_retail'],
+                    'harga' => $updateData['harga_jual_retail'],
                 ]);
         }
 
@@ -789,5 +843,13 @@ class ProdukService
             }
             $variant->update($variantUpdate);
         }
+
+        return [
+            'sukses' => true,
+            'harga_beli_lama' => $hargaBeliLama,
+            'harga_beli_baru' => $hargaBeliBaru,
+            'harga_jual_baru' => $hargaJualBaru,
+            'metode' => $metodeAktif,
+        ];
     }
 }

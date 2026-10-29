@@ -2,7 +2,6 @@
 
 namespace App\Modules\Wms\Livewire;
 
-use App\Modules\Akunting\Models\AkunCOA;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Wms\Models\Grn;
 use App\Modules\Wms\Models\Produk;
@@ -11,7 +10,9 @@ use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Services\GrnService;
+use App\Modules\Wms\Services\MarginGuardService;
 use App\Modules\Wms\Services\NomorSeriService;
+use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\ScanResolverService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
@@ -65,6 +66,97 @@ class GrnTab extends Component
     public ?int $confirmGrnId = null;
 
     public ?int $confirmActionedBy = null;
+
+    public ?string $confirmAkunKasBank = null;
+
+    public function hitungEstimasiTotalHpp(): float
+    {
+        $total = 0.0;
+        foreach ($this->grnForm['item_qty'] ?? [] as $row) {
+            $qty = (int) ($row['qty_received'] ?? 0);
+            $harga = isset($row['harga_beli']) && $row['harga_beli'] !== null && $row['harga_beli'] !== ''
+                ? (float) $row['harga_beli']
+                : (float) ($row['harga_po'] ?? 0);
+            $total += $qty * $harga;
+        }
+
+        return round($total, 2);
+    }
+
+    /**
+     * Hitung preview harga beli baru berdasarkan opsi penentuan harga (average, tertinggi, manual).
+     */
+    public function hitungPreviewHargaBeli(array $item): float
+    {
+        $opsi = $item['opsi_harga_beli'] ?? 'average';
+        $hargaMasuk = (float) ($item['harga_beli'] ?? 0);
+        $konversi = max(0.0001, (float) ($item['konversi'] ?? 1));
+        $hargaMasukPerBase = round($hargaMasuk / $konversi, 2);
+        $hargaMaster = (float) ($item['harga_master'] ?? 0);
+        $hargaTertinggiHistori = (float) ($item['harga_tertinggi_histori'] ?? 0);
+
+        if ($opsi === 'manual') {
+            return $hargaMasukPerBase;
+        }
+
+        if ($opsi === 'tertinggi') {
+            return max($hargaMaster, $hargaMasukPerBase, $hargaTertinggiHistori);
+        }
+
+        // Default 'average'
+        $stokLama = (int) StokItem::where('produk_id', $item['produk_id'] ?? 0)->sum('jumlah');
+        $qtyMasukDasar = (int) ($item['qty_po_dasar'] ?? 1);
+
+        if ($stokLama <= 0) {
+            return $hargaMasukPerBase;
+        }
+
+        return round((($stokLama * $hargaMaster) + ($qtyMasukDasar * $hargaMasukPerBase)) / ($stokLama + $qtyMasukDasar), 2);
+    }
+
+    /**
+     * Hitung preview harga jual berdasarkan skema (default_margin, persen, manual).
+     */
+    public function hitungPreviewHargaJual(array $item, float $hargaBeliFinal): float
+    {
+        $skema = $item['skema_harga_jual'] ?? 'default_margin';
+
+        if ($skema === 'default_margin') {
+            $margin = (float) ($item['margin_default'] ?? 0);
+            if ($margin > 0) {
+                return round($hargaBeliFinal * (1 + ($margin / 100)));
+            }
+
+            return (float) ($item['harga_jual_master'] ?? $hargaBeliFinal);
+        }
+
+        if ($skema === 'persen') {
+            $persen = (float) ($item['persen_margin_custom'] ?? 0);
+            if ($persen > 0) {
+                return round($hargaBeliFinal * (1 + ($persen / 100)));
+            }
+
+            return $hargaBeliFinal;
+        }
+
+        if ($skema === 'manual') {
+            return (float) ($item['harga_jual_custom'] ?? 0);
+        }
+
+        return (float) ($item['harga_jual_master'] ?? $hargaBeliFinal);
+    }
+
+    /**
+     * Evaluasi potensi rugi / risiko margin menggunakan MarginGuardService.
+     */
+    public function evaluasiMarginItem(array $item): array
+    {
+        $hargaBeliFinal = $this->hitungPreviewHargaBeli($item);
+        $hargaJualFinal = $this->hitungPreviewHargaJual($item, $hargaBeliFinal);
+        $kategori = $item['kategori'] ?? null;
+
+        return app(MarginGuardService::class)->evaluasiHarga($hargaBeliFinal, $hargaJualFinal, $kategori);
+    }
 
     public bool $showTolakDialog = false;
 
@@ -124,15 +216,6 @@ class GrnTab extends Component
 
         // [P1-1] Scope cabang — PO harus milik cabang aktif di session
         $this->tolakJikaBukanCabang($po->gudangTujuan?->cabang_id, 'PO bukan milik cabang aktif');
-
-        if ($po->metode_bayar === 'tunai' && ! GrnService::userBolehOtorisasiKas(auth()->user())) {
-            $this->dispatch('alert', [
-                'type' => 'error',
-                'message' => 'PO ini bertipe pembayaran tunai. Anda tidak memiliki role/hak akses untuk mengotorisasi pembayaran kas (memerlukan role Kasir, Finance, atau Admin Toko).',
-            ]);
-
-            return;
-        }
 
         $this->gudangRaks = Rak::where('gudang_id', $po->gudang_tujuan_id)
             ->where('is_active', true)
@@ -197,6 +280,10 @@ class GrnTab extends Component
                 ? (int) round($rawJumlahDasar)
                 : (int) round($qtyPoSatuan * $konversi);
 
+            $histori = app(ProcurementService::class)->getHistoriPembelian((int) $poItem->produk_id);
+            $hargaTertinggiHistori = (float) ($histori['statistik']['harga_tertinggi'] ?? 0);
+            $hargaTerakhirHistori = (float) ($histori['statistik']['harga_terakhir'] ?? 0);
+
             $itemForms[] = [
                 'produk_id' => $poItem->produk_id,
                 'produk_nama' => $prod?->nama ?? ('#'.$poItem->produk_id),
@@ -207,6 +294,20 @@ class GrnTab extends Component
                 'sku' => $var?->sku ?: '',
                 'sku_variant_id' => $poItem->sku_variant_id,
                 'harga_beli' => (float) $poItem->harga_beli,
+                'harga_po' => (float) $poItem->harga_beli,
+                'harga_master' => (float) ($prod?->harga_beli ?? 0),
+                'harga_jual_master' => (float) ($prod?->harga_jual_retail ?? 0),
+                'margin_default' => (float) ($prod?->margin_persen ?? 0),
+                'metode_master' => $prod?->metode_harga_beli ?: 'average',
+                'kategori' => $prod?->kategori,
+                'harga_tertinggi_histori' => $hargaTertinggiHistori,
+                'harga_terakhir_histori' => $hargaTerakhirHistori,
+                // Opsi penentuan harga beli: average / tertinggi / manual
+                'opsi_harga_beli' => $prod?->metode_harga_beli ?: 'average',
+                // Skema harga jual: default_margin / persen / manual
+                'skema_harga_jual' => 'default_margin',
+                'persen_margin_custom' => (float) ($prod?->margin_persen ?? 0),
+                'harga_jual_custom' => (float) ($prod?->harga_jual_retail ?? 0),
                 'qty_po' => $qtyPoSatuan,
                 'qty_po_dasar' => $qtyPoDasar,
                 'qty_received' => 0,
@@ -373,6 +474,73 @@ class GrnTab extends Component
         }
     }
 
+    public function updatedGrnFormAkunKasBank($val): void
+    {
+        if (empty($this->grnForm['is_cash']) || empty($val)) {
+            return;
+        }
+
+        $cabangId = (int) session('cabang_id');
+        $totalHpp = $this->hitungEstimasiTotalHpp();
+        $kasDipilih = AkunCOA::where('kode', $val)->first();
+        $saldoAktual = $kasDipilih ? GrnService::hitungSaldoKasCabang($kasDipilih, $cabangId) : 0;
+
+        if ($saldoAktual < $totalHpp) {
+            $kasCukup = GrnService::getKasDenganSaldoCukup($totalHpp, $cabangId);
+            $rekomendasi = $kasCukup->first();
+            $namaDipilih = $kasDipilih ? $kasDipilih->nama : $val;
+
+            if ($rekomendasi) {
+                $this->grnForm['akun_kas_bank'] = $rekomendasi->kode;
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => "Saldo kas '{$namaDipilih}' (Rp ".number_format($saldoAktual, 0, ',', '.').') tidak mencukupi kebutuhan Rp '.number_format($totalHpp, 0, ',', '.').". Otomatis dialihkan ke [{$rekomendasi->kode}] {$rekomendasi->nama} (Saldo: Rp ".number_format($rekomendasi->saldo_aktual, 0, ',', '.').').',
+                ]);
+            } else {
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Saldo kas '{$namaDipilih}' tidak mencukupi (Rp ".number_format($saldoAktual, 0, ',', '.').' < Rp '.number_format($totalHpp, 0, ',', '.').') dan tidak ada akun kas lain dengan saldo cukup.',
+                ]);
+            }
+        }
+    }
+
+    public function updatedConfirmAkunKasBank($val): void
+    {
+        if (empty($val) || ! $this->confirmGrnId) {
+            return;
+        }
+
+        $grn = Grn::find($this->confirmGrnId);
+        if (! $grn || $grn->purchaseOrder?->metode_bayar !== 'tunai') {
+            return;
+        }
+
+        $cabangId = (int) ($grn->cabang_id ?: session('cabang_id'));
+        $totalHpp = (float) $grn->total_hpp;
+        $kasDipilih = AkunCOA::where('kode', $val)->first();
+        $saldoAktual = $kasDipilih ? GrnService::hitungSaldoKasCabang($kasDipilih, $cabangId) : 0;
+
+        if ($saldoAktual < $totalHpp) {
+            $kasCukup = GrnService::getKasDenganSaldoCukup($totalHpp, $cabangId);
+            $rekomendasi = $kasCukup->first();
+            $namaDipilih = $kasDipilih ? $kasDipilih->nama : $val;
+
+            if ($rekomendasi) {
+                $this->confirmAkunKasBank = $rekomendasi->kode;
+                $this->dispatch('alert', [
+                    'type' => 'warning',
+                    'message' => "Saldo kas '{$namaDipilih}' (Rp ".number_format($saldoAktual, 0, ',', '.').') tidak mencukupi untuk bayar GRN Rp '.number_format($totalHpp, 0, ',', '.').". Dialihkan ke [{$rekomendasi->kode}] {$rekomendasi->nama}.",
+                ]);
+            } else {
+                $this->dispatch('alert', [
+                    'type' => 'error',
+                    'message' => "Saldo kas '{$namaDipilih}' tidak mencukupi (Rp ".number_format($saldoAktual, 0, ',', '.').' < Rp '.number_format($totalHpp, 0, ',', '.').').',
+                ]);
+            }
+        }
+    }
+
     public function setActiveItemLengkap(): void
     {
         if ($this->activeItemIndex !== null && isset($this->grnForm['item_qty'][$this->activeItemIndex])) {
@@ -486,14 +654,6 @@ class GrnTab extends Component
         $this->tolakJikaBukanCabang($cabangId, 'PO bukan milik cabang aktif');
 
         if ($po->metode_bayar === 'tunai') {
-            if (! GrnService::userBolehOtorisasiKas(auth()->user())) {
-                $this->dispatch('alert', [
-                    'type' => 'error',
-                    'message' => 'Anda tidak memiliki role/hak akses untuk mengotorisasi transaksi pembayaran kas tunai PO ini. Memerlukan role Kasir, Finance, atau Admin Toko.',
-                ]);
-
-                return;
-            }
             $this->grnForm['dibayar_oleh'] = auth()->user()?->name ?? 'Kasir / Staf';
         }
 
@@ -504,6 +664,7 @@ class GrnTab extends Component
             $hargaPerProduk = [];
             $snPerProduk = [];
             $itemRakId = [];
+            $itemHargaOptions = [];
             foreach ($this->grnForm['item_qty'] as $row) {
                 $kunci = GrnService::kunciItem($row['produk_id'] ?? 0, $row['sku_variant_id'] ?? null);
                 $itemReceived[$kunci] = (int) ($row['qty_received'] ?? 0);
@@ -519,6 +680,20 @@ class GrnTab extends Component
                     $snPerProduk[$kunci] = app(NomorSeriService::class)
                         ->parseList((string) ($row['sn'] ?? ''));
                 }
+
+                $skema = $row['skema_harga_jual'] ?? 'default_margin';
+                $nilaiJual = null;
+                if ($skema === 'persen') {
+                    $nilaiJual = (float) ($row['persen_margin_custom'] ?? 0);
+                } elseif ($skema === 'manual') {
+                    $nilaiJual = (float) ($row['harga_jual_custom'] ?? 0);
+                }
+
+                $itemHargaOptions[$kunci] = [
+                    'opsi_harga_beli' => $row['opsi_harga_beli'] ?? 'average',
+                    'skema_harga_jual' => $skema,
+                    'nilai_jual_atau_margin' => $nilaiJual,
+                ];
             }
 
             $grn = app(GrnService::class)->inputGudang(
@@ -529,7 +704,8 @@ class GrnTab extends Component
                 $hargaPerProduk,
                 $itemRakId,
                 $this->grnForm['akun_kas_bank'] ?? null,
-                $this->grnForm['dibayar_oleh'] ?? null
+                $this->grnForm['dibayar_oleh'] ?? null,
+                $itemHargaOptions
             );
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
@@ -541,14 +717,13 @@ class GrnTab extends Component
             $grn->update(['catatan' => $this->grnForm['catatan']]);
         }
 
-        $hasSelisih = collect($grn->item_qty_received ?? [])
-            ->contains(fn ($item) => ($item['status'] ?? '') !== 'lengkap');
+        $isMenungguApproval = $grn->status === 'draft';
 
         $this->dispatch('alert', [
-            'type' => $hasSelisih ? 'info' : 'success',
-            'message' => $hasSelisih
-                ? "GRN {$grn->no_grn} dibuat dengan selisih qty — menunggu approval."
-                : "GRN {$grn->no_grn} diterima — stok & jurnal AP otomatis dibuat.",
+            'type' => $isMenungguApproval ? 'info' : 'success',
+            'message' => $isMenungguApproval
+                ? "GRN {$grn->no_grn} dibuat — diajukan ke pemilik otoritas untuk persetujuan."
+                : "GRN {$grn->no_grn} diterima — stok & jurnal otomatis dibuat.",
         ]);
 
         $this->cancelGrnModal();
@@ -567,11 +742,16 @@ class GrnTab extends Component
             // (hook selesaikanEntity finalisasi GRN + notifikasi pemohon, idempoten).
             $pending = $this->permintaanPending($grn->id);
 
+            $options = [];
+            if ($this->confirmAkunKasBank) {
+                $options['akun_kas_bank'] = $this->confirmAkunKasBank;
+            }
+
             if ($pending) {
-                app(ApprovalService::class)->proses($pending->id, 'approved', $actionedBy, null);
+                app(ApprovalService::class)->proses($pending->id, 'approved', $actionedBy, null, $options);
                 $grn = $grn->fresh();
             } else {
-                $grn = app(GrnService::class)->setujuiGrn($grn->id, $actionedBy);
+                $grn = app(GrnService::class)->setujuiGrn($grn->id, $actionedBy, $options);
             }
         } catch (ValidationException $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => collect($e->errors())->flatten()->implode(' ')]);
@@ -644,8 +824,9 @@ class GrnTab extends Component
 
         $this->confirmGrnId = $grn->id;
         $this->confirmActionedBy = auth()->id();
+        $this->confirmAkunKasBank = $grn->akun_kas_bank ?: ($grn->purchaseOrder?->akun_kas_bank ?: '110-01');
         $this->confirmTitle = 'Setujui GRN';
-        $this->confirmText = 'Setujui GRN ini? Jurnal AP akan terposting dan stok masuk dicatat.';
+        $this->confirmText = 'Setujui GRN ini? Jurnal persediaan dan pembayaran kas akan terposting serta stok masuk dicatat.';
         $this->showConfirmDialog = true;
     }
 
@@ -826,6 +1007,22 @@ class GrnTab extends Component
                 ->find($this->detailGrnId);
         }
 
+        $cabangId = (int) session('cabang_id');
+        $totalHpp = $this->hitungEstimasiTotalHpp();
+
+        // [KAS-SALDO] Muat kas dengan saldo cukup untuk pembayaran GRN tunai
+        $akunKasCukup = GrnService::getKasDenganSaldoCukup($totalHpp, $cabangId);
+        $semuaKas = GrnService::getKasDenganSaldoAktual($cabangId);
+
+        // Jika akun_kas_bank yang dipilih saat ini tidak ada di daftar kas cukup, set otomatis
+        if (! empty($this->grnForm['is_cash']) && $akunKasCukup->isNotEmpty()) {
+            $currentAkun = $this->grnForm['akun_kas_bank'] ?? null;
+            if (! $akunKasCukup->contains(fn ($ak) => $ak->kode === $currentAkun)) {
+                $laci = $akunKasCukup->firstWhere('kode', '110-04');
+                $this->grnForm['akun_kas_bank'] = $laci ? $laci->kode : $akunKasCukup->first()->kode;
+            }
+        }
+
         return view('modules.wms.livewire.grn-tab', [
             'poList' => $poList,
             'grnList' => $grnList,
@@ -836,7 +1033,9 @@ class GrnTab extends Component
             'countDitolak' => $countDitolak,
             'countTotal' => $countTotal,
             'countPoSiapTerima' => $countPoSiapTerima,
-            'akunKasBankList' => AkunCOA::whereIn('kelompok', ['kas', 'bank'])->where('is_active', true)->orderBy('kode')->get(),
+            'akunKasBankList' => $akunKasCukup,
+            'semuaKasBankList' => $semuaKas,
+            'estimasiTotalHpp' => $totalHpp,
         ]);
     }
 }

@@ -12,6 +12,7 @@ use App\Modules\Wms\Models\PurchaseOrderItem;
 use App\Modules\Wms\Models\Supplier;
 use App\Modules\Wms\Services\ProcurementService;
 use App\Modules\Wms\Services\PurchaseOrderService;
+use App\Modules\Workflow\Models\ApprovalRequest;
 use App\Modules\Workflow\Services\ApprovalService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\DB;
@@ -339,6 +340,30 @@ class PoTab extends Component
         $this->showPoModal = true;
     }
 
+    public function updatedPoFormSupplierId($val): void
+    {
+        if (empty($val) || ($this->poForm['metode_bayar'] ?? 'kredit') !== 'kredit') {
+            return;
+        }
+
+        $supplier = Supplier::find($val);
+        if ($supplier) {
+            $termin = (int) ($supplier->termin_hari ?: 30);
+            $this->poForm['jatuh_tempo'] = now()->addDays($termin)->toDateString();
+        }
+    }
+
+    public function updatedPoFormMetodeBayar($val): void
+    {
+        if ($val === 'kredit' && ! empty($this->poForm['supplier_id'])) {
+            $supplier = Supplier::find($this->poForm['supplier_id']);
+            $termin = (int) ($supplier?->termin_hari ?: 30);
+            $this->poForm['jatuh_tempo'] = now()->addDays($termin)->toDateString();
+        } elseif ($val === 'tunai') {
+            $this->poForm['jatuh_tempo'] = '';
+        }
+    }
+
     /**
      * [B-15c] Scope cabang untuk query produk: produk yang punya stok di gudang cabang
      * aktif, atau produk yang belum punya stok sama sekali (produk baru — supaya PO
@@ -548,6 +573,23 @@ class PoTab extends Component
             'poForm.metode_bayar' => 'required|in:tunai,kredit',
             'poForm.akun_kas_bank' => 'nullable|string|max:20',
             'poForm.items' => 'required|array|min:1',
+            'poForm.items.*.produk_id' => 'required|exists:produk,id',
+            'poForm.items.*.jumlah' => 'required|numeric|min:1',
+            'poForm.items.*.harga_beli' => 'required|numeric|min:0',
+        ], [
+            'poForm.supplier_id.required' => 'Supplier wajib dipilih.',
+            'poForm.supplier_id.exists' => 'Supplier tidak valid.',
+            'poForm.gudang_tujuan_id.required' => 'Gudang tujuan wajib dipilih.',
+            'poForm.gudang_tujuan_id.exists' => 'Gudang tujuan tidak valid.',
+            'poForm.metode_bayar.required' => 'Metode pembayaran wajib dipilih.',
+            'poForm.items.required' => 'Minimal 1 item produk harus ditambahkan.',
+            'poForm.items.min' => 'Minimal 1 item produk harus ditambahkan.',
+            'poForm.items.*.produk_id.required' => 'Produk pada baris PO wajib dipilih.',
+            'poForm.items.*.produk_id.exists' => 'Produk tidak ditemukan.',
+            'poForm.items.*.jumlah.required' => 'Jumlah (Qty) wajib diisi.',
+            'poForm.items.*.jumlah.min' => 'Jumlah (Qty) minimal 1.',
+            'poForm.items.*.harga_beli.required' => 'Harga beli wajib diisi.',
+            'poForm.items.*.harga_beli.min' => 'Harga beli tidak boleh negatif.',
         ]);
 
         $gudang = Gudang::find($this->poForm['gudang_tujuan_id']);
@@ -702,6 +744,17 @@ class PoTab extends Component
 
         $alasanFinal = trim((string) $alasan) ?: 'Dibatalkan oleh purchasing/gudang';
         $catatanLama = $po->catatan ? $po->catatan.' | ' : '';
+
+        // Batalkan approval request jika ada yang masih pending
+        ApprovalRequest::where('entity_type', 'po')
+            ->where('entity_id', $po->id)
+            ->where('status', 'pending')
+            ->update([
+                'status' => 'rejected',
+                'actioned_by' => auth()->id(),
+                'actioned_at' => now(),
+                'catatan' => 'PO dibatalkan sebelum disetujui: '.$alasanFinal,
+            ]);
 
         $po->update([
             'status' => 'dibatalkan',
@@ -881,6 +934,15 @@ class PoTab extends Component
         $nama = $supplier->nama;
         $supplier->delete();
         $this->dispatch('alert', ['type' => 'success', 'message' => "Supplier '{$nama}' berhasil dihapus."]);
+    }
+
+    protected function tolakJikaBukanCabang(int|string|null $recordCabangId, string $pesan): void
+    {
+        $cabangId = session('cabang_id');
+
+        if ($cabangId !== null && $cabangId !== '' && $recordCabangId !== null && (int) $recordCabangId !== (int) $cabangId) {
+            abort(403, $pesan);
+        }
     }
 
     protected function boleh(string $permission, string $pesan = 'Anda tidak memiliki hak akses untuk tindakan ini.'): bool

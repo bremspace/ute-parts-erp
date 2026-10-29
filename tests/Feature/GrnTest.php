@@ -31,6 +31,7 @@ use App\Modules\Wms\Services\ReturnPembelianService;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -1108,7 +1109,7 @@ class GrnTest extends TestCase
         $this->assertEquals(100000, (float) $jurnalPersediaan->debit);
     }
 
-    public function test_staff_gudang_tanpa_izin_kas_ditolak_menerima_po_tunai(): void
+    public function test_staff_gudang_tanpa_izin_kas_membuat_grn_draft_dan_ajukan_approval(): void
     {
         Queue::fake();
 
@@ -1142,18 +1143,24 @@ class GrnTest extends TestCase
             'subtotal' => 50000,
         ]);
 
-        // Cek via GrnService::inputGudang harus melempar Exception otorisasi kas
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('tidak memiliki role/hak akses untuk mengotorisasi transaksi pembayaran kas tunai PO');
-
-        $this->service()->inputGudang(
+        // GrnService::inputGudang untuk PO tunai oleh staf tanpa otoritas kas
+        // menghasilkan GRN draft + ApprovalRequest (bukan langsung terima)
+        $grn = $this->service()->inputGudang(
             $po,
             [$this->produk->id => 1],
             $staffGudang->id
         );
+
+        $this->assertEquals('draft', $grn->status);
+        $this->assertDatabaseHas('approval_requests', [
+            'entity_type' => 'grn',
+            'entity_id' => $grn->id,
+            'status' => 'pending',
+            'requested_by' => $staffGudang->id,
+        ]);
     }
 
-    public function test_livewire_grn_tab_menolak_staff_gudang_menerima_po_tunai(): void
+    public function test_livewire_grn_tab_staff_gudang_ajukan_approval_po_tunai(): void
     {
         $staffGudang = User::create([
             'name' => 'Staf Gudang Komponen',
@@ -1162,6 +1169,7 @@ class GrnTest extends TestCase
             'is_active' => true,
         ]);
         $staffGudang->assignRole('staff-gudang');
+        $staffGudang->givePermissionTo('wms.receive-po');
         $staffGudang->cabangs()->attach($this->cabang->id);
 
         $po = PurchaseOrder::create([
@@ -1189,13 +1197,77 @@ class GrnTest extends TestCase
 
         Livewire::test(GrnTab::class)
             ->call('openGrnModal', $po->id)
+            ->assertSet('showGrnModal', true)
+            ->set('grnForm.item_qty.0.qty_received', 1)
+            ->call('simpanGrn')
             ->assertDispatched('alert', function ($event, $params) {
                 $payload = $params[0] ?? $params;
 
-                return ($payload['type'] ?? '') === 'error'
-                    && str_contains($payload['message'], 'tidak memiliki role/hak akses untuk mengotorisasi pembayaran kas');
+                return ($payload['type'] ?? '') === 'info'
+                    && str_contains($payload['message'], 'diajukan ke pemilik otoritas untuk persetujuan');
             })
             ->assertSet('showGrnModal', false);
+
+        $this->assertDatabaseHas('grn', [
+            'po_id' => $po->id,
+            'status' => 'draft',
+        ]);
+    }
+
+    public function test_grn_po_tunai_kas_laci_mencatat_kas_mutasi_laci(): void
+    {
+        // Setup sesi kas kasir terbuka
+        $sesiId = DB::table('kas_sesi')->insertGetId([
+            'cabang_id' => $this->cabang->id,
+            'user_id' => $this->user->id,
+            'saldo_awal' => 500000,
+            'status' => 'buka',
+            'dibuka_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $po = PurchaseOrder::create([
+            'no_po' => 'PO-TEST-LACI-001',
+            'supplier_id' => $this->supplier->id,
+            'gudang_tujuan_id' => $this->gudang->id,
+            'status' => 'dikirim',
+            'metode_bayar' => 'tunai',
+            'akun_kas_bank' => '110-04', // Kas Laci
+            'jatuh_tempo' => null,
+            'total' => 75000,
+            'total_dibayar' => 0,
+        ]);
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id,
+            'produk_id' => $this->produk->id,
+            'jumlah' => 1,
+            'harga_beli' => 75000,
+            'subtotal' => 75000,
+        ]);
+
+        $grn = $this->service()->inputGudang(
+            $po,
+            [$this->produk->id => 1],
+            $this->user->id,
+            [],
+            [],
+            [],
+            '110-04'
+        );
+
+        $this->assertEquals('terima', $grn->status);
+
+        // Verifikasi kas_mutasi_laci otomatis tercatat
+        $this->assertDatabaseHas('kas_mutasi_laci', [
+            'kas_sesi_id' => $sesiId,
+            'cabang_id' => $this->cabang->id,
+            'jenis' => 'keluar',
+            'nominal' => 75000,
+            'no_jurnal' => $grn->no_grn,
+            'akun_lawan_kode' => '130-01',
+        ]);
     }
 
     public function test_wms_print_documents_return_200_with_a5_default(): void
