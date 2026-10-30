@@ -2647,7 +2647,7 @@ class SettingsRbac extends Component
         }
 
         $s = SatuanUnit::findOrFail($id);
-        $terpakai = Produk::where('satuan_kode', $s->kode)->count();
+        $terpakai = Produk::where('satuan', $s->kode)->count();
         if ($terpakai > 0) {
             $s->update(['is_active' => false]);
             $this->dispatch('alert', [
@@ -3245,7 +3245,7 @@ class SettingsRbac extends Component
             case 'satuan':
                 $satuans = SatuanUnit::whereIn('id', $this->selectedSatuanIds)->get();
                 foreach ($satuans as $s) {
-                    $terpakai = Produk::where('satuan_kode', $s->kode)->count();
+                    $terpakai = Produk::where('satuan', $s->kode)->count();
                     if ($terpakai > 0) {
                         $s->update(['is_active' => false]);
                         $deactivated++;
