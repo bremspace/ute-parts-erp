@@ -65,13 +65,22 @@
                         @endcanany
                         @can('wms.create')
                         <a
-                            href="/app/wms/import-export"
+                            href="/app/pengaturan?tab=export_import"
                             wire:navigate
                             class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                            title="Import & Penyesuaian Master Produk & Foto"
+                            title="Export & Import Master Produk & Atribut di Pengaturan"
                         >
                             <span>📥</span>
-                            <span>Import Master</span>
+                            <span>Import Excel</span>
+                        </a>
+                        <a
+                            href="/app/wms/import-foto"
+                            wire:navigate
+                            class="px-3.5 sm:px-4 py-2.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/30 font-bold text-xs transition-[transform,background-color] active:scale-[0.97] min-h-[44px] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                            title="Import Foto Bulk"
+                        >
+                            <span>📸</span>
+                            <span>Import Foto</span>
                         </a>
                         <!-- Dropdown Export (Semua atau Terpilih) -->
                         <div class="relative" x-data="{ openExport: false }" @click.outside="openExport = false">
@@ -221,7 +230,7 @@
                         wire:click="$set('activeTab', 'po')"
                         class="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer shrink-0 {{ $activeTab === 'po' ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
                     >
-                        PO &amp; Supplier
+                        PO & Supplier
                     </button>
                     <button
                         wire:click="$set('activeTab', 'grn')"

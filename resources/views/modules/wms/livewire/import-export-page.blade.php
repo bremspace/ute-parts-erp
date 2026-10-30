@@ -31,19 +31,25 @@
         </div>
     </div>
 
-    <!-- Main Navigation Tabs: Import vs Foto vs Export -->
+    <!-- Main Navigation Tabs: Import vs Foto vs Export vs Atribut -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1.5 bg-black/5 dark:bg-white/[0.03] rounded-2xl border border-black/10 dark:border-white/5 w-full sm:w-fit">
         <button type="button"
                 wire:click="setTab('import')"
                 class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'import' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
             <span>📥</span>
-            <span>Import Produk &amp; Penyesuaian</span>
+            <span>Import Master Produk</span>
+        </button>
+        <button type="button"
+                wire:click="setTab('atribut')"
+                class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'atribut' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
+            <span>🏷️</span>
+            <span>Atribut (Kategori, Brand, dll)</span>
         </button>
         <button type="button"
                 wire:click="setTab('foto')"
                 class="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer {{ $activeTab === 'foto' ? 'bg-up-primary text-white shadow-md shadow-up-primary/20' : 'text-ink-400 hover:text-white' }}">
             <span>📸</span>
-            <span>Import Foto Massal (Auto SKU)</span>
+            <span>Import Foto Massal</span>
         </button>
         <button type="button"
                 wire:click="setTab('export')"
@@ -1772,7 +1778,7 @@
                 </div>
             </div>
         @endif
-    @else
+    @elseif($activeTab === 'export')
         <!-- TAB 2: EXPORT WORKSPACE -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Ekspor Master Produk -->
@@ -1841,5 +1847,395 @@
                 </div>
             </div>
         </div>
+
+    @elseif($activeTab === 'atribut')
+        <!-- TAB 4: ATRIBUT PRODUK WORKSPACE -->
+        @if($atributStep === 'upload')
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Card 1: Export & Template Atribut -->
+                <div class="p-6 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-5">
+                    <div class="space-y-1">
+                        <h3 class="text-sm font-bold text-ink-900 dark:text-white flex items-center gap-2">
+                            <span>🏷️</span>
+                            <span>Ekspor &amp; Unduh Template Atribut</span>
+                        </h3>
+                        <p class="text-xs text-ink-400 leading-relaxed">
+                            Unduh daftar master atribut terpisah (Kategori, Brand, Kualitas/Grade, Satuan, Rak, dan Tipe HP) untuk menyiapkan referensi sebelum mengimpor katalog produk.
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-ink-700 dark:text-ink-300 mb-1.5">Pilih Target Master Atribut:</label>
+                            <select wire:model.live="atributTarget"
+                                    class="w-full text-xs font-semibold px-3 py-2.5 rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-night-900 text-ink-900 dark:text-white focus:outline-none focus:border-up-primary">
+                                <option value="all">Semua Atribut (Multi-Sheet Workbook .xlsx)</option>
+                                <option value="kategori">Kategori &amp; Sub-Kategori</option>
+                                <option value="brand">Brand / Merk</option>
+                                <option value="kualitas">Kualitas / Grade Produk</option>
+                                <option value="satuan">Satuan Unit</option>
+                                <option value="rak">Rak Penyimpanan</option>
+                                <option value="tipe_hp">Tipe HP (Merk &amp; Model)</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            <button type="button"
+                                    wire:click="downloadTemplateAtribut"
+                                    class="w-full py-2.5 px-3.5 rounded-xl bg-up-primary/10 hover:bg-up-primary/20 border border-up-primary/30 text-up-primary font-bold text-xs transition flex items-center justify-between cursor-pointer">
+                                <span class="flex items-center gap-1.5">
+                                    <span>📥</span>
+                                    <span>Template (.xlsx)</span>
+                                </span>
+                                <span>Unduh ↓</span>
+                            </button>
+
+                            <button type="button"
+                                    wire:click="exportAtribut('xlsx')"
+                                    class="w-full py-2.5 px-3.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-between cursor-pointer shadow-md shadow-up-primary/20">
+                                <span class="flex items-center gap-1.5">
+                                    <span>📊</span>
+                                    <span>Ekspor Data (.xlsx)</span>
+                                </span>
+                                <span>Unduh ↓</span>
+                            </button>
+                        </div>
+
+                        <button type="button"
+                                wire:click="exportAtribut('csv')"
+                                class="w-full py-2.5 px-3.5 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 font-bold text-xs transition flex items-center justify-between cursor-pointer">
+                            <span class="flex items-center gap-1.5">
+                                <span>📄</span>
+                                <span>Ekspor Format .CSV (Sheet Terpilih)</span>
+                            </span>
+                            <span>Unduh ↓</span>
+                        </button>
+                    </div>
+
+                    <!-- Panduan Kolom Atribut -->
+                    <div class="p-4 rounded-xl bg-black/20 border border-white/5 space-y-2 text-[11px] text-ink-400">
+                        <div class="font-bold text-ink-200 flex items-center gap-1.5">
+                            <span>💡</span>
+                            <span>Struktur Kolom per Atribut:</span>
+                        </div>
+                        <ul class="space-y-1 font-mono text-[10px] text-ink-300">
+                            <li>• <strong class="text-up-mint">Kategori:</strong> kategori_utama, sub_kategori, kode_slug, urutan, is_active</li>
+                            <li>• <strong class="text-up-mint">Brand:</strong> nama, keterangan, is_active</li>
+                            <li>• <strong class="text-up-mint">Kualitas:</strong> nama, brand, keterangan, is_active</li>
+                            <li>• <strong class="text-up-mint">Satuan:</strong> kode, nama, is_active</li>
+                            <li>• <strong class="text-up-mint">Rak:</strong> gudang, kode, nama, zona, is_active</li>
+                            <li>• <strong class="text-up-mint">Tipe HP:</strong> merk, model, nama, is_active</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Card 2: Import File Atribut -->
+                <div class="p-6 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-5">
+                    <div class="space-y-1">
+                        <h3 class="text-sm font-bold text-ink-900 dark:text-white flex items-center gap-2">
+                            <span>📥</span>
+                            <span>Import File Master Atribut</span>
+                        </h3>
+                        <p class="text-xs text-ink-400 leading-relaxed">
+                            Unggah berkas Excel (.xlsx) atau CSV untuk mendaftarkan atau memperbarui atribut massal. Sistem otomatis memeriksa data baru vs data yang sudah terdaftar.
+                        </p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Dropzone File Input -->
+                        <div class="relative overflow-hidden p-6 rounded-2xl border-2 border-dashed {{ $atributFile ? 'border-up-mint bg-up-mint/[0.03]' : 'border-black/15 dark:border-white/15 bg-black/5 dark:bg-white/[0.01]' }} hover:border-up-primary transition text-center space-y-2 cursor-pointer group">
+                            <input type="file"
+                                   wire:model="atributFile"
+                                   accept=".xlsx,.xls,.csv"
+                                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+
+                            @if($atributFile)
+                                <div class="text-3xl text-up-mint">✓</div>
+                                <div class="font-bold text-xs text-ink-900 dark:text-white">
+                                    {{ $atributFile->getClientOriginalName() }}
+                                </div>
+                                <div class="text-[11px] text-ink-400">
+                                    {{ number_format($atributFile->getSize() / 1024, 1) }} KB — Siap dipratinjau
+                                </div>
+                                <span class="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-up-mint/20 text-up-mint">
+                                    Klik untuk ganti file
+                                </span>
+                            @else
+                                <div class="text-3xl group-hover:scale-110 transition-transform">📂</div>
+                                <div class="font-bold text-xs text-ink-900 dark:text-white">
+                                    Pilih atau Seret Berkas ke Sini
+                                </div>
+                                <p class="text-[11px] text-ink-400">
+                                    Mendukung format .xlsx (multi-sheet) dan .csv (maks 20 MB)
+                                </p>
+                                <span class="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-up-primary/10 text-up-primary">
+                                    Pilih Berkas...
+                                </span>
+                            @endif
+                        </div>
+
+                        @error('atributFile')
+                            <p class="text-xs text-up-red font-semibold">{{ $message }}</p>
+                        @enderror
+
+                        <!-- Tombol Pratinjau -->
+                        <button type="button"
+                                wire:click="previewImportAtribut"
+                                wire:loading.attr="disabled"
+                                class="w-full py-3 px-4 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-up-primary/20 disabled:opacity-50">
+                            <span wire:loading.remove wire:target="previewImportAtribut">Pratinjau Data Atribut →</span>
+                            <span wire:loading wire:target="previewImportAtribut" class="flex items-center gap-2">
+                                <span class="animate-spin">⏳</span>
+                                <span>Membaca &amp; Memvalidasi Berkas...</span>
+                            </span>
+                        </button>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-up-primary/5 border border-up-primary/20 text-[11px] text-ink-400 leading-relaxed">
+                        <strong class="text-up-primary">💡 Catatan Alur Kerja:</strong>
+                        Setelah mengimpor seluruh kategori, brand, tipe HP, satuan, dan rak di tab ini, Anda dapat beralih ke tab <strong>Import Master Produk</strong> untuk mengimpor daftar produk tanpa risiko data referensi kosong atau terpotong.
+                    </div>
+                </div>
+            </div>
+
+        @elseif($atributStep === 'preview')
+            <!-- Step 2: Preview Hasil Parsing Atribut -->
+            <div class="space-y-6">
+                <!-- Summary Metrics Bar -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div class="p-4 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-1">
+                        <div class="text-[10px] uppercase font-bold text-ink-400">Total Baris Terbaca</div>
+                        <div class="text-2xl font-black text-ink-950 dark:text-white tabular-nums">{{ $atributPreview['total_baris'] ?? 0 }}</div>
+                        <div class="text-[11px] text-ink-400">Dari seluruh sheet atribut</div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-up-mint/10 border border-up-mint/30 space-y-1">
+                        <div class="text-[10px] uppercase font-bold text-up-mint">Data Baru</div>
+                        <div class="text-2xl font-black text-up-mint tabular-nums">
+                            {{ collect($atributPreview['summary'] ?? [])->sum('baru') }}
+                        </div>
+                        <div class="text-[11px] text-up-mint/80">Akan ditambahkan ke database</div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-up-primary/10 border border-up-primary/30 space-y-1">
+                        <div class="text-[10px] uppercase font-bold text-up-primary">Data Sudah Ada</div>
+                        <div class="text-2xl font-black text-up-primary tabular-nums">
+                            {{ collect($atributPreview['summary'] ?? [])->sum('update') }}
+                        </div>
+                        <div class="text-[11px] text-up-primary/80">Akan disinkronkan / diperbarui</div>
+                    </div>
+                    <div class="p-4 rounded-2xl bg-up-red/10 border border-up-red/30 space-y-1">
+                        <div class="text-[10px] uppercase font-bold text-up-red">Baris Error</div>
+                        <div class="text-2xl font-black text-up-red tabular-nums">{{ $atributPreview['total_error'] ?? 0 }}</div>
+                        <div class="text-[11px] text-up-red/80">Kolom wajib kosong / tidak valid</div>
+                    </div>
+                </div>
+
+                <!-- Sub-tab Selector per Atribut Type -->
+                <div class="flex items-center gap-2 overflow-x-auto pb-1 border-b border-black/10 dark:border-white/10">
+                    @php
+                        $tabLabels = [
+                            'kategori' => 'Kategori & Sub',
+                            'brand' => 'Brand / Merk',
+                            'kualitas' => 'Kualitas / Grade',
+                            'satuan' => 'Satuan Unit',
+                            'rak' => 'Rak Gudang',
+                            'tipe_hp' => 'Tipe HP',
+                        ];
+                    @endphp
+                    @foreach($tabLabels as $key => $label)
+                        @php
+                            $sum = $atributPreview['summary'][$key] ?? ['total' => 0, 'baru' => 0, 'update' => 0, 'error' => 0];
+                            $isActive = $atributActivePreviewTab === $key;
+                        @endphp
+                        <button type="button"
+                                wire:click="setAtributActivePreviewTab('{{ $key }}')"
+                                class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer whitespace-nowrap {{ $isActive ? 'bg-up-primary text-white shadow' : 'bg-black/5 dark:bg-white/5 text-ink-400 hover:text-white' }}">
+                            <span>{{ $label }}</span>
+                            <span class="px-1.5 py-0.5 rounded-full text-[10px] {{ $isActive ? 'bg-white/20 text-white' : 'bg-black/20 text-ink-300' }}">
+                                {{ $sum['total'] }}
+                            </span>
+                        </button>
+                    @endforeach
+                </div>
+
+                <!-- Data Table Preview -->
+                <div class="p-5 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-4">
+                    @php
+                        $activeItems = $atributPreview['items'][$atributActivePreviewTab] ?? [];
+                    @endphp
+
+                    @if(empty($activeItems))
+                        <div class="py-12 text-center text-xs text-ink-400">
+                            Tidak ada baris data untuk jenis atribut <strong>{{ $tabLabels[$atributActivePreviewTab] ?? $atributActivePreviewTab }}</strong> di dalam file ini.
+                        </div>
+                    @else
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="border-b border-black/10 dark:border-white/10 text-ink-400 text-[10px] uppercase font-bold">
+                                        <th class="py-2.5 px-3">No</th>
+                                        <th class="py-2.5 px-3">Baris</th>
+                                        @if($atributActivePreviewTab === 'kategori')
+                                            <th class="py-2.5 px-3">Kategori Utama</th>
+                                            <th class="py-2.5 px-3">Sub Kategori</th>
+                                            <th class="py-2.5 px-3">Slug</th>
+                                            <th class="py-2.5 px-3">Urutan</th>
+                                        @elseif($atributActivePreviewTab === 'brand')
+                                            <th class="py-2.5 px-3">Nama Brand</th>
+                                            <th class="py-2.5 px-3">Keterangan</th>
+                                        @elseif($atributActivePreviewTab === 'kualitas')
+                                            <th class="py-2.5 px-3">Nama Kualitas / Grade</th>
+                                            <th class="py-2.5 px-3">Brand Terkait</th>
+                                            <th class="py-2.5 px-3">Keterangan</th>
+                                        @elseif($atributActivePreviewTab === 'satuan')
+                                            <th class="py-2.5 px-3">Kode Satuan</th>
+                                            <th class="py-2.5 px-3">Nama Satuan</th>
+                                        @elseif($atributActivePreviewTab === 'rak')
+                                            <th class="py-2.5 px-3">Gudang</th>
+                                            <th class="py-2.5 px-3">Kode Rak</th>
+                                            <th class="py-2.5 px-3">Nama Rak</th>
+                                            <th class="py-2.5 px-3">Zona</th>
+                                        @elseif($atributActivePreviewTab === 'tipe_hp')
+                                            <th class="py-2.5 px-3">Merk</th>
+                                            <th class="py-2.5 px-3">Model</th>
+                                            <th class="py-2.5 px-3">Nama Lengkap</th>
+                                        @endif
+                                        <th class="py-2.5 px-3 text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-black/5 dark:divide-white/5">
+                                    @foreach(array_slice($activeItems, 0, 100) as $idx => $row)
+                                        <tr class="hover:bg-white/[0.02] transition">
+                                            <td class="py-2.5 px-3 text-ink-400 font-mono">{{ $idx + 1 }}</td>
+                                            <td class="py-2.5 px-3 text-ink-400 font-mono">#{{ $row['_baris'] ?? '-' }}</td>
+                                            @if($atributActivePreviewTab === 'kategori')
+                                                <td class="py-2.5 px-3 font-bold text-ink-900 dark:text-white">{{ $row['kategori_utama'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 text-ink-300">{{ $row['sub_kategori'] ?: '-' }}</td>
+                                                <td class="py-2.5 px-3 font-mono text-[11px] text-ink-400">{{ $row['kode_slug'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 tabular-nums text-ink-400">{{ $row['urutan'] ?? 0 }}</td>
+                                            @elseif($atributActivePreviewTab === 'brand')
+                                                <td class="py-2.5 px-3 font-bold text-ink-900 dark:text-white">{{ $row['nama'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 text-ink-400">{{ $row['keterangan'] ?: '-' }}</td>
+                                            @elseif($atributActivePreviewTab === 'kualitas')
+                                                <td class="py-2.5 px-3 font-bold text-ink-900 dark:text-white">{{ $row['nama'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 text-ink-300">{{ $row['brand'] ?: 'Universal (Semua Brand)' }}</td>
+                                                <td class="py-2.5 px-3 text-ink-400">{{ $row['keterangan'] ?: '-' }}</td>
+                                            @elseif($atributActivePreviewTab === 'satuan')
+                                                <td class="py-2.5 px-3 font-mono font-bold text-up-mint uppercase">{{ $row['kode'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 text-ink-900 dark:text-white">{{ $row['nama'] ?? '-' }}</td>
+                                            @elseif($atributActivePreviewTab === 'rak')
+                                                <td class="py-2.5 px-3 text-ink-300">{{ $row['gudang'] ?: 'Gudang Utama (Default)' }}</td>
+                                                <td class="py-2.5 px-3 font-mono font-bold text-up-mint">{{ $row['kode'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 text-ink-900 dark:text-white">{{ $row['nama'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 text-ink-400">{{ $row['zona'] ?: '-' }}</td>
+                                            @elseif($atributActivePreviewTab === 'tipe_hp')
+                                                <td class="py-2.5 px-3 font-bold text-up-primary">{{ $row['merk'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 font-semibold text-ink-900 dark:text-white">{{ $row['model'] ?? '-' }}</td>
+                                                <td class="py-2.5 px-3 text-ink-400">{{ $row['nama'] ?: '-' }}</td>
+                                            @endif
+                                            <td class="py-2.5 px-3 text-right">
+                                                @if(($row['status'] ?? '') === 'baru')
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/20 text-up-mint">
+                                                        + Baru
+                                                    </span>
+                                                @elseif(($row['status'] ?? '') === 'update')
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-primary/20 text-up-primary">
+                                                        ⟳ Perbarui
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-red/20 text-up-red" title="{{ $row['error_msg'] ?? '' }}">
+                                                        ⚠ {{ $row['error_msg'] ?? 'Error' }}
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if(count($activeItems) > 100)
+                            <div class="text-center text-[11px] text-ink-400 pt-2">
+                                Menampilkan 100 dari {{ count($activeItems) }} baris data. Seluruh baris valid akan diproses saat konfirmasi.
+                            </div>
+                        @endif
+                    @endif
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                    <button type="button"
+                            wire:click="batalImportAtribut"
+                            class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-300 font-bold text-xs hover:bg-black/10 transition cursor-pointer">
+                        ← Batalkan &amp; Ganti Berkas
+                    </button>
+
+                    <button type="button"
+                            wire:click="commitImportAtribut"
+                            wire:loading.attr="disabled"
+                            class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/20 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
+                        <span wire:loading.remove wire:target="commitImportAtribut">Konfirmasi &amp; Proses Import Atribut ✓</span>
+                        <span wire:loading wire:target="commitImportAtribut" class="flex items-center gap-2">
+                            <span class="animate-spin">⏳</span>
+                            <span>Menyimpan ke Database...</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+        @elseif($atributStep === 'selesai')
+            <!-- Step 3: Ringkasan Selesai Import Atribut -->
+            <div class="max-w-xl mx-auto p-6 sm:p-8 rounded-2xl bg-black/5 dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-6 text-center">
+                <div class="w-16 h-16 rounded-full bg-up-mint/10 border border-up-mint/20 text-up-mint text-3xl flex items-center justify-center mx-auto shadow-lg shadow-up-mint/10">
+                    ✓
+                </div>
+
+                <div class="space-y-1.5">
+                    <h2 class="text-xl sm:text-2xl font-black text-ink-950 dark:text-white">
+                        Import Atribut Produk Berhasil!
+                    </h2>
+                    <p class="text-xs text-ink-400">
+                        Seluruh master atribut telah berhasil disimpan dan disinkronkan ke database. Master produk kini siap diimpor dengan referensi lengkap.
+                    </p>
+                </div>
+
+                <!-- Breakdown Metrics -->
+                <div class="p-4 rounded-xl bg-black/40 border border-white/5 text-left text-xs space-y-2">
+                    <div class="font-bold text-ink-300 pb-1 border-b border-white/10 flex items-center justify-between">
+                        <span>Rincian Data Tersimpan</span>
+                        <span class="text-up-mint font-mono font-bold">{{ $atributImportResult['total_berhasil'] ?? 0 }} Data Berhasil</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                        @foreach(['kategori' => 'Kategori', 'brand' => 'Brand', 'kualitas' => 'Kualitas', 'satuan' => 'Satuan', 'rak' => 'Rak', 'tipe_hp' => 'Tipe HP'] as $k => $l)
+                            @php
+                                $r = $atributImportResult[$k] ?? ['sukses' => 0, 'update' => 0];
+                                $tot = ($r['sukses'] ?? 0) + ($r['update'] ?? 0);
+                            @endphp
+                            <div class="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                                <span class="text-ink-400">{{ $l }}</span>
+                                <span class="font-bold font-mono text-ink-200">
+                                    {{ $tot }} <span class="text-[9px] text-ink-500">({{ $r['sukses'] ?? 0 }} baru, {{ $r['update'] ?? 0 }} update)</span>
+                                </span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- Bottom Next Step CTA -->
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                    <button type="button"
+                            wire:click="batalImportAtribut"
+                            class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-ink-300 font-bold text-xs hover:bg-black/10 transition cursor-pointer">
+                        Import Atribut Lainnya
+                    </button>
+
+                    <button type="button"
+                            wire:click="setTab('import')"
+                            class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-up-primary hover:bg-up-primary/90 text-white font-bold text-xs shadow-md shadow-up-primary/20 transition cursor-pointer flex items-center justify-center gap-2">
+                        <span>Lanjut ke Import Master Produk →</span>
+                    </button>
+                </div>
+            </div>
+        @endif
     @endif
 </div>

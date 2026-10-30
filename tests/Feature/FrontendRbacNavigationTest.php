@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Modules\Rbac\Livewire\SettingsRbac;
 use App\Modules\Rbac\Models\Cabang;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class FrontendRbacNavigationTest extends TestCase
@@ -214,5 +216,61 @@ class FrontendRbacNavigationTest extends TestCase
 
         $responseKasir->assertStatus(200);
         $responseKasir->assertSee('Buka Kasir POS (F2)');
+    }
+
+    public function test_sidebar_pengaturan_terkategorisasi_dan_shortcut_wms_export_import_dihapus(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->cabangs()->attach($this->cabang->id);
+        $superAdmin->assignRole('super-admin');
+
+        $response = $this->actingAs($superAdmin)
+            ->withSession(['active_cabang_id' => $this->cabang->id])
+            ->get(route('dashboard'));
+
+        $response->assertStatus(200);
+
+        // Shortcut di WMS dropdown sudah dihapus
+        $response->assertDontSee('Export & Import Master → Pengaturan');
+
+        // Sidebar dropdown Pengaturan memiliki pengelompokan kategori yang jelas
+        $response->assertSee('Akses &amp; Pengguna', false);
+        $response->assertSee('Katalog &amp; Web', false);
+        $response->assertSee('Operasional &amp; Bisnis', false);
+        $response->assertSee('Sistem &amp; Keamanan', false);
+    }
+
+    public function test_pengaturan_card_kategori_dan_slider_mobile_berfungsi(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->cabangs()->attach($this->cabang->id);
+        $superAdmin->assignRole('super-admin');
+
+        Livewire::actingAs($superAdmin)
+            ->test(SettingsRbac::class)
+            ->assertSet('activeTab', 'users')
+            // Switch category via card category method
+            ->call('setSubModul', 'katalog')
+            ->assertSet('activeTab', 'master_produk')
+            ->call('setSubModul', 'kebijakan')
+            ->assertSet('activeTab', 'loyalitas')
+            ->call('setSubModul', 'operasional')
+            ->assertSet('activeTab', 'master')
+            ->call('setSubModul', 'integrasi')
+            ->assertSet('activeTab', 'integrasi')
+            ->call('setSubModul', 'sistem')
+            ->assertSet('activeTab', 'database')
+            ->call('setSubModul', 'akses')
+            ->assertSet('activeTab', 'users');
+
+        $response = $this->actingAs($superAdmin)
+            ->withSession(['active_cabang_id' => $this->cabang->id])
+            ->get(route('pengaturan'));
+
+        $response->assertStatus(200);
+        // Slider horizontal mobile didukung pada Tier 1 card kategori dan Tier 2 contextual tabs
+        $response->assertSee('touch-pan-x');
+        $response->assertSee('scrollbar-none');
+        $response->assertSee('w-[140px]');
     }
 }

@@ -2331,7 +2331,7 @@ class ProdukTab extends Component
     #[On('wms-import-modal')]
     public function openImportModal()
     {
-        return $this->redirect(route('wms.import-export'), navigate: true);
+        return $this->redirect(route('pengaturan', ['tab' => 'export_import']), navigate: true);
     }
 
     // Quick action header "Export Master Produk" (dari shell WmsDashboard via $dispatch)

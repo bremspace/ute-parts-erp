@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
-use App\Modules\Wms\Livewire\ImportExportPage;
+use App\Modules\Wms\Livewire\ImportFotoPage;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
@@ -183,7 +183,7 @@ class BulkFotoChunkUploadTest extends TestCase
         $fakeImg = UploadedFile::fake()->image('LCD-IP13-PRO_1.jpg');
         $fakeImg->storeAs($stagingDir, 'lcd-ip13-pro-1_123456.jpg', 'local');
 
-        Livewire::test(ImportExportPage::class)
+        Livewire::test(ImportFotoPage::class)
             ->call('scanFromStagingSession', $sessionId)
             ->assertSet('fotoStep', 'preview')
             ->assertDispatched('alert');
@@ -215,7 +215,7 @@ class BulkFotoChunkUploadTest extends TestCase
         $fakeImg->storeAs($stagingDir, 'bat-ip12-01_123456.jpg', 'local');
 
         // Saat fotoMode = 'skip_existing', produk yang sudah memiliki foto disortir ke skipped
-        Livewire::test(ImportExportPage::class)
+        Livewire::test(ImportFotoPage::class)
             ->set('fotoMode', 'skip_existing')
             ->call('scanFromStagingSession', $sessionId)
             ->assertSet('fotoStep', 'preview')

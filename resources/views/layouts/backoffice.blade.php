@@ -451,7 +451,12 @@
                     <div x-show="isDropdownOpen('pengaturan')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
+
+                        <!-- Kategori: Akses & Pengguna -->
                         @canany(['pengaturan.manage', 'user.view'])
+                        <div class="px-2 pt-1.5 pb-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-400/70 dark:text-ink-500 select-none">
+                            Akses &amp; Pengguna
+                        </div>
                         <a href="/app/pengaturan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pengaturan') && !request()->has('tab') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pengaturan') && !request()->has('tab') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
                             <span>Pusat Pengaturan</span>
@@ -463,15 +468,31 @@
                             <span>Akses, User &amp; Cabang</span>
                         </a>
                         @endcan
+
+                        <!-- Kategori: Katalog & Web -->
                         @can('pengaturan.manage')
-                        <a href="{{ route('pengaturan.web-konsumen') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->routeIs('pengaturan.web-konsumen') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('pengaturan.web-konsumen') ? 'bg-white' : 'bg-pink-400' }}"></span>
-                            <span>Web Konsumen (CMS)</span>
-                        </a>
+                        <div class="px-2 pt-2.5 pb-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-400/70 dark:text-ink-500 select-none">
+                            Katalog &amp; Web
+                        </div>
                         <a href="/app/pengaturan?tab=master_produk" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'master_produk' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'master_produk' ? 'bg-white' : 'bg-sky-400' }}"></span>
                             <span>Katalog &amp; Master Part</span>
                         </a>
+                        @canany(['pengaturan.manage', 'wms.create'])
+                        <a href="/app/pengaturan?tab=export_import" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'export_import' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'export_import' ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                            <span>Export &amp; Import Master</span>
+                        </a>
+                        @endcanany
+                        <a href="{{ route('pengaturan.web-konsumen') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->routeIs('pengaturan.web-konsumen') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('pengaturan.web-konsumen') ? 'bg-white' : 'bg-pink-400' }}"></span>
+                            <span>Web Konsumen (CMS)</span>
+                        </a>
+
+                        <!-- Kategori: Operasional & Bisnis -->
+                        <div class="px-2 pt-2.5 pb-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-400/70 dark:text-ink-500 select-none">
+                            Operasional &amp; Bisnis
+                        </div>
                         <a href="/app/pengaturan?tab=loyalitas" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'loyalitas' || request('tab') === 'pajak' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'loyalitas' || request('tab') === 'pajak' ? 'bg-white' : 'bg-up-amber' }}"></span>
                             <span>Kebijakan Poin &amp; PPN</span>
@@ -485,6 +506,11 @@
                             <span>Gateway &amp; Integrasi</span>
                         </a>
                         @endcan
+
+                        <!-- Kategori: Sistem & Keamanan -->
+                        <div class="px-2 pt-2.5 pb-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-400/70 dark:text-ink-500 select-none">
+                            Sistem &amp; Keamanan
+                        </div>
                         @if(isSuperAdminOrOwner())
                         <a href="/app/pengaturan?tab=database" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'database' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'database' ? 'bg-white' : 'bg-purple-400' }}"></span>

@@ -16,6 +16,7 @@ use App\Modules\Rbac\Services\AuditService;
 use App\Modules\Rbac\Services\DatabaseManagementService;
 use App\Modules\Reseller\Models\SkemaKomisi;
 use App\Modules\Servis\Models\JenisServis;
+use App\Modules\Wms\Exports\AtributProdukExport;
 use App\Modules\Wms\Models\Brand;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\KategoriProduk;
@@ -25,6 +26,7 @@ use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\SatuanUnit;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\TipeHp;
+use App\Modules\Wms\Services\ImportAtributService;
 use App\Traits\ParsesNominal;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +36,7 @@ use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -105,6 +108,19 @@ class SettingsRbac extends Component
         'percent' => 11.0,
         'mode' => 'exclusive',
     ];
+
+    // Export & Import Atribut (tab export_import)
+    public $atributFile = null;
+
+    public string $atributTarget = 'all';
+
+    public string $atributStep = 'upload'; // upload, preview, selesai
+
+    public array $atributPreview = [];
+
+    public array $atributImportResult = [];
+
+    public string $atributActivePreviewTab = 'kategori';
 
     // Konfigurasi Printer Label QR Produk & Struk Kasir
     public string $printerSubTab = 'struk'; // 'struk' | 'label' | 'wms_doc' | 'hr_slip' | 'laporan' | 'pengiriman'
@@ -222,7 +238,7 @@ class SettingsRbac extends Component
     {
         if (request()->has('tab')) {
             $tab = (string) request('tab');
-            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris'], true)) {
+            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'export_import', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris'], true)) {
                 $this->activeTab = $tab;
             }
         }
@@ -262,6 +278,19 @@ class SettingsRbac extends Component
         $this->loadPajakConfig();
         $this->loadPrinterConfig();
         $this->loadIntegrasiConfig();
+    }
+
+    public function setSubModul(string $modul): void
+    {
+        match ($modul) {
+            'akses' => $this->activeTab = in_array($this->activeTab, ['users', 'role', 'cabang'], true) ? $this->activeTab : 'users',
+            'katalog' => $this->activeTab = in_array($this->activeTab, ['master_produk', 'export_import'], true) ? $this->activeTab : 'master_produk',
+            'kebijakan' => $this->activeTab = in_array($this->activeTab, ['loyalitas', 'pajak', 'qris'], true) ? $this->activeTab : 'loyalitas',
+            'operasional' => $this->activeTab = in_array($this->activeTab, ['master', 'printer'], true) ? $this->activeTab : 'master',
+            'integrasi' => $this->activeTab = 'integrasi',
+            'sistem' => $this->activeTab = (isSuperAdminOrOwner() ? 'database' : 'master'),
+            default => null,
+        };
     }
 
     public function updatedPajakFormTarget(): void
@@ -3479,6 +3508,88 @@ class SettingsRbac extends Component
         }
 
         return false;
+    }
+
+    // ===== Export & Import Master Data (tab export_import) =====
+
+    public function exportData(string $format = 'xlsx')
+    {
+        $this->validate(['format' => 'in:xlsx,csv']);
+        $export = new AtributProdukExport(
+            mode: 'template',
+            cabangId: session('cabang_id')
+        );
+        $fileName = 'template-atribut-'.now()->format('Ymd-His').'.'.$format;
+
+        return Excel::download($export, $fileName);
+    }
+
+    public function exportAtribut(string $format = 'xlsx')
+    {
+        $this->validate(['format' => 'in:xlsx,csv']);
+        $export = new AtributProdukExport(
+            mode: 'data',
+            cabangId: session('cabang_id')
+        );
+        $fileName = 'data-atribut-'.now()->format('Ymd-His').'.'.$format;
+
+        return Excel::download($export, $fileName);
+    }
+
+    public function downloadTemplateAtribut()
+    {
+        $export = new AtributProdukExport(
+            mode: 'template',
+            cabangId: session('cabang_id')
+        );
+        $fileName = 'template-atribut.xlsx';
+
+        return Excel::download($export, $fileName);
+    }
+
+    public function previewImportAtribut(): void
+    {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengimpor atribut.')) {
+            return;
+        }
+
+        $this->validate(['atributFile' => 'required|file|mimes:xlsx,xls,csv|max:5120']);
+
+        $service = app(ImportAtributService::class);
+        $filePath = is_string($this->atributFile) ? $this->atributFile : $this->atributFile->getRealPath();
+        $preview = $service->preview($filePath, $this->atributTarget ?? 'all', session('cabang_id'));
+
+        $this->atributPreview = $preview;
+        $this->atributStep = 'preview';
+    }
+
+    public function commitImportAtribut(): void
+    {
+        if (! $this->bolehKatalog(self::PERM_MASTER_PRODUK, 'Anda tidak memiliki izin mengimpor atribut.')) {
+            return;
+        }
+
+        $service = app(ImportAtributService::class);
+        $result = $service->execute($this->atributPreview['items'] ?? [], session('cabang_id'));
+
+        $this->atributImportResult = $result;
+        $this->atributStep = 'selesai';
+        $this->dispatch('alert', ['type' => 'success', 'message' => 'Import Atribut Produk Berhasil']);
+    }
+
+    public function cancelImportAtribut(): void
+    {
+        $this->reset('atributFile', 'atributStep', 'atributPreview', 'atributImportResult');
+    }
+
+    public function batalImportAtribut(): void
+    {
+        $this->cancelImportAtribut();
+    }
+
+    public function setAtributActivePreviewTab(string $tab): void
+    {
+        $this->atributActivePreviewTab = $tab;
     }
 
     public function render()

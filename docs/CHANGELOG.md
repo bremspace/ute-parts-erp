@@ -3,6 +3,54 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-30 — Perbaikan UI Sidebar Pengaturan, Card Kategori & Slider Mobile ✅
+
+- **Kategorisasi Dropdown Sidebar Pengaturan (`backoffice.blade.php`)**:
+  - Mengelompokkan submenu Pengaturan ke dalam 4 bagian terstruktur: **Akses & Pengguna**, **Katalog & Web**, **Operasional & Bisnis**, dan **Sistem & Keamanan** dengan header sub-kategori yang rapi sehingga tidak terasa sesak.
+- **Pembersihan Shortcut WMS (`backoffice.blade.php`)**:
+  - Menghapus shortcut tautan "Export & Import Master → Pengaturan" dari dropdown sidebar WMS sesuai permintaan.
+- **Perbaikan Navigasi Card Kategori Pengaturan (`SettingsRbac.php`, `settings-rbac.blade.php`)**:
+  - Menambahkan method `setSubModul(modul)` pada backend Livewire `SettingsRbac.php` untuk meresolusi tab aktif kategori secara konsisten.
+  - Memperbaiki reaktivitas Alpine `setSubModul` yang sebelumnya mengandalkan nilai statis `@js($activeTab)`, sehingga klik pada card kategori (Akses, Katalog, Kebijakan, Operasional, Integrasi, Sistem) langsung beralih tab dengan benar.
+  - Memperbaiki mapping kategori `export_import` ke `katalog` dan mendaftarkan tab `export_import` ke whitelist `$activeTab` di `mount()`.
+- **Perbaikan Slider Horizontal Mobile (`settings-rbac.blade.php`)**:
+  - Mengubah layout card kategori Tier 1 menjadi smooth horizontal slider di mobile (`flex sm:grid overflow-x-auto flex-nowrap sm:flex-wrap touch-pan-x scrollbar-none w-[140px] sm:w-auto`) agar tidak bertumpuk dalam 3 baris grid.
+  - Mengoptimalkan tab kontekstual Tier 2, sub-tab Tier 3 atribut produk, dan preview import dengan kontainer `w-full min-w-0 flex-nowrap overflow-x-auto` dan tombol `flex-shrink-0 whitespace-nowrap` untuk navigasi horizontal mulus pada layar sentuh.
+- **Pengujian & Verifikasi Fitur**:
+  - 100% test lulus pada `FrontendRbacNavigationTest` dan seluruh rangkaian modul terkait (58 tests, 340 assertions).
+
+## 2026-10-30 — Relokasi Export & Import Master ke Pengaturan & Isolasi Bulk Foto WMS ✅
+
+- **Relokasi Workspace Export & Import Master ke Pengaturan (`SettingsRbac.php`, `settings-rbac.blade.php`)**:
+  - Memindahkan seluruh fungsionalitas ekspor & impor master atribut (Kategori, Brand, Kualitas, Satuan, Rak, Tipe HP) ke menu Pengaturan di bawah grup **Katalog & Master Produk** (`/app/pengaturan?tab=export_import`).
+  - Menyediakan unduh template multi-sheet (.xlsx), ekspor data master (.xlsx/.csv), preview dry-run (data baru vs update vs error), serta transactional commit.
+- **Pintasan Navigasi & Backward Compatibility (`backoffice.blade.php`, `wms-dashboard.blade.php`, `web.php`)**:
+  - Menambahkan menu pintasan di sidebar WMS menuju `/app/pengaturan?tab=export_import` bagi staf dengan izin `pengaturan.manage` atau `wms.create`.
+  - Mengarahkan tombol "Import Excel" di dashboard WMS ke Pengaturan `export_import`, dan rute lama `/app/wms/import-export` dialihkan otomatis (HTTP redirect) ke Pengaturan untuk menjaga kompatibilitas bookmark dan alur kerja staf.
+- **Isolasi Halaman Bulk Foto Produk (`ImportFotoPage.php`, `import-foto-page.blade.php`)**:
+  - Mengisolasi fitur upload massal foto produk ke rute dedicated `/app/wms/import-foto` (`name: 'wms.import-foto'`).
+  - Mendukung pre-check staging directory, upload chunked, auto-matching nama file ke SKU produk, kompresi otomatis WebP (Full & Thumbnail), download laporan file dilewati (.xlsx), dan ekspor CSV error.
+- **Pengujian & Verifikasi Fitur**:
+  - Lolos 100% pada 9 rangkaian feature test (56 assertions/tests): `WmsImportExportAtributTest`, `BulkFotoProdukFeatureTest`, `BulkFotoChunkUploadTest`, `WmsImportDuplicateResolutionAndScaleTest`, `WmsImportErrorManagementTest`, `ImportMultiCabangGudangTest`, `WmsImportRakDanSatuanTest`, `FrontendRbacNavigationTest`, dan `WmsDashboardSplitTest`.
+
+## 2026-10-30 — Export & Import Master Atribut Produk (Terpisah dari Master Produk) ✅
+
+- **T-ATR-01 — Export Atribut Multi-Sheet (`AtributProdukExport.php`)**:
+  - Ekspor master atribut dalam workbook multi-sheet: Kategori (dengan parent–sub), Brand, Kualitas/Grade, Satuan, Rak (per gudang, scoped cabang), dan Tipe HP (merk–model).
+  - Dua mode: `template` (contoh baris siap diisi) dan `data` (data existing dari database, round-trip compatible dengan import).
+  - Bisa semua atribut sekaligus (multi-sheet) atau spesifik satu atribut saja.
+- **T-ATR-02 — Import Atribut dengan Pre-Flight Validation (`ImportAtributService.php`)**:
+  - Membaca file multi-sheet (.xlsx) dan mendeteksi atribut dari nama sheet (Kategori/Brand/Kualitas/Satuan/Rak/Tipe HP); CSV file tunggal dideteksi otomatis dari header kolom.
+  - Preview dry-run: setiap baris diklasifikasi `baru` / `update` / `error` (kolom wajib kosong) dengan ringkasan per atribut.
+  - Commit transactional: kategori parent–child dengan deteksi nama/slug (case-insensitive) + generator slug unik anti-tabrakan, brand/kualitas/satuan upsert by natural key, rak resolved per gudang (fallback gudang cabang), tipe HP upsert by merk+model.
+  - `is_active` diparse fleksibel (`ya/tidak/1/0/true/aktif`), data error tidak menghentikan proses.
+- **T-ATR-03 — Tab Baru "Atribut" di Halaman Import/Export (`ImportExportPage.php`, `import-export-page.blade.php`)**:
+  - Tab ke-2 `Atribut (Kategori, Brand, dll)` ditambahkan di navigation; alur 3 langkah: Upload → Preview (metric + sub-tab per atribut + tabel status per baris) → Ringkasan selesai.
+  - Sumbu pemilih target atribut (`atributTarget`) mengendalikan template download, ekspor data (.xlsx/.csv), dan scope import.
+  - CTA "Lanjut ke Import Master Produk" di akhir langkah selesai untuk menuntaskan alur kerja atribut-lengkap-terlebih-dahulu.
+- **Pengujian Terotomasi (`WmsImportExportAtributTest.php`)**:
+  - 5 feature tests: struktur multi-sheet export (template & data), execute import 6 tipe atribut sekaligus, upsert/update existing, interaksi Livewire tab + template download, serta flow preview→commit CSV end-to-end (34 assertions passing).
+
 ## 2026-10-28 — Perbaikan 17 Bug Operasional: Fase 4 (Modul Servis & Pengerjaan) ✅
 
 - **T-13 — Form Terima Servis Standar & Auto-Sync CRM Pelanggan (`ServisService.php`, `ServisBoard.php`)**:

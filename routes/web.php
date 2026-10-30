@@ -49,7 +49,7 @@ use App\Modules\Servis\Models\TiketServis;
 use App\Modules\Servis\Services\ServisService;
 use App\Modules\Wms\Controllers\BulkFotoUploadController;
 use App\Modules\Wms\Livewire\CycleCountPage;
-use App\Modules\Wms\Livewire\ImportExportPage;
+use App\Modules\Wms\Livewire\ImportFotoPage;
 use App\Modules\Wms\Livewire\LaporanNomorSeri;
 use App\Modules\Wms\Livewire\WmsDashboard;
 use App\Modules\Wms\Models\Grn;
@@ -599,13 +599,17 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function ()
     Route::get('/wms', WmsDashboard::class)
         ->name('wms')
         ->middleware('permission:wms.view');
+    // WMS Chunked Bulk Foto Upload
 
-    // WMS Export & Import Master Produk Screen
-    Route::get('/wms/import-export', ImportExportPage::class)
+    // WMS Export & Import Master (redirect to Pengaturan)
+    Route::get('/wms/import-export', fn () => redirect()->route('pengaturan', ['tab' => 'export_import']))
         ->name('wms.import-export')
         ->middleware('permission:wms.view');
 
-    // WMS Chunked Bulk Foto Upload
+    // WMS Import Foto Massal (halaman terpisah dari Export/Import yang pindah ke Pengaturan)
+    Route::get('/wms/import-foto', ImportFotoPage::class)
+        ->name('wms.import-foto')
+        ->middleware('permission:wms.view');
     Route::post('/wms/import-foto/pre-check', [BulkFotoUploadController::class, 'preCheck'])
         ->name('wms.import-foto.pre-check')
         ->middleware('permission:wms.view');

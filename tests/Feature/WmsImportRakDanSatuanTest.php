@@ -547,12 +547,13 @@ class WmsImportRakDanSatuanTest extends TestCase
     {
         $role = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
         $permission = Permission::firstOrCreate(['name' => 'wms.view', 'guard_name' => 'web']);
-        $role->givePermissionTo($permission);
+        $permission2 = Permission::firstOrCreate(['name' => 'pengaturan.manage', 'guard_name' => 'web']);
+        $role->givePermissionTo([$permission, $permission2]);
         $this->admin->assignRole($role);
 
-        $response = $this->actingAs($this->admin)->get(route('wms.import-export'));
+        $response = $this->actingAs($this->admin)->get(route('pengaturan', ['tab' => 'export_import']));
         $response->assertStatus(200);
-        $response->assertSee('Workspace Export & Import Produk');
+        $response->assertSee('Export & Import Master');
     }
 
     public function test_livewire_import_export_page_threshold_dapat_diatur_manual(): void

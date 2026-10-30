@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
-use App\Modules\Wms\Livewire\ImportExportPage;
+use App\Modules\Wms\Livewire\ImportFotoPage;
 use App\Modules\Wms\Models\Gudang;
 use App\Modules\Wms\Models\Produk;
 use App\Modules\Wms\Models\SkuVariant;
@@ -54,10 +54,10 @@ class BulkFotoProdukFeatureTest extends TestCase
 
     public function test_import_foto_tab_can_be_rendered(): void
     {
-        $response = $this->get('/app/wms/import-export?tab=foto');
+        $response = $this->get('/app/wms/import-foto');
         $response->assertSuccessful();
-        $response->assertSee('Import Foto Massal');
-        $response->assertSee('Pilih Sumber Foto');
+        $response->assertSee('Import Foto Produk Massal');
+        $response->assertSee('Sumber Foto:');
     }
 
     public function test_bulk_scan_and_match_image_files_via_livewire(): void
@@ -102,7 +102,7 @@ class BulkFotoProdukFeatureTest extends TestCase
         $file2 = UploadedFile::fake()->image('BAT-SAM-A52_1.png', 600, 600);
         $file3 = UploadedFile::fake()->image('UNKNOWN-SKU-999.jpg', 600, 600);
 
-        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+        Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
             ->set('fotoSourceType', 'files')
             ->set('fotoUploads', [$file1, $file2, $file3])
@@ -139,7 +139,7 @@ class BulkFotoProdukFeatureTest extends TestCase
 
         $file = UploadedFile::fake()->image('KAM-BEL-IP12.jpg', 800, 800);
 
-        $test = Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+        $test = Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
             ->set('fotoUploads', [$file])
             ->call('scanUploadedFoto')
@@ -161,7 +161,7 @@ class BulkFotoProdukFeatureTest extends TestCase
     {
         $fileUnknown = UploadedFile::fake()->image('TIDAK-ADA-SKU.jpg', 400, 400);
 
-        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+        Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
             ->set('fotoUploads', [$fileUnknown])
             ->call('scanUploadedFoto')
@@ -174,7 +174,7 @@ class BulkFotoProdukFeatureTest extends TestCase
     {
         $file = UploadedFile::fake()->image('ANY-FILE.jpg', 400, 400);
 
-        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+        Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
             ->set('fotoUploads', [$file])
             ->call('scanUploadedFoto')
@@ -205,7 +205,7 @@ class BulkFotoProdukFeatureTest extends TestCase
 
         $file = UploadedFile::fake()->image('FLX-CHG-IP11.jpg', 800, 800);
 
-        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+        Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
             ->set('fotoUploads', [$file])
             ->call('scanUploadedFoto')
@@ -231,7 +231,7 @@ class BulkFotoProdukFeatureTest extends TestCase
         $fileUnknown1 = UploadedFile::fake()->image('UNKNOWN-A.jpg', 400, 400);
         $fileUnknown2 = UploadedFile::fake()->image('UNKNOWN-B.jpg', 400, 400);
 
-        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+        Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
             ->set('fotoUploads', [$fileUnknown1, $fileUnknown2])
             ->call('scanUploadedFoto')
@@ -246,7 +246,7 @@ class BulkFotoProdukFeatureTest extends TestCase
     {
         $fileUnknown = UploadedFile::fake()->image('ERROR-TEST-SKU.jpg', 400, 400);
 
-        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+        Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
             ->set('fotoUploads', [$fileUnknown])
             ->call('scanUploadedFoto')
@@ -256,7 +256,7 @@ class BulkFotoProdukFeatureTest extends TestCase
 
     public function test_foto_error_filtering_and_load_more(): void
     {
-        Livewire::test(ImportExportPage::class, ['tab' => 'foto'])
+        Livewire::test(ImportFotoPage::class)
             ->set('activeTab', 'foto')
             ->call('setFotoErrorFilterTab', 'gagal')
             ->assertSet('fotoErrorFilterTab', 'gagal')
