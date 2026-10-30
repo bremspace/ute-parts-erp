@@ -645,30 +645,50 @@
                     </label>
                 </div>
 
-                <div class="pt-3 border-t border-white/[0.06]">
-                    <div class="text-xs font-semibold text-white mb-2">Filter Sidebar Katalog yang Diizinkan:</div>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <label class="flex items-center gap-2 text-xs text-ink-300">
-                            <input type="checkbox" wire:model.live="stockForm.allowed_filters.brand" class="rounded border-white/20 text-up-primary focus:ring-0">
-                            <span>Filter Brand</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-xs text-ink-300">
-                            <input type="checkbox" wire:model.live="stockForm.allowed_filters.kategori" class="rounded border-white/20 text-up-primary focus:ring-0">
-                            <span>Filter Kategori</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-xs text-ink-300">
-                            <input type="checkbox" wire:model.live="stockForm.allowed_filters.kualitas" class="rounded border-white/20 text-up-primary focus:ring-0">
-                            <span>Filter Grade Kualitas</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-xs text-ink-300">
-                            <input type="checkbox" wire:model.live="stockForm.allowed_filters.hp" class="rounded border-white/20 text-up-primary focus:ring-0">
-                            <span>Filter Tipe/Model HP</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-xs text-ink-300">
-                            <input type="checkbox" wire:model.live="stockForm.allowed_filters.kondisi" class="rounded border-white/20 text-up-primary focus:ring-0">
-                            <span>Filter Kondisi (Baru/Bekas)</span>
-                        </label>
+                <div class="pt-3 border-t border-white/[0.06] space-y-3">
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/10">
+                        <div>
+                            <div class="text-xs font-semibold text-white">Menu Filter Baris Katalog</div>
+                            <div class="text-[11px] text-ink-400">Tampilkan atau sembunyikan seluruh menu filter di halaman katalog web konsumen</div>
+                        </div>
+                        <input type="checkbox" wire:model.live="stockForm.allowed_filters.enabled" class="rounded border-white/20 text-up-primary focus:ring-0">
                     </div>
+
+                    @if($stockForm['allowed_filters']['enabled'] ?? true)
+                        <div>
+                            <div class="text-xs font-semibold text-white mb-2">Pilih Filter yang Ingin Dimunculkan:</div>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                <label class="flex items-center gap-2 text-xs text-ink-300">
+                                    <input type="checkbox" wire:model.live="stockForm.allowed_filters.kategori" class="rounded border-white/20 text-up-primary focus:ring-0">
+                                    <span>Filter Kategori</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-ink-300">
+                                    <input type="checkbox" wire:model.live="stockForm.allowed_filters.kondisi" class="rounded border-white/20 text-up-primary focus:ring-0">
+                                    <span>Filter Kondisi (Baru/OEM)</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-ink-300">
+                                    <input type="checkbox" wire:model.live="stockForm.allowed_filters.hp" class="rounded border-white/20 text-up-primary focus:ring-0">
+                                    <span>Filter Merk & Model Gadget</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-ink-300">
+                                    <input type="checkbox" wire:model.live="stockForm.allowed_filters.brand" class="rounded border-white/20 text-up-primary focus:ring-0">
+                                    <span>Filter Brand Sparepart</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-ink-300">
+                                    <input type="checkbox" wire:model.live="stockForm.allowed_filters.harga" class="rounded border-white/20 text-up-primary focus:ring-0">
+                                    <span>Filter Rentang Harga</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-ink-300">
+                                    <input type="checkbox" wire:model.live="stockForm.allowed_filters.kualitas" class="rounded border-white/20 text-up-primary focus:ring-0">
+                                    <span>Filter Grade Kualitas</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-ink-300">
+                                    <input type="checkbox" wire:model.live="stockForm.allowed_filters.stok" class="rounded border-white/20 text-up-primary focus:ring-0">
+                                    <span>Filter Ketersediaan Stok</span>
+                                </label>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </x-prism.glass-card>
         </div>

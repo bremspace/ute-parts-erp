@@ -166,17 +166,42 @@
                 </div>
             </div>
 
-            <!-- Step 5: Checklist Kondisi Fisik & Kelengkapan Awal -->
+            <!-- Step 5: Checklist Kondisi Fisik, Kelengkapan & Foto Unit -->
             <div class="space-y-4 pt-4 border-t border-ink-100/80 dark:border-white/10">
                 <div class="flex items-center gap-3">
                     <span class="w-6 h-6 rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-950 text-xs font-bold flex items-center justify-center flex-shrink-0">5</span>
-                    <h3 class="text-sm font-bold uppercase tracking-wider text-ink-900 dark:text-white">Kondisi Fisik & Kelengkapan Awal</h3>
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-ink-900 dark:text-white">Kondisi Fisik, Kelengkapan & Foto Unit</h3>
                 </div>
 
-                <div class="pl-0 sm:pl-9 space-y-4">
+                <div class="pl-0 sm:pl-9 space-y-5">
+                    <!-- Standard Backoffice Core Hardware Checklist -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">
+                            Bagian Fisik yang Bermasalah:
+                        </label>
+                        <p class="text-[11px] text-ink-500 dark:text-ink-400 mb-2.5">
+                            Standar cek diagnostik: klik bagian unit yang terindikasi kendala (chip berwarna = perlu diperiksa):
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            @php $fisikChecks = ['Layar', 'Body', 'Baterai', 'Kamera', 'Speaker', 'Watermark / Kena Air']; @endphp
+                            @foreach($fisikChecks as $check)
+                                <button
+                                    type="button"
+                                    @class([
+                                        'px-3.5 py-2 rounded-xl text-xs font-semibold border transition-[background-color,color,border-color,transform] duration-140 cursor-pointer active:scale-95',
+                                        'bg-up-primary text-white border-up-primary shadow-sm' => in_array($check, $kondisi_fisik, true),
+                                        'bg-ink-50 dark:bg-ink-950 text-ink-700 dark:text-ink-300 border-ink-200/80 dark:border-white/10 hover:border-up-primary' => !in_array($check, $kondisi_fisik, true),
+                                    ])
+                                    wire:click="toggleKondisiFisik('{{ $check }}')"
+                                >{{ $check }}</button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Gejala Kerusakan Tambahan -->
                     <div>
                         <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-2">
-                            Kondisi Fisik Unit Saat Ini (Pilih yang sesuai):
+                            Detail Gejala Kerusakan:
                         </label>
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             @foreach([
@@ -185,7 +210,7 @@
                                 'Bodi / bezel dent baret',
                                 'Backdoor pecah / renggang',
                                 'Tombol keras / macet',
-                                'Pernah kena air / lembap',
+                                'Tidak bisa dicas / longgar',
                             ] as $kf)
                                 <label class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs transition-colors {{ in_array($kf, $kondisi_fisik) ? 'bg-up-amber/10 border-up-amber text-up-amber font-semibold' : 'bg-ink-50 dark:bg-ink-950 border-ink-200/80 dark:border-white/10 text-ink-700 dark:text-ink-300' }}">
                                     <input type="checkbox" wire:click="toggleKondisiFisik('{{ $kf }}')" {{ in_array($kf, $kondisi_fisik) ? 'checked' : '' }} class="rounded text-up-primary focus:ring-up-primary" />
@@ -195,6 +220,7 @@
                         </div>
                     </div>
 
+                    <!-- Kelengkapan yang Dibawa -->
                     <div>
                         <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-2">
                             Kelengkapan yang Dibawa Saat Drop-Off:
@@ -210,6 +236,56 @@
                                     <input type="checkbox" wire:click="toggleKelengkapan('{{ $kel }}')" {{ in_array($kel, $kelengkapan) ? 'checked' : '' }} class="rounded text-up-mint focus:ring-up-mint" />
                                     <span>{{ $kel }}</span>
                                 </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Foto Unit Fisik (Standar Backoffice) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-ink-700 dark:text-ink-300 mb-1.5">
+                            Foto Kondisi Unit Fisik <span class="text-ink-400 font-normal">(opsional — maks. 3 foto)</span>
+                        </label>
+                        <p class="text-[11px] text-ink-500 dark:text-ink-400 mb-2.5">
+                            Lampirkan foto fisik unit depan, belakang, atau titik kerusakan agar teknisi dapat menyiapkan suku cadang presisi.
+                        </p>
+                        <div class="grid grid-cols-3 gap-2.5">
+                            @foreach([0, 1, 2] as $idx)
+                                @php $foto = $foto_unit[$idx] ?? null; @endphp
+                                <div class="relative aspect-square rounded-2xl border-2 border-dashed border-ink-200/80 dark:border-white/15 bg-ink-50 dark:bg-ink-950 overflow-hidden flex items-center justify-center">
+                                    @if($foto)
+                                        <img src="{{ $foto }}" alt="Foto Unit {{ $idx + 1 }}" class="w-full h-full object-cover">
+                                        <button
+                                            type="button"
+                                            wire:click="removeFoto({{ $idx }})"
+                                            class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/75 text-up-red hover:bg-black flex items-center justify-center text-xs font-bold cursor-pointer shadow-md"
+                                            title="Hapus foto"
+                                        >✕</button>
+                                    @else
+                                        <label class="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-ink-100 dark:hover:bg-white/5 transition-colors p-2 text-center">
+                                            <svg class="w-5 h-5 text-ink-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            </svg>
+                                            <span class="text-[10px] text-ink-500 font-semibold leading-tight">
+                                                {{ $idx === 0 ? 'Foto Depan' : ($idx === 1 ? 'Foto Belakang' : 'Detail Rusak') }}
+                                            </span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                class="hidden"
+                                                @change="
+                                                    const file = $event.target.files[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onload = (e) => $wire.handleFotoUpload({{ $idx }}, e.target.result);
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                "
+                                            />
+                                        </label>
+                                    @endif
+                                </div>
                             @endforeach
                         </div>
                     </div>

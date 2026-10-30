@@ -9,16 +9,27 @@
         isDragging: false,
         currentPos: null,
         dots: [
-            { id: 1, x: 50,  y: 50,  label: 'Kiri Atas', row: 0, col: 0 },
-            { id: 2, x: 150, y: 50,  label: 'Tengah Atas', row: 0, col: 1 },
-            { id: 3, x: 250, y: 50,  label: 'Kanan Atas', row: 0, col: 2 },
-            { id: 4, x: 50,  y: 150, label: 'Kiri Tengah', row: 1, col: 0 },
-            { id: 5, x: 150, y: 150, label: 'Tengah / Pusat', row: 1, col: 1 },
-            { id: 6, x: 250, y: 150, label: 'Kanan Tengah', row: 1, col: 2 },
-            { id: 7, x: 50,  y: 250, label: 'Kiri Bawah', row: 2, col: 0 },
-            { id: 8, x: 150, y: 250, label: 'Tengah Bawah', row: 2, col: 1 },
-            { id: 9, x: 250, y: 250, label: 'Kanan Bawah', row: 2, col: 2 },
+            { id: 1, x: 45,  y: 45,  label: 'Kiri Atas', row: 0, col: 0 },
+            { id: 2, x: 135, y: 45,  label: 'Tengah Atas', row: 0, col: 1 },
+            { id: 3, x: 225, y: 45,  label: 'Kanan Atas', row: 0, col: 2 },
+            { id: 4, x: 45,  y: 135, label: 'Kiri Tengah', row: 1, col: 0 },
+            { id: 5, x: 135, y: 135, label: 'Tengah', row: 1, col: 1 },
+            { id: 6, x: 225, y: 135, label: 'Kanan Tengah', row: 1, col: 2 },
+            { id: 7, x: 45,  y: 225, label: 'Kiri Bawah', row: 2, col: 0 },
+            { id: 8, x: 135, y: 225, label: 'Tengah Bawah', row: 2, col: 1 },
+            { id: 9, x: 225, y: 225, label: 'Kanan Bawah', row: 2, col: 2 },
         ],
+        // Android LockPatternView: intermediate collinear dots automatically connect
+        intermediates: {
+            '1-3': 2, '3-1': 2,
+            '4-6': 5, '6-4': 5,
+            '7-9': 8, '9-7': 8,
+            '1-7': 4, '7-1': 4,
+            '2-8': 5, '8-2': 5,
+            '3-9': 6, '9-3': 6,
+            '1-9': 5, '9-1': 5,
+            '3-7': 5, '7-3': 5
+        },
         isDark: {{ $dark ? 'true' : 'false' }},
         init() {
             if (!{{ $dark ? 'true' : 'false' }}) {
@@ -60,12 +71,19 @@
             const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
             const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
             return {
-                x: ((clientX - rect.left) / rect.width) * 300,
-                y: ((clientY - rect.top) / rect.height) * 300,
+                x: ((clientX - rect.left) / rect.width) * 270,
+                y: ((clientY - rect.top) / rect.height) * 270,
             };
         },
         startDrag(e) {
+            try {
+                if (e.target && e.target.setPointerCapture && e.pointerId !== undefined) {
+                    e.target.setPointerCapture(e.pointerId);
+                }
+            } catch (_) {}
+
             this.isDragging = true;
+            this.sequence = [];
             const pos = this.getSvgCoords(e);
             this.currentPos = pos;
             this.checkHit(pos);
@@ -76,25 +94,42 @@
             this.currentPos = pos;
             this.checkHit(pos);
         },
-        endDrag() {
+        endDrag(e) {
             if (!this.isDragging) return;
             this.isDragging = false;
             this.currentPos = null;
             this.syncToWire();
         },
         checkHit(pos) {
-            const threshold = 36;
+            const hitRadius = 32;
             for (const dot of this.dots) {
                 const dist = Math.hypot(pos.x - dot.x, pos.y - dot.y);
-                if (dist <= threshold && !this.sequence.includes(dot.id)) {
+                if (dist <= hitRadius && !this.sequence.includes(dot.id)) {
+                    // Check collinear intermediate dot like Android LockPatternView
+                    if (this.sequence.length > 0) {
+                        const lastId = this.sequence[this.sequence.length - 1];
+                        const pair = `${lastId}-${dot.id}`;
+                        const intermediate = this.intermediates[pair];
+                        if (intermediate && !this.sequence.includes(intermediate)) {
+                            this.sequence.push(intermediate);
+                        }
+                    }
                     this.sequence.push(dot.id);
-                    if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {}
+                    if (navigator.vibrate) try { navigator.vibrate(12); } catch (_) {}
                     break;
                 }
             }
         },
         clickDot(id) {
             if (!this.sequence.includes(id)) {
+                if (this.sequence.length > 0) {
+                    const lastId = this.sequence[this.sequence.length - 1];
+                    const pair = `${lastId}-${id}`;
+                    const intermediate = this.intermediates[pair];
+                    if (intermediate && !this.sequence.includes(intermediate)) {
+                        this.sequence.push(intermediate);
+                    }
+                }
                 this.sequence.push(id);
                 this.syncToWire();
             }
@@ -120,208 +155,129 @@
         },
         get urutanString() {
             return this.sequence.length > 0 ? this.sequence.join(' ➔ ') : '-';
-        },
-        get alurPosisi() {
-            if (this.sequence.length === 0) return '-';
-            return this.sequence.map(id => this.getDot(id).label).join(' ➔ ');
-        },
-        get alurArah() {
-            if (this.sequence.length < 2) return this.sequence.length === 1 ? 'Mulai dari ' + this.getDot(this.sequence[0]).label : '-';
-            const arahList = [];
-            for (let i = 0; i < this.sequence.length - 1; i++) {
-                const from = this.getDot(this.sequence[i]);
-                const to = this.getDot(this.sequence[i + 1]);
-                const dRow = to.row - from.row;
-                const dCol = to.col - from.col;
-                let dir = '';
-                if (dRow === 0 && dCol > 0) dir = 'Kanan ➔';
-                else if (dRow === 0 && dCol < 0) dir = 'Kiri ⬅';
-                else if (dRow > 0 && dCol === 0) dir = 'Bawah ⬇';
-                else if (dRow < 0 && dCol === 0) dir = 'Atas ⬆';
-                else if (dRow > 0 && dCol > 0) dir = 'Serong Kanan-Bawah ↘';
-                else if (dRow > 0 && dCol < 0) dir = 'Serong Kiri-Bawah ↙';
-                else if (dRow < 0 && dCol > 0) dir = 'Serong Kanan-Atas ↗';
-                else if (dRow < 0 && dCol < 0) dir = 'Serong Kiri-Atas ↖';
-                else dir = `${from.id} ke ${to.id}`;
-                arahList.push(`${from.id}➔${to.id} (${dir})`);
-            }
-            return arahList.join(' • ');
         }
     }"
     class="w-full select-none"
 >
-    <!-- Petunjuk Interaktif -->
-    <div class="flex items-center justify-between mb-2">
-        <p class="text-[11px] {{ $dark ? 'text-ink-300' : 'text-ink-600 dark:text-ink-300' }} font-medium flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-up-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
-            </svg>
-            <span>Geser / swipe pola antar titik (seperti di HP Android):</span>
-        </p>
-        <button
-            type="button"
-            @click="reset()"
-            class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-up-red/10 text-up-red hover:bg-up-red/20 border border-up-red/20 cursor-pointer transition-colors"
-        >
-            Reset Pola
-        </button>
-    </div>
-
-    <!-- Area Kanvas Pola Interaktif dalam Smartphone Frame Mockup -->
-    <div class="flex flex-col sm:flex-row gap-5 items-center sm:items-start justify-center">
-        <!-- Smartphone Body Container -->
-        <div class="relative w-64 sm:w-[260px] p-3 pt-3.5 pb-4 rounded-[2.5rem] {{ $dark ? 'bg-[#0f172a] border-4 border-slate-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.8)]' : 'bg-slate-900 border-4 border-slate-700 shadow-2xl' }} flex flex-col items-center flex-shrink-0 transition-transform select-none">
-            <!-- Smartphone Top Speaker & Front Camera Hole -->
-            <div class="w-full flex items-center justify-center gap-2 mb-2.5">
-                <div class="w-10 h-1.5 rounded-full bg-slate-800 border border-slate-700/50"></div>
-                <div class="w-2.5 h-2.5 rounded-full bg-slate-800 border border-slate-700/60 relative">
-                    <span class="absolute inset-0.5 rounded-full bg-blue-900/60"></span>
-                </div>
+    <!-- Android Lock Screen Authentic Pattern Container -->
+    <div class="flex flex-col items-center justify-center space-y-3.5">
+        <!-- Status & Instruction Header -->
+        <div class="w-full flex items-center justify-between text-xs px-1">
+            <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full" :class="sequence.length > 0 ? 'bg-up-mint animate-pulse' : 'bg-slate-400'"></div>
+                <span class="font-medium text-ink-600 dark:text-ink-300" x-text="sequence.length === 0 ? 'Tarik pola kunci layar (Android)' : 'Pola tersambung: ' + sequence.length + ' titik'"></span>
             </div>
-
-            <!-- Smartphone Screen Area -->
-            <div class="relative w-full aspect-square rounded-[1.8rem] {{ $dark ? 'bg-ink-950' : 'bg-slate-950' }} border border-white/10 shadow-inner flex items-center justify-center p-2 touch-none overflow-hidden">
-                <!-- Watermark / Brand in Screen -->
-                <div class="absolute top-2 left-0 right-0 text-center pointer-events-none opacity-40">
-                    <span class="text-[9px] uppercase tracking-widest text-slate-400 font-bold font-mono">Buka Pola Layar</span>
-                </div>
-
-                <svg
-                    x-ref="svgCanvas"
-                    viewBox="0 0 300 300"
-                    class="w-full h-full cursor-crosshair mt-1"
-                    style="touch-action: none;"
-                    @pointerdown="startDrag($event)"
-                    @pointermove="onDrag($event)"
-                    @pointerup="endDrag($event)"
-                    @pointercancel="endDrag($event)"
-                >
-                    <defs>
-                        <filter id="glow-pola" x="-30%" y="-30%" width="160%" height="160%">
-                            <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#8B5CF6" flood-opacity="0.9"/>
-                        </filter>
-                        <filter id="dot-active-glow" x="-40%" y="-40%" width="180%" height="180%">
-                            <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#A78BFA" flood-opacity="1"/>
-                        </filter>
-                    </defs>
-                    <!-- Grid background lines (decorative subtle) -->
-                    <line x1="50" y1="50" x2="250" y2="50" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
-                    <line x1="50" y1="150" x2="250" y2="150" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
-                    <line x1="50" y1="250" x2="250" y2="250" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
-                    <line x1="50" y1="50" x2="50" y2="250" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
-                    <line x1="150" y1="50" x2="150" y2="250" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
-                    <line x1="250" y1="50" x2="250" y2="250" stroke="rgba(255, 255, 255, 0.12)" stroke-dasharray="4,4" />
-
-                    <!-- Polyline connecting selected dots -->
-                    <polyline
-                        :points="polylinePoints"
-                        fill="none"
-                        stroke="#8B5CF6"
-                        stroke-width="7"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        filter="url(#glow-pola)"
-                        class="transition-all"
-                    />
-
-                    <!-- Line following dragging finger/mouse -->
-                    <template x-if="isDragging && lastDot && currentPos">
-                        <line
-                            :x1="lastDot.x"
-                            :y1="lastDot.y"
-                            :x2="currentPos.x"
-                            :y2="currentPos.y"
-                            stroke="#C4B5FD"
-                            stroke-width="5"
-                            stroke-linecap="round"
-                            stroke-dasharray="6,4"
-                            opacity="0.95"
-                        />
-                    </template>
-
-                    <!-- 9 Touch Dots -->
-                    <template x-for="dot in dots" :key="dot.id">
-                        <g :transform="`translate(${dot.x}, ${dot.y})`" class="cursor-pointer transition-transform duration-150" @click="clickDot(dot.id)">
-                            <!-- Outer Touch Area Ring -->
-                            <circle
-                                r="36"
-                                fill="transparent"
-                            />
-
-                            <!-- Outer Visual Pulse Ring on Active -->
-                            <circle
-                                r="26"
-                                :fill="sequence.includes(dot.id) ? 'rgba(139, 92, 246, 0.4)' : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)')"
-                                :stroke="sequence.includes(dot.id) ? '#8B5CF6' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.25)')"
-                                stroke-width="2.5"
-                                :filter="sequence.includes(dot.id) ? 'url(#dot-active-glow)' : 'none'"
-                            />
-
-                            <!-- Inner Core Dot -->
-                            <circle
-                                r="10"
-                                :fill="sequence.includes(dot.id) ? '#FFFFFF' : (isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(0, 0, 0, 0.65)')"
-                                :stroke="sequence.includes(dot.id) ? '#7C3AED' : 'none'"
-                                stroke-width="2"
-                            />
-
-                            <!-- Step Order Badge if visited -->
-                            <template x-if="sequence.includes(dot.id)">
-                                <g transform="translate(14, -14)">
-                                    <circle r="11" fill="#EA580C" stroke="#FFFFFF" stroke-width="1.5" />
-                                    <text
-                                        text-anchor="middle"
-                                        dy="4"
-                                        fill="#FFFFFF"
-                                        font-size="11"
-                                        font-weight="bold"
-                                        x-text="sequence.indexOf(dot.id) + 1"
-                                    ></text>
-                                </g>
-                            </template>
-
-                            <!-- Node Number (subtle background) -->
-                            <template x-if="!sequence.includes(dot.id)">
-                                <text
-                                    text-anchor="middle"
-                                    dy="4"
-                                    :fill="isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'"
-                                    font-size="11"
-                                    font-weight="bold"
-                                    x-text="dot.id"
-                                ></text>
-                            </template>
-                        </g>
-                    </template>
-                </svg>
-            </div>
-
-            <!-- Smartphone Bottom Home Bar Indicator -->
-            <div class="w-16 h-1 rounded-full bg-slate-700/80 mt-2.5 mb-0.5"></div>
+            <button
+                type="button"
+                @click="reset()"
+                x-show="sequence.length > 0"
+                x-cloak
+                class="px-2.5 py-1 rounded-xl text-[11px] font-bold text-up-red hover:bg-up-red/10 border border-up-red/20 cursor-pointer transition-colors"
+            >
+                Reset Pola
+            </button>
         </div>
 
-        <!-- Terjemahan Langsung di Bawah / Samping Pola -->
-        <div class="flex-1 w-full space-y-2">
-            <!-- 1. Urutan Angka -->
-            <div class="p-2.5 rounded-xl {{ $dark ? 'bg-white/[0.03] border border-white/5' : 'bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5' }}">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase tracking-wider {{ $dark ? 'text-ink-400' : 'text-slate-500 dark:text-ink-400' }}">Urutan Titik (1-9)</span>
-                    <span class="text-[10px] font-mono font-bold text-up-amber tabular-nums" x-text="sequence.length + ' titik terpilih'"></span>
-                </div>
-                <p class="text-xs font-mono font-bold text-up-primary mt-1 tracking-wider" x-text="urutanString"></p>
-            </div>
+        <!-- Android Lock Screen Pad Frame -->
+        <div class="relative w-full max-w-[290px] aspect-square rounded-3xl p-3.5 flex items-center justify-center shadow-lg transition-all duration-200 border"
+             :class="isDark ? 'bg-[#0B1120] border-slate-800 shadow-[0_12px_36px_rgba(0,0,0,0.6)]' : 'bg-slate-900 border-slate-800 text-white shadow-xl'">
 
-            <!-- 2. Terjemahan Posisi Grid -->
-            <div class="p-2.5 rounded-xl {{ $dark ? 'bg-white/[0.03] border border-white/5' : 'bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5' }}">
-                <span class="text-[10px] font-bold uppercase tracking-wider {{ $dark ? 'text-ink-400' : 'text-slate-500 dark:text-ink-400' }}">Alur Posisi</span>
-                <p class="text-[11px] font-medium {{ $dark ? 'text-ink-200' : 'text-slate-700 dark:text-ink-200' }} mt-1 leading-relaxed" x-text="alurPosisi"></p>
-            </div>
+            <!-- Ambient Glow Effect -->
+            <div class="absolute inset-0 rounded-3xl bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 pointer-events-none"></div>
 
-            <!-- 3. Terjemahan Arah Gerak -->
-            <div class="p-2.5 rounded-xl {{ $dark ? 'bg-white/[0.03] border border-white/5' : 'bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5' }}">
-                <span class="text-[10px] font-bold uppercase tracking-wider {{ $dark ? 'text-ink-400' : 'text-slate-500 dark:text-ink-400' }}">Arah Gerak Pola</span>
-                <p class="text-[11px] font-semibold text-up-mint mt-1 leading-relaxed" x-text="alurArah"></p>
-            </div>
+            <!-- SVG Pattern Canvas -->
+            <svg
+                x-ref="svgCanvas"
+                viewBox="0 0 270 270"
+                class="w-full h-full cursor-crosshair touch-none select-none relative z-10"
+                style="touch-action: none;"
+                @pointerdown="startDrag($event)"
+                @pointermove="onDrag($event)"
+                @pointerup="endDrag($event)"
+                @pointercancel="endDrag($event)"
+            >
+                <defs>
+                    <!-- Android Glowing Line Filter -->
+                    <filter id="android-glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="#818CF8" flood-opacity="0.85"/>
+                    </filter>
+                    <radialGradient id="dot-active-grad" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#C7D2FE" />
+                        <stop offset="60%" stop-color="#818CF8" />
+                        <stop offset="100%" stop-color="#6366F1" />
+                    </radialGradient>
+                </defs>
+
+                <!-- Line connecting visited dots (Android style smooth polyline) -->
+                <polyline
+                    :points="polylinePoints"
+                    fill="none"
+                    stroke="#818CF8"
+                    stroke-width="5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    filter="url(#android-glow)"
+                    class="transition-all"
+                />
+
+                <!-- Live Drag line following finger -->
+                <template x-if="isDragging && lastDot && currentPos">
+                    <line
+                        :x1="lastDot.x"
+                        :y1="lastDot.y"
+                        :x2="currentPos.x"
+                        :y2="currentPos.y"
+                        stroke="#A5B4FC"
+                        stroke-width="4"
+                        stroke-linecap="round"
+                        stroke-dasharray="4,3"
+                        opacity="0.9"
+                    />
+                </template>
+
+                <!-- 9 Android Pattern Dots -->
+                <template x-for="dot in dots" :key="dot.id">
+                    <g :transform="`translate(${dot.x}, ${dot.y})`" class="cursor-pointer" @click="clickDot(dot.id)">
+                        <!-- Outer Touch Area (Transparent Hit Target) -->
+                        <circle r="36" fill="transparent" />
+
+                        <!-- Active Outer Halo Ring (Android ripple style) -->
+                        <circle
+                            r="22"
+                            :fill="sequence.includes(dot.id) ? 'rgba(129, 140, 248, 0.22)' : 'transparent'"
+                            :stroke="sequence.includes(dot.id) ? 'rgba(129, 140, 248, 0.7)' : 'transparent'"
+                            stroke-width="2"
+                            class="transition-all duration-150"
+                        />
+
+                        <!-- Default Outer Ring Guide (Subtle Android Ring) -->
+                        <circle
+                            r="18"
+                            fill="none"
+                            :stroke="sequence.includes(dot.id) ? 'transparent' : 'rgba(255, 255, 255, 0.12)'"
+                            stroke-width="1.5"
+                        />
+
+                        <!-- Center Dot (The iconic Android dot) -->
+                        <circle
+                            :r="sequence.includes(dot.id) ? 8 : 5.5"
+                            :fill="sequence.includes(dot.id) ? 'url(#dot-active-grad)' : 'rgba(255, 255, 255, 0.75)'"
+                            class="transition-all duration-150"
+                        />
+
+                        <!-- Inner highlight for active dot -->
+                        <template x-if="sequence.includes(dot.id)">
+                            <circle r="3" fill="#FFFFFF" />
+                        </template>
+                    </g>
+                </template>
+            </svg>
+        </div>
+
+        <!-- Pattern Sequence Result Footer -->
+        <div class="w-full p-2.5 rounded-2xl bg-ink-50 dark:bg-white/[0.03] border border-ink-100 dark:border-white/10 flex items-center justify-between text-xs">
+            <span class="text-[11px] font-semibold text-ink-500 dark:text-ink-400">Urutan Terdaftar:</span>
+            <span class="font-mono font-bold text-xs text-up-primary tracking-wide tabular-nums" x-text="urutanString"></span>
         </div>
     </div>
 </div>

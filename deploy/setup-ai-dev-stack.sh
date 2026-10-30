@@ -54,7 +54,6 @@ cat > "${CONFIG_DIR}/opencode.json" <<'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    "opencode-sync-plugin",
     "oh-my-opencode-slim"
   ],
   "provider": {

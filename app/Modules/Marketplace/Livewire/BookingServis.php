@@ -31,9 +31,25 @@ class BookingServis extends Component
 
     public array $kelengkapan = [];
 
+    public array $foto_unit = [];
+
     public string $rencana_datang = '';
 
     public string $catatan = '';
+
+    public function handleFotoUpload(int $index, $content): void
+    {
+        if (! $content) {
+            return;
+        }
+        $this->foto_unit[$index] = $content;
+    }
+
+    public function removeFoto(int $index): void
+    {
+        unset($this->foto_unit[$index]);
+        $this->foto_unit = array_values($this->foto_unit);
+    }
 
     public function mount(): void
     {
@@ -86,6 +102,7 @@ class BookingServis extends Component
             'kunci_terenkripsi' => 'nullable|string|max:255',
             'kondisi_fisik' => 'nullable|array',
             'kelengkapan' => 'nullable|array',
+            'foto_unit' => 'nullable|array',
             'rencana_datang' => 'nullable|string|max:100',
             'catatan' => 'nullable|string|max:500',
         ];
@@ -106,8 +123,11 @@ class BookingServis extends Component
             $catatanBooking[] = 'Catatan: '.$this->catatan;
         }
 
+        $foto = array_values(array_filter($this->foto_unit));
+
         $payload = array_merge($validated, [
             'pelanggan_id' => auth('customer')->id(),
+            'foto_unit' => $foto ?: null,
             'catatan_booking' => implode(' | ', $catatanBooking) ?: null,
         ]);
 

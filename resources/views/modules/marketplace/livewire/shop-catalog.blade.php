@@ -414,8 +414,14 @@
             @endif
         </div>
 
+        @php
+            $allowedFilters = (array) ($webConfig['allowed_filters'] ?? []);
+            $filtersEnabled = $allowedFilters['enabled'] ?? true;
+        @endphp
+        @if($filtersEnabled)
         <!-- Filter Selectors Matrix -->
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5">
+            @if($allowedFilters['kategori'] ?? true)
             <!-- Kategori -->
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="filterKategori"
@@ -456,7 +462,9 @@
                     </div>
                 @endif
             </div>
+            @endif
 
+            @if($allowedFilters['kondisi'] ?? true)
             <!-- Kondisi -->
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="filterKondisi"
@@ -476,7 +484,9 @@
                     </div>
                 @endif
             </div>
+            @endif
 
+            @if($allowedFilters['hp'] ?? true)
             <!-- Merk HP -->
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="filterHpMerk"
@@ -568,7 +578,9 @@
                     </div>
                 @endif
             </div>
+            @endif
 
+            @if($allowedFilters['brand'] ?? true)
             <!-- Brand Part -->
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="filterBrand"
@@ -592,7 +604,9 @@
                     </div>
                 @endif
             </div>
+            @endif
 
+            @if($allowedFilters['harga'] ?? true)
             <!-- Rentang Harga -->
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="hargaMax"
@@ -612,7 +626,9 @@
                     </div>
                 @endif
             </div>
+            @endif
 
+            @if($allowedFilters['kualitas'] ?? true)
             <!-- Kualitas / Grade Part -->
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="filterKualitas"
@@ -637,7 +653,9 @@
                     </div>
                 @endif
             </div>
+            @endif
 
+            @if($allowedFilters['stok'] ?? true)
             <!-- Ketersediaan Stok (sinkron live dengan stok_items backoffice) -->
             <div class="relative min-w-0 w-full">
                 <select wire:model.live="filterStok"
@@ -656,6 +674,7 @@
                     </div>
                 @endif
             </div>
+            @endif
 
             <!-- Sortasi -->
             <div class="relative min-w-0 w-full">
@@ -678,6 +697,7 @@
                 @endif
             </div>
         </div>
+        @endif
     </section>
 
     <!-- Product Section -->

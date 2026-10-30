@@ -91,8 +91,9 @@ class CartCheckout extends Component
         return Cabang::where('is_active', true)->get();
     }
 
-    public function updateQty(string $key, int $qty)
+    public function updateQty(string $key, int|string $qty)
     {
+        $qty = max(1, (int) $qty);
         app(CartService::class)->updateQty($key, $qty);
         $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
     }

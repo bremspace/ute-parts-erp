@@ -62,11 +62,14 @@ class WebKonsumenSettings extends Component
         'show_tier_teaser' => true,
         'catalog_per_page' => 24,
         'allowed_filters' => [
-            'brand' => true,
+            'enabled' => true,
             'kategori' => true,
-            'kualitas' => true,
-            'hp' => true,
             'kondisi' => true,
+            'hp' => true,
+            'brand' => true,
+            'harga' => true,
+            'kualitas' => true,
+            'stok' => true,
         ],
     ];
 

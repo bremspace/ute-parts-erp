@@ -561,7 +561,17 @@
                         </div>
 
                         <div class="flex justify-between items-center pt-3 border-t border-ink-100 dark:border-white/10 text-xs">
-                            <span class="text-ink-500 dark:text-ink-400">{{ $o->cabang?->nama }}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-ink-500 dark:text-ink-400">{{ $o->cabang?->nama }}</span>
+                                <button
+                                    type="button"
+                                    wire:click="bukaDetailOrder({{ $o->id }})"
+                                    class="inline-flex items-center gap-1 text-[11px] font-bold text-up-primary hover:text-indigo-600 transition-colors cursor-pointer"
+                                >
+                                    <span>Cek Detail</span>
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </button>
+                            </div>
                             <span class="font-black text-up-primary tabular-nums text-sm">Rp {{ number_format($o->total_akhir, 0, ',', '.') }}</span>
                         </div>
                     </div>
@@ -895,6 +905,141 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- Modal Detail Pesanan --}}
+                @if($showOrderDetailModal && $selectedOrder)
+                    <div
+                        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="modal-order-title"
+                    >
+                        <div
+                            class="absolute inset-0 bg-ink-950/60 backdrop-blur-sm"
+                            wire:click="tutupDetailOrder"
+                            aria-hidden="true"
+                        ></div>
+
+                        <div class="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-ink-900 border border-ink-100 dark:border-white/10 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+                            <div class="flex items-start justify-between gap-3 border-b border-ink-100 dark:border-white/10 pb-4">
+                                <div>
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Rincian Pesanan</p>
+                                    <h3 id="modal-order-title" class="font-mono text-up-primary font-bold text-base sm:text-lg">
+                                        {{ $selectedOrder->no_transaksi }}
+                                    </h3>
+                                    <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
+                                        {{ $selectedOrder->created_at->format('d M Y, H:i') }} • Cabang: <strong>{{ $selectedOrder->cabang?->nama ?? '-' }}</strong>
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    wire:click="tutupDetailOrder"
+                                    class="w-9 h-9 flex-shrink-0 rounded-xl bg-ink-50 dark:bg-white/5 text-ink-400 hover:text-up-red flex items-center justify-center transition-colors cursor-pointer"
+                                    aria-label="Tutup"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 rounded-2xl bg-ink-50 dark:bg-white/5 text-xs">
+                                <span class="text-ink-600 dark:text-ink-400 font-medium">Status Pesanan:</span>
+                                <x-prism.status-pill :status="$selectedOrder->status" />
+                            </div>
+
+                            {{-- Informasi Pengiriman / Pengambilan --}}
+                            @if($selectedOrder->pengiriman)
+                                <div class="p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/40 text-xs space-y-1.5">
+                                    <p class="font-bold text-sky-700 dark:text-sky-300 flex items-center gap-1.5">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                        <span>Informasi Pengiriman</span>
+                                    </p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-ink-700 dark:text-ink-300 pt-1">
+                                        <div>
+                                            <span class="text-ink-400 block">Kurir / Layanan:</span>
+                                            <span class="font-semibold">{{ $selectedOrder->pengiriman->kurir }} {{ $selectedOrder->pengiriman->layanan ? '('.$selectedOrder->pengiriman->layanan.')' : '' }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-ink-400 block">Nomor Resi:</span>
+                                            <span class="font-mono font-bold text-up-primary">{{ $selectedOrder->pengiriman->tracking_id ?: 'Menunggu resi' }}</span>
+                                        </div>
+                                        <div class="sm:col-span-2">
+                                            <span class="text-ink-400 block">Penerima & Alamat:</span>
+                                            <span class="font-medium">{{ $selectedOrder->pengiriman->nama_penerima }} ({{ $selectedOrder->pengiriman->telepon_tujuan }})</span>
+                                            <p class="text-ink-500 dark:text-ink-400 text-[11px] mt-0.5 leading-relaxed">{{ $selectedOrder->pengiriman->alamat_tujuan }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- Daftar Item Produk --}}
+                            <div class="space-y-2">
+                                <p class="text-xs font-bold text-ink-900 dark:text-white">Daftar Produk ({{ $selectedOrder->items->count() }})</p>
+                                <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                    @foreach($selectedOrder->items as $item)
+                                        <div class="p-3 rounded-2xl bg-white dark:bg-ink-950 border border-ink-100 dark:border-white/10 flex items-center justify-between gap-3 text-xs">
+                                            <div class="min-w-0 flex-1">
+                                                <p class="font-bold text-ink-900 dark:text-white truncate">
+                                                    {{ $item->produk?->nama ?? 'Produk' }}
+                                                </p>
+                                                @if($item->skuVariant)
+                                                    <p class="text-[10px] text-ink-400 font-mono">
+                                                        Varian: {{ $item->skuVariant->warna ?? $item->skuVariant->kode_sku }}
+                                                    </p>
+                                                @endif
+                                                <p class="text-[11px] text-ink-500 dark:text-ink-400 mt-0.5">
+                                                    {{ $item->jumlah }} × Rp {{ number_format($item->harga_satuan, 0, ',', '.') }}
+                                                </p>
+                                            </div>
+                                            <span class="font-mono font-bold text-ink-900 dark:text-white tabular-nums shrink-0">
+                                                Rp {{ number_format($item->subtotal, 0, ',', '.') }}
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            {{-- Rincian Biaya --}}
+                            <div class="p-4 rounded-2xl bg-ink-50 dark:bg-white/5 border border-ink-100 dark:border-white/10 space-y-2 text-xs">
+                                <div class="flex justify-between text-ink-600 dark:text-ink-400">
+                                    <span>Subtotal Produk</span>
+                                    <span class="font-mono tabular-nums">Rp {{ number_format($selectedOrder->subtotal, 0, ',', '.') }}</span>
+                                </div>
+                                @if($selectedOrder->pengiriman && (float) $selectedOrder->pengiriman->ongkir > 0)
+                                    <div class="flex justify-between text-ink-600 dark:text-ink-400">
+                                        <span>Ongkos Kirim</span>
+                                        <span class="font-mono tabular-nums">Rp {{ number_format($selectedOrder->pengiriman->ongkir, 0, ',', '.') }}</span>
+                                    </div>
+                                @endif
+                                @if((float) $selectedOrder->diskon_nominal > 0)
+                                    <div class="flex justify-between text-up-mint">
+                                        <span>Potongan Diskon</span>
+                                        <span class="font-mono tabular-nums">-Rp {{ number_format($selectedOrder->diskon_nominal, 0, ',', '.') }}</span>
+                                    </div>
+                                @endif
+                                @if((float) $selectedOrder->diskon_poin > 0)
+                                    <div class="flex justify-between text-up-mint">
+                                        <span>Poin Ditukar ({{ $selectedOrder->poin_ditukar }} poin)</span>
+                                        <span class="font-mono tabular-nums">-Rp {{ number_format($selectedOrder->diskon_poin, 0, ',', '.') }}</span>
+                                    </div>
+                                @endif
+                                <div class="flex justify-between items-center pt-2 border-t border-ink-200/60 dark:border-white/10 text-sm font-bold">
+                                    <span class="text-ink-900 dark:text-white">Total Akhir</span>
+                                    <span class="font-mono text-up-primary font-black tabular-nums text-base">Rp {{ number_format($selectedOrder->total_akhir, 0, ',', '.') }}</span>
+                                </div>
+                            </div>
+
+                            <div class="pt-2">
+                                <button
+                                    type="button"
+                                    wire:click="tutupDetailOrder"
+                                    class="w-full py-3 rounded-2xl bg-ink-100 dark:bg-white/10 hover:bg-ink-200 dark:hover:bg-white/15 text-ink-700 dark:text-ink-200 font-bold text-xs transition-colors cursor-pointer min-h-[44px]"
+                                >
+                                    Tutup Rincian
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
         @endif
 

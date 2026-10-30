@@ -41,6 +41,11 @@ class CustomerAccount extends Component
 
     public string $newPassword_confirmation = '';
 
+    // Order Detail Modal State
+    public ?int $selectedOrderId = null;
+
+    public bool $showOrderDetailModal = false;
+
     public function mount(): void
     {
         $tab = request()->query('tab');
@@ -55,6 +60,42 @@ class CustomerAccount extends Component
             $this->email = $customer->email ?? '';
             $this->alamat = $customer->alamat ?? '';
         }
+    }
+
+    public function bukaDetailOrder(int $orderId): void
+    {
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return;
+        }
+
+        $order = Transaksi::where('pelanggan_id', $customer->id)->find($orderId);
+        if ($order) {
+            $this->selectedOrderId = $order->id;
+            $this->showOrderDetailModal = true;
+        }
+    }
+
+    public function tutupDetailOrder(): void
+    {
+        $this->showOrderDetailModal = false;
+        $this->selectedOrderId = null;
+    }
+
+    public function getSelectedOrderProperty(): ?Transaksi
+    {
+        if (! $this->selectedOrderId) {
+            return null;
+        }
+
+        $customer = auth('customer')->user();
+        if (! $customer) {
+            return null;
+        }
+
+        return Transaksi::with(['items.produk', 'items.skuVariant', 'cabang', 'pengiriman'])
+            ->where('pelanggan_id', $customer->id)
+            ->find($this->selectedOrderId);
     }
 
     public function getOrdersProperty()
@@ -335,6 +376,7 @@ class CustomerAccount extends Component
         return view('modules.marketplace.livewire.customer-account', [
             'customer' => auth('customer')->user(),
             'orders' => $this->orders,
+            'selectedOrder' => $this->selectedOrder,
             'servis' => $this->servis,
             'notifikasi' => $this->notifikasi,
             'komisi' => $this->komisi,

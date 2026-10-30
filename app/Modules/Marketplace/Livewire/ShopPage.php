@@ -392,6 +392,15 @@ class ShopPage extends Component
         }
     }
 
+    public function updatedQty($value): void
+    {
+        if ((int) $value < 1) {
+            $this->qty = 1;
+        } else {
+            $this->qty = (int) $value;
+        }
+    }
+
     public function addToCart(?int $produkId = null)
     {
         $produk = $produkId ? Produk::find($produkId) : $this->productDetail;
@@ -412,6 +421,32 @@ class ShopPage extends Component
             );
             $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
             $this->dispatch('alert', ['type' => 'success', 'message' => "{$produk->nama} masuk keranjang"]);
+        } catch (\Exception $e) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function beliLangsung(?int $produkId = null)
+    {
+        $produk = $produkId ? Produk::find($produkId) : $this->productDetail;
+        if (! $produk) {
+            return;
+        }
+
+        $catatan = (! $produkId || ($this->productDetail && $produkId === $this->productDetail->id)) && $this->selectedGadgetModel
+            ? "Model: {$this->selectedGadgetModel}"
+            : null;
+
+        try {
+            app(CartService::class)->isi(
+                $produk->id,
+                $this->selectedVariantId,
+                max(1, $this->qty),
+                $catatan
+            );
+            $this->dispatch('cart-updated', count: app(CartService::class)->jumlahItem());
+
+            return redirect()->to('/checkout');
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }

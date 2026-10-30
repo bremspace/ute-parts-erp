@@ -166,9 +166,13 @@
                                 class="w-8 h-8 rounded-xl bg-ink-100/60 dark:bg-white/5 hover:bg-ink-200 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92]">
                                 −
                             </button>
-                            <span class="w-12 text-center font-bold text-sm text-ink-900 dark:text-white tabular-nums">
-                                {{ $qty }}
-                            </span>
+                            <input
+                                type="number"
+                                min="1"
+                                wire:model.live.debounce.300ms="qty"
+                                class="w-14 text-center font-bold text-sm text-ink-900 dark:text-white bg-transparent outline-none border-0 focus:ring-0 p-0 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                aria-label="Jumlah beli"
+                            />
                             <button
                                 type="button"
                                 wire:click="$set('qty', {{ $qty + 1 }})"
@@ -224,12 +228,17 @@
                         </svg>
                         <span>Tambah ke Keranjang</span>
                     </button>
-                    @if(auth('customer')->user())
-                        <a href="{{ route('checkout') }}"
-                           class="px-8 py-4 rounded-2xl font-bold text-sm bg-ink-900 text-white dark:bg-white dark:text-ink-950 hover:opacity-90 transition-[opacity,transform] duration-140 cursor-pointer min-h-[48px] flex items-center justify-center active:scale-[0.97] shadow-sm">
-                            Beli Langsung
-                        </a>
-                    @endif
+                    <button
+                        type="button"
+                        wire:click="beliLangsung"
+                        {{ $stokTotal <= 0 ? 'disabled' : '' }}
+                        class="px-8 py-4 rounded-2xl font-bold text-sm bg-ink-900 text-white dark:bg-white dark:text-ink-950 hover:opacity-90 transition-[opacity,transform] duration-140 cursor-pointer min-h-[48px] flex items-center justify-center active:scale-[0.97] shadow-sm disabled:opacity-40 disabled:cursor-not-allowed gap-2"
+                    >
+                        <svg class="w-4 h-4 text-up-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>Beli Langsung</span>
+                    </button>
                 </div>
 
                 @guest('customer')
@@ -341,7 +350,7 @@
         </div>
 
         <!-- Mobile Floating Sticky Bar for Quick Purchase -->
-        <div class="md:hidden fixed bottom-20 inset-x-3 max-w-xs sm:max-w-sm mx-auto bg-white/95 dark:bg-ink-950/95 backdrop-blur-2xl border border-ink-200/90 dark:border-white/15 rounded-2xl p-2.5 z-30 flex items-center justify-between gap-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)]"
+        <div class="md:hidden fixed bottom-20 inset-x-3 max-w-sm mx-auto bg-white/95 dark:bg-ink-950/95 backdrop-blur-2xl border border-ink-200/90 dark:border-white/15 rounded-2xl p-2.5 z-30 flex items-center justify-between gap-2 shadow-[0_12px_36px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)]"
              style="bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));">
             <div class="pl-2 min-w-0 flex-1">
                 @if($selectedGadgetModel)
@@ -353,17 +362,31 @@
                     Rp {{ number_format($hargaInfo['harga'] * $qty, 0, ',', '.') }}
                 </span>
             </div>
-            <button
-                type="button"
-                wire:click="addToCart"
-                {{ $stokTotal <= 0 ? 'disabled' : '' }}
-                class="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-up-primary hover:bg-up-primary-dark text-white shadow-md active:scale-[0.96] transition-[background-color,transform] duration-140 flex items-center gap-1.5 cursor-pointer disabled:opacity-40 min-h-[44px] flex-shrink-0"
-            >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                <span>+ Keranjang</span>
-            </button>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                    type="button"
+                    wire:click="addToCart"
+                    {{ $stokTotal <= 0 ? 'disabled' : '' }}
+                    class="py-2.5 px-3 rounded-xl font-bold text-xs bg-ink-100 dark:bg-white/10 hover:bg-ink-200 text-ink-800 dark:text-white active:scale-[0.96] transition-[background-color,transform] duration-140 flex items-center gap-1 cursor-pointer disabled:opacity-40 min-h-[42px]"
+                    title="Tambah ke Keranjang"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span>+Keranjang</span>
+                </button>
+                <button
+                    type="button"
+                    wire:click="beliLangsung"
+                    {{ $stokTotal <= 0 ? 'disabled' : '' }}
+                    class="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-up-primary hover:bg-up-primary-dark text-white shadow-md active:scale-[0.96] transition-[background-color,transform] duration-140 flex items-center gap-1 cursor-pointer disabled:opacity-40 min-h-[42px]"
+                >
+                    <span>Beli</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </button>
+            </div>
         </div>
     @endif
 </div>

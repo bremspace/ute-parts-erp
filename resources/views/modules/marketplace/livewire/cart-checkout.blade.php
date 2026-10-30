@@ -359,17 +359,22 @@
                                 </div>
 
                                 <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-5 w-full sm:w-auto min-w-0">
-                                    <!-- Stepper button -->
+                                    <!-- Stepper button & manual input -->
                                     <div class="flex items-center bg-ink-50 dark:bg-ink-950 border border-ink-200/80 dark:border-white/10 rounded-2xl p-1 flex-shrink-0">
                                         <button
                                             type="button"
-                                            wire:click="updateQty('{{ $itemKey }}', {{ $item['qty'] - 1 }})"
+                                            wire:click="updateQty('{{ $itemKey }}', {{ max(1, $item['qty'] - 1) }})"
                                             class="w-7 h-7 rounded-xl bg-white dark:bg-ink-900 hover:bg-ink-100 dark:hover:bg-white/10 font-bold text-ink-700 dark:text-ink-300 transition-colors flex items-center justify-center cursor-pointer active:scale-[0.92] text-xs">
                                             −
                                         </button>
-                                        <span class="w-8 text-center font-bold text-xs text-ink-900 dark:text-white tabular-nums">
-                                            {{ $item['qty'] }}
-                                        </span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value="{{ $item['qty'] }}"
+                                            wire:change="updateQty('{{ $itemKey }}', $event.target.value)"
+                                            class="w-10 text-center font-bold text-xs text-ink-900 dark:text-white bg-transparent outline-none border-0 focus:ring-0 p-0 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            aria-label="Jumlah pesanan"
+                                        />
                                         <button
                                             type="button"
                                             wire:click="updateQty('{{ $itemKey }}', {{ $item['qty'] + 1 }})"
