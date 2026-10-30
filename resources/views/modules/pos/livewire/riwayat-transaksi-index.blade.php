@@ -24,7 +24,7 @@
     </div>
 
     {{-- Kartu Ringkasan (Hari / Tanggal Terpilih) --}}
-    <div class="flex items-stretch gap-3 overflow-x-auto scrollbar-none py-1 sm:grid sm:grid-cols-2 lg:grid-cols-5 -mx-4 px-4 sm:mx-0 sm:px-0 flex-nowrap snap-x snap-mandatory">
+    <div class="flex items-stretch gap-3 overflow-x-auto scrollbar-none py-1 sm:grid sm:grid-cols-2 lg:grid-cols-6 -mx-4 px-4 sm:mx-0 sm:px-0 flex-nowrap snap-x snap-mandatory">
         <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10 snap-start">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
                 <span>Penjualan POS</span>
@@ -45,11 +45,20 @@
         </div>
         <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10 snap-start">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
-                <span>Servis Selesai & Lunas</span>
+                <span>Servis Lunas</span>
                 <span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 text-[10px] font-mono">{{ $ringkasan['count_servis_selesai'] }} Unit</span>
             </div>
             <p class="text-lg sm:text-xl font-bold text-teal-400 tabular-nums mt-1">
                 Rp {{ number_format($ringkasan['total_servis_selesai'], 0, ',', '.') }}
+            </p>
+        </div>
+        <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10 snap-start">
+            <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
+                <span>Total Retur</span>
+                <span class="px-1.5 py-0.5 rounded bg-amber-500/10 text-up-accent text-[10px] font-mono">{{ $ringkasan['count_retur'] ?? 0 }} Trx</span>
+            </div>
+            <p class="text-lg sm:text-xl font-bold text-up-accent tabular-nums mt-1">
+                Rp {{ number_format($ringkasan['total_retur'] ?? 0, 0, ',', '.') }}
             </p>
         </div>
         <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10 snap-start">
@@ -65,7 +74,7 @@
         </div>
         <div class="w-[165px] min-w-[165px] sm:w-auto sm:min-w-0 flex-shrink-0 p-4 rounded-2xl glass-panel border border-white/10 snap-start">
             <div class="flex items-center justify-between text-xs text-ink-400 font-medium">
-                <span>Total Kas / Arus Bersih</span>
+                <span>Total Arus Bersih</span>
                 <span class="px-1.5 py-0.5 rounded bg-up-mint/10 text-up-mint text-[10px] font-bold">Net</span>
             </div>
             <p class="text-lg sm:text-xl font-bold {{ $ringkasan['total_kas_bersih'] >= 0 ? 'text-up-mint' : 'text-up-red' }} tabular-nums mt-1">
@@ -99,6 +108,18 @@
             class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0 min-h-[44px] snap-start {{ $activeTab === 'servis' ? 'bg-up-mint text-white shadow-sm shadow-up-mint/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
             <span>Rekap Servis Selesai & Lunas</span>
+        </button>
+        <button
+            wire:click="$set('activeTab', 'pembelian')"
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0 min-h-[44px] snap-start {{ $activeTab === 'pembelian' ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <span>Pembelian (PO)</span>
+        </button>
+        <button
+            wire:click="$set('activeTab', 'retur')"
+            class="px-4 py-2.5 rounded-xl text-xs font-bold transition-[background-color,color,box-shadow,transform] duration-140 active:scale-[0.98] cursor-pointer flex items-center gap-2 whitespace-nowrap flex-shrink-0 min-h-[44px] snap-start {{ $activeTab === 'retur' ? 'bg-amber-600 text-white shadow-sm shadow-amber-600/20' : 'text-ink-400 hover:text-white hover:bg-white/5' }}">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+            <span>Histori Retur Transaksi</span>
         </button>
         <button
             wire:click="$set('activeTab', 'mutasi_kas')"
@@ -188,6 +209,8 @@
                         <option value="online">Pesanan Online (Web & Omni)</option>
                         <option value="servis">Pelunasan Servis Gadget</option>
                         <option value="retur">Retur Penjualan</option>
+                        <option value="retur_pembelian">Retur Pembelian (Supplier)</option>
+                        <option value="pembelian">Pembelian (PO)</option>
                         <option value="void">Riwayat Void (Batal)</option>
                         <option value="mutasi_masuk">Kas Masuk (Laci)</option>
                         <option value="mutasi_keluar">Kas Keluar (Laci)</option>
@@ -296,6 +319,43 @@
                         <option value="split">Split</option>
                     </select>
                 </div>
+            @elseif($activeTab === 'pembelian')
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
+                        <option value="">Semua Status PO</option>
+                        <option value="diterima">Diterima</option>
+                        <option value="draft">Draft</option>
+                        <option value="diajukan">Diajukan</option>
+                        <option value="disetujui">Disetujui</option>
+                        <option value="dibatalkan">Dibatalkan</option>
+                        <option value="bisa_retur">Bisa Diretur</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterMetode" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
+                        <option value="">Semua Metode</option>
+                        <option value="tunai">Tunai</option>
+                        <option value="transfer">Transfer</option>
+                        <option value="utang">Utang</option>
+                    </select>
+                </div>
+            @elseif($activeTab === 'retur')
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterJenisRetur" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
+                        <option value="">Semua Jenis Retur</option>
+                        <option value="penjualan">Retur Penjualan (Konsumen)</option>
+                        <option value="pembelian">Retur Pembelian (Supplier)</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
+                        <option value="">Semua Status</option>
+                        <option value="selesai">Selesai</option>
+                        <option value="draft">Draft</option>
+                        <option value="menunggu">Menunggu</option>
+                        <option value="disetujui">Disetujui</option>
+                    </select>
+                </div>
             @elseif($activeTab === 'mutasi_kas')
                 <div class="w-full sm:w-auto">
                     <select wire:model.live="filterStatus" class="w-full sm:w-auto px-3 py-2.5 rounded-xl glass-input text-xs font-semibold text-white bg-ink-900 border border-white/10 cursor-pointer min-h-[44px]">
@@ -323,12 +383,14 @@
         {{-- Unified Panel Header with View Mode Switcher --}}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-white/10 bg-white/[0.02]">
             <div class="flex items-center gap-2 flex-wrap">
-                <span class="w-2.5 h-2.5 rounded-full {{ $activeTab === 'global' ? 'bg-up-primary' : ($activeTab === 'pos' ? 'bg-up-primary' : ($activeTab === 'online' ? 'bg-indigo-500' : ($activeTab === 'servis' ? 'bg-teal-400' : 'bg-up-accent'))) }}"></span>
+                <span class="w-2.5 h-2.5 rounded-full {{ $activeTab === 'global' ? 'bg-up-primary' : ($activeTab === 'pos' ? 'bg-up-primary' : ($activeTab === 'online' ? 'bg-indigo-500' : ($activeTab === 'servis' ? 'bg-teal-400' : ($activeTab === 'pembelian' ? 'bg-sky-500' : ($activeTab === 'retur' ? 'bg-amber-500' : 'bg-up-accent'))))) }}"></span>
                 <h2 class="text-xs font-bold text-white tracking-wide uppercase">
                     @if($activeTab === 'global') Riwayat Semua Transaksi
                     @elseif($activeTab === 'pos') Penjualan Kasir POS
                     @elseif($activeTab === 'online') Pesanan Online & Omnichannel
                     @elseif($activeTab === 'servis') Rekap Servis Selesai & Lunas
+                    @elseif($activeTab === 'pembelian') Pembelian (Purchase Order)
+                    @elseif($activeTab === 'retur') Histori Retur Transaksi
                     @elseif($activeTab === 'mutasi_kas') Mutasi Kas Laci
                     @endif
                 </h2>
@@ -415,6 +477,14 @@
                                         @elseif($row->jenis === 'retur')
                                             <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-up-accent/15 text-up-accent border border-up-accent/25">
                                                 ↩ Retur Konsumen
+                                            </span>
+                                        @elseif($row->jenis === 'retur_pembelian')
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/20">
+                                                ↩ Retur Supplier
+                                            </span>
+                                        @elseif($row->jenis === 'pembelian')
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-600/15 text-sky-300 border border-sky-600/20">
+                                                📦 Pembelian PO
                                             </span>
                                         @endif
                                     </td>
@@ -531,6 +601,11 @@
                                                 >
                                                     🖨️
                                                 </button>
+                                            @elseif($row->jenis === 'retur_pembelian')
+                                                <button wire:click="lihatDetailReturPembelian({{ $row->target_id }})" class="px-2.5 py-1.5 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 text-[11px] font-semibold transition cursor-pointer">Detail</button>
+                                                <button wire:click="cetakUlangStruk('retur_pembelian', {{ $row->target_id }})" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition cursor-pointer">🖨️</button>
+                                            @elseif($row->jenis === 'pembelian')
+                                                <button wire:click="lihatDetailPembelian({{ $row->target_id }})" class="px-2.5 py-1.5 rounded-lg bg-sky-600/15 hover:bg-sky-600/25 text-sky-300 text-[11px] font-semibold transition cursor-pointer">Detail</button>
                                             @endif
                                         </div>
                                     </td>
@@ -615,6 +690,14 @@
                                             @elseif($row->jenis === 'retur')
                                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-up-accent/15 text-up-accent border border-up-accent/25">
                                                     ↩ Retur
+                                                </span>
+                                            @elseif($row->jenis === 'retur_pembelian')
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/20">
+                                                    ↩ Retur Supplier
+                                                </span>
+                                            @elseif($row->jenis === 'pembelian')
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-600/15 text-sky-300 border border-sky-600/20">
+                                                    📦 Pembelian PO
                                                 </span>
                                             @endif
                                         </div>
@@ -729,6 +812,27 @@
                                         title="Cetak Struk Retur"
                                     >
                                         🖨️
+                                    </button>
+                                @elseif($row->jenis === 'retur_pembelian')
+                                    <button
+                                        wire:click="lihatDetailReturPembelian({{ $row->target_id }})"
+                                        class="flex-1 min-w-[70px] py-2 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/25 text-sky-300 font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                    >
+                                        Detail Retur
+                                    </button>
+                                    <button
+                                        wire:click="cetakUlangStruk('retur_pembelian', {{ $row->target_id }})"
+                                        class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                        title="Cetak Struk Retur"
+                                    >
+                                        🖨️
+                                    </button>
+                                @elseif($row->jenis === 'pembelian')
+                                    <button
+                                        wire:click="lihatDetailPembelian({{ $row->target_id }})"
+                                        class="flex-1 min-w-[70px] py-2 rounded-xl bg-sky-600/15 hover:bg-sky-600/25 border border-sky-600/25 text-sky-300 font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                    >
+                                        Detail PO
                                     </button>
                                 @endif
                             </div>
@@ -1400,6 +1504,366 @@
                 </div>
             </x-prism.dual-scroll>
 
+        @elseif($activeTab === 'pembelian')
+            {{-- TAB: PEMBELIAN (PURCHASE ORDER) --}}
+            <x-prism.dual-scroll>
+                {{-- Desktop Table --}}
+                <div x-show="view === 'list' && isDesktop" x-cloak class="hidden md:block">
+                    <table class="w-full text-left text-xs min-w-[800px]">
+                        <thead>
+                            <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02] whitespace-nowrap">
+                                <th class="py-3 px-4">No PO</th>
+                                <th class="py-3 px-4">Waktu</th>
+                                <th class="py-3 px-4">Supplier</th>
+                                <th class="py-3 px-4">Gudang Tujuan</th>
+                                <th class="py-3 px-4 text-right">Total</th>
+                                <th class="py-3 px-4 text-center">Status</th>
+                                <th class="py-3 px-4 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            @forelse($dataList as $row)
+                                <tr class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
+                                    <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $row->no_po }}</td>
+                                    <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $row->created_at?->format('d/m/Y H:i') }}</td>
+                                    <td class="py-3.5 px-4 text-white font-medium">{{ $row->supplier->nama ?? 'Supplier' }}</td>
+                                    <td class="py-3.5 px-4 text-ink-200">{{ $row->gudangTujuan->nama ?? 'Gudang' }}</td>
+                                    <td class="py-3.5 px-4 text-right font-bold tabular-nums text-white">Rp {{ number_format($row->total, 0, ',', '.') }}</td>
+                                    <td class="py-3.5 px-4 text-center">
+                                        @if($row->status === 'diterima')
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/15 text-up-mint border border-up-mint/25">
+                                                Diterima
+                                            </span>
+                                        @elseif(in_array($row->status, ['draft', 'diajukan', 'disetujui']))
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                                                {{ ucfirst($row->status) }}
+                                            </span>
+                                        @elseif($row->status === 'dibatalkan')
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-red/15 text-up-red border border-up-red/25">
+                                                Dibatalkan
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-ink-300">
+                                                {{ ucfirst($row->status) }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            <button
+                                                wire:click="lihatDetailPembelian({{ $row->id }})"
+                                                class="px-2.5 py-1.5 rounded-lg bg-sky-600/15 hover:bg-sky-600/25 text-sky-300 text-[11px] font-semibold transition cursor-pointer"
+                                                title="Lihat Detail PO"
+                                            >
+                                                Detail
+                                            </button>
+                                            @if($row->status === 'diterima')
+                                                <button
+                                                    wire:click="bukaModalReturPembelian({{ $row->id }})"
+                                                    class="px-2.5 py-1.5 rounded-lg bg-up-accent/15 hover:bg-up-accent/25 text-up-accent text-[11px] font-semibold transition cursor-pointer"
+                                                    title="Buat Retur Pembelian ke Supplier"
+                                                >
+                                                    ↩ Retur
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="py-12 text-center text-ink-400 text-xs">
+                                        Tidak ada data pembelian PO ditemukan untuk filter ini.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- Cards / List Mode --}}
+                <div x-show="view === 'grid' || !isDesktop" x-cloak :class="view === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 p-3.5 divide-y-0' : 'block divide-y divide-white/5'" class="md:divide-y-0">
+                    @forelse($dataList as $row)
+                        <div
+                            :class="view === 'grid'
+                                ? 'rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.015] backdrop-blur-md hover:border-white/20 hover:shadow-xl hover:shadow-sky-500/5 p-4 space-y-3.5 transition-all duration-200 flex flex-col justify-between group'
+                                : 'p-3.5 sm:p-4 hover:bg-white/[0.02] transition-colors space-y-2.5'"
+                        >
+                            <div class="space-y-3">
+                                <div class="flex items-start justify-between gap-2.5">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-mono font-bold text-xs text-white truncate">
+                                                {{ $row->no_po }}
+                                            </span>
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-600/15 text-sky-300 border border-sky-600/20">
+                                                📦 PO
+                                            </span>
+                                        </div>
+                                        <div class="text-[10px] text-ink-400 tabular-nums mt-0.5">
+                                            📅 {{ $row->created_at?->format('d/m/Y H:i') }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        @if($row->status === 'diterima')
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-mint/15 text-up-mint border border-up-mint/25">
+                                                Diterima
+                                            </span>
+                                        @elseif(in_array($row->status, ['draft', 'diajukan', 'disetujui']))
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                                                {{ ucfirst($row->status) }}
+                                            </span>
+                                        @elseif($row->status === 'dibatalkan')
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-up-red/15 text-up-red border border-up-red/25">
+                                                Dibatalkan
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-ink-300">
+                                                {{ ucfirst($row->status) }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div :class="view === 'grid' ? 'p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5 text-xs' : 'text-xs space-y-1'">
+                                    <div class="flex justify-between items-center text-[11px]">
+                                        <span class="text-ink-400">Supplier:</span>
+                                        <span class="text-white font-medium truncate max-w-[170px]">{{ $row->supplier->nama ?? 'Supplier' }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-[11px]">
+                                        <span class="text-ink-400">Gudang:</span>
+                                        <span class="text-ink-300 font-medium truncate max-w-[150px]">{{ $row->gudangTujuan->nama ?? 'Gudang' }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-[11px] pt-1 border-t border-white/5 font-bold">
+                                        <span class="text-ink-400">Total PO:</span>
+                                        <span class="text-white tabular-nums">Rp {{ number_format($row->total, 0, ',', '.') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 pt-2 border-t border-white/5 flex-wrap">
+                                <button
+                                    wire:click="lihatDetailPembelian({{ $row->id }})"
+                                    class="flex-1 min-w-[70px] py-2 rounded-xl bg-sky-600/15 hover:bg-sky-600/25 border border-sky-600/25 text-sky-300 font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                >
+                                    Detail PO
+                                </button>
+                                @if($row->status === 'diterima')
+                                    <button
+                                        wire:click="bukaModalReturPembelian({{ $row->id }})"
+                                        class="px-3.5 py-2 rounded-xl bg-up-accent/15 hover:bg-up-accent/25 border border-up-accent/25 text-up-accent font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                        title="Buat Retur Pembelian"
+                                    >
+                                        ↩ Retur
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <div class="py-12 text-center text-ink-400 text-xs col-span-full">
+                            Tidak ada data pembelian PO ditemukan untuk filter ini.
+                        </div>
+                    @endforelse
+                </div>
+            </x-prism.dual-scroll>
+
+        @elseif($activeTab === 'retur')
+            {{-- TAB: HISTORI RETUR TRANSAKSI --}}
+            <x-prism.dual-scroll>
+                {{-- Desktop Table --}}
+                <div x-show="view === 'list' && isDesktop" x-cloak class="hidden md:block">
+                    <table class="w-full text-left text-xs min-w-[850px]">
+                        <thead>
+                            <tr class="border-b border-white/10 text-ink-400 uppercase text-[10px] tracking-wider bg-white/[0.02] whitespace-nowrap">
+                                <th class="py-3 px-4">No Return</th>
+                                <th class="py-3 px-4">Jenis Retur</th>
+                                <th class="py-3 px-4">Tanggal</th>
+                                <th class="py-3 px-4">Pihak</th>
+                                <th class="py-3 px-4">Ref Transaksi</th>
+                                <th class="py-3 px-4 text-right">Nominal</th>
+                                <th class="py-3 px-4 text-center">Status</th>
+                                <th class="py-3 px-4 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            @forelse($dataList as $row)
+                                <tr class="hover:bg-white/[0.02] transition-colors whitespace-nowrap">
+                                    <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $row->no_return }}</td>
+                                    <td class="py-3.5 px-4">
+                                        @if($row->jenis_retur === 'penjualan')
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-up-accent/15 text-up-accent border border-up-accent/25">
+                                                ↩ Retur Konsumen
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/20">
+                                                ↩ Retur Supplier
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3.5 px-4 text-ink-300 tabular-nums">
+                                        {{ $row->tanggal ? \Illuminate\Support\Carbon::parse($row->tanggal)->format('d/m/Y') : '-' }}
+                                    </td>
+                                    <td class="py-3.5 px-4 text-white font-medium">{{ $row->pihak }}</td>
+                                    <td class="py-3.5 px-4 font-mono text-ink-200">{{ $row->no_referensi }}</td>
+                                    <td class="py-3.5 px-4 text-right font-bold tabular-nums text-up-accent">
+                                        Rp {{ number_format($row->nominal, 0, ',', '.') }}
+                                    </td>
+                                    <td class="py-3.5 px-4 text-center">
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ in_array(strtolower($row->status), ['selesai', 'disetujui']) ? 'bg-up-mint/15 text-up-mint border border-up-mint/25' : 'bg-white/10 text-ink-300 border border-white/10' }}">
+                                            {{ ucfirst($row->status) }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            @if($row->jenis_retur === 'penjualan')
+                                                <button
+                                                    wire:click="lihatDetailRetur({{ $row->target_id }})"
+                                                    class="px-2.5 py-1.5 rounded-lg bg-up-accent/15 hover:bg-up-accent/25 text-up-accent text-[11px] font-semibold transition cursor-pointer"
+                                                    title="Lihat Detail Retur"
+                                                >
+                                                    Detail
+                                                </button>
+                                                <button
+                                                    wire:click="cetakUlangStruk('retur', {{ $row->target_id }})"
+                                                    class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition cursor-pointer"
+                                                    title="Cetak Struk Retur"
+                                                >
+                                                    🖨️
+                                                </button>
+                                            @else
+                                                <button
+                                                    wire:click="lihatDetailReturPembelian({{ $row->target_id }})"
+                                                    class="px-2.5 py-1.5 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 text-[11px] font-semibold transition cursor-pointer"
+                                                    title="Lihat Detail Retur Pembelian"
+                                                >
+                                                    Detail
+                                                </button>
+                                                <button
+                                                    wire:click="cetakUlangStruk('retur_pembelian', {{ $row->target_id }})"
+                                                    class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-ink-300 hover:text-white transition cursor-pointer"
+                                                    title="Cetak Struk Retur Pembelian"
+                                                >
+                                                    🖨️
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="py-12 text-center text-ink-400 text-xs">
+                                        Tidak ada riwayat retur ditemukan untuk filter ini.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- Cards / List Mode --}}
+                <div x-show="view === 'grid' || !isDesktop" x-cloak :class="view === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 p-3.5 divide-y-0' : 'block divide-y divide-white/5'" class="md:divide-y-0">
+                    @forelse($dataList as $row)
+                        <div
+                            :class="view === 'grid'
+                                ? 'rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.015] backdrop-blur-md hover:border-white/20 hover:shadow-xl hover:shadow-amber-500/5 p-4 space-y-3.5 transition-all duration-200 flex flex-col justify-between group'
+                                : 'p-3.5 sm:p-4 hover:bg-white/[0.02] transition-colors space-y-2.5'"
+                        >
+                            <div class="space-y-3">
+                                <div class="flex items-start justify-between gap-2.5">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-mono font-bold text-xs text-white truncate">
+                                                {{ $row->no_return }}
+                                            </span>
+                                        </div>
+                                        <div class="text-[10px] text-ink-400 tabular-nums mt-0.5">
+                                            📅 {{ $row->tanggal ? \Illuminate\Support\Carbon::parse($row->tanggal)->format('d/m/Y') : '-' }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ in_array(strtolower($row->status), ['selesai', 'disetujui']) ? 'bg-up-mint/15 text-up-mint border border-up-mint/25' : 'bg-white/10 text-ink-300 border border-white/10' }}">
+                                            {{ ucfirst($row->status) }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div :class="view === 'grid' ? 'p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-2' : 'flex items-center justify-between gap-2'">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div>
+                                            @if($row->jenis_retur === 'penjualan')
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-up-accent/15 text-up-accent border border-up-accent/25">
+                                                    ↩ Retur Konsumen
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/20">
+                                                    ↩ Retur Supplier
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="text-[9px] uppercase tracking-wider text-ink-400 block font-bold" x-show="view === 'grid'">Nominal Retur</span>
+                                            <span class="text-up-accent font-black tabular-nums" :class="view === 'grid' ? 'text-base' : 'text-sm'">
+                                                Rp {{ number_format($row->nominal, 0, ',', '.') }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-xs space-y-1 pt-1.5 border-t border-white/5" x-show="view === 'grid'">
+                                        <div class="flex justify-between items-center text-[11px]">
+                                            <span class="text-ink-400">Pihak:</span>
+                                            <span class="text-white font-medium truncate max-w-[170px]">{{ $row->pihak }}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center text-[11px]">
+                                            <span class="text-ink-400">Ref:</span>
+                                            <span class="text-ink-300 font-mono text-[11px] truncate max-w-[150px]">{{ $row->no_referensi }}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center text-[11px]">
+                                            <span class="text-ink-400">Operator:</span>
+                                            <span class="text-ink-300 text-[11px] truncate max-w-[150px]">{{ $row->operator }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 pt-2 border-t border-white/5 flex-wrap">
+                                @if($row->jenis_retur === 'penjualan')
+                                    <button
+                                        wire:click="lihatDetailRetur({{ $row->target_id }})"
+                                        class="flex-1 min-w-[70px] py-2 rounded-xl bg-up-accent/15 hover:bg-up-accent/25 border border-up-accent/25 text-up-accent font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                    >
+                                        Detail Retur
+                                    </button>
+                                    <button
+                                        wire:click="cetakUlangStruk('retur', {{ $row->target_id }})"
+                                        class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                        title="Cetak Struk Retur"
+                                    >
+                                        🖨️
+                                    </button>
+                                @else
+                                    <button
+                                        wire:click="lihatDetailReturPembelian({{ $row->target_id }})"
+                                        class="flex-1 min-w-[70px] py-2 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/25 text-sky-300 font-bold text-xs cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                    >
+                                        Detail Retur
+                                    </button>
+                                    <button
+                                        wire:click="cetakUlangStruk('retur_pembelian', {{ $row->target_id }})"
+                                        class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white cursor-pointer min-h-[44px] flex items-center justify-center transition active:scale-95"
+                                        title="Cetak Struk Retur Pembelian"
+                                    >
+                                        🖨️
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <div class="py-12 text-center text-ink-400 text-xs col-span-full">
+                            Tidak ada riwayat retur ditemukan untuk filter ini.
+                        </div>
+                    @endforelse
+                </div>
+            </x-prism.dual-scroll>
+
         @elseif($activeTab === 'mutasi_kas')
             {{-- TAB 3: MUTASI KAS LACI --}}
             <x-prism.dual-scroll>
@@ -1571,6 +2035,18 @@
                                 <h3 class="text-base font-bold text-white truncate">Detail Retur {{ $selectedDetail['no_return'] }}</h3>
                             </div>
                             <p class="text-xs text-ink-400 mt-0.5">{{ $selectedDetail['tanggal'] }} · Ref Trx: {{ $selectedDetail['no_transaksi'] }} · Operator: {{ $selectedDetail['operator'] }}</p>
+                        @elseif($selectedDetail['tipe'] === 'pembelian')
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2 py-0.5 rounded bg-sky-600/20 text-sky-400 font-bold text-[10px] uppercase">Pembelian (PO)</span>
+                                <h3 class="text-base font-bold text-white truncate">Detail PO {{ $selectedDetail['no_po'] }}</h3>
+                            </div>
+                            <p class="text-xs text-ink-400 mt-0.5">{{ $selectedDetail['tanggal'] }} · Supplier: {{ $selectedDetail['supplier'] }}</p>
+                        @elseif($selectedDetail['tipe'] === 'retur_pembelian')
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold text-[10px] uppercase">↩ Retur Pembelian</span>
+                                <h3 class="text-base font-bold text-white truncate">Detail Retur {{ $selectedDetail['no_return'] }}</h3>
+                            </div>
+                            <p class="text-xs text-ink-400 mt-0.5">{{ $selectedDetail['tanggal'] }} · PO: {{ $selectedDetail['no_po'] }} · Operator: {{ $selectedDetail['operator'] }}</p>
                         @endif
                     </div>
                     <button wire:click="tutupDetailModal" class="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-400 hover:text-white cursor-pointer rounded-xl hover:bg-white/5 shrink-0 transition" aria-label="Tutup modal">✕</button>
@@ -1947,6 +2423,193 @@
                                 <span class="tabular-nums text-up-accent text-base">Rp {{ number_format($selectedDetail['jumlah'], 0, ',', '.') }}</span>
                             </div>
                         </div>
+                    @elseif($selectedDetail['tipe'] === 'pembelian')
+                        {{-- DETAIL PEMBELIAN (PO) --}}
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/5 text-xs">
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Supplier</span>
+                                <span class="font-semibold text-white">{{ $selectedDetail['supplier'] }}</span>
+                                @if(!empty($selectedDetail['supplier_telepon']) && $selectedDetail['supplier_telepon'] !== '-')
+                                    <span class="text-[10px] text-ink-400 block font-mono">{{ $selectedDetail['supplier_telepon'] }}</span>
+                                @endif
+                            </div>
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Gudang Tujuan</span>
+                                <span class="font-semibold text-white">{{ $selectedDetail['gudang'] }}</span>
+                            </div>
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Metode Bayar</span>
+                                <span class="font-semibold text-white uppercase">{{ $selectedDetail['metode_bayar'] }}</span>
+                                @if(!empty($selectedDetail['jatuh_tempo']) && $selectedDetail['jatuh_tempo'] !== '-')
+                                    <span class="text-[10px] text-ink-400 block">Tempo: {{ $selectedDetail['jatuh_tempo'] }}</span>
+                                @endif
+                            </div>
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Status PO</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase inline-block mt-0.5 {{ $selectedDetail['status'] === 'diterima' ? 'bg-up-mint/15 text-up-mint' : 'bg-amber-500/15 text-amber-300' }}">
+                                    {{ $selectedDetail['status'] }}
+                                </span>
+                            </div>
+                        </div>
+
+                        @if(!empty($selectedDetail['catatan']) && $selectedDetail['catatan'] !== '-')
+                            <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs space-y-1">
+                                <div class="text-ink-400 text-[10px]">Catatan PO:</div>
+                                <div class="text-ink-200">{{ $selectedDetail['catatan'] }}</div>
+                            </div>
+                        @endif
+
+                        {{-- Items Table --}}
+                        <div>
+                            <h4 class="text-xs font-semibold text-ink-300 mb-2">Item Barang Purchase Order:</h4>
+                            <div class="rounded-xl border border-white/10 overflow-hidden">
+                                <table class="w-full text-left text-xs">
+                                    <thead>
+                                        <tr class="border-b border-white/10 text-ink-400 text-[10px] bg-white/[0.02] whitespace-nowrap">
+                                            <th class="py-2 px-3">Produk</th>
+                                            <th class="py-2 px-3 text-center">Qty PO</th>
+                                            <th class="py-2 px-3 text-center">Sudah Retur</th>
+                                            <th class="py-2 px-3 text-center">Sisa Retur</th>
+                                            <th class="py-2 px-3 text-center">Stok</th>
+                                            <th class="py-2 px-3 text-right">Harga Beli</th>
+                                            <th class="py-2 px-3 text-right">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-white/5">
+                                        @forelse($selectedDetail['items'] as $it)
+                                            <tr>
+                                                <td class="py-2.5 px-3">
+                                                    <div class="text-white font-medium">{{ $it['nama'] }}</div>
+                                                    <div class="text-[10px] text-ink-500 font-mono">{{ $it['sku'] }}</div>
+                                                </td>
+                                                <td class="py-2.5 px-3 text-center text-white tabular-nums font-bold">{{ $it['qty'] }}</td>
+                                                <td class="py-2.5 px-3 text-center text-amber-400 tabular-nums font-medium">{{ $it['sudah_retur'] }}</td>
+                                                <td class="py-2.5 px-3 text-center text-sky-400 tabular-nums font-bold">{{ $it['sisa_retur'] }}</td>
+                                                <td class="py-2.5 px-3 text-center text-ink-300 tabular-nums">{{ $it['stok_tersedia'] }}</td>
+                                                <td class="py-2.5 px-3 text-right text-ink-300 tabular-nums">Rp {{ number_format($it['harga_beli'], 0, ',', '.') }}</td>
+                                                <td class="py-2.5 px-3 text-right text-white font-bold tabular-nums">Rp {{ number_format($it['subtotal'], 0, ',', '.') }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="7" class="py-4 text-center text-ink-400 text-xs">Tidak ada item dalam PO ini.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {{-- Returns List --}}
+                        @if(!empty($selectedDetail['returns']))
+                            <div class="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/[0.08] text-xs space-y-2">
+                                <div class="font-bold text-sky-300 flex items-center justify-between">
+                                    <span>↩ Retur Terkait Pembelian Ini ({{ count($selectedDetail['returns']) }})</span>
+                                </div>
+                                <div class="space-y-1.5 divide-y divide-white/5">
+                                    @foreach($selectedDetail['returns'] as $ret)
+                                        <div class="pt-1.5 first:pt-0 flex items-center justify-between text-[11px] gap-2">
+                                            <div>
+                                                <span class="font-mono font-bold text-white">{{ $ret['no_return'] }}</span>
+                                                <span class="text-ink-400 ml-1">({{ $ret['tanggal'] }})</span>
+                                                <span class="text-ink-400 block text-[10px]">Alasan: {{ $ret['alasan'] ?? '-' }}</span>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="font-bold text-up-accent tabular-nums">Rp {{ number_format($ret['jumlah'], 0, ',', '.') }}</span>
+                                                <span class="block text-[9px] uppercase px-1.5 py-0.5 rounded font-bold {{ $ret['status'] === 'selesai' ? 'bg-up-mint/20 text-up-mint' : 'bg-amber-500/20 text-amber-300' }}">{{ $ret['status'] }}</span>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Totals --}}
+                        <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5 text-xs">
+                            <div class="flex justify-between text-ink-300">
+                                <span>Total Pembelian PO</span>
+                                <span class="tabular-nums font-bold text-white text-sm">Rp {{ number_format($selectedDetail['total'], 0, ',', '.') }}</span>
+                            </div>
+                            <div class="flex justify-between text-ink-300">
+                                <span>Total Dibayar</span>
+                                <span class="tabular-nums text-up-mint">Rp {{ number_format($selectedDetail['total_dibayar'], 0, ',', '.') }}</span>
+                            </div>
+                            @if($selectedDetail['sisa_utang'] > 0)
+                                <div class="flex justify-between text-up-accent font-semibold pt-1 border-t border-white/5">
+                                    <span>Sisa Utang</span>
+                                    <span class="tabular-nums">Rp {{ number_format($selectedDetail['sisa_utang'], 0, ',', '.') }}</span>
+                                </div>
+                            @endif
+                        </div>
+
+                    @elseif($selectedDetail['tipe'] === 'retur_pembelian')
+                        {{-- DETAIL RETUR PEMBELIAN --}}
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/5 text-xs">
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Supplier</span>
+                                <span class="font-semibold text-white">{{ $selectedDetail['supplier'] }}</span>
+                            </div>
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Gudang Asal</span>
+                                <span class="font-semibold text-white">{{ $selectedDetail['gudang'] }}</span>
+                            </div>
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Ref PO Asal</span>
+                                <span class="font-mono font-bold text-sky-400">{{ $selectedDetail['no_po'] }}</span>
+                            </div>
+                            <div>
+                                <span class="text-ink-400 block text-[10px]">Pengembalian</span>
+                                <span class="font-semibold text-white uppercase">{{ $selectedDetail['metode_pengembalian'] }}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase inline-block mt-0.5 {{ $selectedDetail['status'] === 'selesai' ? 'bg-up-mint/15 text-up-mint' : 'bg-amber-500/15 text-amber-300' }}">
+                                    {{ $selectedDetail['status'] }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs space-y-1">
+                            <div class="text-ink-400 text-[10px]">Alasan Retur Supplier:</div>
+                            <div class="text-white font-medium">{{ $selectedDetail['alasan'] }}</div>
+                        </div>
+
+                        {{-- Items Table --}}
+                        <div>
+                            <h4 class="text-xs font-semibold text-ink-300 mb-2">Item Barang yang Diretur ke Supplier:</h4>
+                            <div class="rounded-xl border border-white/10 overflow-hidden">
+                                <table class="w-full text-left text-xs">
+                                    <thead>
+                                        <tr class="border-b border-white/10 text-ink-400 text-[10px] bg-white/[0.02]">
+                                            <th class="py-2 px-3">Produk</th>
+                                            <th class="py-2 px-3 text-center">Qty</th>
+                                            <th class="py-2 px-3 text-right">Harga Beli</th>
+                                            <th class="py-2 px-3 text-right">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-white/5">
+                                        @forelse($selectedDetail['items'] as $it)
+                                            <tr>
+                                                <td class="py-2.5 px-3">
+                                                    <div class="text-white font-medium">{{ $it['nama'] }}</div>
+                                                    <div class="text-[10px] text-ink-500 font-mono">{{ $it['sku'] }}</div>
+                                                </td>
+                                                <td class="py-2.5 px-3 text-center text-white tabular-nums font-bold">{{ $it['qty'] }}</td>
+                                                <td class="py-2.5 px-3 text-right text-ink-300 tabular-nums">Rp {{ number_format($it['harga_beli'], 0, ',', '.') }}</td>
+                                                <td class="py-2.5 px-3 text-right text-white font-bold tabular-nums">Rp {{ number_format($it['subtotal'], 0, ',', '.') }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="4" class="py-4 text-center text-ink-400 text-xs">Tidak ada item retur tercatat.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5 text-xs">
+                            <div class="flex justify-between text-sm font-bold text-white">
+                                <span>Total Nilai Retur Supplier</span>
+                                <span class="tabular-nums text-sky-400 text-base">Rp {{ number_format($selectedDetail['jumlah'], 0, ',', '.') }}</span>
+                            </div>
+                        </div>
                     @endif
                 </div>
 
@@ -1962,6 +2625,27 @@
                                 Audit Log
                             </button>
                             @if($selectedDetail['tipe'] === 'pos')
+                                @if($selectedDetail['status'] === 'selesai')
+                                    @canany(['pos.view', 'pos.view-own', 'pos.create'])
+                                        <a
+                                            href="/app/pos/retur?no_faktur={{ urlencode($selectedDetail['no_transaksi']) }}"
+                                            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-accent/20 hover:bg-up-accent/30 border border-up-accent/30 text-up-accent font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 min-h-[44px] transition active:scale-95"
+                                            title="Proses Retur / Tukar Barang Konsumen"
+                                        >
+                                            ↩ Retur Barang
+                                        </a>
+                                    @endcanany
+                                    @can('pos.void')
+                                        <button
+                                            type="button"
+                                            wire:click="bukaVoidModal({{ $selectedDetail['id'] }})"
+                                            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 min-h-[44px] transition active:scale-95"
+                                            title="Batalkan & Void Transaksi"
+                                        >
+                                            ⛔ Void Transaksi
+                                        </button>
+                                    @endcan
+                                @endif
                                 <button
                                     wire:click="cetakUlangStruk('pos', {{ $selectedDetail['id'] }})"
                                     class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-up-primary hover:bg-indigo-600 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] transition active:scale-95"
@@ -2022,6 +2706,39 @@
                             >
                                 🖨️ Cetak Struk Retur
                             </button>
+                        @elseif($selectedDetail['tipe'] === 'pembelian')
+                            @if(!empty($selectedDetail['returns']))
+                                <button
+                                    wire:click="bukaRiwayat('po', {{ $selectedDetail['id'] }})"
+                                    class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 min-h-[44px] transition active:scale-95"
+                                    title="Audit / Log Aktivitas Pembelian"
+                                >
+                                    Audit Log PO
+                                </button>
+                            @endif
+                            @if($selectedDetail['bisa_diretur'] ?? false)
+                                <button
+                                    wire:click="bukaModalReturPembelian({{ $selectedDetail['id'] }})"
+                                    class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] transition active:scale-95"
+                                    title="Buat Retur Pembelian ke Supplier"
+                                >
+                                    ↩ Buat Retur Pembelian
+                                </button>
+                            @endif
+                        @elseif($selectedDetail['tipe'] === 'retur_pembelian')
+                            <button
+                                wire:click="bukaRiwayat('retur_pembelian', {{ $selectedDetail['id'] }})"
+                                class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 min-h-[44px] transition active:scale-95"
+                                title="Audit / Log Aktivitas Retur Pembelian"
+                            >
+                                Audit Log Retur
+                            </button>
+                            <button
+                                wire:click="cetakUlangStruk('retur_pembelian', {{ $selectedDetail['id'] }})"
+                                class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] transition active:scale-95"
+                            >
+                                🖨️ Cetak Struk Retur Pembelian
+                            </button>
                         @endif
                     </div>
                     <button wire:click="tutupDetailModal" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer transition min-h-[44px] flex items-center justify-center active:scale-95">
@@ -2034,6 +2751,157 @@
 
     {{-- Modal Struk Thermal Reusable (58mm / 80mm) --}}
     @include('partials.thermal-receipt-modal')
+
+    {{-- Modal Form Retur Pembelian ke Supplier --}}
+    @if($showReturPembelianModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="w-full max-w-2xl glass-panel p-5 sm:p-6 rounded-3xl relative max-h-[90vh] flex flex-col shadow-2xl border border-white/10">
+                {{-- Header --}}
+                <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10 gap-2">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="px-2 py-0.5 rounded bg-sky-600/20 text-sky-400 font-bold text-[10px] uppercase">↩ Retur Pembelian</span>
+                            <h3 class="text-base font-bold text-white truncate">Retur PO {{ $returNoPo }}</h3>
+                        </div>
+                        <p class="text-xs text-ink-400 mt-0.5">Supplier: {{ $returSupplierNama }} · Pilih item dengan jumlah retur &gt; 0</p>
+                    </div>
+                    <button wire:click="tutupModalReturPembelian" class="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-400 hover:text-white cursor-pointer rounded-xl hover:bg-white/5 shrink-0 transition" aria-label="Tutup modal">✕</button>
+                </div>
+
+                {{-- Body --}}
+                <div class="overflow-y-auto flex-1 space-y-4 pr-1">
+                    {{-- Items Retur --}}
+                    <div>
+                        <h4 class="text-xs font-semibold text-ink-300 mb-2">Item Barang PO yang Dapat Diretur:</h4>
+                        <div class="rounded-xl border border-white/10 overflow-hidden">
+                            <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="border-b border-white/10 text-ink-400 text-[10px] bg-white/[0.02] whitespace-nowrap">
+                                        <th class="py-2 px-3">Produk</th>
+                                        <th class="py-2 px-3 text-center">Sisa Retur</th>
+                                        <th class="py-2 px-3 text-center">Stok</th>
+                                        <th class="py-2 px-3 text-right">Harga Beli</th>
+                                        <th class="py-2 px-3 text-center w-[110px]">Jumlah Retur</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @foreach($returItems as $poItemId => $item)
+                                        <tr class="{{ ($item['sisa_bisa_retur'] ?? 0) <= 0 ? 'opacity-50' : '' }}">
+                                            <td class="py-2.5 px-3">
+                                                <div class="text-white font-medium">{{ $item['produk_nama'] }}</div>
+                                                <div class="text-[10px] text-ink-500 font-mono">
+                                                    {{ $item['sku'] }} · PO: {{ $item['qty_po'] }} · Sudah retur: {{ $item['sudah_retur'] }}
+                                                </div>
+                                                @error("returItems.{$poItemId}.jumlah_retur")
+                                                    <div class="text-up-red text-[10px] font-semibold mt-1">{{ $message }}</div>
+                                                @enderror
+                                            </td>
+                                            <td class="py-2.5 px-3 text-center text-sky-400 tabular-nums font-bold">{{ $item['sisa_bisa_retur'] }}</td>
+                                            <td class="py-2.5 px-3 text-center tabular-nums {{ $item['stok_tersedia'] <= 0 ? 'text-up-red font-bold' : 'text-ink-300' }}">{{ $item['stok_tersedia'] }}</td>
+                                            <td class="py-2.5 px-3 text-right text-ink-300 tabular-nums">Rp {{ number_format($item['harga_beli'], 0, ',', '.') }}</td>
+                                            <td class="py-2.5 px-3 text-center">
+                                                @if(($item['sisa_bisa_retur'] ?? 0) > 0)
+                                                    <input
+                                                        type="number"
+                                                        wire:model.live.debounce.300ms="returItems.{{ $poItemId }}.jumlah_retur"
+                                                        min="0"
+                                                        max="{{ $item['sisa_bisa_retur'] }}"
+                                                        step="1"
+                                                        class="w-full px-2 py-2 rounded-lg glass-input text-xs font-bold text-white bg-ink-900 border border-white/10 text-center min-h-[38px] focus:ring-1 focus:ring-sky-500"
+                                                        aria-label="Jumlah retur {{ $item['produk_nama'] }}"
+                                                    />
+                                                @else
+                                                    <span class="text-[10px] text-ink-500 font-bold uppercase">Habis / Sudah Diretur</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {{-- Total Estimasi Retur --}}
+                    @php
+                        $estimasiRetur = 0;
+                        foreach ($returItems as $item) {
+                            $estimasiRetur += ((float) ($item['harga_beli'] ?? 0)) * ((float) ($item['jumlah_retur'] ?? 0));
+                        }
+                    @endphp
+                    <div class="p-3 rounded-xl bg-sky-500/[0.08] border border-sky-500/25 flex items-center justify-between text-xs">
+                        <span class="font-bold text-sky-300">Estimasi Nilai Retur</span>
+                        <span class="font-black tabular-nums text-white text-base">Rp {{ number_format($estimasiRetur, 0, ',', '.') }}</span>
+                    </div>
+
+                    {{-- Metode Pengembalian --}}
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <label class="relative flex cursor-pointer">
+                            <input type="radio" wire:model.live="returMetodePengembalian" value="utang" class="peer sr-only" />
+                            <div class="w-full p-3 rounded-xl border border-white/10 bg-white/[0.03] peer-checked:border-sky-500 peer-checked:bg-sky-500/10 text-xs font-semibold transition active:scale-[0.98]">
+                                <div class="font-bold text-white">Kurangi Utang</div>
+                                <div class="text-[10px] text-ink-400 mt-0.5">Sisa utang PO dipotong retur</div>
+                            </div>
+                        </label>
+                        <label class="relative flex cursor-pointer">
+                            <input type="radio" wire:model.live="returMetodePengembalian" value="saldo" class="peer sr-only" />
+                            <div class="w-full p-3 rounded-xl border border-white/10 bg-white/[0.03] peer-checked:border-sky-500 peer-checked:bg-sky-500/10 text-xs font-semibold transition active:scale-[0.98]">
+                                <div class="font-bold text-white">Saldo Supplier</div>
+                                <div class="text-[10px] text-ink-400 mt-0.5">Jadi deposit untuk PO berikutnya</div>
+                            </div>
+                        </label>
+                        <label class="relative flex cursor-pointer">
+                            <input type="radio" wire:model.live="returMetodePengembalian" value="kas" class="peer sr-only" />
+                            <div class="w-full p-3 rounded-xl border border-white/10 bg-white/[0.03] peer-checked:border-sky-500 peer-checked:bg-sky-500/10 text-xs font-semibold transition active:scale-[0.98]">
+                                <div class="font-bold text-white">Kas Kembali</div>
+                                <div class="text-[10px] text-ink-400 mt-0.5">Dana langsung masuk kas laci</div>
+                            </div>
+                        </label>
+                    </div>
+                    @error('returMetodePengembalian')
+                        <div class="text-up-red text-[11px] font-semibold">{{ $message }}</div>
+                    @enderror
+
+                    {{-- Alasan Retur --}}
+                    <div>
+                        <label for="returAlasan" class="text-xs font-semibold text-ink-300 block mb-1.5">Alasan Retur ke Supplier <span class="text-up-red">*</span></label>
+                        <textarea
+                            wire:model.live.debounce.300ms="returAlasan"
+                            id="returAlasan"
+                            rows="2"
+                            placeholder="Contoh: Barang rusak saat QC, LCD tidak menyala, salah kirim varian..."
+                            class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium text-white border border-white/10 min-h-[44px] focus:ring-1 focus:ring-sky-500"
+                        ></textarea>
+                        @error('returAlasan')
+                            <div class="text-up-red text-[11px] font-semibold mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                {{-- Footer --}}
+                <div class="pt-3.5 mt-2 border-t border-white/10 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-2">
+                    <button
+                        wire:click="tutupModalReturPembelian"
+                        class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs cursor-pointer transition min-h-[44px] flex items-center justify-center active:scale-95"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        wire:click="prosesSimpanReturPembelian"
+                        wire:loading.attr="disabled"
+                        wire:target="prosesSimpanReturPembelian"
+                        class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 shadow-sm min-h-[44px] transition active:scale-95"
+                        title="Eksekusi Retur Pembelian"
+                    >
+                        <span wire:loading.remove wire:target="prosesSimpanReturPembelian">↩ Eksekusi Retur</span>
+                        <span wire:loading wire:target="prosesSimpanReturPembelian" class="flex items-center gap-1.5">
+                            <svg class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                            Memproses...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Modal Void Transaksi --}}
     @include('modules.pos.livewire.modals.void-transaksi-modal')

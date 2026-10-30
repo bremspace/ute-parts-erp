@@ -13,6 +13,11 @@ use App\Modules\Pos\Services\TransaksiVoidService;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\PunyaRiwayatAktivitas;
 use App\Modules\Servis\Models\TiketServis;
+use App\Modules\Wms\Models\PurchaseOrder;
+use App\Modules\Wms\Models\ReturnPembelian;
+use App\Modules\Wms\Models\ReturnPembelianItem;
+use App\Modules\Wms\Models\StokItem;
+use App\Modules\Wms\Services\ReturnPembelianService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -24,7 +29,7 @@ class RiwayatTransaksiIndex extends Component
     use PunyaRiwayatAktivitas;
     use WithPagination;
 
-    public string $activeTab = 'global'; // 'global' | 'pos' | 'online' | 'servis' | 'mutasi_kas'
+    public string $activeTab = 'global'; // 'global' | 'pos' | 'online' | 'servis' | 'pembelian' | 'retur' | 'mutasi_kas'
 
     public string $search = '';
 
@@ -44,6 +49,8 @@ class RiwayatTransaksiIndex extends Component
 
     public string $filterMetodePengiriman = ''; // '' | 'pickup' | 'kurir'
 
+    public string $filterJenisRetur = ''; // '' | 'penjualan' | 'pembelian'
+
     // Modal otorisasi void transaksi
     public bool $showVoidModal = false;
 
@@ -59,10 +66,25 @@ class RiwayatTransaksiIndex extends Component
 
     public string $voidSupervisorPassword = '';
 
-    // Modal detail transaksi / servis / mutasi
+    // Modal detail transaksi / servis / pembelian / retur / mutasi
     public bool $showDetailModal = false;
 
     public ?array $selectedDetail = null;
+
+    // Modal Retur Pembelian
+    public bool $showReturPembelianModal = false;
+
+    public ?int $returPoId = null;
+
+    public ?string $returNoPo = null;
+
+    public ?string $returSupplierNama = null;
+
+    public string $returAlasan = '';
+
+    public string $returMetodePengembalian = 'utang'; // 'utang' | 'saldo' | 'kas'
+
+    public array $returItems = [];
 
     // Modal struk thermal reusable
     public bool $showReceiptModal = false;
@@ -81,6 +103,7 @@ class RiwayatTransaksiIndex extends Component
         'filterStatus' => ['except' => ''],
         'filterPlatform' => ['except' => ''],
         'filterMetodePengiriman' => ['except' => ''],
+        'filterJenisRetur' => ['except' => ''],
     ];
 
     public function mount(?string $activeTab = null): void
@@ -297,6 +320,11 @@ class RiwayatTransaksiIndex extends Component
 
             if ($this->selectedDetail && ($this->selectedDetail['id'] ?? null) === $transaksi->id) {
                 $this->selectedDetail['status'] = 'void';
+                $this->selectedDetail['void'] = [
+                    'oleh' => $supervisor->name,
+                    'pada' => now()->format('d/m/Y H:i:s'),
+                    'alasan' => $this->voidAlasan,
+                ];
             }
 
             $this->dispatch('alert', [
@@ -319,6 +347,12 @@ class RiwayatTransaksiIndex extends Component
         $this->filterMetode = '';
         $this->filterPlatform = '';
         $this->filterMetodePengiriman = '';
+        $this->filterJenisRetur = '';
+    }
+
+    public function updatedFilterJenisRetur(): void
+    {
+        $this->resetPage();
     }
 
     public function updatedFilterPlatform(): void
@@ -346,7 +380,7 @@ class RiwayatTransaksiIndex extends Component
 
     public function resetFilter(): void
     {
-        $this->reset(['search', 'filterMetode', 'filterStatus', 'filterPlatform', 'filterMetodePengiriman']);
+        $this->reset(['search', 'filterMetode', 'filterStatus', 'filterPlatform', 'filterMetodePengiriman', 'filterJenisRetur']);
         $this->filterTanggalPreset = 'today';
         $this->applyPresetDates('today');
         $this->syncLegacyFilterTanggal();
@@ -547,6 +581,288 @@ class RiwayatTransaksiIndex extends Component
         $this->showDetailModal = true;
     }
 
+    public function lihatDetailReturPembelian(int $id): void
+    {
+        $cabangId = $this->getActiveCabangId();
+        $retur = ReturnPembelian::with(['purchaseOrder', 'supplier', 'user', 'items.produk', 'gudang.cabang'])
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->findOrFail($id);
+
+        $this->selectedDetail = [
+            'tipe' => 'retur_pembelian',
+            'id' => $retur->id,
+            'no_return' => $retur->no_return,
+            'no_po' => $retur->purchaseOrder?->no_po ?? 'Pool Karantina Supplier',
+            'po_id' => $retur->purchase_order_id,
+            'tanggal' => $retur->tanggal?->format('d/m/Y') ?? $retur->created_at?->format('d/m/Y H:i'),
+            'supplier' => $retur->supplier?->nama ?? 'Supplier',
+            'supplier_telepon' => $retur->supplier?->telepon ?? '-',
+            'operator' => $retur->user?->name ?? 'Staff Gudang',
+            'gudang' => $retur->gudang?->nama ?? 'Gudang',
+            'metode_pengembalian' => $retur->metode_pengembalian,
+            'status' => $retur->status,
+            'jumlah' => (float) $retur->jumlah,
+            'alasan' => $retur->alasan ?? '-',
+            'items' => $retur->items->map(fn ($it) => [
+                'nama' => $it->produk?->nama ?? 'Produk',
+                'sku' => $it->produk?->sku ?? '-',
+                'qty' => (float) $it->jumlah,
+                'harga_beli' => (float) $it->harga_beli,
+                'subtotal' => (float) $it->subtotal,
+            ])->toArray(),
+        ];
+
+        $this->showDetailModal = true;
+    }
+
+    public function lihatDetailPembelian(int $id): void
+    {
+        $cabangId = $this->getActiveCabangId();
+        $po = PurchaseOrder::with(['supplier', 'gudangTujuan.cabang', 'items.produk', 'returnPembelian.items.produk'])
+            ->whereHas('gudangTujuan', fn ($q) => $q->where('cabang_id', $cabangId))
+            ->findOrFail($id);
+
+        $items = [];
+        $totalBisaDireturCount = 0;
+
+        foreach ($po->items as $it) {
+            $qtyPo = (float) $it->jumlah;
+            $sudahRetur = (float) ReturnPembelianItem::whereHas('returnPembelian', fn ($q) => $q->whereIn('status', ['draft', 'menunggu', 'disetujui', 'selesai']))
+                ->where('produk_id', $it->produk_id)
+                ->where('sku_variant_id', $it->sku_variant_id)
+                ->whereHas('returnPembelian', fn ($q) => $q->where('purchase_order_id', $po->id))
+                ->sum('jumlah');
+
+            $sisaRetur = max(0, $qtyPo - $sudahRetur);
+
+            $stokItem = StokItem::where('gudang_id', $po->gudang_tujuan_id)
+                ->where('produk_id', $it->produk_id)
+                ->where('sku_variant_id', $it->sku_variant_id)
+                ->first();
+            $stokTersedia = $stokItem ? (int) $stokItem->jumlah : 0;
+
+            if ($sisaRetur > 0 && $stokTersedia > 0) {
+                $totalBisaDireturCount++;
+            }
+
+            $items[] = [
+                'id' => $it->id,
+                'nama' => $it->produk?->nama ?? 'Produk',
+                'sku' => $it->produk?->sku ?? '-',
+                'satuan' => $it->produk?->satuan ?? 'pcs',
+                'qty' => $qtyPo,
+                'sudah_retur' => $sudahRetur,
+                'sisa_retur' => $sisaRetur,
+                'stok_tersedia' => $stokTersedia,
+                'harga_beli' => (float) $it->harga_beli,
+                'subtotal' => (float) $it->subtotal,
+            ];
+        }
+
+        $bisaDiretur = $po->status === 'diterima' && $totalBisaDireturCount > 0;
+
+        $this->selectedDetail = [
+            'tipe' => 'pembelian',
+            'id' => $po->id,
+            'no_po' => $po->no_po,
+            'tanggal' => $po->created_at?->format('d/m/Y H:i:s'),
+            'supplier' => $po->supplier?->nama ?? 'Supplier',
+            'supplier_telepon' => $po->supplier?->telepon ?? '-',
+            'supplier_alamat' => $po->supplier?->alamat ?? '-',
+            'gudang' => $po->gudangTujuan?->nama ?? 'Gudang',
+            'metode_bayar' => $po->metode_bayar,
+            'jatuh_tempo' => $po->jatuh_tempo?->format('d/m/Y') ?? '-',
+            'status' => $po->status,
+            'total' => (float) $po->total,
+            'total_dibayar' => (float) $po->total_dibayar,
+            'sisa_utang' => (float) $po->sisa,
+            'catatan' => $po->catatan ?? '-',
+            'bisa_diretur' => $bisaDiretur,
+            'items' => $items,
+            'returns' => $po->returnPembelian->map(fn ($r) => [
+                'id' => $r->id,
+                'no_return' => $r->no_return,
+                'tanggal' => $r->tanggal?->format('d/m/Y'),
+                'status' => $r->status,
+                'metode_pengembalian' => $r->metode_pengembalian,
+                'jumlah' => (float) $r->jumlah,
+                'alasan' => $r->alasan,
+            ])->toArray(),
+        ];
+
+        $this->showDetailModal = true;
+    }
+
+    public function bukaModalReturPembelian(int $poId): void
+    {
+        $cabangId = $this->getActiveCabangId();
+        $po = PurchaseOrder::with(['items.produk', 'supplier', 'gudangTujuan'])
+            ->whereHas('gudangTujuan', fn ($q) => $q->where('cabang_id', $cabangId))
+            ->findOrFail($poId);
+
+        if ($po->status !== 'diterima') {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => "Hanya transaksi pembelian berstatus 'diterima' yang dapat diretur ke supplier (status saat ini: {$po->status})",
+            ]);
+
+            return;
+        }
+
+        $returItems = [];
+        foreach ($po->items as $it) {
+            $qtyPo = (float) $it->jumlah;
+            $sudahRetur = (float) ReturnPembelianItem::whereHas('returnPembelian', fn ($q) => $q->whereIn('status', ['draft', 'menunggu', 'disetujui', 'selesai']))
+                ->where('produk_id', $it->produk_id)
+                ->where('sku_variant_id', $it->sku_variant_id)
+                ->whereHas('returnPembelian', fn ($q) => $q->where('purchase_order_id', $po->id))
+                ->sum('jumlah');
+
+            $sisaRetur = max(0, $qtyPo - $sudahRetur);
+
+            $stokItem = StokItem::where('gudang_id', $po->gudang_tujuan_id)
+                ->where('produk_id', $it->produk_id)
+                ->where('sku_variant_id', $it->sku_variant_id)
+                ->first();
+            $stokTersedia = $stokItem ? (int) $stokItem->jumlah : 0;
+
+            $returItems[$it->id] = [
+                'po_item_id' => $it->id,
+                'produk_id' => $it->produk_id,
+                'produk_nama' => $it->produk?->nama ?? 'Produk',
+                'sku' => $it->produk?->sku ?? '-',
+                'satuan' => $it->produk?->satuan ?? 'pcs',
+                'harga_beli' => (float) $it->harga_beli,
+                'qty_po' => $qtyPo,
+                'sudah_retur' => $sudahRetur,
+                'sisa_bisa_retur' => $sisaRetur,
+                'stok_tersedia' => $stokTersedia,
+                'jumlah_retur' => 0,
+                'sn_raw' => '',
+            ];
+        }
+
+        $this->returPoId = $po->id;
+        $this->returNoPo = $po->no_po;
+        $this->returSupplierNama = $po->supplier?->nama ?? 'Supplier';
+        $this->returAlasan = '';
+        $this->returMetodePengembalian = ((float) $po->sisa > 0) ? 'utang' : 'saldo';
+        $this->returItems = $returItems;
+        $this->resetValidation();
+
+        $this->showReturPembelianModal = true;
+    }
+
+    public function tutupModalReturPembelian(): void
+    {
+        $this->showReturPembelianModal = false;
+        $this->returPoId = null;
+        $this->returNoPo = null;
+        $this->returSupplierNama = null;
+        $this->returItems = [];
+        $this->resetValidation();
+    }
+
+    public function prosesSimpanReturPembelian(): void
+    {
+        $this->validate([
+            'returAlasan' => 'required|string|min:4|max:500',
+            'returMetodePengembalian' => 'required|in:utang,saldo,kas',
+        ], [
+            'returAlasan.required' => 'Alasan retur pembelian wajib diisi',
+            'returAlasan.min' => 'Alasan retur minimal 4 karakter',
+            'returMetodePengembalian.required' => 'Pilih metode penyelesaian retur',
+        ]);
+
+        if (! $this->returPoId) {
+            $this->dispatch('alert', ['type' => 'error', 'message' => 'Tidak ada PO yang dipilih']);
+
+            return;
+        }
+
+        $cabangId = $this->getActiveCabangId();
+        $po = PurchaseOrder::whereHas('gudangTujuan', fn ($q) => $q->where('cabang_id', $cabangId))
+            ->findOrFail($this->returPoId);
+
+        $itemsPayload = [];
+        $totalQtyRetur = 0;
+
+        foreach ($this->returItems as $poItemId => $itemData) {
+            $qty = (float) ($itemData['jumlah_retur'] ?? 0);
+            if ($qty > 0) {
+                $sisaBisaRetur = (float) ($itemData['sisa_bisa_retur'] ?? 0);
+                $stokTersedia = (float) ($itemData['stok_tersedia'] ?? 0);
+
+                if ($qty > $sisaBisaRetur + 0.001) {
+                    $this->addError("returItems.{$poItemId}.jumlah_retur", "Jumlah retur ({$qty}) melebihi sisa item PO ({$sisaBisaRetur})");
+
+                    return;
+                }
+
+                if ($qty > $stokTersedia + 0.001) {
+                    $this->addError("returItems.{$poItemId}.jumlah_retur", "Jumlah retur ({$qty}) melebihi stok fisik tersedia di gudang ({$stokTersedia})");
+
+                    return;
+                }
+
+                $snList = [];
+                if (! empty($itemData['sn_raw'])) {
+                    $snList = preg_split('/[\r\n,;]+/', (string) $itemData['sn_raw']) ?: [];
+                    $snList = array_values(array_filter(array_map('trim', $snList)));
+                }
+
+                $itemsPayload[] = [
+                    'purchase_order_item_id' => (int) $poItemId,
+                    'jumlah' => $qty,
+                    'sn' => $snList,
+                ];
+
+                $totalQtyRetur += $qty;
+            }
+        }
+
+        if (empty($itemsPayload) || $totalQtyRetur <= 0) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Pilih minimal satu item barang dengan jumlah retur > 0',
+            ]);
+
+            return;
+        }
+
+        try {
+            $retur = app(ReturnPembelianService::class)->buatRetur(
+                $po,
+                $itemsPayload,
+                $this->returAlasan,
+                $this->returMetodePengembalian,
+                auth()->id()
+            );
+
+            $noReturn = $retur->no_return;
+            $statusRetur = $retur->status;
+            $this->tutupModalReturPembelian();
+
+            if ($this->selectedDetail && ($this->selectedDetail['id'] ?? null) === $po->id && $this->selectedDetail['tipe'] === 'pembelian') {
+                $this->lihatDetailPembelian($po->id);
+            }
+
+            $msg = $statusRetur === 'selesai'
+                ? "Retur Pembelian {$noReturn} berhasil dieksekusi! Stok fisik terpotong & keuangan tersinkronisasi."
+                : "Retur Pembelian {$noReturn} berhasil dibuat dan menunggu persetujuan (approval) workflow.";
+
+            $this->dispatch('alert', [
+                'type' => 'success',
+                'message' => $msg,
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('alert', [
+                'type' => 'error',
+                'message' => 'Gagal memproses retur pembelian: '.$e->getMessage(),
+            ]);
+        }
+    }
+
     public function cetakUlangStruk(string $tipe, int $id): void
     {
         $cabangId = $this->getActiveCabangId();
@@ -696,7 +1012,7 @@ class RiwayatTransaksiIndex extends Component
                 'cabang' => $tiket->cabang?->nama ?? 'Ute Parts Servis',
             ];
 
-        } elseif ($tipe === 'retur') {
+        } elseif ($tipe === 'retur' || $tipe === 'retur_penjualan') {
             $retur = ReturnPenjualan::with(['items.produk', 'pelanggan', 'user', 'cabang'])
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
                 ->find($id);
@@ -727,6 +1043,41 @@ class RiwayatTransaksiIndex extends Component
                 'bayar' => (float) $retur->jumlah,
                 'kembalian' => 0.0,
                 'metode' => 'RETUR ('.strtoupper($retur->metode_pengembalian ?? 'KAS').')',
+                'cabang' => $retur->cabang?->nama ?? 'Ute Parts Store',
+            ];
+
+            $this->showReceiptModal = true;
+        } elseif ($tipe === 'retur_pembelian') {
+            $retur = ReturnPembelian::with(['items.produk', 'supplier', 'user', 'cabang', 'purchaseOrder'])
+                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->find($id);
+
+            if (! $retur) {
+                return;
+            }
+
+            $items = $retur->items->map(fn ($it) => [
+                'nama' => '[RETUR BELI] '.($it->produk?->nama ?? 'Produk'),
+                'qty' => (int) $it->jumlah,
+                'harga' => (float) $it->harga_beli,
+                'subtotal' => (float) $it->subtotal,
+            ])->toArray();
+
+            $this->completedTransactionId = $retur->purchase_order_id;
+            $this->receiptData = [
+                'no_transaksi' => $retur->no_return,
+                'waktu' => $retur->tanggal?->format('d/m/Y H:i') ?? $retur->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
+                'kasir' => $retur->user?->name ?? 'Staff Gudang',
+                'pelanggan' => 'Supplier: '.($retur->supplier?->nama ?? '-'),
+                'telepon' => $retur->supplier?->telepon ?? null,
+                'items' => $items,
+                'subtotal' => (float) $retur->jumlah,
+                'diskon' => 0.0,
+                'pajak' => 0.0,
+                'total' => (float) $retur->jumlah,
+                'bayar' => (float) $retur->jumlah,
+                'kembalian' => 0.0,
+                'metode' => 'RETUR BELI ('.strtoupper($retur->metode_pengembalian ?? 'UTANG').')',
                 'cabang' => $retur->cabang?->nama ?? 'Ute Parts Store',
             ];
 
@@ -826,6 +1177,39 @@ class RiwayatTransaksiIndex extends Component
             $ringkasan['total_servis_selesai'] = $servisTrxSum + $servisDirectSum;
             $ringkasan['count_servis_selesai'] = $servisTrxCount + $servisDirectCount;
 
+            // Retur Penjualan (Konsumen)
+            $returJualStats = DB::table('return_penjualan')
+                ->where('cabang_id', $cabangId)
+                ->whereDate('tanggal', '>=', $this->localDate($startUtc))
+                ->whereDate('tanggal', '<=', $this->localDate($endUtc))
+                ->selectRaw('COALESCE(SUM(jumlah), 0) as total, COUNT(*) as count')
+                ->first();
+            $ringkasan['total_retur_penjualan'] = (float) ($returJualStats->total ?? 0);
+            $ringkasan['count_retur_penjualan'] = (int) ($returJualStats->count ?? 0);
+
+            // Retur Pembelian (Supplier)
+            $returBeliStats = DB::table('return_pembelian')
+                ->where('cabang_id', $cabangId)
+                ->whereDate('tanggal', '>=', $this->localDate($startUtc))
+                ->whereDate('tanggal', '<=', $this->localDate($endUtc))
+                ->selectRaw('COALESCE(SUM(jumlah), 0) as total, COUNT(*) as count')
+                ->first();
+            $ringkasan['total_retur_pembelian'] = (float) ($returBeliStats->total ?? 0);
+            $ringkasan['count_retur_pembelian'] = (int) ($returBeliStats->count ?? 0);
+
+            $ringkasan['total_retur'] = $ringkasan['total_retur_penjualan'] + $ringkasan['total_retur_pembelian'];
+            $ringkasan['count_retur'] = $ringkasan['count_retur_penjualan'] + $ringkasan['count_retur_pembelian'];
+
+            // Pembelian PO
+            $poStats = DB::table('purchase_order as po')
+                ->join('gudang as g', 'po.gudang_tujuan_id', '=', 'g.id')
+                ->where('g.cabang_id', $cabangId)
+                ->whereBetween('po.created_at', [$startUtc, $endUtc])
+                ->selectRaw('COALESCE(SUM(po.total), 0) as total, COUNT(*) as count')
+                ->first();
+            $ringkasan['total_pembelian_po'] = (float) ($poStats->total ?? 0);
+            $ringkasan['count_pembelian_po'] = (int) ($poStats->count ?? 0);
+
             // Total arus masuk & kas bersih
             $ringkasan['total_arus_masuk'] = $ringkasan['total_penjualan_pos'] + $ringkasan['total_pesanan_online'] + $ringkasan['total_servis_selesai'] + $ringkasan['total_mutasi_masuk'];
             $ringkasan['total_kas_bersih'] = $ringkasan['total_arus_masuk'] - $ringkasan['total_mutasi_keluar'];
@@ -841,6 +1225,10 @@ class RiwayatTransaksiIndex extends Component
             $dataList = $cabangId ? $this->getOnlineData($cabangId) : null;
         } elseif ($this->activeTab === 'servis') {
             $dataList = $cabangId ? $this->getServisData($cabangId) : null;
+        } elseif ($this->activeTab === 'pembelian') {
+            $dataList = $cabangId ? $this->getPembelianData($cabangId) : null;
+        } elseif ($this->activeTab === 'retur') {
+            $dataList = $cabangId ? $this->getReturData($cabangId) : null;
         } elseif ($this->activeTab === 'mutasi_kas') {
             $dataList = $cabangId ? $this->getMutasiData($cabangId) : null;
         }
@@ -962,8 +1350,52 @@ class RiwayatTransaksiIndex extends Component
                 'r.jumlah as nominal',
                 DB::raw("'keluar' as arah_kas"),
                 'r.status as status',
-                DB::raw("COALESCE(r.alasan, CONCAT('Retur ', COALESCE(t.no_transaksi, '-'))) as deskripsi"),
+                DB::raw("COALESCE(r.alasan, CONCAT('Retur Penjualan ', COALESCE(t.no_transaksi, '-'))) as deskripsi"),
                 'r.id as target_id',
+            ]);
+
+        // 3c. Riwayat retur pembelian ke supplier
+        $qReturBeli = DB::table('return_pembelian as rb')
+            ->leftJoin('supplier as s', 'rb.supplier_id', '=', 's.id')
+            ->leftJoin('purchase_order as po', 'rb.purchase_order_id', '=', 'po.id')
+            ->leftJoin('users as u', 'rb.user_id', '=', 'u.id')
+            ->where('rb.cabang_id', $cabangId)
+            ->whereDate('rb.tanggal', '>=', $this->localDate($startUtc))
+            ->whereDate('rb.tanggal', '<=', $this->localDate($endUtc))
+            ->select([
+                'rb.id as id',
+                DB::raw("'retur_pembelian' as jenis"),
+                'rb.no_return as no_referensi',
+                DB::raw('COALESCE(rb.updated_at, rb.created_at) as waktu'),
+                DB::raw("COALESCE(s.nama, 'Supplier') as pihak"),
+                DB::raw("COALESCE(u.name, 'Staff Gudang') as operator"),
+                DB::raw("COALESCE(rb.metode_pengembalian, 'utang') as metode"),
+                'rb.jumlah as nominal',
+                DB::raw("'masuk' as arah_kas"),
+                'rb.status as status',
+                DB::raw("COALESCE(rb.alasan, CONCAT('Retur Pembelian ', COALESCE(po.no_po, '-'))) as deskripsi"),
+                'rb.id as target_id',
+            ]);
+
+        // 3d. Transaksi Pembelian PO
+        $qPembelian = DB::table('purchase_order as po')
+            ->join('gudang as g', 'po.gudang_tujuan_id', '=', 'g.id')
+            ->leftJoin('supplier as s', 'po.supplier_id', '=', 's.id')
+            ->where('g.cabang_id', $cabangId)
+            ->whereBetween('po.created_at', [$startUtc, $endUtc])
+            ->select([
+                'po.id as id',
+                DB::raw("'pembelian' as jenis"),
+                'po.no_po as no_referensi',
+                'po.created_at as waktu',
+                DB::raw("COALESCE(s.nama, 'Supplier') as pihak"),
+                DB::raw("COALESCE(g.nama, 'Gudang') as operator"),
+                'po.metode_bayar as metode',
+                'po.total as nominal',
+                DB::raw("'keluar' as arah_kas"),
+                'po.status as status',
+                DB::raw("COALESCE(po.catatan, 'Purchase Order Pembelian') as deskripsi"),
+                'po.id as target_id',
             ]);
 
         // 3. Servis Direct (TiketServis lunas tanpa transaksi_id)
@@ -1026,7 +1458,7 @@ class RiwayatTransaksiIndex extends Component
         // Susun queries berdasarkan filterStatus jenis
         $queries = [];
         if (! $status || $status === 'semua') {
-            $queries = [$qPos, $qOnline, $qServisTrx, $qRetur];
+            $queries = [$qPos, $qOnline, $qServisTrx, $qRetur, $qReturBeli, $qPembelian];
             if ($qServisDirect) {
                 $queries[] = $qServisDirect;
             }
@@ -1043,7 +1475,13 @@ class RiwayatTransaksiIndex extends Component
                 $queries[] = $qServisDirect;
             }
         } elseif ($status === 'retur') {
+            $queries = [$qRetur, $qReturBeli];
+        } elseif ($status === 'retur_penjualan') {
             $queries = [$qRetur];
+        } elseif ($status === 'retur_pembelian') {
+            $queries = [$qReturBeli];
+        } elseif ($status === 'pembelian') {
+            $queries = [$qPembelian];
         } elseif ($status === 'void') {
             $qPos->where('t.status', 'void');
             $qOnline->where('t.status', 'void');
@@ -1078,6 +1516,125 @@ class RiwayatTransaksiIndex extends Component
         }
 
         return $base->orderBy('waktu', 'desc')->paginate(15);
+    }
+
+    protected function getReturData(int $cabangId)
+    {
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
+        $status = $this->filterStatus;
+        $jenisRetur = $this->filterJenisRetur;
+        $search = trim($this->search);
+
+        $qReturJual = DB::table('return_penjualan as r')
+            ->leftJoin('pelanggan as p', 'r.pelanggan_id', '=', 'p.id')
+            ->leftJoin('transaksi as t', 'r.transaksi_id', '=', 't.id')
+            ->leftJoin('users as u', 'r.user_id', '=', 'u.id')
+            ->where('r.cabang_id', $cabangId)
+            ->whereDate('r.tanggal', '>=', $this->localDate($startUtc))
+            ->whereDate('r.tanggal', '<=', $this->localDate($endUtc))
+            ->select([
+                'r.id as id',
+                DB::raw("'penjualan' as jenis_retur"),
+                'r.no_return as no_return',
+                'r.tanggal as tanggal',
+                DB::raw("COALESCE(p.nama, 'Pelanggan Umum') as pihak"),
+                DB::raw("COALESCE(t.no_transaksi, '-') as no_referensi"),
+                DB::raw("COALESCE(r.metode_pengembalian, 'retur') as metode"),
+                DB::raw("COALESCE(r.tipe_penyelesaian, 'kembali_dana') as tipe_penyelesaian"),
+                DB::raw("COALESCE(u.name, 'Kasir') as operator"),
+                'r.jumlah as nominal',
+                'r.status as status',
+                DB::raw("COALESCE(r.alasan, '-') as deskripsi"),
+                'r.id as target_id',
+                'r.transaksi_id as ref_id',
+            ]);
+
+        $qReturBeli = DB::table('return_pembelian as rb')
+            ->leftJoin('supplier as s', 'rb.supplier_id', '=', 's.id')
+            ->leftJoin('purchase_order as po', 'rb.purchase_order_id', '=', 'po.id')
+            ->leftJoin('users as u', 'rb.user_id', '=', 'u.id')
+            ->where('rb.cabang_id', $cabangId)
+            ->whereDate('rb.tanggal', '>=', $this->localDate($startUtc))
+            ->whereDate('rb.tanggal', '<=', $this->localDate($endUtc))
+            ->select([
+                'rb.id as id',
+                DB::raw("'pembelian' as jenis_retur"),
+                'rb.no_return as no_return',
+                'rb.tanggal as tanggal',
+                DB::raw("COALESCE(s.nama, 'Supplier') as pihak"),
+                DB::raw("COALESCE(po.no_po, 'Pool Karantina') as no_referensi"),
+                DB::raw("COALESCE(rb.metode_pengembalian, 'utang') as metode"),
+                DB::raw("COALESCE(rb.metode_pengembalian, 'utang') as tipe_penyelesaian"),
+                DB::raw("COALESCE(u.name, 'Staff Gudang') as operator"),
+                'rb.jumlah as nominal',
+                'rb.status as status',
+                DB::raw("COALESCE(rb.alasan, '-') as deskripsi"),
+                'rb.id as target_id',
+                'rb.purchase_order_id as ref_id',
+            ]);
+
+        $queries = [];
+        if (! $jenisRetur || $jenisRetur === 'semua') {
+            $queries = [$qReturJual, $qReturBeli];
+        } elseif ($jenisRetur === 'penjualan') {
+            $queries = [$qReturJual];
+        } elseif ($jenisRetur === 'pembelian') {
+            $queries = [$qReturBeli];
+        }
+
+        if (empty($queries)) {
+            return null;
+        }
+
+        $first = array_shift($queries);
+        foreach ($queries as $sub) {
+            $first->unionAll($sub);
+        }
+
+        $base = DB::query()->fromSub($first, 'ret');
+
+        if ($status) {
+            $base->where('status', $status);
+        }
+
+        if ($search) {
+            $base->where(function ($q) use ($search) {
+                $q->where('no_return', 'like', "%{$search}%")
+                    ->orWhere('pihak', 'like', "%{$search}%")
+                    ->orWhere('no_referensi', 'like', "%{$search}%")
+                    ->orWhere('operator', 'like', "%{$search}%")
+                    ->orWhere('deskripsi', 'like', "%{$search}%");
+            });
+        }
+
+        return $base->orderBy('tanggal', 'desc')->orderBy('id', 'desc')->paginate(15);
+    }
+
+    protected function getPembelianData(int $cabangId)
+    {
+        [$startUtc, $endUtc] = $this->getDateBoundaries();
+
+        $query = PurchaseOrder::with(['supplier', 'gudangTujuan', 'items.produk', 'returnPembelian'])
+            ->whereHas('gudangTujuan', fn ($q) => $q->where('cabang_id', $cabangId))
+            ->whereBetween('created_at', [$startUtc, $endUtc])
+            ->when($this->filterMetode, fn ($q) => $q->where('metode_bayar', $this->filterMetode))
+            ->when($this->filterStatus, function ($q) {
+                if ($this->filterStatus === 'bisa_retur') {
+                    $q->where('status', 'diterima');
+                } else {
+                    $q->where('status', $this->filterStatus);
+                }
+            })
+            ->when($this->search, function ($q) {
+                $q->where(function ($sub) {
+                    $sub->where('no_po', 'like', "%{$this->search}%")
+                        ->orWhereHas('supplier', fn ($s) => $s->where('nama', 'like', "%{$this->search}%"))
+                        ->orWhereHas('gudangTujuan', fn ($g) => $g->where('nama', 'like', "%{$this->search}%"));
+                });
+            })
+            ->latest('id');
+
+        return $query->paginate(15);
     }
 
     protected function localDate(Carbon $utc): string

@@ -3104,3 +3104,17 @@ EOF
   - **Stok Log (17.176)**: `sid_retail_raw_arus_stok` (19.286) → `stok_items` + `stok_log` + `stock_mutation_log` (sumber `sid_migration`), lookup gudang via `lokasi_stok` map, referensi transaksi via `no_transaksi` di `sid_import_map`. ~2k di-skip (delta=0 atau barang tidak termap).
   - **Servis (332)**: `sid_retail_raw_servis` → `tiket_servis` (status map: SEDANG DI SERVIS→dalam_pengerjaan, SUDAH DI AMBIL→diambil, DIBATALKAN→dibatalkan, MENUNGGU APPROVAL→menunggu_approval) + `teknisi` seed ke `users`.
 - **Verifikasi aktual (db_staging)**: Produk 6.368 (3.235 existing + 3.133 SID), SkuVariant 6.368, HargaTier 19.104 (3×), Pelanggan 291 (284 SID + 4 member + 3 existing), Supplier 12 (10 SID + 2 existing), Transaksi 18.786 (12.524 existing + 6.262 SID), TransaksiItem 28.491 (18.994 existing + 9.497 SID), StokItem 3.044, StokLog 120.167 (68.712 existing + 51.455 SID re-run with refs), TiketServis 342 (10 existing + 332 SID), Piutang 0, Utang 0, SidImportMap 13.251 entries. Idempoten: re-run → 0 insert baru (guard unique `kode_sumber+tabel_sumber`). Semua test suite PASS (kecuali `WmsImportVerifyTest` temporary test memori).
+
+## 2026-10-30 (Histori Retur + Retur Pembelian dari Riwayat Transaksi)
+
+### Fitur: Histori Transaksi Retur & Retur Pembelian di Riwayat Transaksi (POS)
+- **Backend `RiwayatTransaksiIndex`**:
+  - Tab baru `pembelian` (daftar PO cabang via `getPembelianData`) & `retur` (gabungan retur penjualan + retur pembelian via `getReturData` union, filter `filterJenisRetur`).
+  - Tab `global`: tambah sumber data retur pembelian (`qReturBeli`) & pembelian PO (`qPembelian`) + filter jenis `retur_pembelian`/`pembelian`.
+  - Detail modal tipe baru: `pembelian` (info supplier/gudang/utang, item dengan sisa retur per item berbasis `ReturnPembelianItem` + stok fisik `StokItem`, riwayat retur terkait, flag `bisa_diretur`) dan `retur_pembelian`.
+  - Form retur pembelian: `bukaModalReturPembelian` (validasi status `diterima`, map sisa retur & stok per item), `prosesSimpanReturPembelian` (validasi qty ≤ sisa PO & stok fisik, SN list, memanggil `ReturnPembelianService::buatRetur`, auto-refresh detail PO setelah simpan).
+  - **Void dari modal detail transaksi**: footer detail POS kini punya tombol `↩ Retur Barang` & `⛔ Void Transaksi` (gated `pos.void`) — paritas fitur dengan modal riwayat kasir (`PosKasir`). Setelah void sukses, `selectedDetail` langsung diperbarui (status `void` + banner `TRANSAKSI TELAH DI-VOID` beserta operator/waktu/alasan) tanpa perlu refresh.
+  - Cetak struk thermal tipe `retur_pembelian` (metadata supplier/PO, item harga beli).
+- **Model**: relasi `PurchaseOrder::returnPembelian()`.
+- **View `riwayat-transaksi-index.blade.php`**: tab nav + filter + tabel/kartu (list & grid) untuk tab `pembelian` & `retur`; badge & aksi global untuk jenis `pembelian`/`retur_pembelian`; body + footer detail modal tipe `pembelian`/`retur_pembelian`; modal form retur pembelian (pilih qty per item, metode pengembalian `utang|saldo|kas`, alasan, estimasi nilai retur live); tombol Retur/Void di footer detail POS.
+- **Test**: `tests/Feature/RiwayatTransaksiReturPembelianTest.php` (6 test): akses tab pembelian + detail PO + `bisa_diretur`, filter `bisa_retur`, tab retur menampilkan kedua jenis retur + filter jenis, eksekusi retur pembelian sukses (stok terpotong bila auto-selesai), validasi qty melebihi sisa PO, void transaksi langsung dari modal detail. Seluruh suite `RiwayatTransaksi*` 16 test PASS.

@@ -59,6 +59,11 @@ class PurchaseOrder extends Model
         return $this->hasOne(Grn::class, 'po_id');
     }
 
+    public function returnPembelian(): HasMany
+    {
+        return $this->hasMany(ReturnPembelian::class, 'purchase_order_id');
+    }
+
     public function getSisaAttribute(): float
     {
         return max(0, (float) $this->total - (float) $this->total_dibayar);
