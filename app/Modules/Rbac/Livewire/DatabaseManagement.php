@@ -272,6 +272,12 @@ class DatabaseManagement extends Component
                 'type' => 'success',
                 'message' => "{$res['mode_label']} Berhasil! {$res['cleared_tables']} tabel diproses. Snapshot backup: {$res['pre_reset_backup']}.{$passwordMsg}",
             ]);
+
+            if (in_array($this->resetMode, ['factory_reset', 'full_wipe'], true)) {
+                session()->flash('info', 'Database telah dibersihkan. Silakan lengkapi wizard inisialisasi awal toko Anda.');
+
+                return redirect()->route('setup.wizard');
+            }
         } catch (Throwable $e) {
             $this->dispatch('alert', [
                 'type' => 'error',

@@ -538,9 +538,11 @@ class DatabaseManagementService
                 // Pulihkan izin inti dan cabang default
                 try {
                     (new RolesAndPermissionsSeeder)->run();
+                    (new AkunCoaSeeder)->run();
+                    (new TierMembershipSeeder)->run();
                     $cabang = Cabang::firstOrCreate(
                         ['kode' => 'CBG-01'],
-                        ['nama' => 'Cabang Utama', 'is_active' => true]
+                        ['nama' => 'Cabang Pusat', 'is_active' => true]
                     );
                     if ($admin) {
                         $admin->syncRoles($savedRoles);
