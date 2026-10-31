@@ -126,6 +126,9 @@ function layoutStruk58(data) {
     if (data.show_cabang !== false && data.cabang) {
         E.push({ t: 'line', s: String(data.cabang), c: 1 });
     }
+    if (data.is_offline) {
+        E.push({ t: 'line', s: '*** STRUK OFFLINE (BUKTI SEMENTARA) ***', c: 1, b: 1 });
+    }
     if (data.show_waktu !== false && data.waktu) {
         E.push({ t: 'line', s: String(data.waktu), c: 1 });
     }
@@ -257,6 +260,9 @@ function layoutFaktur80(data) {
     if (data.telepon) E.push({ t: 'line', s: 'Telp/WA: ' + String(data.telepon), c: 1 });
     if (data.show_cabang !== false && data.cabang) {
         E.push({ t: 'line', s: String(data.cabang), c: 1 });
+    }
+    if (data.is_offline) {
+        E.push({ t: 'line', s: '*** STRUK OFFLINE (BUKTI SEMENTARA) ***', c: 1, b: 1 });
     }
     if (data.show_waktu !== false && data.waktu) {
         E.push({ t: 'line', s: `${data.waktu}`, c: 1 });

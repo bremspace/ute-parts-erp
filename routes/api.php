@@ -69,6 +69,8 @@ Route::middleware(['throttle:60,1'])->group(function () {
 
         // [API: POS-01, POS-02, PRICING-01] Modul POS
         Route::prefix('pos')->group(function () {
+            Route::get('/master-offline', [PosController::class, 'masterOffline'])->middleware('permission:pos.view|pos.view-own');
+            Route::post('/sync-offline', [PosController::class, 'syncOffline'])->middleware('permission:pos.create|pos.view-own');
             Route::get('/produk', [PosController::class, 'products'])->middleware('permission:pos.view');
             Route::get('/pelanggan', [PosController::class, 'pelanggan'])->middleware('permission:pos.view'); // [T-08] POS-06
             Route::get('/transaksi', [PosController::class, 'index'])->middleware('permission:pos.view'); // [T-03] POS-05

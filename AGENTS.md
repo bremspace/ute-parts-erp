@@ -39,11 +39,11 @@ Each module owns Models, Controllers, Livewire components, Services, Migrations.
 - **Marketplace** (`/` public storefront) — customers, mobile-first, light mode default
 
 ## Key Constraints (non-obvious)
-- **1GB RAM server** (CyberPanel + OpenLiteSpeed): 2-3 PHP-LSAPI workers, OPcache mandatory, `database` queue driver (not Redis unless RAM permits), async reports with 15-min cache, no sync queue dispatch in requests
+- **1GB RAM server** (VPS Murni / Standalone Linux, non-CyberPanel): PHP 8.3+, OPcache mandatory, `database` queue driver (not Redis unless RAM permits), async reports with 15-min cache, no sync queue dispatch in requests
 - **All queries MUST scope to `cabang_id`** (active branch in session). Never leak cross-branch data.
 - **RBAC via `spatie/laravel-permission` enforced in route middleware**, not just UI
 - **Auth via Laravel Sanctum** (SPA cookie session)
-- **PHP binary**: `/usr/local/lsws/lsphp85/bin/php` or `/usr/bin/php8.3` (VPS); verify with `find /usr -name "php" -path "*/bin/*" 2>/dev/null | head -1`
+- **PHP binary**: `/usr/bin/php8.3` atau `/usr/local/lsws/lsphp85/bin/php` (VPS); verify with `find /usr -name "php" -path "*/bin/*" 2>/dev/null | head -1`
 
 ## API Contract Rules
 - Every endpoint uses codes like `[API: AUTH-01]`, `[API: POS-01]`, etc. defined in `PRD-Backend-UteParts.md` §5
@@ -108,9 +108,8 @@ npm run build
 - **Jurnal servis di onSelesai** — 4 baris: Kas debit / Pendapatan jasa kredit / Pendapatan penjualan sparepart kredit / HPP debit (persediaan kredit)
 - **TiketServis status `menunggu_approval` → token** — Token WAIBS di-generate saat setEstimasi, bukan saat updateStatus
 - **Livewire computed properties** — WAIBS pass eksplisit di `render()`: `['propName' => $this->computedProp]` — bare `$prop` di blade GAGAL
-- **Setup MySQL: pakai `sudo mysql`** — CyberPanel/Unix socket auth — `mysql -uroot -p` FAILS
-- **Handler LSAPI bernama `lsphp`** (bukan `lsphp85`) — ExtProcessor di server bernama `lsphp` + socket `lsphp85.sock`; vhost scripthandler harus pakai nama itu
-- **OLS vhost format: flat, bukan `virtualHostConfig{}`** — `virtualHostConfig{}` dengan `dirindex`/`enablelscache` → invalid parse → 403
+- **Setup MySQL: pakai `sudo mysql`** — Linux auth_socket / sudo access
+- **Infrastruktur: VPS Murni (Direct Host / Bare Linux, Non-CyberPanel)** — kelola daemon & service via systemd/Supervisor standar Linux
 
 ## ADR Index (docs/adr/)
 - `0006-security-scan-approach.md` — Security headers, CSP, HTTPS enforcement

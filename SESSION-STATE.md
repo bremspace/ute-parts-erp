@@ -52,9 +52,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/bremspace/ute-parts-erp/main
 | **Jurnal servis di onSelesai** | 4 baris: Kas debit / Pendapatan jasa kredit / Pendapatan penjualan sparepart kredit / HPP debit (persediaan kredit) |
 | **TiketServis status `menunggu_approval` → token** | Token WAJIB di-generate saat setEstimasi, bukan saat updateStatus |
 | **Livewire computed properties** | WAJIB pass eksplisit di `render()`: `return view('...', ['propName' => $this->computedProp])` — bare `$prop` di blade GAGAL |
-| **Setup MySQL: pakai `sudo mysql`** | CyberPanel/Unix socket auth — `mysql -uroot -p` FAILS |
-| **Handler LSAPI bernama `lsphp`** (bukan `lsphp85`) | ExtProcessor di server bernama `lsphp` + socket `lsphp85.sock`; vhost scripthandler harus pakai nama itu |
-| **OLS vhost format: flat, bukan `virtualHostConfig{}`** | `virtualHostConfig{}` dengan `dirindex`/`enablelscache` → invalid parse → 403 |
+| **Setup MySQL: pakai `sudo mysql`** | Linux auth_socket / sudo access |
+| **Infrastruktur: VPS Murni (Direct Host, Non-CyberPanel)** | Pengelolaan daemon via systemd / Supervisor murni Linux |
 
 ---
 

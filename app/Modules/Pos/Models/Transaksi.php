@@ -36,6 +36,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'payment_reference', 'payment_url', 'paid_at',
     'void_by_id', 'void_at', 'void_alasan',
     'expires_at',
+    'offline_uuid', 'is_offline', 'client_created_at', 'synced_at', 'sync_status', 'discrepancy_amount',
 ])]
 class Transaksi extends Model
 {
@@ -69,6 +70,10 @@ class Transaksi extends Model
         'expires_at' => 'datetime',
         'void_at' => 'datetime',
         'garansi_berakhir_pada' => 'date',
+        'is_offline' => 'boolean',
+        'client_created_at' => 'datetime',
+        'synced_at' => 'datetime',
+        'discrepancy_amount' => 'decimal:2',
     ];
 
     public function cabang(): BelongsTo

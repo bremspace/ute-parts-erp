@@ -148,6 +148,21 @@ export default defineConfig({
                         }
                     },
                     {
+                        urlPattern: /\/api\/pos\/master-offline/i,
+                        handler: 'NetworkFirst',
+                        options: {
+                            cacheName: 'pos-master-cache',
+                            expiration: {
+                                maxEntries: 5,
+                                maxAgeSeconds: 60 * 60 * 24, // 24 jam
+                            },
+                            networkTimeoutSeconds: 5,
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                        },
+                    },
+                    {
                         urlPattern: /\/api\/.*/i,
                         handler: 'NetworkFirst',
                         options: {

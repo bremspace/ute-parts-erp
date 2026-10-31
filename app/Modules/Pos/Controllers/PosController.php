@@ -12,6 +12,7 @@ use App\Modules\Pos\Jobs\PrintThermalJob;
 use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Pos\Models\TransaksiItem;
 use App\Modules\Pos\Services\KasSesiState;
+use App\Modules\Pos\Services\PosOfflineSyncService;
 use App\Modules\Pos\Services\PricingService;
 use App\Modules\Reseller\Models\Komisi;
 use App\Modules\Reseller\Services\KomisiService;
@@ -165,6 +166,95 @@ class PosController extends Controller
             'last_page' => $products->lastPage(),
             'total' => $products->total(),
         ], 'Daftar produk berhasil dimuat');
+    }
+
+    // [API: POS-OFFLINE-01] Master data produk dan pelanggan untuk cache offline
+    public function masterOffline(Request $request)
+    {
+        $cabangId = $this->resolveCabangId($request);
+        $gudangIds = Gudang::where('cabang_id', $cabangId)->pluck('id');
+
+        $products = Produk::query()
+            ->where('is_active', true)
+            ->with(['hargaTier', 'skuVariants' => fn ($q) => $q->where('is_active', true)])
+            ->get()
+            ->map(function ($p) use ($gudangIds, $cabangId) {
+                $stok = (int) StokItem::where('produk_id', $p->id)
+                    ->whereIn('gudang_id', $gudangIds)
+                    ->sum('jumlah');
+
+                $bengkelTier = $p->hargaTier->firstWhere('tipe_konsumen', 'reseller')
+                    ?? $p->hargaTier->firstWhere('tier_membership_id', 2);
+                $grosirTier = $p->hargaTier->firstWhere('tipe_konsumen', 'agen')
+                    ?? $p->hargaTier->firstWhere('tier_membership_id', 3);
+
+                $hargaBengkel = $bengkelTier?->nominal_tetap ?? $bengkelTier?->harga ?? $p->harga_jual_retail;
+                $hargaGrosir = $grosirTier?->nominal_tetap ?? $grosirTier?->harga ?? $p->harga_jual_retail;
+
+                return [
+                    'id' => $p->id,
+                    'kode' => $p->skuVariants->first()?->sku ?? ('PRD-'.$p->id),
+                    'barcode' => $p->barcode ?? $p->skuVariants->first()?->sku ?? ('PRD-'.$p->id),
+                    'nama' => $p->nama,
+                    'kategori' => $p->kategori ?? 'Umum',
+                    'harga_retail' => (float) $p->harga_jual_retail,
+                    'harga_bengkel' => (float) $hargaBengkel,
+                    'harga_grosir' => (float) $hargaGrosir,
+                    'stok_terakhir' => $stok,
+                    'gudang_id' => $gudangIds->first() ?? null,
+                    'cabang_id' => $cabangId,
+                    'updated_at' => $p->updated_at?->toIso8601String(),
+                ];
+            });
+
+        $customers = Pelanggan::query()
+            ->where(function ($q) use ($cabangId) {
+                $q->where('cabang_id', $cabangId)->orWhereNull('cabang_id');
+            })
+            ->where('is_active', true)
+            ->with('tierMembership')
+            ->limit(200)
+            ->get()
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'nama' => $c->nama,
+                'telepon' => $c->telepon,
+                'tier' => strtolower($c->tierMembership?->nama ?? 'retail'),
+            ]);
+
+        return $this->success([
+            'cabang_id' => $cabangId,
+            'synced_at' => now()->toIso8601String(),
+            'products' => $products,
+            'customers' => $customers,
+        ], 'Master data offline berhasil dimuat');
+    }
+
+    // [API: POS-OFFLINE-02] Sinkronisasi antrean transaksi offline dari kasir
+    public function syncOffline(Request $request)
+    {
+        $request->validate([
+            'transactions' => 'required|array|min:1',
+            'transactions.*.offline_uuid' => 'required|string',
+            'transactions.*.items' => 'required|array|min:1',
+            'transactions.*.items.*.produk_id' => 'required|integer',
+            'client_batch_id' => 'nullable|string|max:100',
+        ]);
+
+        $cabangId = $this->resolveCabangId($request);
+        $userId = auth()->id() ?? (int) $request->input('user_id', 1);
+
+        $syncService = app(PosOfflineSyncService::class);
+        $result = $syncService->syncBatch(
+            transactions: $request->input('transactions'),
+            cabangId: $cabangId,
+            userId: $userId,
+            batchId: $request->input('client_batch_id'),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent()
+        );
+
+        return $this->success($result, 'Proses sinkronisasi batch offline selesai diproses');
     }
 
     // [API: PRICING-01] Resolusi harga final per pelanggan

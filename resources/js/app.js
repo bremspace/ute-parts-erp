@@ -10,6 +10,8 @@ import './components/barcode-scanner.js'; // Barcode scanner engine (hardware ke
 import './components/notification-sound.js'; // [2026] Precision Web Audio notification synthesizer
 import * as fflate from 'fflate'; // Fast client-side ZIP directory inspection & selective extraction
 import './components/bulk-foto-uploader.js'; // [2026] Bulk product photo pre-flight sorter & chunk uploader
+import './components/offline-db.js'; // [T-OFFLINE-02] UtePartsOfflineDB client engine
+import './components/pos-offline-engine.js'; // [T-OFFLINE-07,08,09,10] Alpine.js POS Offline Store & Sync Worker
 import { Html5Qrcode } from 'html5-qrcode';
 
 window.fflate = fflate;
@@ -27,6 +29,9 @@ window.addEventListener('online', () => {
     console.log('[PWA] Back online');
     document.body.classList.remove('offline');
     showToast('Kembali online', 'success');
+    if (window.location.pathname.includes('/app/pos') && window.UteOfflineDB) {
+        window.UteOfflineDB.syncMasterFromServer();
+    }
 });
 
 window.addEventListener('offline', () => {
@@ -38,6 +43,11 @@ window.addEventListener('offline', () => {
 // Check initial connection
 if (!navigator.onLine) {
     document.body.classList.add('offline');
+} else if (window.location.pathname.includes('/app/pos') && window.UteOfflineDB) {
+    // Warm up offline master cache for POS
+    setTimeout(() => {
+        window.UteOfflineDB.syncMasterFromServer();
+    }, 2000);
 }
 
 const seenNotificationIds = new Set();

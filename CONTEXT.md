@@ -9,7 +9,7 @@
   - **Marketplace** (`/`): Public storefront, mobile-first, breathing room, default light mode (`--up-ink-50`), tiered customer & reseller self-service.
 
 ## 2. Core Goals & Constraints
-- **Resource Envelope**: CyberPanel + OpenLiteSpeed on **1 GB RAM** VPS.
+- **Resource Envelope**: VPS Murni (Standalone Linux / Direct Host, Non-CyberPanel) on **1 GB RAM**.
 - **Execution Architecture**: Modular monolith in `app/Modules/` (15 modules: `Akunting`, `Crm`, `Dashboard`, `Hr`, `Marketplace`, `Notifikasi`, `Omnichannel`, `Pos`, `Rbac`, `Report`, `Reseller`, `Servis`, `Webhook`, `Wms`, `Workflow`).
 - **Data Isolation**: Multi-tenancy scoped by active `cabang_id` in session. Never leak cross-branch data.
 - **Asynchronous Execution**: Strict database queue driver for jobs (notifications, stock broadcast, export). No synchronous external HTTP in request lifecycle.

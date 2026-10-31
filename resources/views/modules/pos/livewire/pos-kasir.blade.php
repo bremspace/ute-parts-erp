@@ -24,6 +24,107 @@
     <!-- PWA Install Prompt Banner -->
     <x-prism.pwa-install-prompt variant="banner" class="flex-shrink-0" />
 
+    <!-- Offline Banner & Drawer Trigger (PRD-OFFLINE-01) -->
+    <div
+        x-show="!$store.posOffline.isOnline || $store.posOffline.pendingCount > 0"
+        x-cloak
+        class="flex items-center justify-between px-3.5 py-2 rounded-xl border text-xs transition-all duration-200"
+        :class="!$store.posOffline.isOnline ? 'bg-amber-500/15 border-amber-500/30 text-amber-900 dark:text-amber-200' : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-900 dark:text-indigo-200'"
+    >
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full" :class="!$store.posOffline.isOnline ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'"></span>
+            <span class="font-medium" x-text="!$store.posOffline.isOnline ? 'Mode Kasir Offline Mandiri: Transaksi tersimpan lokal di perangkat' : 'Koneksi Pulih: Ada antrean yang siap disinkronkan'"></span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button
+                type="button"
+                @click="$store.posOffline.toggleDrawer()"
+                class="px-2.5 py-1 rounded-lg bg-black/10 dark:bg-white/10 hover:bg-black/20 font-semibold cursor-pointer flex items-center gap-1.5"
+            >
+                <span>Antrean Outbox</span>
+                <span
+                    class="px-1.5 py-0.2 rounded-full text-[10px] font-bold"
+                    :class="$store.posOffline.pendingCount > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'"
+                    x-text="$store.posOffline.pendingCount"
+                ></span>
+            </button>
+            <template x-if="$store.posOffline.isOnline && $store.posOffline.pendingCount > 0">
+                <button
+                    type="button"
+                    @click="$store.posOffline.triggerAutoSync()"
+                    :disabled="$store.posOffline.isSyncing"
+                    class="px-2.5 py-1 rounded-lg bg-up-primary text-white font-semibold cursor-pointer hover:opacity-90 disabled:opacity-50"
+                >
+                    <span x-text="$store.posOffline.isSyncing ? 'Sinkronisasi...' : 'Sinkronkan Sekarang'"></span>
+                </button>
+            </template>
+        </div>
+    </div>
+
+    <!-- Drawer Antrean Outbox Modal -->
+    <div
+        x-show="$store.posOffline.drawerOpen"
+        x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-end bg-black/50 backdrop-blur-xs"
+        @click.self="$store.posOffline.drawerOpen = false"
+    >
+        <div class="w-full max-w-md h-full bg-white dark:bg-[#0B1120] border-l border-ink-200 dark:border-white/10 p-4 flex flex-col gap-3 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-ink-100 dark:border-white/10">
+                <div>
+                    <h3 class="font-bold text-ink-900 dark:text-white">Antrean Transaksi Offline</h3>
+                    <p class="text-xs text-ink-500">Daftar transaksi tersimpan di memori perangkat</p>
+                </div>
+                <button
+                    type="button"
+                    @click="$store.posOffline.drawerOpen = false"
+                    class="p-1.5 rounded-lg text-ink-400 hover:text-ink-900 dark:hover:text-white"
+                >
+                    ✕
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto flex flex-col gap-2">
+                <template x-if="$store.posOffline.outboxItems.length === 0">
+                    <div class="p-8 text-center text-xs text-ink-400">
+                        Tidak ada antrean transaksi offline saat ini.
+                    </div>
+                </template>
+                <template x-for="item in $store.posOffline.outboxItems" :key="item.offline_uuid">
+                    <div class="p-3 rounded-xl border border-ink-100 dark:border-white/10 bg-ink-50/50 dark:bg-white/[0.02] flex flex-col gap-1.5 text-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-ink-900 dark:text-white" x-text="item.server_no_transaksi || item.offline_uuid.slice(0, 8)"></span>
+                            <span
+                                class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                :class="{
+                                    'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20': item.status === 'synced',
+                                    'bg-amber-500/10 text-amber-500 border border-amber-500/20': item.status === 'pending',
+                                    'bg-rose-500/10 text-rose-500 border border-rose-500/20': item.status === 'conflict' || item.status === 'failed'
+                                }"
+                                x-text="item.status.toUpperCase()"
+                            ></span>
+                        </div>
+                        <div class="flex items-center justify-between text-ink-500">
+                            <span x-text="new Date(item.client_created_at).toLocaleTimeString('id-ID')"></span>
+                            <span class="font-semibold text-ink-900 dark:text-white" x-text="'Rp ' + Number(item.total_nominal || 0).toLocaleString('id-ID')"></span>
+                        </div>
+                        <div class="text-[11px] text-ink-400" x-text="(item.items ? item.items.length : 0) + ' item produk'"></div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="pt-3 border-t border-ink-100 dark:border-white/10 flex items-center gap-2">
+                <button
+                    type="button"
+                    @click="$store.posOffline.triggerAutoSync()"
+                    :disabled="$store.posOffline.isSyncing || !$store.posOffline.isOnline"
+                    class="flex-1 py-2 rounded-xl bg-up-primary text-white font-semibold text-xs cursor-pointer disabled:opacity-50"
+                >
+                    <span x-text="$store.posOffline.isSyncing ? 'Memproses...' : 'Sinkronkan Sekarang'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOP CONTROL BAR: Scan/Search, Gudang, Pelanggan, Aksi Cepat & Big Total -->
     <div class="glass-panel p-3 sm:p-3.5 rounded-2xl border border-ink-200/80 dark:border-white/10 shadow-sm flex-shrink-0 flex flex-col gap-2.5">
         <div class="flex items-center gap-2.5 flex-wrap lg:flex-nowrap justify-between">
