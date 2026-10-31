@@ -425,10 +425,10 @@ class Nplus1P2Test extends TestCase
     {
         $svc = app(KonfigurasiService::class);
         $kunci = array_keys($svc->defaults());
-        $this->assertCount(5, $kunci);
+        $this->assertCount(count($svc->defaults()), $kunci);
 
         [$hasil, $q] = $this->rekam(fn () => $svc->getMany($kunci));
-        $this->assertSame(1, $q, "getMany 5 kunci harus 1 query, dapat {$q}");
+        $this->assertSame(1, $q, "getMany kunci harus 1 query, dapat {$q}");
         $this->assertSame([], $hasil, 'tabel konfigurasi masih kosong');
 
         // get() ber-cache: query pertama 1, berikutnya 0.

@@ -433,8 +433,8 @@
                 </div>
                 @endcan
 
-                <!-- 10. Approval Inbox (RBAC: approve-workflow) -->
-                @can('approve-workflow')
+                <!-- 10. Approval & Audit Log (RBAC: approve-workflow / lihat-audit-log) -->
+                @canany(['approve-workflow', 'lihat-audit-log'])
                     @php
                         $pendingApprovalCount = \Illuminate\Support\Facades\Cache::remember(
                             'backoffice-approval-badge-'.(session('cabang_id') ?? 'all'),
@@ -446,24 +446,56 @@
                         );
                     @endphp
                     <div class="sidebar-group">
-                        <a href="/app/approvals" title="Approval Inbox" class="sidebar-nav-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium {{ request()->is('app/approvals*') ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }} transition-[background-color,color,box-shadow] duration-140">
+                        <button
+                            type="button"
+                            @click="toggleDropdown('approval')"
+                            class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/approvals*', 'app/audit-log*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
+                            title="Approval & Audit Log"
+                        >
                             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                             </svg>
-                            <span class="sidebar-label">Approval</span>
+                            <span class="sidebar-label">Approval &amp; Log</span>
                             @if($pendingApprovalCount > 0)
                                 <span class="sidebar-badge ml-auto text-[10px] font-extrabold text-white bg-up-red animate-pulse ring-2 ring-up-red/40 px-1.5 py-0.5 rounded">{{ $pendingApprovalCount }}</span>
                             @endif
-                        </a>
+                            <svg class="sidebar-chevron {{ $pendingApprovalCount > 0 ? 'ml-1.5' : 'ml-auto' }} w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': isDropdownOpen('approval') }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <div x-show="isDropdownOpen('approval')"
+                             x-collapse
+                             class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
+                            @can('approve-workflow')
+                                <a href="/app/approvals" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/approvals*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/approvals*') ? 'bg-white' : 'bg-up-mint/70' }}"></span>
+                                        <span>Inbox Approval</span>
+                                    </div>
+                                    @if($pendingApprovalCount > 0)
+                                        <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-up-red text-white">
+                                            {{ $pendingApprovalCount }}
+                                        </span>
+                                    @endif
+                                </a>
+                            @endcan
+
+                            @can('lihat-audit-log')
+                                <a href="/app/audit-log" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/audit-log*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/audit-log*') ? 'bg-white' : 'bg-up-accent/70' }}"></span>
+                                    <span>Audit &amp; Log Aktivitas</span>
+                                </a>
+                            @endcan
+                        </div>
                     </div>
-                @endcan
+                @endcanany
 
                 <!-- 11. Pengaturan & Sistem -->
                 <div class="sidebar-group">
                     <button
                         type="button"
                         @click="toggleDropdown('pengaturan')"
-                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
+                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/pengaturan*', 'app/keamanan*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
                         title="Pengaturan & Sistem"
                     >
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -481,11 +513,11 @@
                             $isAkses = request()->is('app/pengaturan*') && (in_array(request('tab'), ['users', 'role', 'cabang']) || (!request()->has('tab') && !request()->routeIs('pengaturan.web-konsumen')));
                             $isKatalog = request()->is('app/pengaturan*') && (in_array(request('tab'), ['master_produk', 'export_import']) || request()->routeIs('pengaturan.web-konsumen'));
                             $isOperasional = request()->is('app/pengaturan*') && in_array(request('tab'), ['loyalitas', 'pajak', 'qris', 'master', 'printer', 'integrasi']);
-                            $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit'])) || request()->is('app/keamanan*', 'app/audit-log*') || request()->routeIs('setup.wizard');
+                            $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit'])) || request()->is('app/keamanan*') || request()->routeIs('setup.wizard');
                         @endphp
 
                         @canany(['pengaturan.manage', 'user.view'])
-                            <a href="/app/pengaturan?tab=users" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkses ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <a href="/app/pengaturan?tab=users" title="Pusat Pengaturan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkses ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isAkses ? 'bg-white' : 'bg-indigo-400' }}"></span>
                                 <span>Akses &amp; Pengguna</span>
                             </a>
@@ -500,14 +532,11 @@
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isOperasional ? 'bg-white' : 'bg-up-amber' }}"></span>
                                 <span>Operasional &amp; Bisnis</span>
                             </a>
-                        @endcan
-
-                        @canany(['pengaturan.manage', 'lihat-audit-log'])
-                            <a href="{{ isSuperAdminOrOwner() ? '/app/pengaturan?tab=database' : '/app/audit-log' }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isSistem ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <a href="/app/pengaturan?tab=database" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isSistem ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                 <span class="w-1.5 h-1.5 rounded-full {{ $isSistem ? 'bg-white' : 'bg-purple-400' }}"></span>
                                 <span>Sistem &amp; Keamanan</span>
                             </a>
-                        @endcanany
+                        @endcan
                     </div>
                 </div>
             </nav>
@@ -851,8 +880,8 @@
                 sidebarOpen: false,
                 sidebarCollapsed: false,
                 isMobile: window.innerWidth < 768,
-                defaultDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : ''))))))) }}',
-                activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/pengaturan*', 'app/keamanan*', 'app/audit-log*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : ''))))))) }}',
+                defaultDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/approvals*', 'app/audit-log*') ? 'approval' : (request()->is('app/pengaturan*', 'app/keamanan*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : '')))))))) }}',
+                activeDropdown: '{{ request()->is('app/dashboard*', 'app/laporan*') ? 'dashboard' : (request()->is('app/pos*', 'app/servis*') ? 'transaksi' : (request()->is('app/wms*') ? 'wms' : (request()->is('app/crm*', 'app/reseller*') ? 'crm' : (request()->is('app/akunting*', 'app/laporan-pajak*') ? 'akunting' : (request()->is('app/hr*') ? 'hr' : (request()->is('app/approvals*', 'app/audit-log*') ? 'approval' : (request()->is('app/pengaturan*', 'app/keamanan*') ? 'pengaturan' : (request()->is('app/omnichannel*') ? 'omnichannel' : '')))))))) }}',
 
                 init() {
                     this.isMobile = window.innerWidth < 768;

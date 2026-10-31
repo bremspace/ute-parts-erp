@@ -9,6 +9,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Workflow\Models\ApprovalRequest;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
 class NotificationCenter extends Component
@@ -268,18 +269,24 @@ class NotificationCenter extends Component
 
         $cabangId = session('cabang_id');
 
-        $query = ApprovalRequest::query()
-            ->where('status', 'pending')
-            ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId));
+        return Cache::remember(
+            'backoffice-approval-badge-'.($cabangId ?? 'all'),
+            60,
+            function () use ($user, $cabangId): int {
+                $query = ApprovalRequest::query()
+                    ->where('status', 'pending')
+                    ->where(fn ($q) => $q->whereNull('cabang_id')->orWhere('cabang_id', $cabangId));
 
-        if (! $user->hasRole('super-admin') && ! $user->hasRole('owner')) {
-            $userRoles = $user->getRoleNames()->toArray();
-            $query->where(function ($q) use ($userRoles) {
-                $q->whereNull('approver_role')->orWhereIn('approver_role', $userRoles);
-            });
-        }
+                if (! $user->hasRole('super-admin') && ! $user->hasRole('owner')) {
+                    $userRoles = $user->getRoleNames()->toArray();
+                    $query->where(function ($q) use ($userRoles) {
+                        $q->whereNull('approver_role')->orWhereIn('approver_role', $userRoles);
+                    });
+                }
 
-        return $query->count();
+                return $query->count();
+            }
+        );
     }
 
     public function render(): View
@@ -305,7 +312,8 @@ class NotificationCenter extends Component
             : collect();
 
         $pendingApprovals = collect();
-        if (($this->filter === 'semua' || $this->filter === 'belum_proses' || $this->filter === 'approval')
+        if ($this->open
+            && ($this->filter === 'semua' || $this->filter === 'belum_proses' || $this->filter === 'approval')
             && in_array('approval', $this->userEvents)
             && $user && $user->can('approve-workflow')) {
             $approvalQuery = ApprovalRequest::query()
