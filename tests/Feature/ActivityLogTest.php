@@ -519,4 +519,47 @@ class ActivityLogTest extends TestCase
             ->call('tutupRiwayat')
             ->assertSet('showRiwayatModal', false);
     }
+
+    public function test_riwayat_aktivitas_resolve_nama_entitas_foreign_key_id(): void
+    {
+        $this->userAuthed('super-admin');
+
+        // 1. Resolve produk
+        $resolvedProduk = RiwayatAktivitas::resolveNamaEntitas('produk_id', $this->produk->id);
+        $this->assertNotNull($resolvedProduk);
+        $this->assertStringContainsString($this->produk->nama, $resolvedProduk);
+        $this->assertStringContainsString((string) $this->produk->id, $resolvedProduk);
+
+        // 2. formatNilai resolving produk_id
+        $formattedProduk = RiwayatAktivitas::formatNilai($this->produk->id, 'produk_id');
+        $this->assertStringContainsString($this->produk->nama, $formattedProduk);
+
+        // 3. formatNilai resolving pelanggan_id
+        $formattedPelanggan = RiwayatAktivitas::formatNilai($this->pelanggan->id, 'pelanggan_id');
+        $this->assertStringContainsString($this->pelanggan->nama, $formattedPelanggan);
+
+        // 4. formatNilai resolving cabang_id
+        $formattedCabang = RiwayatAktivitas::formatNilai($this->cabang->id, 'cabang_id');
+        $this->assertStringContainsString($this->cabang->nama, $formattedCabang);
+    }
+
+    public function test_riwayat_aktivitas_contextual_search_dan_export_excel(): void
+    {
+        $user = $this->userAuthed('super-admin');
+        $trx = $this->buatTransaksi();
+
+        // 1. Test contextual search filterCari
+        Livewire::test(RiwayatAktivitas::class)
+            ->set('filterCari', $trx->no_transaksi)
+            ->assertSee($trx->no_transaksi)
+            ->assertSee('Export Excel')
+            ->assertSee('Buka Semua Rincian')
+            ->call('exportExcel');
+
+        // 2. Test search unmatched query returns empty
+        Livewire::test(RiwayatAktivitas::class)
+            ->set('filterCari', 'NON_EXISTENT_DOCUMENT_KEY_99999')
+            ->assertDontSee($trx->no_transaksi)
+            ->assertSee('Tidak ada aktivitas tercatat untuk filter ini');
+    }
 }

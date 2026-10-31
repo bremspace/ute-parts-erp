@@ -8,6 +8,7 @@ use App\Modules\Akunting\Models\JurnalAkuntansi;
 use App\Modules\Akunting\Models\Piutang;
 use App\Modules\Akunting\Models\Utang;
 use App\Modules\Crm\Models\Pelanggan;
+use App\Modules\Crm\Models\TierMembership;
 use App\Modules\Hr\Models\AbsensiLog;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KaryawanKomponenGaji;
@@ -15,9 +16,11 @@ use App\Modules\Hr\Models\KomisiTeknisiRule;
 use App\Modules\Hr\Models\KpiHasil;
 use App\Modules\Hr\Models\PayrollPeriode;
 use App\Modules\Hr\Models\PayrollSlip;
+use App\Modules\Hr\Models\Shift;
 use App\Modules\Hr\Models\ShiftJadwal;
 use App\Modules\Pos\Models\ReturnPenjualan;
 use App\Modules\Pos\Models\Transaksi;
+use App\Modules\Rbac\Exports\AuditLogExport;
 use App\Modules\Rbac\Models\AktivitasLog;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\AktivitasCabang;
@@ -33,6 +36,7 @@ use App\Modules\Wms\Models\PurchaseOrder;
 use App\Modules\Wms\Models\Rak;
 use App\Modules\Wms\Models\ReturnPembelian;
 use App\Modules\Wms\Models\SatuanUnit;
+use App\Modules\Wms\Models\SkuVariant;
 use App\Modules\Wms\Models\StokItem;
 use App\Modules\Wms\Models\StokOpname;
 use App\Modules\Wms\Models\StokTransfer;
@@ -41,6 +45,8 @@ use App\Modules\Wms\Models\TipeHp;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\Paginator;
 use Livewire\Component;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * [F1-4] Tab riwayat audit trail per entitas + filter (user, aksi, rentang tanggal).
@@ -102,6 +108,8 @@ class RiwayatAktivitas extends Component
     public ?int $entityId = null;
 
     // ===== Filter =====
+    public string $filterCari = '';
+
     public string $filterUser = '';
 
     /** '' | created | updated | deleted | penjualan | void | retur_penjualan | dll */
@@ -140,6 +148,7 @@ class RiwayatAktivitas extends Component
 
     public function resetFilter(): void
     {
+        $this->filterCari = '';
         $this->filterUser = '';
         $this->filterAksi = '';
         $this->filterKategoriTransaksi = '';
@@ -250,12 +259,8 @@ class RiwayatAktivitas extends Component
         };
     }
 
-    public function getAktivitasProperty(): Paginator
+    public function getBaseQuery()
     {
-        if ($this->akses !== 'ok') {
-            return new \Illuminate\Pagination\Paginator(collect(), self::PER_HALAMAN, $this->halaman);
-        }
-
         $query = AktivitasLog::query()->orderByDesc('id');
 
         // [Dual-Indexing] Jika melihat riwayat produk, sertakan transaksi yang menyangkut produk ini
@@ -287,7 +292,129 @@ class RiwayatAktivitas extends Component
             }
         }
 
-        // Filter Kategori Alur Transaksi
+        // 1. Pencarian Bebas Terintegrasi (Cari No. Dokumen, Referensi, Produk, Pelanggan, Catatan, dsb)
+        $filterCari = trim($this->filterCari);
+        if ($filterCari !== '') {
+            $query->where(function ($q) use ($filterCari) {
+                $q->where('description', 'like', "%{$filterCari}%")
+                    ->orWhere('event', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->no_referensi', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->no_transaksi', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->attributes->no_transaksi', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->no_tiket', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->attributes->no_tiket', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->no_po', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->attributes->no_po', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->no_grn', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->attributes->no_grn', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->no_opname', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->attributes->no_opname', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->no_transfer', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->attributes->no_transfer', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->no_return', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->attributes->no_return', 'like', "%{$filterCari}%")
+                    ->orWhere('properties->ringkasan', 'like', "%{$filterCari}%");
+
+                $q->orWhereHasMorph('causer', [User::class], function ($u) use ($filterCari) {
+                    $u->where('name', 'like', "%{$filterCari}%")
+                        ->orWhere('email', 'like', "%{$filterCari}%");
+                });
+
+                if (ctype_digit($filterCari)) {
+                    $idNum = (int) $filterCari;
+                    $q->orWhere('subject_id', $idNum)
+                        ->orWhere('causer_id', $idNum)
+                        ->orWhereJsonContains('properties->produk_ids', $idNum)
+                        ->orWhere('properties->pelanggan_id', $idNum)
+                        ->orWhere('properties->supplier_id', $idNum);
+                }
+
+                // Match Transaksi
+                $matchedTrxIds = Transaksi::where('no_transaksi', 'like', "%{$filterCari}%")->pluck('id')->all();
+                if (! empty($matchedTrxIds)) {
+                    $q->orWhere(function ($tQ) use ($matchedTrxIds) {
+                        $tQ->where('subject_type', Transaksi::class)->whereIn('subject_id', $matchedTrxIds);
+                    });
+                }
+
+                // Match Tiket Servis
+                $matchedTiketIds = TiketServis::where('no_tiket', 'like', "%{$filterCari}%")->pluck('id')->all();
+                if (! empty($matchedTiketIds)) {
+                    $q->orWhere(function ($sQ) use ($matchedTiketIds) {
+                        $sQ->where('subject_type', TiketServis::class)->whereIn('subject_id', $matchedTiketIds);
+                    });
+                }
+
+                // Match PO
+                $matchedPoIds = PurchaseOrder::where('no_po', 'like', "%{$filterCari}%")->pluck('id')->all();
+                if (! empty($matchedPoIds)) {
+                    $q->orWhere(function ($poQ) use ($matchedPoIds) {
+                        $poQ->where('subject_type', PurchaseOrder::class)->whereIn('subject_id', $matchedPoIds);
+                    });
+                }
+
+                // Match GRN
+                $matchedGrnIds = Grn::where('no_grn', 'like', "%{$filterCari}%")->pluck('id')->all();
+                if (! empty($matchedGrnIds)) {
+                    $q->orWhere(function ($gQ) use ($matchedGrnIds) {
+                        $gQ->where('subject_type', Grn::class)->whereIn('subject_id', $matchedGrnIds);
+                    });
+                }
+
+                // Match Transfer
+                $matchedTrfIds = StokTransfer::where('no_transfer', 'like', "%{$filterCari}%")->pluck('id')->all();
+                if (! empty($matchedTrfIds)) {
+                    $q->orWhere(function ($trfQ) use ($matchedTrfIds) {
+                        $trfQ->where('subject_type', StokTransfer::class)->whereIn('subject_id', $matchedTrfIds);
+                    });
+                }
+
+                // Match Retur Penjualan
+                $matchedReturIds = ReturnPenjualan::where('no_return', 'like', "%{$filterCari}%")->pluck('id')->all();
+                if (! empty($matchedReturIds)) {
+                    $q->orWhere(function ($rQ) use ($matchedReturIds) {
+                        $rQ->where('subject_type', ReturnPenjualan::class)->whereIn('subject_id', $matchedReturIds);
+                    });
+                }
+
+                $matchedProdukIds = Produk::where('nama', 'like', "%{$filterCari}%")
+                    ->orWhere('barcode', 'like', "%{$filterCari}%")
+                    ->pluck('id')->all();
+                if (! empty($matchedProdukIds)) {
+                    $q->orWhere(function ($pQ) use ($matchedProdukIds) {
+                        $pQ->where('subject_type', Produk::class)->whereIn('subject_id', $matchedProdukIds);
+                    });
+                    foreach ($matchedProdukIds as $pId) {
+                        $q->orWhereJsonContains('properties->produk_ids', (int) $pId);
+                    }
+                }
+
+                $matchedPelangganIds = Pelanggan::where('nama', 'like', "%{$filterCari}%")
+                    ->orWhere('telepon', 'like', "%{$filterCari}%")
+                    ->pluck('id')->all();
+                if (! empty($matchedPelangganIds)) {
+                    $q->orWhere(function ($pQ) use ($matchedPelangganIds) {
+                        $pQ->where('subject_type', Pelanggan::class)->whereIn('subject_id', $matchedPelangganIds);
+                    });
+                    foreach ($matchedPelangganIds as $pelId) {
+                        $q->orWhere('properties->pelanggan_id', (int) $pelId);
+                    }
+                }
+
+                $matchedSupplierIds = Supplier::where('nama', 'like', "%{$filterCari}%")
+                    ->pluck('id')->all();
+                if (! empty($matchedSupplierIds)) {
+                    $q->orWhere(function ($sQ) use ($matchedSupplierIds) {
+                        $sQ->where('subject_type', Supplier::class)->whereIn('subject_id', $matchedSupplierIds);
+                    });
+                    foreach ($matchedSupplierIds as $supId) {
+                        $q->orWhere('properties->supplier_id', (int) $supId);
+                    }
+                }
+            });
+        }
+
+        // 2. Filter Kategori Alur Transaksi
         if ($this->filterKategoriTransaksi !== '') {
             $kat = $this->filterKategoriTransaksi;
             $query->where(function ($q) use ($kat) {
@@ -296,7 +423,7 @@ class RiwayatAktivitas extends Component
             });
         }
 
-        // Filter Pencarian Produk / SKU pada transaksi
+        // 3. Filter Spesifik Produk / SKU pada transaksi
         $filterProduk = trim($this->filterProduk);
         if ($filterProduk !== '') {
             $pIds = Produk::query()
@@ -358,7 +485,33 @@ class RiwayatAktivitas extends Component
             });
         }
 
-        return $query->paginate(self::PER_HALAMAN, ['*'], 'page', $this->halaman);
+        return $query;
+    }
+
+    public function getAktivitasProperty(): Paginator
+    {
+        if ($this->akses !== 'ok') {
+            return new \Illuminate\Pagination\Paginator(collect(), self::PER_HALAMAN, $this->halaman);
+        }
+
+        return $this->getBaseQuery()->paginate(self::PER_HALAMAN, ['*'], 'page', $this->halaman);
+    }
+
+    /**
+     * Ekspor data audit log ke file Excel (.xlsx) sesuai filter yang aktif
+     */
+    public function exportExcel(): BinaryFileResponse
+    {
+        if (! $this->izin || $this->akses !== 'ok') {
+            abort(403, 'Anda tidak memiliki akses untuk mengekspor audit log.');
+        }
+
+        // Ambil data log sesuai filter yang sedang aktif, dibatasi 5.000 baris agar aman memori 1GB VPS
+        $logs = $this->getBaseQuery()->limit(5000)->get();
+
+        $namaFile = 'audit-log-'.($this->tipe ?: 'semua').'-'.now()->format('Ymd-His').'.xlsx';
+
+        return Excel::download(new AuditLogExport($logs), $namaFile);
     }
 
     /**
@@ -518,14 +671,21 @@ class RiwayatAktivitas extends Component
             'status_pembayaran' => 'Status Pembayaran',
             'status_garansi' => 'Status Garansi',
             'kondisi_barang' => 'Kondisi Barang',
-            'pelanggan_id' => 'ID Pelanggan',
-            'cabang_id' => 'ID Cabang',
-            'user_id' => 'ID Pengguna',
-            'kasir_id' => 'ID Kasir',
-            'teknisi_id' => 'ID Teknisi',
-            'gudang_id' => 'ID Gudang',
-            'produk_id' => 'ID Produk',
-            'supplier_id' => 'ID Supplier',
+            'pelanggan_id' => 'Pelanggan',
+            'cabang_id' => 'Cabang Toko',
+            'user_id' => 'Pengguna (User)',
+            'kasir_id' => 'Kasir',
+            'teknisi_id' => 'Teknisi',
+            'gudang_id' => 'Gudang',
+            'produk_id' => 'Produk',
+            'sku_variant_id' => 'Varian SKU',
+            'supplier_id' => 'Supplier / Vendor',
+            'rak_id' => 'Rak Gudang',
+            'karyawan_id' => 'Karyawan',
+            'akun_coa_id' => 'Akun COA',
+            'jenis_servis_id' => 'Jenis Servis',
+            'tiket_servis_id' => 'Tiket Servis',
+            'transaksi_id' => 'Transaksi Penjualan',
             'diskon_nominal' => 'Potongan Diskon',
             'diskon_persen' => 'Persen Diskon',
             'pajak_nominal' => 'Nominal Pajak',
@@ -630,6 +790,56 @@ class RiwayatAktivitas extends Component
         return ucwords($clean);
     }
 
+    protected static array $namaCache = [];
+
+    public static function resolveNamaEntitas(string $key, mixed $id): ?string
+    {
+        if (empty($id) || ! is_numeric($id)) {
+            return null;
+        }
+
+        $id = (int) $id;
+        $cacheKey = "{$key}:{$id}";
+        if (array_key_exists($cacheKey, self::$namaCache)) {
+            return self::$namaCache[$cacheKey];
+        }
+
+        try {
+            $nama = match ($key) {
+                'produk_id' => Produk::find($id)?->nama,
+                'sku_variant_id' => ($v = SkuVariant::with('produk')->find($id)) ? (($v->produk?->nama ? $v->produk->nama.' - ' : '').$v->sku) : null,
+                'cabang_id' => Cabang::find($id)?->nama,
+                'pelanggan_id' => Pelanggan::find($id)?->nama,
+                'supplier_id' => Supplier::find($id)?->nama,
+                'gudang_id' => Gudang::find($id)?->nama,
+                'rak_id' => Rak::find($id)?->nama,
+                'brand_id' => Brand::find($id)?->nama,
+                'kategori_id' => KategoriProduk::find($id)?->nama,
+                'kualitas_id' => KualitasProduk::find($id)?->nama,
+                'satuan_id' => SatuanUnit::find($id)?->nama,
+                'tipe_hp_id' => TipeHp::find($id)?->nama,
+                'user_id', 'causer_id', 'void_by', 'kasir_id' => User::find($id)?->name ?? Karyawan::find($id)?->nama,
+                'teknisi_id', 'karyawan_id' => Karyawan::find($id)?->nama ?? User::find($id)?->name,
+                'shift_id' => Shift::find($id)?->nama,
+                'akun_coa_id' => ($coa = AkunCOA::find($id)) ? ($coa->kode_akun.' - '.$coa->nama) : null,
+                'jenis_servis_id' => JenisServis::find($id)?->nama,
+                'tier_membership_id' => TierMembership::find($id)?->nama,
+                'tiket_servis_id' => TiketServis::find($id)?->no_tiket,
+                'transaksi_id' => Transaksi::find($id)?->no_transaksi,
+                default => null,
+            };
+
+            $formatted = $nama ? "{$nama} (ID: #{$id})" : null;
+            self::$namaCache[$cacheKey] = $formatted;
+
+            return $formatted;
+        } catch (\Throwable) {
+            self::$namaCache[$cacheKey] = null;
+
+            return null;
+        }
+    }
+
     public static function formatNilai(mixed $value, string $key): string
     {
         if ($value === null || $value === '') {
@@ -637,6 +847,15 @@ class RiwayatAktivitas extends Component
         }
         if (is_bool($value)) {
             return $value ? 'Ya / Aktif' : 'Tidak / Nonaktif';
+        }
+
+        if (is_numeric($value) && (str_ends_with($key, '_id') || in_array($key, ['void_by', 'kasir_id', 'teknisi_id', 'causer_id'], true))) {
+            $resolved = self::resolveNamaEntitas($key, (int) $value);
+            if ($resolved) {
+                return $resolved;
+            }
+
+            return '#'.$value;
         }
 
         $statusMap = [

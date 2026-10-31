@@ -125,6 +125,27 @@ class AktivitasLog extends Activity
         if (! empty($props['no_transaksi'])) {
             return (string) $props['no_transaksi'];
         }
+        if (! empty($props['attributes']['no_transaksi'])) {
+            return (string) $props['attributes']['no_transaksi'];
+        }
+        if (! empty($props['attributes']['no_tiket'])) {
+            return (string) $props['attributes']['no_tiket'];
+        }
+        if (! empty($props['attributes']['no_po'])) {
+            return (string) $props['attributes']['no_po'];
+        }
+        if (! empty($props['attributes']['no_grn'])) {
+            return (string) $props['attributes']['no_grn'];
+        }
+        if (! empty($props['attributes']['no_transfer'])) {
+            return (string) $props['attributes']['no_transfer'];
+        }
+        if (! empty($props['attributes']['no_return'])) {
+            return (string) $props['attributes']['no_return'];
+        }
+        if (! empty($props['attributes']['no_opname'])) {
+            return (string) $props['attributes']['no_opname'];
+        }
 
         return null;
     }
@@ -133,25 +154,50 @@ class AktivitasLog extends Activity
     public function getItemsListAttribute(): array
     {
         $props = $this->normalized_properties;
+        $items = [];
         if (! empty($props['items']) && is_array($props['items'])) {
-            return $props['items'];
-        }
-        if (! empty($props['items_retur']) && is_array($props['items_retur'])) {
-            return $props['items_retur'];
+            $items = $props['items'];
+        } elseif (! empty($props['items_retur']) && is_array($props['items_retur'])) {
+            $items = $props['items_retur'];
         }
 
-        return [];
+        foreach ($items as &$item) {
+            if (is_array($item)) {
+                if (empty($item['nama_produk']) && ! empty($item['produk_id'])) {
+                    $item['nama_produk'] = RiwayatAktivitas::resolveNamaEntitas('produk_id', $item['produk_id']) ?? ('Produk #'.$item['produk_id']);
+                }
+                if (empty($item['sku']) && ! empty($item['sku_variant_id'])) {
+                    $item['sku'] = RiwayatAktivitas::resolveNamaEntitas('sku_variant_id', $item['sku_variant_id']) ?? ('Varian #'.$item['sku_variant_id']);
+                }
+            }
+        }
+        unset($item);
+
+        return $items;
     }
 
     /** Daftar barang pengganti (tukar produk) dalam retur */
     public function getItemsTukarListAttribute(): array
     {
         $props = $this->normalized_properties;
+        $items = [];
         if (! empty($props['items_tukar']) && is_array($props['items_tukar'])) {
-            return $props['items_tukar'];
+            $items = $props['items_tukar'];
         }
 
-        return [];
+        foreach ($items as &$item) {
+            if (is_array($item)) {
+                if (empty($item['nama_produk']) && ! empty($item['produk_id'])) {
+                    $item['nama_produk'] = RiwayatAktivitas::resolveNamaEntitas('produk_id', $item['produk_id']) ?? ('Produk #'.$item['produk_id']);
+                }
+                if (empty($item['sku']) && ! empty($item['sku_variant_id'])) {
+                    $item['sku'] = RiwayatAktivitas::resolveNamaEntitas('sku_variant_id', $item['sku_variant_id']) ?? ('Varian #'.$item['sku_variant_id']);
+                }
+            }
+        }
+        unset($item);
+
+        return $items;
     }
 
     /**
