@@ -16,10 +16,23 @@ class WmsDashboard extends Component
 
     public function mount(): void
     {
-        // [FIX] Dukung deep-link ke tab via query param ?tab=...
+        // [FIX] Dukung deep-link ke tab via query param ?tab=... atau ?sub=...
         // Default langsung ke 'produk' (Master Produk & Stok terpadu)
         $allowed = ['produk', 'stok', 'transfer', 'opname', 'po', 'grn', 'retur', 'histori_po', 'monitoring_harga'];
-        $tab = (string) request('tab', 'produk');
+        $tab = (string) request('tab', '');
+        $sub = (string) request('sub', '');
+
+        if (! $tab && $sub) {
+            $tab = match ($sub) {
+                'operasional' => 'transfer',
+                'pengadaan' => 'po',
+                default => 'produk',
+            };
+        }
+
+        if (! $tab) {
+            $tab = 'produk';
+        }
 
         if ($tab === 'monitoring_harga' && ! isSuperAdminOrOwner() && ! auth()->user()?->can('pengaturan.manage')) {
             $tab = 'produk';

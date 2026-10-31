@@ -1,8 +1,8 @@
-<div class="space-y-6">
+<div class="space-y-6 w-full min-w-0 max-w-full overflow-hidden">
     <!-- Header + Periode (Responsive, No Overlap) -->
     <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-black/10 dark:border-white/5 pb-4">
         <!-- Navigation Tabs: Horizontal Scroll on Mobile, No Overlapping -->
-        <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x">
+        <div class="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap scrollbar-none scroll-smooth touch-pan-x -mx-1 px-1 sm:mx-0 sm:px-0">
             @foreach([
                 'laporan' => 'Laporan',
                 'jurnal' => 'Jurnal',
@@ -15,7 +15,7 @@
             ] as $kode => $label)
                 <button
                     wire:click="$set('activeTab', '{{ $kode }}')"
-                    class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-300 hover:bg-black/10 dark:hover:bg-white/10' }}"
+                    class="px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-[transform,background-color] active:scale-[0.97] min-h-[44px] whitespace-nowrap cursor-pointer flex-shrink-0 {{ $activeTab === $kode ? 'bg-up-primary text-white shadow-md shadow-up-primary/25' : 'bg-black/5 dark:bg-white/5 text-ink-700 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10' }}"
                 >
                     {{ $label }}
                 </button>
@@ -27,11 +27,11 @@
             @if(auth()->user()?->can('laporan.konsolidasi'))
                 <div class="flex items-center bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-black/10 dark:border-white/5 text-xs font-semibold w-full sm:w-auto">
                     <button type="button" wire:click="setCakupanLaporan('cabang')"
-                            class="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg transition-all cursor-pointer text-center whitespace-nowrap {{ $cakupanLaporan === 'cabang' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-400 hover:text-ink-200' }}">
+                            class="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg transition-all cursor-pointer text-center whitespace-nowrap {{ $cakupanLaporan === 'cabang' ? 'bg-up-primary text-white shadow-sm' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-200' }}">
                         {{ session('cabang_nama', 'Cabang Ini') }}
                     </button>
                     <button type="button" wire:click="setCakupanLaporan('konsolidasi')"
-                            class="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap {{ $cakupanLaporan === 'konsolidasi' ? 'bg-up-accent text-white shadow-sm' : 'text-ink-400 hover:text-ink-200' }}">
+                            class="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap {{ $cakupanLaporan === 'konsolidasi' ? 'bg-up-accent text-white shadow-sm' : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-200' }}">
                         <span>Konsolidasi</span>
                     </button>
                 </div>
@@ -45,7 +45,7 @@
                     <input type="date" wire:model.live="periodeSampai" class="flex-1 sm:w-32 px-2.5 py-1.5 rounded-xl glass-input text-xs font-medium min-h-[40px]" />
                 </div>
                 <button type="button" wire:click="segarkanLaporan" title="Sinkronkan & Segarkan Laporan"
-                        class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white transition-all cursor-pointer min-h-[40px] flex items-center justify-center">
+                        class="p-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white transition-all cursor-pointer min-h-[40px] flex items-center justify-center">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
             </div>
@@ -66,9 +66,9 @@
                                 $pKode = is_array($p) ? ($p['kode'] ?? '') : (is_object($p) ? ($p->kode ?? '') : '');
                                 $pTotal = is_array($p) ? ($p['total'] ?? 0) : (is_object($p) ? ($p->total ?? 0) : 0);
                             @endphp
-                            <div class="flex justify-between text-xs py-1 border-b border-white/5">
-                                <span class="text-ink-200">{{ $pNama }} @if($pKode)<span class="text-ink-500 font-mono">({{ $pKode }})</span>@endif</span>
-                                <span class="font-bold text-white tabular-nums">Rp {{ number_format($pTotal, 0, ',', '.') }}</span>
+                            <div class="flex justify-between text-xs py-1 border-b border-black/5 dark:border-white/5">
+                                <span class="text-ink-700 dark:text-ink-200">{{ $pNama }} @if($pKode)<span class="text-ink-500 font-mono">({{ $pKode }})</span>@endif</span>
+                                <span class="font-bold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($pTotal, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500 py-1">Belum ada pendapatan di periode ini.</p>
@@ -87,9 +87,9 @@
                                 $bKode = is_array($b) ? ($b['kode'] ?? '') : (is_object($b) ? ($b->kode ?? '') : '');
                                 $bTotal = is_array($b) ? ($b['total'] ?? 0) : (is_object($b) ? ($b->total ?? 0) : 0);
                             @endphp
-                            <div class="flex justify-between text-xs py-1 border-b border-white/5">
-                                <span class="text-ink-200">{{ $bNama }} @if($bKode)<span class="text-ink-500 font-mono">({{ $bKode }})</span>@endif</span>
-                                <span class="font-bold text-white tabular-nums">Rp {{ number_format($bTotal, 0, ',', '.') }}</span>
+                            <div class="flex justify-between text-xs py-1 border-b border-black/5 dark:border-white/5">
+                                <span class="text-ink-700 dark:text-ink-200">{{ $bNama }} @if($bKode)<span class="text-ink-500 font-mono">({{ $bKode }})</span>@endif</span>
+                                <span class="font-bold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($bTotal, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500 py-1">Belum ada beban di periode ini.</p>
@@ -112,8 +112,8 @@
             <!-- Neraca -->
             <x-prism.glass-card title="Neraca" :subtitle="($cakupanLaporan === 'konsolidasi' ? '[Konsolidasi Seluruh Cabang] ' : '') . 'Saldo kumulatif s/d ' . $neraca['sampai_tanggal']" circuit="true">
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                        <p class="text-[10px] text-ink-400 uppercase font-bold mb-2">Aset</p>
+                    <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/5">
+                        <p class="text-[10px] text-ink-500 dark:text-ink-400 uppercase font-bold mb-2">Aset</p>
                         @forelse($neraca['aset'] as $a)
                             @if(!is_array($a) && !is_object($a)) @continue @endif
                             @php
@@ -121,20 +121,20 @@
                                 $aSaldo = is_array($a) ? ($a['saldo'] ?? 0) : ($a->saldo ?? 0);
                             @endphp
                             <div class="flex justify-between text-[11px] py-0.5">
-                                <span class="text-ink-300">{{ $aNama }}</span>
-                                <span class="text-white tabular-nums">{{ number_format($aSaldo, 0, ',', '.') }}</span>
+                                <span class="text-ink-600 dark:text-ink-300">{{ $aNama }}</span>
+                                <span class="text-ink-900 dark:text-white tabular-nums font-semibold">{{ number_format($aSaldo, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500">Kosong</p>
                         @endforelse
-                        <div class="border-t border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
-                            <span class="text-ink-200">Total</span>
-                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_aset'] ?? 0, 0, ',', '.') }}</span>
+                        <div class="border-t border-black/10 dark:border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
+                            <span class="text-ink-700 dark:text-ink-200">Total</span>
+                            <span class="text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($neraca['total_aset'] ?? 0, 0, ',', '.') }}</span>
                         </div>
                     </div>
 
-                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                        <p class="text-[10px] text-ink-400 uppercase font-bold mb-2">Kewajiban</p>
+                    <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/5">
+                        <p class="text-[10px] text-ink-500 dark:text-ink-400 uppercase font-bold mb-2">Kewajiban</p>
                         @forelse($neraca['kewajiban'] as $kw)
                             @if(!is_array($kw) && !is_object($kw)) @continue @endif
                             @php
@@ -142,20 +142,20 @@
                                 $kwSaldo = is_array($kw) ? ($kw['saldo'] ?? 0) : ($kw->saldo ?? 0);
                             @endphp
                             <div class="flex justify-between text-[11px] py-0.5">
-                                <span class="text-ink-300">{{ $kwNama }}</span>
-                                <span class="text-white tabular-nums">{{ number_format($kwSaldo, 0, ',', '.') }}</span>
+                                <span class="text-ink-600 dark:text-ink-300">{{ $kwNama }}</span>
+                                <span class="text-ink-900 dark:text-white tabular-nums font-semibold">{{ number_format($kwSaldo, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500">Kosong</p>
                         @endforelse
-                        <div class="border-t border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
-                            <span class="text-ink-200">Total</span>
-                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_kewajiban'] ?? 0, 0, ',', '.') }}</span>
+                        <div class="border-t border-black/10 dark:border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
+                            <span class="text-ink-700 dark:text-ink-200">Total</span>
+                            <span class="text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($neraca['total_kewajiban'] ?? 0, 0, ',', '.') }}</span>
                         </div>
                     </div>
 
-                    <div class="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                        <p class="text-[10px] text-ink-400 uppercase font-bold mb-2">Ekuitas</p>
+                    <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/5">
+                        <p class="text-[10px] text-ink-500 dark:text-ink-400 uppercase font-bold mb-2">Ekuitas</p>
                         @forelse($neraca['ekuitas'] as $e)
                             @if(!is_array($e) && !is_object($e)) @continue @endif
                             @php
@@ -163,8 +163,8 @@
                                 $eSaldo = is_array($e) ? ($e['saldo'] ?? 0) : ($e->saldo ?? 0);
                             @endphp
                             <div class="flex justify-between text-[11px] py-0.5">
-                                <span class="text-ink-300">{{ $eNama }}</span>
-                                <span class="text-white tabular-nums">{{ number_format($eSaldo, 0, ',', '.') }}</span>
+                                <span class="text-ink-600 dark:text-ink-300">{{ $eNama }}</span>
+                                <span class="text-ink-900 dark:text-white tabular-nums font-semibold">{{ number_format($eSaldo, 0, ',', '.') }}</span>
                             </div>
                         @empty
                             <p class="text-[11px] text-ink-500">Kosong</p>
@@ -173,12 +173,12 @@
                              laba kumulatif ikut dihitung sebagai bagian ekuitas (sumber:
                              ExportLaporanService::neracaSaldo / API ACC-06). --}}
                         <div class="flex justify-between text-[11px] py-0.5">
-                            <span class="text-ink-300">Laba Periode Berjalan</span>
-                            <span class="text-white tabular-nums">{{ number_format($neraca['laba_periode_berjalan'], 0, ',', '.') }}</span>
+                            <span class="text-ink-600 dark:text-ink-300">Laba Periode Berjalan</span>
+                            <span class="text-ink-900 dark:text-white tabular-nums font-semibold">{{ number_format($neraca['laba_periode_berjalan'], 0, ',', '.') }}</span>
                         </div>
-                        <div class="border-t border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
-                            <span class="text-ink-200">Total</span>
-                            <span class="text-white tabular-nums">Rp {{ number_format($neraca['total_ekuitas_bersama_laba'], 0, ',', '.') }}</span>
+                        <div class="border-t border-black/10 dark:border-white/10 mt-1.5 pt-1.5 flex justify-between text-xs font-bold">
+                            <span class="text-ink-700 dark:text-ink-200">Total</span>
+                            <span class="text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($neraca['total_ekuitas_bersama_laba'], 0, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
@@ -208,26 +208,26 @@
             <x-prism.glass-card title="Laporan Arus Kas" :subtitle="($cakupanLaporan === 'konsolidasi' ? '[Konsolidasi Seluruh Cabang] ' : '') . 'Metode Tidak Langsung — ' . $periodeDari . ' s.d. ' . $periodeSampai" circuit="true" class="lg:col-span-2">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Operasi -->
-                    <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                    <div class="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/5">
                         <p class="text-[10px] text-up-mint uppercase font-bold mb-2">Arus Kas Operasi</p>
                         <div class="space-y-1.5 text-xs">
                             <div class="flex justify-between">
-                                <span class="text-ink-400">Laba bersih</span>
-                                <span class="font-semibold text-white tabular-nums">Rp {{ number_format($arusKas['laba_bersih'], 0, ',', '.') }}</span>
+                                <span class="text-ink-500 dark:text-ink-400">Laba bersih</span>
+                                <span class="font-semibold text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($arusKas['laba_bersih'], 0, ',', '.') }}</span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-ink-400">Kenaikan piutang</span>
+                                <span class="text-ink-500 dark:text-ink-400">Kenaikan piutang</span>
                                 <span class="font-semibold text-up-red tabular-nums">({{ number_format($arusKas['penyesuaian']['kenaikan_piutang'], 0, ',', '.') }})</span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-ink-400">Kenaikan persediaan</span>
+                                <span class="text-ink-500 dark:text-ink-400">Kenaikan persediaan</span>
                                 <span class="font-semibold text-up-red tabular-nums">({{ number_format($arusKas['penyesuaian']['kenaikan_persediaan'], 0, ',', '.') }})</span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-ink-400">Kenaikan utang</span>
+                                <span class="text-ink-500 dark:text-ink-400">Kenaikan utang</span>
                                 <span class="font-semibold text-up-mint tabular-nums">+{{ number_format($arusKas['penyesuaian']['kenaikan_utang'], 0, ',', '.') }}</span>
                             </div>
-                            <div class="flex justify-between pt-2 border-t border-white/10 font-bold mt-2">
+                            <div class="flex justify-between pt-2 border-t border-black/10 dark:border-white/10 font-bold mt-2">
                                 <span class="text-up-mint">Kas dari operasi</span>
                                 <span class="text-up-mint tabular-nums">Rp {{ number_format($arusKas['arus_kas_operasi'], 0, ',', '.') }}</span>
                             </div>
@@ -235,11 +235,11 @@
                     </div>
 
                     <!-- Investasi -->
-                    <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                    <div class="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/5">
                         <p class="text-[10px] text-up-accent uppercase font-bold mb-2">Arus Kas Investasi</p>
                         <div class="space-y-1.5 text-xs">
                             <div class="flex justify-between">
-                                <span class="text-ink-400">Pembelian aset tetap & peralatan</span>
+                                <span class="text-ink-500 dark:text-ink-400">Pembelian aset tetap & peralatan</span>
                                 <span class="font-semibold text-up-accent tabular-nums">Rp {{ number_format($arusKas['arus_kas_investasi'], 0, ',', '.') }}</span>
                             </div>
                             <p class="text-[10px] text-ink-500 mt-3">Beban pendapatan & pembelian aset jangka panjang periode ini.</p>
@@ -247,11 +247,11 @@
                     </div>
 
                     <!-- Pendanaan -->
-                    <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                    <div class="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/5">
                         <p class="text-[10px] text-up-primary uppercase font-bold mb-2">Arus Kas Pendanaan</p>
                         <div class="space-y-1.5 text-xs">
                             <div class="flex justify-between">
-                                <span class="text-ink-400">Setoran modal / laba</span>
+                                <span class="text-ink-500 dark:text-ink-400">Setoran modal / laba</span>
                                 <span class="font-semibold text-up-primary tabular-nums">Rp {{ number_format($arusKas['arus_kas_pendanaan'], 0, ',', '.') }}</span>
                             </div>
                             <p class="text-[10px] text-ink-500 mt-3">Perubahan ekuitas & laba ditahan periode ini.</p>
@@ -259,8 +259,8 @@
                     </div>
                 </div>
 
-                <div class="mt-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex justify-between items-center">
-                    <span class="text-xs font-bold text-ink-200 uppercase tracking-wider">Kenaikan Kas Neto</span>
+                <div class="mt-4 p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/5 flex justify-between items-center">
+                    <span class="text-xs font-bold text-ink-700 dark:text-ink-200 uppercase tracking-wider">Kenaikan Kas Neto</span>
                     <span class="text-2xl font-black tabular-nums {{ $arusKas['kenaikan_kas_neto'] >= 0 ? 'text-up-mint' : 'text-up-red' }}">
                         {{ $arusKas['kenaikan_kas_neto'] >= 0 ? '+' : '-' }} Rp {{ number_format(abs($arusKas['kenaikan_kas_neto']), 0, ',', '.') }}
                     </span>
@@ -273,23 +273,23 @@
             @php $sumberLabel = ['manual' => 'Manual', 'legacy' => 'Legacy', 'carryover' => 'Lanjutan Shift']; @endphp
             <x-prism.data-table :headers="['Sesi', 'Kasir', 'Saldo Awal', 'Saldo Sistem', 'Saldo Fisik', 'Selisih', 'Sumber', 'Status', 'Dibuka', 'Ditutup']">
                 @forelse($kasSesiRiwayat as $s)
-                    <tr class="hover:bg-white/[0.02] transition-colors text-xs">
-                        <td class="py-3.5 px-4 font-mono font-bold text-white">#{{ $s->id }}</td>
-                        <td class="py-3.5 px-4 text-ink-100 font-medium">{{ $s->kasir }}</td>
-                        <td class="py-3.5 px-4 tabular-nums text-white">Rp {{ number_format($s->saldo_awal, 0, ',', '.') }}</td>
-                        <td class="py-3.5 px-4 tabular-nums text-ink-200">{{ $s->saldo_akhir_sistem !== null ? 'Rp '.number_format($s->saldo_akhir_sistem, 0, ',', '.') : '-' }}</td>
-                        <td class="py-3.5 px-4 tabular-nums text-ink-200">{{ $s->saldo_akhir_fisik !== null ? 'Rp '.number_format($s->saldo_akhir_fisik, 0, ',', '.') : '-' }}</td>
+                    <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors text-xs">
+                        <td class="py-3.5 px-4 font-mono font-bold text-ink-900 dark:text-white">#{{ $s->id }}</td>
+                        <td class="py-3.5 px-4 text-ink-800 dark:text-ink-100 font-medium">{{ $s->kasir }}</td>
+                        <td class="py-3.5 px-4 tabular-nums text-ink-900 dark:text-white">Rp {{ number_format($s->saldo_awal, 0, ',', '.') }}</td>
+                        <td class="py-3.5 px-4 tabular-nums text-ink-700 dark:text-ink-200">{{ $s->saldo_akhir_sistem !== null ? 'Rp '.number_format($s->saldo_akhir_sistem, 0, ',', '.') : '-' }}</td>
+                        <td class="py-3.5 px-4 tabular-nums text-ink-700 dark:text-ink-200">{{ $s->saldo_akhir_fisik !== null ? 'Rp '.number_format($s->saldo_akhir_fisik, 0, ',', '.') : '-' }}</td>
                         <td class="py-3.5 px-4 tabular-nums {{ $s->selisih === null ? 'text-ink-500' : (abs($s->selisih) < 0.01 ? 'text-up-mint font-semibold' : 'text-up-amber font-semibold') }}">
                             {{ $s->selisih !== null ? ($s->selisih >= 0 ? '+' : '-') . ' Rp ' . number_format(abs($s->selisih), 0, ',', '.') : '-' }}
                         </td>
                         <td class="py-3.5 px-4">
-                            <span class="text-[10px] font-semibold capitalize {{ $s->sumber === 'carryover' ? 'text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-full' : 'bg-white/5 text-ink-300 px-2 py-0.5 rounded-full' }}">
+                            <span class="text-[10px] font-semibold capitalize {{ $s->sumber === 'carryover' ? 'text-up-primary bg-up-primary/10 px-2 py-0.5 rounded-full' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300 px-2 py-0.5 rounded-full' }}">
                                 {{ $sumberLabel[$s->sumber] ?? $s->sumber }}
                             </span>
                         </td>
                         <td class="py-3.5 px-4"><x-prism.status-pill :status="$s->status" /></td>
-                        <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $s->dibuka_at ? \Carbon\Carbon::parse($s->dibuka_at)->format('d/m/Y H:i') : '-' }}</td>
-                        <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $s->ditutup_at ? \Carbon\Carbon::parse($s->ditutup_at)->format('d/m/Y H:i') : '-' }}</td>
+                        <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300 tabular-nums">{{ $s->dibuka_at ? \Carbon\Carbon::parse($s->dibuka_at)->format('d/m/Y H:i') : '-' }}</td>
+                        <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300 tabular-nums">{{ $s->ditutup_at ? \Carbon\Carbon::parse($s->ditutup_at)->format('d/m/Y H:i') : '-' }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="10" class="py-12 text-center text-ink-400">Belum ada riwayat sesi kas untuk cabang ini.</td></tr>
@@ -305,27 +305,27 @@
                 <!-- Search input -->
                 <div class="relative min-w-[200px] flex-1 max-w-xs">
                     <input type="text" wire:model.live.debounce.300ms="jurnalSearch" placeholder="Cari No. Jurnal / Deskripsi / Akun..."
-                           class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs placeholder:text-ink-500 focus:border-up-primary focus:outline-none min-h-[40px]">
+                           class="w-full px-3 py-2 rounded-xl glass-input text-xs placeholder:text-ink-500 focus:border-up-primary focus:outline-none min-h-[40px]">
                 </div>
 
                 <!-- Filter Sumber -->
-                <select wire:model.live="jurnalFilterSumber" class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-medium focus:border-up-primary focus:outline-none min-h-[40px]">
-                    <option value="" class="bg-slate-900 text-white">Semua Sumber</option>
-                    <option value="manual" class="bg-slate-900 text-white">Manual</option>
-                    <option value="pos" class="bg-slate-900 text-white">POS Kasir</option>
-                    <option value="servis" class="bg-slate-900 text-white">Servis</option>
-                    <option value="pembelian" class="bg-slate-900 text-white">Pembelian PO</option>
-                    <option value="pembayaran" class="bg-slate-900 text-white">Pembayaran Subledger</option>
-                    <option value="komisi" class="bg-slate-900 text-white">Komisi</option>
-                    <option value="opname" class="bg-slate-900 text-white">Opname</option>
-                    <option value="kas" class="bg-slate-900 text-white">Kas</option>
+                <select wire:model.live="jurnalFilterSumber" class="px-3 py-2 rounded-xl glass-input text-xs font-medium focus:border-up-primary focus:outline-none min-h-[40px]">
+                    <option value="">Semua Sumber</option>
+                    <option value="manual">Manual</option>
+                    <option value="pos">POS Kasir</option>
+                    <option value="servis">Servis</option>
+                    <option value="pembelian">Pembelian PO</option>
+                    <option value="pembayaran">Pembayaran Subledger</option>
+                    <option value="komisi">Komisi</option>
+                    <option value="opname">Opname</option>
+                    <option value="kas">Kas</option>
                 </select>
 
                 <!-- [F2-5] Export laporan jurnal (queue) -->
                 @can('laporan.cabang')
                     <div class="flex items-center gap-1.5">
-                        <button type="button" wire:click="exportLaporan('jurnal', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">Export Excel</button>
-                        <button type="button" wire:click="exportLaporan('jurnal', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">Export CSV</button>
+                        <button type="button" wire:click="exportLaporan('jurnal', 'xlsx')" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">Export Excel</button>
+                        <button type="button" wire:click="exportLaporan('jurnal', 'csv')" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">Export CSV</button>
                     </div>
                 @endcan
             </div>
@@ -337,23 +337,23 @@
 
         <x-prism.data-table :headers="['No. Jurnal', 'Akun', 'Sumber', 'Deskripsi', 'Debit', 'Kredit', '']">
             @forelse($jurnals as $j)
-                <tr class="hover:bg-white/[0.02] transition-colors text-xs">
-                    <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $j->no_jurnal }}</td>
+                <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors text-xs">
+                    <td class="py-3.5 px-4 font-mono font-bold text-ink-900 dark:text-white">{{ $j->no_jurnal }}</td>
                     <td class="py-3.5 px-4">
                         <button type="button" wire:click="lihatMutasiAkun({{ $j->akun_coa_id }})" class="text-left group cursor-pointer" title="Klik untuk lihat mutasi buku besar">
-                            <span class="text-ink-100 font-medium group-hover:text-up-primary transition-colors">{{ $j->akun?->nama }}</span>
+                            <span class="text-ink-800 dark:text-ink-100 font-medium group-hover:text-up-primary transition-colors">{{ $j->akun?->nama }}</span>
                             <span class="block text-[10px] text-ink-500 font-mono group-hover:text-up-primary/80 transition-colors">{{ $j->akun?->kode }} ↗</span>
                         </button>
                     </td>
                     <td class="py-3.5 px-4"><x-prism.status-pill :status="$j->sumber" /></td>
-                    <td class="py-3.5 px-4 text-ink-300">{{ $j->deskripsi }}</td>
+                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300">{{ $j->deskripsi }}</td>
                     <td class="py-3.5 px-4 tabular-nums {{ $j->debit > 0 ? 'text-up-amber font-semibold' : 'text-ink-500' }}">{{ $j->debit > 0 ? 'Rp '.number_format($j->debit, 0, ',', '.') : '-' }}</td>
                     <td class="py-3.5 px-4 tabular-nums {{ $j->kredit > 0 ? 'text-up-mint font-semibold' : 'text-ink-500' }}">{{ $j->kredit > 0 ? 'Rp '.number_format($j->kredit, 0, ',', '.') : '-' }}</td>
                     <td class="py-3.5 px-4">
                         <div class="flex items-center gap-1.5">
                             <button wire:click="lihatMutasiAkun({{ $j->akun_coa_id }})" class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/25 font-bold text-[10px] cursor-pointer" title="Cek Mutasi Buku Besar">Mutasi</button>
                             @can('lihat-audit-log')
-                                <button wire:click="bukaRiwayat('jurnal', {{ $j->id }})" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer">Riwayat</button>
+                                <button wire:click="bukaRiwayat('jurnal', {{ $j->id }})" class="px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white font-bold text-[10px] cursor-pointer">Riwayat</button>
                             @endcan
                         </div>
                     </td>
@@ -378,10 +378,10 @@
                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
                         <!-- Akun Selector -->
                         <div class="min-w-[240px] flex-1">
-                            <label class="block text-[11px] font-bold text-ink-400 mb-1">Pilih Akun (COA):</label>
-                            <select wire:model.live="selectedBukuBesarAkunId" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-medium focus:border-up-primary focus:outline-none min-h-[40px]">
+                            <label class="block text-[11px] font-bold text-ink-500 dark:text-ink-400 mb-1">Pilih Akun (COA):</label>
+                            <select wire:model.live="selectedBukuBesarAkunId" class="w-full px-3 py-2 rounded-xl glass-input text-xs font-medium focus:border-up-primary focus:outline-none min-h-[40px]">
                                 @foreach($akunJurnalOptions as $opt)
-                                    <option value="{{ $opt->id }}" class="bg-slate-900 text-white">
+                                    <option value="{{ $opt->id }}">
                                         {{ $opt->kode }} — {{ $opt->nama }} ({{ ucfirst($opt->tipe) }})
                                     </option>
                                 @endforeach
@@ -391,12 +391,12 @@
                         <!-- Rentang Tanggal -->
                         <div class="flex items-center gap-2">
                             <div>
-                                <label class="block text-[11px] font-bold text-ink-400 mb-1">Dari:</label>
-                                <input type="date" wire:model.live="bukuBesarDari" class="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-mono focus:border-up-primary focus:outline-none min-h-[40px]">
+                                <label class="block text-[11px] font-bold text-ink-500 dark:text-ink-400 mb-1">Dari:</label>
+                                <input type="date" wire:model.live="bukuBesarDari" class="px-2.5 py-1.5 rounded-xl glass-input text-xs font-mono focus:border-up-primary focus:outline-none min-h-[40px]">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-ink-400 mb-1">Sampai:</label>
-                                <input type="date" wire:model.live="bukuBesarSampai" class="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-mono focus:border-up-primary focus:outline-none min-h-[40px]">
+                                <label class="block text-[11px] font-bold text-ink-500 dark:text-ink-400 mb-1">Sampai:</label>
+                                <input type="date" wire:model.live="bukuBesarSampai" class="px-2.5 py-1.5 rounded-xl glass-input text-xs font-mono focus:border-up-primary focus:outline-none min-h-[40px]">
                             </div>
                         </div>
                     </div>
@@ -404,10 +404,10 @@
                     <!-- Export Buttons -->
                     @can('laporan.cabang')
                         <div class="flex items-center gap-2 self-end md:self-center">
-                            <button type="button" wire:click="exportLaporan('buku_besar', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">
+                            <button type="button" wire:click="exportLaporan('buku_besar', 'xlsx')" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">
                                 Export Excel
                             </button>
-                            <button type="button" wire:click="exportLaporan('buku_besar', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">
+                            <button type="button" wire:click="exportLaporan('buku_besar', 'csv')" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">
                                 Export CSV
                             </button>
                         </div>
@@ -421,22 +421,22 @@
                 @endphp
                 <!-- Info Akun & Rekap Saldo -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
-                        <span class="text-[10px] uppercase font-bold text-ink-400 block mb-0.5">Akun Terpilih</span>
-                        <div class="font-bold text-white text-sm truncate">{{ $bAkun->nama }}</div>
+                    <div class="p-3.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+                        <span class="text-[10px] uppercase font-bold text-ink-500 dark:text-ink-400 block mb-0.5">Akun Terpilih</span>
+                        <div class="font-bold text-ink-900 dark:text-white text-sm truncate">{{ $bAkun->nama }}</div>
                         <div class="font-mono text-xs text-up-primary mt-0.5">{{ $bAkun->kode }} · Saldo Normal: {{ strtoupper($bAkun->saldo_normal) }}</div>
                     </div>
 
-                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
-                        <span class="text-[10px] uppercase font-bold text-ink-400 block mb-0.5">Saldo Awal (sebelum {{ \Carbon\Carbon::parse($bukuBesarData['dari'])->format('d/m/Y') }})</span>
-                        <div class="font-bold text-white text-sm tabular-nums">
+                    <div class="p-3.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+                        <span class="text-[10px] uppercase font-bold text-ink-500 dark:text-ink-400 block mb-0.5">Saldo Awal (sebelum {{ \Carbon\Carbon::parse($bukuBesarData['dari'])->format('d/m/Y') }})</span>
+                        <div class="font-bold text-ink-900 dark:text-white text-sm tabular-nums">
                             Rp {{ number_format($bukuBesarData['saldo_awal'], 0, ',', '.') }}
                         </div>
                         <span class="text-[10px] text-ink-500">Saldo kumulatif awal</span>
                     </div>
 
-                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
-                        <span class="text-[10px] uppercase font-bold text-ink-400 block mb-0.5">Total Mutasi Periode</span>
+                    <div class="p-3.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+                        <span class="text-[10px] uppercase font-bold text-ink-500 dark:text-ink-400 block mb-0.5">Total Mutasi Periode</span>
                         <div class="text-xs space-y-0.5">
                             <div class="flex justify-between text-up-amber font-semibold tabular-nums">
                                 <span>Debit (+):</span>
@@ -449,8 +449,8 @@
                         </div>
                     </div>
 
-                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
-                        <span class="text-[10px] uppercase font-bold text-ink-400 block mb-0.5">Saldo Akhir</span>
+                    <div class="p-3.5 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10">
+                        <span class="text-[10px] uppercase font-bold text-ink-500 dark:text-ink-400 block mb-0.5">Saldo Akhir</span>
                         <div class="font-black text-base tabular-nums {{ $bukuBesarData['saldo_akhir'] >= 0 ? 'text-up-mint' : 'text-up-red' }}">
                             Rp {{ number_format($bukuBesarData['saldo_akhir'], 0, ',', '.') }}
                         </div>
@@ -461,11 +461,11 @@
                 <!-- Tabel Baris Mutasi -->
                 <x-prism.data-table :headers="['Tanggal', 'No. Jurnal', 'Sumber', 'Deskripsi / Keterangan', 'Debit', 'Kredit', 'Saldo Berjalan']">
                     @forelse($bukuBesarData['mutasi'] as $m)
-                        <tr class="hover:bg-white/[0.02] transition-colors text-xs">
-                            <td class="py-3 px-4 font-mono text-ink-300 whitespace-nowrap">{{ $m['tanggal'] }}</td>
-                            <td class="py-3 px-4 font-mono font-bold text-white whitespace-nowrap">{{ $m['no_jurnal'] }}</td>
+                        <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors text-xs">
+                            <td class="py-3 px-4 font-mono text-ink-600 dark:text-ink-300 whitespace-nowrap">{{ $m['tanggal'] }}</td>
+                            <td class="py-3 px-4 font-mono font-bold text-ink-900 dark:text-white whitespace-nowrap">{{ $m['no_jurnal'] }}</td>
                             <td class="py-3 px-4"><x-prism.status-pill :status="$m['sumber']" /></td>
-                            <td class="py-3 px-4 text-ink-200">
+                            <td class="py-3 px-4 text-ink-700 dark:text-ink-200">
                                 {{ $m['deskripsi'] }}
                                 @if(!empty($m['user']))
                                     <span class="block text-[10px] text-ink-500">Oleh: {{ $m['user'] }}</span>
@@ -477,7 +477,7 @@
                             <td class="py-3 px-4 tabular-nums {{ $m['kredit'] > 0 ? 'text-up-mint font-semibold' : 'text-ink-500' }}">
                                 {{ $m['kredit'] > 0 ? 'Rp '.number_format($m['kredit'], 0, ',', '.') : '-' }}
                             </td>
-                            <td class="py-3 px-4 tabular-nums font-bold text-white">
+                            <td class="py-3 px-4 tabular-nums font-bold text-ink-900 dark:text-white">
                                 Rp {{ number_format($m['saldo'], 0, ',', '.') }}
                             </td>
                         </tr>
@@ -501,9 +501,9 @@
 
         <x-prism.data-table :headers="['Kode', 'Nama Akun', 'Tipe', 'Kelompok', 'Saldo Normal', 'Aksi']">
             @forelse($akunCoaList as $akun)
-                <tr class="hover:bg-white/[0.02] transition-colors text-xs">
-                    <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $akun->kode }}</td>
-                    <td class="py-3.5 px-4 text-ink-100 font-medium">
+                <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors text-xs">
+                    <td class="py-3.5 px-4 font-mono font-bold text-ink-900 dark:text-white">{{ $akun->kode }}</td>
+                    <td class="py-3.5 px-4 text-ink-800 dark:text-ink-100 font-medium">
                         {{ $akun->nama }}
                         @if(! $akun->is_active)
                             <span class="block text-[9px] font-bold text-up-red bg-up-red/10 px-1.5 py-0.5 rounded mt-0.5 w-fit">NONAKTIF</span>
@@ -514,13 +514,13 @@
                             {{ $akun->tipe }}
                         </span>
                     </td>
-                    <td class="py-3.5 px-4 text-ink-300">{{ $akun->kelompok }}</td>
-                    <td class="py-3.5 px-4 text-ink-300">{{ $akun->saldo_normal }}</td>
+                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300">{{ $akun->kelompok }}</td>
+                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300">{{ $akun->saldo_normal }}</td>
                     <td class="py-3.5 px-4">
                         <div class="flex items-center gap-1.5 flex-wrap">
                             <button type="button" wire:click="lihatMutasiAkun({{ $akun->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/25 font-bold text-[10px] cursor-pointer active:scale-[0.97]" title="Lihat Mutasi Buku Besar Akun Ini">Mutasi</button>
                             @can('akunting.edit')
-                                <button type="button" wire:click="openEditCoaModal({{ $akun->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer active:scale-[0.97]" title="Edit Akun COA">Edit</button>
+                                <button type="button" wire:click="openEditCoaModal({{ $akun->id }})" class="px-2.5 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white font-bold text-[10px] cursor-pointer active:scale-[0.97]" title="Edit Akun COA">Edit</button>
                             @endcan
                             @if(isSuperAdminOrOwner())
                                 <button type="button" wire:click="hapusCoa({{ $akun->id }})" wire:confirm="Yakin ingin menghapus akun COA '{{ $akun->kode }} — {{ $akun->nama }}'? Jika akun memiliki riwayat jurnal atau akun anak, status akan dinonaktifkan." class="px-2.5 py-1.5 rounded-lg bg-up-red/10 hover:bg-up-red/20 text-up-red border border-up-red/30 font-bold text-[10px] cursor-pointer whitespace-nowrap active:scale-[0.97]" title="Hapus Akun COA">Hapus</button>
@@ -541,20 +541,20 @@
         <!-- [F2-5] Export laporan piutang (queue) -->
         <div class="flex items-center gap-2 mb-4">
             @can('laporan.cabang')
-                <button type="button" wire:click="exportLaporan('piutang', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
-                <button type="button" wire:click="exportLaporan('piutang', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+                <button type="button" wire:click="exportLaporan('piutang', 'xlsx')" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
+                <button type="button" wire:click="exportLaporan('piutang', 'csv')" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
             @endcan
         </div>
         <x-prism.data-table :headers="['No. Piutang', 'Pelanggan', 'Jumlah', 'Dibayar', 'Sisa', 'Jatuh Tempo', 'Status', '']">
             @forelse($piutangs as $p)
-                <tr class="hover:bg-white/[0.02] transition-colors text-xs">
-                    <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $p->no_piutang }}</td>
-                    <td class="py-3.5 px-4 text-ink-100">{{ $p->pelanggan?->nama }}</td>
-                    <td class="py-3.5 px-4 tabular-nums text-white font-semibold">Rp {{ number_format($p->jumlah, 0, ',', '.') }}</td>
+                <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors text-xs">
+                    <td class="py-3.5 px-4 font-mono font-bold text-ink-900 dark:text-white">{{ $p->no_piutang }}</td>
+                    <td class="py-3.5 px-4 text-ink-800 dark:text-ink-100">{{ $p->pelanggan?->nama }}</td>
+                    <td class="py-3.5 px-4 tabular-nums text-ink-900 dark:text-white font-semibold">Rp {{ number_format($p->jumlah, 0, ',', '.') }}</td>
                     <td class="py-3.5 px-4 tabular-nums text-up-mint font-semibold">Rp {{ number_format($p->jumlah_dibayar, 0, ',', '.') }}</td>
                     <td class="py-3.5 px-4 tabular-nums font-bold text-up-amber">Rp {{ number_format($p->sisa, 0, ',', '.') }}</td>
                     <td class="py-3.5 px-4">
-                        <span class="{{ $p->jatuh_tempo_lewat ? 'text-up-red font-bold' : 'text-ink-300' }} tabular-nums">
+                        <span class="{{ $p->jatuh_tempo_lewat ? 'text-up-red font-bold' : 'text-ink-600 dark:text-ink-300' }} tabular-nums">
                             {{ $p->jatuh_tempo?->format('d/m/Y') ?? '-' }}
                         </span>
                         @if($p->jatuh_tempo_lewat)
@@ -567,7 +567,7 @@
                             <button wire:click="openBayarPiutangModal({{ $p->id }})" class="px-3 py-1.5 rounded-lg bg-up-primary hover:bg-up-primary-dark text-white font-bold text-[11px] transition-all cursor-pointer">Terima Bayar</button>
                         @endif
                         @can('lihat-audit-log')
-                            <button wire:click="bukaRiwayat('piutang', {{ $p->id }})" class="px-2.5 py-1 ml-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer">Riwayat</button>
+                            <button wire:click="bukaRiwayat('piutang', {{ $p->id }})" class="px-2.5 py-1 ml-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white font-bold text-[10px] cursor-pointer">Riwayat</button>
                         @endcan
                     </td>
                 </tr>
@@ -582,26 +582,26 @@
         <!-- [F2-5] Export laporan utang (queue) -->
         <div class="flex items-center gap-2 mb-4">
             @can('laporan.cabang')
-                <button type="button" wire:click="exportLaporan('utang', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
-                <button type="button" wire:click="exportLaporan('utang', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+                <button type="button" wire:click="exportLaporan('utang', 'xlsx')" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
+                <button type="button" wire:click="exportLaporan('utang', 'csv')" class="px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
             @endcan
         </div>
         <x-prism.data-table :headers="['No. Utang', 'Kreditor', 'Referensi', 'Jumlah', 'Sisa', 'Jatuh Tempo', 'Status', '']">
             @forelse($utangs as $u)
-                <tr class="hover:bg-white/[0.02] transition-colors text-xs">
-                    <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $u->no_utang }}</td>
-                    <td class="py-3.5 px-4 text-ink-100 font-medium">{{ $u->kreditor_nama ?? $u->pelanggan?->nama ?? '-' }}</td>
-                    <td class="py-3.5 px-4 text-ink-400">{{ $u->referensi_tipe }}</td>
-                    <td class="py-3.5 px-4 tabular-nums text-white font-semibold">Rp {{ number_format($u->jumlah, 0, ',', '.') }}</td>
+                <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors text-xs">
+                    <td class="py-3.5 px-4 font-mono font-bold text-ink-900 dark:text-white">{{ $u->no_utang }}</td>
+                    <td class="py-3.5 px-4 text-ink-800 dark:text-ink-100 font-medium">{{ $u->kreditor_nama ?? $u->pelanggan?->nama ?? '-' }}</td>
+                    <td class="py-3.5 px-4 text-ink-500 dark:text-ink-400">{{ $u->referensi_tipe }}</td>
+                    <td class="py-3.5 px-4 tabular-nums text-ink-900 dark:text-white font-semibold">Rp {{ number_format($u->jumlah, 0, ',', '.') }}</td>
                     <td class="py-3.5 px-4 tabular-nums font-bold text-up-amber">Rp {{ number_format($u->sisa, 0, ',', '.') }}</td>
-                    <td class="py-3.5 px-4 text-ink-300 tabular-nums">{{ $u->jatuh_tempo?->format('d/m/Y') ?? '-' }}</td>
+                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300 tabular-nums">{{ $u->jatuh_tempo?->format('d/m/Y') ?? '-' }}</td>
                     <td class="py-3.5 px-4"><x-prism.status-pill :status="$u->status" /></td>
                     <td class="py-3.5 px-4">
                         @if($u->sisa > 0)
                             <button wire:click="openBayarUtangModal({{ $u->id }})" class="px-3 py-1.5 rounded-lg bg-up-mint hover:opacity-90 text-ink-950 font-bold text-[11px] transition-all cursor-pointer">Bayar</button>
                         @endif
                         @can('lihat-audit-log')
-                            <button wire:click="bukaRiwayat('utang', {{ $u->id }})" class="px-2.5 py-1 ml-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer">Riwayat</button>
+                            <button wire:click="bukaRiwayat('utang', {{ $u->id }})" class="px-2.5 py-1 ml-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-600 dark:text-ink-300 hover:text-ink-900 dark:hover:text-white font-bold text-[10px] cursor-pointer">Riwayat</button>
                         @endcan
                     </td>
                 </tr>
@@ -617,11 +617,11 @@
             <!-- Header matching kas -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <h2 class="text-lg font-bold text-ink-900 dark:text-white flex items-center gap-2">
                         <svg class="w-5 h-5 text-up-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         <span>Monitoring &amp; Pencocokan Kas Real vs Aplikasi</span>
                     </h2>
-                    <p class="text-xs text-ink-400 mt-1">Bandingkan saldo kas buku besar (GL) aplikasi dengan uang fisik aktual di laci/brankas atau saldo mutasi rekening koran bank.</p>
+                    <p class="text-xs text-ink-500 dark:text-ink-400 mt-1">Bandingkan saldo kas buku besar (GL) aplikasi dengan uang fisik aktual di laci/brankas atau saldo mutasi rekening koran bank.</p>
                 </div>
                 <div>
                     <button type="button" wire:click="bukaFormMatching"
@@ -635,17 +635,17 @@
             <!-- Overview Akun Kas & Bank -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach($kasAccounts as $acc)
-                    <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition space-y-3">
+                    <div class="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 transition space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="font-mono text-xs font-bold text-up-accent">{{ $acc['kode'] }}</span>
-                            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-white/5 text-ink-300">{{ $acc['kelompok'] }}</span>
+                            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-300">{{ $acc['kelompok'] }}</span>
                         </div>
                         <div>
-                            <h3 class="text-sm font-semibold text-white">{{ $acc['nama'] }}</h3>
-                            <p class="text-xl font-bold text-white tabular-nums mt-1">Rp {{ number_format($acc['saldo'], 0, ',', '.') }}</p>
-                            <span class="text-[11px] text-ink-400">Saldo Buku Besar (GL) Sistem</span>
+                            <h3 class="text-sm font-semibold text-ink-900 dark:text-white">{{ $acc['nama'] }}</h3>
+                            <p class="text-xl font-bold text-ink-900 dark:text-white tabular-nums mt-1">Rp {{ number_format($acc['saldo'], 0, ',', '.') }}</p>
+                            <span class="text-[11px] text-ink-500 dark:text-ink-400">Saldo Buku Besar (GL) Sistem</span>
                         </div>
-                        <div class="pt-2 border-t border-white/5 flex justify-end">
+                        <div class="pt-2 border-t border-black/5 dark:border-white/5 flex justify-end">
                             <button type="button" wire:click="bukaFormMatching({{ $acc['id'] }})"
                                 class="text-xs text-up-mint hover:text-up-mint/80 font-bold transition flex items-center gap-1 cursor-pointer">
                                 <span>Cocokkan Fisik</span>
@@ -659,9 +659,9 @@
             <!-- Tabel Riwayat Pencocokan Kas Real -->
             <x-prism.glass-card title="Riwayat Pencocokan &amp; Opname Kas Real" subtitle="Daftar audit rekonsiliasi kas fisik vs catatan buku besar sistem" circuit="true">
                 <x-prism.dual-scroll>
-                    <table class="w-full text-xs text-left">
+                    <table class="w-full text-xs text-left min-w-[780px] whitespace-nowrap">
                         <thead>
-                            <tr class="border-b border-white/10 text-ink-400 font-semibold uppercase text-[10px]">
+                            <tr class="border-b border-black/10 dark:border-white/10 text-ink-500 dark:text-ink-400 font-semibold uppercase text-[10px]">
                                 <th class="py-3 px-4">Tanggal</th>
                                 <th class="py-3 px-4">Cabang</th>
                                 <th class="py-3 px-4">Akun Kas / Bank</th>
@@ -674,18 +674,18 @@
                                 <th class="py-3 px-4 text-center">Tindak Lanjut</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-white/5">
+                        <tbody class="divide-y divide-black/5 dark:divide-white/5">
                             @forelse($kasMatchings as $m)
-                                <tr class="hover:bg-white/[0.02] transition">
-                                    <td class="py-3.5 px-4 font-mono text-ink-200">{{ $m->tanggal->format('d/m/Y') }}</td>
-                                    <td class="py-3.5 px-4 text-ink-300 font-medium whitespace-nowrap">{{ $m->cabang?->nama ?? '-' }}</td>
+                                <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                                    <td class="py-3.5 px-4 font-mono text-ink-700 dark:text-ink-200">{{ $m->tanggal->format('d/m/Y') }}</td>
+                                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300 font-medium whitespace-nowrap">{{ $m->cabang?->nama ?? '-' }}</td>
                                     <td class="py-3.5 px-4">
-                                        <div class="font-bold text-white">{{ $m->akun?->nama ?? '-' }}</div>
-                                        <div class="text-[10px] text-ink-400 font-mono">{{ $m->akun?->kode ?? '-' }}</div>
+                                        <div class="font-bold text-ink-900 dark:text-white">{{ $m->akun?->nama ?? '-' }}</div>
+                                        <div class="text-[10px] text-ink-500 dark:text-ink-400 font-mono">{{ $m->akun?->kode ?? '-' }}</div>
                                     </td>
-                                    <td class="py-3.5 px-4 text-ink-300">{{ $m->user?->name ?? 'Sistem' }}</td>
-                                    <td class="py-3.5 px-4 text-right tabular-nums text-white">Rp {{ number_format($m->saldo_sistem, 0, ',', '.') }}</td>
-                                    <td class="py-3.5 px-4 text-right tabular-nums text-white font-semibold">Rp {{ number_format($m->saldo_fisik, 0, ',', '.') }}</td>
+                                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-300">{{ $m->user?->name ?? 'Sistem' }}</td>
+                                    <td class="py-3.5 px-4 text-right tabular-nums text-ink-900 dark:text-white">Rp {{ number_format($m->saldo_sistem, 0, ',', '.') }}</td>
+                                    <td class="py-3.5 px-4 text-right tabular-nums text-ink-900 dark:text-white font-semibold">Rp {{ number_format($m->saldo_fisik, 0, ',', '.') }}</td>
                                     <td class="py-3.5 px-4 text-right tabular-nums font-bold {{ abs($m->selisih) < 0.01 ? 'text-up-mint' : ($m->selisih > 0 ? 'text-up-amber' : 'text-up-red') }}">
                                         {{ $m->selisih > 0 ? '+' : ($m->selisih < 0 ? '−' : '') }} Rp {{ number_format(abs($m->selisih), 0, ',', '.') }}
                                     </td>
@@ -701,7 +701,7 @@
                                             {{ $m->status === 'cocok' ? 'Cocok' : ($m->status === 'disesuaikan' ? 'Disesuaikan' : 'Selisih') }}
                                         </span>
                                     </td>
-                                    <td class="py-3.5 px-4 text-ink-400 max-w-xs truncate">{{ $m->catatan ?: '-' }}</td>
+                                    <td class="py-3.5 px-4 text-ink-600 dark:text-ink-400 max-w-xs truncate">{{ $m->catatan ?: '-' }}</td>
                                     <td class="py-3.5 px-4 text-center">
                                         @if($m->status === 'selisih' && ! $m->jurnal_id)
                                             <button type="button" wire:click="postingPenyesuaianKas({{ $m->id }})"
@@ -803,22 +803,22 @@
 
                 <!-- Rangkuman Tanggung Jawab Departemen / Bagian Terkait -->
                 <div>
-                    <h3 class="text-xs uppercase font-bold tracking-wider text-ink-400 mb-3">Distribusi Tindak Lanjut per Bagian / Departemen</h3>
+                    <h3 class="text-xs uppercase font-bold tracking-wider text-ink-500 dark:text-ink-400 mb-3">Distribusi Tindak Lanjut per Bagian / Departemen</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                         @foreach($hasilDiagnosa['ringkasan_bagian'] as $namaBagian => $dataBagian)
-                            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
-                                <div class="text-xs font-bold text-white truncate" title="{{ $namaBagian }}">{{ $namaBagian }}</div>
+                            <div class="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/5 space-y-2">
+                                <div class="text-xs font-bold text-ink-900 dark:text-white truncate" title="{{ $namaBagian }}">{{ $namaBagian }}</div>
                                 <div class="flex items-center justify-between text-xs">
-                                    <span class="text-ink-400">Total Isu:</span>
+                                    <span class="text-ink-500 dark:text-ink-400">Total Isu:</span>
                                     <span class="font-bold tabular-nums {{ $dataBagian['total'] > 0 ? 'text-up-amber' : 'text-up-mint' }}">{{ $dataBagian['total'] }}</span>
                                 </div>
                                 <div class="flex items-center justify-between text-xs">
-                                    <span class="text-ink-400">Kritis:</span>
+                                    <span class="text-ink-500 dark:text-ink-400">Kritis:</span>
                                     <span class="font-bold tabular-nums {{ $dataBagian['kritis'] > 0 ? 'text-up-red' : 'text-ink-400' }}">{{ $dataBagian['kritis'] }}</span>
                                 </div>
-                                <div class="pt-1.5 border-t border-white/5 text-[11px] flex justify-between">
+                                <div class="pt-1.5 border-t border-black/5 dark:border-white/5 text-[11px] flex justify-between">
                                     <span class="text-ink-500">Dampak:</span>
-                                    <span class="tabular-nums font-semibold text-ink-300">Rp {{ number_format($dataBagian['dampak'], 0, ',', '.') }}</span>
+                                    <span class="tabular-nums font-semibold text-ink-700 dark:text-ink-200">Rp {{ number_format($dataBagian['dampak'], 0, ',', '.') }}</span>
                                 </div>
                             </div>
                         @endforeach
@@ -829,33 +829,33 @@
                 <x-prism.glass-card title="Daftar Temuan, Akar Penyebab &amp; Solusi Rekomendasi" subtitle="Daftar masalah yang perlu ditindaklanjuti untuk menjaga keseimbangan neraca" circuit="true">
                     <div class="space-y-4">
                         @forelse($hasilDiagnosa['daftar_temuan'] as $item)
-                            <div class="p-4 rounded-xl bg-white/[0.02] border {{ $item['tingkat'] === 'kritis' ? 'border-up-red/30' : 'border-up-amber/30' }} space-y-3">
+                            <div class="p-4 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] border {{ $item['tingkat'] === 'kritis' ? 'border-up-red/30' : 'border-up-amber/30' }} space-y-3">
                                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                     <div class="flex items-center gap-2">
                                         <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md {{ $item['tingkat'] === 'kritis' ? 'bg-up-red/20 text-up-red' : 'bg-up-amber/20 text-up-amber' }}">
                                             {{ strtoupper($item['tingkat']) }}
                                         </span>
-                                        <h4 class="text-xs font-bold text-white">{{ $item['judul'] }}</h4>
+                                        <h4 class="text-xs font-bold text-ink-900 dark:text-white">{{ $item['judul'] }}</h4>
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <span class="text-[11px] font-semibold text-up-accent bg-up-accent/10 px-2 py-0.5 rounded-lg border border-up-accent/20">
                                             Bagian: {{ $item['bagian'] }}
                                         </span>
                                         @if($item['dampak_nominal'] > 0)
-                                            <span class="text-xs font-bold tabular-nums text-white">
+                                            <span class="text-xs font-bold tabular-nums text-ink-900 dark:text-white">
                                                 Dampak: Rp {{ number_format($item['dampak_nominal'], 0, ',', '.') }}
                                             </span>
                                         @endif
                                     </div>
                                 </div>
 
-                                <div class="text-xs text-ink-300 space-y-1">
-                                    <p><strong class="text-ink-200">Akar Masalah:</strong> {{ $item['penyebab'] }}</p>
+                                <div class="text-xs text-ink-600 dark:text-ink-300 space-y-1">
+                                    <p><strong class="text-ink-800 dark:text-ink-200">Akar Masalah:</strong> {{ $item['penyebab'] }}</p>
                                     <p><strong class="text-up-mint">Rekomendasi Tindakan:</strong> {{ $item['rekomendasi'] }}</p>
                                 </div>
 
                                 @if(!empty($item['solusi_otomatis_tersedia']) && !empty($item['auto_fix_key']))
-                                    <div class="pt-2 border-t border-white/5 flex justify-end">
+                                    <div class="pt-2 border-t border-black/5 dark:border-white/5 flex justify-end">
                                         <button type="button" wire:click="eksekusiSolusiDiagnosa('{{ $item['auto_fix_key'] }}', @js($item['payload'] ?? []))"
                                             class="px-3 py-1.5 rounded-lg bg-up-mint hover:bg-up-mint/90 text-ink-950 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-sm">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>

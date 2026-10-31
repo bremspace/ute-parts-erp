@@ -1,17 +1,17 @@
-<div class="space-y-6">
+<div class="space-y-6 w-full min-w-0 max-w-full overflow-hidden">
     <!-- Header + Periode + Export -->
-    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-white/5 pb-4">
+    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border-b border-black/10 dark:border-white/5 pb-4">
         <div>
-            <h2 class="text-lg font-semibold text-white tracking-wide">Laporan Pajak Bulanan</h2>
-            <p class="text-xs text-ink-400 mt-0.5">Rekap PPN keluaran &amp; masukan — siap ekspor e-Faktur</p>
+            <h2 class="text-lg font-semibold text-ink-900 dark:text-white tracking-wide">Laporan Pajak Bulanan</h2>
+            <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Rekap PPN keluaran &amp; masukan — siap ekspor e-Faktur</p>
         </div>
 
-        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap">
-            <label class="text-[11px] text-ink-400 font-medium whitespace-nowrap">Periode</label>
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap sm:flex-wrap -mx-1 px-1 sm:mx-0 sm:px-0">
+            <label class="text-[11px] text-ink-500 dark:text-ink-400 font-medium whitespace-nowrap">Periode</label>
             <input type="date" wire:model.live="periodeDari" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
             <span class="text-ink-400 text-xs">—</span>
             <input type="date" wire:model.live="periodeSampai" class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-[44px]" />
-            <a href="{{ route('laporan.pajak.print', ['dari' => $periodeDari, 'sampai' => $periodeSampai]) }}" target="_blank" class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 hover:text-white font-bold text-xs inline-flex items-center gap-1.5 transition whitespace-nowrap min-h-[44px]">
+            <a href="{{ route('laporan.pajak.print', ['dari' => $periodeDari, 'sampai' => $periodeSampai]) }}" target="_blank" class="px-3.5 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 text-ink-700 dark:text-ink-200 hover:text-ink-900 dark:hover:text-white font-bold text-xs inline-flex items-center gap-1.5 transition whitespace-nowrap min-h-[44px]">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                 <span>Cetak Laporan</span>
             </a>
@@ -23,7 +23,7 @@
 
     <!-- Status config PPN cabang -->
     <div class="flex items-center gap-2 text-xs">
-        <span class="px-2.5 py-1 rounded-lg {{ $config['enabled'] ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : 'bg-white/5 text-ink-400 border border-white/10' }}">
+        <span class="px-2.5 py-1 rounded-lg {{ $config['enabled'] ? 'bg-up-mint/15 text-up-mint border border-up-mint/30' : 'bg-black/5 dark:bg-white/5 text-ink-600 dark:text-ink-400 border border-black/10 dark:border-white/10' }}">
             PPN {{ $config['enabled'] ? 'AKTIF' : 'NONAKTIF' }} — {{ number_format($config['percent'], 0, ',', '.') }}%
         </span>
         <span class="text-ink-500">Berlaku utk transaksi baru di cabang aktif</span>
@@ -32,7 +32,7 @@
     <!-- Ringkasan -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <x-prism.glass-card title="PPN Keluaran" :subtitle="'Periode ' . $periodeDari . ' — ' . $periodeSampai" circuit="true" padding="p-5">
-            <p class="text-2xl font-black text-white tabular-nums">Rp {{ number_format($rekap['keluaran_ppn'], 0, ',', '.') }}</p>
+            <p class="text-2xl font-black text-ink-900 dark:text-white tabular-nums">Rp {{ number_format($rekap['keluaran_ppn'], 0, ',', '.') }}</p>
             <p class="text-[11px] text-ink-500 mt-1">DPP: Rp {{ number_format($rekap['keluaran_dpp'], 0, ',', '.') }} · {{ $rekap['jumlah_transaksi'] }} transaksi</p>
         </x-prism.glass-card>
 
@@ -49,7 +49,7 @@
         </x-prism.glass-card>
 
         <x-prism.glass-card title="Cache" subtitle="Rekap di-cache 15 menit" circuit="true" padding="p-5">
-            <p class="text-[11px] text-ink-400 leading-relaxed">
+            <p class="text-[11px] text-ink-600 dark:text-ink-400 leading-relaxed">
                 Rekap berat di-cache per cabang + periode. Export berjalan via antrian (queue) — tidak memblokir request (RAM 1GB).
             </p>
         </x-prism.glass-card>
@@ -59,11 +59,11 @@
     <x-prism.glass-card title="Detail PPN Keluaran" subtitle="Transaksi dengan PPN pada periode terpilih" circuit="true">
         <x-prism.data-table :headers="['Tanggal', 'No Transaksi', 'DPP (Rp)', '%', 'PPN (Rp)']">
             @forelse($keluaranRows as $row)
-                <tr class="hover:bg-white/[0.03]">
-                    <td class="py-3 px-4 text-xs text-ink-300">{{ $row['tanggal'] }}</td>
-                    <td class="py-3 px-4 text-xs font-mono text-white">{{ $row['no_transaksi'] }}</td>
-                    <td class="py-3 px-4 text-xs text-white tabular-nums text-right">{{ number_format($row['dpp'], 0, ',', '.') }}</td>
-                    <td class="py-3 px-4 text-xs text-ink-400 tabular-nums text-right">{{ number_format($row['percent'], 2, ',', '.') }}%</td>
+                <tr class="hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                    <td class="py-3 px-4 text-xs text-ink-600 dark:text-ink-300">{{ $row['tanggal'] }}</td>
+                    <td class="py-3 px-4 text-xs font-mono font-bold text-ink-900 dark:text-white">{{ $row['no_transaksi'] }}</td>
+                    <td class="py-3 px-4 text-xs text-ink-900 dark:text-white tabular-nums text-right">{{ number_format($row['dpp'], 0, ',', '.') }}</td>
+                    <td class="py-3 px-4 text-xs text-ink-600 dark:text-ink-400 tabular-nums text-right">{{ number_format($row['percent'], 2, ',', '.') }}%</td>
                     <td class="py-3 px-4 text-xs font-bold text-up-mint tabular-nums text-right">{{ number_format($row['ppn'], 0, ',', '.') }}</td>
                 </tr>
             @empty
@@ -73,13 +73,13 @@
             @endforelse
             @slot('mobileCards')
                 @forelse($keluaranRows as $row)
-                    <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <div class="p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/10 dark:border-white/5">
                         <div class="flex justify-between text-xs">
-                            <span class="font-mono text-white">{{ $row['no_transaksi'] }}</span>
-                            <span class="text-ink-400">{{ $row['tanggal'] }}</span>
+                            <span class="font-mono text-ink-900 dark:text-white">{{ $row['no_transaksi'] }}</span>
+                            <span class="text-ink-500 dark:text-ink-400">{{ $row['tanggal'] }}</span>
                         </div>
                         <div class="flex justify-between text-[11px] mt-1.5">
-                            <span class="text-ink-400">DPP <span class="tabular-nums text-white">Rp {{ number_format($row['dpp'], 0, ',', '.') }}</span></span>
+                            <span class="text-ink-500 dark:text-ink-400">DPP <span class="tabular-nums text-ink-900 dark:text-white">Rp {{ number_format($row['dpp'], 0, ',', '.') }}</span></span>
                             <span class="text-up-mint font-bold tabular-nums">Rp {{ number_format($row['ppn'], 0, ',', '.') }}</span>
                         </div>
                     </div>

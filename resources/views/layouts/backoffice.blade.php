@@ -226,12 +226,12 @@
                 @endcanany
 
                 <!-- 3. Gudang & WMS -->
-                @canany(['wms.view', 'laporan.cabang'])
+                @can('wms.view')
                 <div class="sidebar-group">
                     <button
                         type="button"
                         @click="toggleDropdown('wms')"
-                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/wms*', 'app/laporan/nomor-seri*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
+                        class="sidebar-nav-link w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-[transform,background-color,color] duration-150 cursor-pointer active:scale-[0.98] {{ request()->is('app/wms*') ? 'bg-up-primary/15 text-up-primary border border-up-primary/30 dark:bg-up-primary/20 dark:text-white' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}"
                         title="Gudang & WMS"
                     >
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -245,33 +245,37 @@
                     <div x-show="isDropdownOpen('wms')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
-                        @can('wms.view')
-                            <a href="/app/wms" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                                <span>Inventori & Stok</span>
-                            </a>
-                            <a href="/app/wms/cycle-count" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms/cycle-count*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms/cycle-count*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
-                                <span>Cycle Count & Opname</span>
-                            </a>
-                            <a href="/app/wms/import-export" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms/import-export*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms/import-export*') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                                <span>Import &amp; Export Produk</span>
-                            </a>
-                            <a href="/app/wms/import-foto" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/wms/import-foto*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/wms/import-foto*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
-                                <span>Import Foto Massal</span>
-                            </a>
-                        @endcan
-                        @can('laporan.cabang')
-                            <a href="/app/laporan/nomor-seri" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/laporan/nomor-seri*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/laporan/nomor-seri*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
-                                <span>Nomor Seri & Garansi</span>
-                            </a>
-                        @endcan
+                        @php
+                            $isWmsInventori = request()->is('app/wms*') && (
+                                request('sub') === 'inventori' ||
+                                in_array(request('tab'), ['produk', 'stok', 'monitoring_harga']) ||
+                                (!request()->has('sub') && !request()->has('tab') && !request()->is('app/wms/cycle-count*'))
+                            );
+                            $isWmsOperasional = request()->is('app/wms*') && (
+                                request('sub') === 'operasional' ||
+                                in_array(request('tab'), ['transfer', 'opname']) ||
+                                request()->is('app/wms/cycle-count*')
+                            );
+                            $isWmsPengadaan = request()->is('app/wms*') && (
+                                request('sub') === 'pengadaan' ||
+                                in_array(request('tab'), ['po', 'grn', 'retur', 'histori_po'])
+                            );
+                        @endphp
+                        <a href="/app/wms?sub=inventori" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsInventori ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsInventori ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                            <span>Inventori</span>
+                        </a>
+                        <a href="/app/wms?sub=operasional" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsOperasional ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsOperasional ? 'bg-white' : 'bg-up-mint/60' }}"></span>
+                            <span>Operasional</span>
+                        </a>
+                        <a href="/app/wms?sub=pengadaan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isWmsPengadaan ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $isWmsPengadaan ? 'bg-white' : 'bg-up-accent/60' }}"></span>
+                            <span>Pengadaan</span>
+                        </a>
                     </div>
                 </div>
-                @endcanany
+                @endcan
 
                 <!-- 5. CRM & Member -->
                 @canany(['crm.view', 'reseller.view'])
@@ -333,20 +337,30 @@
                     <div x-show="isDropdownOpen('akunting')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
+                        @php
+                            $isAkuntingDashboard = request()->is('app/akunting') && (!request()->has('tab') || request('tab') === 'laporan');
+                            $isAkuntingJurnal = request()->is('app/akunting') && request('tab') === 'jurnal';
+                            $isAkuntingAset = request()->is('app/akunting/aset*');
+                            $isAkuntingPajak = request()->is('app/laporan-pajak*');
+                        @endphp
                         @can('akunting.view')
-                            <a href="/app/akunting" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/akunting') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/akunting') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                                <span>Buku Besar & Neraca</span>
+                            <a href="/app/akunting?tab=laporan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkuntingDashboard ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isAkuntingDashboard ? 'bg-white' : 'bg-up-primary/60' }}"></span>
+                                <span>Laporan / Dashboard Akuntansi</span>
                             </a>
-                            <a href="/app/akunting/aset" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/akunting/aset*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/akunting/aset*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
+                            <a href="/app/akunting?tab=jurnal" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkuntingJurnal ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isAkuntingJurnal ? 'bg-white' : 'bg-up-mint/60' }}"></span>
+                                <span>Jurnal</span>
+                            </a>
+                            <a href="/app/akunting/aset" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkuntingAset ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isAkuntingAset ? 'bg-white' : 'bg-up-accent/60' }}"></span>
                                 <span>Aset Tetap & Depresiasi</span>
                             </a>
                         @endcan
                         @canany(['akunting.view', 'laporan.cabang'])
-                            <a href="{{ route('laporan.pajak') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/laporan-pajak*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/laporan-pajak*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
-                                <span>Laporan Pajak (PPN/PPh)</span>
+                            <a href="{{ route('laporan.pajak') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkuntingPajak ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isAkuntingPajak ? 'bg-white' : 'bg-up-amber/60' }}"></span>
+                                <span>Laporan Pajak</span>
                             </a>
                         @endcanany
                     </div>
@@ -375,6 +389,10 @@
                              x-collapse
                              class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
                             @can('kelola-hr')
+                                <a href="/app/hr/karyawan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/karyawan*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/karyawan*') ? 'bg-white' : 'bg-up-primary/80' }}"></span>
+                                    <span>Data Karyawan</span>
+                                </a>
                                 <a href="/app/hr/absensi" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/hr/absensi*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
                                     <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/hr/absensi*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
                                     <span>Absensi &amp; KPI</span>
@@ -459,92 +477,37 @@
                     <div x-show="isDropdownOpen('pengaturan')"
                          x-collapse
                          class="sidebar-submenu ml-4 pl-3.5 my-1 space-y-1 border-l border-black/10 dark:border-white/10">
+                        @php
+                            $isAkses = request()->is('app/pengaturan*') && (in_array(request('tab'), ['users', 'role', 'cabang']) || (!request()->has('tab') && !request()->routeIs('pengaturan.web-konsumen')));
+                            $isKatalog = request()->is('app/pengaturan*') && (in_array(request('tab'), ['master_produk', 'export_import']) || request()->routeIs('pengaturan.web-konsumen'));
+                            $isOperasional = request()->is('app/pengaturan*') && in_array(request('tab'), ['loyalitas', 'pajak', 'qris', 'master', 'printer', 'integrasi']);
+                            $isSistem = (request()->is('app/pengaturan*') && in_array(request('tab'), ['database', 'audit'])) || request()->is('app/keamanan*', 'app/audit-log*') || request()->routeIs('setup.wizard');
+                        @endphp
 
-                        <!-- Kategori: Akses & Pengguna -->
                         @canany(['pengaturan.manage', 'user.view'])
-                        <div class="px-2 pt-1.5 pb-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-400/70 dark:text-ink-500 select-none">
-                            Akses &amp; Pengguna
-                        </div>
-                        <a href="/app/pengaturan" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/pengaturan') && !request()->has('tab') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/pengaturan') && !request()->has('tab') ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Pusat Pengaturan</span>
-                        </a>
+                            <a href="/app/pengaturan?tab=users" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isAkses ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isAkses ? 'bg-white' : 'bg-indigo-400' }}"></span>
+                                <span>Akses &amp; Pengguna</span>
+                            </a>
                         @endcanany
-                        @can('user.view')
-                        <a href="/app/pengaturan?tab=users" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'users' || request('tab') === 'role' || request('tab') === 'cabang' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'users' || request('tab') === 'role' || request('tab') === 'cabang' ? 'bg-white' : 'bg-indigo-400' }}"></span>
-                            <span>Akses, User &amp; Cabang</span>
-                        </a>
-                        @endcan
 
-                        <!-- Kategori: Katalog & Web -->
                         @can('pengaturan.manage')
-                        <div class="px-2 pt-2.5 pb-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-400/70 dark:text-ink-500 select-none">
-                            Katalog &amp; Web
-                        </div>
-                        <a href="/app/pengaturan?tab=master_produk" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'master_produk' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'master_produk' ? 'bg-white' : 'bg-sky-400' }}"></span>
-                            <span>Katalog &amp; Master Part</span>
-                        </a>
-                        @canany(['pengaturan.manage', 'wms.create'])
-                        <a href="/app/pengaturan?tab=export_import" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'export_import' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'export_import' ? 'bg-white' : 'bg-up-primary/60' }}"></span>
-                            <span>Export &amp; Import Master</span>
-                        </a>
+                            <a href="/app/pengaturan?tab=master_produk" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isKatalog ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isKatalog ? 'bg-white' : 'bg-sky-400' }}"></span>
+                                <span>Katalog &amp; Web</span>
+                            </a>
+                            <a href="/app/pengaturan?tab=loyalitas" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isOperasional ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isOperasional ? 'bg-white' : 'bg-up-amber' }}"></span>
+                                <span>Operasional &amp; Bisnis</span>
+                            </a>
+                        @endcan
+
+                        @canany(['pengaturan.manage', 'lihat-audit-log'])
+                            <a href="{{ isSuperAdminOrOwner() ? '/app/pengaturan?tab=database' : '/app/audit-log' }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ $isSistem ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $isSistem ? 'bg-white' : 'bg-purple-400' }}"></span>
+                                <span>Sistem &amp; Keamanan</span>
+                            </a>
                         @endcanany
-                        <a href="{{ route('pengaturan.web-konsumen') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->routeIs('pengaturan.web-konsumen') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('pengaturan.web-konsumen') ? 'bg-white' : 'bg-pink-400' }}"></span>
-                            <span>Web Konsumen (CMS)</span>
-                        </a>
-
-                        <!-- Kategori: Operasional & Bisnis -->
-                        <div class="px-2 pt-2.5 pb-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-400/70 dark:text-ink-500 select-none">
-                            Operasional &amp; Bisnis
-                        </div>
-                        <a href="/app/pengaturan?tab=loyalitas" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'loyalitas' || request('tab') === 'pajak' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'loyalitas' || request('tab') === 'pajak' ? 'bg-white' : 'bg-up-amber' }}"></span>
-                            <span>Kebijakan Poin &amp; PPN</span>
-                        </a>
-                        <a href="/app/pengaturan?tab=printer" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'printer' || request('tab') === 'master' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'printer' || request('tab') === 'master' ? 'bg-white' : 'bg-up-mint' }}"></span>
-                            <span>Servis &amp; Struk Kasir</span>
-                        </a>
-                        <a href="/app/pengaturan?tab=integrasi" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'integrasi' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'integrasi' ? 'bg-white' : 'bg-emerald-400' }}"></span>
-                            <span>Gateway &amp; Integrasi</span>
-                        </a>
-                        @endcan
-
-                        <!-- Kategori: Sistem & Keamanan -->
-                        <div class="px-2 pt-2.5 pb-0.5 text-[9px] font-extrabold uppercase tracking-wider text-ink-400/70 dark:text-ink-500 select-none">
-                            Sistem &amp; Keamanan
-                        </div>
-                        @if(isSuperAdminOrOwner())
-                        <a href="{{ route('setup.wizard') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->routeIs('setup.wizard') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->routeIs('setup.wizard') ? 'bg-white' : 'bg-up-mint' }}"></span>
-                            <span>Setup Wizard Toko</span>
-                        </a>
-                        <a href="/app/pengaturan?tab=database" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request('tab') === 'database' ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request('tab') === 'database' ? 'bg-white' : 'bg-purple-400' }}"></span>
-                            <span>Basis Data &amp; Backup</span>
-                        </a>
-                        @endif
-                        <a href="{{ route('two-factor.setup') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/keamanan/dua-faktor*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/keamanan/dua-faktor*') ? 'bg-white' : 'bg-up-accent/60' }}"></span>
-                            <span>Keamanan Akun &amp; 2FA</span>
-                        </a>
-                        @can('kelola-sesi')
-                            <a href="{{ route('keamanan.sesi') }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/keamanan/sesi*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/keamanan/sesi*') ? 'bg-white' : 'bg-up-mint/60' }}"></span>
-                                <span>Sesi Perangkat</span>
-                            </a>
-                        @endcan
-                        @can('lihat-audit-log')
-                            <a href="/app/audit-log" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors {{ request()->is('app/audit-log*') ? 'bg-up-primary text-white shadow-sm shadow-up-primary/30 font-semibold' : 'text-ink-400 hover:text-ink-900 hover:bg-black/5 dark:hover:text-white dark:hover:bg-white/5' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ request()->is('app/audit-log*') ? 'bg-white' : 'bg-up-amber/60' }}"></span>
-                                <span>Audit Trail &amp; Log</span>
-                            </a>
-                        @endcan
                     </div>
                 </div>
             </nav>
@@ -733,7 +696,7 @@
             </header>
 
             <!-- Page Content -->
-            <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6 bg-transparent outline-none">
+            <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 lg:p-6 pb-24 md:pb-6 bg-transparent outline-none min-w-0 w-full max-w-full">
                 {{-- [F1-3] Banner paksa setup 2FA untuk role wajib (tanpa lock-out, bisa skip per sesi/disimpan) --}}
                 @if(auth()->check() && auth()->user()->requiresTwoFactor() && ! auth()->user()->hasEnabledTwoFactor() && ! request()->routeIs('two-factor.*'))
                     <div x-data="{

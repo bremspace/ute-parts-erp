@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Lead;
+use App\Modules\Hr\Models\AbsensiLog;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KpiHasil;
 use App\Modules\Hr\Models\KpiMetric;
@@ -227,6 +228,42 @@ class KpiHitungTest extends TestCase
 
         $this->assertEquals(1, KpiHasil::where('karyawan_id', $teknisi->id)->count());
         $this->assertEquals(1, KpiHasil::where('periode', $this->periode)->count());
+    }
+
+    public function test_metric_kehadiran_tepat_waktu_dari_data_absensi_real(): void
+    {
+        $staff = $this->buatKaryawan($this->buatUser('staff@test.local'), 'staff');
+
+        // Buat 3 hari absensi: 2 hadir tepat waktu, 1 terlambat
+        AbsensiLog::create([
+            'karyawan_id' => $staff->id,
+            'tanggal' => now()->startOfMonth()->toDateString(),
+            'jam_masuk' => '08:00:00',
+            'status' => 'hadir',
+        ]);
+        AbsensiLog::create([
+            'karyawan_id' => $staff->id,
+            'tanggal' => now()->startOfMonth()->addDay()->toDateString(),
+            'jam_masuk' => '08:05:00',
+            'status' => 'hadir',
+        ]);
+        AbsensiLog::create([
+            'karyawan_id' => $staff->id,
+            'tanggal' => now()->startOfMonth()->addDays(2)->toDateString(),
+            'jam_masuk' => '08:30:00',
+            'status' => 'terlambat',
+        ]);
+
+        $this->buatMetric('kehadiran_tepat_waktu', 'kehadiran_tepat_waktu', 90);
+
+        $this->kpi->hitung($this->periode);
+
+        $hasil = KpiHasil::where('karyawan_id', $staff->id)->first();
+        $this->assertNotNull($hasil);
+        // 2 tepat waktu dari 3 hadir = 66.67%
+        $this->assertEquals(66.67, (float) $hasil->nilai_aktual);
+        // 66.67 / 90 * 100 = 74.08%
+        $this->assertEquals(74.08, (float) $hasil->persen_capaian);
     }
 
     public function test_karyawan_jabatan_tidak_cocok_tidak_dihitung(): void

@@ -4,12 +4,16 @@ namespace App\Modules\Hr\Services;
 
 use App\Models\User;
 use App\Modules\Hr\Models\Karyawan;
+use App\Modules\Hr\Models\KaryawanRiwayat;
 use App\Modules\Rbac\Models\Cabang;
+use App\Modules\Rbac\Services\AuditService;
+use App\Modules\Rbac\Services\SessionManagementService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
  * Service tersentralisasi untuk sinkronisasi User dan Data Karyawan HR.
+ * Mengatur onboarding (rekrut) dan offboarding (pemutusan/terminasi/resign).
  */
 class UserHrSyncService
 {
@@ -25,6 +29,21 @@ class UserHrSyncService
             'marketing' => 'marketing',
             'kelola-hr', 'finance' => 'manager',
             default => 'staff',
+        };
+    }
+
+    /**
+     * Resolusi default role sistem dari jabatan HR.
+     */
+    public function resolveRoleFromJabatan(string $jabatan): string
+    {
+        return match ($jabatan) {
+            'teknisi' => 'teknisi',
+            'kasir' => 'kasir',
+            'admin' => 'admin-toko',
+            'marketing' => 'marketing',
+            'manager' => 'kelola-hr',
+            default => 'karyawan',
         };
     }
 
@@ -72,6 +91,8 @@ class UserHrSyncService
                 [
                     'nama' => $user->name,
                     'nik' => $finalNik,
+                    'email' => $user->email,
+                    'telepon' => $user->phone ?? $karyawan?->telepon,
                     'jabatan' => $finalJabatan,
                     'cabang_id' => $defaultCabangId,
                     'tgl_masuk' => $karyawan?->tgl_masuk ?? now()->toDateString(),
@@ -89,11 +110,17 @@ class UserHrSyncService
     {
         Karyawan::where('user_id', $user->id)->update([
             'status_aktif' => (bool) $user->is_active,
+            'tgl_keluar' => $user->is_active ? null : now()->toDateString(),
+            'alasan_keluar' => $user->is_active ? null : 'Akun login dinonaktifkan oleh administrator',
         ]);
+
+        if (! $user->is_active) {
+            $this->revokeUserAccess($user);
+        }
     }
 
     /**
-     * Buat akun User baru dan tautkan langsung ke profil Karyawan.
+     * Buat akun User baru dan tautkan langsung ke profil Karyawan (Onboarding).
      */
     public function createUserFromKaryawan(Karyawan $karyawan, string $email, string $password, string $role, ?int $cabangId = null): User
     {
@@ -101,6 +128,7 @@ class UserHrSyncService
             $user = User::create([
                 'name' => $karyawan->nama,
                 'email' => trim($email),
+                'phone' => $karyawan->telepon,
                 'password' => Hash::make($password),
                 'is_active' => (bool) $karyawan->status_aktif,
             ]);
@@ -112,10 +140,160 @@ class UserHrSyncService
                 $user->cabangs()->sync([(int) $targetCabangId => ['is_default' => true]]);
             }
 
-            $karyawan->update(['user_id' => $user->id]);
+            $karyawan->update([
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+
+            app(AuditService::class)->catat('Karyawan', 'create', $karyawan->id, "Akun user {$user->email} dibuat & ditautkan ke karyawan {$karyawan->nama} (Role: {$role})");
 
             return $user;
         });
+    }
+
+    /**
+     * Hubungkan Karyawan ke akun User yang sudah ada.
+     */
+    public function linkUserToKaryawan(Karyawan $karyawan, int $userId): void
+    {
+        DB::transaction(function () use ($karyawan, $userId) {
+            $user = User::findOrFail($userId);
+
+            // Lepas kaitan karyawan lama jika user pernah terkait
+            Karyawan::where('user_id', $user->id)
+                ->where('id', '!=', $karyawan->id)
+                ->update(['user_id' => null]);
+
+            $karyawan->update([
+                'user_id' => $user->id,
+                'email' => $karyawan->email ?: $user->email,
+                'telepon' => $karyawan->telepon ?: $user->phone,
+            ]);
+
+            app(AuditService::class)->catat('Karyawan', 'update', $karyawan->id, "Karyawan {$karyawan->nama} ditautkan ke akun user {$user->name} ({$user->email})");
+        });
+    }
+
+    /**
+     * Putus kaitan User dari Karyawan.
+     */
+    public function unlinkUserFromKaryawan(Karyawan $karyawan): void
+    {
+        $userId = $karyawan->user_id;
+        $karyawan->update(['user_id' => null]);
+
+        if ($userId) {
+            app(AuditService::class)->catat('Karyawan', 'update', $karyawan->id, "Kaitan akun user #{$userId} dilepas dari karyawan {$karyawan->nama}");
+        }
+    }
+
+    /**
+     * Pemutusan Hubungan Kerja (Offboarding / Terminasi / Resign).
+     * Menonaktifkan Karyawan, menonaktifkan User login, memutus sesi aktif & token.
+     */
+    public function terminateKaryawan(Karyawan $karyawan, string $alasan, ?string $tglKeluar = null, ?string $catatan = null): void
+    {
+        DB::transaction(function () use ($karyawan, $alasan, $tglKeluar, $catatan) {
+            $tglKeluar = $tglKeluar ?: now()->toDateString();
+
+            $karyawan->update([
+                'status_aktif' => false,
+                'tgl_keluar' => $tglKeluar,
+                'alasan_keluar' => $alasan,
+                'catatan_keluar' => $catatan,
+            ]);
+
+            // Jika punya user login, nonaktifkan dan putus seluruh akses seketika
+            if ($karyawan->user_id && $user = $karyawan->user) {
+                $user->update(['is_active' => false]);
+                $this->revokeUserAccess($user);
+            }
+
+            // Catat ke riwayat ketenagakerjaan karyawan
+            KaryawanRiwayat::create([
+                'karyawan_id' => $karyawan->id,
+                'user_id' => auth()->id(),
+                'tipe_event' => 'terminasi',
+                'tanggal_efektif' => $tglKeluar,
+                'judul' => 'Pemutusan Hubungan Kerja ('.ucfirst(str_replace('_', ' ', $alasan)).')',
+                'deskripsi' => $catatan ?: "Karyawan diberhentikan / non-aktif dengan alasan: {$alasan}",
+                'jabatan_lama' => $karyawan->jabatan,
+                'cabang_lama_id' => $karyawan->cabang_id,
+                'gaji_lama' => $karyawan->gaji_pokok,
+            ]);
+
+            app(AuditService::class)->catat(
+                'Karyawan',
+                'update',
+                $karyawan->id,
+                "Pemutusan Karyawan: {$karyawan->nama} ({$karyawan->nik}) dinonaktifkan. Alasan: {$alasan}. Tgl Keluar: {$tglKeluar}"
+            );
+        });
+    }
+
+    /**
+     * Mempekerjakan kembali karyawan yang sebelumnya terminated (Re-hire).
+     */
+    public function rehireKaryawan(Karyawan $karyawan, ?string $tglMasukBaru = null): void
+    {
+        DB::transaction(function () use ($karyawan, $tglMasukBaru) {
+            $karyawan->update([
+                'status_aktif' => true,
+                'tgl_masuk' => $tglMasukBaru ?: now()->toDateString(),
+                'tgl_keluar' => null,
+                'alasan_keluar' => null,
+                'catatan_keluar' => null,
+            ]);
+
+            if ($karyawan->user_id && $user = $karyawan->user) {
+                $user->update(['is_active' => true]);
+            }
+
+            // Catat ke riwayat ketenagakerjaan karyawan
+            KaryawanRiwayat::create([
+                'karyawan_id' => $karyawan->id,
+                'user_id' => auth()->id(),
+                'tipe_event' => 'rehire',
+                'tanggal_efektif' => $tglMasukBaru ?: now()->toDateString(),
+                'judul' => 'Pengaktifan Kembali (Re-hire)',
+                'deskripsi' => 'Karyawan diaktifkan kembali dan hak akses login sistem dibuka kembali.',
+                'jabatan_baru' => $karyawan->jabatan,
+                'cabang_baru_id' => $karyawan->cabang_id,
+                'gaji_baru' => $karyawan->gaji_pokok,
+            ]);
+
+            app(AuditService::class)->catat(
+                'Karyawan',
+                'update',
+                $karyawan->id,
+                "Re-hire Karyawan: {$karyawan->nama} ({$karyawan->nik}) diaktifkan kembali"
+            );
+        });
+    }
+
+    /**
+     * Revoke total akses pengguna: cabut Sanctum tokens & hapus database sessions.
+     */
+    public function revokeUserAccess(User $user): void
+    {
+        // 1. Revoke API Sanctum tokens
+        if (method_exists($user, 'tokens')) {
+            $user->tokens()->delete();
+        }
+
+        // 2. Terminate Web Sessions jika ada tabel sessions
+        try {
+            DB::table('sessions')->where('user_id', $user->id)->delete();
+        } catch (\Throwable) {
+            // Abaikan jika session driver bukan database
+        }
+
+        // 3. Terminate Device Sessions via SessionManagementService jika tersedia
+        try {
+            app(SessionManagementService::class)->forceLogoutAll($user->id);
+        } catch (\Throwable) {
+            // fallback
+        }
     }
 
     /**

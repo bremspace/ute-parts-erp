@@ -4,6 +4,11 @@ html, body {
     overflow-x: hidden;
 }
 
+#main-content {
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
 *, ::before, ::after {
     box-sizing: border-box;
 }
@@ -288,28 +293,53 @@ html:not(.dark) .glass-panel h6 {
     color: #0F172A;
 }
 
+/* Form Controls Contrast & Accessibility */
+html[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+html[data-theme="light"] select,
+html[data-theme="light"] textarea,
 html[data-theme="light"] .glass-input,
+html:not(.dark) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+html:not(.dark) select,
+html:not(.dark) textarea,
 html:not(.dark) .glass-input {
-    background: #FFFFFF;
-    border-color: rgba(15, 23, 42, 0.15);
+    background-color: #FFFFFF !important;
+    border-color: rgba(15, 23, 42, 0.18) !important;
     color: #0F172A !important;
 }
 
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+html.dark select,
+html.dark textarea,
 html.dark .glass-input,
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
 html[data-theme="dark"] .glass-input {
+    background-color: rgba(15, 23, 42, 0.85);
+    border-color: rgba(255, 255, 255, 0.12);
     color: #F8FAFC !important;
 }
 
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder,
 html[data-theme="light"] .glass-input::placeholder,
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder,
 html:not(.dark) .glass-input::placeholder {
-    color: #94A3B8;
+    color: #94A3B8 !important;
 }
 
+html[data-theme="light"] input:focus,
+html[data-theme="light"] select:focus,
+html[data-theme="light"] textarea:focus,
 html[data-theme="light"] .glass-input:focus,
+html:not(.dark) input:focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus,
 html:not(.dark) .glass-input:focus {
-    background: #FFFFFF;
-    border-color: var(--up-primary);
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    background-color: #FFFFFF !important;
+    border-color: var(--up-primary) !important;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2) !important;
 }
 
 select option {
@@ -323,41 +353,80 @@ html[data-theme="dark"] select option {
     color: #F8FAFC;
 }
 
-/* Safety Fallback: Kontras teks putih yang tidak memiliki variant dark: di tema terang */
+/* ===== TEMA TERANG: Safety Fallbacks untuk Teks, Border, dan Background ===== */
+
+/* 1. Kontras border & outline di tema terang: border-white menjadi border slate halus yang terlihat jelas */
+html[data-theme="light"]:not(.dark) :not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *)[class*="border-white/"],
+html:not(.dark) :not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *)[class*="border-white/"] {
+    border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+html[data-theme="light"]:not(.dark) :not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *)[class*="divide-white/"] > :not([hidden]) ~ :not([hidden]),
+html:not(.dark) :not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *)[class*="divide-white/"] > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* 2. Kontras background kotak/kartu nested di tema terang */
+html[data-theme="light"]:not(.dark) :not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *)[class*="bg-white/0"],
+html[data-theme="light"]:not(.dark) :not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *)[class*="bg-white/[0"],
+html:not(.dark) :not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *)[class*="bg-white/0"],
+html:not(.dark) :not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *)[class*="bg-white/[0"] {
+    background-color: rgba(248, 250, 252, 0.75) !important;
+}
+
+/* 3. Kontras teks putih di tema terang: ubah menjadi gelap KECUALI tombol/badge solid berwarna */
 html[data-theme="light"]:not(.dark) select option,
 html:not(.dark) select option {
     background: #FFFFFF !important;
     color: #0F172A !important;
 }
 
-html[data-theme="light"]:not(.dark) table td.text-white:not([class*="bg-"]),
-html[data-theme="light"]:not(.dark) table td > span.text-white:not([class*="bg-"]),
-html:not(.dark) table td.text-white:not([class*="bg-"]),
-html:not(.dark) table td > span.text-white:not([class*="bg-"]),
-html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-white,
-html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-white {
+html[data-theme="light"]:not(.dark) :not([class*="bg-up-"]):not([class*="bg-black"]):not([class*="bg-slate-900"]):not([class*="bg-ink-900"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-blue-"]):not([class*="bg-amber-"]):not([class*="bg-green-"]):not(.btn-tactile):not(.btn-touch):not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *).text-white,
+html:not(.dark) :not([class*="bg-up-"]):not([class*="bg-black"]):not([class*="bg-slate-900"]):not([class*="bg-ink-900"]):not([class*="bg-red-"]):not([class*="bg-emerald-"]):not([class*="bg-blue-"]):not([class*="bg-amber-"]):not([class*="bg-green-"]):not(.btn-tactile):not(.btn-touch):not(.dark-surface):not(.dark-surface *):not([data-theme-surface="dark"]):not([data-theme-surface="dark"] *).text-white {
     color: #0F172A !important;
 }
 
-html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-200,
-html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-200 {
+html[data-theme="light"]:not(.dark) :not(.dark-surface *):not([data-theme-surface="dark"] *).text-ink-100,
+html:not(.dark) :not(.dark-surface *):not([data-theme-surface="dark"] *).text-ink-100 {
+    color: #0F172A !important;
+}
+
+html[data-theme="light"]:not(.dark) :not(.dark-surface *):not([data-theme-surface="dark"] *).text-ink-200,
+html:not(.dark) :not(.dark-surface *):not([data-theme-surface="dark"] *).text-ink-200 {
     color: #334155 !important;
 }
 
-html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-300,
-html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-300 {
+html[data-theme="light"]:not(.dark) :not(.dark-surface *):not([data-theme-surface="dark"] *).text-ink-300,
+html:not(.dark) :not(.dark-surface *):not([data-theme-surface="dark"] *).text-ink-300 {
     color: #475569 !important;
 }
 
-html[data-theme="light"]:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-400,
-html:not(.dark) .glass-panel :not([class*="bg-"]):not(.btn-tactile):not(.dark-surface *).text-ink-400 {
+html[data-theme="light"]:not(.dark) :not(.dark-surface *):not([data-theme-surface="dark"] *).text-ink-400,
+html:not(.dark) :not(.dark-surface *):not([data-theme-surface="dark"] *).text-ink-400 {
     color: #64748B !important;
 }
 
-html[data-theme="light"]:not(.dark) select.glass-input,
-html:not(.dark) select.glass-input {
-    background-color: #FFFFFF !important;
-    color: #0F172A !important;
+/* ===== TEMA GELAP: Safety Fallbacks untuk Outline & Teks Gelap ===== */
+/* Border hitam di tema gelap otomatis menjadi border putih transparan agar box tetap tergaris */
+html.dark :not([data-theme-surface="light"] *)[class*="border-black/"],
+html[data-theme="dark"] :not([data-theme-surface="light"] *)[class*="border-black/"] {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark :not([data-theme-surface="light"] *)[class*="divide-black/"] > :not([hidden]) ~ :not([hidden]),
+html[data-theme="dark"] :not([data-theme-surface="light"] *)[class*="divide-black/"] > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Teks gelap di tema gelap tanpa variant dark: otomatis menjadi putih/terang */
+html.dark :not(.btn-tactile):not([class*="bg-white"]):not([class*="bg-slate-50"]):not([class*="bg-amber-100"]):not([class*="bg-emerald-100"]):not([data-theme-surface="light"] *).text-ink-900,
+html[data-theme="dark"] :not(.btn-tactile):not([class*="bg-white"]):not([class*="bg-slate-50"]):not([class*="bg-amber-100"]):not([class*="bg-emerald-100"]):not([data-theme-surface="light"] *).text-ink-900 {
+    color: #F8FAFC !important;
+}
+
+html.dark :not(.btn-tactile):not([class*="bg-white"]):not([class*="bg-slate-50"]):not([class*="bg-amber-100"]):not([class*="bg-emerald-100"]):not([data-theme-surface="light"] *).text-ink-800,
+html[data-theme="dark"] :not(.btn-tactile):not([class*="bg-white"]):not([class*="bg-slate-50"]):not([class*="bg-amber-100"]):not([class*="bg-emerald-100"]):not([data-theme-surface="light"] *).text-ink-800 {
+    color: #E2E8F0 !important;
 }
 
 /* Kontainer dengan .dark-surface / [data-theme-surface="dark"] mempertahankan teks kontras putih & abu terang */

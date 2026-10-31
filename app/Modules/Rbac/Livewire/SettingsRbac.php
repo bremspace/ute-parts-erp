@@ -240,7 +240,15 @@ class SettingsRbac extends Component
     {
         if (request()->has('tab')) {
             $tab = (string) request('tab');
-            if (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'export_import', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit'], true)) {
+            if ($tab === 'operasional' || $tab === 'bisnis') {
+                $this->activeTab = 'loyalitas';
+            } elseif ($tab === 'sistem' || $tab === 'keamanan') {
+                $this->activeTab = isSuperAdminOrOwner() ? 'database' : 'audit';
+            } elseif ($tab === 'akses') {
+                $this->activeTab = 'users';
+            } elseif ($tab === 'katalog') {
+                $this->activeTab = 'master_produk';
+            } elseif (in_array($tab, ['users', 'role', 'cabang', 'master_produk', 'export_import', 'master', 'loyalitas', 'pajak', 'printer', 'integrasi', 'database', 'qris', 'audit'], true)) {
                 $this->activeTab = $tab;
             }
         }

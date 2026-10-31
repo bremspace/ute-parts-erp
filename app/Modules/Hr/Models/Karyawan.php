@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Traits\CatatAktivitas;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,7 +17,8 @@ use Spatie\Activitylog\Support\LogOptions;
  * [F3-8] Karyawan — master data karyawan link ke users.
  */
 #[Fillable([
-    'user_id', 'nik', 'nama', 'jabatan', 'cabang_id', 'tgl_masuk',
+    'user_id', 'nik', 'nama', 'telepon', 'email', 'jabatan', 'cabang_id',
+    'tgl_masuk', 'tgl_keluar', 'alasan_keluar', 'catatan_keluar',
     'gaji_pokok', 'status_aktif', 'rekening_bank',
 ])]
 class Karyawan extends Model
@@ -28,6 +30,7 @@ class Karyawan extends Model
 
     protected $casts = [
         'tgl_masuk' => 'date',
+        'tgl_keluar' => 'date',
         'gaji_pokok' => 'decimal:2',
         'status_aktif' => 'boolean',
     ];
@@ -52,22 +55,64 @@ class Karyawan extends Model
         return $this->hasMany(KaryawanKomponenGaji::class);
     }
 
+    public function riwayats(): HasMany
+    {
+        return $this->hasMany(KaryawanRiwayat::class)->orderBy('tanggal_efektif', 'desc')->orderBy('id', 'desc');
+    }
+
+    public function absensiLogs(): HasMany
+    {
+        return $this->hasMany(AbsensiLog::class);
+    }
+
+    public function shiftJadwals(): HasMany
+    {
+        return $this->hasMany(ShiftJadwal::class);
+    }
+
+    public function kpiHasils(): HasMany
+    {
+        return $this->hasMany(KpiHasil::class);
+    }
+
+    /**
+     * Scope karyawan aktif.
+     */
+    public function scopeAktif(Builder $query): Builder
+    {
+        return $query->where('status_aktif', true);
+    }
+
+    /**
+     * Scope karyawan non-aktif / diberhentikan.
+     */
+    public function scopeNonaktif(Builder $query): Builder
+    {
+        return $query->where('status_aktif', false);
+    }
+
+    /**
+     * Scope cabang aktif.
+     */
+    public function scopeCabang(Builder $query, ?int $cabangId): Builder
+    {
+        if (! $cabangId) {
+            return $query;
+        }
+
+        return $query->where('cabang_id', $cabangId);
+    }
+
     /**
      * [F1-4] Audit trail data karyawan.
-     *
-     * `logOnly` — HANYA kolom yang relevan untuk audit. `rekening_bank` NOMOR
-     * REKENING Employee DIBUANG dari snapshot: permission `lihat-audit-log` juga
-     * dipegang admin-toko, dan nomor rekening staff bukan miliknya untuk dilihat.
-     * `dontLogEmptyChanges()` sengaja TIDAK dipakai supaya perubahan rekening
-     * saja tetap menulis baris log (event terlihat, isi sensitifnya tidak) —
-     * dengan begitu tidak ada CRUD karyawan yang tak terlihat pemiliknya.
      */
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
             ->logOnly([
-                'user_id', 'nik', 'nama', 'jabatan', 'cabang_id',
-                'tgl_masuk', 'gaji_pokok', 'status_aktif',
+                'user_id', 'nik', 'nama', 'telepon', 'email', 'jabatan', 'cabang_id',
+                'tgl_masuk', 'tgl_keluar', 'alasan_keluar', 'catatan_keluar',
+                'gaji_pokok', 'status_aktif',
             ])
             ->logOnlyDirty()
             ->setDescriptionForEvent(fn (string $event) => 'Data Karyawan '.self::labelAksiAktivitas($event));

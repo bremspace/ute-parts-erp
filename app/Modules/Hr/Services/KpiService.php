@@ -3,6 +3,7 @@
 namespace App\Modules\Hr\Services;
 
 use App\Modules\Crm\Models\Lead;
+use App\Modules\Hr\Models\AbsensiLog;
 use App\Modules\Hr\Models\Karyawan;
 use App\Modules\Hr\Models\KpiHasil;
 use App\Modules\Hr\Models\KpiMetric;
@@ -32,6 +33,7 @@ class KpiService
         'selisih_kas' => ['kasir'],
         'lead_won' => ['marketing'],
         'penjualan_lead_won' => ['marketing'],
+        'kehadiran_tepat_waktu' => ['teknisi', 'kasir', 'admin', 'marketing', 'manager', 'staff', 'other'],
     ];
 
     /**
@@ -101,15 +103,15 @@ class KpiService
         return match ($rumus) {
             'tiket_selesai' => TiketServis::where('teknisi_id', $userId)
                 ->where('status', 'selesai')
-                ->whereBetween('tanggal_selesai', [$mulai, $selesai])
+                ->whereBetween('tanggal_selesai', [$mulai.' 00:00:00', $selesai.' 23:59:59'])
                 ->count(),
             'sla_servis_ontime' => (float) TiketServis::where('teknisi_id', $userId)
                 ->where('status_sla_kpi', 'on_time')
-                ->whereBetween('tanggal_selesai', [$mulai, $selesai])
+                ->whereBetween('tanggal_selesai', [$mulai.' 00:00:00', $selesai.' 23:59:59'])
                 ->count(),
             'rata_durasi_servis' => (float) (TiketServis::where('teknisi_id', $userId)
                 ->whereNotNull('durasi_pengerjaan_menit')
-                ->whereBetween('tanggal_selesai', [$mulai, $selesai])
+                ->whereBetween('tanggal_selesai', [$mulai.' 00:00:00', $selesai.' 23:59:59'])
                 ->avg('durasi_pengerjaan_menit') ?? 0),
             'transaksi_kasir' => DB::table('transaksi')
                 ->where('kasir_id', $userId)
@@ -131,6 +133,21 @@ class KpiService
                 ->where('stage', 'won')
                 ->whereBetween('won_at', [$mulai.' 00:00:00', $selesai.' 23:59:59'])
                 ->sum('nilai_estimasi'),
+            'kehadiran_tepat_waktu' => (function () use ($karyawan, $mulai, $selesai) {
+                $totalHadir = AbsensiLog::where('karyawan_id', $karyawan->id)
+                    ->whereBetween('tanggal', [$mulai, $selesai])
+                    ->whereIn('status', ['hadir', 'terlambat'])
+                    ->count();
+                if ($totalHadir === 0) {
+                    return 0.0;
+                }
+                $tepatWaktu = AbsensiLog::where('karyawan_id', $karyawan->id)
+                    ->whereBetween('tanggal', [$mulai, $selesai])
+                    ->where('status', 'hadir')
+                    ->count();
+
+                return round(($tepatWaktu / $totalHadir) * 100, 2);
+            })(),
             default => 0,
         };
     }
@@ -160,6 +177,14 @@ class KpiService
             }
 
             return round(min(120, max(0, ($target / $nilai) * 100)), 2);
+        }
+
+        if ($rumus === 'kehadiran_tepat_waktu') {
+            if ($target <= 0) {
+                return $nilai > 0 ? 100 : 0;
+            }
+
+            return round(min(120, ($nilai / $target) * 100), 2);
         }
 
         if ($target <= 0) {

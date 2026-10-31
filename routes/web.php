@@ -18,6 +18,7 @@ use App\Modules\Crm\Services\PelangganService;
 use App\Modules\Dashboard\Livewire\DashboardIndex;
 use App\Modules\Hr\Livewire\HrAbsensiKpiPage;
 use App\Modules\Hr\Livewire\HrSayaPage;
+use App\Modules\Hr\Livewire\KaryawanPage;
 use App\Modules\Hr\Livewire\KomisiSkemaPage;
 use App\Modules\Hr\Livewire\PayrollPage;
 use App\Modules\Hr\Models\PayrollSlip;
@@ -769,6 +770,11 @@ Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])
     Route::get('/laporan/nomor-seri', LaporanNomorSeri::class)
         ->name('laporan.nomor-seri')
         ->middleware('permission:laporan.cabang');
+
+    // [F3-8 / Onboarding-Offboarding] Manajemen Karyawan, Rekrut & Terminasi — admin/finance (kelola-hr)
+    Route::get('/hr/karyawan', KaryawanPage::class)
+        ->name('hr.karyawan')
+        ->middleware('permission:kelola-hr');
 
     // [F3-8] HR & Payroll Screen — [PRD §4.3] RBAC `kelola-payroll` (super-admin + finance saja);
     // teknisi lihat slip sendiri hanya via guard komponen PayrollSlipDetail (user_id + cabang)

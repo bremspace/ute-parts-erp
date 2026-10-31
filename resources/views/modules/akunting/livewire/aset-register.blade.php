@@ -24,30 +24,30 @@
     $tanpaCabang = ! session('cabang_id');
 @endphp
 
-<div class="space-y-6">
+<div class="space-y-6 w-full min-w-0 max-w-full overflow-hidden">
     <!-- ═══ HEADER: judul, filter, aksi utama ═══ -->
-    <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 border-b border-white/5 pb-4">
+    <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 border-b border-black/10 dark:border-white/5 pb-4">
         <div class="min-w-0">
             <div class="flex items-center gap-2">
-                <h2 class="text-lg font-semibold text-white tracking-wide">Aset Tetap &amp; Depresiasi</h2>
-                <span class="text-[10px] font-mono text-ink-500 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded">F3-3</span>
+                <h2 class="text-lg font-semibold text-ink-900 dark:text-white tracking-wide">Aset Tetap &amp; Depresiasi</h2>
+                <span class="text-[10px] font-mono text-ink-500 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 px-1.5 py-0.5 rounded">F3-3</span>
             </div>
-            <p class="text-xs text-ink-400 mt-0.5">
+            <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">
                 Penyusutan garis lurus per bulan — jurnal beban <span class="font-mono">530-01</span> / akumulasi <span class="font-mono">130-02</span> diposting otomatis tiap awal bulan oleh job terjadwal.
             </p>
         </div>
 
-        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap xl:flex-wrap">
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -my-1 flex-nowrap xl:flex-wrap -mx-1 px-1 xl:mx-0 xl:px-0">
             <!-- Filter status (Livewire nyata — AsetRegister::$filterStatus) -->
             <div class="flex items-center gap-2">
-                <label for="aset-filter-status" class="text-[11px] text-ink-400 font-medium whitespace-nowrap">Status</label>
+                <label for="aset-filter-status" class="text-[11px] text-ink-500 dark:text-ink-400 font-medium whitespace-nowrap">Status</label>
                 <select
                     id="aset-filter-status"
                     wire:model.live="filterStatus"
                     class="px-2.5 py-2 rounded-lg glass-input text-xs font-medium min-h-11"
                 >
                     @foreach($filterStatusOptions as $value => $label)
-                        <option value="{{ $value }}" class="bg-ink-900">{{ $label }}</option>
+                        <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
                 </select>
             </div>

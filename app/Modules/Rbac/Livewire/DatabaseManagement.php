@@ -215,7 +215,7 @@ class DatabaseManagement extends Component
     /**
      * Eksekusi reset database enterprise.
      */
-    public function eksekusiReset(DatabaseManagementService $dbService): void
+    public function eksekusiReset(DatabaseManagementService $dbService)
     {
         $this->authorizeAccess();
 
