@@ -58,7 +58,7 @@ class AkuntingDashboard extends Component
      */
     private const PER_HALAMAN_SUBLEDGER = 15;
 
-    public string $activeTab = 'laporan'; // laporan, jurnal, coa, piutang, utang, matching-kas, diagnosa-neraca
+    public string $activeTab = 'laporan'; // laporan, jurnal, buku-besar, coa, piutang, utang, matching-kas, diagnosa-neraca
 
     /** Cakupan laporan keuangan: 'cabang' (cabang aktif) atau 'konsolidasi' (gabungan seluruh cabang) */
     public string $cakupanLaporan = 'cabang';
@@ -66,6 +66,18 @@ class AkuntingDashboard extends Component
     public string $periodeDari = '';
 
     public string $periodeSampai = '';
+
+    // Jurnal filter & search
+    public string $jurnalSearch = '';
+
+    public string $jurnalFilterSumber = '';
+
+    // Buku Besar / Mutasi Akun
+    public ?int $selectedBukuBesarAkunId = null;
+
+    public string $bukuBesarDari = '';
+
+    public string $bukuBesarSampai = '';
 
     // Jurnal manual modal
     public bool $showJurnalManual = false;
@@ -135,11 +147,21 @@ class AkuntingDashboard extends Component
     {
         $this->periodeDari = now()->startOfMonth()->toDateString();
         $this->periodeSampai = now()->toDateString();
+        $this->bukuBesarDari = now()->startOfMonth()->toDateString();
+        $this->bukuBesarSampai = now()->toDateString();
         $this->resetManualJournalForm();
 
+        $firstAkun = AkunCOA::where('kode', '110-01')->first() ?? AkunCOA::where('is_active', true)->orderBy('kode')->first();
+        $this->selectedBukuBesarAkunId = $firstAkun?->id;
+
         $tab = request('tab');
-        if ($tab && in_array($tab, ['laporan', 'jurnal', 'coa', 'piutang', 'utang', 'matching-kas', 'diagnosa-neraca'], true)) {
+        if ($tab && in_array($tab, ['laporan', 'jurnal', 'buku-besar', 'coa', 'piutang', 'utang', 'matching-kas', 'diagnosa-neraca'], true)) {
             $this->activeTab = $tab;
+        }
+
+        if (request()->has('akun_id')) {
+            $this->selectedBukuBesarAkunId = (int) request('akun_id');
+            $this->activeTab = 'buku-besar';
         }
     }
 
@@ -225,13 +247,16 @@ class AkuntingDashboard extends Component
 
         $userId = auth()->id();
         $fmt = $format === 'csv' ? 'csv' : 'xlsx';
+        $targetAkunId = $jenis === 'buku_besar' ? $this->selectedBukuBesarAkunId : null;
+        $dari = $jenis === 'buku_besar' ? ($this->bukuBesarDari ?: $this->periodeDari) : $this->periodeDari;
+        $sampai = $jenis === 'buku_besar' ? ($this->bukuBesarSampai ?: $this->periodeSampai) : $this->periodeSampai;
 
         dispatch(new ExportLaporanJob(
             jenis: $jenis,
-            periodeDari: $this->periodeDari ?: null,
-            periodeSampai: $this->periodeSampai ?: null,
+            periodeDari: $dari ?: null,
+            periodeSampai: $sampai ?: null,
             cabangId: $exportCabangId,
-            akunId: null,
+            akunId: $targetAkunId,
             userId: $userId,
             format: $fmt,
         ));
@@ -243,7 +268,7 @@ class AkuntingDashboard extends Component
         ]);
 
         $path = app(ExportLaporanService::class)->export(
-            $jenis, $this->periodeDari ?: null, $this->periodeSampai ?: null, $exportCabangId, null, $fmt, $userId
+            $jenis, $dari ?: null, $sampai ?: null, $exportCabangId, $targetAkunId, $fmt, $userId
         );
         $fullPath = Storage::disk('local')->path($path);
 
@@ -385,6 +410,16 @@ class AkuntingDashboard extends Component
     }
 
     // ===== JURNAL =====
+    public function updatedJurnalSearch(): void
+    {
+        $this->resetPage('page');
+    }
+
+    public function updatedJurnalFilterSumber(): void
+    {
+        $this->resetPage('page');
+    }
+
     public function getJurnalsProperty()
     {
         // [B-10a / P0-2] list jurnal scoped cabang aktif (atau seluruh cabang jika konsolidasi)
@@ -395,7 +430,23 @@ class AkuntingDashboard extends Component
             $query->where('cabang_id', $cabangId);
         }
 
-        return $query->latest('tanggal')->paginate(25);
+        if ($this->jurnalSearch !== '') {
+            $term = '%'.trim($this->jurnalSearch).'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('no_jurnal', 'like', $term)
+                    ->orWhere('deskripsi', 'like', $term)
+                    ->orWhereHas('akun', function ($qa) use ($term) {
+                        $qa->where('nama', 'like', $term)
+                            ->orWhere('kode', 'like', $term);
+                    });
+            });
+        }
+
+        if ($this->jurnalFilterSumber !== '') {
+            $query->where('sumber', $this->jurnalFilterSumber);
+        }
+
+        return $query->latest('tanggal')->latest('id')->paginate(25);
     }
 
     public function openJurnalManualModal(): void
@@ -508,13 +559,130 @@ class AkuntingDashboard extends Component
 
             $this->resetManualJournalForm();
             $this->showJurnalManual = false;
+            $this->bersihkanCacheLaporan();
+
+            // Set fokus akun pertama ke Buku Besar & aktifkan tab jurnal agar mutasi langsung terlihat
+            $firstLineAkunKode = $validation['lines'][0]['akun_kode'] ?? null;
+            if ($firstLineAkunKode) {
+                $akunPertama = AkunCOA::where('kode', $firstLineAkunKode)->first();
+                if ($akunPertama) {
+                    $this->selectedBukuBesarAkunId = $akunPertama->id;
+                }
+            }
+            $this->activeTab = 'jurnal';
+
             $this->dispatch('alert', [
                 'type' => 'success',
-                'message' => "Jurnal manual {$noJurnal} diposting",
+                'message' => "Jurnal manual {$noJurnal} diposting dan tercatat di sistem",
             ]);
         } catch (\Exception $e) {
             $this->dispatch('alert', ['type' => 'error', 'message' => $e->getMessage()]);
         }
+    }
+
+    public function bersihkanCacheLaporan(): void
+    {
+        $cabangId = $this->cabangAktif();
+        $keys = [
+            'laporan-neraca-'.$cabangId.'-'.$this->periodeSampai,
+            'laporan-neraca-'.$cabangId.'-'.now()->toDateString(),
+            'laporan-neraca-konsolidasi-'.$this->periodeSampai,
+            'laporan-neraca-konsolidasi-'.now()->toDateString(),
+            'laporan-labarugi-'.$cabangId.'-'.$this->periodeDari.'-'.$this->periodeSampai,
+            'laporan-labarugi-konsolidasi-'.$this->periodeDari.'-'.$this->periodeSampai,
+        ];
+        foreach ($keys as $k) {
+            Cache::forget($k);
+        }
+    }
+
+    public function segarkanLaporan(): void
+    {
+        $this->bersihkanCacheLaporan();
+        $this->dispatch('alert', [
+            'type' => 'success',
+            'message' => 'Laporan keuangan berhasil disinkronkan ulang dengan data terbaru.',
+        ]);
+    }
+
+    public function lihatMutasiAkun(int $akunId): void
+    {
+        $this->selectedBukuBesarAkunId = $akunId;
+        $this->activeTab = 'buku-besar';
+    }
+
+    public function getBukuBesarDataProperty(): ?array
+    {
+        if (! $this->selectedBukuBesarAkunId) {
+            return null;
+        }
+
+        $akun = AkunCOA::find($this->selectedBukuBesarAkunId);
+        if (! $akun) {
+            return null;
+        }
+
+        $dari = $this->bukuBesarDari ?: $this->periodeDari;
+        $sampai = $this->bukuBesarSampai ?: $this->periodeSampai;
+        $cabangId = $this->cabangScopeId();
+
+        // 1. Hitung saldo awal kumulatif sebelum tanggal $dari
+        $queryAwal = JurnalAkuntansi::where('akun_coa_id', $akun->id)
+            ->whereDate('tanggal', '<', $dari);
+        if ($cabangId !== null) {
+            $queryAwal->where('cabang_id', $cabangId);
+        }
+        $mutasiAwal = $queryAwal->selectRaw('COALESCE(SUM(debit), 0) as deb, COALESCE(SUM(kredit), 0) as kre')->first();
+        $debAwal = (float) ($mutasiAwal->deb ?? 0);
+        $kreAwal = (float) ($mutasiAwal->kre ?? 0);
+        $saldoAwal = $akun->saldo_normal === 'debit' ? ($debAwal - $kreAwal) : ($kreAwal - $debAwal);
+
+        // 2. Ambil entri mutasi periode
+        $queryPeriode = JurnalAkuntansi::with(['cabang', 'user'])
+            ->where('akun_coa_id', $akun->id)
+            ->whereDate('tanggal', '>=', $dari)
+            ->whereDate('tanggal', '<=', $sampai);
+        if ($cabangId !== null) {
+            $queryPeriode->where('cabang_id', $cabangId);
+        }
+        $jurnals = $queryPeriode->orderBy('tanggal')->orderBy('id')->get();
+
+        $saldoBerjalan = $saldoAwal;
+        $totalDebit = 0.0;
+        $totalKredit = 0.0;
+
+        $mutasiList = $jurnals->map(function ($j) use ($akun, &$saldoBerjalan, &$totalDebit, &$totalKredit) {
+            $deb = (float) $j->debit;
+            $kre = (float) $j->kredit;
+            $totalDebit += $deb;
+            $totalKredit += $kre;
+
+            $saldoBerjalan += $akun->saldo_normal === 'debit' ? ($deb - $kre) : ($kre - $deb);
+
+            return [
+                'id' => $j->id,
+                'tanggal' => $j->tanggal instanceof \DateTimeInterface ? $j->tanggal->format('d/m/Y') : (string) $j->tanggal,
+                'no_jurnal' => $j->no_jurnal,
+                'sumber' => $j->sumber,
+                'deskripsi' => $j->deskripsi,
+                'debit' => $deb,
+                'kredit' => $kre,
+                'saldo' => round($saldoBerjalan, 2),
+                'user' => $j->user?->name,
+                'cabang' => $j->cabang?->nama,
+            ];
+        });
+
+        return [
+            'akun' => $akun,
+            'dari' => $dari,
+            'sampai' => $sampai,
+            'saldo_awal' => round($saldoAwal, 2),
+            'total_debit' => round($totalDebit, 2),
+            'total_kredit' => round($totalKredit, 2),
+            'saldo_akhir' => round($saldoBerjalan, 2),
+            'mutasi' => $mutasiList,
+        ];
     }
 
     /**
@@ -1000,6 +1168,7 @@ class AkuntingDashboard extends Component
         $this->showBayarPiutangModal = false;
         $this->piutangId = null;
         $this->bayarPiutangKunci = '';
+        $this->bersihkanCacheLaporan();
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => 'Penerimaan piutang dicatat (jurnal '.$hasil['no_jurnal'].')',
@@ -1069,6 +1238,7 @@ class AkuntingDashboard extends Component
         $this->showBayarUtangModal = false;
         $this->utangId = null;
         $this->bayarUtangKunci = '';
+        $this->bersihkanCacheLaporan();
         $this->dispatch('alert', [
             'type' => 'success',
             'message' => 'Pembayaran utang dicatat (jurnal '.$hasil['no_jurnal'].')',
@@ -1271,6 +1441,7 @@ class AkuntingDashboard extends Component
         ], auth()->id());
 
         if ($res['success']) {
+            $this->bersihkanCacheLaporan();
             $this->dispatch('alert', ['type' => 'success', 'message' => $res['message']]);
         } else {
             $this->dispatch('alert', ['type' => 'error', 'message' => $res['message']]);
@@ -1303,6 +1474,7 @@ class AkuntingDashboard extends Component
     {
         $res = app(DiagnosaNeracaService::class)->perbaikiOtomatis($aksiKey, $payload, auth()->id());
         if ($res['success']) {
+            $this->bersihkanCacheLaporan();
             $this->dispatch('alert', ['type' => 'success', 'message' => $res['message']]);
             $this->jalankanDiagnosa();
         } else {
@@ -1313,10 +1485,11 @@ class AkuntingDashboard extends Component
     public function render()
     {
         $manualFormVisible = $this->showJurnalManual || $this->showJurnalConfirmation;
+        $needAkunOptions = $manualFormVisible || $this->activeTab === 'buku-besar';
 
         return view('modules.akunting.livewire.akunting-dashboard', [
             'akunCoaList' => $this->coaList,
-            'akunJurnalOptions' => $manualFormVisible ? $this->akunJurnalOptions : collect(),
+            'akunJurnalOptions' => $needAkunOptions ? $this->akunJurnalOptions : collect(),
             'manualValidation' => $manualFormVisible ? $this->manualValidation : [
                 'debit' => 0,
                 'kredit' => 0,
@@ -1326,6 +1499,7 @@ class AkuntingDashboard extends Component
                 'errors' => [],
                 'messages' => [],
             ],
+            'bukuBesarData' => $this->activeTab === 'buku-besar' ? $this->bukuBesarData : null,
             'labaRugi' => $this->labaRugi,
             'neraca' => $this->neraca,
             'arusKas' => $this->arusKas,

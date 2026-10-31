@@ -3,6 +3,28 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-31 — Panduan Setup Migrasi Awal & Optimasi Modul Akunting (Buku Besar + Sinkronisasi Real-time) ✅
+
+- **Dokumen Panduan Setup Awal & Migrasi (`docs/PANDUAN-SETUP-AWAL-MIGRASI.md`)**:
+  - Menyusun panduan menyeluruh mulai dari full wipe database, seeder pondasi wajib (tanpa data dummy demo), alur migrasi data pelanggan/master produk/stok awal/saldo neraca, konfigurasi hardware kasir, SOP buka-tutup shift kasir, hingga checklist kesiapan go-live.
+- **Fitur Buku Besar & Mutasi Akun Backoffice (`AkuntingDashboard.php`, `akunting-dashboard.blade.php`)**:
+  - Menambahkan tab navigasi dan workspace **Buku Besar / Mutasi** (`buku-besar`).
+  - Menghitung saldo awal kumulatif sebelum rentang tanggal filter, running balance per mutasi transaksi, total mutasi debit/kredit, dan saldo akhir.
+  - Menyediakan filter akun COA, filter rentang tanggal, ringkasan saldo, serta tombol export Excel & CSV per akun.
+  - Menambahkan shortcut tombol **Mutasi** di setiap baris akun pada tab COA dan tautan interaktif pada kode/nama akun di tab Jurnal untuk langsung membuka mutasi buku besar akun tersebut.
+- **Sinkronisasi Otomatis & Invalidation Cache Laporan Keuangan**:
+  - Menambahkan method `bersihkanCacheLaporan()` yang dipicu otomatis saat posting jurnal manual (`simpanJurnalManual`), penerimaan piutang (`bayarPiutang`), pembayaran utang (`bayarUtang`), dan rekonsiliasi kas.
+  - Menambahkan tombol sinkronisasi manual (*refresh*) pada bar periode laporan keuangan untuk memuat ulang data tanpa menunggu kedaluwarsa cache 15 menit.
+  - Mengarahkan tampilan otomatis ke tab Jurnal dan mengeset fokus Buku Besar ke akun terkait setelah simpan jurnal manual sukses.
+- **Pencarian & Filter Sumber Tab Jurnal**:
+  - Menambahkan input pencarian instan (No. Jurnal, Deskripsi, Nama/Kode Akun) dengan debounce 300ms dan filter dropdown per sumber transaksi (`manual`, `pos`, `servis`, `pembelian`, dll).
+- **Koreksi Saldo Awal API Buku Besar (`AkuntingController.php`)**:
+  - Menghitung saldo awal sebelum parameter tanggal `dari` pada endpoint `[API: ACC-07] /api/akunting/buku-besar/{id}` agar saldo berjalan dan saldo akhir akurat konsisten dengan laporan keuangan.
+- **Pengujian & Verifikasi Fitur**:
+  - Membuat feature test baru `tests/Feature/AkuntingBukuBesarTest.php` (lulus 100%).
+  - Memastikan seluruh rangkaian test akunting (40 tests, 189 assertions) lulus tanpa regresi dan kode lolos format Laravel Pint PSR-12.
+
+
 ## 2026-10-30 — Perbaikan UI Sidebar Pengaturan, Card Kategori & Slider Mobile ✅
 
 - **Kategorisasi Dropdown Sidebar Pengaturan (`backoffice.blade.php`)**:

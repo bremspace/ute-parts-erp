@@ -322,15 +322,29 @@ class AkuntingController extends Controller
 
         $akun = AkunCOA::findOrFail($akunId);
         // [B-10a / P0-2] buku besar WAJIB scoped cabang (sebelumnya tanpa filter sama sekali)
+        $cabangId = $this->cabangScopeId();
+
+        // Hitung saldo awal kumulatif sebelum periode $dari
+        $queryAwal = JurnalAkuntansi::where('akun_coa_id', $akunId)
+            ->whereDate('tanggal', '<', $dari);
+        if ($cabangId !== null) {
+            $queryAwal->where('cabang_id', $cabangId);
+        }
+        $mutasiAwal = $queryAwal->selectRaw('COALESCE(SUM(debit), 0) as deb, COALESCE(SUM(kredit), 0) as kre')->first();
+        $debAwal = (float) ($mutasiAwal->deb ?? 0);
+        $kreAwal = (float) ($mutasiAwal->kre ?? 0);
+        $saldoAwal = $akun->saldo_normal === 'debit' ? ($debAwal - $kreAwal) : ($kreAwal - $debAwal);
+
         $jurnals = JurnalAkuntansi::with(['cabang', 'user'])
             ->where('akun_coa_id', $akunId)
-            ->where('cabang_id', $this->cabangScopeId())
+            ->where('cabang_id', $cabangId)
             ->whereDate('tanggal', '>=', $dari)
             ->whereDate('tanggal', '<=', $sampai)
             ->orderBy('tanggal')
+            ->orderBy('id')
             ->get();
 
-        $saldoBerjalan = 0;
+        $saldoBerjalan = $saldoAwal;
         $rows = $jurnals->map(function ($j) use ($akun, &$saldoBerjalan) {
             $saldoBerjalan += $akun->saldo_normal === 'debit'
                 ? (float) $j->debit - (float) $j->kredit
@@ -350,6 +364,7 @@ class AkuntingController extends Controller
             'akun' => $akun,
             'dari' => $dari,
             'sampai' => $sampai,
+            'saldo_awal' => round($saldoAwal, 2),
             'entries' => $rows,
             'saldo_akhir' => round($saldoBerjalan, 2),
         ], 'Buku besar berhasil diambil');

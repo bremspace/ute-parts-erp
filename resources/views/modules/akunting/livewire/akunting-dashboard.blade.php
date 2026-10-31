@@ -6,6 +6,7 @@
             @foreach([
                 'laporan' => 'Laporan',
                 'jurnal' => 'Jurnal',
+                'buku-besar' => 'Buku Besar / Mutasi',
                 'coa' => 'COA',
                 'piutang' => 'Piutang',
                 'utang' => 'Utang',
@@ -43,6 +44,10 @@
                     <span class="text-ink-400 text-xs">—</span>
                     <input type="date" wire:model.live="periodeSampai" class="flex-1 sm:w-32 px-2.5 py-1.5 rounded-xl glass-input text-xs font-medium min-h-[40px]" />
                 </div>
+                <button type="button" wire:click="segarkanLaporan" title="Sinkronkan & Segarkan Laporan"
+                        class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 hover:text-white transition-all cursor-pointer min-h-[40px] flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                </button>
             </div>
         </div>
     </div>
@@ -295,15 +300,37 @@
 
     <!-- TAB: JURNAL -->
     @if($activeTab === 'jurnal')
-        <div class="flex justify-between items-center gap-2 mb-4 flex-wrap">
-            <!-- [F2-5] Export laporan jurnal (queue) -->
-            @can('laporan.cabang')
-                <div class="flex items-center gap-2">
-                    <button type="button" wire:click="exportLaporan('jurnal', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export Excel</button>
-                    <button type="button" wire:click="exportLaporan('jurnal', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all">Export CSV</button>
+        <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4 flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap flex-1">
+                <!-- Search input -->
+                <div class="relative min-w-[200px] flex-1 max-w-xs">
+                    <input type="text" wire:model.live.debounce.300ms="jurnalSearch" placeholder="Cari No. Jurnal / Deskripsi / Akun..."
+                           class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs placeholder:text-ink-500 focus:border-up-primary focus:outline-none min-h-[40px]">
                 </div>
-            @endcan
-            <x-prism.prism-button wire:click="openJurnalManualModal" size="sm" class="min-h-11">
+
+                <!-- Filter Sumber -->
+                <select wire:model.live="jurnalFilterSumber" class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-medium focus:border-up-primary focus:outline-none min-h-[40px]">
+                    <option value="" class="bg-slate-900 text-white">Semua Sumber</option>
+                    <option value="manual" class="bg-slate-900 text-white">Manual</option>
+                    <option value="pos" class="bg-slate-900 text-white">POS Kasir</option>
+                    <option value="servis" class="bg-slate-900 text-white">Servis</option>
+                    <option value="pembelian" class="bg-slate-900 text-white">Pembelian PO</option>
+                    <option value="pembayaran" class="bg-slate-900 text-white">Pembayaran Subledger</option>
+                    <option value="komisi" class="bg-slate-900 text-white">Komisi</option>
+                    <option value="opname" class="bg-slate-900 text-white">Opname</option>
+                    <option value="kas" class="bg-slate-900 text-white">Kas</option>
+                </select>
+
+                <!-- [F2-5] Export laporan jurnal (queue) -->
+                @can('laporan.cabang')
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" wire:click="exportLaporan('jurnal', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">Export Excel</button>
+                        <button type="button" wire:click="exportLaporan('jurnal', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">Export CSV</button>
+                    </div>
+                @endcan
+            </div>
+
+            <x-prism.prism-button wire:click="openJurnalManualModal" size="sm" class="min-h-[40px]">
                 + Jurnal Manual
             </x-prism.prism-button>
         </div>
@@ -313,27 +340,157 @@
                 <tr class="hover:bg-white/[0.02] transition-colors text-xs">
                     <td class="py-3.5 px-4 font-mono font-bold text-white">{{ $j->no_jurnal }}</td>
                     <td class="py-3.5 px-4">
-                        <span class="text-ink-100 font-medium">{{ $j->akun?->nama }}</span>
-                        <span class="block text-[10px] text-ink-500 font-mono">{{ $j->akun?->kode }}</span>
+                        <button type="button" wire:click="lihatMutasiAkun({{ $j->akun_coa_id }})" class="text-left group cursor-pointer" title="Klik untuk lihat mutasi buku besar">
+                            <span class="text-ink-100 font-medium group-hover:text-up-primary transition-colors">{{ $j->akun?->nama }}</span>
+                            <span class="block text-[10px] text-ink-500 font-mono group-hover:text-up-primary/80 transition-colors">{{ $j->akun?->kode }} ↗</span>
+                        </button>
                     </td>
                     <td class="py-3.5 px-4"><x-prism.status-pill :status="$j->sumber" /></td>
                     <td class="py-3.5 px-4 text-ink-300">{{ $j->deskripsi }}</td>
                     <td class="py-3.5 px-4 tabular-nums {{ $j->debit > 0 ? 'text-up-amber font-semibold' : 'text-ink-500' }}">{{ $j->debit > 0 ? 'Rp '.number_format($j->debit, 0, ',', '.') : '-' }}</td>
                     <td class="py-3.5 px-4 tabular-nums {{ $j->kredit > 0 ? 'text-up-mint font-semibold' : 'text-ink-500' }}">{{ $j->kredit > 0 ? 'Rp '.number_format($j->kredit, 0, ',', '.') : '-' }}</td>
                     <td class="py-3.5 px-4">
-                        @can('lihat-audit-log')
-                            <button wire:click="bukaRiwayat('jurnal', {{ $j->id }})" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer">Riwayat</button>
-                        @endcan
+                        <div class="flex items-center gap-1.5">
+                            <button wire:click="lihatMutasiAkun({{ $j->akun_coa_id }})" class="px-2.5 py-1 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/25 font-bold text-[10px] cursor-pointer" title="Cek Mutasi Buku Besar">Mutasi</button>
+                            @can('lihat-audit-log')
+                                <button wire:click="bukaRiwayat('jurnal', {{ $j->id }})" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer">Riwayat</button>
+                            @endcan
+                        </div>
                     </td>
                 </tr>
             @empty
                 <tr>
                     <td colspan="7" class="py-12 text-center text-ink-400">
-                        Belum ada jurnal. Jurnal dibuat otomatis dari transaksi POS, Servis, dan komisi reseller.
+                        Belum ada jurnal yang sesuai filter pencarian.
                     </td>
                 </tr>
             @endforelse
+            <x-slot:pagination>{{ $jurnals->links() }}</x-slot:pagination>
         </x-prism.data-table>
+    @endif
+
+    <!-- TAB: BUKU BESAR / MUTASI -->
+    @if($activeTab === 'buku-besar')
+        <div class="space-y-4">
+            <!-- Filter & Toolbar Buku Besar -->
+            <x-prism.glass-card>
+                <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                        <!-- Akun Selector -->
+                        <div class="min-w-[240px] flex-1">
+                            <label class="block text-[11px] font-bold text-ink-400 mb-1">Pilih Akun (COA):</label>
+                            <select wire:model.live="selectedBukuBesarAkunId" class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-medium focus:border-up-primary focus:outline-none min-h-[40px]">
+                                @foreach($akunJurnalOptions as $opt)
+                                    <option value="{{ $opt->id }}" class="bg-slate-900 text-white">
+                                        {{ $opt->kode }} — {{ $opt->nama }} ({{ ucfirst($opt->tipe) }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Rentang Tanggal -->
+                        <div class="flex items-center gap-2">
+                            <div>
+                                <label class="block text-[11px] font-bold text-ink-400 mb-1">Dari:</label>
+                                <input type="date" wire:model.live="bukuBesarDari" class="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-mono focus:border-up-primary focus:outline-none min-h-[40px]">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-ink-400 mb-1">Sampai:</label>
+                                <input type="date" wire:model.live="bukuBesarSampai" class="px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-mono focus:border-up-primary focus:outline-none min-h-[40px]">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export Buttons -->
+                    @can('laporan.cabang')
+                        <div class="flex items-center gap-2 self-end md:self-center">
+                            <button type="button" wire:click="exportLaporan('buku_besar', 'xlsx')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">
+                                Export Excel
+                            </button>
+                            <button type="button" wire:click="exportLaporan('buku_besar', 'csv')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-ink-200 font-bold text-[11px] whitespace-nowrap cursor-pointer transition-all min-h-[40px]">
+                                Export CSV
+                            </button>
+                        </div>
+                    @endcan
+                </div>
+            </x-prism.glass-card>
+
+            @if($bukuBesarData)
+                @php
+                    $bAkun = $bukuBesarData['akun'];
+                @endphp
+                <!-- Info Akun & Rekap Saldo -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <span class="text-[10px] uppercase font-bold text-ink-400 block mb-0.5">Akun Terpilih</span>
+                        <div class="font-bold text-white text-sm truncate">{{ $bAkun->nama }}</div>
+                        <div class="font-mono text-xs text-up-primary mt-0.5">{{ $bAkun->kode }} · Saldo Normal: {{ strtoupper($bAkun->saldo_normal) }}</div>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <span class="text-[10px] uppercase font-bold text-ink-400 block mb-0.5">Saldo Awal (sebelum {{ \Carbon\Carbon::parse($bukuBesarData['dari'])->format('d/m/Y') }})</span>
+                        <div class="font-bold text-white text-sm tabular-nums">
+                            Rp {{ number_format($bukuBesarData['saldo_awal'], 0, ',', '.') }}
+                        </div>
+                        <span class="text-[10px] text-ink-500">Saldo kumulatif awal</span>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <span class="text-[10px] uppercase font-bold text-ink-400 block mb-0.5">Total Mutasi Periode</span>
+                        <div class="text-xs space-y-0.5">
+                            <div class="flex justify-between text-up-amber font-semibold tabular-nums">
+                                <span>Debit (+):</span>
+                                <span>Rp {{ number_format($bukuBesarData['total_debit'], 0, ',', '.') }}</span>
+                            </div>
+                            <div class="flex justify-between text-up-mint font-semibold tabular-nums">
+                                <span>Kredit (-):</span>
+                                <span>Rp {{ number_format($bukuBesarData['total_kredit'], 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10">
+                        <span class="text-[10px] uppercase font-bold text-ink-400 block mb-0.5">Saldo Akhir</span>
+                        <div class="font-black text-base tabular-nums {{ $bukuBesarData['saldo_akhir'] >= 0 ? 'text-up-mint' : 'text-up-red' }}">
+                            Rp {{ number_format($bukuBesarData['saldo_akhir'], 0, ',', '.') }}
+                        </div>
+                        <span class="text-[10px] text-ink-500">Per {{ \Carbon\Carbon::parse($bukuBesarData['sampai'])->format('d/m/Y') }}</span>
+                    </div>
+                </div>
+
+                <!-- Tabel Baris Mutasi -->
+                <x-prism.data-table :headers="['Tanggal', 'No. Jurnal', 'Sumber', 'Deskripsi / Keterangan', 'Debit', 'Kredit', 'Saldo Berjalan']">
+                    @forelse($bukuBesarData['mutasi'] as $m)
+                        <tr class="hover:bg-white/[0.02] transition-colors text-xs">
+                            <td class="py-3 px-4 font-mono text-ink-300 whitespace-nowrap">{{ $m['tanggal'] }}</td>
+                            <td class="py-3 px-4 font-mono font-bold text-white whitespace-nowrap">{{ $m['no_jurnal'] }}</td>
+                            <td class="py-3 px-4"><x-prism.status-pill :status="$m['sumber']" /></td>
+                            <td class="py-3 px-4 text-ink-200">
+                                {{ $m['deskripsi'] }}
+                                @if(!empty($m['user']))
+                                    <span class="block text-[10px] text-ink-500">Oleh: {{ $m['user'] }}</span>
+                                @endif
+                            </td>
+                            <td class="py-3 px-4 tabular-nums {{ $m['debit'] > 0 ? 'text-up-amber font-semibold' : 'text-ink-500' }}">
+                                {{ $m['debit'] > 0 ? 'Rp '.number_format($m['debit'], 0, ',', '.') : '-' }}
+                            </td>
+                            <td class="py-3 px-4 tabular-nums {{ $m['kredit'] > 0 ? 'text-up-mint font-semibold' : 'text-ink-500' }}">
+                                {{ $m['kredit'] > 0 ? 'Rp '.number_format($m['kredit'], 0, ',', '.') : '-' }}
+                            </td>
+                            <td class="py-3 px-4 tabular-nums font-bold text-white">
+                                Rp {{ number_format($m['saldo'], 0, ',', '.') }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="py-10 text-center text-ink-400">
+                                Tidak ada mutasi transaksi pada periode ini untuk akun {{ $bAkun->nama }} ({{ $bAkun->kode }}).
+                            </td>
+                        </tr>
+                    @endforelse
+                </x-prism.data-table>
+            @endif
+        </div>
     @endif
 
     <!-- TAB: COA -->
@@ -361,6 +518,7 @@
                     <td class="py-3.5 px-4 text-ink-300">{{ $akun->saldo_normal }}</td>
                     <td class="py-3.5 px-4">
                         <div class="flex items-center gap-1.5 flex-wrap">
+                            <button type="button" wire:click="lihatMutasiAkun({{ $akun->id }})" class="px-2.5 py-1.5 rounded-lg bg-up-primary/10 hover:bg-up-primary/20 text-up-primary border border-up-primary/25 font-bold text-[10px] cursor-pointer active:scale-[0.97]" title="Lihat Mutasi Buku Besar Akun Ini">Mutasi</button>
                             @can('akunting.edit')
                                 <button type="button" wire:click="openEditCoaModal({{ $akun->id }})" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-ink-300 font-bold text-[10px] cursor-pointer active:scale-[0.97]" title="Edit Akun COA">Edit</button>
                             @endcan
