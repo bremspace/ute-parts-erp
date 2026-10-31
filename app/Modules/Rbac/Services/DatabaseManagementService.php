@@ -3,6 +3,7 @@
 namespace App\Modules\Rbac\Services;
 
 use App\Models\User;
+use App\Modules\Crm\Services\KonfigurasiService;
 use App\Modules\Notifikasi\Services\NotificationService;
 use App\Modules\Rbac\Models\Cabang;
 use Database\Seeders\DatabaseSeeder;
@@ -465,6 +466,12 @@ class DatabaseManagementService
 
                 app(PermissionRegistrar::class)->forgetCachedPermissions();
 
+                try {
+                    app(KonfigurasiService::class)->set('app_setup_completed', false, 'Setup awal toko perlu dijalankan');
+                } catch (Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('Gagal set app_setup_completed di factory_reset: '.$e->getMessage());
+                }
+
                 $activeSuper = User::where('email', 'superadmin@uteparts.id')->first();
                 if ($activeSuper) {
                     auth()->login($activeSuper);
@@ -533,6 +540,11 @@ class DatabaseManagementService
                 }
 
                 app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+                try {
+                    app(KonfigurasiService::class)->set('app_setup_completed', false, 'Setup awal toko perlu dijalankan');
+                } catch (Throwable) {
+                }
                 break;
 
             case 'transaksi_only':

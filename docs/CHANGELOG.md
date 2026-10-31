@@ -3,6 +3,31 @@
 Semua ringkasan task yang selesai dari `implement-plan.md` (pasca-MVP).
 Format: `[Fase X] T-XX — ringkasan`.
 
+## 2026-10-31 — Setup Wizard Interaktif Pasca-Instalasi & Factory Reset ✅
+
+- **Middleware Deteksi Setup Awal (`EnsureSetupCompleted.php`)**:
+  - Memeriksa status inisialisasi aplikasi (`app_setup_completed`) di `KonfigurasiService`.
+  - Otomatis mengarahkan Super Admin / Owner ke `/app/setup-wizard` saat pertama kali login setelah instalasi baru atau factory reset.
+  - Memiliki whitelist rute bebas redirect loop (`app/setup-wizard*`, `livewire*`, `logout`, `app/keamanan*`).
+- **Komponen Livewire Setup Wizard (`SetupWizard.php`, `setup-wizard.blade.php`)**:
+  - Mengimplementasikan antarmuka interaktif 6 tahap dengan Ute Prism Glassmorphism & Stepper visual:
+    1. **Profil Toko & Cabang Pusat**: Nama toko, nama cabang utama, kontak telepon/WA, alamat fisik, dan header/slogan/footer struk kasir.
+    2. **Modal Kas & Bank Awal**: Inisialisasi kas tunai brankas (`110-01`) & bank operasional (`110-02`), tanggal pembukuan, pratinjau perhitungan modal disetor (`310-01`), dan opsi otomatis posting jurnal double-entry balance.
+    3. **Akun & Keamanan Staf**: Ganti sandi akun default Super Admin (`Password123!`), pembaruan nama admin/owner, serta inisiasi nama & sandi akun Kasir (`kasir@uteparts.id`) dan Teknisi (`teknisi@uteparts.id`).
+    4. **Migrasi Produk & Stok Awal (Opsional)**: Drag-and-drop file Excel migrasi (Standar WMS & SidRetail), tombol unduh template Excel resmi, validasi preview instan (total baris, valid, SKU, estimasi nilai persediaan modal), dan opsi lewati langkah untuk input manual nanti.
+    5. **Konfigurasi POS & Pembayaran**: Pilihan lebar kertas printer thermal (58mm hemat kertas / 80mm standar lebar), pengaturan payload statis QRIS cabang toko (EMVCo), dan toggle perhitungan PPN kasir.
+    6. **Aktivasi Go-Live**: Ringkasan menyeluruh konfigurasi, eksekusi pembaruan dalam database transaction atomik, pembuatan jurnal pembuka, penandaan status `app_setup_completed = true`, dan pengalihan langsung ke layar kasir POS (`/app/pos`).
+- **Integrasi Factory Reset & Full Wipe (`DatabaseManagementService.php`)**:
+  - Menyetel ulang flag `app_setup_completed = false` saat factory reset dan full wipe dijalankan, sehingga wizard otomatis aktif kembali pada siklus berikutnya.
+- **Navigasi & Menu Backoffice (`backoffice.blade.php`, `routes/web.php`)**:
+  - Mendaftarkan rute `Route::get('/setup-wizard', SetupWizard::class)->name('setup.wizard')`.
+  - Menambahkan menu tautan "Setup Wizard Toko" di kategori Sistem & Keamanan pada dropdown sidebar Pengaturan bagi Super Admin/Owner.
+- **Pengujian & Verifikasi Otomatis (`SetupWizardTest.php`)**:
+  - 4 test unit & fitur komprehensif (25 assertions): verifikasi redirect middleware, render halaman wizard, eksekusi alur multi-step dan commit aktivasi (update Cabang, user, posting jurnal kas/bank, flag selesai), serta verifikasi reset flag saat factory reset.
+  - Lolos Laravel Pint PSR-12 dan build asset Vite 8 sukses tanpa error.
+
+
+
 ## 2026-10-31 — Panduan Setup Migrasi Awal & Optimasi Modul Akunting (Buku Besar + Sinkronisasi Real-time) ✅
 
 - **Dokumen Panduan Setup Awal & Migrasi (`docs/PANDUAN-SETUP-AWAL-MIGRASI.md`)**:

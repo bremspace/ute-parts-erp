@@ -39,6 +39,7 @@ use App\Modules\Pos\Models\Transaksi;
 use App\Modules\Rbac\Livewire\RiwayatAktivitas;
 use App\Modules\Rbac\Livewire\SessionManagementPage;
 use App\Modules\Rbac\Livewire\SettingsRbac;
+use App\Modules\Rbac\Livewire\SetupWizard;
 use App\Modules\Rbac\Models\Cabang;
 use App\Modules\Rbac\Services\SessionManagementService;
 use App\Modules\Report\Livewire\DrillDownViewer;
@@ -551,8 +552,11 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-Route::prefix('app')->middleware(['auth', 'cabang.selected'])->group(function () {
+Route::prefix('app')->middleware(['auth', 'cabang.selected', 'setup.completed'])->group(function () {
     Route::get('/', fn () => redirect('/app/dashboard'));
+
+    // Setup Wizard pasca-instalasi awal / factory reset
+    Route::get('/setup-wizard', SetupWizard::class)->name('setup.wizard');
 
     // [T-02] Ganti cabang aktif — perbarui session + kembali ke halaman asal (full reload supaya semua modul re-query)
     Route::post('/pilih-cabang', function (Request $request) {

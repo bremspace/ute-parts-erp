@@ -2,6 +2,7 @@
 
 use App\Console\Commands\SidImportRaw;
 use App\Http\Middleware\EnsureCabangSelected;
+use App\Http\Middleware\EnsureSetupCompleted;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetAssetUrl;
@@ -62,6 +63,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // Enforce context cabang aktif di session (RBAC Multi-Cabang)
             'cabang.selected' => EnsureCabangSelected::class,
+
+            // Enforce inisialisasi awal toko / post-factory reset
+            'setup.completed' => EnsureSetupCompleted::class,
         ]);
 
         // Arahkan guest sesuai zona: /app/* ke backoffice login, lainnya ke customer login
